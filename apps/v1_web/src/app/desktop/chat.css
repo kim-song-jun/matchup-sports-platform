@@ -1,0 +1,242 @@
+/*
+ * Desktop overrides for /chat and /chat/[id] — owned by the chat wave.
+ * ALL rules MUST be inside @media (min-width:1024px) or @media (min-width:1440px).
+ * Mobile (<768) is byte-identical — do NOT add mobile rules here.
+ *
+ * Mobile transparency note: the desktop layout wrapper (.tm-chat-desktop-wrap)
+ * and page-head (.tm-chat-room-desktop-head) are rendered in JSX always but use
+ * display:contents on mobile so they do not disrupt existing mobile layout.
+ */
+
+/* Mobile transparency: .tm-chat-desktop-wrap is invisible on mobile (display:contents
+ * makes it a transparent layout wrapper). .tm-chat-room-desktop-head uses
+ * tm-show-desktop (display:none on mobile) so it needs no extra rule here. */
+.tm-chat-desktop-wrap {
+  display: contents;
+}
+
+/* ─── /chat list: constrained reading column ──────────────────────────────
+ * The swipe-row list should not stretch to the full 1120px.
+ * A ~760px column feels like a proper chat app list on desktop.
+ */
+@media (min-width: 1024px) {
+  /* Override display:contents for the column wrapper. */
+  .tm-chat-desktop-wrap {
+    display: block;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* List: remove the mobile-inherited full-bleed padding; wrapper provides the
+     column centring. Keep the bottom padding for breathing room. */
+  .tm-chat-list {
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 48px;
+  }
+
+  /* Category chip row: comfortable top padding without the shell's topbar gap. */
+  .tm-chat-list .tm-sport-chip-row {
+    padding-top: 8px;
+    padding-bottom: 12px;
+  }
+
+  /* Section label: tighten vertical rhythm. */
+  .tm-chat-section-label {
+    padding-top: 18px;
+    padding-bottom: 8px;
+  }
+
+  /* Chat rows: more vertical breathing room on desktop; a resting card style. */
+  .tm-chat-row {
+    border-bottom: none;
+    border-radius: 14px;
+    margin-bottom: 4px;
+  }
+
+  /* Swipe actions exist only on touch; on desktop, reset the translateX so
+     actions are never visible (no pointer drag on desktop). The underlying
+     pointer events still work but the actions are collapsed out of view. */
+  .tm-chat-row-swipe {
+    /* Reset to a simple flex row — no hidden overflowing action panel on desktop.
+     * The mobile grid layout (grid-template-columns, overflow-hidden translateX) is
+     * superseded by a plain flex container that fills the full row width. */
+    display: flex;
+    width: 100%;
+    min-height: 72px;
+  }
+
+  /* Main link area fills the full width (actions hidden on desktop). */
+  .tm-chat-row-main {
+    width: 100%;
+    min-height: 72px;
+    border-radius: 14px;
+    transition: background-color 0.12s;
+    grid-column: auto;
+  }
+
+  .tm-chat-row-main:hover {
+    background: var(--grey50);
+  }
+
+  .tm-chat-row-unread .tm-chat-row-main:hover {
+    background: color-mix(in srgb, var(--blue50) 90%, var(--blue500) 10%);
+  }
+
+  .tm-chat-row-main:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 14px;
+  }
+
+  /* Slightly larger avatar on desktop. */
+  .tm-chat-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 18px;
+  }
+
+  /* Hide swipe actions on desktop — they are touch-only affordances. */
+  .tm-chat-row-actions {
+    display: none;
+  }
+
+  /* Empty state: more vertical breathing on desktop. */
+  .tm-chat-empty {
+    min-height: 320px;
+    padding-top: 72px;
+  }
+
+  /* Leave confirm sheet: a centered dialog (not a bottom sheet) on desktop. */
+  .tm-chat-leave-scrim {
+    position: fixed;
+    top: 0;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.32);
+  }
+
+  .tm-chat-leave-sheet {
+    width: min(100%, 400px);
+    border-radius: 20px;
+    box-shadow: var(--shadow-2);
+  }
+}
+
+/* ─── /chat/[id] room: centered conversation column ──────────────────────
+ * Message bubbles + input bar re-scoped to a ~760px centered column.
+ * The mobile .tm-topbar is hidden on desktop — the JSX renders a
+ * .tm-chat-room-desktop-head (display:contents on mobile) with back + title.
+ */
+@media (min-width: 1024px) {
+  /* Override display:contents for the desktop page head wrapper. */
+  .tm-chat-room-desktop-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 0 14px;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .tm-chat-room-desktop-head .tm-desktop-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    color: var(--grey700);
+    flex-shrink: 0;
+    text-decoration: none;
+    transition: background-color 0.12s;
+  }
+
+  .tm-chat-room-desktop-head .tm-desktop-back:hover {
+    background: var(--grey100);
+    color: var(--grey900);
+  }
+
+  .tm-chat-room-desktop-head .tm-desktop-back:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+
+  /* Room content: a full-height conversation card. The card fills the viewport
+   * below the nav so the composer rests near the bottom and the message thread
+   * grows to fill the space (instead of a short top-packed card with a big void). */
+  .tm-chat-room {
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-bottom: 0;
+    background: var(--bg);
+    border: 1px solid var(--grey100);
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    /* 64px nav + ~104px desktop head/padding breathing room. */
+    height: calc(100dvh - 168px);
+    min-height: 480px;
+  }
+
+  /* Context strip: no horizontal padding adjustment needed (already inside card). */
+  .tm-chat-context {
+    border-radius: 0;
+  }
+
+  /* Message thread: flex-grows to fill the full-height room card. The composer
+   * (.tm-chat-inputbar) stays pinned at the card bottom; long threads scroll
+   * within this area while short threads simply leave the upper space empty. */
+  .tm-chat-thread {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+
+  /* Bubble max-width: slightly wider on desktop (more comfortable). */
+  .tm-chat-bubble {
+    max-width: 380px;
+  }
+
+  .tm-chat-bubble-me {
+    max-width: 340px;
+  }
+
+  /* Input bar: relative flow (not absolute), scoped to the card. */
+  .tm-chat-inputbar {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: 100%;
+    padding: 12px 16px 14px;
+    border-top: 1px solid var(--grey100);
+    border-radius: 0 0 16px 16px;
+  }
+}
+
+/* ─── Wide (≥1440): bump column width ────────────────────────────────────── */
+@media (min-width: 1440px) {
+  .tm-chat-list {
+    max-width: 840px;
+  }
+
+  .tm-chat-desktop-wrap {
+    max-width: 840px;
+  }
+
+  .tm-chat-room {
+    max-width: 840px;
+  }
+
+  .tm-chat-room-desktop-head {
+    max-width: 840px;
+  }
+}

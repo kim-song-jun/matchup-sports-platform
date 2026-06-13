@@ -276,12 +276,6 @@ export class ProfileService {
         : await tx.v1UserProfile.findUnique({ where: { userId: user.id } });
 
       const notificationInput = dto.notifications ?? {};
-      const activityEnabled =
-        notificationInput.matchEnabled ??
-        notificationInput.teamEnabled ??
-        notificationInput.teamMatchEnabled ??
-        notificationInput.chatEnabled ??
-        notificationInput.noticeEnabled;
       const individualNotifications = {
         ...(notificationInput.matchEnabled === undefined ? {} : { matchEnabled: notificationInput.matchEnabled }),
         ...(notificationInput.teamEnabled === undefined ? {} : { teamEnabled: notificationInput.teamEnabled }),
@@ -295,19 +289,18 @@ export class ProfileService {
         where: { userId: user.id },
         update: {
           ...individualNotifications,
-          ...(activityEnabled === undefined ? {} : { activityEnabled }),
           ...(notificationInput.marketingEnabled === undefined
             ? {}
             : { marketingEnabled: notificationInput.marketingEnabled }),
         },
         create: {
           userId: user.id,
-          activityEnabled: activityEnabled ?? true,
-          matchEnabled: notificationInput.matchEnabled ?? activityEnabled ?? true,
-          teamEnabled: notificationInput.teamEnabled ?? activityEnabled ?? true,
-          teamMatchEnabled: notificationInput.teamMatchEnabled ?? activityEnabled ?? true,
-          chatEnabled: notificationInput.chatEnabled ?? activityEnabled ?? true,
-          noticeEnabled: notificationInput.noticeEnabled ?? activityEnabled ?? true,
+          activityEnabled: true,
+          matchEnabled: notificationInput.matchEnabled ?? true,
+          teamEnabled: notificationInput.teamEnabled ?? true,
+          teamMatchEnabled: notificationInput.teamMatchEnabled ?? true,
+          chatEnabled: notificationInput.chatEnabled ?? true,
+          noticeEnabled: notificationInput.noticeEnabled ?? true,
           marketingEnabled: notificationInput.marketingEnabled ?? false,
         },
       });

@@ -2034,6 +2034,21 @@ async function seedCoverageChatNotificationsAndAdmin(userIds: Record<string, str
     });
   }
 
+  // Active support admin for QA — coverage-extra-e@teameet.v1
+  // QA personas: owner=admin@teameet.v1, ops=coverage-extra-h@teameet.v1, support=coverage-extra-e@teameet.v1
+  await prisma.v1AdminUser.upsert({
+    where: { userId: userIds['coverage-extra-e@teameet.v1'] },
+    update: { adminRole: V1AdminRole.support, status: 'active', revokedAt: null },
+    create: {
+      userId: userIds['coverage-extra-e@teameet.v1'],
+      adminRole: V1AdminRole.support,
+      status: 'active',
+      grantedByAdminUserId: userIds['admin@teameet.v1'],
+      grantedAt: seedNow,
+      revokedAt: null,
+    },
+  });
+
   const ownerAdmin = await prisma.v1AdminUser.findUniqueOrThrow({ where: { userId: userIds['admin@teameet.v1'] } });
   await prisma.v1AdminActionLog.upsert({
     where: { id: '00000000-0000-4000-8000-000000001701' },

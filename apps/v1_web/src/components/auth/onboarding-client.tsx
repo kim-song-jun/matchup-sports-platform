@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
+import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import {
   useV1CompleteOnboarding,
   useV1DeferOnboarding,
@@ -229,12 +231,26 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const skipAction = step === 'region' ? defer : undefined;
   const meta = stepMeta[step];
 
+  const backHref = getBackHref(step);
+  const topTitle = step === 'resume' ? '이어하기' : '운동 설정';
+
   return (
     <AuthFrame
-      topTitle={step === 'resume' ? '이어하기' : '운동 설정'}
-      backHref={getBackHref(step)}
+      topTitle={topTitle}
+      backHref={backHref}
       fixedAction={fixedAction}
+      className="tm-onboarding-frame"
     >
+      {/* Desktop back-nav: replaces the hidden mobile topbar for wizard navigation.
+          .tm-show-desktop is display:none on mobile, display:block at ≥1024 (see _shell.css). */}
+      <div className="tm-onboarding-desktop-nav tm-show-desktop">
+        {backHref ? (
+          <Link className="tm-onboarding-desktop-back" href={backHref} aria-label="뒤로가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.2} />
+          </Link>
+        ) : null}
+        <span className="tm-onboarding-desktop-nav-title">{topTitle}</span>
+      </div>
       <div className="tm-auth-body">
         <ProgressHeader stepNo={meta.stepNo} total={3} />
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
@@ -392,11 +408,11 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
     .join(' · ');
 
   return (
-    <div className="tm-auth-stack">
+    <div className="tm-auth-stack tm-onboarding-confirm-grid">
       <Card pad={15}><div className="tm-text-label">관심 종목과 실력</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{sportSummary || '선택 필요'}</div></Card>
       <Card pad={15}><div className="tm-text-label">활동 지역</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{regionSummary || '선택 안 함'}</div></Card>
       {draft.currentLocation ? (
-        <Card pad={15}>
+        <Card pad={15} className="tm-onboarding-confirm-full">
           <div className="tm-text-label">현재 위치</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>
             {formatLocation(draft.currentLocation)}

@@ -1,0 +1,136 @@
+/*
+ * Desktop overrides for /notifications — owned by the notifications wave.
+ * ALL rules MUST be inside @media (min-width:1024px) or @media (min-width:1440px).
+ * Mobile (<768) is byte-identical — do NOT add mobile rules here.
+ *
+ * Mobile transparency note: the desktop layout wrapper (.tm-notifications-desktop-wrap)
+ * uses display:contents on mobile so it does not disrupt existing mobile layout.
+ */
+
+/* Mobile transparency: layout wrapper invisible on mobile. */
+.tm-notifications-desktop-wrap {
+  display: contents;
+}
+
+/* ─── /notifications list: constrained reading column ────────────────────
+ * Notification cards should not stretch to 1120px; a ~720px column is
+ * the right width for comfortable reading of notification text.
+ */
+@media (min-width: 1024px) {
+  /* Override display:contents for the column wrapper. */
+  .tm-notifications-desktop-wrap {
+    display: block;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* List: constrain width + remove mobile bottom-nav padding. */
+  .tm-notification-list {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-top: 0;
+    padding-bottom: 48px;
+    /* Horizontal padding: inherit from .tm-scroll-area on desktop. */
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Section label: more top whitespace before each day group. */
+  .tm-notification-section .tm-text-label {
+    margin-bottom: 10px;
+    margin-top: 4px;
+  }
+
+  /* Stack: slightly wider gap between cards on desktop. */
+  .tm-notification-stack {
+    gap: 10px;
+  }
+
+  /* Notification card: hover lift + focus ring. */
+  .tm-notification-card {
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+
+  .tm-notification-card:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+  }
+
+  .tm-notification-card:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 16px;
+  }
+
+  /* Icon: slightly larger touch-zone comfort on desktop. */
+  .tm-notification-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 15px;
+  }
+
+  /* Toast: re-scope to the notification column, not the 480px mobile frame.
+     On desktop the toast is not absolutely positioned against a fixed column —
+     use a fixed position relative to the viewport centered over the column. */
+  .tm-notification-toast {
+    position: fixed;
+    left: 50%;
+    right: auto;
+    bottom: 32px;
+    transform: translateX(-50%);
+    width: min(400px, calc(100vw - 48px));
+    border-radius: 14px;
+    z-index: 60;
+    box-shadow: var(--shadow-2);
+  }
+
+  /* Page head: rendered via .tm-desktop-page-head primitive in the JSX.
+     The notifications page shows a title + read-all action in the
+     mobile .tm-topbar. On desktop the topbar is hidden; the page head
+     provides a back link + title bar above the list. The "모두읽음" button
+     is placed in the notifications desktop head actions area. */
+  .tm-notifications-desktop-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 28px 0 16px;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .tm-notifications-desktop-head-title {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tm-notifications-desktop-head-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+/* ─── Wide (≥1440): bump column width ─────────────────────────────────────── */
+@media (min-width: 1440px) {
+  .tm-notifications-desktop-wrap {
+    max-width: 800px;
+  }
+
+  .tm-notification-list {
+    max-width: 800px;
+  }
+
+  .tm-notifications-desktop-head {
+    max-width: 800px;
+  }
+
+  /* .tm-notifications-desktop-2col was defined here but is unused in any JSX.
+     Removed as dead CSS (§6 gate-fix). */
+}

@@ -1,8 +1,10 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
 import {
   useV1ApproveTeamJoinApplication,
@@ -108,7 +110,8 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
 export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
-  const members = useV1TeamMembers(teamId, { limit: 50 });
+  const canViewMembers = Boolean(team.data?.canViewMembers);
+  const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
   const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
   const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
   const changeRole = useV1ChangeTeamMembershipRole(teamId);
@@ -347,7 +350,14 @@ export function ProfileEditPageClient() {
 
   return (
     <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell" id="v1-profile-edit-form" onSubmit={submit}>
+      <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop" id="v1-profile-edit-form" onSubmit={submit}>
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">프로필 수정</h1>
+        </div>
         <section className="tm-my-profile-head">
           <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: `url(${profileImageUrl})` } : undefined}>
             {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName)}</span>}
@@ -471,7 +481,7 @@ export function ProfileEditPageClient() {
           <div className="tm-text-caption" style={{ marginTop: 5 }}>종목, 난이도, 활동 지역은 마이페이지의 운동 정보에서 따로 관리합니다.</div>
         </Card>
       </form>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-my-profile-edit-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>
@@ -534,7 +544,13 @@ export function SportsSettingsPageClient() {
 
   return (
     <AppChrome title="운동 정보" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell" id="v1-sports-settings-form" onSubmit={submit}>
+      <form className="tm-create-shell tm-profile-edit-shell tm-my-sports-desktop" id="v1-sports-settings-form" onSubmit={submit}>
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">운동 정보</h1>
+        </div>
         <Card pad={16}>
           <div className="tm-text-body-lg">운동 종목</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>추천과 모집 조건에 사용할 종목을 선택합니다.</div>
@@ -589,7 +605,7 @@ export function SportsSettingsPageClient() {
           <div className="tm-text-caption" style={{ marginTop: 5 }}>저장 후 마이페이지의 종목 칩과 추천 기준에 바로 반영됩니다.</div>
         </Card>
       </form>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-my-sports-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-sports-settings-form" disabled={updatePreferences.isPending}>
           {updatePreferences.isPending ? '저장 중' : '운동 정보 저장'}
         </button>
@@ -717,45 +733,53 @@ export function LocationSettingsPageClient() {
   return (
     <AppChrome title="위치 및 활동 지역" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
-        <Card pad={16}>
-          <div className="tm-text-label">현재 활동 지역</div>
-          <div className="tm-text-heading" style={{ marginTop: 6 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 6 }}>
-            매치, 팀매치, 팀 추천의 기본 지역 기준으로 사용됩니다.
+        <div className="tm-my-location-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">위치 및 활동 지역</h1>
           </div>
-        </Card>
+          <Card pad={16}>
+            <div className="tm-text-label">현재 활동 지역</div>
+            <div className="tm-text-heading" style={{ marginTop: 6 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
+            <div className="tm-text-caption" style={{ marginTop: 6 }}>
+              매치, 팀매치, 팀 추천의 기본 지역 기준으로 사용됩니다.
+            </div>
+          </Card>
 
-        <Card pad={16}>
-          <div className="tm-text-body-lg">현재 위치로 찾기</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>
-            좌표는 저장하지 않고 지원 지역으로 변환할 때만 사용합니다.
-          </div>
-          <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" onClick={requestCurrentLocation} disabled={status === 'requesting' || resolveLocation.isPending}>
-            {status === 'requesting' || resolveLocation.isPending ? '현재 위치 확인 중' : '현재 위치로 지역 찾기'}
-          </button>
-        </Card>
+          <Card pad={16}>
+            <div className="tm-text-body-lg">현재 위치로 찾기</div>
+            <div className="tm-text-caption" style={{ marginTop: 5 }}>
+              좌표는 저장하지 않고 지원 지역으로 변환할 때만 사용합니다.
+            </div>
+            <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" onClick={requestCurrentLocation} disabled={status === 'requesting' || resolveLocation.isPending}>
+              {status === 'requesting' || resolveLocation.isPending ? '현재 위치 확인 중' : '현재 위치로 지역 찾기'}
+            </button>
+          </Card>
 
-        <label className="tm-create-field">
-          <span className="tm-text-label">활동 지역 직접 선택</span>
-          <select className="tm-input" value={selectedRegionId} onChange={(event) => {
-            setSelectedRegionId(event.target.value);
-            setMatchedLabel(regions.find((region) => region.id === event.target.value)?.name ?? null);
-            setStatus('idle');
-            setMessage('선택한 지역을 저장하면 추천 기준 지역으로 사용됩니다.');
-          }}>
-            <option value="">시/군/구 선택</option>
-            {regions.map((region) => (
-              <option key={region.id} value={region.id}>{region.name}</option>
-            ))}
-          </select>
-        </label>
+          <label className="tm-create-field">
+            <span className="tm-text-label">활동 지역 직접 선택</span>
+            <select className="tm-input" value={selectedRegionId} onChange={(event) => {
+              setSelectedRegionId(event.target.value);
+              setMatchedLabel(regions.find((region) => region.id === event.target.value)?.name ?? null);
+              setStatus('idle');
+              setMessage('선택한 지역을 저장하면 추천 기준 지역으로 사용됩니다.');
+            }}>
+              <option value="">시/군/구 선택</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>{region.name}</option>
+              ))}
+            </select>
+          </label>
 
-        <Card pad={14} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
-          <div className="tm-text-label">{matchedLabel ?? '지역 확인 필요'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>{message}</div>
-        </Card>
+          <Card pad={14} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
+            <div className="tm-text-label">{matchedLabel ?? '지역 확인 필요'}</div>
+            <div className="tm-text-caption" style={{ marginTop: 5 }}>{message}</div>
+          </Card>
+        </div>
       </div>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-my-location-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={!selectedRegionId || updateRegion.isPending} onClick={save}>
           {updateRegion.isPending ? '저장 중' : '활동 지역 저장'}
         </button>
@@ -768,6 +792,7 @@ export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
   const notifications = settings.data?.notifications;
+  const [toggleError, setToggleError] = useState(false);
   const items = [
     { key: 'matchEnabled', label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때' },
     { key: 'teamEnabled', label: '팀 가입 요청', sub: '내가 운영하는 팀에 요청이 들어올 때' },
@@ -779,26 +804,49 @@ export function NotificationSettingsPageClient() {
 
   const toggle = (key: keyof V1Settings['notifications']) => {
     if (!notifications) return;
-    update.mutate({ notifications: { [key]: !notifications[key] } });
+    setToggleError(false);
+    update.mutate(
+      { notifications: { [key]: !notifications[key] } },
+      {
+        onError: () => {
+          setToggleError(true);
+          window.setTimeout(() => setToggleError(false), 3000);
+        },
+      },
+    );
   };
 
   return (
     <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
-        {items.map((setting) => {
-          const enabled = Boolean(notifications?.[setting.key]);
-          return (
-            <button key={setting.key} className="tm-card tm-my-toggle-button tm-pressable" onClick={() => toggle(setting.key)} type="button" disabled={!notifications || update.isPending}>
-              <div className="tm-my-toggle-row">
-                <div>
-                  <div className="tm-text-body-lg">{setting.label}</div>
-                  <div className="tm-text-caption" style={{ marginTop: 4 }}>{setting.sub}</div>
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">알림 설정</h1>
+          </div>
+          {toggleError ? (
+            <div className="tm-card" style={{ padding: 14, background: 'rgba(254,152,0,.10)', marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+            </div>
+          ) : null}
+          {items.map((setting) => {
+            const enabled = Boolean(notifications?.[setting.key]);
+            return (
+              <button key={setting.key} className="tm-card tm-my-toggle-button tm-pressable" onClick={() => toggle(setting.key)} type="button" disabled={!notifications || update.isPending}>
+                <div className="tm-my-toggle-row">
+                  <div>
+                    <div className="tm-text-body-lg">{setting.label}</div>
+                    <div className="tm-text-caption" style={{ marginTop: 4 }}>{setting.sub}</div>
+                  </div>
+                  <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
                 </div>
-                <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-              </div>
-            </button>
-          );
-        })}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </AppChrome>
   );
@@ -812,21 +860,29 @@ export function WithdrawalPageClient() {
   return (
     <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
-        <section className="tm-danger-panel">
-          <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
-          <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 남아 있으면 탈퇴가 제한될 수 있습니다.</p>
-        </section>
-        <Card pad={16}>
-          <ListItem title="요청 상태" sub="탈퇴 요청 후에는 계정 검토가 진행됩니다" trailing="검토" />
-          <ListItem title="보관 데이터" sub="법적 보관 기간 이후 삭제됩니다" trailing="필수" />
-        </Card>
-        <label className="tm-create-field">
-          <span className="tm-text-label">탈퇴 사유</span>
-          <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
-        </label>
-        {withdrawal.isError ? <Card pad={14} className="tm-auth-soft-card-error"><div className="tm-text-label">탈퇴 요청에 실패했습니다</div></Card> : null}
+        <div className="tm-my-withdrawal-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">회원 탈퇴</h1>
+          </div>
+          <section className="tm-danger-panel">
+            <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
+            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 남아 있으면 탈퇴가 제한될 수 있습니다.</p>
+          </section>
+          <Card pad={16}>
+            <ListItem title="요청 상태" sub="탈퇴 요청 후에는 계정 검토가 진행됩니다" trailing="검토" />
+            <ListItem title="보관 데이터" sub="법적 보관 기간 이후 삭제됩니다" trailing="필수" />
+          </Card>
+          <label className="tm-create-field">
+            <span className="tm-text-label">탈퇴 사유</span>
+            <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
+          </label>
+          {withdrawal.isError ? <Card pad={14} className="tm-auth-soft-card-error"><div className="tm-text-label">탈퇴 요청에 실패했습니다</div></Card> : null}
+        </div>
       </div>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-my-withdrawal-cta">
         <button
           className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
           type="button"

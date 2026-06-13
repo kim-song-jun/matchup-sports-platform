@@ -186,8 +186,8 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           viewerState,
           eligible: eligibility.data?.eligible,
           applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
-          apply: () => applyMatch.mutate({ message: null }),
-          withdraw: () => withdrawMatch.mutate({ reason: 'applicant_withdrawn_from_v1_web' }),
+          apply: () => applyMatch.mutateAsync({ message: null }),
+          withdraw: () => withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }),
         }),
       }
     : fallback;
@@ -464,7 +464,13 @@ async function shareMatch(match: V1Match) {
   const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
 
   if (navigator.share) {
-    await navigator.share({ title, url });
+    try {
+      await navigator.share({ title, url });
+    } catch (err) {
+      // AbortError: user dismissed the native share sheet — not an error
+      if (err instanceof Error && err.name === 'AbortError') return;
+      throw err;
+    }
     return;
   }
 
@@ -481,9 +487,9 @@ function getApplyAction({
   viewerState: V1ViewerState;
   eligible?: boolean;
   applicationId?: string | null;
-  apply: () => void;
-  withdraw: () => void;
-}) {
+  apply: () => Promise<unknown>;
+  withdraw: () => Promise<unknown>;
+}): (() => Promise<unknown>) | undefined {
   if (viewerState === 'requested' && applicationId) return withdraw;
   if (eligible) return apply;
   return undefined;

@@ -168,6 +168,12 @@ export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamS
       query: '풋살',
       teams: [],
     },
+    restricted: {
+      title: '멤버 목록이 비공개예요',
+      description: '이 팀은 운영진이 멤버 목록을 비공개로 설정했어요. 팀 운영진만 멤버 목록을 볼 수 있어요.',
+      query: '',
+      teams: [],
+    },
     filter: {
       title: '팀 필터',
       description: '지역, 종목, 모집 상태를 선택해 나에게 맞는 팀을 찾아보세요.',
@@ -187,7 +193,7 @@ export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamS
       ...base.summary,
       total: copy.teams.length,
       recruiting: copy.teams.filter((team) => team.status === 'open').length,
-      nearby: state === 'empty' || state === 'error' ? 0 : base.summary.nearby,
+      nearby: state === 'empty' || state === 'error' || state === 'restricted' ? 0 : base.summary.nearby,
     },
   };
 }

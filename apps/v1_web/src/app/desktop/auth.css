@@ -1,0 +1,396 @@
+/*
+ * Desktop overrides for auth screens — owned by the auth wave.
+ * ALL rules are behind @media (min-width:1024px) or (min-width:1440px).
+ * Mobile (<768) is NEVER touched here.
+ *
+ * Foundation (_shell.css) already converts .tm-auth-frame into a centered
+ * 420px card with box-shadow on a var(--grey50) background at ≥1024.
+ * This file polishes the INTERNALS of that card so every auth screen
+ * looks balanced and intentional — not a raw mobile column stretched to 420px.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 1. Un-pin the scroll area and fixed CTA so they work inside a static card.
+ *    Mobile: .tm-auth-scroll is position:absolute; inset:56px 0 0.
+ *    Desktop: the card itself scrolls naturally — no inset box needed.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* The auth frame is now a static card — it cannot host absolutely-positioned
+   * children that span to viewport edges. Un-pin the scroll area. */
+  .tm-auth-scroll {
+    position: static;
+    overflow: visible;
+    inset: auto;
+    /* Remove the mobile bottom-clearance so content isn't clipped */
+    bottom: auto;
+  }
+
+  /* Remove mobile's bottom-offset for the fixed CTA (90px clearance) */
+  .tm-auth-scroll-with-cta {
+    bottom: auto;
+    padding-bottom: 0;
+  }
+
+  /* The "full" variant (no topbar) had top:0; nothing to override on desktop */
+  .tm-auth-scroll-full {
+    top: auto;
+  }
+
+  /* Fixed CTA: re-scope from viewport-pinned to natural flow inside the card.
+   * Use sticky so it stays at the card bottom when the content is short, but
+   * flows in-document when the card is tall (long signup form). */
+  .tm-auth-fixed-cta {
+    position: sticky;
+    bottom: 0;
+    left: auto;
+    right: auto;
+    /* Round the bottom corners to match the card */
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+    /* Slightly increase padding for more breathing room */
+    padding: 16px 24px 24px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 2. Topbar: hide on desktop — the card frame already implies context.
+ *    Screens that rely on topTitle for navigation use the back-link convention
+ *    from _shell.css; for auth we simply hide the mobile topbar.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-topbar {
+    display: none;
+  }
+
+  /* Since topbar is gone, the scroll area should start from the top of the card */
+  .tm-auth-scroll {
+    /* Already static; reset any top residuals */
+    top: auto;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 3. Login screen (tm-auth-login) — card-interior polish.
+ *    Mobile: full-height flex column with justify-content:space-between.
+ *    Desktop: more comfortable internal padding; the card has its own height.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-login {
+    /* Let height be natural — card doesn't fill viewport on desktop */
+    min-height: auto;
+    padding: 48px 32px 36px;
+    gap: 32px;
+    /* Stack vertically, no space-between stretching */
+    justify-content: flex-start;
+  }
+
+  .tm-auth-login > div:first-child {
+    flex: none;
+  }
+
+  /* Logo: comfortable size in the card */
+  .tm-auth-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    font-size: 28px;
+    margin-bottom: 24px;
+  }
+
+  /* Title spacing */
+  .tm-auth-title {
+    /* Already handled by tm-text-heading; ensure no white-space pre-line
+     * causes awkward breaks at 420px — single line is fine */
+    white-space: normal;
+  }
+
+  /* Sub-copy — tighten bottom margin since layout is no longer space-between */
+  .tm-auth-sub {
+    margin-bottom: 24px;
+  }
+
+  /* Provider buttons row — they look better slightly larger in the card */
+  .tm-auth-provider-row {
+    gap: 12px;
+  }
+
+  /* Policy text — less top space needed */
+  .tm-auth-policy {
+    margin-top: 12px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 4. Generic auth body (forms, exception, complete, onboarding).
+ *    Mobile: padding 24px 20px.
+ *    Desktop: more horizontal padding to breathe inside the card.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-body {
+    padding: 32px 28px 24px;
+  }
+
+  .tm-auth-heading {
+    margin-top: 16px;
+  }
+
+  /* Forms get a little extra vertical gap between fields */
+  .tm-auth-form {
+    gap: 20px;
+  }
+
+  .tm-auth-signup-form {
+    gap: 18px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 5. Exception pages (blocked, account-conflict, missing-email, etc.).
+ *    Mobile: min-height:100%; padding 72px 24px 42px; centered.
+ *    Desktop: natural card height, no big top padding (topbar is gone).
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-exception {
+    min-height: auto;
+    padding: 48px 28px 36px;
+    justify-content: flex-start;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 6. Signup complete screen.
+ *    Mobile: min-height:100%; padding 72px 24px 42px; centered.
+ *    Desktop: natural height, balanced padding.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-complete {
+    min-height: auto;
+    padding: 48px 28px 36px;
+    justify-content: flex-start;
+  }
+
+  .tm-auth-complete-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 7. Agreement rows — make them look intentional in the 420px card.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* "Agree all" banner: slightly more padding */
+  .tm-auth-agree-all {
+    padding: 18px;
+    margin-top: 24px;
+  }
+
+  .tm-auth-agreement {
+    padding: 16px 18px;
+  }
+
+  .tm-auth-agreement-detail {
+    margin: 0 18px 16px 54px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 8. Segmented gender control — balanced inside the card.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-segmented {
+    gap: 8px;
+    padding: 5px;
+  }
+
+  .tm-auth-segment {
+    min-height: 44px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 9. Profile upload — no changes needed; 72px preview + label row works well
+ *    in a 420px card. Extra border-radius polish only.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 10. Onboarding sport grid — 2-column already works in 420px card.
+ *     Minor vertical-rhythm polish.
+ * ───────────────────────────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-auth-sport-grid {
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .tm-auth-option-card {
+    min-height: 80px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 11. Progress bar (onboarding steps) — already correct at 420px card width.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 12. Two-pane split layout for the LOGIN screen on wide desktop (≥1024).
+ *     Left: blue brand panel (gradient + "teameet" wordmark + tagline).
+ *     Right: the auth card at its natural 420px max.
+ *
+ *     Markup contract (in LoginPageView):
+ *       <div class="tm-auth-login-split">          ← wraps both panels
+ *         <div class="tm-auth-split-brand">...</div>  ← hidden on mobile
+ *         <div class="tm-auth-split-card-side">    ← right slot
+ *           <AuthFrame>...</AuthFrame>
+ *         </div>
+ *       </div>
+ *
+ *     .tm-auth-split-brand uses display:none by default and flex at ≥1024.
+ *     On mobile: .tm-auth-login-split is just a passthrough block; only the
+ *     .tm-auth-split-card-side (which contains the normal AuthFrame) is shown,
+ *     so mobile layout is completely unchanged.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/* Brand panel: hidden on mobile */
+.tm-auth-split-brand {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  /* The split wrapper becomes a full-viewport flex row */
+  .tm-auth-login-split {
+    display: flex;
+    min-height: 100dvh;
+    width: 100%;
+  }
+
+  /* Override body centering from _shell.css for the split layout */
+  body:has(.tm-auth-login-split) {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: flex-start;
+    /* Reset the 40px padding-block from _shell.css `body:has(.tm-auth-frame)`
+     * so the split layout is fully full-bleed (min-height:100dvh, no grey bands). */
+    padding-block: 0;
+  }
+
+  /* Left brand panel */
+  .tm-auth-split-brand {
+    flex: 1;
+    min-height: 100dvh;
+    background: linear-gradient(160deg, var(--blue500) 0%, var(--blue600) 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 40px;
+    color: var(--static-white);
+    gap: 20px;
+  }
+
+  .tm-auth-split-brand-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.18);
+    display: grid;
+    place-items: center;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--static-white);
+    letter-spacing: -1px;
+    border: 2px solid rgba(255, 255, 255, 0.32);
+  }
+
+  .tm-auth-split-brand-wordmark {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: var(--static-white);
+    line-height: 1;
+  }
+
+  .tm-auth-split-brand-tagline {
+    font-size: 16px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.82);
+    text-align: center;
+    max-width: 280px;
+    line-height: 1.6;
+    margin-top: 4px;
+  }
+
+  .tm-auth-split-brand-features {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-self: flex-start;
+    max-width: 280px;
+  }
+
+  .tm-auth-split-brand-feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .tm-auth-split-brand-feature::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+    flex-shrink: 0;
+  }
+
+  /* Right side: card holder column */
+  .tm-auth-split-card-side {
+    flex-shrink: 0;
+    width: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    background: var(--grey50);
+    min-height: 100dvh;
+  }
+
+  /* Auth frame inside the split — override the auto-margins from _shell.css */
+  .tm-auth-split-card-side .tm-auth-frame {
+    margin-top: 0;
+    margin-bottom: 0;
+    width: 100%;
+    max-width: 420px;
+  }
+}
+
+/* On very wide screens: more brand panel breathing room */
+@media (min-width: 1440px) {
+  .tm-auth-split-card-side {
+    width: 500px;
+    padding: 64px 40px;
+  }
+
+  .tm-auth-split-brand {
+    padding: 64px 80px;
+  }
+
+  .tm-auth-split-brand-wordmark {
+    font-size: 36px;
+  }
+
+  .tm-auth-split-brand-tagline {
+    font-size: 17px;
+    max-width: 320px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 13. Prefers-reduced-motion: no transitions added to auth, so nothing to
+ *     suppress here. The split layout is pure layout (no animation).
+ * ───────────────────────────────────────────────────────────────────────────── */

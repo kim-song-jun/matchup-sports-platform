@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { LogoutButton } from '@/components/auth/logout-button';
-import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { MyMemberCard } from './my-member-card';
@@ -23,31 +23,43 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   return (
     <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
       <div className="tm-my-shell">
-        <section className="tm-my-profile-head">
-          <div className="tm-my-avatar">{model.user.initials}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="tm-text-heading">{model.user.name}</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.user.handle} · {model.user.region}</div>
-            <div
-              className="tm-text-caption"
-              style={{
-                marginTop: 6,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {model.user.intro}
+        {/* Mobile layout: flat stack (unchanged) */}
+        {/* Desktop layout: 2-column via tm-my-desktop-layout */}
+        <div className="tm-my-desktop-layout">
+          {/* LEFT sticky: profile identity */}
+          <div className="tm-my-desktop-sidebar">
+            <section className="tm-my-profile-head">
+              <div className="tm-my-avatar">{model.user.initials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-heading">{model.user.name}</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.user.handle} · {model.user.region}</div>
+                <div
+                  className="tm-text-caption"
+                  style={{
+                    marginTop: 6,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {model.user.intro}
+                </div>
+              </div>
+              <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">수정</Link>
+            </section>
+            <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
+            <Card pad={16}>
+              <div className="tm-text-body-lg">이번 달 활동</div>
+              <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
+            </Card>
+          </div>
+          {/* RIGHT: menu sections */}
+          <div className="tm-my-desktop-main">
+            <div className="tm-my-desktop-menu-grid">
+              {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>
           </div>
-          <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">수정</Link>
-        </section>
-        <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
-        <Card pad={16}>
-          <div className="tm-text-body-lg">이번 달 활동</div>
-          <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
-        </Card>
-        {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
+        </div>
       </div>
     </AppChrome>
   );
@@ -57,7 +69,14 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
   const joined = model.mode === 'joined';
   return (
     <AppChrome title="내 매치" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-my-matches-desktop">
+        {/* Desktop page head — hidden on mobile via tm-show-desktop */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">내 매치</h1>
+        </div>
         <div className="tm-segment-row">
           <Link className={`tm-btn tm-btn-md ${joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/joined">참여한 매치</Link>
           <Link className={`tm-btn tm-btn-md ${!joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/created">생성한 매치</Link>
@@ -85,7 +104,14 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
 export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
   return (
     <AppChrome title="내 팀" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-my-teams-desktop">
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">내 팀</h1>
+        </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
         </div>
@@ -101,24 +127,57 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
   return (
     <AppChrome title="팀 정보" activeTab="my" bottomNav={false} backHref="/my/teams">
       <div className="tm-my-shell">
-        <section className="tm-my-team-hero">
-          <div className="tm-team-logo tm-team-logo-large">{model.team.logo}</div>
-          <div>
-            <h1 className="tm-text-heading">{model.team.name}</h1>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my/teams" aria-label="내 팀 목록으로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">{model.team.name}</h1>
+        </div>
+        {/* Desktop 2-column layout */}
+        <div className="tm-my-team-detail-desktop">
+          {/* LEFT: hero + info + recent matches */}
+          <div className="tm-my-team-detail-left">
+            <section className="tm-my-team-hero">
+              <div className="tm-team-logo tm-team-logo-large">{model.team.logo}</div>
+              <div>
+                <h2 className="tm-text-heading">{model.team.name}</h2>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
+              </div>
+              <p className="tm-text-body" style={{ margin: 0, lineHeight: 1.55 }}>{model.team.description}</p>
+            </section>
+            <Card pad={16}>
+              <InfoRow label="멤버" value={`${model.team.members}명`} />
+              <InfoRow label="매너" value={model.team.manner} />
+              <InfoRow label="다음 일정" value={model.team.next} />
+            </Card>
+            {model.recentMatches.length > 0 ? (
+              <>
+                <div className="tm-my-section-label">최근 팀 매치</div>
+                <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
+              </>
+            ) : null}
           </div>
-          <p className="tm-text-body" style={{ margin: 0, lineHeight: 1.55 }}>{model.team.description}</p>
-        </section>
-        <Card pad={16}>
-          <InfoRow label="멤버" value={`${model.team.members}명`} />
-          <InfoRow label="매너" value={model.team.manner} />
-          <InfoRow label="다음 일정" value={model.team.next} />
-        </Card>
-        <MenuSection section={{ title: '운영 메뉴', items: model.actions }} />
-        <div className="tm-my-section-label">최근 팀 매치</div>
-        <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
+          {/* RIGHT sticky: action menu + CTA */}
+          <div className="tm-my-team-detail-right">
+            <MenuSection section={{ title: '운영 메뉴', items: model.actions }} />
+            {/* Desktop inline CTA (replaces fixed bottom bar) */}
+            <div className="tm-my-team-detail-cta tm-show-desktop">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
+                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link></div></div>
+      {/* Mobile fixed CTA — hidden on desktop */}
+      <div className="tm-fixed-cta tm-hide-desktop">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
+          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
+        </div>
+      </div>
     </AppChrome>
   );
 }
@@ -126,8 +185,14 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
 export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: { model: MyTeamMembersViewModel; backHref?: string }) {
   return (
     <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref={backHref}>
-      <div className="tm-my-shell">
-        <h1 className="tm-text-heading">{model.teamName}</h1>
+      <div className="tm-my-shell tm-my-members-desktop">
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href={backHref} aria-label="팀 정보로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">{model.teamName} — 멤버 관리</h1>
+        </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
         </div>
@@ -167,8 +232,17 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
   return (
     <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
-        {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
-        <LogoutButton />
+        <div className="tm-my-settings-desktop">
+          {/* Desktop page head */}
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">{model.title}</h1>
+          </div>
+          {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
+          <LogoutButton />
+        </div>
       </div>
     </AppChrome>
   );
@@ -178,17 +252,25 @@ export function NotificationSettingsPageView({ model }: { model: NotificationSet
   return (
     <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
-        {model.settings.map((setting) => (
-          <Card key={setting.label} pad={16}>
-            <div className="tm-my-toggle-row">
-              <div>
-                <div className="tm-text-body-lg">{setting.label}</div>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>{setting.sub}</div>
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">알림 설정</h1>
+          </div>
+          {model.settings.map((setting) => (
+            <Card key={setting.label} pad={16}>
+              <div className="tm-my-toggle-row">
+                <div>
+                  <div className="tm-text-body-lg">{setting.label}</div>
+                  <div className="tm-text-caption" style={{ marginTop: 4 }}>{setting.sub}</div>
+                </div>
+                <span className={`tm-toggle ${setting.enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
               </div>
-              <span className={`tm-toggle ${setting.enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))}
+        </div>
       </div>
     </AppChrome>
   );
@@ -198,12 +280,20 @@ export function LegalPageView({ model }: { model: SettingsViewModel }) {
   return (
     <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
-        <Card pad={16}>
-          <ListItem title="이용약관" sub="서비스 이용에 필요한 기본 약관" trailing="2026.05" chev />
-          <ListItem title="개인정보 처리방침" sub="개인정보 수집과 보관 기준" trailing="2026.05" chev />
-          <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산 기준" trailing="선택" chev />
-        </Card>
-        <MenuSection section={model.groups[0]} />
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">약관 및 정책</h1>
+          </div>
+          <Card pad={16}>
+            <ListItem title="이용약관" sub="서비스 이용에 필요한 기본 약관" trailing="2026.05" chev />
+            <ListItem title="개인정보 처리방침" sub="개인정보 수집과 보관 기준" trailing="2026.05" chev />
+            <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산 기준" trailing="선택" chev />
+          </Card>
+          <MenuSection section={model.groups[0]} />
+        </div>
       </div>
     </AppChrome>
   );
@@ -213,17 +303,27 @@ export function WithdrawalPageView() {
   return (
     <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
-        <section className="tm-danger-panel">
-          <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
-          <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 남아 있으면 탈퇴가 제한될 수 있습니다.</p>
-        </section>
-        <Card pad={16}>
-          <ListItem title="참여 예정 매치" sub="2건이 남아 있어요" trailing="정리 필요" />
-          <ListItem title="팀장 권한" sub="FC 발빠른놈들" trailing="위임 필요" />
-          <ListItem title="보관 데이터" sub="법적 보관 기간 이후 삭제됩니다" trailing="필수" />
-        </Card>
+        <div className="tm-my-withdrawal-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </Link>
+            <h1 className="tm-text-heading">회원 탈퇴</h1>
+          </div>
+          <section className="tm-danger-panel">
+            <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
+            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 남아 있으면 탈퇴가 제한될 수 있습니다.</p>
+          </section>
+          <Card pad={16}>
+            <ListItem title="참여 예정 매치" sub="2건이 남아 있어요" trailing="정리 필요" />
+            <ListItem title="팀장 권한" sub="FC 발빠른놈들" trailing="위임 필요" />
+            <ListItem title="보관 데이터" sub="법적 보관 기간 이후 삭제됩니다" trailing="필수" />
+          </Card>
+        </div>
       </div>
-      <div className="tm-fixed-cta"><button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>탈퇴 요청 불가</button></div>
+      <div className="tm-fixed-cta tm-hide-desktop">
+        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>탈퇴 요청 불가</button>
+      </div>
     </AppChrome>
   );
 }

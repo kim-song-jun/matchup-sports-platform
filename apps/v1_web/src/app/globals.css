@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   color-scheme: light;
   --static-white: #ffffff;
@@ -1644,6 +1646,19 @@ button:disabled {
 @keyframes tm-filter-sheet-up {
   from {
     transform: translateY(100%);
+  }
+}
+
+/* Toast entrance — referenced by admin toasts via animate-[fade-in_0.15s_ease-out]
+ * (gated behind motion-safe: so it respects prefers-reduced-motion). */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

@@ -10,6 +10,7 @@ import {
   TeamMatchIcon,
   TeamsIcon,
 } from './icons';
+import { DesktopScrollTop } from './desktop-scroll-top';
 
 export type V1NavTab = 'home' | 'matches' | 'teamMatches' | 'teams' | 'my';
 
@@ -63,6 +64,7 @@ export function AppChrome({
 
   return (
     <div className={frameClassName}>
+      <DesktopNav activeTab={activeTab} hasNewNotification={hasNewNotification} />
       {topBar ? (
         <header className={centerTitle ? 'tm-topbar tm-topbar-centered' : 'tm-topbar'}>
           <div className="tm-topbar-title">
@@ -95,9 +97,34 @@ export function AppChrome({
       <main className="tm-scroll-area" style={{ paddingBottom: bottomNav ? 'var(--v1-shell-scroll-bottom-pad)' : 0 }}>
         {children}
       </main>
+      <DesktopFooter />
+      <DesktopScrollTop />
       {floatingSlot}
       {bottomNav ? <BottomNav activeTab={activeTab} /> : null}
     </div>
+  );
+}
+
+// Desktop-only site footer. Hidden on mobile (.tm-desktop-footer is display:none
+// below 1024px). Adds a familiar web-app footer and fills the lower viewport on
+// short pages — a desktop convention that the mobile app intentionally omits.
+function DesktopFooter() {
+  return (
+    <footer className="tm-desktop-footer" aria-label="사이트 정보">
+      <div className="tm-desktop-footer-inner">
+        <div className="tm-desktop-footer-brand">
+          <span className="tm-desktop-footer-wordmark">teameet</span>
+          <span className="tm-desktop-footer-tagline">같이 뛸 사람을 한 번에</span>
+        </div>
+        <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
+          <Link href="/notices">공지사항</Link>
+          <Link href="/terms">이용약관</Link>
+          <Link href="/my/settings/legal">개인정보·정책</Link>
+          <Link href="/search">탐색</Link>
+        </nav>
+        <p className="tm-desktop-footer-copy">© 2026 Teameet</p>
+      </div>
+    </footer>
   );
 }
 
@@ -113,6 +140,63 @@ function BottomNav({ activeTab }: { activeTab: V1NavTab }) {
           </Link>
         );
       })}
+    </nav>
+  );
+}
+
+// Persistent desktop top navigation. Always rendered; CSS hides it below 1024px
+// (`.tm-desktop-nav` in src/app/desktop/_shell.css). It is the primary nav on
+// desktop, replacing the mobile topbar + bottom-nav.
+function DesktopNav({
+  activeTab,
+  hasNewNotification,
+}: {
+  activeTab: V1NavTab;
+  hasNewNotification: boolean;
+}) {
+  return (
+    <nav className="tm-desktop-nav" aria-label="데스크톱 주요 메뉴">
+      <Link className="tm-desktop-nav-brand" href="/home">
+        teameet
+      </Link>
+      <div className="tm-desktop-nav-tabs">
+        {tabs.map(({ id, label, href }) => {
+          const active = id === activeTab;
+          return (
+            <Link
+              key={id}
+              className="tm-desktop-nav-tab"
+              href={href}
+              aria-current={active ? 'page' : undefined}
+              data-active={active}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+      <div className="tm-desktop-nav-actions">
+        <Link className="tm-desktop-nav-action" href="/search" aria-label="검색">
+          <SearchIcon size={20} strokeWidth={2} />
+        </Link>
+        <Link
+          className="tm-desktop-nav-action"
+          href="/notifications"
+          aria-label={hasNewNotification ? '알림 (새 알림 있음)' : '알림'}
+        >
+          <BellIcon size={20} strokeWidth={2} />
+          {hasNewNotification ? <span className="tm-desktop-nav-dot" aria-hidden="true" /> : null}
+        </Link>
+        {/* Desktop-only account affordance — top-right avatar entry to My page. */}
+        <Link
+          className={`tm-desktop-nav-avatar ${activeTab === 'my' ? 'is-active' : ''}`}
+          href="/my"
+          aria-label="내 정보"
+          aria-current={activeTab === 'my' ? 'page' : undefined}
+        >
+          <MyIcon size={19} strokeWidth={activeTab === 'my' ? 2.2 : 1.8} />
+        </Link>
+      </div>
     </nav>
   );
 }

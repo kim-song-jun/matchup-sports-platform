@@ -201,8 +201,8 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           selectedTeamId: selectedEligibility?.teamId,
           applicationId: selectedEligibility?.applicationId,
           eligible: selectedEligibility?.eligible,
-          apply: (teamId) => applyTeamMatch.mutate({ applicantTeamId: teamId, message: null }),
-          withdraw: () => withdrawTeamMatch.mutate({ reason: 'applicant_team_withdrawn_from_v1_web' }),
+          apply: (teamId) => applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }),
+          withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
         }),
       }
     : fallback;
@@ -424,7 +424,13 @@ async function shareTeamMatch(match: V1TeamMatch) {
   const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
 
   if (navigator.share) {
-    await navigator.share({ title, url });
+    try {
+      await navigator.share({ title, url });
+    } catch (err) {
+      // AbortError: user dismissed the native share sheet — not an error
+      if (err instanceof Error && err.name === 'AbortError') return;
+      throw err;
+    }
     return;
   }
 
@@ -443,9 +449,9 @@ function getApplyAction({
   selectedTeamId?: string;
   applicationId?: string | null;
   eligible?: boolean;
-  apply: (teamId: string) => void;
-  withdraw: () => void;
-}) {
+  apply: (teamId: string) => Promise<unknown>;
+  withdraw: () => Promise<unknown>;
+}): (() => Promise<unknown>) | undefined {
   if ((viewerState === 'requested' || applicationId) && applicationId) return withdraw;
   if (eligible && selectedTeamId) return () => apply(selectedTeamId);
   return undefined;

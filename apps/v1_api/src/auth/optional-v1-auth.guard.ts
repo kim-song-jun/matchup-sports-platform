@@ -1,7 +1,6 @@
 import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { Request } from 'express';
@@ -37,11 +36,8 @@ export class OptionalV1AuthGuard implements CanActivate {
       return true;
     }
 
-    if (user.accountStatus === 'deleted') {
-      throw new ForbiddenException({
-        code: 'PERMISSION_DENIED',
-        message: 'Deleted account cannot access v1 API',
-      });
+    if (['suspended', 'blocked', 'deleted'].includes(user.accountStatus)) {
+      return true;
     }
 
     request.v1User = user;

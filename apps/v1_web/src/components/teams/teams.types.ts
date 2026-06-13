@@ -53,7 +53,7 @@ export type TeamListViewModel = {
 };
 
 export type TeamStateViewModel = TeamListViewModel & {
-  state: 'search' | 'empty' | 'error' | 'filter';
+  state: 'search' | 'empty' | 'error' | 'filter' | 'restricted';
   title: string;
   description: string;
 };

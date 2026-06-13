@@ -1,14 +1,26 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  AdminListQueryDto,
   AdminLogsQueryDto,
+  AdminMatchListQueryDto,
   AdminOverviewQueryDto,
+  AdminTeamListQueryDto,
+  AdminTeamMatchListQueryDto,
+  AdminUserListQueryDto,
   ChangeMatchStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
+  GrantAdminDto,
+  UpdateAdminDto,
 } from './dto/admin.dto';
 
 type ActiveAdmin = {
@@ -86,17 +98,32 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-    const updated = await this.prisma.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'user.status.update',
-      targetType: 'user',
-      targetId: userId,
-      previousStatus: target.accountStatus,
-      status: updated.accountStatus,
-      reason: dto.reason,
-      beforeState: { accountStatus: target.accountStatus },
-      afterState: { accountStatus: updated.accountStatus },
-      responseIdKey: 'userId',
+
+    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
+    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: '운영자 계정의 상태는 owner만 변경할 수 있어요.',
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'user.status.update',
+          targetType: 'user',
+          targetId: userId,
+          previousStatus: target.accountStatus,
+          status: updated.accountStatus,
+          reason: dto.reason,
+          beforeState: { accountStatus: target.accountStatus },
+          afterState: { accountStatus: updated.accountStatus },
+          responseIdKey: 'userId',
+        },
+        tx,
+      );
     });
   }
 
@@ -104,17 +131,23 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1Match.findUnique({ where: { id: matchId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
-    const updated = await this.prisma.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'match.status.update',
-      targetType: 'match',
-      targetId: matchId,
-      previousStatus: target.status,
-      status: updated.status,
-      reason: dto.reason,
-      beforeState: { status: target.status },
-      afterState: { status: updated.status },
-      responseIdKey: 'matchId',
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'match.status.update',
+          targetType: 'match',
+          targetId: matchId,
+          previousStatus: target.status,
+          status: updated.status,
+          reason: dto.reason,
+          beforeState: { status: target.status },
+          afterState: { status: updated.status },
+          responseIdKey: 'matchId',
+        },
+        tx,
+      );
     });
   }
 
@@ -122,17 +155,23 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1Team.findUnique({ where: { id: teamId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
-    const updated = await this.prisma.v1Team.update({ where: { id: teamId }, data: { status: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'team.status.update',
-      targetType: 'team',
-      targetId: teamId,
-      previousStatus: target.status,
-      status: updated.status,
-      reason: dto.reason,
-      beforeState: { status: target.status },
-      afterState: { status: updated.status },
-      responseIdKey: 'teamId',
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1Team.update({ where: { id: teamId }, data: { status: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'team.status.update',
+          targetType: 'team',
+          targetId: teamId,
+          previousStatus: target.status,
+          status: updated.status,
+          reason: dto.reason,
+          beforeState: { status: target.status },
+          afterState: { status: updated.status },
+          responseIdKey: 'teamId',
+        },
+        tx,
+      );
     });
   }
 
@@ -140,17 +179,23 @@ export class AdminService {
     const admin = await this.getMutationAdmin(user.id);
     const target = await this.prisma.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
     if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
-    const updated = await this.prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
-    return this.writeAdminStatusLogs(admin, {
-      action: 'team_match.status.update',
-      targetType: 'team_match',
-      targetId: teamMatchId,
-      previousStatus: target.status,
-      status: updated.status,
-      reason: dto.reason,
-      beforeState: { status: target.status },
-      afterState: { status: updated.status },
-      responseIdKey: 'teamMatchId',
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
+      return this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'team_match.status.update',
+          targetType: 'team_match',
+          targetId: teamMatchId,
+          previousStatus: target.status,
+          status: updated.status,
+          reason: dto.reason,
+          beforeState: { status: target.status },
+          afterState: { status: updated.status },
+          responseIdKey: 'teamMatchId',
+        },
+        tx,
+      );
     });
   }
 
@@ -217,6 +262,606 @@ export class AdminService {
     };
   }
 
+  // ─── User list / detail ────────────────────────────────────────────────────
+
+  async listUsers(user: V1AuthUser, query: AdminUserListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+
+    const searchWhere = query.q
+      ? {
+          OR: [
+            { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } },
+            { profile: { displayName: { contains: query.q, mode: 'insensitive' as const } } },
+            { email: { contains: query.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const rows = await this.prisma.v1User.findMany({
+      where: {
+        ...(query.status ? { accountStatus: query.status } : {}),
+        ...searchWhere,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        email: true,
+        accountStatus: true,
+        onboardingStatus: true,
+        lastLoginAt: true,
+        createdAt: true,
+        profile: { select: { nickname: true, displayName: true } },
+        adminUser: { select: { adminRole: true } },
+        _count: {
+          select: {
+            hostedMatches: true,
+            ownedTeams: true,
+            teamMemberships: true,
+          },
+        },
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => ({
+        userId: row.id,
+        nickname: row.profile?.nickname ?? null,
+        displayName: row.profile?.displayName ?? null,
+        email: row.email ?? null,
+        accountStatus: row.accountStatus,
+        onboardingStatus: row.onboardingStatus,
+        lastLoginAt: row.lastLoginAt,
+        createdAt: row.createdAt,
+        hostedMatchCount: row._count.hostedMatches,
+        ownedTeamCount: row._count.ownedTeams,
+        membershipCount: row._count.teamMemberships,
+        adminRole: row.adminUser?.adminRole ?? null,
+      })),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async getUser(user: V1AuthUser, targetUserId: string) {
+    await this.getActiveAdmin(user.id);
+
+    const row = await this.prisma.v1User.findUnique({
+      where: { id: targetUserId },
+      select: {
+        id: true,
+        email: true,
+        accountStatus: true,
+        onboardingStatus: true,
+        lastLoginAt: true,
+        createdAt: true,
+        profile: { select: { nickname: true, displayName: true } },
+        adminUser: { select: { adminRole: true } },
+        reputationSummary: {
+          select: { trustState: true, mannerScore: true, reviewCount: true, calculatedAt: true },
+        },
+        _count: {
+          select: {
+            hostedMatches: true,
+            ownedTeams: true,
+            teamMemberships: true,
+          },
+        },
+        hostedMatches: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, title: true, status: true, startAt: true },
+        },
+        ownedTeams: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, name: true, status: true, memberCount: true },
+        },
+      },
+    });
+
+    if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+    return {
+      userId: row.id,
+      nickname: row.profile?.nickname ?? null,
+      displayName: row.profile?.displayName ?? null,
+      email: row.email ?? null,
+      accountStatus: row.accountStatus,
+      onboardingStatus: row.onboardingStatus,
+      lastLoginAt: row.lastLoginAt,
+      createdAt: row.createdAt,
+      hostedMatchCount: row._count.hostedMatches,
+      ownedTeamCount: row._count.ownedTeams,
+      membershipCount: row._count.teamMemberships,
+      adminRole: row.adminUser?.adminRole ?? null,
+      reputationSummary: row.reputationSummary
+        ? {
+            trustState: row.reputationSummary.trustState,
+            mannerScore: row.reputationSummary.mannerScore,
+            reviewCount: row.reputationSummary.reviewCount,
+            calculatedAt: row.reputationSummary.calculatedAt,
+          }
+        : null,
+      hostedMatches: row.hostedMatches.map((m) => ({
+        matchId: m.id,
+        title: m.title,
+        status: m.status,
+        startAt: m.startAt,
+      })),
+      ownedTeams: row.ownedTeams.map((t) => ({
+        teamId: t.id,
+        name: t.name,
+        status: t.status,
+        memberCount: t.memberCount,
+      })),
+    };
+  }
+
+  // ─── Match list / detail ───────────────────────────────────────────────────
+
+  async listMatches(user: V1AuthUser, query: AdminMatchListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+
+    const searchWhere = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { placeName: { contains: query.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const rows = await this.prisma.v1Match.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.sportId ? { sportId: query.sportId } : {}),
+        ...searchWhere,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        title: true,
+        placeName: true,
+        startAt: true,
+        status: true,
+        maxParticipants: true,
+        createdAt: true,
+        hostUserId: true,
+        sport: { select: { name: true, code: true } },
+        hostUser: { select: { profile: { select: { nickname: true } } } },
+        _count: { select: { participants: true } },
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => ({
+        matchId: row.id,
+        title: row.title,
+        sportName: row.sport.name,
+        sportCode: row.sport.code,
+        hostUserId: row.hostUserId,
+        hostName: row.hostUser.profile?.nickname ?? null,
+        placeName: row.placeName,
+        startAt: row.startAt,
+        status: row.status,
+        participantCount: row._count.participants,
+        maxParticipants: row.maxParticipants,
+        createdAt: row.createdAt,
+      })),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async getMatch(user: V1AuthUser, matchId: string) {
+    await this.getActiveAdmin(user.id);
+
+    const row = await this.prisma.v1Match.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        placeName: true,
+        startAt: true,
+        deadlineAt: true,
+        status: true,
+        maxParticipants: true,
+        createdAt: true,
+        hostUserId: true,
+        sport: { select: { name: true, code: true } },
+        region: { select: { name: true } },
+        hostUser: { select: { profile: { select: { nickname: true } } } },
+        _count: { select: { participants: true, applications: true } },
+      },
+    });
+
+    if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
+
+    return {
+      matchId: row.id,
+      title: row.title,
+      description: row.description ?? null,
+      sportName: row.sport.name,
+      sportCode: row.sport.code,
+      hostUserId: row.hostUserId,
+      hostName: row.hostUser.profile?.nickname ?? null,
+      regionName: row.region?.name ?? null,
+      placeName: row.placeName,
+      startAt: row.startAt,
+      deadlineAt: row.deadlineAt ?? null,
+      status: row.status,
+      participantCount: row._count.participants,
+      applicationCount: row._count.applications,
+      maxParticipants: row.maxParticipants,
+      createdAt: row.createdAt,
+    };
+  }
+
+  // ─── Team list / detail ────────────────────────────────────────────────────
+
+  async listTeams(user: V1AuthUser, query: AdminTeamListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+
+    const rows = await this.prisma.v1Team.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        memberCount: true,
+        managerCount: true,
+        createdAt: true,
+        ownerUserId: true,
+        sport: { select: { name: true } },
+        ownerUser: { select: { profile: { select: { nickname: true } } } },
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => ({
+        teamId: row.id,
+        name: row.name,
+        sportName: row.sport.name,
+        ownerUserId: row.ownerUserId,
+        ownerName: row.ownerUser.profile?.nickname ?? null,
+        memberCount: row.memberCount,
+        managerCount: row.managerCount,
+        status: row.status,
+        createdAt: row.createdAt,
+      })),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async getTeam(user: V1AuthUser, teamId: string) {
+    await this.getActiveAdmin(user.id);
+
+    const row = await this.prisma.v1Team.findUnique({
+      where: { id: teamId },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        memberCount: true,
+        managerCount: true,
+        createdAt: true,
+        ownerUserId: true,
+        sport: { select: { name: true } },
+        region: { select: { name: true } },
+        ownerUser: { select: { profile: { select: { nickname: true } } } },
+        trustScore: {
+          select: { trustState: true, mannerScore: true, matchCount: true, calculatedAt: true },
+        },
+        hostedTeamMatches: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, title: true, status: true, startAt: true },
+        },
+      },
+    });
+
+    if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
+
+    return {
+      teamId: row.id,
+      name: row.name,
+      sportName: row.sport.name,
+      regionName: row.region.name,
+      ownerUserId: row.ownerUserId,
+      ownerName: row.ownerUser.profile?.nickname ?? null,
+      memberCount: row.memberCount,
+      managerCount: row.managerCount,
+      status: row.status,
+      createdAt: row.createdAt,
+      trustScore: row.trustScore
+        ? {
+            trustState: row.trustScore.trustState,
+            mannerScore: row.trustScore.mannerScore,
+            matchCount: row.trustScore.matchCount,
+            calculatedAt: row.trustScore.calculatedAt,
+          }
+        : null,
+      recentHostedTeamMatches: row.hostedTeamMatches.map((tm) => ({
+        teamMatchId: tm.id,
+        title: tm.title,
+        status: tm.status,
+        startAt: tm.startAt,
+      })),
+    };
+  }
+
+  // ─── Team-match list ───────────────────────────────────────────────────────
+
+  async listTeamMatches(user: V1AuthUser, query: AdminTeamMatchListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+
+    const rows = await this.prisma.v1TeamMatch.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        title: true,
+        startAt: true,
+        status: true,
+        createdAt: true,
+        hostTeamId: true,
+        hostTeam: { select: { name: true } },
+        sport: { select: { name: true } },
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => ({
+        teamMatchId: row.id,
+        title: row.title,
+        hostTeamId: row.hostTeamId,
+        hostTeamName: row.hostTeam.name,
+        sportName: row.sport.name,
+        startAt: row.startAt,
+        status: row.status,
+        createdAt: row.createdAt,
+      })),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  // ─── Admin management (owner-only) ────────────────────────────────────────
+
+  async listAdmins(user: V1AuthUser, query: AdminListQueryDto) {
+    await this.getOwnerAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+
+    const rows = await this.prisma.v1AdminUser.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+      },
+      orderBy: { grantedAt: 'desc' },
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      include: {
+        user: {
+          select: {
+            email: true,
+            profile: { select: { nickname: true, displayName: true } },
+          },
+        },
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => ({
+        adminUserId: row.id,
+        userId: row.userId,
+        nickname: row.user.profile?.nickname ?? null,
+        displayName: row.user.profile?.displayName ?? null,
+        email: row.user.email ?? null,
+        adminRole: row.adminRole,
+        status: row.status,
+        grantedByAdminUserId: row.grantedByAdminUserId ?? null,
+        grantedAt: row.grantedAt,
+        revokedAt: row.revokedAt ?? null,
+      })),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async grantAdmin(user: V1AuthUser, dto: GrantAdminDto) {
+    const actor = await this.getOwnerAdmin(user.id);
+
+    const targetUser = await this.prisma.v1User.findUnique({ where: { id: dto.userId } });
+    if (!targetUser) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+    }
+
+    const now = new Date();
+
+    const adminRow = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1AdminUser.findUnique({ where: { userId: dto.userId } });
+      if (existing && existing.status === 'active') {
+        throw new ConflictException({ code: 'ALREADY_ADMIN', message: 'User is already an active admin' });
+      }
+
+      let row: { id: string; userId: string; adminRole: string; status: string; grantedByAdminUserId: string | null; grantedAt: Date; revokedAt: Date | null };
+
+      if (existing) {
+        // revoked/suspended → reactivate
+        row = await tx.v1AdminUser.update({
+          where: { userId: dto.userId },
+          data: {
+            adminRole: dto.adminRole,
+            status: 'active',
+            revokedAt: null,
+            grantedByAdminUserId: actor.userId,
+            grantedAt: now,
+          },
+        });
+      } else {
+        row = await tx.v1AdminUser.create({
+          data: {
+            userId: dto.userId,
+            adminRole: dto.adminRole,
+            status: 'active',
+            grantedByAdminUserId: actor.userId,
+            grantedAt: now,
+          },
+        });
+      }
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: actor.id,
+          action: 'admin.grant',
+          targetType: 'admin',
+          targetId: dto.userId,
+          reason: dto.reason,
+          beforeJson: (existing
+            ? { adminRole: existing.adminRole, status: existing.status }
+            : null) as Prisma.InputJsonValue,
+          afterJson: { adminRole: row.adminRole, status: row.status } as Prisma.InputJsonValue,
+        },
+      });
+
+      return row;
+    });
+
+    const withUser = await this.prisma.v1AdminUser.findUniqueOrThrow({
+      where: { userId: dto.userId },
+      include: {
+        user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+      },
+    });
+
+    return {
+      adminUserId: withUser.id,
+      userId: withUser.userId,
+      nickname: withUser.user.profile?.nickname ?? null,
+      displayName: withUser.user.profile?.displayName ?? null,
+      email: withUser.user.email ?? null,
+      adminRole: withUser.adminRole,
+      status: withUser.status,
+      grantedByAdminUserId: withUser.grantedByAdminUserId ?? null,
+      grantedAt: withUser.grantedAt,
+      revokedAt: withUser.revokedAt ?? null,
+    };
+  }
+
+  async updateAdmin(user: V1AuthUser, targetUserId: string, dto: UpdateAdminDto) {
+    const actor = await this.getOwnerAdmin(user.id);
+
+    // Guard: cannot modify self (check before entering transaction — self-id is immutable)
+    if (actor.userId === targetUserId) {
+      throw new ConflictException({ code: 'SELF_MODIFICATION', message: 'Cannot modify your own admin record' });
+    }
+
+    const now = new Date();
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1AdminUser.findUnique({ where: { userId: targetUserId } });
+      if (!existing) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: 'Admin was not found' });
+      }
+
+      // Guard: cannot demote or revoke the last active owner (atomic count inside tx)
+      const wouldLoseOwnerStatus =
+        existing.adminRole === 'owner' &&
+        (dto.status === 'revoked' || (dto.adminRole !== undefined && dto.adminRole !== 'owner'));
+      if (wouldLoseOwnerStatus) {
+        const activeOwnerCount = await tx.v1AdminUser.count({
+          where: { adminRole: 'owner', status: 'active' },
+        });
+        if (activeOwnerCount <= 1) {
+          throw new ConflictException({
+            code: 'LAST_OWNER',
+            message: 'Cannot demote or revoke the last active owner',
+          });
+        }
+      }
+
+      const updateData: Prisma.V1AdminUserUpdateInput = {};
+      if (dto.adminRole !== undefined) updateData.adminRole = dto.adminRole;
+      if (dto.status !== undefined) {
+        updateData.status = dto.status;
+        updateData.revokedAt = dto.status === 'revoked' ? now : null;
+      }
+
+      const row = await tx.v1AdminUser.update({
+        where: { userId: targetUserId },
+        data: updateData,
+        include: {
+          user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+        },
+      });
+
+      const action = dto.status === 'revoked' ? 'admin.revoke' : 'admin.update';
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: actor.id,
+          action,
+          targetType: 'admin',
+          targetId: targetUserId,
+          reason: dto.reason,
+          beforeJson: { adminRole: existing.adminRole, status: existing.status } as Prisma.InputJsonValue,
+          afterJson: { adminRole: row.adminRole, status: row.status } as Prisma.InputJsonValue,
+        },
+      });
+
+      return row;
+    });
+
+    return {
+      adminUserId: updated.id,
+      userId: updated.userId,
+      nickname: updated.user.profile?.nickname ?? null,
+      displayName: updated.user.profile?.displayName ?? null,
+      email: updated.user.email ?? null,
+      adminRole: updated.adminRole,
+      status: updated.status,
+      grantedByAdminUserId: updated.grantedByAdminUserId ?? null,
+      grantedAt: updated.grantedAt,
+      revokedAt: updated.revokedAt ?? null,
+    };
+  }
+
+  private async getOwnerAdmin(userId: string): Promise<ActiveAdmin> {
+    const admin = await this.getActiveAdmin(userId);
+    if (admin.adminRole !== 'owner') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Owner access is required' });
+    }
+    return admin;
+  }
+
   private async getActiveAdmin(userId: string): Promise<ActiveAdmin> {
     const admin = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
     if (!admin || admin.status !== 'active') {
@@ -246,39 +891,38 @@ export class AdminService {
       afterState: Record<string, string>;
       responseIdKey: string;
     },
+    tx?: Prisma.TransactionClient,
   ) {
-    const logs = await this.prisma.$transaction(async (tx) => {
-      const actionLog = await tx.v1AdminActionLog.create({
-        data: {
-          adminUserId: admin.id,
-          action: input.action,
-          targetType: input.targetType,
-          targetId: input.targetId,
-          reason: input.reason,
-          beforeJson: input.beforeState as Prisma.InputJsonValue,
-          afterJson: input.afterState as Prisma.InputJsonValue,
-        },
-      });
-      const statusChangeLog = await tx.v1StatusChangeLog.create({
-        data: {
-          targetType: input.targetType,
-          targetId: input.targetId,
-          fromStatus: input.previousStatus,
-          toStatus: input.status,
-          actorType: 'admin',
-          adminUserId: admin.id,
-          reason: input.reason,
-        },
-      });
-      return { actionLog, statusChangeLog };
+    const client = tx ?? this.prisma;
+    const actionLog = await client.v1AdminActionLog.create({
+      data: {
+        adminUserId: admin.id,
+        action: input.action,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        reason: input.reason,
+        beforeJson: input.beforeState as Prisma.InputJsonValue,
+        afterJson: input.afterState as Prisma.InputJsonValue,
+      },
+    });
+    const statusChangeLog = await client.v1StatusChangeLog.create({
+      data: {
+        targetType: input.targetType,
+        targetId: input.targetId,
+        fromStatus: input.previousStatus,
+        toStatus: input.status,
+        actorType: 'admin',
+        adminUserId: admin.id,
+        reason: input.reason,
+      },
     });
 
     return {
       [input.responseIdKey]: input.targetId,
       previousStatus: input.previousStatus,
       status: input.status,
-      actionLogId: logs.actionLog.id,
-      statusChangeLogId: logs.statusChangeLog.id,
+      actionLogId: actionLog.id,
+      statusChangeLogId: statusChangeLog.id,
     };
   }
 }

@@ -1,0 +1,551 @@
+/* Desktop overrides for landing — owned by the landing wave. Add @media (min-width:1024px) rules here. */
+
+/* ─── Mobile-first base (all widths) ──────────────────────────────────────── */
+/*
+ * NOTE: This is a STANDALONE page (no AppChrome / .tm-app-frame).
+ * All base styles live here (not in globals.css) because this component
+ * was previously a static design artboard. Mobile rules come first,
+ * then desktop @media blocks augment them.
+ */
+
+.tm-landing {
+  min-height: 100vh;
+  background: var(--bg);
+  font-family: var(--font);
+}
+
+/* ── Nav ── */
+.tm-landing-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--grey150);
+}
+
+.tm-landing-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 56px;
+  gap: 12px;
+}
+
+.tm-landing-brand {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--blue500);
+  letter-spacing: -0.5px;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tm-landing-brand:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Nav links: hidden on mobile, shown on desktop */
+.tm-landing-nav-links {
+  display: none;
+}
+
+/* CTA buttons */
+.tm-landing-nav-ctas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Section scaffold ── */
+.tm-landing-section {
+  padding: 56px 20px;
+}
+
+.tm-landing-section-alt {
+  background: var(--grey50);
+}
+
+.tm-landing-section-inner {
+  max-width: 1120px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+.tm-landing-section-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.tm-landing-section-header .tm-text-heading {
+  margin-bottom: 10px;
+}
+
+/* ── Hero ── */
+.tm-landing-hero {
+  padding: 48px 20px 52px;
+  background: linear-gradient(160deg, var(--blue50) 0%, var(--bg) 60%);
+}
+
+.tm-landing-hero-eyebrow {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue500);
+  background: var(--blue50);
+  border: 1px solid var(--blue100);
+  border-radius: 20px;
+  padding: 4px 12px;
+  margin-bottom: 16px;
+  letter-spacing: 0.3px;
+}
+
+.tm-landing-hero-heading {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--grey900);
+  line-height: 1.3;
+  letter-spacing: -0.5px;
+  margin: 0 0 14px;
+}
+
+.tm-landing-hero-sub {
+  font-size: 15px;
+  color: var(--text-muted);
+  line-height: 1.65;
+  max-width: 480px;
+  margin: 0 0 28px;
+}
+
+.tm-landing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tm-landing-hero-disclaimer {
+  font-size: 12px;
+  color: var(--text-caption);
+  margin: 0;
+}
+
+/* Hero stats */
+.tm-landing-hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 36px;
+  padding: 18px 20px;
+  background: var(--bg);
+  border: 1px solid var(--grey150);
+  border-radius: 14px;
+  box-shadow: var(--shadow-1);
+}
+
+.tm-landing-stat {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tm-landing-stat-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--grey900);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.tm-landing-stat-label {
+  font-size: 11px;
+  color: var(--text-caption);
+  font-weight: 500;
+}
+
+.tm-landing-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--grey200);
+  flex-shrink: 0;
+}
+
+/* ── Feature cards ── */
+.tm-landing-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.tm-landing-feature-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  background: var(--bg);
+  border: 1px solid var(--grey150);
+  border-radius: 14px;
+  box-shadow: var(--shadow-1);
+}
+
+.tm-landing-feature-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--blue50);
+  color: var(--blue500);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.tm-landing-feature-title {
+  margin: 0 0 6px;
+  color: var(--text-strong);
+}
+
+.tm-landing-feature-desc {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ── Sports chips ── */
+.tm-landing-sports {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.tm-landing-sport-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg);
+  border: 1px solid var(--grey200);
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+  box-shadow: var(--shadow-1);
+}
+
+/* ── Steps ── */
+.tm-landing-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  counter-reset: step;
+}
+
+.tm-landing-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg);
+  border: 1px solid var(--grey150);
+  border-radius: 14px;
+  box-shadow: var(--shadow-1);
+}
+
+.tm-landing-step-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--blue500);
+  color: var(--static-white);
+  font-size: 15px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.tm-landing-step-title {
+  margin: 0 0 6px;
+  color: var(--text-strong);
+}
+
+.tm-landing-step-desc {
+  margin: 0;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+/* ── CTA banner ── */
+.tm-landing-cta-banner {
+  padding: 56px 20px;
+  background: var(--grey900);
+  text-align: center;
+}
+
+.tm-landing-cta-heading {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--static-white);
+  letter-spacing: -0.4px;
+  margin: 0 0 10px;
+}
+
+.tm-landing-cta-sub {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.66);
+  margin: 0 0 28px;
+  line-height: 1.6;
+}
+
+/* ── Footer ── */
+.tm-landing-footer {
+  background: var(--grey900);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 32px 20px 40px;
+}
+
+.tm-landing-footer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.tm-landing-footer-brand .tm-landing-brand {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tm-landing-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.tm-landing-footer-link {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  transition: color 0.1s;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tm-landing-footer-link:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.tm-landing-footer-link:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tm-landing-footer-copy {
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0;
+}
+
+/* ─── Desktop (≥1024px) ────────────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* Nav */
+  .tm-landing-nav-inner {
+    height: 64px;
+    max-width: 1120px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 32px;
+  }
+
+  .tm-landing-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    margin: 0 24px;
+  }
+
+  .tm-landing-nav-link {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--grey700);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.1s, color 0.1s;
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  .tm-landing-nav-link:hover {
+    background: var(--grey100);
+    color: var(--grey900);
+  }
+
+  .tm-landing-nav-link:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+  }
+
+  /* Section padding */
+  .tm-landing-section {
+    padding: 80px 32px;
+  }
+
+  .tm-landing-section-inner {
+    padding: 0;
+  }
+
+  /* Hero: two-column layout — content left, stats right */
+  .tm-landing-hero {
+    padding: 80px 32px 88px;
+  }
+
+  .tm-landing-hero .tm-landing-section-inner {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 60px;
+    align-items: center;
+  }
+
+  .tm-landing-hero-heading {
+    font-size: 44px;
+    letter-spacing: -1px;
+    line-height: 1.2;
+    margin-bottom: 18px;
+  }
+
+  .tm-landing-hero-sub {
+    font-size: 16px;
+    max-width: 520px;
+    margin-bottom: 32px;
+  }
+
+  .tm-landing-hero-stats {
+    margin-top: 0;
+    flex-direction: column;
+    padding: 28px 24px;
+    gap: 0;
+    align-items: stretch;
+  }
+
+  .tm-landing-stat {
+    text-align: left;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--grey150);
+  }
+
+  .tm-landing-stat:last-child {
+    border-bottom: none;
+  }
+
+  .tm-landing-stat-num {
+    font-size: 28px;
+  }
+
+  .tm-landing-stat-label {
+    font-size: 13px;
+    text-align: right;
+  }
+
+  /* Hide horizontal dividers (now vertical stacking) */
+  .tm-landing-stat-divider {
+    display: none;
+  }
+
+  /* Feature grid: 2 col at 1024, 3 col at 1440 */
+  .tm-landing-features {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .tm-landing-feature-card {
+    padding: 22px;
+  }
+
+  /* Steps: 3 col */
+  .tm-landing-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  /* CTA banner */
+  .tm-landing-cta-heading {
+    font-size: 32px;
+  }
+
+  .tm-landing-cta-banner {
+    padding: 80px 32px;
+  }
+
+  /* Footer */
+  .tm-landing-footer {
+    padding: 40px 32px 48px;
+  }
+
+  .tm-landing-footer-inner {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+}
+
+/* ─── Wide (≥1440px) ───────────────────────────────────────────────────────── */
+@media (min-width: 1440px) {
+  .tm-landing-nav-inner {
+    max-width: 1120px;
+    padding: 0 40px;
+  }
+
+  .tm-landing-hero {
+    padding: 96px 40px 104px;
+  }
+
+  .tm-landing-hero .tm-landing-section-inner {
+    grid-template-columns: 1fr 420px;
+    gap: 80px;
+  }
+
+  .tm-landing-hero-heading {
+    font-size: 52px;
+  }
+
+  .tm-landing-section {
+    padding: 96px 40px;
+  }
+
+  /* Feature grid: 3 col at 1440 */
+  .tm-landing-features {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .tm-landing-footer {
+    padding: 48px 40px 56px;
+  }
+}

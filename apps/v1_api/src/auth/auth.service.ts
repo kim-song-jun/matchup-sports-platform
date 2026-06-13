@@ -585,6 +585,13 @@ export class AuthService {
   }
 
   async devLogin(email: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException({
+        code: 'DEV_LOGIN_DISABLED',
+        message: '개발 전용 로그인은 프로덕션에서 사용할 수 없어요.',
+      });
+    }
+
     const user = await this.prisma.v1User.findUnique({
       where: { email },
       select: {

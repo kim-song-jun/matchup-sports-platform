@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "api", "dev"],
       "port": 8100
+    },
+    {
+      "name": "v1_web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "v1_web", "dev"],
+      "port": 3013
     }
   ]
 }

@@ -1,0 +1,250 @@
+/* ============================================================
+ * Desktop overrides for /home — owned by the home wave.
+ * ALL rules are behind @media (min-width:1024px) or (min-width:1440px).
+ * Mobile (<768) is UNCHANGED — never edit existing mobile rules here.
+ * ============================================================ */
+
+/* ─── Desktop 2-column dashboard wrapper ──────────────────────────────────── */
+/*
+ * .tm-home-desktop wraps the entire home content in JSX.
+ * On mobile it behaves like display:contents (transparent to layout).
+ * On desktop it becomes a 2-column grid:
+ *   LEFT  main column  — 1fr (≈ 720px at 1120px viewport)
+ *   RIGHT sidebar      — 360px fixed
+ */
+.tm-home-desktop {
+  /* Mobile: transparent to layout — children flow normally */
+  display: contents;
+}
+
+/* ─── Desktop left + right column wrappers ────────────────────────────────── */
+/* On mobile these are also transparent — the sections inside flow naturally. */
+.tm-home-main,
+.tm-home-sidebar {
+  display: contents;
+}
+
+@media (min-width: 1024px) {
+  /* Switch wrapper to grid */
+  .tm-home-desktop {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-rows: auto;
+    gap: 0 28px;
+    align-items: start;
+    /* Remove the padding the AppChrome scroll-area adds; we apply our own rhythm */
+    padding-top: 28px;
+  }
+
+  /* Left column: stacks its children vertically */
+  .tm-home-main {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  /* Right sidebar column */
+  .tm-home-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    /* Stick to viewport top when scrolling long content */
+    position: sticky;
+    top: 88px; /* 64px nav + 24px breathing room */
+    max-height: calc(100dvh - 100px);
+    overflow-y: auto;
+    /* Subtle scroll without visible scrollbar chrome */
+    scrollbar-width: none;
+  }
+  .tm-home-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─── Greeting + stats block (desktop) ────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /*
+   * On mobile the greeting+stats live inside an inline div with padding.
+   * On desktop we remove that extra padding — the desktop wrapper owns rhythm.
+   */
+  .tm-home-greeting-block {
+    padding: 0;
+  }
+
+  /* Widen the stats strip — give each side more breathing room */
+  .tm-home-greeting-block .tm-home-stats {
+    margin-top: 6px;
+    gap: 24px;
+  }
+}
+
+/* ─── Featured hero card (desktop) ────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /*
+   * On mobile the featured card media is 146px tall.
+   * On desktop it sits in a wider column, so we give it a proper hero height.
+   */
+  .tm-featured-media {
+    height: 220px;
+  }
+
+  /* The featured wrapper removes its inline margin — grid gap handles spacing */
+  .tm-home-featured-block {
+    margin: 0;
+  }
+}
+
+/* ─── Recommended match rail → desktop wrapped grid ───────────────────────── */
+/*
+ * On mobile: .tm-match-rail is a horizontal overflow-x:auto flex strip.
+ * On desktop: convert to a 2-up wrapped grid. Cards lose their fixed 220px
+ * width and fill the available column naturally.
+ */
+@media (min-width: 1024px) {
+  /* Section header: remove the mobile left/right 20px padding — grid owns spacing */
+  .tm-home-matches-block .tm-section-title {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 16px;
+  }
+
+  /* Convert horizontal rail to wrapped grid */
+  .tm-match-rail {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    overflow-x: visible;
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+
+  /* Cards fill the grid cell — remove the fixed mobile width */
+  .tm-match-rail .tm-match-card {
+    flex-shrink: unset;
+    width: 100%;
+  }
+
+  /* Slightly taller media on wider cards */
+  .tm-match-rail .tm-match-card-media {
+    height: 128px;
+  }
+}
+
+@media (min-width: 1440px) {
+  /* 3-up grid on wide screens */
+  .tm-match-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+/* ─── Sidebar: quick actions panel ────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  /* .tm-home-sidebar-stats-card: no matching DOM in sidebar (greeting+stats live
+     in the left main column). Rule removed as dead CSS (§7 gate-fix).
+     .tm-home-sidebar-section-head: no section-head rows in sidebar. Removed. */
+
+  /* Quick-grid keeps its 4-column layout but shrinks icon size to fit 360px */
+  .tm-home-sidebar .tm-quick-grid {
+    padding: 16px 12px;
+    border-radius: 14px;
+    /* Override the 480px responsive override that makes it 2-col */
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  .tm-home-sidebar .tm-quick-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+}
+
+/* ─── Sidebar: weather strip ──────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-home-sidebar .tm-weather-strip {
+    border-radius: 14px;
+  }
+
+  /* Weather section: label + refresh button row */
+  .tm-home-weather-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+}
+
+/* ─── Sidebar: notices panel ──────────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  .tm-home-sidebar .tm-notice-head {
+    padding: 0 0 10px;
+  }
+
+  /* Notices card surface */
+  .tm-home-sidebar-notices {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  .tm-home-sidebar-notices .tm-notice-head {
+    padding: 0 0 10px;
+  }
+}
+
+/* ─── Remove mobile inline spacing on desktop (grip resets rhythm) ─────────── */
+/*
+ * The mobile markup uses inline style="padding: ..." and "margin: ..."
+ * on the section wrappers. On desktop the .tm-home-main flex gap handles
+ * vertical rhythm, so we zero those out via class-based overrides on the
+ * block wrappers we inject in JSX.
+ */
+@media (min-width: 1024px) {
+  .tm-home-greeting-block,
+  .tm-home-featured-block,
+  .tm-home-matches-block {
+    /* No extra margin/padding — grid gap is the only spacing */
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* ─── Desktop EmptyState / error fills the column gracefully ──────────────── */
+@media (min-width: 1024px) {
+  .tm-home-matches-block .tm-empty-state,
+  .tm-home-matches-block .tm-error-state {
+    /* Don't let the empty state be a tiny centered card in a huge column */
+    min-height: 200px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* ─── Wide (≥1440): expand sidebar slightly ───────────────────────────────── */
+@media (min-width: 1440px) {
+  .tm-home-desktop {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 0 36px;
+  }
+
+  .tm-home-sidebar {
+    /* Wider sidebar on 1440+ */
+    min-width: 0;
+  }
+
+  /* Larger featured hero on wide screens */
+  .tm-featured-media {
+    height: 260px;
+  }
+}

@@ -16,84 +16,121 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
       hasNewNotification={model.hasNewNotification && !model.network}
       floatingSlot={<HomeChatFloatingButton model={model} />}
     >
-      <div style={{ padding: '8px 20px 24px' }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-          {dash ? '안녕하세요' : `안녕하세요, ${model.viewerName}님`}
-        </div>
-        <div className="tm-home-stats">
+      {/*
+       * .tm-home-desktop: display:contents on mobile → transparent to layout.
+       * display:grid on desktop → 2-column dashboard (main | sidebar).
+       * .tm-home-main / .tm-home-sidebar: display:contents on mobile so their
+       * children flow in DOM order; on desktop they become flex columns that
+       * slot into grid-column 1 and 2 respectively.
+       */}
+      <div className="tm-home-desktop">
+
+        {/* ── LEFT: main content column ─────────────────────────────────── */}
+        <div className="tm-home-main">
+
+          {/* Greeting + activity stats */}
+          <div className="tm-home-greeting-block" style={{ padding: '8px 20px 24px' }}>
+            <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+              {dash ? '안녕하세요' : `안녕하세요, ${model.viewerName}님`}
+            </div>
+            <div className="tm-home-stats">
+              <div>
+                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
+                <NumberDisplay
+                  value={dash ? '-' : model.stats.monthlyActivity}
+                  unit={dash ? '' : '경기'}
+                  size={36}
+                  sub={dash ? '지난달 비교 -' : model.stats.monthlyActivitySub}
+                />
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
+                <NumberDisplay
+                  value={dash ? '-' : model.stats.mannerScore}
+                  unit={dash ? '' : '점'}
+                  size={36}
+                  sub={dash ? '상위 -' : model.stats.mannerScoreSub}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Featured recommendation hero */}
+          <div className="tm-home-featured-block" style={{ margin: '0 20px 28px' }}>
+            <div className="tm-text-label" style={{ marginBottom: 8 }}>오늘의 추천</div>
+            <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+          </div>
+
+          {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
+          <div className="tm-home-matches-block">
+            <SectionTitle title="추천 매치" sub={model.network ? '다시 불러오기가 필요합니다' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
+            {model.network ? (
+              <div style={{ padding: '0 20px 8px' }}>
+                <EmptyState title="새로고침이 필요합니다" sub="추천 목록과 대표 매치를 다시 불러올 수 있어야 합니다." cta="다시 불러오기" onCta={model.retry} />
+              </div>
+            ) : (
+              <RecommendedMatchRail matches={model.recommendedMatches} />
+            )}
+          </div>
+
+        </div>{/* /tm-home-main */}
+
+        {/* ── RIGHT: sticky sidebar ─────────────────────────────────────── */}
+        <div className="tm-home-sidebar">
+
+          {/* Quick-action shortcuts: 매치 / 팀매치 / 팀 / 나의팀 */}
           <div>
-            <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
-            <NumberDisplay
-              value={dash ? '-' : model.stats.monthlyActivity}
-              unit={dash ? '' : '경기'}
-              size={36}
-              sub={dash ? '지난달 비교 -' : model.stats.monthlyActivitySub}
-            />
+            <div style={{ padding: '0 20px 28px' }}>
+              <div className="tm-quick-grid">
+                {model.quickActions.map((item) => (
+                  <QuickAction key={item.label} item={item} />
+                ))}
+              </div>
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
-            <NumberDisplay
-              value={dash ? '-' : model.stats.mannerScore}
-              unit={dash ? '' : '점'}
-              size={36}
-              sub={dash ? '상위 -' : model.stats.mannerScoreSub}
-            />
+
+          {/* Weather strip */}
+          <div>
+            <div style={{ padding: '0 20px 24px' }}>
+              <div className="tm-home-weather-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
+                <div className="tm-text-label">현재 위치 날씨</div>
+                <button
+                  className="tm-btn tm-btn-icon tm-btn-neutral"
+                  type="button"
+                  onClick={model.refreshWeather}
+                  disabled={!model.refreshWeather || model.weatherRefreshing}
+                  aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 위치 날씨 새로고침'}
+                  title={model.weatherRefreshing ? '확인 중' : '새로고침'}
+                >
+                  <RefreshIcon size={18} strokeWidth={2.1} />
+                </button>
+              </div>
+              <WeatherStrip {...model.weather} />
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div style={{ margin: '0 20px 28px' }}>
-        <div className="tm-text-label" style={{ marginBottom: 8 }}>오늘의 추천</div>
-        <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
-      </div>
+          {/* Notices */}
+          <div>
+            {/* .tm-home-sidebar-notices gives the panel a card surface on desktop.
+                The inner div retains the original mobile inline padding. */}
+            <div className="tm-home-sidebar-notices" style={{ padding: '20px 20px 24px' }}>
+              <div className="tm-notice-head">
+                <div className="tm-text-body-lg">공지사항</div>
+                <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>
+                  전체보기
+                </Link>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {model.notices.map((notice) => (
+                  <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
+                ))}
+              </div>
+            </div>
+          </div>
 
-      <div style={{ padding: '0 20px 28px' }}>
-        <div className="tm-quick-grid">
-          {model.quickActions.map((item) => (
-            <QuickAction key={item.label} item={item} />
-          ))}
-        </div>
-      </div>
+        </div>{/* /tm-home-sidebar */}
 
-      <div style={{ padding: '0 20px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
-          <div className="tm-text-label">현재 위치 날씨</div>
-          <button
-            className="tm-btn tm-btn-icon tm-btn-neutral"
-            type="button"
-            onClick={model.refreshWeather}
-            disabled={!model.refreshWeather || model.weatherRefreshing}
-            aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 위치 날씨 새로고침'}
-            title={model.weatherRefreshing ? '확인 중' : '새로고침'}
-          >
-            <RefreshIcon size={18} strokeWidth={2.1} />
-          </button>
-        </div>
-        <WeatherStrip {...model.weather} />
-      </div>
-
-      <SectionTitle title="추천 매치" sub={model.network ? '다시 불러오기가 필요합니다' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
-      {model.network ? (
-        <div style={{ padding: '0 20px 8px' }}>
-          <EmptyState title="새로고침이 필요합니다" sub="추천 목록과 대표 매치를 다시 불러올 수 있어야 합니다." cta="다시 불러오기" onCta={model.retry} />
-        </div>
-      ) : (
-        <RecommendedMatchRail matches={model.recommendedMatches} />
-      )}
-
-      <div style={{ padding: '20px 20px 24px' }}>
-        <div className="tm-notice-head">
-          <div className="tm-text-body-lg">공지사항</div>
-          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>
-            전체보기
-          </Link>
-        </div>
-        <div style={{ display: 'grid', gap: 8 }}>
-          {model.notices.map((notice) => (
-            <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
-          ))}
-        </div>
-      </div>
+      </div>{/* /tm-home-desktop */}
     </AppChrome>
   );
 }

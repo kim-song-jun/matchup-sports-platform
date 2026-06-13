@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -22,8 +22,16 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
       title="팀"
       activeTab="teams"
       topBar={false}
-      floatingSlot={<Link className="tm-floating-fab" href="/teams/new" aria-label="팀 만들기"><PlusIcon size={26} strokeWidth={2.3} /></Link>}
+      floatingSlot={<Link className="tm-floating-fab tm-hide-desktop" href="/teams/new" aria-label="팀 만들기"><PlusIcon size={26} strokeWidth={2.3} /></Link>}
     >
+      {/* Desktop-only page header with inline create CTA */}
+      <div className="tm-team-desktop-header tm-show-desktop">
+        <h1 className="tm-team-desktop-header-title">팀</h1>
+        <Link className="tm-team-desktop-create-btn" href="/teams/new">
+          <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
+          팀 만들기
+        </Link>
+      </div>
       <TeamSearchBar model={model} />
       <div className="tm-team-list">
         <div className="tm-sport-chip-row">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button">{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
@@ -43,7 +51,14 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
 
   return (
     <AppChrome title={model.title} activeTab="teams" bottomNav={false} backHref="/teams">
-      <TeamSearchBar model={model} />
+      {/* Desktop back header for search/empty/error states */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+          <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading">{model.title}</h1>
+      </div>
+      {model.state === 'restricted' ? null : <TeamSearchBar model={model} />}
       <div className="tm-team-list">
         {model.state === 'search' ? (
           <>
@@ -57,7 +72,7 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
           <>
             <EmptyState title={model.title} sub={model.description} />
             {model.state === 'error' ? (
-              <Card pad={16} style={{ marginTop: 18, background: 'var(--grey50)' }}>
+              <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18, background: 'var(--grey50)' }}>
                 <div className="tm-text-label">목록으로 돌아가 다시 확인해 주세요</div>
                 <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
                   새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
@@ -75,7 +90,14 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
 function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
   return (
     <AppChrome title="필터" activeTab="teams" bottomNav={false} backHref="/teams">
-      <div className="tm-create-shell">
+      {/* Desktop back header */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+          <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading">팀 조건 필터</h1>
+      </div>
+      <div className="tm-create-shell tm-team-filter-shell">
         <section>
           <h1 className="tm-text-heading">팀 조건</h1>
           <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
@@ -95,7 +117,7 @@ function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
           </div>
         </Card>
       </div>
-      <div className="tm-fixed-cta">
+      <div className="tm-fixed-cta tm-team-filter-cta">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/teams">초기화</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/teams">{model.teams.length}개 결과 보기</Link>
@@ -110,15 +132,117 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const locked = mode === 'pending' || mode === 'closed';
   const cta = model.ctaLabel ?? (mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
+  const [heroMessage, setHeroMessage] = useState('');
+
+  const runHeroAction = (action: (() => void | Promise<void>) | undefined, successMessage: string) => {
+    if (!action) return;
+    void Promise.resolve(action())
+      .then(() => {
+        setHeroMessage(successMessage);
+        window.setTimeout(() => setHeroMessage(''), 1800);
+      })
+      .catch(() => {
+        setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        window.setTimeout(() => setHeroMessage(''), 1800);
+      });
+  };
+
   return (
     <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
-      <article className="tm-team-detail-body">
+      {/* Desktop back header */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+          <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading">{team.name}</h1>
+      </div>
+
+      {/* Desktop 2-column layout */}
+      <div className="tm-team-detail-desktop-layout tm-show-desktop">
+        {/* LEFT: hero + info */}
+        <div className="tm-team-detail-desktop-main">
+          <Card pad={18} className="tm-team-detail-hero-card" style={{ position: 'relative' }}>
+            <button
+              className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
+              type="button"
+              aria-label="공유"
+              onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}
+              style={{ position: 'absolute', top: 14, right: 14 }}
+            >
+              <ShareIcon size={20} />
+            </button>
+            <TeamLogo team={team} large />
+            <h2 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h2>
+            <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+              <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+              <span className="tm-badge tm-badge-grey">{team.members}명</span>
+            </div>
+          </Card>
+          <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
+          <Card pad={16}>
+            <InfoRow label="팀명" value={team.name} />
+            <InfoChips label="종목" items={team.sports} />
+            <InfoRow label="팀 소개" value={team.description} />
+            <InfoRow label="시/도" value={team.city} />
+            <InfoRow label="구/군" value={team.county} />
+            <InfoRow label="레벨" value={team.level} />
+            <InfoRow label="성별 조건" value={team.genderRule} />
+            <InfoRow label="정원" value={`${team.capacity}명`} />
+            <InfoRow label="모집 여부" value={`${team.statusLabel} · ${team.activity}`} />
+            <InfoRow label="정기 일정" value={team.schedule} />
+          </Card>
+          <Card pad={16} style={{ marginTop: 14, opacity: team.memberAccess.canView ? 1 : 0.72 }}>
+            <div className="tm-section-row" style={{ marginTop: 0 }}>
+              <div>
+                <div className="tm-text-body-lg">주요 멤버</div>
+                <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
+              </div>
+              {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비활성</button>}
+            </div>
+            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀에 소속되어 있고 멤버 현황 조회가 활성화된 경우에만 목록을 볼 수 있습니다.</div>}
+          </Card>
+        </div>
+
+        {/* RIGHT: sticky sidebar (replaces mobile fixed CTA on desktop) */}
+        <aside className="tm-team-detail-desktop-sidebar">
+          <div className="tm-team-detail-sidebar-identity">
+            <TeamLogo team={team} />
+            <div>
+              <div className="tm-text-body-lg">{team.name}</div>
+              <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.sport} · {team.region}</div>
+            </div>
+          </div>
+          <div className="tm-team-detail-sidebar-divider" />
+          <div className="tm-team-detail-sidebar-meta">
+            <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+            <span className="tm-badge tm-badge-grey">{team.members}명</span>
+          </div>
+          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            {locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}
+          </div>
+          {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
+          <div className="tm-team-detail-sidebar-cta">
+            <button
+              className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
+              type="button"
+              disabled={!model.onCta || model.ctaPending}
+              onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}
+            >
+              {model.ctaPending ? '처리 중' : cta}
+            </button>
+          </div>
+        </aside>
+      </div>
+
+      {/* Mobile layout (unchanged) */}
+      <article className="tm-team-detail-body tm-hide-desktop">
         <Card pad={18} className="tm-team-detail-hero-card" style={{ position: 'relative' }}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
             type="button"
             aria-label="공유"
-            onClick={model.onShare}
+            onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}
             style={{ position: 'absolute', top: 14, right: 14 }}
           >
             <ShareIcon size={20} />
@@ -155,7 +279,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀에 소속되어 있고 멤버 현황 조회가 활성화된 경우에만 목록을 볼 수 있습니다.</div>}
         </Card>
       </article>
-      <div className="tm-fixed-cta"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div><button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={model.onCta}>{model.ctaPending ? '처리 중' : cta}</button></div>
+      <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div>{heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}<button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>{model.ctaPending ? '처리 중' : cta}</button></div>
     </AppChrome>
   );
 }
@@ -173,7 +297,14 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
   const form = model.form;
   return (
     <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false} backHref="/teams">
-      <div className="tm-create-shell">
+      {/* Desktop back header */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+          <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
+      </div>
+      <div className="tm-create-shell tm-team-form-shell">
         {edit ? (
           <Card pad={16}>
             <div className="tm-my-toggle-row">
@@ -192,7 +323,7 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
             </div>
           </Card>
         ) : null}
-        <h1 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h1>
+        <h2 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h2>
         {form?.error ? <Card pad={14} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
         <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
         <div className="tm-create-field">
@@ -205,7 +336,7 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
         <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
         <CreateField label="활동 방식" value={team.activity} placeholder="예: 평일 저녁 · 주 1회" onChange={(value) => form?.onFieldChange('activity', value)} />
       </div>
-      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
+      <div className="tm-fixed-cta tm-team-form-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </AppChrome>
   );
 }
@@ -213,8 +344,15 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
 export function TeamMembersPageView({ model }: { model: TeamMembersViewModel }) {
   return (
     <AppChrome title="멤버 관리" activeTab="teams" bottomNav={false}>
-      <div className="tm-team-list">
-        <h1 className="tm-text-heading">{model.teamName}</h1>
+      {/* Desktop back header */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+          <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
+      </div>
+      <div className="tm-team-list tm-team-members-list">
+        <h2 className="tm-text-heading tm-hide-desktop">{model.teamName}</h2>
         <div className="tm-team-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           <Card pad={12}><KPIStat label="전체" value={model.summary.total} unit="명" /></Card>
           <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
@@ -232,11 +370,11 @@ export function TeamMembersPageView({ model }: { model: TeamMembersViewModel }) 
           ))}
         </div>
         {model.activeTab === 'members' ? (
-          <MemberSection title="팀 멤버" sub="이미 팀에 속한 멤버의 역할과 권한을 관리합니다.">
+          <MemberSection title="팀 멤버" sub="이미 팀에 속한 멤버의 역할과 권한을 관리합니다." desktopGrid>
             {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
           </MemberSection>
         ) : (
-          <MemberSection title="가입 요청" sub="아직 팀원이 아닌 신청자는 승인 또는 거절로 처리합니다.">
+          <MemberSection title="가입 요청" sub="아직 팀원이 아닌 신청자는 승인 또는 거절로 처리합니다." desktopGrid>
             {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
           </MemberSection>
         )}
@@ -482,8 +620,16 @@ function TeamCapacityField({ value, onChange }: { value: number; onChange?: (val
   );
 }
 
-function MemberSection({ title, sub, children }: { title: string; sub: string; children: ReactNode }) {
-  return <section className="tm-member-section"><div className="tm-text-label">{title}</div><div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div><div style={{ display: 'grid', gap: 10, marginTop: 10 }}>{children}</div></section>;
+function MemberSection({ title, sub, desktopGrid, children }: { title: string; sub: string; desktopGrid?: boolean; children: ReactNode }) {
+  return (
+    <section className="tm-member-section">
+      <div className="tm-text-label">{title}</div>
+      <div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div>
+      <div className={desktopGrid ? 'tm-team-members-desktop-layout' : ''} style={desktopGrid ? undefined : { display: 'grid', gap: 10, marginTop: 10 }}>
+        {children}
+      </div>
+    </section>
+  );
 }
 
 function MemberCard({

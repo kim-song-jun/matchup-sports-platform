@@ -24,6 +24,14 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
       topBar={false}
       floatingSlot={<MatchCreateFloatingButton />}
     >
+      {/* Desktop-only page header with inline "매치 만들기" CTA */}
+      <div className="tm-match-desktop-header tm-show-desktop">
+        <h1 className="tm-match-desktop-header-title">매치</h1>
+        <Link className="tm-match-desktop-create-btn" href="/matches/new/sport" aria-label="새 매치 만들기">
+          <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
+          매치 만들기
+        </Link>
+      </div>
       <MatchSearchBar query={model.query} filterCount={model.filterCount} search={model.search} filterHref={model.filterHref} />
       <div className="tm-match-list">
         <SportSelector sports={model.sports} />
@@ -50,6 +58,13 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
 
   return (
     <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/matches">
+      {/* Desktop back + title header (mobile topbar is hidden on desktop) */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
+          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
+      </div>
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
@@ -74,9 +89,16 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
 function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
   return (
     <AppChrome title="필터" activeTab="matches" bottomNav={false} backHref="/matches">
-      <div className="tm-create-shell">
+      {/* Desktop page head */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
+          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>필터</h1>
+      </div>
+      <div className="tm-create-shell tm-match-create-shell">
         <section>
-          <h1 className="tm-text-heading">매치 조건</h1>
+          <h2 className="tm-text-heading">매치 조건</h2>
           <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
         </section>
         <Card pad={16}>
@@ -113,6 +135,13 @@ function MatchParticipantsPageView() {
 
   return (
     <AppChrome title="참가자" activeTab="matches" bottomNav={false} backHref="/matches/match-1">
+      {/* Desktop page head */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/matches/match-1" aria-label="매치 상세로 돌아가기">
+          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>참가자</h1>
+      </div>
       <div className="tm-match-list">
         <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
           <div className="tm-text-body-lg">주말 풋살 한판!</div>
@@ -178,14 +207,23 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
 
   return (
     <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
+      {/* Desktop: back link + match title (mobile topbar is hidden on desktop) */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
+          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>{match.title}</h1>
+      </div>
+
       <article className="tm-match-detail">
         <div className="tm-match-detail-hero" style={{ backgroundImage: cssUrl(match.image) }}>
           <div className="tm-match-detail-overlay">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/matches" aria-label="뒤로가기">
+              {/* Mobile back button — hidden on desktop (desktop back is in the page head above) */}
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button tm-hide-desktop" href="/matches" aria-label="뒤로가기">
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}><ShareIcon size={20} /></button>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
               </div>
@@ -197,13 +235,70 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 <span className="tm-badge tm-badge-grey">{match.gender}</span>
                 <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
               </div>
-              <h1 className="tm-match-detail-title">{match.title}</h1>
+              <h2 className="tm-match-detail-title">{match.title}</h2>
               <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.76)', marginTop: 6 }}>{match.host} 호스트 · {match.deadline}</div>
               {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'rgba(255,255,255,.86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
           </div>
         </div>
-        <div className="tm-match-detail-body">
+
+        {/* Desktop: 2-column layout — left body, right sticky CTA card */}
+        <div className="tm-match-detail-desktop-layout tm-show-desktop">
+          {/* Left column */}
+          <div className="tm-match-detail-body">
+            <InfoRow label="지역" value={match.region} />
+            <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
+            <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
+            <InfoRow label="장소" value={match.venue} sub={match.address} />
+            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음`} />
+            <InfoRow label="레벨" value={match.level} />
+            <InfoRow label="성별 조건" value={match.gender} />
+            {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
+            {match.description ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">설명</div><div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div></Card> : null}
+            {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
+            <Card pad={16} style={{ marginTop: 10 }}>
+              <div className="tm-text-body-lg">참가자</div>
+              <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                {match.participants.map((person) => (
+                  <div key={person.name}>
+                    {person.href ? (
+                      <Link href={person.href} aria-label={`${person.name} 관리 페이지로 이동`}>
+                        <ListItem title={person.name} sub={person.meta} trailing={person.status} />
+                      </Link>
+                    ) : (
+                      <ListItem title={person.name} sub={person.meta} trailing={person.status} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* Right column: sticky summary + CTA */}
+          <div className="tm-match-detail-desktop-cta" role="complementary" aria-label="매치 신청">
+            <div className="tm-match-detail-desktop-cta-label">
+              <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
+              <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
+            </div>
+            <div className="tm-match-detail-desktop-cta-actions">
+              {showChat ? (
+                <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!model.onChat || model.chatPending} onClick={model.onChat}>
+                  {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
+                </button>
+              ) : null}
+              {mode === 'mine' ? (
+                <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
+              ) : (
+                <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>
+                  {model.applyPending ? '처리 중' : cta}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile: original single-column body (hidden on desktop) */}
+        <div className="tm-match-detail-body tm-hide-desktop">
           <InfoRow label="지역" value={match.region} />
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
@@ -232,7 +327,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           </Card>
         </div>
       </article>
-      <div className="tm-fixed-cta">
+
+      {/* Mobile-only fixed CTA — hidden on desktop (CSS: .tm-match-detail + .tm-fixed-cta) */}
+      <div className="tm-fixed-cta tm-hide-desktop">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
           <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
@@ -246,7 +343,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           {mode === 'mine' ? (
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
           ) : (
-            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={model.onApply}>
+            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>
               {model.applyPending ? '처리 중' : cta}
             </button>
           )}
@@ -264,7 +361,14 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
   const secondaryAction = model.form?.onBack;
   return (
     <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? '/matches/match-1' : '/matches'}>
-      <div className="tm-create-shell">
+      {/* Desktop page head */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href={edit ? '/matches/match-1' : '/matches'} aria-label={edit ? '매치 상세로 돌아가기' : '매치 목록으로 돌아가기'}>
+          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>{edit ? '매치 수정' : '매치 만들기'}</h1>
+      </div>
+      <div className="tm-create-shell tm-match-create-shell">
         <CreateProgress step={stepNo} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치입니다" body={model.form.lockedReason} /> : null}
@@ -709,7 +813,14 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {
   return (
     <AppChrome title="매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/matches">
-      <div className="tm-create-shell">
+      {/* Desktop page head */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
+          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>매치 만들기 완료</h1>
+      </div>
+      <div className="tm-create-shell tm-match-create-shell">
         <EmptyState title="매치가 만들어졌어요" sub="개인매치도 먼저 내 팀에게 공유해서 팀원 참여 가능 여부를 확인할 수 있습니다." />
         <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
           <div className="tm-text-body-lg">FC 발빠른놈들 팀 채팅</div>

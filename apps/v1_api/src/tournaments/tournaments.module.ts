@@ -5,14 +5,49 @@ import { TournamentsAdminController } from './tournaments-admin.controller';
 import { TournamentsAdminService } from './tournaments-admin.service';
 import { TournamentRegistrationsController } from './tournament-registrations.controller';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
+import { AdminRegistrationsController } from './admin-registrations.controller';
+import { AdminRegistrationsService } from './admin-registrations.service';
+import { TournamentPaymentsController } from './tournament-payments.controller';
+import { TournamentPaymentsService } from './tournament-payments.service';
+import { TournamentBracketController } from './tournament-bracket.controller';
+import { TournamentBracketService } from './tournament-bracket.service';
+import { TournamentPlayersController, TournamentPlayersAdminController } from './tournament-players.controller';
+import { TournamentPlayersService } from './tournament-players.service';
+import { TournamentsReadController } from './tournaments-read.controller';
+import { TournamentsReadService } from './tournaments-read.service';
+import { TournamentAnnouncementsController } from './tournament-announcements.controller';
+import { TournamentAnnouncementsService } from './tournament-announcements.service';
 
 /**
- * 대회(풋살 토너먼트) 도메인 모듈. Wave 2 — 어드민 V1Tournament CRUD +
- * 팀단위 신청 상태머신(V1TournamentRegistration). 이후 명단/결제/대진/순위 추가.
+ * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
+ * 어드민 CRUD/신청확정/대진·결과·순위/공지 + 소비자 신청·명단·조회·결제.
+ *
+ * 라우트 등록 순서 주의: 더 구체적인 경로(:tournamentId/registrations 등)를 가진
+ * 컨트롤러를 와일드카드(:tournamentId) 컨트롤러보다 먼저 두어 매칭 모호성을 줄인다.
  */
 @Module({
   imports: [AdminContextModule],
-  controllers: [TournamentsAdminController, TournamentRegistrationsController],
-  providers: [TournamentsAdminService, TournamentRegistrationsService, V1AuthGuard],
+  controllers: [
+    TournamentsAdminController,
+    AdminRegistrationsController,
+    TournamentBracketController,
+    TournamentPaymentsController,
+    TournamentPlayersController,
+    TournamentPlayersAdminController,
+    TournamentRegistrationsController,
+    TournamentAnnouncementsController,
+    TournamentsReadController,
+  ],
+  providers: [
+    TournamentsAdminService,
+    TournamentRegistrationsService,
+    AdminRegistrationsService,
+    TournamentPaymentsService,
+    TournamentBracketService,
+    TournamentPlayersService,
+    TournamentsReadService,
+    TournamentAnnouncementsService,
+    V1AuthGuard,
+  ],
 })
 export class TournamentsModule {}

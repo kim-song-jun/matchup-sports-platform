@@ -1,0 +1,190 @@
+/**
+ * tournaments-admin.service.spec.ts
+ *
+ * Contract tests for V1Tournament admin CRUD: admin-role gates, status-transition
+ * rules, player-range / sport validation, and idempotent same-status change.
+ * Each test asserts observable behaviour (returned shape or thrown error),
+ * never a mock for its own sake.
+ */
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaService } from '../prisma/prisma.service';
+import { AdminContextService } from '../common/admin-context.service';
+import { TournamentsAdminService } from './tournaments-admin.service';
+
+const ownerAuthUser = { id: 'owner-user-id', email: 'admin@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
+const supportAuthUser = { id: 'support-user-id', email: 'support@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
+const nonAdminAuthUser = { id: 'plain-user-id', email: 'user@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
+
+const ownerAdminRecord = { id: 'owner-admin-id', userId: 'owner-user-id', adminRole: 'owner' as const, status: 'active' as const };
+const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', adminRole: 'support' as const, status: 'active' as const };
+
+function tournamentRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'tournament-1',
+    sportId: 'sport-1',
+    title: '테스트 대회',
+    status: 'draft',
+    registrationDeadlineAt: null,
+    scheduledAt: null,
+    venue: null,
+    teamCount: 8,
+    minPlayers: 6,
+    maxPlayers: 10,
+    entryFee: 120000,
+    bankName: null,
+    bankAccount: null,
+    bankHolder: null,
+    rulesText: null,
+    refundPolicyText: null,
+    createdByAdminUserId: 'owner-admin-id',
+    createdAt: new Date('2026-06-14T00:00:00.000Z'),
+    updatedAt: new Date('2026-06-14T00:00:00.000Z'),
+    deletedAt: null,
+    ...overrides,
+  };
+}
+
+describe('TournamentsAdminService', () => {
+  let service: TournamentsAdminService;
+  let prisma: {
+    v1AdminUser: { findUnique: jest.Mock };
+    v1Sport: { findUnique: jest.Mock };
+    v1Tournament: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock };
+    v1StatusChangeLog: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      v1AdminUser: { findUnique: jest.fn() },
+      v1Sport: { findUnique: jest.fn() },
+      v1Tournament: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      $transaction: jest.fn(),
+    };
+    const p = prisma;
+    (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        TournamentsAdminService,
+        AdminContextService,
+        { provide: PrismaService, useValue: prisma },
+      ],
+    }).compile();
+
+    service = module.get(TournamentsAdminService);
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  // ─── admin-role gates ───────────────────────────────────────────────────────
+
+  it('create: non-admin → 403 PERMISSION_DENIED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(service.create(nonAdminAuthUser, { sportId: 'sport-1', title: 'x' })).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: support admin cannot mutate → 403', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+    await expect(service.create(supportAuthUser, { sportId: 'sport-1', title: 'x' })).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
+
+  it('list: non-admin → 403', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(service.list(nonAdminAuthUser, {})).rejects.toThrow(ForbiddenException);
+  });
+
+  // ─── create validation ──────────────────────────────────────────────────────
+
+  it('create: minPlayers > maxPlayers → 400 PLAYER_RANGE_INVALID', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    await expect(
+      service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', minPlayers: 10, maxPlayers: 6 }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_PLAYER_RANGE_INVALID' } });
+  });
+
+  it('create: unknown sportId → 400 SPORT_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue(null);
+    await expect(service.create(ownerAuthUser, { sportId: 'ghost', title: 'x' })).rejects.toMatchObject({
+      response: { code: 'SPORT_NOT_FOUND' },
+    });
+  });
+
+  it('create: owner with valid input → returns draft tournament + writes audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
+
+    const result = await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', entryFee: 120000 });
+
+    expect(result).toMatchObject({ id: 'tournament-1', status: 'draft', registrationCount: 0, entryFee: 120000 });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.create', targetType: 'tournament' }) }),
+    );
+  });
+
+  // ─── status transitions ───────────────────────────────────────────────────────
+
+  it('changeStatus: draft → open succeeds and records previous/next', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft' }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'open' }));
+
+    const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' });
+
+    expect(result).toMatchObject({ previousStatus: 'draft', status: 'open', alreadyInStatus: false });
+    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ fromStatus: 'draft', toStatus: 'open' }) }),
+    );
+  });
+
+  it('changeStatus: open → completed (skipping in_progress) → 409 TRANSITION_INVALID', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'open' }));
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'completed' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_STATUS_TRANSITION_INVALID' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('changeStatus: same status is idempotent (no write)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'open' }));
+    const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' });
+    expect(result).toMatchObject({ status: 'open', alreadyInStatus: true });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('changeStatus: completed is terminal → cannot go to in_progress (409)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'completed' }));
+    await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'in_progress' })).rejects.toThrow(ConflictException);
+  });
+
+  // ─── not found ────────────────────────────────────────────────────────────────
+
+  it('get: unknown id → 404 TOURNAMENT_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+    await expect(service.get(ownerAuthUser, 'ghost')).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    await expect(service.get(ownerAuthUser, 'ghost')).rejects.toThrow(NotFoundException);
+  });
+
+  // ─── list shape ───────────────────────────────────────────────────────────────
+
+  it('list: returns items with registrationCount + pageInfo', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findMany.mockResolvedValue([{ ...tournamentRow(), _count: { registrations: 3 } }]);
+    const result = await service.list(ownerAuthUser, { limit: 20 });
+    expect(result.items[0]).toMatchObject({ id: 'tournament-1', registrationCount: 3 });
+    expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+  });
+});

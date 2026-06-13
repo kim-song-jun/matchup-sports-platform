@@ -1,6 +1,6 @@
 # Teameet v1 — 기존 기능 피드백 + 대회(풋살 토너먼트) 도메인 설계 계획
 
-> **상태**: 🟢 골격 결정 + IA 재정의 확정(2026-06-13). 버그픽스 먼저 / 신규 Tournament 도메인 / PG 포함 / realName 대회 신청 시 / 알림 전체확장 / **navbar 5탭(홈·매치·대회·팀·마이) · 매치=개인+팀 병존 · 대회=상금+구조**(§G 참고). **선출여부=자기신고+어드민검토 · 결제=PG+계좌이체 택1 확정(2026-06-14, §D #6·#7)**. **Wave1+1.5 버그픽스 커밋 완료(bd5d6377)** · **Wave1.6 IA 재정의 구현·검증 완료** · PR #21 Copilot clean(머지 보류). **Wave2 진행 중: Prisma 스키마 10모델(9 core + V1TournamentPayment) db push 완료** — 다음: V1Tournament 어드민 CRUD.
+> **상태**: 🟢 골격 결정 + IA 재정의 확정(2026-06-13). 버그픽스 먼저 / 신규 Tournament 도메인 / PG 포함 / realName 대회 신청 시 / 알림 전체확장 / **navbar 5탭(홈·매치·대회·팀·마이) · 매치=개인+팀 병존 · 대회=상금+구조**(§G 참고). **선출여부=자기신고+어드민검토 · 결제=PG+계좌이체 택1 확정(2026-06-14, §D #6·#7)**. **Wave1+1.5 버그픽스 커밋 완료(bd5d6377)** · **Wave1.6 IA 재정의 구현·검증 완료** · PR #21 Copilot clean(머지 보류). **Wave2 진행 중**: ① Prisma 스키마 10모델 db push 완료 · ② V1Tournament 어드민 CRUD(list/get/create/update/status, AdminContextService 공용 인증·감사, status 전이 가드, jest 12 + 라이브 스모크 19 통과) 완료 — 다음: V1TournamentRegistration 신청 상태머신.
 > **근거**: 8-finder 병렬 현황 조사(sonnet) → 설계 종합(opus). 모든 항목 file:line 근거 보유.
 > **작성**: 2026-06-13 · 브랜치 `feat/v1-admin-redesign-toss` (조사 대상은 v1 소비자/어드민 앱)
 

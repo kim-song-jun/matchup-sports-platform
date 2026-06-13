@@ -18,6 +18,7 @@ import { AdminModule } from './admin/admin.module';
 import { SearchModule } from './search/search.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { TournamentsModule } from './tournaments/tournaments.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { UploadsModule } from './uploads/uploads.module';
     SearchModule,
     ReviewsModule,
     UploadsModule,
+    TournamentsModule,
   ],
 })
 export class AppModule {}

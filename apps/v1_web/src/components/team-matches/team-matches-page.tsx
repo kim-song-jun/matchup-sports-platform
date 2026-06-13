@@ -570,13 +570,22 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
           ))}
         </div>
       )}
-      {!model.isLoadingTeams && hasTeams && !hasCreatableTeams ? (
-        <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="팀장 또는 관리자인 팀에서만 팀매치를 만들 수 있습니다." />
-      ) : null}
-      <Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}>
-        <div className="tm-text-label">권한 기준</div>
-        <div className="tm-text-caption" style={{ marginTop: 6 }}>팀장 또는 매치 생성 권한이 있는 관리자만 다음 단계로 이동할 수 있습니다.</div>
-      </Card>
+      {(() => {
+        // 팀은 있으나 권한이 없는 경우, 별도 EmptyState("팀이 없어요" — 팀이 실제로
+        // 존재하므로 의미가 틀림)를 추가로 렌더하지 않고, 아래 '권한 기준' 카드 하나가
+        // 일반 규칙과 차단 상태(orange tone)를 모두 안내한다.
+        const blocked = !model.isLoadingTeams && hasTeams && !hasCreatableTeams;
+        return (
+          <Card pad={14} style={{ marginTop: 14, background: blocked ? 'var(--orange50)' : 'var(--grey50)' }}>
+            <div className="tm-text-label" style={blocked ? { color: 'var(--orange500)' } : undefined}>권한 기준</div>
+            <div className="tm-text-caption" style={{ marginTop: 6 }}>
+              {blocked
+                ? '팀장 또는 매치 생성 권한이 있는 팀이 없어 지금은 다음 단계로 이동할 수 없어요. 권한이 있는 팀에서 다시 시도해주세요.'
+                : '팀장 또는 매치 생성 권한이 있는 관리자만 다음 단계로 이동할 수 있습니다.'}
+            </div>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

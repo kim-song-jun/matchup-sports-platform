@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import type {
   TeamMatchCreateViewModel,
   TeamMatchDetailViewModel,
@@ -18,12 +19,13 @@ import type {
 export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel }) {
   return (
     <AppChrome
-      title="팀매치"
-      activeTab="teamMatches"
+      title="매치"
+      activeTab="matches"
       topBar={false}
       floatingSlot={<TeamMatchCreateFloatingButton />}
     >
       <TeamMatchSearchBar filterCount={model.filterCount} search={model.search} query={model.query} filterHref={model.filterHref} />
+      <MatchTypeSegment active="team" />
       <div className="tm-match-list">
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button">{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
         <div className="tm-match-summary-row"><div className="tm-text-label">서울 전체 · 팀매치</div><div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 마감 {model.summary.urgent}</div></div>
@@ -38,7 +40,7 @@ export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewMod
   if (model.state === 'filter') return <TeamMatchFilterPageView model={model} />;
 
   return (
-    <AppChrome title={model.title} activeTab="teamMatches" bottomNav={false} backHref="/team-matches">
+    <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/team-matches">
       <div className="tm-match-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
@@ -57,7 +59,7 @@ export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewMod
 
 function TeamMatchFilterPageView({ model }: { model: TeamMatchStateViewModel }) {
   return (
-    <AppChrome title="필터" activeTab="teamMatches" bottomNav={false} backHref="/team-matches">
+    <AppChrome title="필터" activeTab="matches" bottomNav={false} backHref="/team-matches">
       <div className="tm-create-shell">
         <section>
           <h1 className="tm-text-heading">팀매치 조건</h1>
@@ -162,7 +164,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   );
 
   return (
-    <AppChrome title="" activeTab="teamMatches" bottomNav={false} topBar={false}>
+    <AppChrome title="" activeTab="matches" bottomNav={false} topBar={false}>
       {/* Desktop page header: back link + title (mobile topbar is hidden on desktop) */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/team-matches" aria-label="팀매치 목록으로 돌아가기">
@@ -338,7 +340,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
   return (
-    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="teamMatches" bottomNav={false} backHref={edit ? '/team-matches/team-match-1' : '/team-matches'}>
+    <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? '/team-matches/team-match-1' : '/team-matches'}>
       <div className="tm-create-shell">
         <CreateProgress step={step} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
@@ -608,7 +610,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
 }
 
 function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
-  return <AppChrome title="팀매치 만들기 완료" activeTab="teamMatches" bottomNav={false} backHref="/team-matches"><div className="tm-create-shell"><EmptyState title="팀매치가 만들어졌어요" sub="먼저 우리 팀에게 공유해서 참가 가능 여부와 운영 준비를 확인할 수 있습니다." /><Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)' }}><div className="tm-text-body-lg">{model.selectedTeam} 팀 채팅</div><div className="tm-text-caption" style={{ marginTop: 4 }}>14명에게 팀매치 링크와 경기조건을 공유</div></Card>{['팀 채팅에 공유', '초대 링크 복사', '상대팀 후보에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 경기조건을 공유합니다.</div></Card>)}</div><div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/team-matches/team-match-1">상세 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">팀 채팅에 공유</button></div></div></AppChrome>;
+  return <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches"><div className="tm-create-shell"><EmptyState title="팀매치가 만들어졌어요" sub="먼저 우리 팀에게 공유해서 참가 가능 여부와 운영 준비를 확인할 수 있습니다." /><Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)' }}><div className="tm-text-body-lg">{model.selectedTeam} 팀 채팅</div><div className="tm-text-caption" style={{ marginTop: 4 }}>14명에게 팀매치 링크와 경기조건을 공유</div></Card>{['팀 채팅에 공유', '초대 링크 복사', '상대팀 후보에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 경기조건을 공유합니다.</div></Card>)}</div><div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/team-matches/team-match-1">상세 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">팀 채팅에 공유</button></div></div></AppChrome>;
 }
 
 function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {

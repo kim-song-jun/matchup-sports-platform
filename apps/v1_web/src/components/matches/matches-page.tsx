@@ -8,6 +8,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
+import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import type {
   MatchCardModel,
   MatchCreateViewModel,
@@ -33,6 +34,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         </Link>
       </div>
       <MatchSearchBar query={model.query} filterCount={model.filterCount} search={model.search} filterHref={model.filterHref} />
+      <MatchTypeSegment active="personal" />
       <div className="tm-match-list">
         <SportSelector sports={model.sports} />
         <div className="tm-match-summary-row">

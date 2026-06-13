@@ -7,12 +7,12 @@ import {
   MatchIcon,
   MyIcon,
   SearchIcon,
-  TeamMatchIcon,
   TeamsIcon,
+  TrophyIcon,
 } from './icons';
 import { DesktopScrollTop } from './desktop-scroll-top';
 
-export type V1NavTab = 'home' | 'matches' | 'teamMatches' | 'teams' | 'my';
+export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
 
 const tabs: Array<{
   id: V1NavTab;
@@ -22,7 +22,7 @@ const tabs: Array<{
 }> = [
   { id: 'home', label: '홈', href: '/home', Icon: HomeIcon },
   { id: 'matches', label: '매치', href: '/matches', Icon: MatchIcon },
-  { id: 'teamMatches', label: '팀매치', href: '/team-matches', Icon: TeamMatchIcon },
+  { id: 'tournaments', label: '대회', href: '/tournaments', Icon: TrophyIcon },
   { id: 'teams', label: '팀', href: '/teams', Icon: TeamsIcon },
   { id: 'my', label: '마이', href: '/my', Icon: MyIcon },
 ];

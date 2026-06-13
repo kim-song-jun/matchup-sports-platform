@@ -676,6 +676,8 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
 
   const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    // Reset value so re-selecting the same file (after failure/removal) re-fires onChange.
+    event.target.value = '';
     if (!file) return;
     setFileName(file.name);
     setUploadError(null);

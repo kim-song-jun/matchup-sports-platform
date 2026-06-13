@@ -19,9 +19,6 @@ import { UploadsService } from './uploads.service';
 // Side-effect import: augments global Express.Multer namespace
 import './multer.types';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/webp'];
-
 @ApiTags('uploads')
 @Controller('uploads')
 export class UploadsController {
@@ -52,22 +49,14 @@ export class UploadsController {
     },
   })
   @ApiUnauthorizedResponse({ description: '인증이 필요해요.' })
+  // No multer fileFilter/fileSize check: UploadsService is the single validator
+  // (mimetype + 5MB size) so it returns clear 400 messages and unlinks rejected
+  // temp files. A multer fileFilter silently drops bad files → empty array →
+  // misleading "파일을 선택해주세요" error and unreachable service validation.
   @UseInterceptors(
     FilesInterceptor('files', 5, {
       dest: UploadsService.UPLOAD_BASE,
-      limits: { fileSize: MAX_FILE_SIZE, files: 5 },
-      fileFilter: (
-        _req: unknown,
-        file: { mimetype: string },
-        cb: (err: Error | null, acceptFile: boolean) => void,
-      ) => {
-        if (!ALLOWED_MIMETYPES.includes(file.mimetype)) {
-          // Reject: multer will still write nothing for this file
-          cb(null, false);
-          return;
-        }
-        cb(null, true);
-      },
+      limits: { files: 5 },
     }),
   )
   async uploadFiles(

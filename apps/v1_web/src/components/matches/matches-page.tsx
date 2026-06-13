@@ -198,6 +198,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
     if (!action) return;
     void Promise.resolve(action())
       .then((result) => {
+        // null = 액션이 UX를 직접 처리(네이티브 공유/취소/prompt 폴백) → 토스트 미표시.
+        if (result === null) return;
         const msg = typeof result === 'string' && result ? result : fallbackMessage;
         setHeroMessage(msg);
         window.setTimeout(() => setHeroMessage(''), 1800);

@@ -371,14 +371,17 @@ export class TeamMatchesService {
       return { applications };
     });
 
-    // 알림: 승인된 상대팀 manager+에게 취소 안내 (fire-and-forget)
+    // 알림: 승인된 상대팀 manager+에게 취소 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
     if (teamMatch.approvedApplicantTeamId) {
-      const opponentManagers = await this.prisma.v1TeamMembership.findMany({
-        where: { teamId: teamMatch.approvedApplicantTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
-        select: { userId: true },
-      });
-      void this.notifications.emitNotificationToMany(
-        opponentManagers.map((m) => m.userId),
+      const opponentTeamId = teamMatch.approvedApplicantTeamId;
+      this.notifications.emitToManyDeferred(
+        async () =>
+          (
+            await this.prisma.v1TeamMembership.findMany({
+              where: { teamId: opponentTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
+              select: { userId: true },
+            })
+          ).map((m) => m.userId),
         'team_match_cancelled',
         teamMatch.id,
       );
@@ -444,13 +447,15 @@ export class TeamMatchesService {
       return nextApplication;
     });
 
-    // 알림: 호스트팀 manager+에게 신청 접수 안내 (fire-and-forget)
-    const hostManagers = await this.prisma.v1TeamMembership.findMany({
-      where: { teamId: teamMatch.hostTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { userId: true },
-    });
-    void this.notifications.emitNotificationToMany(
-      hostManagers.map((m) => m.userId),
+    // 알림: 호스트팀 manager+에게 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
+    this.notifications.emitToManyDeferred(
+      async () =>
+        (
+          await this.prisma.v1TeamMembership.findMany({
+            where: { teamId: teamMatch.hostTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
+            select: { userId: true },
+          })
+        ).map((m) => m.userId),
       'team_match_application_received',
       teamMatch.id,
     );

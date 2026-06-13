@@ -713,13 +713,15 @@ export class TeamsService {
       return nextApplication;
     });
 
-    // 알림: 팀 manager+에게 신청 접수 안내 (fire-and-forget)
-    const managers = await this.prisma.v1TeamMembership.findMany({
-      where: { teamId: team.id, status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { userId: true },
-    });
-    void this.notifications.emitNotificationToMany(
-      managers.map((m) => m.userId),
+    // 알림: 팀 manager+에게 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
+    this.notifications.emitToManyDeferred(
+      async () =>
+        (
+          await this.prisma.v1TeamMembership.findMany({
+            where: { teamId: team.id, status: 'active', role: { in: ['owner', 'manager'] } },
+            select: { userId: true },
+          })
+        ).map((m) => m.userId),
       'team_join_application_received',
       team.id,
     );

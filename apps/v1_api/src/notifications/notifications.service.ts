@@ -169,6 +169,27 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * Fire-and-forget for recipient sets that need a lookup: resolves the userIds
+   * then emits, swallowing ALL errors (including the lookup itself) so that the
+   * notification side-effect never breaks the caller's already-committed request.
+   */
+  emitToManyDeferred(
+    resolveUserIds: () => Promise<string[]>,
+    type: NotificationEventType,
+    targetId: string | null,
+    body?: string,
+  ): void {
+    void (async () => {
+      const userIds = await resolveUserIds();
+      await this.emitNotificationToMany(userIds, type, targetId, body);
+    })().catch((e) =>
+      this.logger.warn(
+        `알림 발송 실패(${type}): ${e instanceof Error ? e.message : String(e)}`,
+      ),
+    );
+  }
+
   private emitNotificationFireAndForget(
     userId: string,
     targetType: V1NotificationTargetType,

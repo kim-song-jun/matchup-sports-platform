@@ -72,7 +72,7 @@ done
 gh api graphql -f query='
 query { repository(owner:"<owner>", name:"<repo>") {
   pullRequest(number:<N>) { reviewThreads(first:100) {
-    nodes { id isResolved path line originalLine comments(first:1){nodes{author{login} body}} } } } }' > /tmp/threads.json
+    nodes { id isResolved path line originalLine comments(first:1){nodes{author{login} body}} } } } } }' > /tmp/threads.json
 # python으로 isResolved==false만 파싱 (jq --jq + >는 raw JSON이 아니므로 python 파싱 권장)
 ```
 

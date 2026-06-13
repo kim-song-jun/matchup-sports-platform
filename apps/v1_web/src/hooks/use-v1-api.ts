@@ -1014,8 +1014,10 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
     );
   }
 
-  if (body === null) {
-    // 200이지만 바디 파싱 실패(빈 바디/HTML 등) → data 접근 전 에러로 가드.
+  // 200이지만 정상 엔벨로프가 아닌 경우(빈 바디/HTML → null, 또는 "ok" 같은 JSON
+  // primitive)를 모두 가드. data 필드를 가진 객체임을 확인한 뒤에만 .data 반환 —
+  // primitive를 그대로 통과시키면 .data가 undefined로 호출부에서 크래시한다.
+  if (typeof body !== 'object' || body === null || !('data' in body)) {
     throw new V1ApiError({
       status: 'error' as const,
       statusCode: response.status,

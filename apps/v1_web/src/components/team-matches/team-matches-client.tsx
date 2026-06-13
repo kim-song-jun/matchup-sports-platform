@@ -402,7 +402,7 @@ function toApplicantTeamsWithActions(
     return applications.items.map((app) => ({
       name: app.applicantTeam.name,
       meta: `매너 ${app.applicantTeam.score?.toFixed(1) ?? '-'} · ${app.applicantTeam.matchCount}전`,
-      status: app.status === 'pending' ? '승인 대기' : app.status === 'approved' ? '승인완료' : app.status === 'rejected' ? '거절' : app.status,
+      status: app.status === 'requested' ? '승인 대기' : app.status === 'approved' ? '승인완료' : app.status === 'rejected' ? '거절' : app.status,
       href: manageHref,
       applicationId: app.applicationId,
       actionPending,

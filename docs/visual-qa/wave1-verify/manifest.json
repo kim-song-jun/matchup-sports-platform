@@ -1,0 +1,47 @@
+{
+  "mobile": {
+    "ok": [
+      "01-match-detail",
+      "02-match-applications",
+      "03-matches-list",
+      "04-match-new",
+      "05-team-match-detail",
+      "06-team-match-new",
+      "07-team-match-new-team"
+    ],
+    "fail": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ]
+  },
+  "tablet": {
+    "ok": [
+      "01-match-detail",
+      "02-match-applications",
+      "03-matches-list",
+      "04-match-new",
+      "05-team-match-detail",
+      "06-team-match-new",
+      "07-team-match-new-team"
+    ],
+    "fail": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ]
+  },
+  "desktop": {
+    "ok": [
+      "01-match-detail",
+      "02-match-applications",
+      "03-matches-list",
+      "04-match-new",
+      "05-team-match-detail",
+      "06-team-match-new",
+      "07-team-match-new-team"
+    ],
+    "fail": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ]
+  }
+}

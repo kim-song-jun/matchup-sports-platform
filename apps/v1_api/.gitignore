@@ -1,0 +1,3 @@
+# Runtime-uploaded files (served via express.static at /uploads).
+# Generated at runtime by UploadsService — not source, never committed.
+uploads/

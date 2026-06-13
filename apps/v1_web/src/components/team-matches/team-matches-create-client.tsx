@@ -35,7 +35,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const [regionId, setRegionId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const myTeams = normalizeMyTeams(teams.data);
-  const creatableTeams = myTeams?.filter((team) => team.canCreateTeamMatch) ?? [];
+  const allMyTeams = myTeams ?? [];
+  const creatableTeams = allMyTeams.filter((team) => team.canCreateTeamMatch);
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
   useEffect(() => {
@@ -59,7 +60,15 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     selectedTeamId,
     selectedSportId,
     regionId,
-    teams: creatableTeams.map((team) => ({ id: team.teamId, name: team.name, sport: team.sport.name, members: team.memberCount, role: team.role === 'owner' ? '팀장' : '관리자' })),
+    isLoadingTeams: teams.isLoading,
+    teams: allMyTeams.map((team) => ({
+      id: team.teamId,
+      name: team.name,
+      sport: team.sport.name,
+      members: team.memberCount,
+      role: team.role === 'owner' ? '팀장' : team.role === 'manager' ? '관리자' : '멤버',
+      disabled: !team.canCreateTeamMatch,
+    })),
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
     regions: regionOptions,
     error,
@@ -171,6 +180,7 @@ function buildCreateModel({
   selectedTeamId,
   selectedSportId,
   regionId,
+  isLoadingTeams,
   teams,
   sports,
   regions,
@@ -192,7 +202,8 @@ function buildCreateModel({
   selectedTeamId: string;
   selectedSportId: string;
   regionId: string;
-  teams: Array<{ id: string; name: string; sport: string; members: number; role: string }>;
+  isLoadingTeams?: boolean;
+  teams: Array<{ id: string; name: string; sport: string; members: number; role: string; disabled?: boolean }>;
   sports: Array<{ id: string; name: string }>;
   regions: Array<{ id: string; name: string }>;
   error?: string | null;
@@ -216,7 +227,8 @@ function buildCreateModel({
     ...fallback,
     selectedTeam: selectedTeam?.name ?? fallback.selectedTeam,
     selectedSport: selectedSport?.name ?? fallback.selectedSport,
-    teams: teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId })),
+    isLoadingTeams,
+    teams: teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId, disabled: team.disabled })),
     sports: sports.length ? sports.map((sport) => sport.name) : fallback.sports,
     draft,
     form: {

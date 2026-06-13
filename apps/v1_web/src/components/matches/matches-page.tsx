@@ -192,11 +192,12 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const showChat = mode === 'approved' && Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
-  const runHeroAction = (action: (() => void | Promise<void>) | undefined, successMessage: string) => {
+  const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
     if (!action) return;
     void Promise.resolve(action())
-      .then(() => {
-        setHeroMessage(successMessage);
+      .then((result) => {
+        const msg = typeof result === 'string' && result ? result : fallbackMessage;
+        setHeroMessage(msg);
         window.setTimeout(() => setHeroMessage(''), 1800);
       })
       .catch(() => {
@@ -225,7 +226,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
               <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}><ShareIcon size={20} /></button>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
+                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림 목록" onClick={model.onNotify}><BellIcon size={20} /></button>
               </div>
             </div>
             <div>
@@ -250,11 +251,11 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
             <InfoRow label="장소" value={match.venue} sub={match.address} />
-            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음`} />
+            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 포함)`} />
             <InfoRow label="레벨" value={match.level} />
             <InfoRow label="성별 조건" value={match.gender} />
             {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
-            {match.description ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">설명</div><div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div></Card> : null}
+            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었습니다. 경기 당일 제시간에 방문해 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 10 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -303,11 +304,11 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
-          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음`} />
+          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 포함)`} />
           <InfoRow label="레벨" value={match.level} />
           <InfoRow label="성별 조건" value={match.gender} />
           {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
-          {match.description ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">설명</div><div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div></Card> : null}
+          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었습니다. 경기 당일 제시간에 방문해 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 10 }}>
             <div className="tm-text-body-lg">참가자</div>
@@ -656,7 +657,7 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
       <h1 className="tm-text-heading">매치 정보</h1>
       <CreateField label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
       <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치입니다." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
-      <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} />
+      <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} onUpload={model.form?.uploadImage} />
       <CapacityField value={draft.capacity} onChange={(value) => model.form?.onFieldChange('capacity', value)} />
       <LevelRangeField levels={model.levels} minLevel={draft.minLevel} maxLevel={draft.maxLevel} onChange={(field, value) => model.form?.onFieldChange(field, value)} />
       <GenderRuleSelector value={draft.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} />
@@ -666,17 +667,30 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
   );
 }
 
-function ImageUploadField({ image, onChange }: { image: string; onChange?: (value: string) => void }) {
+function ImageUploadField({ image, onChange, onUpload }: { image: string; onChange?: (value: string) => void; onUpload?: (file: File) => Promise<string> }) {
   const [fileName, setFileName] = useState('');
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') onChange?.(reader.result);
-    };
-    reader.readAsDataURL(file);
+    setUploadError(null);
+
+    if (onUpload) {
+      setUploading(true);
+      try {
+        const url = await onUpload(file);
+        onChange?.(url);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '이미지 업로드에 실패했어요. 다시 시도해 주세요.';
+        setUploadError(msg);
+        setFileName('');
+      } finally {
+        setUploading(false);
+      }
+    }
   };
 
   return (
@@ -685,14 +699,15 @@ function ImageUploadField({ image, onChange }: { image: string; onChange?: (valu
         <span className="tm-badge tm-badge-grey">대표 이미지</span>
       </div>
       <div style={{ padding: 14 }}>
-        <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block">
-          {fileName ? '이미지 변경' : '대표 이미지 선택'}
-          <input className="sr-only" type="file" accept="image/*" onChange={handleChange} />
+        <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ opacity: uploading ? 0.6 : 1 }}>
+          {uploading ? '업로드 중…' : fileName ? '이미지 변경' : '대표 이미지 선택'}
+          <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
         </label>
-        {fileName ? (
+        {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange500)' }}>{uploadError}</div> : null}
+        {fileName && !uploading ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
             <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName}</span>
-            <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" onClick={() => { setFileName(''); onChange?.('/mock/generated/futsal-rooftop.webp'); }}>제거</button>
+            <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" onClick={() => { setFileName(''); onChange?.(''); }}>제거</button>
           </div>
         ) : null}
       </div>

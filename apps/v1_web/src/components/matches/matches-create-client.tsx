@@ -9,6 +9,7 @@ import {
   useV1MasterSports,
   useV1MatchEdit,
   useV1UpdateMatch,
+  useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
@@ -27,6 +28,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const createMatch = useV1CreateMatch();
+  const uploadImages = useV1UploadImages();
   const [draft, setDraft] = usePersistedDraft();
   const [selectedSportId, setSelectedSportId] = useState('');
   const [regionId, setRegionId] = useState('');
@@ -59,6 +61,12 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     onRegionChange: setRegionId,
     onBack: () => router.push(previousCreateHref(step)),
     onNext: () => router.push(nextCreateHref(step)),
+    uploadImage: async (file: File) => {
+      const result = await uploadImages.mutateAsync([file]);
+      const url = result.urls[0];
+      if (!url) throw new Error('이미지 URL을 받지 못했어요. 다시 시도해 주세요.');
+      return url;
+    },
     onSubmit: () => {
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
@@ -85,6 +93,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const editQuery = useV1MatchEdit(matchId);
   const updateMatch = useV1UpdateMatch(matchId);
   const cancelMatch = useV1CancelMatch(matchId);
+  const uploadImages = useV1UploadImages();
   const [draft, setDraft] = useState<MatchDraft>(() => buildDefaultDraft());
   const [selectedSportId, setSelectedSportId] = useState('');
   const [regionId, setRegionId] = useState('');
@@ -115,6 +124,12 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     onRegionChange: setRegionId,
     onBack: () => router.push(`/matches/${matchId}`),
     onNext: () => undefined,
+    uploadImage: async (file: File) => {
+      const result = await uploadImages.mutateAsync([file]);
+      const url = result.urls[0];
+      if (!url) throw new Error('이미지 URL을 받지 못했어요. 다시 시도해 주세요.');
+      return url;
+    },
     onSubmit: () => {
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
@@ -163,6 +178,7 @@ function buildCreateModel({
   onNext,
   onSubmit,
   onCancel,
+  uploadImage,
   submitLabel,
 }: {
   step: MatchCreateStep;
@@ -181,6 +197,7 @@ function buildCreateModel({
   onNext: () => void;
   onSubmit: () => void;
   onCancel?: () => void;
+  uploadImage?: (file: File) => Promise<string>;
   submitLabel?: string;
 }): MatchCreateViewModel {
   const fallback = getMatchCreateViewModel(step);
@@ -203,6 +220,7 @@ function buildCreateModel({
       onNext,
       onSubmit,
       onCancel,
+      uploadImage,
       submitLabel,
       submitting,
       error,

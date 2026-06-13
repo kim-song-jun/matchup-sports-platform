@@ -13,6 +13,7 @@ import {
   V1TeamMembershipRole,
 } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
@@ -59,7 +60,10 @@ type TeamWithRelations = V1Team & {
 
 @Injectable()
 export class TeamsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async list(user: V1AuthUser | null, query: TeamsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -709,6 +713,17 @@ export class TeamsService {
       return nextApplication;
     });
 
+    // 알림: 팀 manager+에게 신청 접수 안내 (fire-and-forget)
+    const managers = await this.prisma.v1TeamMembership.findMany({
+      where: { teamId: team.id, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { userId: true },
+    });
+    void this.notifications.emitNotificationToMany(
+      managers.map((m) => m.userId),
+      'team_join_application_received',
+      team.id,
+    );
+
     return {
       applicationId: application.id,
       teamId: application.teamId,
@@ -924,6 +939,13 @@ export class TeamsService {
       return { updatedApplication, membership, team };
     });
 
+    // 알림: 신청자에게 수락 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      application.applicantUserId,
+      'team_join_application_accepted',
+      application.teamId,
+    );
+
     return {
       applicationId: result.updatedApplication.id,
       teamId: result.updatedApplication.teamId,
@@ -971,6 +993,13 @@ export class TeamsService {
 
       return nextApplication;
     });
+
+    // 알림: 신청자에게 거절 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      application.applicantUserId,
+      'team_join_application_rejected',
+      application.teamId,
+    );
 
     return {
       applicationId: updated.id,

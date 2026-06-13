@@ -58,6 +58,7 @@ export class MasterService {
             code: true,
             name: true,
             level: true,
+            parentId: true,
             centerLat: true,
             centerLng: true,
           },

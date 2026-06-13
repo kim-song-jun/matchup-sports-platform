@@ -145,3 +145,16 @@ export function ChevronRightIcon(props: IconProps) {
     </SvgIcon>
   );
 }
+
+export function TrophyIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M6 2 H18 V10 A6 6 0 0 1 6 10 Z" />
+      <path d="M6 2 H3 V6 A3 3 0 0 0 6 9" />
+      <path d="M18 2 H21 V6 A3 3 0 0 1 18 9" />
+      <path d="M12 16 V12" />
+      <path d="M8 22 H16" />
+      <path d="M12 16 A3 3 0 0 0 9 19 H15 A3 3 0 0 0 12 16 Z" />
+    </SvgIcon>
+  );
+}

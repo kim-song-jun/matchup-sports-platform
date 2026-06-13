@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { ChatIcon, RefreshIcon } from '@/components/v1-ui/icons';
+import { ChatIcon, RefreshIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
 import type { HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
@@ -59,6 +59,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           <div className="tm-home-featured-block" style={{ margin: '0 20px 28px' }}>
             <div className="tm-text-label" style={{ marginBottom: 8 }}>오늘의 추천</div>
             <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+            <TournamentTeaserCard />
           </div>
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
@@ -224,6 +225,48 @@ function FeaturedMatchCard({
   return network ? card : (
     <Link className="tm-featured-link tm-pressable" href={`/matches/${match.id}`}>
       {card}
+    </Link>
+  );
+}
+
+function TournamentTeaserCard() {
+  return (
+    <Link
+      className="tm-pressable tm-tournament-teaser"
+      href="/tournaments"
+      aria-label="대회 페이지로 이동 — 상금 걸린 풋살 대회"
+    >
+      <div className="tm-tournament-teaser-inner">
+        {/* Trophy badge */}
+        <div className="tm-tournament-teaser-badge" aria-hidden="true">
+          <TrophyIcon size={22} strokeWidth={2} />
+        </div>
+
+        {/* Copy */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="tm-text-micro" style={{ color: 'var(--blue500)', marginBottom: 2 }}>
+            대회 · 풋살
+          </div>
+          <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
+            상금 걸린 풋살 대회, 팀과 함께 도전!
+          </div>
+          <div className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 3 }}>
+            조별리그 → 토너먼트 · 곧 오픈 예정이에요
+          </div>
+        </div>
+
+        {/* Chevron */}
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden="true"
+          style={{ flexShrink: 0, color: 'var(--text-muted)' }}
+        >
+          <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
     </Link>
   );
 }

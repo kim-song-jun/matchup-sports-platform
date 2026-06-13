@@ -501,6 +501,20 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - 한국어 사용자 대상이므로 UI 텍스트는 한국어
 - 에러 코드: `DOMAIN_CODE` 형태 (e.g., MATCH_NOT_FOUND)
 
+## 운영 워크플로 — PR · Copilot 리뷰 · 시각 검증
+
+> PR을 올리고 → Copilot 리뷰를 clean까지 돌리고 → 라이브 스크린샷으로 검증해 PR에 올리는 전 과정.
+> **상세 런북(명령어·상수·전체 절차)**: `docs/ops/pr-review-visual-workflow.md` (반드시 이 절차를 따른다)
+
+핵심 규칙 (런북 요약):
+
+1. **커밋은 내 파일만 pathspec** + 직후 `git show --stat HEAD` 검증. 완료 보고 전 게이트 = `tsc 0` + 테스트 + (시각 변경이면) **라이브 스크린샷**.
+2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer` (REST `requested_reviewers`는 422). 도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은 **적대적 검증으로 real만 수정**(Copilot도 틀림, 예: RQ `partialMatchKey` 빈 객체 부분일치). 스레드는 GraphQL `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve. **`generated no new comments`(clean) 나올 때까지 반복.**
+3. **300-파일 한도**: 변경 파일 300개 초과 시 Copilot 리뷰 거부. 커밋된 스크린샷 PNG가 원인이면 **트리에서 `git rm`** — 갤러리 코멘트는 **SHA 고정 raw URL**(`raw.githubusercontent.com/<owner>/<repo>/<SHA>/...`)이라 그대로 렌더된다.
+4. **시각 검증/스크린샷**: v1 스택 기동(DB `teameet_v1_pg`:5432 + `apps/v1_api`:8121 + web:3013) 후 **헤더 dev 인증**(localStorage `teameet.v1.userId`/`userEmail` → `x-v1-user-*` 헤더)으로 Playwright 캡처. **캡처 스크립트는 `scripts/` 내부**(`/tmp`는 모듈 해석 실패). 갤러리는 페이지별 **📱mobile 390 / 📲tablet 768 / 🖥desktop 1440** 3열 + raw URL 200 확인 후 코멘트 게시.
+5. **전체 검수/피드백**은 built-in `Workflow`(ultracode) 8차원 적대 검증으로(= evidence-producing; `/agent-all`은 본 레포 Phase 0 전제 미충족). 모델 배정은 글로벌 규칙 11(결정=opus/fable, 실행=sonnet).
+6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`. 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
+
 ## Agent Team 운영
 
 글로벌 `~/.claude/CLAUDE.md`의 Agent Team 운영 섹션 참조.

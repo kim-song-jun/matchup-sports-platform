@@ -131,6 +131,10 @@ export class TournamentsReadService {
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
       entryFee: row.entryFee,
+      // 계좌이체 신청자에게 입금 계좌 안내가 필요하므로 공개 상세에 포함(주최자 수령 계좌).
+      bankName: row.bankName,
+      bankAccount: row.bankAccount,
+      bankHolder: row.bankHolder,
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       confirmedCount: row._count.registrations,

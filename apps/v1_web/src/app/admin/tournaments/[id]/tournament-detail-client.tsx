@@ -1,0 +1,1612 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  ChevronLeft,
+  Download,
+  Lock,
+  Unlock,
+  Check,
+  X,
+  RefreshCw,
+  Plus,
+  Megaphone,
+  Send,
+} from 'lucide-react';
+import {
+  useV1AdminTournament,
+  useV1AdminMe,
+  useV1ChangeTournamentStatus,
+  useV1AdminTournamentRegistrations,
+  useV1ConfirmPayment,
+  useV1ConfirmRegistration,
+  useV1CancelRegistrationAdmin,
+  useV1RosterLock,
+  useV1RosterUnlock,
+  useV1ExportRosterCsv,
+  useV1TournamentPlayers,
+  useV1UpdatePlayerEligibility,
+  useV1AdminBracket,
+  useV1CreateGroup,
+  useV1AssignGroupTeam,
+  useV1CreateFixture,
+  useV1RecordResult,
+  useV1RecalculateStandings,
+  useV1CreateAnnouncement,
+  useV1PublishAnnouncement,
+} from '@/hooks/use-v1-api';
+import type {
+  V1TournamentStatus,
+  V1AdminTournamentRegistration,
+  V1AdminBracketGroup,
+  V1AdminBracketFixture,
+  V1AdminTournamentAnnouncement,
+  V1TournamentGroupPhase,
+  V1AnnouncementAudience,
+} from '@/types/api';
+import { extractErrorMessage } from '@/lib/error-message';
+import {
+  AdminPageHeader,
+  AdminStatusPill,
+  AdminTableSkeleton,
+  AdminEmpty,
+  AdminToasts,
+  useAdminToast,
+} from '@/components/admin';
+
+// ── Constants ─────────────────────────────────────────────────────────────
+
+const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
+  draft: '초안',
+  open: '접수중',
+  closed: '마감',
+  in_progress: '진행중',
+  completed: '완료',
+  cancelled: '취소됨',
+};
+
+const REGISTRATION_STATUS_LABEL: Record<string, string> = {
+  draft: '초안',
+  awaiting_payment: '입금대기',
+  payment_checking: '확인중',
+  paid: '결제완료',
+  confirmed: '확정',
+  waitlisted: '대기',
+  cancel_requested: '취소요청',
+  cancelled: '취소됨',
+};
+
+const ELIGIBILITY_LABEL: Record<string, string> = {
+  non_pro: '아마추어',
+  pro: '프로',
+  needs_review: '검토필요',
+};
+
+// ── Status transition guards ────────────────────────────────────────────────
+
+/** Returns next allowed statuses from the current one */
+function allowedNextStatuses(current: V1TournamentStatus): V1TournamentStatus[] {
+  switch (current) {
+    case 'draft':
+      return ['open', 'cancelled'];
+    case 'open':
+      return ['closed', 'cancelled'];
+    case 'closed':
+      return ['in_progress', 'open', 'cancelled'];
+    case 'in_progress':
+      return ['completed', 'cancelled'];
+    case 'completed':
+    case 'cancelled':
+      return [];
+    default:
+      return [];
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  try {
+    return new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatCurrency(n: number): string {
+  if (n === 0) return '무료';
+  return `${n.toLocaleString('ko-KR')}원`;
+}
+
+// ── Shared input styles ───────────────────────────────────────────────────
+
+const inputCls = [
+  'h-[44px] px-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
+  'placeholder:text-gray-400',
+  'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
+  'transition-colors disabled:opacity-50 w-full',
+].join(' ');
+
+const textareaCls = [
+  'px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-xl text-gray-900 resize-none',
+  'placeholder:text-gray-400',
+  'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
+  'transition-colors disabled:opacity-50 w-full',
+].join(' ');
+
+// ── Inline modal (reusable within this file) ──────────────────────────────
+
+interface SimpleModalProps {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  pending?: boolean;
+  children: React.ReactNode;
+}
+
+function SimpleModal({ open, title, onClose, pending = false, children }: SimpleModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement;
+    } else {
+      const el = previousFocusRef.current;
+      if (el && typeof (el as HTMLElement).focus === 'function') {
+        (el as HTMLElement).focus();
+      }
+      previousFocusRef.current = null;
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !pending) onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose, pending]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const focusableSelectors =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
+  }, [open]);
+
+  useEffect(() => {
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
+      onClick={(e) => { if (e.target === e.currentTarget && !pending) onClose(); }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="simple-modal-title"
+        className="bg-white rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[480px] overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h2 id="simple-modal-title" className="text-[16px] font-bold text-gray-900">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={() => !pending && onClose()}
+            disabled={pending}
+            aria-label="모달 닫기"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="px-5 py-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab type ──────────────────────────────────────────────────────────────
+
+type TabId = 'registrations' | 'bracket' | 'announcements';
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'registrations', label: '신청 관리' },
+  { id: 'bracket', label: '대진 관리' },
+  { id: 'announcements', label: '공지' },
+];
+
+// ── Registration roster modal ─────────────────────────────────────────────
+
+function RosterModal({
+  open,
+  onClose,
+  tournamentId,
+  registration,
+  showToast,
+}: {
+  open: boolean;
+  onClose: () => void;
+  tournamentId: string;
+  registration: V1AdminTournamentRegistration | null;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const { data, isPending } = useV1TournamentPlayers(
+    tournamentId,
+    registration?.id ?? '',
+  );
+  const updateEligibility = useV1UpdatePlayerEligibility();
+
+  const players = data?.players ?? [];
+
+  const handleEligibilityChange = (playerId: string, status: string) => {
+    updateEligibility.mutate(
+      { playerId, eligibilityStatus: status as 'non_pro' | 'pro' | 'needs_review' },
+      {
+        onSuccess: () => showToast('자격 상태를 변경했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '자격 상태를 변경하지 못했어요.'), 'error'),
+      },
+    );
+  };
+
+  return (
+    <SimpleModal
+      open={open}
+      title={`명단 검토 — ${registration?.teamName ?? registration?.teamId ?? ''}`}
+      onClose={onClose}
+    >
+      {isPending ? (
+        <p className="text-sm text-gray-400">불러오는 중…</p>
+      ) : players.length === 0 ? (
+        <p className="text-sm text-gray-400">등록된 선수가 없어요.</p>
+      ) : (
+        <ul className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto" role="list">
+          {players.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{p.realName}</p>
+                {p.birthDateSnapshot && (
+                  <p className="text-[12px] text-gray-400">{p.birthDateSnapshot}</p>
+                )}
+              </div>
+              <select
+                value={p.eligibilityStatus}
+                onChange={(e) => handleEligibilityChange(p.id, e.target.value)}
+                disabled={updateEligibility.isPending}
+                aria-label={`${p.realName} 자격 상태`}
+                className="h-[36px] px-2 text-[13px] bg-white border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+              >
+                <option value="non_pro">아마추어</option>
+                <option value="pro">프로</option>
+                <option value="needs_review">검토필요</option>
+              </select>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={onClose}
+        className="mt-4 w-full h-[44px] rounded-xl text-[14px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+      >
+        닫기
+      </button>
+    </SimpleModal>
+  );
+}
+
+// ── Export CSV button (one hook instance per row) ─────────────────────────
+
+function ExportCsvButton({
+  registrationId,
+  showToast,
+}: {
+  registrationId: string;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const exportCsv = useV1ExportRosterCsv(registrationId);
+
+  const handleClick = () => {
+    exportCsv.mutate(undefined, {
+      onSuccess: (res) => {
+        const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = res.filename || `roster_${registrationId}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('CSV를 다운로드했어요.', 'success');
+      },
+      onError: (err) =>
+        showToast(extractErrorMessage(err, 'CSV 다운로드에 실패했어요.'), 'error'),
+    });
+  };
+
+  return (
+    <ActionButton
+      onClick={handleClick}
+      disabled={exportCsv.isPending}
+      icon={<Download size={13} />}
+      label={exportCsv.isPending ? '…' : 'CSV'}
+      tone="gray"
+    />
+  );
+}
+
+// ── Tab: Registrations ────────────────────────────────────────────────────
+
+function RegistrationsTab({
+  tournamentId,
+  showToast,
+}: {
+  tournamentId: string;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const { data, isPending, isError, error, refetch } = useV1AdminTournamentRegistrations(tournamentId);
+  const confirmPayment = useV1ConfirmPayment();
+  const confirmRegistration = useV1ConfirmRegistration();
+  const cancelRegistration = useV1CancelRegistrationAdmin();
+  const rosterLock = useV1RosterLock();
+  const rosterUnlock = useV1RosterUnlock();
+  const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
+  const [rosterOpen, setRosterOpen] = useState(false);
+
+  const registrations = data?.items ?? [];
+
+  const handleConfirmPayment = (reg: V1AdminTournamentRegistration) => {
+    confirmPayment.mutate(
+      { registrationId: reg.id },
+      {
+        onSuccess: () => showToast('입금을 확인했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '입금 확인에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleConfirm = (reg: V1AdminTournamentRegistration, decision: 'confirm' | 'waitlist') => {
+    confirmRegistration.mutate(
+      { registrationId: reg.id, decision },
+      {
+        onSuccess: (res) => {
+          if (res.alreadyProcessed) {
+            showToast('이미 처리된 신청이에요.', 'success');
+          } else {
+            showToast(decision === 'confirm' ? '확정했어요.' : '대기로 설정했어요.', 'success');
+          }
+        },
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '처리에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleCancel = (reg: V1AdminTournamentRegistration) => {
+    cancelRegistration.mutate(
+      { registrationId: reg.id },
+      {
+        onSuccess: () => showToast('취소했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '취소에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRosterLock = (reg: V1AdminTournamentRegistration) => {
+    rosterLock.mutate(
+      { registrationId: reg.id },
+      {
+        onSuccess: () => showToast('명단을 잠갔어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '명단 잠금에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRosterUnlock = (reg: V1AdminTournamentRegistration) => {
+    rosterUnlock.mutate(
+      reg.id,
+      {
+        onSuccess: () => showToast('명단 잠금을 해제했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '명단 잠금 해제에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+
+  if (isPending) return <AdminTableSkeleton cols={5} />;
+  if (isError) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 py-8 px-4 text-center">
+        <p className="text-sm text-red-500 mb-3">
+          {extractErrorMessage(error, '신청 목록을 불러오지 못했어요.')}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+        >
+          다시 시도하기
+        </button>
+      </div>
+    );
+  }
+
+  if (registrations.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100">
+        <AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Desktop table */}
+      <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-gray-700">
+            <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
+              <tr>
+                {['팀명', '상태', '결제', '입금자', '선수수'].map((h) => (
+                  <th
+                    key={h}
+                    scope="col"
+                    className="px-4 py-3 font-semibold text-gray-600 text-[12px] tracking-wide whitespace-nowrap text-left select-none"
+                  >
+                    {h}
+                  </th>
+                ))}
+                <th
+                  scope="col"
+                  className="px-4 py-3 font-semibold text-gray-600 text-[12px] tracking-wide text-right whitespace-nowrap"
+                >
+                  작업
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {registrations.map((reg) => {
+                const isLocked = !!reg.rosterLockedAt;
+                return (
+                  <tr key={reg.id} className="transition-colors hover:bg-gray-50/60">
+                    <td className="px-4 py-3 align-middle">
+                      <span className="font-medium text-gray-900">{reg.teamName ?? reg.teamId}</span>
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <AdminStatusPill
+                        status={reg.status}
+                        label={REGISTRATION_STATUS_LABEL[reg.status] ?? reg.status}
+                      />
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      {reg.payment ? (
+                        <span className="text-[13px] text-gray-600">
+                          {reg.payment.method === 'pg' ? 'PG' : '무통장'} ·{' '}
+                          {reg.payment.status}
+                        </span>
+                      ) : (
+                        <span className="text-[13px] text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <span className="text-[13px] text-gray-600">
+                        {reg.depositorName ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 align-middle tabular-nums text-gray-600">
+                      {reg.playerCount}명
+                    </td>
+                    <td className="px-4 py-3 align-middle">
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        {/* 입금확인 */}
+                        {reg.status === 'awaiting_payment' && (
+                          <ActionButton
+                            onClick={() => handleConfirmPayment(reg)}
+                            disabled={confirmPayment.isPending}
+                            icon={<Check size={13} />}
+                            label="입금확인"
+                            tone="blue"
+                          />
+                        )}
+                        {/* 확정 / 대기 */}
+                        {(reg.status === 'payment_checking' || reg.status === 'paid') && (
+                          <>
+                            <ActionButton
+                              onClick={() => handleConfirm(reg, 'confirm')}
+                              disabled={confirmRegistration.isPending}
+                              icon={<Check size={13} />}
+                              label="확정"
+                              tone="blue"
+                            />
+                            <ActionButton
+                              onClick={() => handleConfirm(reg, 'waitlist')}
+                              disabled={confirmRegistration.isPending}
+                              icon={<X size={13} />}
+                              label="대기"
+                              tone="gray"
+                            />
+                          </>
+                        )}
+                        {/* 명단 잠금/해제 */}
+                        {reg.status === 'confirmed' && (
+                          isLocked ? (
+                            <ActionButton
+                              onClick={() => handleRosterUnlock(reg)}
+                              disabled={rosterUnlock.isPending}
+                              icon={<Unlock size={13} />}
+                              label="잠금해제"
+                              tone="gray"
+                            />
+                          ) : (
+                            <ActionButton
+                              onClick={() => handleRosterLock(reg)}
+                              disabled={rosterLock.isPending}
+                              icon={<Lock size={13} />}
+                              label="명단잠금"
+                              tone="gray"
+                            />
+                          )
+                        )}
+                        {/* 명단 검토 */}
+                        <ActionButton
+                          onClick={() => {
+                            setRosterRegistration(reg);
+                            setRosterOpen(true);
+                          }}
+                          icon={<Check size={13} />}
+                          label="명단 검토"
+                          tone="gray"
+                        />
+                        {/* CSV 다운로드 */}
+                        <ExportCsvButton registrationId={reg.id} showToast={showToast} />
+                        {/* 취소 */}
+                        {reg.status !== 'cancelled' && (
+                          <ActionButton
+                            onClick={() => handleCancel(reg)}
+                            disabled={cancelRegistration.isPending}
+                            icon={<X size={13} />}
+                            label="취소"
+                            tone="red"
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Mobile card list */}
+      <ul className="lg:hidden flex flex-col gap-2" role="list">
+        {registrations.map((reg) => {
+          const isLocked = !!reg.rosterLockedAt;
+          return (
+            <li key={reg.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+              <dl className="flex flex-col gap-1.5 text-[13px] mb-3">
+                <div className="flex gap-2">
+                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">팀</dt>
+                  <dd className="text-gray-800 font-semibold">{reg.teamName ?? reg.teamId}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">상태</dt>
+                  <dd>
+                    <AdminStatusPill
+                      status={reg.status}
+                      label={REGISTRATION_STATUS_LABEL[reg.status] ?? reg.status}
+                    />
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">결제</dt>
+                  <dd className="text-gray-800">
+                    {reg.payment
+                      ? `${reg.payment.method === 'pg' ? 'PG' : '무통장'} · ${reg.payment.status}`
+                      : '—'}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">입금자</dt>
+                  <dd className="text-gray-800">{reg.depositorName ?? '—'}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">선수</dt>
+                  <dd className="text-gray-800 tabular-nums">{reg.playerCount}명</dd>
+                </div>
+              </dl>
+              <div className="flex flex-wrap gap-1.5 border-t border-gray-50 pt-2.5">
+                {reg.status === 'awaiting_payment' && (
+                  <ActionButton onClick={() => handleConfirmPayment(reg)} disabled={confirmPayment.isPending} icon={<Check size={13} />} label="입금확인" tone="blue" />
+                )}
+                {(reg.status === 'payment_checking' || reg.status === 'paid') && (
+                  <>
+                    <ActionButton onClick={() => handleConfirm(reg, 'confirm')} disabled={confirmRegistration.isPending} icon={<Check size={13} />} label="확정" tone="blue" />
+                    <ActionButton onClick={() => handleConfirm(reg, 'waitlist')} disabled={confirmRegistration.isPending} icon={<X size={13} />} label="대기" tone="gray" />
+                  </>
+                )}
+                {reg.status === 'confirmed' && (
+                  isLocked ? (
+                    <ActionButton onClick={() => handleRosterUnlock(reg)} disabled={rosterUnlock.isPending} icon={<Unlock size={13} />} label="잠금해제" tone="gray" />
+                  ) : (
+                    <ActionButton onClick={() => handleRosterLock(reg)} disabled={rosterLock.isPending} icon={<Lock size={13} />} label="명단잠금" tone="gray" />
+                  )
+                )}
+                <ActionButton onClick={() => { setRosterRegistration(reg); setRosterOpen(true); }} icon={<Check size={13} />} label="명단 검토" tone="gray" />
+                <ExportCsvButton registrationId={reg.id} showToast={showToast} />
+                {reg.status !== 'cancelled' && (
+                  <ActionButton onClick={() => handleCancel(reg)} disabled={cancelRegistration.isPending} icon={<X size={13} />} label="취소" tone="red" />
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Roster modal */}
+      <RosterModal
+        open={rosterOpen}
+        onClose={() => setRosterOpen(false)}
+        tournamentId={tournamentId}
+        registration={rosterRegistration}
+        showToast={showToast}
+      />
+    </>
+  );
+}
+
+// ── Small action button ───────────────────────────────────────────────────
+
+function ActionButton({
+  onClick,
+  disabled,
+  icon,
+  label,
+  tone,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  icon: React.ReactNode;
+  label: string;
+  tone: 'blue' | 'gray' | 'red';
+}) {
+  const toneClass =
+    tone === 'blue'
+      ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+      : tone === 'red'
+      ? 'text-red-600 bg-red-50 hover:bg-red-100'
+      : 'text-gray-600 bg-gray-100 hover:bg-gray-200';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        'inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap',
+        'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+        'disabled:opacity-50',
+        toneClass,
+      ].join(' ')}
+    >
+      <span aria-hidden="true">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+// ── Tab: Bracket ──────────────────────────────────────────────────────────
+
+function BracketTab({
+  tournamentId,
+  showToast,
+  registrations,
+}: {
+  tournamentId: string;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+  registrations: V1AdminTournamentRegistration[];
+}) {
+  const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
+  const createGroup = useV1CreateGroup(tournamentId);
+  const assignGroupTeam = useV1AssignGroupTeam(tournamentId);
+  const createFixture = useV1CreateFixture(tournamentId);
+  const recordResult = useV1RecordResult(tournamentId);
+  const recalculate = useV1RecalculateStandings(tournamentId);
+
+  // ── Group creation form ─────────────────────────────────────────────
+  const [groupName, setGroupName] = useState('');
+  const [groupPhase, setGroupPhase] = useState<V1TournamentGroupPhase>('group');
+
+  // ── Assign team form ────────────────────────────────────────────────
+  const [assignGroupId, setAssignGroupId] = useState('');
+  const [assignRegId, setAssignRegId] = useState('');
+
+  // ── Create fixture form ─────────────────────────────────────────────
+  const [fixtureGroupId, setFixtureGroupId] = useState('');
+  const [fixtureRound, setFixtureRound] = useState('');
+  const [fixtureNumber, setFixtureNumber] = useState('1');
+  const [fixtureHomeRegId, setFixtureHomeRegId] = useState('');
+  const [fixtureAwayRegId, setFixtureAwayRegId] = useState('');
+
+  // ── Record result state ─────────────────────────────────────────────
+  const [resultFixture, setResultFixture] = useState<V1AdminBracketFixture | null>(null);
+  const [resultOpen, setResultOpen] = useState(false);
+  const [homeScore, setHomeScore] = useState('0');
+  const [awayScore, setAwayScore] = useState('0');
+  const [hasPenalty, setHasPenalty] = useState(false);
+  const [homePenalty, setHomePenalty] = useState('0');
+  const [awayPenalty, setAwayPenalty] = useState('0');
+
+  const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
+
+  const handleCreateGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!groupName.trim()) return;
+    createGroup.mutate(
+      { name: groupName.trim(), phase: groupPhase },
+      {
+        onSuccess: () => { setGroupName(''); showToast('조를 만들었어요.', 'success'); },
+        onError: (err) => showToast(extractErrorMessage(err, '조 생성에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleAssignTeam = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignGroupId || !assignRegId) return;
+    assignGroupTeam.mutate(
+      { groupId: assignGroupId, registrationId: assignRegId },
+      {
+        onSuccess: () => { setAssignRegId(''); showToast('팀을 배정했어요.', 'success'); },
+        onError: (err) => showToast(extractErrorMessage(err, '팀 배정에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleCreateFixture = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fixtureRound.trim() || !fixtureNumber) return;
+    createFixture.mutate(
+      {
+        round: fixtureRound.trim(),
+        fixtureNumber: parseInt(fixtureNumber, 10),
+        ...(fixtureGroupId ? { groupId: fixtureGroupId } : {}),
+        ...(fixtureHomeRegId ? { homeRegistrationId: fixtureHomeRegId } : {}),
+        ...(fixtureAwayRegId ? { awayRegistrationId: fixtureAwayRegId } : {}),
+      },
+      {
+        onSuccess: () => {
+          setFixtureRound('');
+          setFixtureNumber('1');
+          setFixtureHomeRegId('');
+          setFixtureAwayRegId('');
+          showToast('픽스처를 만들었어요.', 'success');
+        },
+        onError: (err) => showToast(extractErrorMessage(err, '픽스처 생성에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRecordResult = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resultFixture) return;
+    recordResult.mutate(
+      {
+        fixtureId: resultFixture.id,
+        homeScore: parseInt(homeScore, 10),
+        awayScore: parseInt(awayScore, 10),
+        ...(hasPenalty
+          ? {
+              hasPenalty: true,
+              homePenaltyScore: parseInt(homePenalty, 10),
+              awayPenaltyScore: parseInt(awayPenalty, 10),
+            }
+          : { hasPenalty: false }),
+      },
+      {
+        onSuccess: () => {
+          setResultOpen(false);
+          showToast('결과를 입력했어요.', 'success');
+        },
+        onError: (err) => showToast(extractErrorMessage(err, '결과 입력에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRecalculate = () => {
+    recalculate.mutate(undefined, {
+      onSuccess: () => showToast('순위를 재계산했어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '순위 재계산에 실패했어요.'), 'error'),
+    });
+  };
+
+  if (isPending) return <AdminTableSkeleton cols={4} />;
+  if (isError) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 py-8 px-4 text-center">
+        <p className="text-sm text-red-500 mb-3">
+          {extractErrorMessage(error, '대진 정보를 불러오지 못했어요.')}
+        </p>
+        <button type="button" onClick={() => void refetch()} className="text-sm text-blue-500 hover:text-blue-600 underline min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded">
+          다시 시도하기
+        </button>
+      </div>
+    );
+  }
+
+  const groups: V1AdminBracketGroup[] = bracket?.groups ?? [];
+  const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* ── 조 만들기 ───────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
+        <h3 className="text-[14px] font-bold text-gray-800 mb-4">조 만들기</h3>
+        <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="group-name" className="text-[12px] font-semibold text-gray-600 sr-only">
+              조 이름
+            </label>
+            <input
+              id="group-name"
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="조 이름 (예: A조)"
+              disabled={createGroup.isPending}
+              maxLength={20}
+              className={inputCls + ' sm:w-[180px]'}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="group-phase" className="text-[12px] font-semibold text-gray-600 sr-only">
+              단계
+            </label>
+            <select
+              id="group-phase"
+              value={groupPhase}
+              onChange={(e) => setGroupPhase(e.target.value as V1TournamentGroupPhase)}
+              disabled={createGroup.isPending}
+              className={inputCls + ' sm:w-[120px]'}
+            >
+              <option value="group">조별</option>
+              <option value="semi">준결승</option>
+              <option value="final">결승</option>
+              <option value="third_place">3위결정</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={!groupName.trim() || createGroup.isPending}
+            className="inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <Plus size={14} aria-hidden="true" />
+            조 추가
+          </button>
+        </form>
+      </div>
+
+      {/* ── 팀 배정 ─────────────────────────────────────────────────── */}
+      {groups.length > 0 && confirmedRegistrations.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
+          <h3 className="text-[14px] font-bold text-gray-800 mb-4">팀 배정</h3>
+          <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="assign-group" className="text-[12px] font-semibold text-gray-600 sr-only">
+                조 선택
+              </label>
+              <select
+                id="assign-group"
+                value={assignGroupId}
+                onChange={(e) => setAssignGroupId(e.target.value)}
+                disabled={assignGroupTeam.isPending}
+                className={inputCls + ' sm:w-[160px]'}
+              >
+                <option value="">조 선택</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="assign-team" className="text-[12px] font-semibold text-gray-600 sr-only">
+                팀 선택
+              </label>
+              <select
+                id="assign-team"
+                value={assignRegId}
+                onChange={(e) => setAssignRegId(e.target.value)}
+                disabled={assignGroupTeam.isPending}
+                className={inputCls + ' sm:w-[200px]'}
+              >
+                <option value="">확정 팀 선택</option>
+                {confirmedRegistrations.map((r) => (
+                  <option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={!assignGroupId || !assignRegId || assignGroupTeam.isPending}
+              className="inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              배정
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ── 조별 순위표 ──────────────────────────────────────────────── */}
+      {groups.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[14px] font-bold text-gray-800">조별 순위표</h3>
+            <button
+              type="button"
+              onClick={handleRecalculate}
+              disabled={recalculate.isPending}
+              className="inline-flex items-center gap-1.5 h-[36px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              <RefreshCw size={13} aria-hidden="true" />
+              순위 재계산
+            </button>
+          </div>
+          {groups.map((group) => {
+            const standings = bracket?.standings.filter((s) => s.groupId === group.id) ?? [];
+            return (
+              <div key={group.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-50 bg-gray-50">
+                  <h4 className="text-[13px] font-bold text-gray-700">{group.name}</h4>
+                </div>
+                {standings.length === 0 ? (
+                  <p className="px-4 py-3 text-[13px] text-gray-400">팀이 없어요.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-gray-700">
+                      <thead>
+                        <tr className="border-b border-gray-50">
+                          {['순위', '팀', '승', '무', '패', '득점', '실점', '승점'].map((h) => (
+                            <th key={h} scope="col" className="px-3 py-2 text-[11px] font-semibold text-gray-500 text-left whitespace-nowrap">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {standings.map((s) => (
+                          <tr key={s.id}>
+                            <td className="px-3 py-2 tabular-nums text-gray-500">{s.position}</td>
+                            <td className="px-3 py-2 font-medium text-gray-900">{s.registrationId}</td>
+                            <td className="px-3 py-2 tabular-nums">{s.wins}</td>
+                            <td className="px-3 py-2 tabular-nums">{s.draws}</td>
+                            <td className="px-3 py-2 tabular-nums">{s.losses}</td>
+                            <td className="px-3 py-2 tabular-nums">{s.goalsFor}</td>
+                            <td className="px-3 py-2 tabular-nums">{s.goalsAgainst}</td>
+                            <td className="px-3 py-2 tabular-nums font-semibold text-blue-600">{s.points}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── 픽스처 만들기 ────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
+        <h3 className="text-[14px] font-bold text-gray-800 mb-4">픽스처 만들기</h3>
+        <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fixture-round" className="text-[12px] font-semibold text-gray-600">라운드</label>
+            <input id="fixture-round" type="text" value={fixtureRound} onChange={(e) => setFixtureRound(e.target.value)} placeholder="예: 조별 1라운드" disabled={createFixture.isPending} maxLength={30} className={inputCls} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fixture-number" className="text-[12px] font-semibold text-gray-600">번호</label>
+            <input id="fixture-number" type="number" min="1" value={fixtureNumber} onChange={(e) => setFixtureNumber(e.target.value)} disabled={createFixture.isPending} className={inputCls} />
+          </div>
+          {groups.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="fixture-group" className="text-[12px] font-semibold text-gray-600">소속 조 (선택)</label>
+              <select id="fixture-group" value={fixtureGroupId} onChange={(e) => setFixtureGroupId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
+                <option value="">조 없음</option>
+                {groups.map((g) => (<option key={g.id} value={g.id}>{g.name}</option>))}
+              </select>
+            </div>
+          )}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fixture-home" className="text-[12px] font-semibold text-gray-600">홈 팀 (선택)</label>
+            <select id="fixture-home" value={fixtureHomeRegId} onChange={(e) => setFixtureHomeRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
+              <option value="">미정</option>
+              {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fixture-away" className="text-[12px] font-semibold text-gray-600">어웨이 팀 (선택)</label>
+            <select id="fixture-away" value={fixtureAwayRegId} onChange={(e) => setFixtureAwayRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
+              <option value="">미정</option>
+              {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={!fixtureRound.trim() || !fixtureNumber || createFixture.isPending} className="inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 w-full sm:w-auto">
+              <Plus size={14} aria-hidden="true" />픽스처 추가
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* ── 픽스처 목록 ──────────────────────────────────────────────── */}
+      {fixtures.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-50 bg-gray-50">
+            <h3 className="text-[13px] font-bold text-gray-700">픽스처 목록</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-gray-700">
+              <thead>
+                <tr className="border-b border-gray-50">
+                  {['라운드', '번호', '홈', '어웨이', '결과', '작업'].map((h, i) => (
+                    <th key={h} scope="col" className={`px-4 py-3 text-[12px] font-semibold text-gray-600 whitespace-nowrap select-none ${i === 5 ? 'text-right' : 'text-left'}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {fixtures.map((f) => (
+                  <tr key={f.id} className="transition-colors hover:bg-gray-50/60">
+                    <td className="px-4 py-3 text-gray-600">{f.round}</td>
+                    <td className="px-4 py-3 tabular-nums text-gray-600">{f.fixtureNumber}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{f.homeRegistrationId ?? '—'}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{f.awayRegistrationId ?? '—'}</td>
+                    <td className="px-4 py-3 tabular-nums text-gray-600">
+                      {f.result
+                        ? `${f.result.homeScore} : ${f.result.awayScore}${f.result.hasPenalty ? ` (PK ${f.result.homePenaltyScore}:${f.result.awayPenaltyScore})` : ''}`
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResultFixture(f);
+                          setHomeScore(String(f.result?.homeScore ?? 0));
+                          setAwayScore(String(f.result?.awayScore ?? 0));
+                          setHasPenalty(f.result?.hasPenalty ?? false);
+                          setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
+                          setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
+                          setResultOpen(true);
+                        }}
+                        aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
+                        className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      >
+                        결과 입력
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Result input modal ────────────────────────────────────────── */}
+      <SimpleModal
+        open={resultOpen}
+        title="결과 입력"
+        onClose={() => setResultOpen(false)}
+        pending={recordResult.isPending}
+      >
+        <form onSubmit={handleRecordResult} noValidate className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1 flex-1">
+              <label htmlFor="home-score" className="text-[13px] font-semibold text-gray-700">
+                홈 ({resultFixture?.homeRegistrationId ?? '홈'})
+              </label>
+              <input
+                id="home-score"
+                type="number"
+                min="0"
+                value={homeScore}
+                onChange={(e) => setHomeScore(e.target.value)}
+                disabled={recordResult.isPending}
+                className={inputCls}
+              />
+            </div>
+            <span className="text-[20px] font-bold text-gray-400 mt-5" aria-hidden="true">:</span>
+            <div className="flex flex-col gap-1 flex-1">
+              <label htmlFor="away-score" className="text-[13px] font-semibold text-gray-700">
+                어웨이 ({resultFixture?.awayRegistrationId ?? '어웨이'})
+              </label>
+              <input
+                id="away-score"
+                type="number"
+                min="0"
+                value={awayScore}
+                onChange={(e) => setAwayScore(e.target.value)}
+                disabled={recordResult.isPending}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer min-h-[44px]">
+            <input
+              type="checkbox"
+              checked={hasPenalty}
+              onChange={(e) => setHasPenalty(e.target.checked)}
+              disabled={recordResult.isPending}
+              className="w-4 h-4 rounded accent-blue-500"
+            />
+            승부차기 있음
+          </label>
+
+          {hasPenalty && (
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-1 flex-1">
+                <label htmlFor="home-penalty" className="text-[13px] font-semibold text-gray-700">홈 PK</label>
+                <input id="home-penalty" type="number" min="0" value={homePenalty} onChange={(e) => setHomePenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
+              </div>
+              <span className="text-[20px] font-bold text-gray-400 mt-5" aria-hidden="true">:</span>
+              <div className="flex flex-col gap-1 flex-1">
+                <label htmlFor="away-penalty" className="text-[13px] font-semibold text-gray-700">어웨이 PK</label>
+                <input id="away-penalty" type="number" min="0" value={awayPenalty} onChange={(e) => setAwayPenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setResultOpen(false)}
+              disabled={recordResult.isPending}
+              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={recordResult.isPending}
+              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              {recordResult.isPending ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </form>
+      </SimpleModal>
+    </div>
+  );
+}
+
+// ── Tab: Announcements ────────────────────────────────────────────────────
+
+function AnnouncementsTab({
+  tournamentId,
+  announcements,
+  showToast,
+}: {
+  tournamentId: string;
+  announcements: V1AdminTournamentAnnouncement[];
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const createAnnouncement = useV1CreateAnnouncement(tournamentId);
+  const publishAnnouncement = useV1PublishAnnouncement();
+
+  const [annTitle, setAnnTitle] = useState('');
+  const [annBody, setAnnBody] = useState('');
+  const [annAudience, setAnnAudience] = useState<V1AnnouncementAudience>('all_registered');
+  const [annPublish, setAnnPublish] = useState(false);
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!annTitle.trim() || !annBody.trim()) return;
+    createAnnouncement.mutate(
+      {
+        title: annTitle.trim(),
+        body: annBody.trim(),
+        audience: annAudience,
+        publish: annPublish,
+      },
+      {
+        onSuccess: () => {
+          setAnnTitle('');
+          setAnnBody('');
+          setAnnPublish(false);
+          showToast('공지를 작성했어요.', 'success');
+        },
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '공지 작성에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handlePublish = (announcementId: string) => {
+    publishAnnouncement.mutate(announcementId, {
+      onSuccess: (res) => {
+        if (res.alreadyPublished) {
+          showToast('이미 발행된 공지예요.', 'success');
+        } else {
+          showToast('공지를 발행했어요.', 'success');
+        }
+      },
+      onError: (err) =>
+        showToast(extractErrorMessage(err, '공지 발행에 실패했어요.'), 'error'),
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
+        <h3 className="text-[14px] font-bold text-gray-800 mb-4">공지 작성</h3>
+        <form onSubmit={handleCreate} noValidate className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="ann-title" className="text-[13px] font-semibold text-gray-700">
+              제목 <span className="text-red-500" aria-hidden="true">*</span>
+              <span className="sr-only">(필수)</span>
+            </label>
+            <input
+              id="ann-title"
+              type="text"
+              value={annTitle}
+              onChange={(e) => setAnnTitle(e.target.value)}
+              disabled={createAnnouncement.isPending}
+              placeholder="공지 제목"
+              maxLength={100}
+              required
+              aria-required="true"
+              className={inputCls}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="ann-body" className="text-[13px] font-semibold text-gray-700">
+              내용 <span className="text-red-500" aria-hidden="true">*</span>
+              <span className="sr-only">(필수)</span>
+            </label>
+            <textarea
+              id="ann-body"
+              value={annBody}
+              onChange={(e) => setAnnBody(e.target.value)}
+              disabled={createAnnouncement.isPending}
+              rows={4}
+              placeholder="공지 내용을 입력해 주세요."
+              required
+              aria-required="true"
+              className={textareaCls}
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col gap-1.5 flex-1">
+              <label htmlFor="ann-audience" className="text-[13px] font-semibold text-gray-700">
+                대상
+              </label>
+              <select
+                id="ann-audience"
+                value={annAudience}
+                onChange={(e) => setAnnAudience(e.target.value as V1AnnouncementAudience)}
+                disabled={createAnnouncement.isPending}
+                className={inputCls}
+              >
+                <option value="all_registered">모든 신청팀</option>
+                <option value="confirmed_only">확정팀만</option>
+                <option value="waitlist">대기팀만</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer min-h-[44px] self-end sm:pb-0.5">
+              <input
+                type="checkbox"
+                checked={annPublish}
+                onChange={(e) => setAnnPublish(e.target.checked)}
+                disabled={createAnnouncement.isPending}
+                className="w-4 h-4 rounded accent-blue-500"
+              />
+              즉시 발행
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={!annTitle.trim() || !annBody.trim() || createAnnouncement.isPending}
+            className="inline-flex items-center justify-center gap-1.5 h-[48px] px-6 rounded-xl text-[14px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <Megaphone size={15} aria-hidden="true" />
+            {createAnnouncement.isPending ? '작성 중…' : '공지 작성'}
+          </button>
+        </form>
+      </div>
+
+      {/* ── 공지 목록 ─────────────────────────────────────────────────── */}
+      {announcements.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100">
+          <AdminEmpty title="공지가 없어요" description="첫 공지를 작성해 보세요." />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {announcements.map((ann) => (
+            <div key={ann.id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-bold text-gray-900 mb-0.5 truncate">{ann.title}</p>
+                  <p className="text-[12px] text-gray-400">
+                    {ann.publishedAt ? `발행 · ${formatDate(ann.publishedAt)}` : '미발행'}
+                    {' '}·{' '}
+                    {ann.audience === 'all_registered'
+                      ? '모든 신청팀'
+                      : ann.audience === 'confirmed_only'
+                      ? '확정팀만'
+                      : '대기팀만'}
+                  </p>
+                </div>
+                {!ann.publishedAt && (
+                  <button
+                    type="button"
+                    onClick={() => handlePublish(ann.id)}
+                    disabled={publishAnnouncement.isPending}
+                    aria-label={`"${ann.title}" 발행`}
+                    className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-[12px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+                  >
+                    <Send size={12} aria-hidden="true" />
+                    발행
+                  </button>
+                )}
+              </div>
+              <p className="mt-2 text-[13px] text-gray-600 whitespace-pre-wrap leading-relaxed">
+                {ann.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main detail client ────────────────────────────────────────────────────
+
+export default function TournamentDetailClient({ id }: { id: string }) {
+  const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
+  const { data: adminMe } = useV1AdminMe();
+  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const changeStatus = useV1ChangeTournamentStatus(id);
+
+  const { toasts, showToast } = useAdminToast();
+
+  const [activeTab, setActiveTab] = useState<TabId>('registrations');
+
+  // ── Registration data (needed by bracket tab for confirmed teams) ────
+  const { data: regData } = useV1AdminTournamentRegistrations(id);
+  const registrations = regData?.items ?? [];
+
+  // ── Status change ────────────────────────────────────────────────────
+  const handleStatusChange = (nextStatus: V1TournamentStatus) => {
+    changeStatus.mutate(
+      { status: nextStatus },
+      {
+        onSuccess: (res) => {
+          if (res.alreadyInStatus) {
+            showToast('이미 해당 상태예요.', 'success');
+          } else {
+            showToast('상태를 변경했어요.', 'success');
+          }
+        },
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '상태 변경에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  if (isPending) {
+    return (
+      <div className="animate-pulse">
+        <div className="mb-4 h-4 bg-gray-100 rounded-lg w-24" />
+        <div className="h-7 bg-gray-100 rounded-lg w-64 mb-2" />
+        <div className="h-4 bg-gray-100 rounded-lg w-48 mb-6" />
+        <AdminTableSkeleton cols={5} />
+      </div>
+    );
+  }
+
+  if (isError || !tournament) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 text-center max-w-[400px] mx-auto mt-8">
+        <p className="text-sm text-red-500 font-medium mb-3">
+          {extractErrorMessage(error, '대회 정보를 불러오지 못했어요.')}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+        >
+          다시 시도하기
+        </button>
+      </div>
+    );
+  }
+
+  const nextStatuses = allowedNextStatuses(tournament.status);
+
+  // Announcements come from bracket endpoint; for detail we grab from tournament data but
+  // V1Tournament admin type doesn't include announcements directly so we store them via
+  // the bracket query. Use an empty array fallback—the AnnouncementsTab creates new ones.
+  const announcements: V1AdminTournamentAnnouncement[] = [];
+
+  return (
+    <>
+      {/* ── Back link ─────────────────────────────────────────────────── */}
+      <div className="mb-4">
+        <Link
+          href="/admin/tournaments"
+          className="inline-flex items-center gap-1 text-[13px] text-gray-400 hover:text-gray-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+        >
+          <ChevronLeft size={14} aria-hidden="true" />
+          대회 목록으로
+        </Link>
+      </div>
+
+      {/* ── Header ────────────────────────────────────────────────────── */}
+      <AdminPageHeader
+        eyebrow="대회 관리"
+        title={tournament.title}
+        description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${formatDate(tournament.scheduledAt)}`}
+        action={
+          canWrite && nextStatuses.length > 0 ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              {nextStatuses.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleStatusChange(s)}
+                  disabled={changeStatus.isPending}
+                  className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+                >
+                  {TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경
+                </button>
+              ))}
+            </div>
+          ) : undefined
+        }
+      />
+
+      {/* ── Info card ─────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6">
+        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3 text-[13px]">
+          {[
+            { label: '상태', value: <AdminStatusPill status={tournament.status} label={TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} /> },
+            { label: '참가비', value: formatCurrency(tournament.entryFee) },
+            { label: '팀 수', value: `${tournament.teamCount}팀` },
+            { label: '선수 수', value: `${tournament.minPlayers}~${tournament.maxPlayers}명` },
+            { label: '신청 수', value: `${tournament.registrationCount}팀` },
+            { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
+            { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
+            { label: '대회 일정', value: formatDate(tournament.scheduledAt) },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <dt className="text-gray-400 font-medium mb-0.5">{label}</dt>
+              <dd className="text-gray-900">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      {/* ── Tabs ──────────────────────────────────────────────────────── */}
+      <div
+        role="tablist"
+        aria-label="대회 운영 탭"
+        className="flex gap-0.5 bg-gray-100 rounded-xl p-1 mb-5 w-fit"
+      >
+        {TABS.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              id={`tab-${tab.id}`}
+              role="tab"
+              aria-selected={active}
+              aria-controls={`panel-${tab.id}`}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={[
+                'inline-flex items-center h-[36px] px-4 rounded-lg text-[13px] font-medium transition-colors',
+                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                active
+                  ? 'bg-white text-gray-900 shadow-sm font-semibold'
+                  : 'text-gray-500 hover:text-gray-700',
+              ].join(' ')}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Tab panels ────────────────────────────────────────────────── */}
+      <div
+        id={`panel-registrations`}
+        role="tabpanel"
+        aria-labelledby="tab-registrations"
+        hidden={activeTab !== 'registrations'}
+      >
+        {activeTab === 'registrations' && (
+          <RegistrationsTab tournamentId={id} showToast={showToast} />
+        )}
+      </div>
+
+      <div
+        id={`panel-bracket`}
+        role="tabpanel"
+        aria-labelledby="tab-bracket"
+        hidden={activeTab !== 'bracket'}
+      >
+        {activeTab === 'bracket' && (
+          <BracketTab tournamentId={id} showToast={showToast} registrations={registrations} />
+        )}
+      </div>
+
+      <div
+        id={`panel-announcements`}
+        role="tabpanel"
+        aria-labelledby="tab-announcements"
+        hidden={activeTab !== 'announcements'}
+      >
+        {activeTab === 'announcements' && (
+          <AnnouncementsTab
+            tournamentId={id}
+            announcements={announcements}
+            showToast={showToast}
+          />
+        )}
+      </div>
+
+      <AdminToasts toasts={toasts} />
+    </>
+  );
+}

@@ -1393,6 +1393,9 @@ export type V1TournamentDetail = {
   minPlayers: number;
   maxPlayers: number;
   entryFee: number;
+  bankName: string | null;
+  bankAccount: string | null;
+  bankHolder: string | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
@@ -1436,6 +1439,8 @@ export type V1TournamentRegistration = {
 /** Serialized by AdminRegistrationsService.serialize — admin view (extra confirmedByAdminUserId) */
 export type V1AdminTournamentRegistration = V1TournamentRegistration & {
   confirmedByAdminUserId: string | null;
+  // 목록 응답에만 포함(team join). mutation 응답에는 없음 → optional.
+  teamName?: string | null;
   payment:
     | (V1TournamentPaymentSummary & { confirmedByAdminUserId: string | null })
     | null;

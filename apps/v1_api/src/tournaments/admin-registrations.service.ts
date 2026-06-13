@@ -61,6 +61,7 @@ export class AdminRegistrationsService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: {
         payment: true,
+        team: { select: { name: true } },
         _count: { select: { players: { where: { removedAt: null } } } },
       },
     });
@@ -69,9 +70,10 @@ export class AdminRegistrationsService {
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
     return {
-      items: pageItems.map((row) =>
-        this.serialize(row, row.payment ?? null, row._count.players),
-      ),
+      items: pageItems.map((row) => ({
+        ...this.serialize(row, row.payment ?? null, row._count.players),
+        teamName: row.team?.name ?? null,
+      })),
       pageInfo: {
         nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
         hasNext,

@@ -69,6 +69,59 @@ function formatPublishedAt(dateStr: string): string {
   return `${month}월 ${day}일`;
 }
 
+/* ── Apply CTA ── */
+
+function ApplyCTA({ tournament }: { tournament: V1TournamentDetail }) {
+  const isOpen = tournament.status === 'open';
+  const isFull = tournament.confirmedCount >= tournament.teamCount;
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: 'sticky',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: '12px 20px calc(12px + env(safe-area-inset-bottom))',
+        background: 'var(--surface)',
+        borderTop: '1px solid var(--grey100)',
+        zIndex: 100,
+      }}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+        <Link
+          href={`/tournaments/${tournament.id}/my`}
+          className="tm-btn tm-btn-lg tm-btn-neutral"
+          aria-label="내 신청 상태 확인"
+        >
+          내 신청
+        </Link>
+        {isFull ? (
+          <button
+            type="button"
+            className="tm-btn tm-btn-lg tm-btn-primary"
+            disabled
+            aria-disabled="true"
+            aria-label="모집이 마감되었어요"
+          >
+            모집 마감
+          </button>
+        ) : (
+          <Link
+            href={`/tournaments/${tournament.id}/apply`}
+            className="tm-btn tm-btn-lg tm-btn-primary"
+            aria-label="참가 신청하기"
+          >
+            참가 신청하기
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Entry point ── */
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
@@ -92,7 +145,12 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   }
 
   return (
-    <AppChrome title={data.title} backHref="/tournaments" bottomNav={false}>
+    <AppChrome
+      title={data.title}
+      backHref="/tournaments"
+      bottomNav={false}
+      floatingSlot={<ApplyCTA tournament={data} />}
+    >
       <TournamentDetailView tournament={data} />
     </AppChrome>
   );
@@ -105,9 +163,11 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
   const hasGroups = tournament.groups.length > 0;
   const hasFixtures = tournament.fixtures.length > 0;
   const hasAnnouncements = tournament.announcements.length > 0;
+  // Extra bottom padding when sticky CTA is shown so content isn't occluded
+  const bottomPad = tournament.status === 'open' ? 96 : 48;
 
   return (
-    <article style={{ padding: '0 20px 48px' }}>
+    <article style={{ padding: `0 20px ${bottomPad}px` }}>
 
       {/* ── Section 1: Header ── */}
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>

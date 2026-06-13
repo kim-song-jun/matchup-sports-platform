@@ -76,11 +76,16 @@ export default function AdminTeamMatchesPage() {
     setActiveStatus(value);
     setAccumulatedRows([]);
     setCursor(null);
+    setNextCursor(null);
   };
 
   // ── Cursor pagination ──────────────────────────────────────────────
   const [cursor, setCursor] = useState<string | null>(null);
   const [accumulatedRows, setAccumulatedRows] = useState<V1AdminTeamMatchRow[]>([]);
+  // Persisted so the "더 보기" button survives the next-page fetch (data is
+  // briefly undefined) and a failed fetch (data stays undefined) — otherwise
+  // the button would vanish mid-load and permanently on error, blocking retry.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   const filters = {
     ...(activeStatus ? { status: activeStatus } : {}),
@@ -88,7 +93,7 @@ export default function AdminTeamMatchesPage() {
     limit: 20,
   };
 
-  const { data, isPending, isError, error, refetch } = useV1AdminTeamMatches(filters);
+  const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches(filters);
 
   // Accumulate rows as pages load
   useEffect(() => {
@@ -98,11 +103,12 @@ export default function AdminTeamMatchesPage() {
     } else {
       setAccumulatedRows((prev) => [...prev, ...data.items]);
     }
+    setNextCursor(data.nextCursor ?? data.pageInfo?.nextCursor ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  const nextCursor = data?.nextCursor ?? data?.pageInfo?.nextCursor ?? null;
   const hasMore = !!nextCursor;
+  const loadMoreFailed = isError && accumulatedRows.length > 0;
 
   const handleLoadMore = () => {
     if (nextCursor) setCursor(nextCursor);
@@ -125,6 +131,7 @@ export default function AdminTeamMatchesPage() {
           showToast('처리했어요.', 'success');
           setAccumulatedRows([]);
           setCursor(null);
+          setNextCursor(null);
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
@@ -247,14 +254,19 @@ export default function AdminTeamMatchesPage() {
 
       {/* Load more */}
       {hasMore && !isInitialLoad && (
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex flex-col items-center gap-1.5">
+          {loadMoreFailed && (
+            <p className="text-[13px] text-red-500" role="alert">
+              {extractErrorMessage(error, '다음 목록을 불러오지 못했어요.')}
+            </p>
+          )}
           <button
             type="button"
-            onClick={handleLoadMore}
-            disabled={isPending}
+            onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
+            disabled={isFetching}
             className="inline-flex items-center h-[44px] px-6 rounded-xl text-[14px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
-            {isPending ? '불러오는 중…' : '더 보기'}
+            {isFetching ? '불러오는 중…' : loadMoreFailed ? '다시 시도' : '더 보기'}
           </button>
         </div>
       )}

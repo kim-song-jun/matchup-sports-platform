@@ -400,6 +400,12 @@ export class MatchesService {
         },
       });
 
+      // Capture active participants BEFORE the update so we notify exactly those
+      // cancelled by this host-cancel (not participants already cancelled earlier).
+      const activeParticipants = await tx.v1MatchParticipant.findMany({
+        where: { matchId: match.id, status: 'active', role: 'participant' },
+        select: { userId: true },
+      });
       const participants = await tx.v1MatchParticipant.updateMany({
         where: { matchId: match.id, status: 'active', role: 'participant' },
         data: {
@@ -420,16 +426,12 @@ export class MatchesService {
         },
       });
 
-      return { applications, participants };
+      return { applications, participants, notifyUserIds: activeParticipants.map((p) => p.userId) };
     });
 
-    // 알림: 취소 시점에 active 상태였던 참가자 전원에게 안내 (호스트 제외, fire-and-forget)
-    const activeParticipantUserIds = await this.prisma.v1MatchParticipant.findMany({
-      where: { matchId: match.id, status: 'cancelled', role: 'participant' },
-      select: { userId: true },
-    });
+    // 알림: 취소 시점에 active였던 참가자 전원에게 안내 (호스트 제외, fire-and-forget)
     void this.notifications.emitNotificationToMany(
-      activeParticipantUserIds.map((p) => p.userId),
+      result.notifyUserIds,
       'match_cancelled',
       match.id,
     );

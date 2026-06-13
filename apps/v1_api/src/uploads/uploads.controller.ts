@@ -19,6 +19,11 @@ import { UploadsService } from './uploads.service';
 // Side-effect import: augments global Express.Multer namespace
 import './multer.types';
 
+// Hard DoS backstop, above the precise 5MB limit enforced in UploadsService.
+// Files between 5MB and this cap still get the clear "5MB 초과" 400 from the
+// service; larger ones are rejected by multer before fully buffering to disk.
+const UPLOAD_HARD_CAP_BYTES = 10 * 1024 * 1024; // 10MB
+
 @ApiTags('uploads')
 @Controller('uploads')
 export class UploadsController {
@@ -49,14 +54,15 @@ export class UploadsController {
     },
   })
   @ApiUnauthorizedResponse({ description: '인증이 필요해요.' })
-  // No multer fileFilter/fileSize check: UploadsService is the single validator
-  // (mimetype + 5MB size) so it returns clear 400 messages and unlinks rejected
-  // temp files. A multer fileFilter silently drops bad files → empty array →
-  // misleading "파일을 선택해주세요" error and unreachable service validation.
+  // UploadsService is the single content validator (mimetype + precise 5MB) so it
+  // returns clear 400s and unlinks rejected temp files. A multer fileFilter would
+  // silently drop bad files → empty array → misleading "파일을 선택해주세요" +
+  // unreachable validation, so we don't use one. The multer fileSize limit below
+  // is only a hard DoS backstop (above the 5MB service limit).
   @UseInterceptors(
     FilesInterceptor('files', 5, {
       dest: UploadsService.UPLOAD_BASE,
-      limits: { files: 5 },
+      limits: { fileSize: UPLOAD_HARD_CAP_BYTES, files: 5 },
     }),
   )
   async uploadFiles(

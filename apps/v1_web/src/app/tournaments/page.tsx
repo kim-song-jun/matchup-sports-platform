@@ -1,8 +1,9 @@
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
+import type { Metadata } from 'next';
 
-export const metadata = {
+export const metadata: Metadata = {
   title: '대회 | Teameet',
   description: '상금 걸린 풋살 대회가 곧 열려요.',
 };

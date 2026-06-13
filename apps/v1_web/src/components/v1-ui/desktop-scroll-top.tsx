@@ -23,6 +23,10 @@ export function DesktopScrollTop() {
       type="button"
       className={`tm-desktop-scrolltop ${visible ? 'is-visible' : ''}`}
       aria-label="맨 위로 이동"
+      // Hidden (faded out) until scrolled: keep out of tab order + a11y tree so
+      // keyboard users don't land on an invisible button.
+      tabIndex={visible ? 0 : -1}
+      aria-hidden={!visible}
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
     >
       {/* rotate the chevron to point up */}

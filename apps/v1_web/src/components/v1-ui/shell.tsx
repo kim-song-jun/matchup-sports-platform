@@ -179,9 +179,13 @@ function DesktopNav({
         <Link className="tm-desktop-nav-action" href="/search" aria-label="검색">
           <SearchIcon size={20} strokeWidth={2} />
         </Link>
-        <Link className="tm-desktop-nav-action" href="/notifications" aria-label="알림">
+        <Link
+          className="tm-desktop-nav-action"
+          href="/notifications"
+          aria-label={hasNewNotification ? '알림 (새 알림 있음)' : '알림'}
+        >
           <BellIcon size={20} strokeWidth={2} />
-          {hasNewNotification ? <span className="tm-desktop-nav-dot" /> : null}
+          {hasNewNotification ? <span className="tm-desktop-nav-dot" aria-hidden="true" /> : null}
         </Link>
         {/* Desktop-only account affordance — top-right avatar entry to My page. */}
         <Link

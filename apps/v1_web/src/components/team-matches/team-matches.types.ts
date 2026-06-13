@@ -98,6 +98,8 @@ export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'pla
 
 export type TeamMatchCreateViewModel = {
   step: TeamMatchCreateStep;
+  /** Back-arrow target. Edit flow points to the real team-match detail; create flow falls back to the list. */
+  backHref?: string;
   selectedTeam: string;
   selectedSport: string;
   isLoadingTeams?: boolean;

@@ -169,6 +169,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       );
     },
     submitLabel: '변경사항 저장',
+    backHref: `/team-matches/${teamMatchId}`,
   });
 
   return <TeamMatchCreatePageView model={model} />;
@@ -196,6 +197,7 @@ function buildCreateModel({
   onSubmit,
   onCancel,
   submitLabel,
+  backHref,
 }: {
   step: TeamMatchCreateStep;
   draft: TeamMatchDraft;
@@ -218,6 +220,7 @@ function buildCreateModel({
   onSubmit: () => void;
   onCancel?: () => void;
   submitLabel?: string;
+  backHref?: string;
 }): TeamMatchCreateViewModel {
   const fallback = getTeamMatchCreateViewModel(step);
   const selectedTeam = teams.find((team) => team.id === selectedTeamId);
@@ -225,6 +228,7 @@ function buildCreateModel({
 
   return {
     ...fallback,
+    backHref,
     selectedTeam: selectedTeam?.name ?? fallback.selectedTeam,
     selectedSport: selectedSport?.name ?? fallback.selectedSport,
     isLoadingTeams,

@@ -86,6 +86,26 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   return 'team_match';
 }
 
+/**
+ * Maps a notification targetType to its consumer route base. Naive pluralization
+ * (`targetType + 's'`) breaks for 'match'/'team_match' → '/matchs'/'/team-matchs',
+ * so map explicitly to the real Next.js routes.
+ */
+const ROUTE_BASE_BY_TARGET_TYPE: Partial<Record<V1NotificationTargetType, string>> = {
+  match: '/matches',
+  team: '/teams',
+  team_match: '/team-matches',
+};
+
+function deepLinkForTarget(
+  targetType: V1NotificationTargetType,
+  targetId: string | null,
+): string | null {
+  if (!targetId) return null;
+  const base = ROUTE_BASE_BY_TARGET_TYPE[targetType] ?? `/${targetType.replace(/_/g, '-')}s`;
+  return `${base}/${targetId}`;
+}
+
 const EVENT_TITLES: Record<NotificationEventType, string> = {
   match_application_received: '매치 신청이 도착했어요',
   match_application_approved: '매치 신청이 승인됐어요',
@@ -119,7 +139,7 @@ export class NotificationsService {
     body?: string,
   ): Promise<void> {
     const targetType = targetTypeForEvent(type);
-    const deepLink = targetId ? `/${targetType.replace('_', '-')}s/${targetId}` : null;
+    const deepLink = deepLinkForTarget(targetType, targetId);
     const title = EVENT_TITLES[type];
     const prefField = preferenceFieldForEvent(type);
 
@@ -143,7 +163,7 @@ export class NotificationsService {
         targetId,
         EVENT_TITLES[type],
         body ?? null,
-        targetId ? `/${targetTypeForEvent(type).replace('_', '-')}s/${targetId}` : null,
+        deepLinkForTarget(targetTypeForEvent(type), targetId),
         preferenceFieldForEvent(type),
       );
     }

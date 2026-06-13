@@ -1,3 +1,5 @@
 # Runtime-uploaded files (served via express.static at /uploads).
 # Generated at runtime by UploadsService — not source, never committed.
-uploads/
+# Anchored with a leading slash so it ONLY ignores apps/v1_api/uploads/
+# and NOT the source module apps/v1_api/src/uploads/.
+/uploads/

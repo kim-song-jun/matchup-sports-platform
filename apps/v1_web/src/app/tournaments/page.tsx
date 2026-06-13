@@ -1,58 +1,119 @@
-import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, SectionTitle } from '@/components/v1-ui/primitives';
-import { TrophyIcon } from '@/components/v1-ui/icons';
-import type { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: '대회 | Teameet',
-  description: '상금 걸린 풋살 대회가 곧 열려요.',
-};
+import Link from 'next/link';
+import { useState } from 'react';
+import { AppChrome } from '@/components/v1-ui/shell';
+import { Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
+import { TrophyIcon } from '@/components/v1-ui/icons';
+import { useV1Tournaments } from '@/hooks/use-v1-api';
+import { extractErrorMessage } from '@/lib/error-message';
+import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 export default function TournamentsPage() {
   return (
     <AppChrome title="대회" activeTab="tournaments" showNotifications>
-      <TournamentsContent />
+      <TournamentsListContent />
     </AppChrome>
   );
 }
 
-function TournamentsContent() {
+/* ── Status helpers ── */
+
+type StatusConfig = {
+  badgeClass: string;
+  label: string;
+  icon: string;
+};
+
+function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
+  switch (status) {
+    case 'open':
+      return { badgeClass: 'tm-badge-blue', label: '모집중', icon: '●' };
+    case 'in_progress':
+      return { badgeClass: 'tm-badge-green', label: '진행중', icon: '▶' };
+    case 'completed':
+      return { badgeClass: 'tm-badge-grey', label: '종료', icon: '■' };
+    case 'closed':
+      return { badgeClass: 'tm-badge-grey', label: '마감', icon: '■' };
+    case 'cancelled':
+      return { badgeClass: 'tm-badge-red', label: '취소', icon: '✕' };
+    default:
+      return { badgeClass: 'tm-badge-grey', label: status, icon: '○' };
+  }
+}
+
+function formatTournamentDate(dateStr: string | null): string {
+  if (!dateStr) return '날짜 미정';
+  const d = new Date(dateStr);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+  const weekday = weekdays[d.getDay()];
+  return `${month}/${day} (${weekday})`;
+}
+
+function formatEntryFee(fee: number): string {
+  if (fee === 0) return '무료';
+  return `${fee.toLocaleString('ko-KR')}원`;
+}
+
+/* ── Main content (client component for data fetching) ── */
+
+function TournamentsListContent() {
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
+
+  const { data, isLoading, isError, error, isFetching } = useV1Tournaments({ cursor, limit: 20 });
+
+  // Accumulate pages when cursor is set
+  const pageItems = data?.items ?? [];
+  const displayItems: V1TournamentListItem[] = cursor
+    ? [...allItems, ...pageItems.filter((item) => !allItems.some((prev) => prev.id === item.id))]
+    : pageItems;
+
+  const hasNext = data?.pageInfo?.hasNext ?? false;
+
+  const handleLoadMore = () => {
+    if (!data?.pageInfo?.nextCursor) return;
+    setAllItems(displayItems);
+    setCursor(data.pageInfo.nextCursor);
+  };
+
   return (
     <div style={{ padding: '0 20px 48px' }}>
-      {/* ── Hero teaser card ── */}
-      <section aria-labelledby="tournament-teaser-heading" style={{ marginTop: 24 }}>
+      {/* ── Hero banner ── */}
+      <section aria-labelledby="tournament-hero-heading" style={{ marginTop: 24 }}>
         <Card pad={0}>
-          {/* Gradient banner */}
           <div
             style={{
               borderRadius: '14px 14px 0 0',
               background: 'linear-gradient(135deg, var(--blue500) 0%, color-mix(in srgb, var(--blue500) 70%, #6366f1) 100%)',
-              height: 140,
+              height: 130,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexDirection: 'column',
-              gap: 10,
+              gap: 8,
             }}
             aria-hidden="true"
           >
             <div
               style={{
-                width: 68,
-                height: 68,
-                borderRadius: 20,
+                width: 60,
+                height: 60,
+                borderRadius: 18,
                 background: 'rgba(255,255,255,0.18)',
                 display: 'grid',
                 placeItems: 'center',
                 color: '#fff',
               }}
             >
-              <TrophyIcon size={36} strokeWidth={1.6} />
+              <TrophyIcon size={32} strokeWidth={1.6} />
             </div>
             <span
               style={{
                 fontWeight: 800,
-                fontSize: 12,
+                fontSize: 11,
                 letterSpacing: '0.12em',
                 color: 'rgba(255,255,255,0.75)',
                 textTransform: 'uppercase',
@@ -61,186 +122,186 @@ function TournamentsContent() {
               상금 대회
             </span>
           </div>
-
-          {/* Body */}
-          <div style={{ padding: '20px 20px 24px' }}>
-            <div className="tm-badge tm-badge-blue" style={{ marginBottom: 10 }}>오픈 예정</div>
+          <div style={{ padding: '16px 18px 18px' }}>
             <h1
-              id="tournament-teaser-heading"
+              id="tournament-hero-heading"
               className="tm-text-heading"
-              style={{ color: 'var(--text-strong)', marginBottom: 8 }}
+              style={{ color: 'var(--text-strong)', marginBottom: 4 }}
             >
-              상금 걸린 풋살 대회가
-              <br />
-              곧 열려요
+              팀과 함께 대회에서 겨뤄보세요
             </h1>
-            <p
-              className="tm-text-body"
-              style={{ color: 'var(--text-secondary)', lineHeight: 1.65, marginBottom: 20 }}
-            >
-              팀 단위로 참가해 조별 리그를 거친 뒤 토너먼트에서 우승을 겨루세요.
-              상위 팀에게는 실제 상금이 지급돼요.
+            <p className="tm-text-label" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+              조별 리그부터 결승 토너먼트까지, 상위 팀에게 실제 상금이 지급돼요.
             </p>
+          </div>
+        </Card>
+      </section>
 
-            {/* Format chips */}
-            <ul
+      {/* ── Tournament list ── */}
+      <section aria-labelledby="tournament-list-heading" style={{ marginTop: 28 }}>
+        <SectionTitle title="대회 목록" />
+        <div id="tournament-list-heading" className="sr-only">대회 목록</div>
+
+        {isLoading ? (
+          <TournamentSkeletonList />
+        ) : isError ? (
+          <TournamentErrorState message={extractErrorMessage(error, '대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')} />
+        ) : displayItems.length === 0 ? (
+          <EmptyState
+            title="아직 열린 대회가 없어요"
+            sub="새로운 대회가 열리면 앱 알림으로 안내드릴게요."
+          />
+        ) : (
+          <>
+            <div
               role="list"
-              aria-label="대회 형식"
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 8,
-                margin: 0,
-                padding: 0,
-                listStyle: 'none',
-              }}
+              aria-label="대회 목록"
+              style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}
             >
-              {FORMAT_CHIPS.map(({ icon, label }) => (
-                <li key={label}>
-                  <span
-                    className="tm-chip"
-                    style={{ minHeight: 32, padding: '0 12px', gap: 5, fontSize: 13, fontWeight: 600 }}
-                  >
-                    <span aria-hidden="true">{icon}</span>
-                    <span>{label}</span>
-                  </span>
-                </li>
+              {displayItems.map((item) => (
+                <TournamentCard key={item.id} item={item} />
               ))}
-            </ul>
-          </div>
-        </Card>
-      </section>
+            </div>
 
-      {/* ── Upcoming placeholder ── */}
-      <section aria-labelledby="upcoming-section-heading" style={{ marginTop: 28 }}>
-        <SectionTitle title="예정 대회" />
-        <div id="upcoming-section-heading" className="sr-only">예정 대회 목록</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-          <SkeletonMatchRow opacity={0.72} />
-          <SkeletonMatchRow opacity={0.4} />
-        </div>
-      </section>
-
-      {/* ── FAQ ── */}
-      <section aria-labelledby="faq-section-heading" style={{ marginTop: 28 }}>
-        <div id="faq-section-heading">
-          <SectionTitle title="자주 묻는 질문" />
-        </div>
-        <Card pad={0}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {FAQ_ITEMS.map(({ q, a }, i) => (
-              <FaqRow key={q} q={q} a={a} showDivider={i < FAQ_ITEMS.length - 1} />
-            ))}
-          </div>
-        </Card>
+            {hasNext ? (
+              <button
+                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                type="button"
+                disabled={isFetching}
+                onClick={handleLoadMore}
+                style={{ marginTop: 16 }}
+              >
+                {isFetching ? '불러오는 중…' : '더 보기'}
+              </button>
+            ) : null}
+          </>
+        )}
       </section>
     </div>
   );
 }
 
-/* ── Data ── */
+/* ── Tournament card ── */
 
-const FORMAT_CHIPS = [
-  { icon: '⚽', label: '풋살 6:6' },
-  { icon: '🏟️', label: '8팀 참가' },
-  { icon: '📋', label: '조별 리그' },
-  { icon: '🏆', label: '결승 토너먼트' },
-  { icon: '👥', label: '팀 단위 신청' },
-] as const;
+function TournamentCard({ item }: { item: V1TournamentListItem }) {
+  const status = getTournamentStatusConfig(item.status);
 
-const FAQ_ITEMS = [
-  {
-    q: '대회 신청은 언제부터 가능해요?',
-    a: '베타 오픈 일정이 확정되면 앱 알림으로 안내드릴게요.',
-  },
-  {
-    q: '팀이 없으면 참가할 수 없나요?',
-    a: '대회는 팀 단위로만 참가할 수 있어요. 팀 탭에서 먼저 팀을 만들어 보세요.',
-  },
-  {
-    q: '상금은 어떻게 정산되나요?',
-    a: '우승·준우승 팀 주장 계좌로 직접 정산돼요. 세부 금액은 대회별로 달라요.',
-  },
-] as const;
+  return (
+    <div role="listitem">
+      <Link
+        className="tm-card tm-pressable"
+        href={`/tournaments/${item.id}`}
+        style={{ display: 'block', padding: '16px 16px 14px', textDecoration: 'none' }}
+        aria-label={`${item.title} — ${status.label}`}
+      >
+        {/* Top row: title + status badge */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
+          <div
+            className="tm-text-body-lg"
+            style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0, lineHeight: 1.35 }}
+          >
+            {item.title}
+          </div>
+          <span className={`tm-badge ${status.badgeClass}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+            <span aria-hidden="true">{status.icon}&nbsp;</span>
+            {status.label}
+          </span>
+        </div>
 
-/* ── Sub-components ── */
+        {/* Meta row */}
+        <div
+          className="tm-text-caption"
+          style={{ marginTop: 6, color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: '4px 10px' }}
+        >
+          {item.scheduledAt ? (
+            <span>{formatTournamentDate(item.scheduledAt)}</span>
+          ) : null}
+          {item.venue ? (
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+              {item.venue}
+            </span>
+          ) : null}
+        </div>
 
-function SkeletonMatchRow({ opacity }: { opacity: number }) {
+        {/* Bottom row: entry fee + team count */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 10,
+            paddingTop: 10,
+            borderTop: '1px solid var(--grey100)',
+          }}
+        >
+          <span className="tm-text-label" style={{ color: 'var(--blue500)', fontWeight: 700 }}>
+            {formatEntryFee(item.entryFee)}
+          </span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            <span className="tab-num">{item.confirmedCount}</span>
+            <span>/</span>
+            <span className="tab-num">{item.teamCount}</span>
+            <span>팀 확정</span>
+          </span>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+/* ── Skeleton list ── */
+
+function TournamentSkeletonList() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="대회 목록 불러오는 중"
+      style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}
+    >
+      <TournamentSkeletonCard opacity={1} />
+      <TournamentSkeletonCard opacity={0.65} />
+      <TournamentSkeletonCard opacity={0.35} />
+    </div>
+  );
+}
+
+function TournamentSkeletonCard({ opacity }: { opacity: number }) {
   return (
     <div
       className="tm-card"
       aria-hidden="true"
-      style={{
-        opacity,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        padding: '14px 16px',
-        pointerEvents: 'none',
-      }}
+      style={{ opacity, padding: '16px 16px 14px', pointerEvents: 'none' }}
     >
-      {/* Icon placeholder */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ height: 14, borderRadius: 6, background: 'var(--grey100)', width: '60%' }} />
+        <div className="tm-badge tm-badge-grey" style={{ opacity: 0.5, width: 48 }}>&nbsp;</div>
+      </div>
+      <div style={{ height: 11, borderRadius: 6, background: 'var(--grey100)', width: '44%', marginTop: 8 }} />
       <div
         style={{
-          flexShrink: 0,
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          background: 'var(--grey100)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--text-caption)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: '1px solid var(--grey100)',
         }}
       >
-        <TrophyIcon size={20} strokeWidth={1.7} />
-      </div>
-
-      {/* Text placeholder bars */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            height: 13,
-            borderRadius: 6,
-            background: 'var(--grey100)',
-            width: '68%',
-          }}
-        />
-        <div
-          style={{
-            height: 11,
-            borderRadius: 6,
-            background: 'var(--grey100)',
-            width: '44%',
-            marginTop: 8,
-          }}
-        />
-      </div>
-
-      {/* Badge placeholder */}
-      <div className="tm-badge tm-badge-grey">
-        <span className="tm-text-micro">준비 중</span>
+        <div style={{ height: 11, borderRadius: 6, background: 'var(--grey100)', width: '22%' }} />
+        <div style={{ height: 11, borderRadius: 6, background: 'var(--grey100)', width: '28%' }} />
       </div>
     </div>
   );
 }
 
-function FaqRow({ q, a, showDivider }: { q: string; a: string; showDivider: boolean }) {
+/* ── Error state ── */
+
+function TournamentErrorState({ message }: { message: string }) {
   return (
-    <div
-      style={{
-        padding: '16px 18px',
-        borderBottom: showDivider ? '1px solid var(--grey100)' : 'none',
-      }}
-    >
-      <div
-        className="tm-text-body"
-        style={{ color: 'var(--text-strong)', fontWeight: 600, marginBottom: 5 }}
-      >
-        {q}
+    <Card pad={16} style={{ marginTop: 8, background: 'var(--grey50)' }}>
+      <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>대회 목록을 불러오지 못했어요</div>
+      <div className="tm-text-caption" style={{ marginTop: 5, lineHeight: 1.55, color: 'var(--text-muted)' }}>
+        {message}
       </div>
-      <div className="tm-text-label" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-        {a}
-      </div>
-    </div>
+    </Card>
   );
 }

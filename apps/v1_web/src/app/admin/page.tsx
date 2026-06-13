@@ -14,7 +14,10 @@ import { adminActionLabel } from '@/lib/admin-labels';
 // ── Date helpers ──────────────────────────────────────────────────────────
 function formatRelativeTime(dateStr: string): string {
   try {
-    const diff = Date.now() - new Date(dateStr).getTime();
+    const ts = new Date(dateStr).getTime();
+    if (Number.isNaN(ts)) return dateStr; // unparseable → show raw, not "NaN일 전"
+    const diff = Date.now() - ts;
+    if (diff < 0) return '방금 전'; // future (clock skew) → clamp, not "-5분 전"
     const minutes = Math.floor(diff / 60_000);
     if (minutes < 1) return '방금 전';
     if (minutes < 60) return `${minutes}분 전`;

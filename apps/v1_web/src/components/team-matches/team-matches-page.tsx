@@ -257,6 +257,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               {mode === 'mine' ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
                   <div className="tm-text-body-lg">신청팀</div>
+                  {match.applicantActionError ? (
+                    <div className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', marginTop: 6 }}>{match.applicantActionError}</div>
+                  ) : null}
                   <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
                     {match.applicantTeams.map((team) => (
                       <div key={team.applicationId ?? team.name} style={{ border: '1px solid var(--grey100)', borderRadius: 12, padding: '10px 12px' }}>

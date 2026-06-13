@@ -18,6 +18,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
+import { extractErrorMessage } from '@/lib/error-message';
 import { TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -165,6 +166,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
   const approveApplication = useV1ApproveTeamMatchApplication(teamMatchId);
   const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);
+  const [actionError, setActionError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
   const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
   const withdrawTeamMatch = useV1WithdrawTeamMatchApplication(teamMatchId, selectedEligibility?.applicationId);
@@ -183,14 +185,27 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
           hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
           hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
+          applicantActionError: actionError,
           manageHref: viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
           applicantTeams: toApplicantTeamsWithActions(
             query.data,
             applications.data,
             fallback.match.applicantTeams,
             viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
-            (applicationId) => approveApplication.mutateAsync({ applicationId }),
-            (applicationId) => rejectApplication.mutateAsync({ applicationId }),
+            (applicationId) => {
+              setActionError(null);
+              approveApplication.mutate(
+                { applicationId },
+                { onError: (e) => setActionError(extractErrorMessage(e, '승인 처리에 실패했어요. 다시 시도해 주세요.')) },
+              );
+            },
+            (applicationId) => {
+              setActionError(null);
+              rejectApplication.mutate(
+                { applicationId },
+                { onError: (e) => setActionError(extractErrorMessage(e, '거절 처리에 실패했어요. 다시 시도해 주세요.')) },
+              );
+            },
             approveApplication.isPending || rejectApplication.isPending,
           ),
         },
@@ -372,8 +387,8 @@ function toApplicantTeamsWithActions(
   applications: import('@/types/api').V1TeamMatchApplicationsPage | undefined,
   fallback: TeamMatchDetailViewModel['match']['applicantTeams'],
   manageHref: string | undefined,
-  onApprove: (applicationId: string) => Promise<unknown>,
-  onReject: (applicationId: string) => Promise<unknown>,
+  onApprove: (applicationId: string) => void,
+  onReject: (applicationId: string) => void,
   actionPending: boolean,
 ): TeamMatchDetailViewModel['match']['applicantTeams'] {
   if (match.approvedOpponentTeam) {

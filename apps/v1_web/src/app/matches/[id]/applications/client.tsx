@@ -203,14 +203,13 @@ function ApplicationRow({
             width: 44,
             height: 44,
             borderRadius: 14,
-            background: application.profileImageUrl
-              ? `${cssUrl(application.profileImageUrl)} center/cover no-repeat, var(--grey200)`
-              : 'var(--grey200)',
+            backgroundColor: 'var(--grey200)',
             backgroundImage: application.profileImageUrl
               ? cssUrl(application.profileImageUrl)
               : undefined,
             backgroundPosition: 'center',
             backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

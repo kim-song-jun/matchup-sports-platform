@@ -47,9 +47,17 @@ export class UploadsController {
   @ApiCreatedResponse({
     description: '업로드 성공',
     schema: {
+      // Reflects the global TransformInterceptor envelope ({ status, data, timestamp }).
       type: 'object',
       properties: {
-        urls: { type: 'array', items: { type: 'string' } },
+        status: { type: 'string', example: 'success' },
+        data: {
+          type: 'object',
+          properties: {
+            urls: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        timestamp: { type: 'string', format: 'date-time' },
       },
     },
   })

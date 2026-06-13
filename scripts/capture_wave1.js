@@ -65,6 +65,20 @@ async function shot(page, dir, name) {
       const where = loc && loc.url ? ` @ ${loc.url.split('/').pop()}:${loc.lineNumber ?? '?'}` : '';
       consoleErrors.push((msg.text().slice(0, 140) + where).slice(0, 200));
     });
+    // "Failed to load resource: 400" 류 console 에러는 URL을 안 남기므로, 4xx/5xx 응답의
+    // pathname+status를 함께 기록해 QA 산출물만 보고도 어떤 엔드포인트가 실패했는지 추적 가능.
+    page.on('response', (res) => {
+      const status = res.status();
+      if (status < 400) return;
+      let where;
+      try {
+        const u = new URL(res.url());
+        where = `${u.pathname}${u.search}`;
+      } catch {
+        where = res.url(); // URL 파싱 실패 시 원본 그대로 (data: URI 등)
+      }
+      consoleErrors.push(`HTTP ${status} ${where}`.slice(0, 200));
+    });
     for (const [name, route] of PAGES) {
       try {
         await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 30000 });

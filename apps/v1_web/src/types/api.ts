@@ -1226,7 +1226,7 @@ export type V1AdminGrantResult = V1AdminRow;
 // Upload
 // ---------------------------------------------------------------------------
 
-/** POST /uploads  (multipart/form-data, field 'files')  → { urls: string[] } */
+/** POST /api/v1/uploads  (multipart/form-data, field 'files')  → { urls: string[] } */
 export type V1UploadImagesResult = {
   urls: string[];
 };

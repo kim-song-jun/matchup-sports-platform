@@ -268,7 +268,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                             <div className="tm-text-label">{team.name}</div>
                             <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{team.meta}</div>
                           </div>
-                          <span className={`tm-badge ${team.status === '승인완료' ? 'tm-badge-blue' : team.status === '거절' ? 'tm-badge-grey' : 'tm-badge-grey'}`}>{team.status}</span>
+                          <span className={`tm-badge ${team.status === '승인완료' ? 'tm-badge-green' : team.status === '거절' ? 'tm-badge-red' : 'tm-badge-orange'}`}>{team.status}</span>
                         </div>
                         {(team.onApprove ?? team.onReject) ? (
                           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>

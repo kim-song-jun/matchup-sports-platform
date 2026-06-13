@@ -1003,7 +1003,7 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
 /**
  * 이미지 업로드 mutation.
  *
- * BE 계약: POST /uploads  multipart/form-data, field 이름 = 'files'
+ * BE 계약: POST /api/v1/uploads (= getV1ApiBaseUrl + '/uploads')  multipart/form-data, field 이름 = 'files'
  * 응답: { urls: string[] }
  *
  * 호출 예시:

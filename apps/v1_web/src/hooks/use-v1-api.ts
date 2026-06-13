@@ -999,7 +999,10 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
 
   const body: ApiEnvelope<T> | ApiErrorBody | null = await response.json().catch(() => null);
 
-  if (!response.ok || (body !== null && 'status' in body && body.status === 'error')) {
+  // `response.json()` can yield a non-object JSON primitive (e.g. a 200 with body "ok").
+  // Guard `typeof === 'object'` before `'status' in body` — the `in` operator throws a
+  // TypeError on primitives, which would turn upload error handling into a crash.
+  if (!response.ok || (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error')) {
     throw new V1ApiError(
       (body as ApiErrorBody) ?? {
         status: 'error' as const,

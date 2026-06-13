@@ -1230,3 +1230,502 @@ export type V1AdminGrantResult = V1AdminRow;
 export type V1UploadImagesResult = {
   urls: string[];
 };
+
+// ---------------------------------------------------------------------------
+// Tournament
+// ---------------------------------------------------------------------------
+
+export type V1TournamentStatus =
+  | 'draft'
+  | 'open'
+  | 'closed'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
+export type V1PublicTournamentStatus = Extract<
+  V1TournamentStatus,
+  'open' | 'closed' | 'in_progress' | 'completed'
+>;
+
+export type V1TournamentRegistrationStatus =
+  | 'draft'
+  | 'awaiting_payment'
+  | 'payment_checking'
+  | 'paid'
+  | 'confirmed'
+  | 'waitlisted'
+  | 'cancel_requested'
+  | 'cancelled';
+
+export type V1TournamentPaymentMethod = 'pg' | 'bank_transfer';
+
+export type V1TournamentPaymentStatus =
+  | 'ready'
+  | 'paid'
+  | 'cancelled'
+  | 'refunded';
+
+export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
+
+export type V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place';
+
+export type V1AnnouncementAudience =
+  | 'all_registered'
+  | 'confirmed_only'
+  | 'waitlist';
+
+/** Serialized by TournamentsReadService.serializeCard — list view */
+export type V1TournamentListItem = {
+  id: string;
+  sportId: string;
+  title: string;
+  status: V1TournamentStatus;
+  registrationDeadlineAt: string | null;
+  scheduledAt: string | null;
+  venue: string | null;
+  teamCount: number;
+  entryFee: number;
+  confirmedCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
+export type V1Tournament = {
+  id: string;
+  sportId: string;
+  title: string;
+  status: V1TournamentStatus;
+  registrationDeadlineAt: string | null;
+  scheduledAt: string | null;
+  venue: string | null;
+  teamCount: number;
+  minPlayers: number;
+  maxPlayers: number;
+  entryFee: number;
+  bankName: string | null;
+  bankAccount: string | null;
+  bankHolder: string | null;
+  rulesText: string | null;
+  refundPolicyText: string | null;
+  registrationCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1TournamentGroupTeam = {
+  id: string;
+  registrationId: string;
+  teamId: string;
+  teamName: string;
+  sortOrder: number;
+};
+
+export type V1TournamentStanding = {
+  registrationId: string;
+  teamId: string;
+  teamName: string;
+  position: number;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  recalculatedAt: string | null;
+};
+
+export type V1TournamentGroup = {
+  id: string;
+  name: string;
+  phase: string;
+  sortOrder: number;
+  groupTeams: V1TournamentGroupTeam[];
+  standings: V1TournamentStanding[];
+};
+
+export type V1TournamentFixtureResult = {
+  homeScore: number;
+  awayScore: number;
+  hasPenalty: boolean;
+  homePenaltyScore: number | null;
+  awayPenaltyScore: number | null;
+  note: string | null;
+  recordedAt: string;
+};
+
+export type V1TournamentFixture = {
+  id: string;
+  groupId: string | null;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  scheduledAt: string | null;
+  venue: string | null;
+  status: string;
+  homeRegistrationId: string | null;
+  homeTeamName: string;
+  awayRegistrationId: string | null;
+  awayTeamName: string;
+  result: V1TournamentFixtureResult | null;
+};
+
+export type V1TournamentAnnouncement = {
+  id: string;
+  title: string;
+  body: string;
+  audience: string;
+  publishedAt: string;
+  createdAt: string;
+};
+
+/** Serialized by TournamentsReadService.get — full public detail */
+export type V1TournamentDetail = {
+  id: string;
+  sportId: string;
+  title: string;
+  status: V1TournamentStatus;
+  registrationDeadlineAt: string | null;
+  scheduledAt: string | null;
+  venue: string | null;
+  teamCount: number;
+  minPlayers: number;
+  maxPlayers: number;
+  entryFee: number;
+  rulesText: string | null;
+  refundPolicyText: string | null;
+  confirmedCount: number;
+  groups: V1TournamentGroup[];
+  fixtures: V1TournamentFixture[];
+  announcements: V1TournamentAnnouncement[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Shared payment summary embedded in registrations */
+export type V1TournamentPaymentSummary = {
+  method: V1TournamentPaymentMethod;
+  status: V1TournamentPaymentStatus;
+  amount: number;
+  paidAt: string | null;
+};
+
+/** Serialized by TournamentRegistrationsService.serialize (consumer-facing) */
+export type V1TournamentRegistration = {
+  id: string;
+  tournamentId: string;
+  teamId: string;
+  appliedByUserId: string;
+  status: V1TournamentRegistrationStatus;
+  depositorName: string | null;
+  agreedRules: boolean;
+  agreedPrivacy: boolean;
+  agreedRefund: boolean;
+  agreedMediaConsent: boolean;
+  confirmedAt: string | null;
+  rosterLockedAt: string | null;
+  cancelRequestedAt: string | null;
+  cancelReason: string | null;
+  playerCount: number;
+  payment: V1TournamentPaymentSummary | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Serialized by AdminRegistrationsService.serialize — admin view (extra confirmedByAdminUserId) */
+export type V1AdminTournamentRegistration = V1TournamentRegistration & {
+  confirmedByAdminUserId: string | null;
+  payment:
+    | (V1TournamentPaymentSummary & { confirmedByAdminUserId: string | null })
+    | null;
+};
+
+export type V1AdminTournamentRegistrationWithIdempotent =
+  V1AdminTournamentRegistration & { alreadyProcessed: boolean };
+
+/** Serialized by TournamentPlayersService.serializePlayer */
+export type V1TournamentPlayer = {
+  id: string;
+  userId: string;
+  realName: string;
+  birthDateSnapshot: string | null;
+  eligibilityStatus: V1PlayerEligibilityStatus;
+  eligibilityNote: string | null;
+  addedAt: string;
+  removedAt: string | null;
+};
+
+export type V1TournamentRosterResponse = {
+  players: V1TournamentPlayer[];
+  belowMinimum: boolean;
+};
+
+/** Serialized by TournamentPaymentsService — PG prepare response */
+export type V1TournamentPgPrepareResponse = {
+  paymentKey: string;
+  orderId: string;
+  amount: number;
+  checkoutUrl: string;
+};
+
+/** Serialized by TournamentPaymentsService — PG confirm response (same shape as registration) */
+export type V1TournamentPgConfirmResponse = {
+  id: string;
+  tournamentId: string;
+  teamId: string;
+  status: V1TournamentRegistrationStatus;
+  playerCount: number;
+  payment: (V1TournamentPaymentSummary & { providerTxId: string | null }) | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Admin bracket bracket view: TournamentBracketService.getBracket groups item */
+export type V1AdminBracketGroup = {
+  id: string;
+  tournamentId: string;
+  name: string;
+  phase: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  groupTeams: V1AdminBracketGroupTeam[];
+};
+
+export type V1AdminBracketGroupTeam = {
+  id: string;
+  groupId: string;
+  registrationId: string;
+  sortOrder: number;
+  createdAt: string;
+};
+
+export type V1AdminBracketFixture = {
+  id: string;
+  tournamentId: string;
+  groupId: string | null;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  parentFixtureId: string | null;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  scheduledAt: string | null;
+  venue: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  result: V1AdminBracketResult | null;
+};
+
+export type V1AdminBracketResult = {
+  id: string;
+  fixtureId: string;
+  homeScore: number;
+  awayScore: number;
+  hasPenalty: boolean;
+  homePenaltyScore: number | null;
+  awayPenaltyScore: number | null;
+  note: string | null;
+  recordedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminBracketStanding = {
+  id: string;
+  groupId: string;
+  registrationId: string;
+  points: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  position: number;
+  recalculatedAt: string | null;
+};
+
+export type V1AdminTournamentBracket = {
+  groups: V1AdminBracketGroup[];
+  fixtures: V1AdminBracketFixture[];
+  standings: V1AdminBracketStanding[];
+};
+
+/** Admin tournament announcement (includes tournamentId, body, updatedAt — full admin serialize) */
+export type V1AdminTournamentAnnouncement = {
+  id: string;
+  tournamentId: string;
+  title: string;
+  body: string;
+  audience: string;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminTournamentAnnouncementWithIdempotent = V1AdminTournamentAnnouncement & {
+  alreadyPublished: boolean;
+};
+
+export type V1AdminTournamentStatusChangeResult = {
+  tournamentId: string;
+  previousStatus: V1TournamentStatus;
+  status: V1TournamentStatus;
+  alreadyInStatus: boolean;
+};
+
+export type V1StandingsRecalculateResult = {
+  tournamentId: string;
+  groupCount: number;
+  recalculatedAt: string;
+};
+
+export type V1ExportRosterCsvResult = {
+  filename: string;
+  csv: string;
+};
+
+export type V1TournamentListPage = {
+  items: V1TournamentListItem[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
+};
+
+export type V1AdminTournamentListPage = {
+  items: V1Tournament[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
+};
+
+export type V1AdminRegistrationListPage = {
+  items: V1AdminTournamentRegistration[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
+};
+
+// Request payload types
+
+export type V1CreateTournamentPayload = {
+  sportId: string;
+  title: string;
+  registrationDeadlineAt?: string;
+  scheduledAt?: string;
+  venue?: string;
+  teamCount?: number;
+  minPlayers?: number;
+  maxPlayers?: number;
+  entryFee?: number;
+  bankName?: string;
+  bankAccount?: string;
+  bankHolder?: string;
+  rulesText?: string;
+  refundPolicyText?: string;
+};
+
+export type V1UpdateTournamentPayload = Partial<Omit<V1CreateTournamentPayload, 'sportId'>>;
+
+export type V1ChangeTournamentStatusPayload = {
+  status: V1TournamentStatus;
+  reason?: string;
+};
+
+export type V1CreateRegistrationPayload = {
+  teamId: string;
+};
+
+export type V1SubmitRegistrationPayload = {
+  paymentMethod: V1TournamentPaymentMethod;
+  depositorName?: string;
+  agreedRules: boolean;
+  agreedPrivacy: boolean;
+  agreedRefund: boolean;
+  agreedMediaConsent?: boolean;
+};
+
+export type V1CancelRegistrationRequestPayload = {
+  reason?: string;
+};
+
+export type V1ConfirmPgPaymentPayload = {
+  paymentKey: string;
+  orderId: string;
+  amount: number;
+};
+
+export type V1AddPlayerPayload = {
+  userId: string;
+  realName: string;
+  birthDate?: string;
+  eligibilityStatus?: V1PlayerEligibilityStatus;
+};
+
+export type V1UpdatePlayerEligibilityPayload = {
+  eligibilityStatus: V1PlayerEligibilityStatus;
+  note?: string;
+};
+
+export type V1AdminConfirmPaymentPayload = {
+  note?: string;
+};
+
+export type V1AdminConfirmRegistrationPayload = {
+  decision: 'confirm' | 'waitlist';
+  note?: string;
+};
+
+export type V1AdminCancelRegistrationPayload = {
+  reason?: string;
+};
+
+export type V1AdminRosterLockPayload = {
+  note?: string;
+};
+
+export type V1CreateGroupPayload = {
+  name: string;
+  phase?: V1TournamentGroupPhase;
+  sortOrder?: number;
+};
+
+export type V1CreateGroupTeamPayload = {
+  groupId: string;
+  registrationId: string;
+  sortOrder?: number;
+};
+
+export type V1CreateFixturePayload = {
+  groupId?: string;
+  round: string;
+  fixtureNumber: number;
+  legNumber?: number;
+  parentFixtureId?: string;
+  homeRegistrationId?: string;
+  awayRegistrationId?: string;
+  scheduledAt?: string;
+  venue?: string;
+};
+
+export type V1RecordResultPayload = {
+  homeScore: number;
+  awayScore: number;
+  hasPenalty?: boolean;
+  homePenaltyScore?: number;
+  awayPenaltyScore?: number;
+  note?: string;
+};
+
+export type V1CreateAnnouncementPayload = {
+  title: string;
+  body: string;
+  audience?: V1AnnouncementAudience;
+  publish?: boolean;
+};

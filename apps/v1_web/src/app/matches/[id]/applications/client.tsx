@@ -114,7 +114,13 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
         <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
           <div className="tm-text-body-lg">{matchTitle}</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>
-            {eligibilityData?.requiresApproval ? '수동 승인 매치' : '자동 승인 매치'} ·
+            {/* eligibility 미도착 시 기본값 '자동 승인'을 보여주면 호스트가 승인 방식을
+                오인할 수 있어, 데이터가 준비될 때까지 중립 문구를 표시한다. */}
+            {!eligibilityData
+              ? '승인 방식 확인 중'
+              : eligibilityData.requiresApproval
+                ? '수동 승인 매치'
+                : '자동 승인 매치'} ·
             {' '}
             {match.capacityText}
             {pendingCount > 0 ? ` · 대기 ${pendingCount}명` : ''}

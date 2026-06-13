@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import * as fs from 'fs/promises';
@@ -106,10 +107,12 @@ export class UploadsService {
       // Roll back: remove already-moved files + any remaining temps.
       await Promise.all(movedPaths.map((p) => this.safeUnlink(p)));
       await this.unlinkTemps(files);
-      this.logger.warn(
+      this.logger.error(
         `업로드 이동 실패 — 이동된 ${movedPaths.length}개 정리: ${err instanceof Error ? err.message : String(err)}`,
       );
-      throw new BadRequestException('파일 저장에 실패했어요. 다시 시도해주세요.');
+      // 형식/크기 검증 실패는 위에서 400으로 끝났고, 여기 도달하는 건 디스크/권한/마운트
+      // 등 서버 내부 오류 → 클라이언트 입력 문제가 아니므로 500으로 분리.
+      throw new InternalServerErrorException('파일 저장에 실패했어요. 다시 시도해주세요.');
     }
 
     return { urls };

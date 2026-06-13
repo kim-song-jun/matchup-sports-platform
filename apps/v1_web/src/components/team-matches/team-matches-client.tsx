@@ -4,11 +4,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApplyTeamMatch,
+  useV1ApproveTeamMatchApplication,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
+  useV1RejectTeamMatchApplication,
   useV1ResolveChatRoom,
   useV1TeamMatch,
+  useV1TeamMatchApplications,
   useV1TeamMatchEligibility,
   useV1TeamMatches,
   useV1WithdrawTeamMatchApplication,
@@ -158,7 +161,10 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const query = useV1TeamMatch(teamMatchId);
   const viewerState = query.data ? getViewerState(query.data) : 'none';
   const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' });
+  const applications = useV1TeamMatchApplications(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState === 'host_team' });
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
+  const approveApplication = useV1ApproveTeamMatchApplication(teamMatchId);
+  const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);
   const resolveChatRoom = useV1ResolveChatRoom();
   const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
   const withdrawTeamMatch = useV1WithdrawTeamMatchApplication(teamMatchId, selectedEligibility?.applicationId);
@@ -175,11 +181,18 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
           address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
           hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
+          hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
+          hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
+          hostTeamMemberCount: null,
           manageHref: viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
-          applicantTeams: toApplicantTeams(
+          applicantTeams: toApplicantTeamsWithActions(
             query.data,
+            applications.data,
             fallback.match.applicantTeams,
             viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
+            (applicationId) => approveApplication.mutateAsync({ applicationId }),
+            (applicationId) => rejectApplication.mutateAsync({ applicationId }),
+            approveApplication.isPending || rejectApplication.isPending,
           ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
@@ -355,13 +368,30 @@ function countTeamMatchFilters(
   return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length;
 }
 
-function toApplicantTeams(
+function toApplicantTeamsWithActions(
   match: V1TeamMatch,
+  applications: import('@/types/api').V1TeamMatchApplicationsPage | undefined,
   fallback: TeamMatchDetailViewModel['match']['applicantTeams'],
-  manageHref?: string,
-) {
+  manageHref: string | undefined,
+  onApprove: (applicationId: string) => Promise<unknown>,
+  onReject: (applicationId: string) => Promise<unknown>,
+  actionPending: boolean,
+): TeamMatchDetailViewModel['match']['applicantTeams'] {
   if (match.approvedOpponentTeam) {
-    return [{ name: match.approvedOpponentTeam.name, meta: '승인된 상대팀', status: '승인완료', href: manageHref }];
+    return [{ name: match.approvedOpponentTeam.name, meta: '승인된 상대팀', status: '승인완료', href: manageHref, applicationId: match.approvedOpponentTeam.applicationId }];
+  }
+
+  if (applications?.items.length) {
+    return applications.items.map((app) => ({
+      name: app.applicantTeam.name,
+      meta: `매너 ${app.applicantTeam.score?.toFixed(1) ?? '-'} · ${app.applicantTeam.matchCount}전`,
+      status: app.status === 'pending' ? '승인 대기' : app.status === 'approved' ? '승인완료' : app.status === 'rejected' ? '거절' : app.status,
+      href: manageHref,
+      applicationId: app.applicationId,
+      actionPending,
+      onApprove: app.canApprove ? () => onApprove(app.applicationId) : undefined,
+      onReject: app.canReject ? () => onReject(app.applicationId) : undefined,
+    }));
   }
 
   return fallback.map((team) => ({ ...team, href: manageHref }));
@@ -415,7 +445,7 @@ function chatLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiSt
 }
 
 function canOpenTeamMatchChat(viewerState: V1TeamMatchViewerState, _status: V1TeamMatchApiStatus) {
-  return viewerState === 'approved';
+  return viewerState === 'approved' || viewerState === 'host_team';
 }
 
 async function shareTeamMatch(match: V1TeamMatch) {

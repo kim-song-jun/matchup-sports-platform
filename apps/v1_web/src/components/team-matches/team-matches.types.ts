@@ -67,12 +67,16 @@ export type TeamMatchDetailViewModel = {
     description: string;
     address: string;
     hostTeamHref?: string;
+    hostTeamLogoUrl?: string | null;
+    hostTeamTrustState?: string | null;
+    hostTeamMemberCount?: number | null;
     manageHref?: string;
     applicantTeams: Array<{
       name: string;
       meta: string;
       status: string;
       href?: string;
+      applicationId?: string;
       onApprove?: () => void;
       onReject?: () => void;
       actionPending?: boolean;
@@ -96,7 +100,8 @@ export type TeamMatchCreateViewModel = {
   step: TeamMatchCreateStep;
   selectedTeam: string;
   selectedSport: string;
-  teams: Array<{ name: string; sport: string; members: number; role: string; selected?: boolean }>;
+  isLoadingTeams?: boolean;
+  teams: Array<{ name: string; sport: string; members: number; role: string; selected?: boolean; disabled?: boolean }>;
   sports: string[];
   draft: {
     title: string;

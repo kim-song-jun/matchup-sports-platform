@@ -3,9 +3,11 @@ import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as compression from 'compression';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { UploadsService } from './uploads/uploads.service';
 
 async function bootstrap() {
   const logger = new Logger('V1Bootstrap');
@@ -13,6 +15,13 @@ async function bootstrap() {
 
   app.set('trust proxy', 1);
   app.use(compression());
+
+  // Serve locally stored upload files at /uploads/*
+  // This is a no-op when S3/CDN is configured, as URLs returned by the service
+  // would point to the external host instead.
+  app.useStaticAssets(path.resolve(UploadsService.UPLOAD_BASE), {
+    prefix: UploadsService.SERVE_PREFIX,
+  });
   app.setGlobalPrefix('api/v1');
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : true,

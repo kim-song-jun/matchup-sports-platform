@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
@@ -39,7 +40,10 @@ type MatchWithRelations = V1Match & {
 
 @Injectable()
 export class MatchesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async list(user: V1AuthUser | null, query: MatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -419,6 +423,17 @@ export class MatchesService {
       return { applications, participants };
     });
 
+    // 알림: 취소 시점에 active 상태였던 참가자 전원에게 안내 (호스트 제외, fire-and-forget)
+    const activeParticipantUserIds = await this.prisma.v1MatchParticipant.findMany({
+      where: { matchId: match.id, status: 'cancelled', role: 'participant' },
+      select: { userId: true },
+    });
+    void this.notifications.emitNotificationToMany(
+      activeParticipantUserIds.map((p) => p.userId),
+      'match_cancelled',
+      match.id,
+    );
+
     return {
       matchId: match.id,
       status: 'cancelled',
@@ -484,6 +499,13 @@ export class MatchesService {
 
       return nextApplication;
     });
+
+    // 알림: 호스트에게 신청 접수 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      match.hostUserId,
+      'match_application_received',
+      match.id,
+    );
 
     return {
       applicationId: application.id,
@@ -670,6 +692,13 @@ export class MatchesService {
       return { updated, participant };
     });
 
+    // 알림: 신청자에게 승인 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      application.applicantUserId,
+      'match_application_approved',
+      application.matchId,
+    );
+
     return {
       applicationId: result.updated.id,
       matchId: result.updated.matchId,
@@ -712,6 +741,13 @@ export class MatchesService {
 
       return nextApplication;
     });
+
+    // 알림: 신청자에게 거절 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      application.applicantUserId,
+      'match_application_rejected',
+      application.matchId,
+    );
 
     return {
       applicationId: updated.id,

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1TeamMatch, V1TeamMatchApplication } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import { CancelTeamMatchDto, MutateTeamMatchDto, UpdateTeamMatchDto } from './dto/mutate-team-match.dto';
@@ -39,7 +40,10 @@ type TeamMatchWithRelations = V1TeamMatch & {
 
 @Injectable()
 export class TeamMatchesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async list(user: V1AuthUser | null, query: TeamMatchesQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -367,6 +371,19 @@ export class TeamMatchesService {
       return { applications };
     });
 
+    // 알림: 승인된 상대팀 manager+에게 취소 안내 (fire-and-forget)
+    if (teamMatch.approvedApplicantTeamId) {
+      const opponentManagers = await this.prisma.v1TeamMembership.findMany({
+        where: { teamId: teamMatch.approvedApplicantTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
+        select: { userId: true },
+      });
+      void this.notifications.emitNotificationToMany(
+        opponentManagers.map((m) => m.userId),
+        'team_match_cancelled',
+        teamMatch.id,
+      );
+    }
+
     return {
       teamMatchId: teamMatch.id,
       status: 'cancelled',
@@ -426,6 +443,17 @@ export class TeamMatchesService {
 
       return nextApplication;
     });
+
+    // 알림: 호스트팀 manager+에게 신청 접수 안내 (fire-and-forget)
+    const hostManagers = await this.prisma.v1TeamMembership.findMany({
+      where: { teamId: teamMatch.hostTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { userId: true },
+    });
+    void this.notifications.emitNotificationToMany(
+      hostManagers.map((m) => m.userId),
+      'team_match_application_received',
+      teamMatch.id,
+    );
 
     return {
       applicationId: result.id,
@@ -610,6 +638,13 @@ export class TeamMatchesService {
       return { updatedApplication, updatedTeamMatch };
     });
 
+    // 알림: 신청팀 대표(신청자)에게 승인 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      application.appliedByUserId,
+      'team_match_application_approved',
+      application.teamMatchId,
+    );
+
     return {
       applicationId: result.updatedApplication.id,
       teamMatchId: result.updatedApplication.teamMatchId,
@@ -651,6 +686,13 @@ export class TeamMatchesService {
       });
       return nextApplication;
     });
+
+    // 알림: 신청팀 대표(신청자)에게 거절 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      application.appliedByUserId,
+      'team_match_application_rejected',
+      application.teamMatchId,
+    );
 
     return {
       applicationId: updated.id,

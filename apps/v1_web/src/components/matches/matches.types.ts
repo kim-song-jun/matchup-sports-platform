@@ -90,7 +90,7 @@ export type MatchDetailViewModel = {
   chatLabel?: string;
   chatPending?: boolean;
   onChat?: () => void;
-  onShare?: () => void | Promise<void>;
+  onShare?: () => void | string | null | Promise<void | string | null>;
   onNotify?: () => void;
 };
 
@@ -130,6 +130,7 @@ export type MatchCreateViewModel = {
     onNext: () => void;
     onSubmit: () => void;
     onCancel?: () => void;
+    uploadImage?: (file: File) => Promise<string>;
     submitLabel?: string;
     submitting?: boolean;
     error?: string | null;

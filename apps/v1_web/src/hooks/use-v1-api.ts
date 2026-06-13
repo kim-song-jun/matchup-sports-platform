@@ -1,9 +1,11 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { v1Get, v1Patch, v1Post } from '@/lib/api-client';
+import { v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
+  ApiEnvelope,
+  ApiErrorBody,
   AdminListFilters,
   CursorPage,
   V1AdminGrantResult,
@@ -85,6 +87,7 @@ import type {
   V1TeamMutationPayload,
   V1TeamMutationResult,
   V1TeamUpdatePayload,
+  V1UploadImagesResult,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -947,6 +950,70 @@ export function useV1WithdrawalRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Upload (multipart/form-data — no application/json header)
+// ---------------------------------------------------------------------------
+
+/**
+ * Multipart POST helper.
+ * Omits `content-type` so the browser sets the correct `multipart/form-data; boundary=...` header.
+ */
+async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${getV1ApiBaseUrl()}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      // intentionally no content-type — browser sets multipart boundary automatically
+      ...getV1DevAuthHeaders(),
+    },
+    body: formData,
+  });
+
+  const body: ApiEnvelope<T> | ApiErrorBody | null = await response.json().catch(() => null);
+
+  if (!response.ok || (body !== null && 'status' in body && body.status === 'error')) {
+    throw new V1ApiError(
+      (body as ApiErrorBody) ?? {
+        status: 'error' as const,
+        statusCode: response.status,
+        code: 'NETWORK_OR_PARSE_ERROR',
+        message: response.statusText || '업로드에 실패했어요.',
+        timestamp: new Date().toISOString(),
+      },
+    );
+  }
+
+  return (body as ApiEnvelope<T>).data;
+}
+
+/**
+ * 이미지 업로드 mutation.
+ *
+ * BE 계약: POST /uploads  multipart/form-data, field 이름 = 'files'
+ * 응답: { urls: string[] }
+ *
+ * 호출 예시:
+ *   const { mutateAsync } = useV1UploadImages();
+ *   const { urls } = await mutateAsync(fileList);
+ *
+ * ⚠️  v1_api에 /uploads 엔드포인트가 아직 없으면 런타임 404.
+ *     BE 준비 전까지는 imageUrl 필드를 직접 문자열로 입력하는 흐름을 유지하세요.
+ */
+export function useV1UploadImages() {
+  return useMutation({
+    mutationFn: (files: File | File[] | FileList) => {
+      const formData = new FormData();
+      const fileArray = files instanceof FileList
+        ? Array.from(files)
+        : Array.isArray(files)
+          ? files
+          : [files];
+      fileArray.forEach((file) => formData.append('files', file));
+      return v1MultipartPost<V1UploadImagesResult>('/uploads', formData);
     },
   });
 }

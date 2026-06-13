@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma, V1NotificationTargetType } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -8,9 +8,193 @@ import {
   UpdateNotificationPreferencesDto,
 } from './dto/notifications.dto';
 
+/** Notification event types emitted by domain services. */
+export type NotificationEventType =
+  | 'match_application_received'
+  | 'match_application_approved'
+  | 'match_application_rejected'
+  | 'match_cancelled'
+  | 'match_completed'
+  | 'team_join_application_received'
+  | 'team_join_application_accepted'
+  | 'team_join_application_rejected'
+  | 'team_match_application_received'
+  | 'team_match_application_approved'
+  | 'team_match_application_rejected'
+  | 'team_match_cancelled';
+
+/** Preference field in V1NotificationPreference that gates the event type. */
+function preferenceFieldForEvent(
+  type: NotificationEventType,
+): keyof Pick<
+  {
+    matchEnabled: boolean;
+    teamEnabled: boolean;
+    teamMatchEnabled: boolean;
+    chatEnabled: boolean;
+    activityEnabled: boolean;
+    importantEnabled: boolean;
+    noticeEnabled: boolean;
+    marketingEnabled: boolean;
+  },
+  'matchEnabled' | 'teamEnabled' | 'teamMatchEnabled' | 'activityEnabled'
+> {
+  if (
+    type === 'match_application_received' ||
+    type === 'match_application_approved' ||
+    type === 'match_application_rejected' ||
+    type === 'match_cancelled' ||
+    type === 'match_completed'
+  ) {
+    return 'matchEnabled';
+  }
+  if (
+    type === 'team_join_application_received' ||
+    type === 'team_join_application_accepted' ||
+    type === 'team_join_application_rejected'
+  ) {
+    return 'teamEnabled';
+  }
+  if (
+    type === 'team_match_application_received' ||
+    type === 'team_match_application_approved' ||
+    type === 'team_match_application_rejected' ||
+    type === 'team_match_cancelled'
+  ) {
+    return 'teamMatchEnabled';
+  }
+  return 'activityEnabled';
+}
+
+function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetType {
+  if (
+    type === 'match_application_received' ||
+    type === 'match_application_approved' ||
+    type === 'match_application_rejected' ||
+    type === 'match_cancelled' ||
+    type === 'match_completed'
+  ) {
+    return 'match';
+  }
+  if (
+    type === 'team_join_application_received' ||
+    type === 'team_join_application_accepted' ||
+    type === 'team_join_application_rejected'
+  ) {
+    return 'team';
+  }
+  return 'team_match';
+}
+
+const EVENT_TITLES: Record<NotificationEventType, string> = {
+  match_application_received: '매치 신청이 도착했어요',
+  match_application_approved: '매치 신청이 승인됐어요',
+  match_application_rejected: '매치 신청이 거절됐어요',
+  match_cancelled: '매치가 취소됐어요',
+  match_completed: '매치가 완료됐어요. 리뷰를 남겨보세요!',
+  team_join_application_received: '팀 가입 신청이 도착했어요',
+  team_join_application_accepted: '팀 가입 신청이 수락됐어요',
+  team_join_application_rejected: '팀 가입 신청이 거절됐어요',
+  team_match_application_received: '팀매치 신청이 도착했어요',
+  team_match_application_approved: '팀매치 신청이 승인됐어요',
+  team_match_application_rejected: '팀매치 신청이 거절됐어요',
+  team_match_cancelled: '팀매치가 취소됐어요',
+};
+
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Fire-and-forget: creates a V1Notification for userId if the user's preference
+   * for this event category is enabled (or no preference row exists → defaults enabled).
+   * Notification failures must NEVER propagate to the caller's transaction or response.
+   */
+  async emitNotification(
+    userId: string,
+    type: NotificationEventType,
+    targetId: string | null,
+    body?: string,
+  ): Promise<void> {
+    const targetType = targetTypeForEvent(type);
+    const deepLink = targetId ? `/${targetType.replace('_', '-')}s/${targetId}` : null;
+    const title = EVENT_TITLES[type];
+    const prefField = preferenceFieldForEvent(type);
+
+    this.emitNotificationFireAndForget(userId, targetType, targetId, title, body ?? null, deepLink, prefField);
+  }
+
+  /**
+   * Emit to multiple users. Each user's preference is checked individually.
+   */
+  async emitNotificationToMany(
+    userIds: string[],
+    type: NotificationEventType,
+    targetId: string | null,
+    body?: string,
+  ): Promise<void> {
+    if (userIds.length === 0) return;
+    for (const userId of userIds) {
+      this.emitNotificationFireAndForget(
+        userId,
+        targetTypeForEvent(type),
+        targetId,
+        EVENT_TITLES[type],
+        body ?? null,
+        targetId ? `/${targetTypeForEvent(type).replace('_', '-')}s/${targetId}` : null,
+        preferenceFieldForEvent(type),
+      );
+    }
+  }
+
+  private emitNotificationFireAndForget(
+    userId: string,
+    targetType: V1NotificationTargetType,
+    targetId: string | null,
+    title: string,
+    body: string | null,
+    deepLink: string | null,
+    prefField: keyof { matchEnabled: boolean; teamEnabled: boolean; teamMatchEnabled: boolean; activityEnabled: boolean },
+  ): void {
+    this.createNotificationWithPrefCheck(userId, targetType, targetId, title, body, deepLink, prefField).catch(
+      (err: unknown) => {
+        this.logger.warn(
+          `알림 생성 실패 [userId=${userId} targetType=${targetType} targetId=${targetId}]: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      },
+    );
+  }
+
+  private async createNotificationWithPrefCheck(
+    userId: string,
+    targetType: V1NotificationTargetType,
+    targetId: string | null,
+    title: string,
+    body: string | null,
+    deepLink: string | null,
+    prefField: keyof { matchEnabled: boolean; teamEnabled: boolean; teamMatchEnabled: boolean; activityEnabled: boolean },
+  ): Promise<void> {
+    const pref = await this.prisma.v1NotificationPreference.findUnique({
+      where: { userId },
+      select: { [prefField]: true },
+    });
+    // If no preference row, default is enabled (treat as true).
+    const enabled = pref ? (pref as Record<string, boolean>)[prefField] !== false : true;
+    if (!enabled) return;
+
+    await this.prisma.v1Notification.create({
+      data: {
+        recipientUserId: userId,
+        targetType,
+        targetId,
+        title,
+        body,
+        deepLink,
+      },
+    });
+  }
 
   async list(user: V1AuthUser, query: NotificationsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);

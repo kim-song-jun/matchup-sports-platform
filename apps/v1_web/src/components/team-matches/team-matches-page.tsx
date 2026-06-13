@@ -116,7 +116,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const canRunAction = Boolean(model.onApply);
-  const showChat = mode === 'approved' && Boolean(model.onChat);
+  // 채팅 버튼: approved 또는 host_team 일 때 활성. 그 외에는 항상 렌더되나 disabled.
+  const chatEnabled = Boolean(model.onChat);
+  const showChat = mode === 'approved' || mode === 'mine';
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
 
@@ -133,14 +135,22 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       });
   };
 
+  /* Chat button — always render, disabled with notice when not yet eligible */
+  const chatButton = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!chatEnabled || model.chatPending} onClick={model.onChat}>
+        {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
+      </button>
+      {!chatEnabled ? (
+        <div className="tm-text-micro" style={{ textAlign: 'center', color: 'var(--text-caption)' }}>승인 완료 후 이용할 수 있어요</div>
+      ) : null}
+    </div>
+  );
+
   /* Shared CTA buttons — rendered in both mobile fixed bar and desktop sticky card */
   const ctaButtons = (
     <>
-      {showChat ? (
-        <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!model.onChat || model.chatPending} onClick={model.onChat}>
-          {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
-        </button>
-      ) : null}
+      {showChat ? chatButton : null}
       {mode === 'mine' ? (
         <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/team-matches/${match.id}/edit`}>{cta}</Link>
       ) : (
@@ -217,27 +227,72 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div>
                 </Card>
               ) : null}
-              <Link className="tm-card tm-pressable" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 14, marginTop: 14 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div className="tm-text-caption">홈팀 정보</div>
-                  <div className="tm-text-body-lg" style={{ marginTop: 3 }}>{match.hostTeam}</div>
-                  <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{match.sport} · {match.grade}등급</div>
+              <Link className="tm-card tm-pressable" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginTop: 14 }}>
+                {/* 팀 로고 아바타 */}
+                <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, overflow: 'hidden', background: 'var(--grey100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {match.hostTeamLogoUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={match.hostTeamLogoUrl} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span className="tm-text-subhead" style={{ color: 'var(--text-caption)' }}>{match.hostTeam.slice(0, 1)}</span>
+                  )}
                 </div>
-                <span className="tm-btn tm-btn-sm tm-btn-neutral">보기</span>
+                {/* 팀 정보 */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>홈팀 정보</div>
+                  <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
+                    <span className="tm-badge tm-badge-blue">{match.sport}</span>
+                    <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
+                    {match.hostTeamMemberCount != null ? (
+                      <span className="tm-badge tm-badge-grey">{match.hostTeamMemberCount}명</span>
+                    ) : null}
+                    {match.hostTeamTrustState && match.hostTeamTrustState !== 'none' ? (
+                      <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <span className="tm-btn tm-btn-sm tm-btn-primary" style={{ flexShrink: 0 }}>팀 보기</span>
               </Link>
               {mode === 'mine' ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
                   <div className="tm-text-body-lg">신청팀</div>
-                  <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                  <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
                     {match.applicantTeams.map((team) => (
-                      <div key={team.name}>
-                        {team.href ? (
-                          <Link href={team.href} aria-label={`${team.name} 관리 페이지로 이동`}>
-                            <ListItem title={team.name} sub={team.meta} trailing={team.status} />
-                          </Link>
-                        ) : (
-                          <ListItem title={team.name} sub={team.meta} trailing={team.status} />
-                        )}
+                      <div key={team.applicationId ?? team.name} style={{ border: '1px solid var(--grey100)', borderRadius: 12, padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div className="tm-text-label">{team.name}</div>
+                            <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{team.meta}</div>
+                          </div>
+                          <span className={`tm-badge ${team.status === '승인완료' ? 'tm-badge-blue' : team.status === '거절' ? 'tm-badge-grey' : 'tm-badge-grey'}`}>{team.status}</span>
+                        </div>
+                        {(team.onApprove ?? team.onReject) ? (
+                          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                            {team.onApprove ? (
+                              <button
+                                className="tm-btn tm-btn-sm tm-btn-primary"
+                                type="button"
+                                disabled={team.actionPending}
+                                onClick={() => { void team.onApprove?.(); }}
+                                aria-label={`${team.name} 승인`}
+                              >
+                                {team.actionPending ? '처리 중' : '승인'}
+                              </button>
+                            ) : null}
+                            {team.onReject ? (
+                              <button
+                                className="tm-btn tm-btn-sm tm-btn-neutral"
+                                type="button"
+                                disabled={team.actionPending}
+                                onClick={() => { void team.onReject?.(); }}
+                                aria-label={`${team.name} 거절`}
+                              >
+                                거절
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -267,7 +322,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
           <span className="tm-text-label">{model.statusLabel ?? `${match.opponentCost.toLocaleString('ko-KR')}원`}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: showChat ? '104px 1fr' : '1fr', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: showChat ? '120px 1fr' : '1fr', gap: 8 }}>
           {ctaButtons}
         </div>
       </div>
@@ -476,7 +531,51 @@ function TeamMatchCard({ match, index }: { match: TeamMatchModel; index: number 
 }
 
 function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">어떤 팀의 매치인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>팀매치는 선택한 내 팀의 권한, 종목, 팀 정보로 생성됩니다.</p>{model.teams.length ? <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>{model.teams.map((team) => <button key={team.name} className={`tm-card tm-pressable ${team.selected ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" onClick={() => model.form?.onSelectTeam(team.name)}><div className="tm-text-body-lg">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.members}명 · {team.role}</div></button>)}</div> : <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="팀장 또는 관리자인 팀에서만 팀매치를 만들 수 있습니다." /> }<Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}><div className="tm-text-label">권한 기준</div><div className="tm-text-caption" style={{ marginTop: 6 }}>팀장 또는 매치 생성 권한이 있는 관리자만 다음 단계로 이동할 수 있습니다.</div></Card></div>;
+  const hasTeams = model.teams.length > 0;
+  const hasCreatableTeams = model.teams.some((team) => !team.disabled);
+  return (
+    <div>
+      <h1 className="tm-text-heading">어떤 팀의 매치인가요?</h1>
+      <p className="tm-text-body" style={{ marginTop: 8 }}>팀매치는 선택한 내 팀의 권한, 종목, 팀 정보로 생성됩니다.</p>
+      {model.isLoadingTeams ? (
+        <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="tm-review-skeleton" style={{ height: 72 }} aria-hidden="true" />
+          ))}
+        </div>
+      ) : !hasTeams ? (
+        <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="소속된 팀이 없거나 팀 정보를 불러오지 못했어요." />
+      ) : (
+        <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>
+          {model.teams.map((team) => (
+            <button
+              key={team.name}
+              className={`tm-card ${team.disabled ? '' : 'tm-pressable'} ${team.selected ? 'tm-create-selected' : ''}`}
+              style={{ padding: 16, textAlign: 'left', opacity: team.disabled ? 0.55 : 1, cursor: team.disabled ? 'default' : 'pointer' }}
+              type="button"
+              disabled={team.disabled}
+              onClick={() => { if (!team.disabled) model.form?.onSelectTeam(team.name); }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div className="tm-text-body-lg">{team.name}</div>
+                {team.disabled ? (
+                  <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>권한 필요</span>
+                ) : null}
+              </div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.members}명 · {team.role}</div>
+            </button>
+          ))}
+        </div>
+      )}
+      {!model.isLoadingTeams && hasTeams && !hasCreatableTeams ? (
+        <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="팀장 또는 관리자인 팀에서만 팀매치를 만들 수 있습니다." />
+      ) : null}
+      <Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}>
+        <div className="tm-text-label">권한 기준</div>
+        <div className="tm-text-caption" style={{ marginTop: 6 }}>팀장 또는 매치 생성 권한이 있는 관리자만 다음 단계로 이동할 수 있습니다.</div>
+      </Card>
+    </div>
+  );
 }
 
 function SportStep({ model }: { model: TeamMatchCreateViewModel }) {
@@ -549,4 +648,12 @@ function nextHref(step: TeamMatchCreateViewModel['step']) {
   if (step === 'place-time') return '/team-matches/new/confirm';
   if (step === 'confirm') return '/team-matches/new/complete';
   return '/team-matches/team-match-1';
+}
+
+function trustStateLabel(trustState: string) {
+  if (trustState === 'verified') return '인증팀';
+  if (trustState === 'gold') return '골드';
+  if (trustState === 'silver') return '실버';
+  if (trustState === 'bronze') return '브론즈';
+  return trustState;
 }

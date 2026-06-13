@@ -27,6 +27,13 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: `${internalApiOrigin}/api/:path*`,
       },
+      {
+        // Uploaded images are served by v1_api via express.static at /uploads
+        // (outside the /api/v1 global prefix). Proxy so the web origin can load
+        // them without CORS and so stored relative URLs resolve in dev + prod.
+        source: '/uploads/:path*',
+        destination: `${internalApiOrigin}/uploads/:path*`,
+      },
     ];
   },
 };

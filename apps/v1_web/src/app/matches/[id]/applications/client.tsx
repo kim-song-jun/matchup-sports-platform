@@ -1,0 +1,368 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import {
+  useV1ApproveMatchApplication,
+  useV1Match,
+  useV1MatchApplicationEligibility,
+  useV1MatchApplications,
+  useV1RejectMatchApplication,
+} from '@/hooks/use-v1-api';
+import { AppChrome } from '@/components/v1-ui/shell';
+import { Card, EmptyState } from '@/components/v1-ui/primitives';
+import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { extractErrorMessage } from '@/lib/error-message';
+import { cssUrl } from '@/lib/assets';
+import type { V1MatchApplication } from '@/types/api';
+
+export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
+  const router = useRouter();
+  const matchQuery = useV1Match(matchId);
+  const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(matchQuery.data) });
+  const viewerState = matchQuery.data?.viewer?.state ?? matchQuery.data?.viewerState ?? 'none';
+  const isHost = viewerState === 'host';
+  // Fetch once we know user is host — avoids 403 for non-hosts
+  const applicationsQuery = useV1MatchApplications(
+    matchId,
+    { status: 'requested', limit: 50 },
+    { enabled: Boolean(matchQuery.data) && isHost },
+  );
+  const approveApplication = useV1ApproveMatchApplication(matchId);
+  const rejectApplication = useV1RejectMatchApplication(matchId);
+
+  // Non-host redirect: once viewer state is resolved, push to detail
+  useEffect(() => {
+    if (!matchQuery.data) return;
+    if (!isHost) {
+      router.replace(`/matches/${matchId}`);
+    }
+  }, [matchQuery.data, isHost, matchId, router]);
+
+  if (matchQuery.isError) {
+    return (
+      <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+        <DesktopPageHead matchId={matchId} />
+        <div className="tm-match-list">
+          <ErrorCard message="매치 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  // While loading or redirecting non-host, show skeleton
+  if (!matchQuery.data || !isHost) {
+    return (
+      <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+        <DesktopPageHead matchId={matchId} />
+        <div className="tm-match-list">
+          <ApplicationsSkeletonList />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const match = matchQuery.data;
+  const matchTitle = match.title;
+  const items = applicationsQuery.data?.items ?? [];
+  const pendingCount = items.filter((a) => a.status === 'requested').length;
+  const actionPending = approveApplication.isPending || rejectApplication.isPending;
+  const eligibilityData = eligibility.data;
+
+  function handleApprove(application: V1MatchApplication) {
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(`${application.displayName}님의 신청을 승인할까요?`)
+    ) {
+      return;
+    }
+    approveApplication.mutate(
+      { applicationId: application.applicationId, note: null },
+      {
+        onError: (err) => {
+          window.alert(extractErrorMessage(err, '승인하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+        },
+      },
+    );
+  }
+
+  function handleReject(application: V1MatchApplication) {
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(`${application.displayName}님의 신청을 거절할까요?`)
+    ) {
+      return;
+    }
+    rejectApplication.mutate(
+      { applicationId: application.applicationId, reason: 'rejected_by_host_from_applications_page' },
+      {
+        onError: (err) => {
+          window.alert(extractErrorMessage(err, '거절하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+        },
+      },
+    );
+  }
+
+  return (
+    <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+      <DesktopPageHead matchId={matchId} />
+      <div className="tm-match-list">
+        {/* 매치 요약 카드 */}
+        <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
+          <div className="tm-text-body-lg">{matchTitle}</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>
+            {eligibilityData?.requiresApproval ? '수동 승인 매치' : '자동 승인 매치'} ·
+            {' '}
+            {match.capacityText}
+            {pendingCount > 0 ? ` · 대기 ${pendingCount}명` : ''}
+          </div>
+        </Card>
+
+        {/* 로딩 중 */}
+        {applicationsQuery.isLoading ? (
+          <div style={{ marginTop: 14 }}>
+            <ApplicationsSkeletonList />
+          </div>
+        ) : applicationsQuery.isError ? (
+          <div style={{ marginTop: 14 }}>
+            <ErrorCard message="신청 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
+          </div>
+        ) : items.length === 0 ? (
+          <div style={{ marginTop: 14 }}>
+            <EmptyState
+              title="신청자가 없어요"
+              sub="아직 이 매치에 신청한 사람이 없습니다. 신청자가 생기면 여기서 승인하거나 거절할 수 있어요."
+            />
+          </div>
+        ) : (
+          <div className="tm-my-list-stack" style={{ marginTop: 14 }}>
+            {items.map((application) => (
+              <ApplicationRow
+                key={application.applicationId}
+                application={application}
+                actionPending={actionPending}
+                onApprove={() => handleApprove(application)}
+                onReject={() => handleReject(application)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </AppChrome>
+  );
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function DesktopPageHead({ matchId }: { matchId: string }) {
+  return (
+    <div className="tm-desktop-page-head tm-show-desktop">
+      <Link
+        className="tm-desktop-back"
+        href={`/matches/${matchId}`}
+        aria-label="매치 상세로 돌아가기"
+      >
+        <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+      </Link>
+      <h1 className="tm-text-heading" style={{ margin: 0 }}>신청자 관리</h1>
+    </div>
+  );
+}
+
+function ApplicationRow({
+  application,
+  actionPending,
+  onApprove,
+  onReject,
+}: {
+  application: V1MatchApplication;
+  actionPending: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const statusLabel = applicationStatusLabel(application.status);
+  const statusBadgeClass = applicationStatusBadgeClass(application.status);
+  const isPending = application.status === 'requested';
+  const mannerScore =
+    application.mannerScore !== null ? application.mannerScore.toFixed(1) : null;
+
+  return (
+    <Card pad={14}>
+      {/* 신청자 정보 행 */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}
+        aria-label={`신청자 ${application.displayName}`}
+      >
+        {/* 프로필 이미지 */}
+        <div
+          role="img"
+          aria-label={`${application.displayName} 프로필 사진`}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+            background: application.profileImageUrl
+              ? `${cssUrl(application.profileImageUrl)} center/cover no-repeat, var(--grey200)`
+              : 'var(--grey200)',
+            backgroundImage: application.profileImageUrl
+              ? cssUrl(application.profileImageUrl)
+              : undefined,
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            color: 'var(--text-muted)',
+            fontSize: 18,
+            fontWeight: 800,
+          }}
+        >
+          {!application.profileImageUrl
+            ? (application.displayName.slice(0, 1) || '?')
+            : null}
+        </div>
+
+        {/* 이름 / 부가 정보 */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            className="tm-text-body"
+            style={{ color: 'var(--text-strong)', fontWeight: 600 }}
+          >
+            {application.displayName}
+          </div>
+          <div
+            className="tm-text-caption"
+            style={{ marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap' }}
+          >
+            {mannerScore !== null ? (
+              <span>매너 {mannerScore}</span>
+            ) : null}
+            {application.reviewCount > 0 ? (
+              <span>리뷰 {application.reviewCount}개</span>
+            ) : null}
+            {application.message ? (
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: 160,
+                  display: 'inline-block',
+                }}
+              >
+                "{application.message}"
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* 상태 뱃지 */}
+        <span className={`tm-badge ${statusBadgeClass}`} aria-label={`상태: ${statusLabel}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      {/* 승인/거절 버튼 — requested(대기중) 상태일 때만 */}
+      {isPending ? (
+        <>
+          <button
+            className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block"
+            type="button"
+            style={{ marginTop: 10 }}
+            disabled={actionPending}
+            aria-expanded={actionsOpen}
+            aria-label={`${application.displayName} 신청 관리`}
+            onClick={() => setActionsOpen((prev) => !prev)}
+          >
+            관리
+          </button>
+          {actionsOpen ? (
+            <div
+              className="tm-member-actions"
+              style={{ marginTop: 10, display: 'flex', gap: 8 }}
+            >
+              <button
+                className="tm-btn tm-btn-sm tm-btn-primary"
+                type="button"
+                style={{ flex: 1 }}
+                disabled={actionPending}
+                aria-label={`${application.displayName} 승인`}
+                onClick={() => {
+                  setActionsOpen(false);
+                  onApprove();
+                }}
+              >
+                승인
+              </button>
+              <button
+                className="tm-btn tm-btn-sm tm-btn-danger"
+                type="button"
+                style={{ flex: 1 }}
+                disabled={actionPending}
+                aria-label={`${application.displayName} 거절`}
+                onClick={() => {
+                  setActionsOpen(false);
+                  onReject();
+                }}
+              >
+                거절
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
+function ApplicationsSkeletonList() {
+  return (
+    <div className="tm-my-list-stack" aria-busy="true" aria-label="신청 목록 불러오는 중">
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="tm-review-skeleton"
+          style={{ minHeight: 76, borderRadius: 16 }}
+          aria-hidden="true"
+        />
+      ))}
+    </div>
+  );
+}
+
+function ErrorCard({ message }: { message: string }) {
+  return (
+    <Card pad={16} style={{ background: 'var(--grey50)' }}>
+      <div className="tm-text-label">{message}</div>
+      <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+        새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
+      </div>
+    </Card>
+  );
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function applicationStatusLabel(status: string): string {
+  switch (status) {
+    case 'requested': return '대기중';
+    case 'approved': return '승인완료';
+    case 'rejected': return '거절됨';
+    case 'withdrawn': return '취소됨';
+    case 'cancelled_by_host': return '호스트 취소';
+    case 'expired': return '마감됨';
+    default: return status;
+  }
+}
+
+function applicationStatusBadgeClass(status: string): string {
+  switch (status) {
+    case 'requested': return 'tm-badge-orange';
+    case 'approved': return 'tm-badge-green';
+    case 'rejected': return 'tm-badge-red';
+    default: return 'tm-badge-grey';
+  }
+}

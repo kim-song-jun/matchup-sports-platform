@@ -161,11 +161,11 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
           address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
           rules: query.data.rulesText ? [query.data.rulesText] : fallback.match.rules,
-          manageHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
+          manageHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
           participants: toParticipants(
             query.data,
             fallback.match.participants,
-            viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
+            viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
           ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
@@ -374,7 +374,13 @@ function getCapacity(match: V1Match, fallback: MatchCardModel) {
 }
 
 function getStatus(match: V1Match): V1MatchApiStatus {
-  return (match.displayState as V1MatchApiStatus | undefined) ?? (match.status as V1MatchApiStatus);
+  const base = (match.displayState as V1MatchApiStatus | undefined) ?? (match.status as V1MatchApiStatus);
+  // 마감 UX 선행: deadlineAt < now 면 모집 종료로 표시
+  if (base === 'recruiting' || base === 'open') {
+    const dl = match.deadlineAt ? new Date(match.deadlineAt) : null;
+    if (dl && !Number.isNaN(dl.getTime()) && dl.getTime() < Date.now()) return 'closed';
+  }
+  return base;
 }
 
 function getViewerState(match: V1Match, preflight?: Exclude<V1ViewerState, 'guest'>): V1ViewerState {
@@ -426,7 +432,7 @@ function actionLabel(status: MatchCardModel['status']) {
   if (status === 'approved') return '승인 완료';
   if (status === 'full') return '신청 마감';
   if (status === 'mine') return '내 매치';
-  return '승인제 신청';
+  return '참가 신청';
 }
 
 function formatDeadline(value: string | null | undefined, status: MatchCardModel['status']) {
@@ -458,7 +464,7 @@ function formatDeadlineDetail(value: string | null | undefined, status: MatchCar
   return `${formatDate(value)} ${formatTime(value)}`;
 }
 
-async function shareMatch(match: V1Match) {
+async function shareMatch(match: V1Match): Promise<string | null> {
   const title = match.title;
   const path = `/matches/${match.matchId ?? match.id}`;
   const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
@@ -466,15 +472,26 @@ async function shareMatch(match: V1Match) {
   if (navigator.share) {
     try {
       await navigator.share({ title, url });
+      return null;
     } catch (err) {
-      // AbortError: user dismissed the native share sheet — not an error
-      if (err instanceof Error && err.name === 'AbortError') return;
-      throw err;
+      // AbortError: 사용자가 공유 시트를 닫은 것 — 오류가 아님
+      if (err instanceof Error && err.name === 'AbortError') return null;
+      // share 실패 시 clipboard로 폴백
     }
-    return;
   }
 
-  await navigator.clipboard?.writeText(url);
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(url);
+      return '링크가 복사되었어요';
+    } catch {
+      // clipboard 실패 — prompt 폴백
+    }
+  }
+
+  // 최후 폴백: prompt로 URL 보여주기
+  window.prompt('링크를 복사해주세요', url);
+  return null;
 }
 
 function getApplyAction({

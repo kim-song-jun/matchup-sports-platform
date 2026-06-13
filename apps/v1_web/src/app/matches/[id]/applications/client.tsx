@@ -7,7 +7,7 @@ import {
   useV1ApproveMatchApplication,
   useV1Match,
   useV1MatchApplicationEligibility,
-  useV1MatchApplications,
+  useV1MatchApplicationsInfinite,
   useV1RejectMatchApplication,
 } from '@/hooks/use-v1-api';
 import { AppChrome } from '@/components/v1-ui/shell';
@@ -23,8 +23,10 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(matchQuery.data) });
   const viewerState = matchQuery.data?.viewer?.state ?? matchQuery.data?.viewerState ?? 'none';
   const isHost = viewerState === 'host';
-  // Fetch once we know user is host — avoids 403 for non-hosts
-  const applicationsQuery = useV1MatchApplications(
+  // Fetch once we know user is host — avoids 403 for non-hosts.
+  // Cursor-paginated: a match can hold up to 100 participants while the API caps each
+  // page at 50, so the host loads further pages via "더 보기" to manage every applicant.
+  const applicationsQuery = useV1MatchApplicationsInfinite(
     matchId,
     { status: 'requested', limit: 50 },
     { enabled: Boolean(matchQuery.data) && isHost },
@@ -65,7 +67,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 
   const match = matchQuery.data;
   const matchTitle = match.title;
-  const items = applicationsQuery.data?.items ?? [];
+  const items = applicationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const pendingCount = items.filter((a) => a.status === 'requested').length;
   const actionPending = approveApplication.isPending || rejectApplication.isPending;
   const eligibilityData = eligibility.data;
@@ -146,6 +148,17 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
                 onReject={() => handleReject(application)}
               />
             ))}
+            {applicationsQuery.hasNextPage ? (
+              <button
+                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                type="button"
+                style={{ marginTop: 4 }}
+                disabled={applicationsQuery.isFetchingNextPage}
+                onClick={() => applicationsQuery.fetchNextPage()}
+              >
+                {applicationsQuery.isFetchingNextPage ? '불러오는 중…' : '더 보기'}
+              </button>
+            ) : null}
           </div>
         )}
       </div>

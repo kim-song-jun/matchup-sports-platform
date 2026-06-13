@@ -162,7 +162,10 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const query = useV1TeamMatch(teamMatchId);
   const viewerState = query.data ? getViewerState(query.data) : 'none';
   const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' });
-  const applications = useV1TeamMatchApplications(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState === 'host_team' });
+  // Request the server max (50) so applicant teams aren't hidden behind the default
+  // page size of 20. One match seeks a single opponent, so applicant teams stay well
+  // within a single page — no cursor pagination needed here.
+  const applications = useV1TeamMatchApplications(teamMatchId, { limit: 50 }, { enabled: Boolean(query.data) && viewerState === 'host_team' });
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
   const approveApplication = useV1ApproveTeamMatchApplication(teamMatchId);
   const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);

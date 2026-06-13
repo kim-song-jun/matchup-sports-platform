@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
@@ -404,6 +404,30 @@ export function useV1MatchApplications(matchId: string, filters?: ListFilters, o
   return useQuery({
     queryKey: [...v1Keys.match(matchId), 'applications', filters ?? {}] as const,
     queryFn: () => v1Get<V1MatchApplicationsPage>(`/matches/${matchId}/applications`, filters),
+    enabled: Boolean(matchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+// Cursor-paginated applicant list for the host management screen. A match can hold
+// up to 100 participants while the server caps each page at 50, so a single page can
+// hide applicants the host must act on. useInfiniteQuery accumulates pages and, on
+// approve/reject invalidation, refetches every loaded page so acted-on applicants drop
+// out while the host keeps their place (manual cursor accumulation would double-append).
+export function useV1MatchApplicationsInfinite(
+  matchId: string,
+  filters?: ListFilters,
+  options?: { enabled?: boolean },
+) {
+  return useInfiniteQuery({
+    queryKey: [...v1Keys.match(matchId), 'applications', 'infinite', filters ?? {}] as const,
+    queryFn: ({ pageParam }) =>
+      v1Get<V1MatchApplicationsPage>(`/matches/${matchId}/applications`, {
+        ...filters,
+        ...(pageParam ? { cursor: pageParam } : {}),
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => (lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined),
     enabled: Boolean(matchId) && (options?.enabled ?? true),
     retry: false,
   });

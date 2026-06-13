@@ -10,9 +10,7 @@
       "07-team-match-new-team"
     ],
     "fail": [],
-    "consoleErrors": [
-      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
-    ]
+    "consoleErrors": []
   },
   "tablet": {
     "ok": [
@@ -25,9 +23,7 @@
       "07-team-match-new-team"
     ],
     "fail": [],
-    "consoleErrors": [
-      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
-    ]
+    "consoleErrors": []
   },
   "desktop": {
     "ok": [
@@ -40,8 +36,6 @@
       "07-team-match-new-team"
     ],
     "fail": [],
-    "consoleErrors": [
-      "Failed to load resource: the server responded with a status of 400 (Bad Request)"
-    ]
+    "consoleErrors": []
   }
 }

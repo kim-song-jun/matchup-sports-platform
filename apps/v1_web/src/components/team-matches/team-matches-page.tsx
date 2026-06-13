@@ -118,9 +118,10 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const canRunAction = Boolean(model.onApply);
-  // 채팅 버튼: approved 또는 host_team 일 때 활성. 그 외에는 항상 렌더되나 disabled.
+  // 채팅 버튼: approved/host(mine)는 활성, pending(승인 대기)은 disabled + '승인 완료 후 이용' 안내.
+  // default(비참여자)에는 미노출.
   const chatEnabled = Boolean(model.onChat);
-  const showChat = mode === 'approved' || mode === 'mine';
+  const showChat = mode === 'approved' || mode === 'mine' || mode === 'pending';
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
 

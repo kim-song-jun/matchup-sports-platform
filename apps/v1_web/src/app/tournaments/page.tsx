@@ -57,7 +57,7 @@ function TournamentsContent() {
                 textTransform: 'uppercase',
               }}
             >
-              Prize Tournament
+              상금 대회
             </span>
           </div>
 

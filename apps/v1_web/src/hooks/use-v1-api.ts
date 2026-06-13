@@ -1000,8 +1000,8 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
  *   const { mutateAsync } = useV1UploadImages();
  *   const { urls } = await mutateAsync(fileList);
  *
- * ⚠️  v1_api에 /uploads 엔드포인트가 아직 없으면 런타임 404.
- *     BE 준비 전까지는 imageUrl 필드를 직접 문자열로 입력하는 흐름을 유지하세요.
+ * 업로드 파일은 v1_api가 /uploads 정적 경로로 서빙하며, 응답 url은 루트-상대(/uploads/...).
+ * web은 next.config rewrite로 /uploads/* → v1_api 프록시.
  */
 export function useV1UploadImages() {
   return useMutation({

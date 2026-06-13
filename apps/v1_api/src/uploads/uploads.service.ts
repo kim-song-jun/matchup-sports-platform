@@ -46,68 +46,93 @@ export class UploadsService {
       throw new BadRequestException('업로드할 파일을 선택해주세요.');
     }
 
-    const urls: string[] = [];
-
+    // 1. Validate ALL files before moving any, so a later validation failure never
+    //    leaves earlier files orphaned on disk. On failure, unlink every temp file.
     for (const file of files) {
       if (!ALLOWED_MIMETYPES.has(file.mimetype)) {
-        // Remove the temp file before throwing
-        await this.safeUnlink(file.path);
+        await this.unlinkTemps(files);
         throw new BadRequestException(
           `허용되지 않는 파일 형식이에요. (${file.mimetype}). jpeg, png, webp만 허용돼요.`,
         );
       }
       if (file.size > MAX_FILE_SIZE) {
-        await this.safeUnlink(file.path);
+        await this.unlinkTemps(files);
         throw new BadRequestException(
           `파일 크기가 5MB를 초과했어요. (${file.originalname})`,
         );
       }
+    }
 
-      const ext = MIME_TO_EXT[file.mimetype] ?? 'bin';
-      const now = new Date();
-      const year = now.getFullYear().toString();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
+    // 2. Move all validated files. If any move fails, clean up everything already
+    //    moved (and remaining temps) so a partial failure leaves no orphan files.
+    const urls: string[] = [];
+    const movedPaths: string[] = [];
+    try {
+      for (const file of files) {
+        const ext = MIME_TO_EXT[file.mimetype] ?? 'bin';
+        const now = new Date();
+        const year = now.getFullYear().toString();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
 
-      const destDir = path.join(UploadsService.UPLOAD_BASE, year, month);
-      await fs.mkdir(destDir, { recursive: true });
+        const destDir = path.join(UploadsService.UPLOAD_BASE, year, month);
+        await fs.mkdir(destDir, { recursive: true });
 
-      const newFilename = `${randomUUID()}.${ext}`;
-      const destPath = path.join(destDir, newFilename);
+        const newFilename = `${randomUUID()}.${ext}`;
+        const destPath = path.join(destDir, newFilename);
 
-      try {
-        await fs.rename(file.path, destPath);
-      } catch (err) {
-        // Cross-device rename (e.g. tmpdir → uploads on different mount) → copy + unlink
-        if (
-          err !== null &&
-          typeof err === 'object' &&
-          'code' in err &&
-          (err as { code?: string }).code === 'EXDEV'
-        ) {
-          await fs.copyFile(file.path, destPath);
-          await this.safeUnlink(file.path);
-        } else {
-          await this.safeUnlink(file.path);
-          this.logger.warn(
-            `파일 이동 실패 (${file.originalname}): ${err instanceof Error ? err.message : String(err)}`,
-          );
-          throw new BadRequestException('파일 저장에 실패했어요. 다시 시도해주세요.');
+        try {
+          await fs.rename(file.path, destPath);
+        } catch (err) {
+          // Cross-device rename (e.g. tmpdir → uploads on different mount) → copy + unlink
+          if (
+            err !== null &&
+            typeof err === 'object' &&
+            'code' in err &&
+            (err as { code?: string }).code === 'EXDEV'
+          ) {
+            await fs.copyFile(file.path, destPath);
+            await this.safeUnlink(file.path);
+          } else {
+            throw err;
+          }
         }
-      }
 
-      // Build the publicly accessible URL
-      const relativePath = `${UploadsService.SERVE_PREFIX}/${year}/${month}/${newFilename}`;
-      const url = `${baseUrl}${relativePath}`;
-      urls.push(url);
+        movedPaths.push(destPath);
+        urls.push(
+          `${baseUrl}${UploadsService.SERVE_PREFIX}/${year}/${month}/${newFilename}`,
+        );
+      }
+    } catch (err) {
+      // Roll back: remove already-moved files + any remaining temps.
+      await Promise.all(movedPaths.map((p) => this.safeUnlink(p)));
+      await this.unlinkTemps(files);
+      this.logger.warn(
+        `업로드 이동 실패 — 이동된 ${movedPaths.length}개 정리: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw new BadRequestException('파일 저장에 실패했어요. 다시 시도해주세요.');
     }
 
     return { urls };
+  }
+
+  /** Best-effort cleanup of all multer temp files (e.g. on a validation failure). */
+  private async unlinkTemps(files: UploadedFile[]): Promise<void> {
+    await Promise.all(files.map((f) => this.safeUnlink(f.path)));
   }
 
   private async safeUnlink(filePath: string): Promise<void> {
     try {
       await fs.unlink(filePath);
     } catch (err) {
+      // Already gone (e.g. moved by a successful rename) — not an error.
+      if (
+        err !== null &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code?: string }).code === 'ENOENT'
+      ) {
+        return;
+      }
       this.logger.warn(
         `임시 파일 삭제 실패 (${filePath}): ${err instanceof Error ? err.message : String(err)}`,
       );

@@ -59,7 +59,12 @@ async function shot(page, dir, name) {
     }, HOST);
     const page = await ctx.newPage();
     const consoleErrors = [];
-    page.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 140)); });
+    page.on('console', (msg) => {
+      if (msg.type() !== 'error') return;
+      const loc = msg.location();
+      const where = loc && loc.url ? ` @ ${loc.url.split('/').pop()}:${loc.lineNumber ?? '?'}` : '';
+      consoleErrors.push((msg.text().slice(0, 140) + where).slice(0, 200));
+    });
     for (const [name, route] of PAGES) {
       try {
         await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 30000 });

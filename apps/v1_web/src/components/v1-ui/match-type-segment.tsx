@@ -6,35 +6,32 @@ interface MatchTypeSegmentProps {
   active: MatchType;
 }
 
+/**
+ * 매치(개인/팀) 유형 세그먼트. 탭 위젯이 아니라 라우팅 링크 2개이므로 aria-current로
+ * 현재 선택을 표현하고, 스타일은 기존 정의된 .tm-segment-row + .tm-review-tab(data-active)
+ * 패턴을 재사용한다.
+ */
 export function MatchTypeSegment({ active }: MatchTypeSegmentProps) {
   return (
-    <div
-      className="tm-segment"
-      role="tablist"
-      aria-label="매치 유형 선택"
-    >
+    <nav className="tm-segment-row" aria-label="매치 유형" style={{ marginBottom: 12 }}>
       <Link
         href="/matches"
-        role="tab"
-        aria-selected={active === 'personal'}
+        className="tm-review-tab"
+        data-active={active === 'personal'}
         aria-current={active === 'personal' ? 'page' : undefined}
-        aria-label="개인 매치"
-        className={`tm-segment-pill${active === 'personal' ? ' tm-segment-pill-active' : ''}`}
-        style={{ minHeight: '44px', minWidth: '44px' }}
+        style={{ minHeight: 44 }}
       >
         개인
       </Link>
       <Link
         href="/team-matches"
-        role="tab"
-        aria-selected={active === 'team'}
+        className="tm-review-tab"
+        data-active={active === 'team'}
         aria-current={active === 'team' ? 'page' : undefined}
-        aria-label="팀 매치"
-        className={`tm-segment-pill${active === 'team' ? ' tm-segment-pill-active' : ''}`}
-        style={{ minHeight: '44px', minWidth: '44px' }}
+        style={{ minHeight: 44 }}
       >
         팀
       </Link>
-    </div>
+    </nav>
   );
 }

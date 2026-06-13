@@ -987,6 +987,16 @@ async function v1MultipartPost<T>(path: string, formData: FormData): Promise<T> 
     );
   }
 
+  if (body === null) {
+    // 200이지만 바디 파싱 실패(빈 바디/HTML 등) → data 접근 전 에러로 가드.
+    throw new V1ApiError({
+      status: 'error' as const,
+      statusCode: response.status,
+      code: 'NETWORK_OR_PARSE_ERROR',
+      message: '업로드 응답을 해석하지 못했어요. 다시 시도해 주세요.',
+      timestamp: new Date().toISOString(),
+    });
+  }
   return (body as ApiEnvelope<T>).data;
 }
 

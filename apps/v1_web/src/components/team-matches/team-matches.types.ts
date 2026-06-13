@@ -69,7 +69,6 @@ export type TeamMatchDetailViewModel = {
     hostTeamHref?: string;
     hostTeamLogoUrl?: string | null;
     hostTeamTrustState?: string | null;
-    hostTeamMemberCount?: number | null;
     manageHref?: string;
     applicantTeams: Array<{
       name: string;

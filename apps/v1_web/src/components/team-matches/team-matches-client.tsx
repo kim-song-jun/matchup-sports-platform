@@ -183,7 +183,6 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
           hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
           hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
-          hostTeamMemberCount: null,
           manageHref: viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
           applicantTeams: toApplicantTeamsWithActions(
             query.data,

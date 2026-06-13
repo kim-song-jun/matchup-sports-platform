@@ -247,9 +247,6 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
                     <span className="tm-badge tm-badge-blue">{match.sport}</span>
                     <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
-                    {match.hostTeamMemberCount != null ? (
-                      <span className="tm-badge tm-badge-grey">{match.hostTeamMemberCount}명</span>
-                    ) : null}
                     {match.hostTeamTrustState && match.hostTeamTrustState !== 'none' ? (
                       <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
                     ) : null}

@@ -33,6 +33,13 @@ export class CreateGroupDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  /** 이 그룹에서 다음 라운드로 진출하는 팀 수. null = 진출선 없음. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  advanceCount?: number;
 }
 
 // ─── GroupTeam DTOs ───────────────────────────────────────────────────────────

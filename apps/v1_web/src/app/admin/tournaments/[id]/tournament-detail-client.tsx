@@ -671,6 +671,7 @@ function BracketTab({
   // ── Group creation form ─────────────────────────────────────────────
   const [groupName, setGroupName] = useState('');
   const [groupPhase, setGroupPhase] = useState<V1TournamentGroupPhase>('group');
+  const [groupAdvanceCount, setGroupAdvanceCount] = useState('');
 
   // ── Assign team form ────────────────────────────────────────────────
   const [assignGroupId, setAssignGroupId] = useState('');
@@ -697,10 +698,12 @@ function BracketTab({
   const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupName.trim()) return;
+    const parsedAdvance = Number.parseInt(groupAdvanceCount, 10);
+    const advanceCount = Number.isInteger(parsedAdvance) && parsedAdvance > 0 ? parsedAdvance : undefined;
     createGroup.mutate(
-      { name: groupName.trim(), phase: groupPhase },
+      { name: groupName.trim(), phase: groupPhase, ...(advanceCount != null ? { advanceCount } : {}) },
       {
-        onSuccess: () => { setGroupName(''); showToast('조를 만들었어요.', 'success'); },
+        onSuccess: () => { setGroupName(''); setGroupAdvanceCount(''); showToast('조를 만들었어요.', 'success'); },
         onError: (err) => showToast(extractErrorMessage(err, '조 생성에 실패했어요.'), 'error'),
       },
     );
@@ -830,6 +833,23 @@ function BracketTab({
               <option value="third_place">3위결정</option>
             </select>
           </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="group-advance" className="tm-text-label text-[color:var(--text-strong)]">
+              진출 팀 수 <span className="tm-text-caption text-[color:var(--text-caption)]">(선택)</span>
+            </label>
+            <input
+              id="group-advance"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              value={groupAdvanceCount}
+              onChange={(e) => setGroupAdvanceCount(e.target.value)}
+              placeholder="예: 2"
+              disabled={createGroup.isPending}
+              className={inputCls + ' sm:w-[110px]'}
+              aria-describedby="group-advance-help"
+            />
+          </div>
           <button
             type="submit"
             disabled={!groupName.trim() || createGroup.isPending}
@@ -839,6 +859,9 @@ function BracketTab({
             조 추가
           </button>
         </form>
+        <p id="group-advance-help" className="tm-text-caption text-[color:var(--text-caption)] mt-2">
+          진출 팀 수를 입력하면 순위표에 상위 N팀 진출선이 표시돼요.
+        </p>
       </div>
 
       {/* ── 팀 배정 ─────────────────────────────────────────────────── */}

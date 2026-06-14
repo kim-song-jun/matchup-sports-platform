@@ -147,6 +147,7 @@ export class TournamentsReadService {
         name: g.name,
         phase: g.phase,
         sortOrder: g.sortOrder,
+        advanceCount: g.advanceCount,
         groupTeams: g.groupTeams.map((gt) => ({
           id: gt.id,
           registrationId: gt.registrationId,

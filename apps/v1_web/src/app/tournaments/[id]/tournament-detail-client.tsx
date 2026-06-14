@@ -790,10 +790,17 @@ function GoalDiff({ goalsFor, goalsAgainst }: { goalsFor: number; goalsAgainst: 
   );
 }
 
-function StandingRow({ standing, rank }: { standing: V1TournamentStanding; rank: number }) {
-  const isTop = rank <= 2;
+function StandingRow({
+  standing,
+  rank,
+  isQualifying,
+}: {
+  standing: V1TournamentStanding;
+  rank: number;
+  isQualifying: boolean;
+}) {
   return (
-    <tr>
+    <tr style={isQualifying ? { background: 'var(--blue50)' } : undefined}>
       <td
         style={{
           padding: '8px 8px 8px 0',
@@ -803,17 +810,22 @@ function StandingRow({ standing, rank }: { standing: V1TournamentStanding; rank:
       >
         <span
           className="tm-text-caption tab-num"
-          style={{ color: isTop ? 'var(--blue500)' : 'var(--text-caption)' }}
+          style={{ color: isQualifying ? 'var(--blue500)' : 'var(--text-caption)' }}
         >
           {rank}
         </span>
       </td>
       <td
-        style={{ padding: '8px 4px', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        style={{ padding: '8px 4px', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
       >
-        <span className="tm-text-label" style={{ color: isTop ? 'var(--blue500)' : 'var(--text-strong)' }}>
+        <span className="tm-text-label" style={{ color: isQualifying ? 'var(--blue500)' : 'var(--text-strong)' }}>
           {standing.teamName}
         </span>
+        {isQualifying ? (
+          <span className="tm-badge tm-badge-blue" style={{ marginLeft: 6, verticalAlign: 'middle' }}>
+            진출
+          </span>
+        ) : null}
       </td>
       <td style={{ padding: '8px 4px', textAlign: 'center' }}>
         <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
@@ -836,6 +848,7 @@ function StandingRow({ standing, rank }: { standing: V1TournamentStanding; rank:
 
 function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
   const sorted = [...group.standings].sort((a, b) => a.position - b.position);
+  const advanceCount = group.advanceCount;
 
   return (
     <Card pad={0}>
@@ -891,7 +904,12 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
           <tbody>
             {sorted.length > 0 ? (
               sorted.map((standing, index) => (
-                <StandingRow key={standing.registrationId} standing={standing} rank={index + 1} />
+                <StandingRow
+                  key={standing.registrationId}
+                  standing={standing}
+                  rank={index + 1}
+                  isQualifying={advanceCount != null && advanceCount > 0 && index + 1 <= advanceCount}
+                />
               ))
             ) : (
               <tr>
@@ -907,6 +925,11 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
           </tbody>
         </table>
       </div>
+      {advanceCount != null && advanceCount > 0 ? (
+        <div className="tm-text-micro" style={{ padding: '0 14px 12px', color: 'var(--text-muted)' }}>
+          상위 {advanceCount}팀이 다음 단계로 진출해요
+        </div>
+      ) : null}
     </Card>
   );
 }

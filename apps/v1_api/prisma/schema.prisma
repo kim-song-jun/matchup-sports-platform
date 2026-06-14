@@ -1220,6 +1220,8 @@ model V1TournamentGroup {
   name         String
   phase        V1TournamentGroupPhase @default(group)
   sortOrder    Int                    @default(0) @map("sort_order")
+  // 이 조에서 상위 몇 팀이 다음 단계로 진출하는지(조별리그 진출선 표시용). null이면 진출 표시 없음.
+  advanceCount Int?                   @map("advance_count")
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
 

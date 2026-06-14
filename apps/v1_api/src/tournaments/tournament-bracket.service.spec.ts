@@ -84,6 +84,7 @@ function groupRow(overrides: Record<string, unknown> = {}) {
     name: 'A조',
     phase: 'group',
     sortOrder: 0,
+    advanceCount: null,
     createdAt: new Date('2026-06-14T00:00:00Z'),
     updatedAt: new Date('2026-06-14T00:00:00Z'),
     ...overrides,
@@ -259,6 +260,43 @@ describe('TournamentBracketService', () => {
         }),
       }),
     );
+  });
+
+  it('createGroup: advanceCount provided → persisted and returned in output', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.create.mockResolvedValue(groupRow({ advanceCount: 2 }));
+
+    const result = await service.createGroup(ownerUser, 'tournament-1', {
+      name: 'A조',
+      phase: 'group',
+      sortOrder: 0,
+      advanceCount: 2,
+    });
+
+    // advanceCount persisted to Prisma
+    expect(prisma.v1TournamentGroup.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ advanceCount: 2 }),
+      }),
+    );
+    // advanceCount round-trips through serializer
+    expect(result).toMatchObject({ id: 'group-1', advanceCount: 2 });
+  });
+
+  it('createGroup: advanceCount omitted → persisted as null, output is null', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.create.mockResolvedValue(groupRow({ advanceCount: null }));
+
+    const result = await service.createGroup(ownerUser, 'tournament-1', { name: 'B조' });
+
+    expect(prisma.v1TournamentGroup.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ advanceCount: null }),
+      }),
+    );
+    expect(result).toMatchObject({ advanceCount: null });
   });
 
   // ─── createGroupTeam ──────────────────────────────────────────────────────
@@ -596,6 +634,9 @@ describe('TournamentBracketService', () => {
       position: 1,
       goalDifference: 1,
     });
+
+    // advanceCount is surfaced on group
+    expect(result.groups[0]).toMatchObject({ advanceCount: null });
 
     // teamName fields are populated (not raw UUIDs)
     expect(result.groups[0].groupTeams[0]).toMatchObject({

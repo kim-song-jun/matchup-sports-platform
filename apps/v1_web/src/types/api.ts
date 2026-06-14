@@ -1347,6 +1347,7 @@ export type V1TournamentGroup = {
   name: string;
   phase: string;
   sortOrder: number;
+  advanceCount: number | null;
   groupTeams: V1TournamentGroupTeam[];
   standings: V1TournamentStanding[];
 };
@@ -1482,6 +1483,7 @@ export type V1AdminBracketGroup = {
   name: string;
   phase: string;
   sortOrder: number;
+  advanceCount: number | null;
   createdAt: string;
   updatedAt: string;
   groupTeams: V1AdminBracketGroupTeam[];
@@ -1687,6 +1689,7 @@ export type V1CreateGroupPayload = {
   name: string;
   phase?: V1TournamentGroupPhase;
   sortOrder?: number;
+  advanceCount?: number;
 };
 
 export type V1CreateGroupTeamPayload = {

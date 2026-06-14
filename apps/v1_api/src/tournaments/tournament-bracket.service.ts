@@ -63,6 +63,7 @@ export class TournamentBracketService {
           name: dto.name,
           phase: dto.phase ?? 'group',
           sortOrder: dto.sortOrder ?? 0,
+          advanceCount: dto.advanceCount ?? null,
         },
       });
       await this.adminContext.logAdminAction(
@@ -511,6 +512,7 @@ export class TournamentBracketService {
       name: row.name,
       phase: row.phase,
       sortOrder: row.sortOrder,
+      advanceCount: row.advanceCount,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

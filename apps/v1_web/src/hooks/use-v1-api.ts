@@ -93,8 +93,6 @@ import type {
   V1TournamentRegistration,
   V1TournamentRosterResponse,
   V1TournamentPlayer,
-  V1TournamentPgPrepareResponse,
-  V1TournamentPgConfirmResponse,
   V1AdminTournamentListPage,
   V1AdminRegistrationListPage,
   V1AdminTournamentRegistration,
@@ -116,7 +114,6 @@ import type {
   V1CreateRegistrationPayload,
   V1SubmitRegistrationPayload,
   V1CancelRegistrationRequestPayload,
-  V1ConfirmPgPaymentPayload,
   V1AddPlayerPayload,
   V1UpdatePlayerEligibilityPayload,
   V1AdminConfirmPaymentPayload,
@@ -128,6 +125,7 @@ import type {
   V1CreateFixturePayload,
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
+  V1AdminAnnouncementListResult,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -1320,6 +1318,23 @@ export function useV1Registration(tournamentId: string, registrationId: string) 
   });
 }
 
+/** 로그인 유저 본인의 신청을 registrationId 없이 조회한다. 없으면 404 (data=undefined). */
+export function useV1MyRegistration(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.myTournamentRegistration(tournamentId),
+    queryFn: () =>
+      v1Get<V1TournamentRegistration>(
+        `/tournaments/${tournamentId}/registrations/my-registration`,
+      ),
+    enabled: !!tournamentId,
+    retry: (failureCount, error) => {
+      // 404 (no registration yet) is expected — do not retry
+      if (error instanceof V1ApiError && error.statusCode === 404) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
 export function useV1SubmitRegistration(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1350,31 +1365,6 @@ export function useV1CancelRegistrationRequest(tournamentId: string, registratio
         queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
-    },
-  });
-}
-
-export function useV1PreparePgPayment(tournamentId: string, registrationId: string) {
-  return useMutation({
-    mutationFn: () =>
-      v1Post<V1TournamentPgPrepareResponse>(
-        `/tournaments/${tournamentId}/registrations/${registrationId}/payment/prepare`,
-      ),
-  });
-}
-
-export function useV1ConfirmPgPayment(tournamentId: string, registrationId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: V1ConfirmPgPaymentPayload) =>
-      v1Post<V1TournamentPgConfirmResponse>(
-        `/tournaments/${tournamentId}/registrations/${registrationId}/payment/confirm`,
-        body,
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
-      });
     },
   });
 }
@@ -1716,6 +1706,17 @@ export function useV1AdminBracket(tournamentId: string) {
 // Tournament — admin announcement hooks
 // ---------------------------------------------------------------------------
 
+export function useV1AdminAnnouncements(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentAnnouncements(tournamentId),
+    queryFn: () =>
+      v1Get<V1AdminAnnouncementListResult>(
+        `/admin/tournaments/${tournamentId}/announcements`,
+      ),
+    enabled: !!tournamentId,
+  });
+}
+
 export function useV1CreateAnnouncement(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1725,13 +1726,14 @@ export function useV1CreateAnnouncement(tournamentId: string) {
         body,
       ),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentAnnouncements(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }
 
-export function useV1PublishAnnouncement() {
+export function useV1PublishAnnouncement(tournamentId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (announcementId: string) =>
@@ -1739,6 +1741,9 @@ export function useV1PublishAnnouncement() {
         `/admin/announcements/${announcementId}/publish`,
       ),
     onSuccess: () => {
+      if (tournamentId) {
+        queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentAnnouncements(tournamentId) });
+      }
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'tournaments'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'tournaments'] });
     },

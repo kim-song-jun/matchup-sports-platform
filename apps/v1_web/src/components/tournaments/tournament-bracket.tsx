@@ -51,8 +51,10 @@ function getRoundLabel(key: string): string {
 /**
  * Groups fixtures into rounds. Returns rounds sorted by phase order,
  * then by fallback round string alphabetically.
+ *
+ * Exported for unit-testing the pure grouping logic.
  */
-function groupFixturesByRound(
+export function groupFixturesByRound(
   fixtures: V1TournamentFixture[],
   groups: V1TournamentGroup[],
 ): RoundGroup[] {

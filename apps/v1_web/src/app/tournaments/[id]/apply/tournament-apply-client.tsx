@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
@@ -10,8 +9,6 @@ import {
   useV1MyTeams,
   useV1CreateRegistration,
   useV1SubmitRegistration,
-  useV1PreparePgPayment,
-  useV1ConfirmPgPayment,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod } from '@/types/api';
@@ -360,56 +357,67 @@ function AgreementsStep({
         </Card>
       </section>
 
-      {/* Payment method */}
+      {/* Payment method — bank transfer only */}
       <section aria-labelledby="payment-method-heading" style={{ marginTop: 16 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="payment-method-heading" title="결제 수단" />
         </div>
-        <div
-          role="radiogroup"
-          aria-labelledby="payment-method-heading"
-          style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}
-        >
-          <PaymentMethodRadio
-            id="method-pg"
-            label="카드 · 간편결제 (PG)"
-            sub="신용카드, 카카오페이, 토스 등"
-            value="pg"
-            selected={state.paymentMethod === 'pg'}
-            onSelect={() => onChange({ paymentMethod: 'pg' })}
-          />
-          <PaymentMethodRadio
-            id="method-bank"
-            label="계좌이체"
-            sub="신청 후 안내된 계좌로 입금해요"
-            value="bank_transfer"
-            selected={state.paymentMethod === 'bank_transfer'}
-            onSelect={() => onChange({ paymentMethod: 'bank_transfer' })}
-          />
-        </div>
+        <Card pad={14} style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
+            <div
+              aria-hidden="true"
+              style={{
+                flexShrink: 0,
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                border: '2px solid var(--blue500)',
+                background: 'var(--blue500)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: 'var(--static-white)',
+                  display: 'block',
+                }}
+              />
+            </div>
+            <div>
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
+                계좌이체
+              </div>
+              <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+                신청 후 안내된 계좌로 입금해요
+              </div>
+            </div>
+          </div>
+        </Card>
 
-        {state.paymentMethod === 'bank_transfer' ? (
-          <Card pad={14} style={{ marginTop: 10 }}>
-            <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 6 }}>
-              입금자명 <span style={{ color: 'var(--red500)' }}>*</span>
-            </label>
-            <input
-              id="depositor-name"
-              type="text"
-              value={state.depositorName}
-              onChange={(e) => onChange({ depositorName: e.target.value })}
-              placeholder="입금자 이름을 입력해 주세요"
-              maxLength={20}
-              className="tm-input"
-              style={{ marginTop: 2 }}
-              aria-required="true"
-              aria-describedby="depositor-name-hint"
-            />
-            <p id="depositor-name-hint" className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
-              입금 확인에 사용돼요. 실제 입금자명과 동일하게 입력해 주세요.
-            </p>
-          </Card>
-        ) : null}
+        <Card pad={14} style={{ marginTop: 10 }}>
+          <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 6 }}>
+            입금자명 <span style={{ color: 'var(--red500)' }}>*</span>
+          </label>
+          <input
+            id="depositor-name"
+            type="text"
+            value={state.depositorName}
+            onChange={(e) => onChange({ depositorName: e.target.value })}
+            placeholder="입금자 이름을 입력해 주세요"
+            maxLength={20}
+            className="tm-input"
+            style={{ marginTop: 2 }}
+            aria-required="true"
+            aria-describedby="depositor-name-hint"
+          />
+          <p id="depositor-name-hint" className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+            입금 확인에 사용돼요. 실제 입금자명과 동일하게 입력해 주세요.
+          </p>
+        </Card>
       </section>
 
       {/* Free tournament notice */}
@@ -496,197 +504,39 @@ function CheckRow({
   );
 }
 
-function PaymentMethodRadio({
-  id,
-  label,
-  sub,
-  value,
-  selected,
-  onSelect,
-}: {
-  id: string;
-  label: string;
-  sub: string;
-  value: V1TournamentPaymentMethod;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <Card
-      pad={14}
-      className={selected ? 'tm-create-selected' : undefined}
-      style={{
-        cursor: 'pointer',
-        transition: 'border-color 0.15s, background 0.15s',
-      }}
-    >
-      <label
-        htmlFor={id}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', minHeight: 44 }}
-      >
-        {/* sr-only real radio for accessibility */}
-        <input
-          id={id}
-          type="radio"
-          name="payment-method"
-          value={value}
-          checked={selected}
-          onChange={onSelect}
-          className="sr-only"
-        />
-        {/* Themed circular radio indicator */}
-        <span
-          aria-hidden="true"
-          style={{
-            flexShrink: 0,
-            width: 22,
-            height: 22,
-            borderRadius: '50%',
-            border: selected ? '2px solid var(--blue500)' : '1px solid var(--grey200)',
-            background: selected ? 'var(--blue500)' : 'var(--bg)',
-            display: 'grid',
-            placeItems: 'center',
-            transition: 'border-color 0.15s, background 0.15s',
-          }}
-        >
-          {selected && (
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: 'var(--static-white)',
-                display: 'block',
-              }}
-            />
-          )}
-        </span>
-        <div>
-          <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
-            {label}
-          </div>
-          <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-            {sub}
-          </div>
-        </div>
-      </label>
-    </Card>
-  );
-}
-
 /* ── Step 3: Payment guide ── */
 
 function PaymentGuideStep({
   tournament,
   registrationId,
-  paymentMethod,
   onBack,
 }: {
   tournament: V1TournamentDetail;
   registrationId: string;
-  paymentMethod: V1TournamentPaymentMethod;
   onBack: () => void;
 }) {
-  const router = useRouter();
-  const preparePg = useV1PreparePgPayment(tournament.id, registrationId);
-  const confirmPg = useV1ConfirmPgPayment(tournament.id, registrationId);
-  const [pgError, setPgError] = useState<string | null>(null);
-
-  // Bank transfer view — no action needed, just show account info
-  if (paymentMethod === 'bank_transfer') {
-    return (
-      <div style={{ padding: '0 20px 120px' }}>
-        <section aria-labelledby="bank-guide-heading" style={{ marginTop: 20 }}>
-          <div style={{ marginLeft: -20, marginRight: -20 }}>
-            <SectionTitle title="입금 안내" />
-          </div>
-          <Card pad={0} style={{ marginTop: 8 }}>
-            <div
-              id="bank-guide-heading"
-              className="tm-text-label"
-              style={{ color: 'var(--text-strong)', fontWeight: 700, padding: '14px 16px 10px' }}
-            >
-              아래 계좌로 참가비를 입금해 주세요
-            </div>
-            {/* 공개 상세(V1TournamentDetail)에 주최자 입금 계좌가 포함된다. 미설정이면 안내 fallback. */}
-            <div style={{ padding: '0 16px' }}>
-              <InfoRow label="은행" value={tournament.bankName ?? '신청 확인 후 안내'} />
-              <InfoRow label="계좌번호" value={tournament.bankAccount ?? '신청 확인 후 안내'} />
-              <InfoRow label="예금주" value={tournament.bankHolder ?? '신청 확인 후 안내'} />
-              <InfoRow
-                label="입금액"
-                value={formatEntryFee(tournament.entryFee)}
-                valueColor="var(--blue500)"
-                isLast
-              />
-            </div>
-          </Card>
-
-          <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              입금 확인 후 신청이 최종 확정돼요. 입금자명이 일치하지 않으면 확인이 지연될 수 있어요.
-            </p>
-          </Card>
-        </section>
-
-        <div className="tm-fixed-cta">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-            <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onBack}>
-              이전
-            </button>
-            <Link
-              href={`/tournaments/${tournament.id}/my?reg=${registrationId}`}
-              className="tm-btn tm-btn-lg tm-btn-primary"
-            >
-              내 신청 확인하기
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // PG payment view
-  async function handlePgPay() {
-    setPgError(null);
-    try {
-      const prepare = await preparePg.mutateAsync();
-      // In production: redirect to prepare.checkoutUrl or open Toss Payments SDK.
-      // Here we stub the confirm call with the returned paymentKey/orderId/amount.
-      // TODO: replace with actual Toss SDK integration (checkoutUrl redirect / widget mount).
-      const confirmed = await confirmPg.mutateAsync({
-        paymentKey: prepare.paymentKey,
-        orderId: prepare.orderId,
-        amount: prepare.amount,
-      });
-      if (confirmed) {
-        router.push(`/tournaments/${tournament.id}/my?reg=${registrationId}`);
-      }
-    } catch (err) {
-      setPgError(extractErrorMessage(err, '결제 처리 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
-    }
-  }
-
-  const isPgPending = preparePg.isPending || confirmPg.isPending;
-
+  // Bank transfer is the only supported payment method.
   return (
     <div style={{ padding: '0 20px 120px' }}>
-      <section aria-labelledby="pg-guide-heading" style={{ marginTop: 20 }}>
+      <section aria-labelledby="bank-guide-heading" style={{ marginTop: 20 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle title="결제하기" />
+          <SectionTitle title="입금 안내" />
         </div>
         <Card pad={0} style={{ marginTop: 8 }}>
           <div
-            id="pg-guide-heading"
+            id="bank-guide-heading"
             className="tm-text-label"
             style={{ color: 'var(--text-strong)', fontWeight: 700, padding: '14px 16px 10px' }}
           >
-            결제 정보 확인
+            아래 계좌로 참가비를 입금해 주세요
           </div>
+          {/* V1TournamentDetail includes organizer bank info; fallback if unset */}
           <div style={{ padding: '0 16px' }}>
-            <InfoRow label="대회명" value={tournament.title} />
+            <InfoRow label="은행" value={tournament.bankName ?? '신청 확인 후 안내'} />
+            <InfoRow label="계좌번호" value={tournament.bankAccount ?? '신청 확인 후 안내'} />
+            <InfoRow label="예금주" value={tournament.bankHolder ?? '신청 확인 후 안내'} />
             <InfoRow
-              label="결제 금액"
+              label="입금액"
               value={formatEntryFee(tournament.entryFee)}
               valueColor="var(--blue500)"
               isLast
@@ -694,27 +544,24 @@ function PaymentGuideStep({
           </div>
         </Card>
 
-        {pgError ? (
-          <div style={{ marginTop: 12 }}>
-            <AlertBanner message={pgError} />
-          </div>
-        ) : null}
+        <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+            입금 확인 후 신청이 최종 확정돼요. 입금자명이 일치하지 않으면 확인이 지연될 수 있어요.
+          </p>
+        </Card>
       </section>
 
       <div className="tm-fixed-cta">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onBack} disabled={isPgPending}>
+          <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onBack}>
             이전
           </button>
-          <button
-            type="button"
+          <Link
+            href={`/tournaments/${tournament.id}/my?reg=${registrationId}`}
             className="tm-btn tm-btn-lg tm-btn-primary"
-            onClick={handlePgPay}
-            disabled={isPgPending}
-            aria-label={isPgPending ? '결제 처리 중' : '결제하기'}
           >
-            {isPgPending ? '처리 중…' : `${formatEntryFee(tournament.entryFee)} 결제하기`}
-          </button>
+            내 신청 확인하기
+          </Link>
         </div>
       </div>
     </div>
@@ -740,7 +587,6 @@ function LoadingSkeleton() {
 /* ── Main client ── */
 
 export function TournamentApplyPageClient({ tournamentId }: { tournamentId: string }) {
-  const router = useRouter();
   const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
 
@@ -754,7 +600,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     agreedPrivacy: false,
     agreedRefund: false,
     agreedMediaConsent: false,
-    paymentMethod: 'pg',
+    paymentMethod: 'bank_transfer',
     depositorName: '',
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -907,7 +753,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         <PaymentGuideStep
           tournament={tournament}
           registrationId={registrationId}
-          paymentMethod={agreements.paymentMethod}
           onBack={() => setStep('agreements')}
         />
       ) : null}

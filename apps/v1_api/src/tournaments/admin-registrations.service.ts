@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
@@ -37,6 +38,7 @@ export class AdminRegistrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async list(user: V1AuthUser, tournamentId: string, query: AdminRegistrationListQueryDto) {
@@ -185,6 +187,15 @@ export class AdminRegistrationsService {
       return updated;
     });
 
+    // 알림: 신청자에게 확정/대기 결과 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    void this.notifications.emitNotification(
+      registration.appliedByUserId,
+      dto.decision === 'confirm'
+        ? 'tournament_registration_confirmed'
+        : 'tournament_registration_waitlisted',
+      registration.tournamentId,
+    );
+
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
     const playerCount = await this.countPlayers(registrationId);
     return { alreadyProcessed: false, ...this.serialize(result, payment ?? null, playerCount) };
@@ -236,6 +247,13 @@ export class AdminRegistrationsService {
       );
       return { updated, updatedPayment };
     });
+
+    // 알림: 신청자에게 취소 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    void this.notifications.emitNotification(
+      registration.appliedByUserId,
+      'tournament_registration_cancelled',
+      registration.tournamentId,
+    );
 
     const playerCount = await this.countPlayers(registrationId);
     return this.serialize(result.updated, result.updatedPayment ?? null, playerCount);

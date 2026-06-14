@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
 import {
   useV1Tournament,
-  useV1Registration,
+  useV1MyRegistration,
   useV1TournamentPlayers,
   useV1CancelRegistrationRequest,
 } from '@/hooks/use-v1-api';
@@ -420,18 +419,15 @@ function NoRegistrationState({ tournamentId }: { tournamentId: string }) {
 /* ── Main client ── */
 
 export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
-  const searchParams = useSearchParams();
-  const registrationId = searchParams.get('reg');
-
   const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
   const {
     data: registration,
     isLoading: loadingReg,
     isError: regError,
     error: regErr,
-  } = useV1Registration(tournamentId, registrationId ?? '', );
+  } = useV1MyRegistration(tournamentId);
 
-  const isLoading = loadingTournament || (!!registrationId && loadingReg);
+  const isLoading = loadingTournament || loadingReg;
 
   if (isLoading) {
     return (
@@ -449,16 +445,16 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     );
   }
 
-  // No registrationId in URL — guide user to apply
-  if (!registrationId) {
-    return (
-      <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
-        <NoRegistrationState tournamentId={tournamentId} />
-      </AppChrome>
-    );
-  }
-
+  // 404 from useV1MyRegistration means no registration for this user yet
   if (regError) {
+    const err = regErr as { statusCode?: number } | undefined;
+    if (err?.statusCode === 404) {
+      return (
+        <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
+          <NoRegistrationState tournamentId={tournamentId} />
+        </AppChrome>
+      );
+    }
     const msg = extractErrorMessage(regErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
       <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">

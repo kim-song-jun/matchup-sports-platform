@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -64,5 +65,6 @@ export class CreateAnnouncementDto {
   audience?: AnnouncementAudience;
 
   @IsOptional()
+  @IsBoolean()
   publish?: boolean;
 }

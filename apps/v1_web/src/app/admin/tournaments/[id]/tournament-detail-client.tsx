@@ -34,6 +34,7 @@ import {
   useV1CreateFixture,
   useV1RecordResult,
   useV1RecalculateStandings,
+  useV1AdminAnnouncements,
   useV1CreateAnnouncement,
   useV1PublishAnnouncement,
 } from '@/hooks/use-v1-api';
@@ -43,7 +44,6 @@ import type {
   V1AdminBracketGroup,
   V1AdminBracketFixture,
   V1AdminBracketStanding,
-  V1AdminTournamentAnnouncement,
   V1TournamentGroupPhase,
   V1AnnouncementAudience,
 } from '@/types/api';
@@ -916,9 +916,9 @@ function BracketTab({
                 render: (s) => <span className="tabular-nums text-gray-500">{s.position}</span>,
               },
               {
-                key: 'registrationId',
+                key: 'teamName',
                 header: '팀',
-                render: (s) => <span className="font-medium text-gray-900">{s.registrationId}</span>,
+                render: (s) => <span className="font-medium text-gray-900">{s.teamName ?? s.registrationId}</span>,
               },
               {
                 key: 'wins',
@@ -1032,14 +1032,14 @@ function BracketTab({
                 render: (f) => <span className="tabular-nums text-gray-600">{f.fixtureNumber}</span>,
               },
               {
-                key: 'homeRegistrationId',
+                key: 'homeTeamName',
                 header: '홈',
-                render: (f) => <span className="font-medium text-gray-900">{f.homeRegistrationId ?? '—'}</span>,
+                render: (f) => <span className="font-medium text-gray-900">{f.homeTeamName ?? '—'}</span>,
               },
               {
-                key: 'awayRegistrationId',
+                key: 'awayTeamName',
                 header: '어웨이',
-                render: (f) => <span className="font-medium text-gray-900">{f.awayRegistrationId ?? '—'}</span>,
+                render: (f) => <span className="font-medium text-gray-900">{f.awayTeamName ?? '—'}</span>,
               },
               {
                 key: 'result',
@@ -1091,9 +1091,9 @@ function BracketTab({
               <label htmlFor="home-score" className="text-[13px] font-semibold text-gray-700">
                 홈
               </label>
-              {resultFixture?.homeRegistrationId && (
+              {(resultFixture?.homeTeamName ?? resultFixture?.homeRegistrationId) && (
                 <p className="text-[12px] text-gray-400 truncate max-w-[140px]">
-                  {resultFixture.homeRegistrationId}
+                  {resultFixture?.homeTeamName ?? resultFixture?.homeRegistrationId}
                 </p>
               )}
               <input
@@ -1111,9 +1111,9 @@ function BracketTab({
               <label htmlFor="away-score" className="text-[13px] font-semibold text-gray-700">
                 어웨이
               </label>
-              {resultFixture?.awayRegistrationId && (
+              {(resultFixture?.awayTeamName ?? resultFixture?.awayRegistrationId) && (
                 <p className="text-[12px] text-gray-400 truncate max-w-[140px]">
-                  {resultFixture.awayRegistrationId}
+                  {resultFixture?.awayTeamName ?? resultFixture?.awayRegistrationId}
                 </p>
               )}
               <input
@@ -1180,15 +1180,15 @@ function BracketTab({
 
 function AnnouncementsTab({
   tournamentId,
-  announcements,
   showToast,
 }: {
   tournamentId: string;
-  announcements: V1AdminTournamentAnnouncement[];
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
+  const { data: annData, isPending: annPending, isError: annError, error: annErr, refetch: annRefetch } = useV1AdminAnnouncements(tournamentId);
+  const announcements = annData?.items ?? [];
   const createAnnouncement = useV1CreateAnnouncement(tournamentId);
-  const publishAnnouncement = useV1PublishAnnouncement();
+  const publishAnnouncement = useV1PublishAnnouncement(tournamentId);
 
   const [annTitle, setAnnTitle] = useState('');
   const [annBody, setAnnBody] = useState('');
@@ -1317,10 +1317,20 @@ function AnnouncementsTab({
       </div>
 
       {/* ── 공지 목록 ─────────────────────────────────────────────────── */}
-      {/* f10: announcements is always [] (no backend endpoint yet). Do NOT render
-          permanent EmptyState — only render the list when data exists.
-          TODO: 백엔드 announcements 목록 연결 후 복원 */}
-      {announcements.length > 0 && (
+      {(annPending || annError) && (
+        <AdminDataTable
+          columns={[]}
+          rows={[]}
+          keyExtractor={() => ''}
+          loading={annPending}
+          error={annError ? extractErrorMessage(annErr, '공지 목록을 불러오지 못했어요.') : undefined}
+          onRetry={() => void annRefetch()}
+        />
+      )}
+      {!annPending && !annError && announcements.length === 0 && (
+        <AdminEmpty title="공지가 없어요" description="아직 작성된 공지가 없어요." />
+      )}
+      {!annPending && !annError && announcements.length > 0 && (
         <div className="flex flex-col gap-3">
           {announcements.map((ann) => (
             <div key={ann.id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4">
@@ -1425,10 +1435,6 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
   const nextStatuses = allowedNextStatuses(tournament.status);
 
-  // Announcements come from bracket endpoint; for detail we grab from tournament data but
-  // V1Tournament admin type doesn't include announcements directly so we store them via
-  // the bracket query. Use an empty array fallback—the AnnouncementsTab creates new ones.
-  const announcements: V1AdminTournamentAnnouncement[] = [];
 
   return (
     <>
@@ -1551,7 +1557,6 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         {activeTab === 'announcements' && (
           <AnnouncementsTab
             tournamentId={id}
-            announcements={announcements}
             showToast={showToast}
           />
         )}

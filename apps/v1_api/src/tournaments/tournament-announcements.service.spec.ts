@@ -66,6 +66,7 @@ describe('TournamentAnnouncementsService', () => {
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentAnnouncement: {
       create: jest.Mock;
+      findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
     };
@@ -80,6 +81,7 @@ describe('TournamentAnnouncementsService', () => {
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentAnnouncement: {
         create: jest.fn(),
+        findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
       },
@@ -108,6 +110,98 @@ describe('TournamentAnnouncementsService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  // ─── listByTournament ─────────────────────────────────────────────────────────
+
+  it('listByTournament: non-admin → 403 PERMISSION_DENIED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(
+      service.listByTournament(plainUser, 'tournament-1'),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1TournamentAnnouncement.findMany).not.toHaveBeenCalled();
+  });
+
+  it('listByTournament: support admin can read (read-only gate)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([]);
+    const result = await service.listByTournament(supportAuthUser, 'tournament-1');
+    expect(result).toEqual({ items: [] });
+  });
+
+  it('listByTournament: unknown tournament → 404 TOURNAMENT_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+    await expect(
+      service.listByTournament(ownerAuthUser, 'ghost'),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    expect(prisma.v1TournamentAnnouncement.findMany).not.toHaveBeenCalled();
+  });
+
+  it('listByTournament: returns drafts and published ordered newest-first', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+
+    const draft = announcementRow({
+      id: 'ann-draft',
+      publishedAt: null,
+      createdAt: new Date('2026-06-14T10:00:00.000Z'),
+      updatedAt: new Date('2026-06-14T10:00:00.000Z'),
+    });
+    const published = announcementRow({
+      id: 'ann-pub',
+      publishedAt: new Date('2026-06-13T09:00:00.000Z'),
+      createdAt: new Date('2026-06-13T08:00:00.000Z'),
+      updatedAt: new Date('2026-06-13T09:00:00.000Z'),
+    });
+    // Prisma returns newest-first; we trust the orderBy and just mock that order.
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([draft, published]);
+
+    const result = await service.listByTournament(ownerAuthUser, 'tournament-1');
+
+    expect(result.items).toHaveLength(2);
+    // Newest first: draft (createdAt 10:00) before published (createdAt 08:00)
+    expect(result.items[0].id).toBe('ann-draft');
+    expect(result.items[0].publishedAt).toBeNull();
+    expect(result.items[1].id).toBe('ann-pub');
+    expect(result.items[1].publishedAt).toBe('2026-06-13T09:00:00.000Z');
+  });
+
+  it('listByTournament: scoped to the given tournamentId only', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([]);
+
+    await service.listByTournament(ownerAuthUser, 'tournament-1');
+
+    expect(prisma.v1TournamentAnnouncement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tournamentId: 'tournament-1' }),
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+  });
+
+  it('listByTournament: serializes all required fields (id/title/body/audience/publishedAt/createdAt)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
+    const row = announcementRow({
+      publishedAt: new Date('2026-06-14T12:00:00.000Z'),
+    });
+    prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([row]);
+
+    const result = await service.listByTournament(ownerAuthUser, 'tournament-1');
+
+    const item = result.items[0];
+    expect(item).toMatchObject({
+      id: 'ann-1',
+      title: '경기 일정 공지',
+      body: '7월 1일 오전 10시 시작합니다.',
+      audience: 'all_registered',
+      publishedAt: '2026-06-14T12:00:00.000Z',
+      createdAt: '2026-06-14T00:00:00.000Z',
+    });
+  });
 
   // ─── admin-role gates ─────────────────────────────────────────────────────────
 

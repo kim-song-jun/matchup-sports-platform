@@ -187,4 +187,85 @@ describe('TournamentsAdminService', () => {
     expect(result.items[0]).toMatchObject({ id: 'tournament-1', registrationCount: 3 });
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
   });
+
+  // ─── update ──────────────────────────────────────────────────────────────────
+
+  it('update: partial field (title only) persists updated value', async () => {
+    // Arrange: admin resolves, existing tournament found, update returns patched row,
+    // and get() (called at the end of update()) also resolves via findFirst+_count.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ title: '원래 제목' });
+    const updated = tournamentRow({ title: '새 제목' });
+    prisma.v1Tournament.findFirst
+      // first call inside update() to load existing
+      .mockResolvedValueOnce(existing)
+      // second call inside get() which update() delegates to
+      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(updated);
+
+    const result = await service.update(ownerAuthUser, 'tournament-1', { title: '새 제목' });
+
+    expect(result).toMatchObject({ id: 'tournament-1', title: '새 제목' });
+    // Only `title` was in the dto — verify update was called with exactly that field.
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ title: '새 제목' }) }),
+    );
+  });
+
+  it('update: minPlayers > maxPlayers (merged with existing) → 400 TOURNAMENT_PLAYER_RANGE_INVALID', async () => {
+    // Existing has minPlayers=6, maxPlayers=10. Sending minPlayers=11 should fail
+    // the merged-range check (11 > 10).
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 6, maxPlayers: 10 }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { minPlayers: 11 }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_PLAYER_RANGE_INVALID' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('update: sending only maxPlayers that falls below existing minPlayers → 400', async () => {
+    // Existing: minPlayers=6, maxPlayers=10. Sending maxPlayers=3 makes merged (6,3) invalid.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 6, maxPlayers: 10 }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { maxPlayers: 3 }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_PLAYER_RANGE_INVALID' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('update: non-existent tournament → 404 TOURNAMENT_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.update(ownerAuthUser, 'ghost-tournament', { title: '변경 시도' }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('update: emits audit log with before/after titles', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ title: '이전 제목' });
+    const updated = tournamentRow({ title: '이후 제목' });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(updated);
+
+    await service.update(ownerAuthUser, 'tournament-1', { title: '이후 제목' });
+
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'tournament.update',
+          targetType: 'tournament',
+          targetId: 'tournament-1',
+          beforeJson: expect.objectContaining({ title: '이전 제목' }),
+          afterJson: expect.objectContaining({ title: '이후 제목' }),
+        }),
+      }),
+    );
+  });
 });

@@ -23,6 +23,14 @@ export class TournamentRegistrationsController {
     return this.registrationsService.create(user, tournamentId, dto);
   }
 
+  @Get('my-registration')
+  getMyRegistration(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+  ) {
+    return this.registrationsService.getMyRegistration(user, tournamentId);
+  }
+
   @Get(':registrationId')
   get(
     @CurrentUser() user: V1AuthUser,

@@ -206,6 +206,30 @@ export class TournamentRegistrationsService {
     return this.serialize(registration, payment, playerCount);
   }
 
+  /**
+   * 로그인 유저 본인의 신청 조회 — registrationId 없이 tournamentId만으로 호출 가능.
+   * appliedByUserId 기준으로 가장 최근 non-deleted 신청을 반환한다.
+   * 없으면 404 TOURNAMENT_REGISTRATION_NOT_FOUND.
+   */
+  async getMyRegistration(user: V1AuthUser, tournamentId: string) {
+    const registration = await this.prisma.v1TournamentRegistration.findFirst({
+      where: { tournamentId, appliedByUserId: user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!registration) {
+      throw new NotFoundException({
+        code: 'TOURNAMENT_REGISTRATION_NOT_FOUND',
+        message: 'No registration found for this user in the tournament',
+      });
+    }
+    const registrationId = registration.id;
+    const [payment, playerCount] = await Promise.all([
+      this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
+      this.countPlayers(registrationId),
+    ]);
+    return this.serialize(registration, payment, playerCount);
+  }
+
   private async loadRegistration(tournamentId: string, registrationId: string): Promise<V1TournamentRegistration> {
     const registration = await this.prisma.v1TournamentRegistration.findFirst({
       where: { id: registrationId, tournamentId },

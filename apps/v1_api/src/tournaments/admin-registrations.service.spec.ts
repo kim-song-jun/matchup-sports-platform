@@ -11,6 +11,7 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AdminRegistrationsService } from './admin-registrations.service';
 
 const opsAuth = { id: 'ops-user-id', email: 'ops@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -65,6 +66,7 @@ function paymentRow(overrides: Record<string, unknown> = {}) {
 
 describe('AdminRegistrationsService', () => {
   let service: AdminRegistrationsService;
+  let notifications: { emitNotification: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
@@ -90,11 +92,14 @@ describe('AdminRegistrationsService', () => {
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
 
+    notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminRegistrationsService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -303,5 +308,76 @@ describe('AdminRegistrationsService', () => {
       payment: { method: 'bank_transfer', status: 'paid', amount: 120000 },
     });
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+  });
+
+  // ─── notification emissions ──────────────────────────────────────────────────
+
+  it('confirm: decision=confirm emits tournament_registration_confirmed to registrant', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'payment_checking', appliedByUserId: 'manager-user', tournamentId: 'tournament-1' }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', confirmedAt: new Date() }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+
+    await service.confirm(opsAuth, 'reg-1', { decision: 'confirm' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'manager-user',
+      'tournament_registration_confirmed',
+      'tournament-1',
+    );
+  });
+
+  it('confirm: decision=waitlist emits tournament_registration_waitlisted to registrant', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'paid', appliedByUserId: 'manager-user', tournamentId: 'tournament-1' }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'waitlisted', confirmedAt: new Date() }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+
+    await service.confirm(opsAuth, 'reg-1', { decision: 'waitlist' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'manager-user',
+      'tournament_registration_waitlisted',
+      'tournament-1',
+    );
+  });
+
+  it('cancel: emits tournament_registration_cancelled to registrant', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed', appliedByUserId: 'manager-user', tournamentId: 'tournament-1' }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancelled' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+    prisma.v1TournamentPayment.update.mockResolvedValue(paymentRow({ status: 'cancelled', cancelledAt: new Date() }));
+
+    await service.cancel(opsAuth, 'reg-1', { reason: '운영 취소' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'manager-user',
+      'tournament_registration_cancelled',
+      'tournament-1',
+    );
+  });
+
+  it('confirm: alreadyProcessed idempotent path does NOT emit notification', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed', appliedByUserId: 'manager-user' }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+
+    const result = await service.confirm(opsAuth, 'reg-1', { decision: 'confirm' });
+
+    expect(result.alreadyProcessed).toBe(true);
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
   });
 });

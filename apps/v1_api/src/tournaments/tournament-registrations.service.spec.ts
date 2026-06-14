@@ -181,4 +181,49 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(null);
     await expect(service.get(manager, 'tournament-1', 'ghost')).rejects.toThrow(NotFoundException);
   });
+
+  // ─── getMyRegistration ───────────────────────────────────────────────────────
+
+  it('getMyRegistration: returns the caller\'s most-recent registration', async () => {
+    const row = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(row);
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue({
+      method: 'bank_transfer', status: 'ready', amount: 120000, paidAt: null,
+    });
+    const result = await service.getMyRegistration(manager, 'tournament-1');
+    expect(result).toMatchObject({
+      id: 'reg-1',
+      appliedByUserId: manager.id,
+      status: 'awaiting_payment',
+      payment: { method: 'bank_transfer', status: 'ready', amount: 120000 },
+    });
+    // Must query by tournamentId AND appliedByUserId — not by a different user's id
+    expect(prisma.v1TournamentRegistration.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tournamentId: 'tournament-1', appliedByUserId: manager.id }),
+      }),
+    );
+  });
+
+  it('getMyRegistration: 404 TOURNAMENT_REGISTRATION_NOT_FOUND when no registration exists', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(null);
+    await expect(service.getMyRegistration(manager, 'tournament-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_REGISTRATION_NOT_FOUND' },
+    });
+  });
+
+  it('getMyRegistration: ignores registrations belonging to other users', async () => {
+    // Simulate other user's registration being returned — should NOT happen because
+    // the where clause filters by appliedByUserId. We verify by checking the query args.
+    const otherUser = { id: 'other-user', email: 'o@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(null); // correct: no result for this user
+    await expect(service.getMyRegistration(otherUser, 'tournament-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_REGISTRATION_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentRegistration.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ appliedByUserId: otherUser.id }),
+      }),
+    );
+  });
 });

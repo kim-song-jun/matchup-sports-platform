@@ -359,33 +359,51 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
  *  group_knockout  → 조별 순위(phase=group 그룹들) + TournamentBracket(준결승·결승·3위전 fixtures)
  */
 
-function FormatSections({ tournament }: { tournament: V1TournamentDetail }) {
-  const { format, fixtures, groups } = tournament;
-
-  /* ── Partition groups and fixtures by phase ── */
+/** Pure partition helper — exported for unit testing. */
+export function partitionTournamentSections(
+  format: V1TournamentFormat,
+  fixtures: V1TournamentFixture[],
+  groups: V1TournamentGroup[],
+) {
   const groupPhaseGroups = groups.filter((g) => g.phase === 'group');
   const knockoutPhases = new Set(['semi', 'final', 'third_place']);
   const knockoutGroupIds = new Set(
     groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),
   );
 
-  /** Fixtures belonging to group-phase groups */
   const groupFixtures = fixtures.filter((f) =>
     f.groupId !== null && !knockoutGroupIds.has(f.groupId),
   );
 
-  /** Fixtures belonging to knockout-phase groups, plus ungrouped fixtures for knockout format */
   const knockoutFixtures =
     format === 'knockout'
       ? fixtures
       : fixtures.filter((f) => f.groupId !== null && knockoutGroupIds.has(f.groupId));
 
-  /* ── Render helpers ── */
+  return {
+    groupPhaseGroups,
+    groupFixtures,
+    knockoutFixtures,
+    hasGroupStandings: groupPhaseGroups.length > 0,
+    hasGroupFixtures: groupFixtures.length > 0,
+    hasKnockoutFixtures: knockoutFixtures.length > 0,
+    hasAnyFixtures: fixtures.length > 0,
+  };
+}
 
-  const hasGroupStandings = groupPhaseGroups.length > 0;
-  const hasGroupFixtures = groupFixtures.length > 0;
-  const hasKnockoutFixtures = knockoutFixtures.length > 0;
-  const hasAnyFixtures = fixtures.length > 0;
+function FormatSections({ tournament }: { tournament: V1TournamentDetail }) {
+  const { format, fixtures, groups } = tournament;
+
+  /* ── Partition groups and fixtures by phase ── */
+  const {
+    groupPhaseGroups,
+    groupFixtures,
+    knockoutFixtures,
+    hasGroupStandings,
+    hasGroupFixtures,
+    hasKnockoutFixtures,
+    hasAnyFixtures,
+  } = partitionTournamentSections(format, fixtures, groups);
 
   /* ── league: single standings table (first group or all) + full fixture list ── */
   if (format === 'league') {

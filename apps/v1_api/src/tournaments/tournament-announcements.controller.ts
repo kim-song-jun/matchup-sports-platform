@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -11,6 +11,18 @@ export class TournamentAnnouncementsController {
   constructor(
     private readonly announcementsService: TournamentAnnouncementsService,
   ) {}
+
+  /** GET /admin/tournaments/:tournamentId/announcements
+   * 대회별 전체 공지 목록 (초안+공개, createdAt 내림차순).
+   * active admin이면 조회 가능(support 포함).
+   */
+  @Get('admin/tournaments/:tournamentId/announcements')
+  list(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+  ) {
+    return this.announcementsService.listByTournament(user, tournamentId);
+  }
 
   /** POST /admin/tournaments/:tournamentId/announcements */
   @Post('admin/tournaments/:tournamentId/announcements')

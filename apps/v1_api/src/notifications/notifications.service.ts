@@ -21,7 +21,10 @@ export type NotificationEventType =
   | 'team_match_application_received'
   | 'team_match_application_approved'
   | 'team_match_application_rejected'
-  | 'team_match_cancelled';
+  | 'team_match_cancelled'
+  | 'tournament_registration_confirmed'
+  | 'tournament_registration_waitlisted'
+  | 'tournament_registration_cancelled';
 
 /** Preference field in V1NotificationPreference that gates the event type. */
 function preferenceFieldForEvent(
@@ -63,6 +66,13 @@ function preferenceFieldForEvent(
   ) {
     return 'teamMatchEnabled';
   }
+  if (
+    type === 'tournament_registration_confirmed' ||
+    type === 'tournament_registration_waitlisted' ||
+    type === 'tournament_registration_cancelled'
+  ) {
+    return 'activityEnabled';
+  }
   return 'activityEnabled';
 }
 
@@ -83,6 +93,13 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   ) {
     return 'team';
   }
+  if (
+    type === 'tournament_registration_confirmed' ||
+    type === 'tournament_registration_waitlisted' ||
+    type === 'tournament_registration_cancelled'
+  ) {
+    return 'tournament';
+  }
   return 'team_match';
 }
 
@@ -95,6 +112,7 @@ const ROUTE_BASE_BY_TARGET_TYPE: Partial<Record<V1NotificationTargetType, string
   match: '/matches',
   team: '/teams',
   team_match: '/team-matches',
+  tournament: '/tournaments',
 };
 
 function deepLinkForTarget(
@@ -119,6 +137,9 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_match_application_approved: '팀매치 신청이 승인됐어요',
   team_match_application_rejected: '팀매치 신청이 거절됐어요',
   team_match_cancelled: '팀매치가 취소됐어요',
+  tournament_registration_confirmed: '대회 참가가 확정됐어요',
+  tournament_registration_waitlisted: '대기자 명단에 등록됐어요',
+  tournament_registration_cancelled: '대회 참가가 취소됐어요',
 };
 
 @Injectable()

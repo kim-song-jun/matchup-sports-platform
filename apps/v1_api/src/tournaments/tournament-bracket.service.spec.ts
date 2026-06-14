@@ -543,10 +543,27 @@ describe('TournamentBracketService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentGroup.findMany.mockResolvedValue([
-      { ...groupRow(), groupTeams: [] },
+      {
+        ...groupRow(),
+        groupTeams: [
+          {
+            id: 'gt-1',
+            groupId: 'group-1',
+            registrationId: 'reg-1',
+            sortOrder: 0,
+            createdAt: new Date('2026-06-14T00:00:00Z'),
+            registration: { team: { name: '서울 FC' } },
+          },
+        ],
+      },
     ]);
     prisma.v1TournamentFixture.findMany.mockResolvedValue([
-      { ...fixtureRow(), result: resultRow() },
+      {
+        ...fixtureRow(),
+        result: resultRow(),
+        homeRegistration: { team: { name: '서울 FC' } },
+        awayRegistration: { team: { name: '부산 SC' } },
+      },
     ]);
     prisma.v1TournamentStanding.findMany.mockResolvedValue([
       {
@@ -561,6 +578,7 @@ describe('TournamentBracketService', () => {
         goalsAgainst: 1,
         position: 1,
         recalculatedAt: new Date('2026-06-14T00:00:00Z'),
+        registration: { team: { name: '서울 FC' } },
       },
     ]);
 
@@ -577,6 +595,48 @@ describe('TournamentBracketService', () => {
       points: 3,
       position: 1,
       goalDifference: 1,
+    });
+
+    // teamName fields are populated (not raw UUIDs)
+    expect(result.groups[0].groupTeams[0]).toMatchObject({
+      registrationId: 'reg-1',
+      teamName: '서울 FC',
+    });
+    expect(result.fixtures[0]).toMatchObject({
+      homeRegistrationId: 'reg-1',
+      homeTeamName: '서울 FC',
+      awayRegistrationId: 'reg-2',
+      awayTeamName: '부산 SC',
+    });
+    expect(result.standings[0]).toMatchObject({
+      registrationId: 'reg-1',
+      teamName: '서울 FC',
+    });
+  });
+
+  it('getBracket: TBD when registration is null', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findMany.mockResolvedValue([
+      { ...groupRow(), groupTeams: [] },
+    ]);
+    prisma.v1TournamentFixture.findMany.mockResolvedValue([
+      {
+        ...fixtureRow(),
+        homeRegistrationId: null,
+        awayRegistrationId: null,
+        homeRegistration: null,
+        awayRegistration: null,
+        result: null,
+      },
+    ]);
+    prisma.v1TournamentStanding.findMany.mockResolvedValue([]);
+
+    const result = await service.getBracket(ownerUser, 'tournament-1');
+
+    expect(result.fixtures[0]).toMatchObject({
+      homeTeamName: 'TBD',
+      awayTeamName: 'TBD',
     });
   });
 });

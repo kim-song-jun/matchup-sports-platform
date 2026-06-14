@@ -12,6 +12,32 @@ export class TournamentAnnouncementsService {
   ) {}
 
   /**
+   * 어드민 공지 목록 조회.
+   * 대회 소속 전체 공지(초안+공개)를 createdAt 내림차순으로 반환.
+   * active admin이면 support 포함 조회 가능 (읽기 전용이므로 getMutationAdmin 불필요).
+   */
+  async listByTournament(user: V1AuthUser, tournamentId: string) {
+    await this.adminContext.getActiveAdmin(user.id);
+
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId },
+    });
+    if (!tournament) {
+      throw new NotFoundException({
+        code: 'TOURNAMENT_NOT_FOUND',
+        message: 'Tournament was not found',
+      });
+    }
+
+    const rows = await this.prisma.v1TournamentAnnouncement.findMany({
+      where: { tournamentId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { items: rows.map((r) => this.serialize(r)) };
+  }
+
+  /**
    * 어드민 공지 생성.
    * publish=true이면 publishedAt=now()로 즉시 공개. 기본은 draft(publishedAt=null).
    * audience는 현재 타겟 발송 메타로만 저장(실제 발송은 후속 task).

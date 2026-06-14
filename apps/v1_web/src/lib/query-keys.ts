@@ -40,6 +40,8 @@ export const v1Keys = {
   tournament: (id: string) => [...v1Keys.all, 'tournaments', id] as const,
   tournamentRegistration: (tournamentId: string, registrationId: string) =>
     [...v1Keys.all, 'tournaments', tournamentId, 'registrations', registrationId] as const,
+  myTournamentRegistration: (tournamentId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'my-registration'] as const,
   tournamentPlayers: (tournamentId: string, registrationId: string) =>
     [...v1Keys.all, 'tournaments', tournamentId, 'registrations', registrationId, 'players'] as const,
   adminTournaments: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'tournaments', filters ?? {}] as const,
@@ -48,4 +50,6 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'registrations', filters ?? {}] as const,
   adminTournamentBracket: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'bracket'] as const,
+  adminTournamentAnnouncements: (tournamentId: string) =>
+    [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'announcements'] as const,
 };

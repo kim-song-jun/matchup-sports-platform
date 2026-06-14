@@ -1471,26 +1471,6 @@ export type V1TournamentRosterResponse = {
   belowMinimum: boolean;
 };
 
-/** Serialized by TournamentPaymentsService — PG prepare response */
-export type V1TournamentPgPrepareResponse = {
-  paymentKey: string;
-  orderId: string;
-  amount: number;
-  checkoutUrl: string;
-};
-
-/** Serialized by TournamentPaymentsService — PG confirm response (same shape as registration) */
-export type V1TournamentPgConfirmResponse = {
-  id: string;
-  tournamentId: string;
-  teamId: string;
-  status: V1TournamentRegistrationStatus;
-  playerCount: number;
-  payment: (V1TournamentPaymentSummary & { providerTxId: string | null }) | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 /** Admin bracket bracket view: TournamentBracketService.getBracket groups item */
 export type V1AdminBracketGroup = {
   id: string;
@@ -1507,6 +1487,7 @@ export type V1AdminBracketGroupTeam = {
   id: string;
   groupId: string;
   registrationId: string;
+  teamName: string;
   sortOrder: number;
   createdAt: string;
 };
@@ -1520,7 +1501,9 @@ export type V1AdminBracketFixture = {
   legNumber: number;
   parentFixtureId: string | null;
   homeRegistrationId: string | null;
+  homeTeamName: string;
   awayRegistrationId: string | null;
+  awayTeamName: string;
   scheduledAt: string | null;
   venue: string | null;
   status: string;
@@ -1547,6 +1530,7 @@ export type V1AdminBracketStanding = {
   id: string;
   groupId: string;
   registrationId: string;
+  teamName: string;
   points: number;
   wins: number;
   draws: number;
@@ -1666,12 +1650,6 @@ export type V1CancelRegistrationRequestPayload = {
   reason?: string;
 };
 
-export type V1ConfirmPgPaymentPayload = {
-  paymentKey: string;
-  orderId: string;
-  amount: number;
-};
-
 export type V1AddPlayerPayload = {
   userId: string;
   realName: string;
@@ -1739,4 +1717,8 @@ export type V1CreateAnnouncementPayload = {
   body: string;
   audience?: V1AnnouncementAudience;
   publish?: boolean;
+};
+
+export type V1AdminAnnouncementListResult = {
+  items: V1AdminTournamentAnnouncement[];
 };

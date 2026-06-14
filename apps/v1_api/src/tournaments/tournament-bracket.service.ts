@@ -446,16 +446,37 @@ export class TournamentBracketService {
     const [groups, fixtures, standings] = await Promise.all([
       this.prisma.v1TournamentGroup.findMany({
         where: { tournamentId },
-        include: { groupTeams: true },
+        include: {
+          groupTeams: {
+            include: {
+              registration: {
+                include: { team: { select: { name: true } } },
+              },
+            },
+          },
+        },
         orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }],
       }),
       this.prisma.v1TournamentFixture.findMany({
         where: { tournamentId },
-        include: { result: true },
+        include: {
+          result: true,
+          homeRegistration: {
+            include: { team: { select: { name: true } } },
+          },
+          awayRegistration: {
+            include: { team: { select: { name: true } } },
+          },
+        },
         orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
       }),
       this.prisma.v1TournamentStanding.findMany({
         where: { group: { tournamentId } },
+        include: {
+          registration: {
+            include: { team: { select: { name: true } } },
+          },
+        },
         orderBy: [{ groupId: 'asc' }, { position: 'asc' }],
       }),
     ]);
@@ -463,13 +484,21 @@ export class TournamentBracketService {
     return {
       groups: groups.map((g) => ({
         ...this.serializeGroup(g),
-        groupTeams: g.groupTeams.map(this.serializeGroupTeam),
+        groupTeams: g.groupTeams.map((gt) => ({
+          ...this.serializeGroupTeam(gt),
+          teamName: gt.registration.team.name,
+        })),
       })),
       fixtures: fixtures.map((f) => ({
         ...this.serializeFixture(f),
+        homeTeamName: f.homeRegistration?.team.name ?? 'TBD',
+        awayTeamName: f.awayRegistration?.team.name ?? 'TBD',
         result: f.result ? this.serializeResult(f.result) : null,
       })),
-      standings: standings.map(this.serializeStanding),
+      standings: standings.map((s) => ({
+        ...this.serializeStanding(s),
+        teamName: s.registration.team.name,
+      })),
     };
   }
 

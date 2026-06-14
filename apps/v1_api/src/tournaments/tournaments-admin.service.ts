@@ -90,6 +90,7 @@ export class TournamentsAdminService {
         data: {
           sportId: dto.sportId,
           title: dto.title,
+          format: dto.format ?? 'group_knockout',
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           venue: dto.venue ?? null,
@@ -138,6 +139,7 @@ export class TournamentsAdminService {
 
     const data: Prisma.V1TournamentUpdateInput = {};
     if (dto.title !== undefined) data.title = dto.title;
+    if (dto.format !== undefined) data.format = dto.format;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
     }
@@ -228,6 +230,7 @@ export class TournamentsAdminService {
       sportId: row.sportId,
       title: row.title,
       status: row.status,
+      format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       venue: row.venue,

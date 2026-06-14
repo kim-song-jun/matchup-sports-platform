@@ -1038,6 +1038,12 @@ enum V1TournamentStatus {
   cancelled
 }
 
+enum V1TournamentFormat {
+  league
+  knockout
+  group_knockout
+}
+
 enum V1TournamentRegistrationStatus {
   draft
   submitted
@@ -1094,6 +1100,7 @@ model V1Tournament {
   sportId                String             @map("sport_id")
   title                  String
   status                 V1TournamentStatus @default(draft)
+  format                 V1TournamentFormat @default(group_knockout)
   registrationDeadlineAt DateTime?          @map("registration_deadline_at")
   scheduledAt            DateTime?          @map("scheduled_at")
   venue                  String?

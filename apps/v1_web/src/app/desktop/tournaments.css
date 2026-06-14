@@ -68,3 +68,80 @@
     padding: 0 0 48px;
   }
 }
+
+/* ─── Bracket — desktop horizontal layout ─────────────────────────────────────
+ * .tm-tournament-bracket-h renders on desktop only (via .tm-show-desktop).
+ * On mobile the .tm-hide-desktop vertical layout is used instead.
+ * Structure:
+ *   .tm-tournament-bracket-h           — outer flex row, overflow-x auto
+ *     .tm-bracket-column               — per-round column, flex column
+ *       .tm-bracket-column-label       — round name header
+ *       .tm-bracket-column-fixtures    — stacked fixture cards
+ *       .tm-bracket-trophy             — trophy placeholder (final column only)
+ *     .tm-bracket-connector            — → arrow between columns
+ */
+
+@media (min-width: 1024px) {
+  .tm-tournament-bracket-h {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    /* Smooth scrollbar appearance */
+    scrollbar-width: thin;
+  }
+
+  .tm-bracket-column {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 220px;
+    max-width: 260px;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .tm-bracket-column-label {
+    text-align: center;
+    padding: 6px 8px 10px;
+    border-bottom: 1px solid var(--grey100);
+    margin-bottom: 12px;
+  }
+
+  .tm-bracket-column-fixtures {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 8px;
+    /* Vertically center the cards when column heights differ */
+    justify-content: center;
+    flex: 1;
+  }
+
+  .tm-bracket-trophy {
+    display: flex;
+    justify-content: center;
+    padding-top: 12px;
+  }
+
+  /* Arrow connector: absolutely positioned between columns */
+  .tm-bracket-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    flex-shrink: 0;
+    /* Vertically align with the column fixture area */
+    padding-top: 46px;
+    color: var(--text-caption);
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-bracket-column {
+    min-width: 240px;
+    max-width: 300px;
+  }
+}

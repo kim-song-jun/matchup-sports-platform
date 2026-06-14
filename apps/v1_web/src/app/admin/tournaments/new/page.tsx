@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import type { V1TournamentFormat } from '@/types/api';
 import {
   AdminPageHeader,
   AdminToasts,
@@ -71,6 +72,7 @@ export default function AdminTournamentsNewPage() {
   // ── Form state ──────────────────────────────────────────────────────
   const [sportId, setSportId] = useState('');
   const [title, setTitle] = useState('');
+  const [format, setFormat] = useState<V1TournamentFormat>('knockout');
   const [scheduledAt, setScheduledAt] = useState('');
   const [registrationDeadlineAt, setRegistrationDeadlineAt] = useState('');
   const [venue, setVenue] = useState('');
@@ -101,6 +103,7 @@ export default function AdminTournamentsNewPage() {
       {
         sportId: sportId.trim(),
         title: title.trim(),
+        format,
         ...(scheduledAt ? { scheduledAt: new Date(scheduledAt).toISOString() } : {}),
         ...(registrationDeadlineAt
           ? { registrationDeadlineAt: new Date(registrationDeadlineAt).toISOString() }
@@ -186,6 +189,27 @@ export default function AdminTournamentsNewPage() {
                   maxLength={100}
                   className={inputCls}
                 />
+              </FormField>
+
+              <FormField
+                id="format"
+                label="대회 형식"
+                required
+                hint="리그: 모든 팀이 순위전 / 토너먼트: 녹아웃 대진 / 조별리그+토너먼트: 혼합"
+              >
+                <select
+                  id="format"
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value as V1TournamentFormat)}
+                  disabled={isPending}
+                  required
+                  aria-required="true"
+                  className={inputCls}
+                >
+                  <option value="league">리그 (순위전)</option>
+                  <option value="knockout">토너먼트 (녹아웃)</option>
+                  <option value="group_knockout">조별리그 + 토너먼트</option>
+                </select>
               </FormField>
 
               <FormField id="scheduled-at" label="대회 일정" hint="캘린더에서 날짜·시간을 선택하세요">

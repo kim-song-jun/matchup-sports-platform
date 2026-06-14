@@ -47,6 +47,9 @@ export class AdminTournamentListQueryDto {
   limit?: number;
 }
 
+export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout'] as const;
+export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
+
 export class CreateTournamentDto {
   @IsUUID()
   sportId!: string;
@@ -54,6 +57,10 @@ export class CreateTournamentDto {
   @IsString()
   @MaxLength(120)
   title!: string;
+
+  @IsOptional()
+  @IsIn(TOURNAMENT_FORMATS)
+  format?: TournamentFormat;
 
   @IsOptional()
   @IsDateString()
@@ -128,6 +135,10 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(120)
   title?: string;
+
+  @IsOptional()
+  @IsIn(TOURNAMENT_FORMATS)
+  format?: TournamentFormat;
 
   @IsOptional()
   @IsDateString()

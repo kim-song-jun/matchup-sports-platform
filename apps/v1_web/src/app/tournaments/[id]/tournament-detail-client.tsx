@@ -6,8 +6,10 @@ import { Card } from '@/components/v1-ui/primitives';
 import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import type {
   V1TournamentDetail,
+  V1TournamentFormat,
   V1TournamentStatus,
   V1TournamentGroup,
   V1TournamentFixture,
@@ -33,6 +35,16 @@ function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
       return { badgeClass: 'tm-badge-red', label: '취소' };
     default:
       return { badgeClass: 'tm-badge-grey', label: status };
+  }
+}
+
+/* ── Format helpers ── */
+
+function getFormatLabel(format: V1TournamentFormat): string {
+  switch (format) {
+    case 'league': return '리그';
+    case 'knockout': return '토너먼트';
+    case 'group_knockout': return '조별리그+토너먼트';
   }
 }
 
@@ -163,8 +175,6 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 
 function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }) {
   const status = getTournamentStatusConfig(tournament.status);
-  const hasGroups = tournament.groups.length > 0;
-  const hasFixtures = tournament.fixtures.length > 0;
   const hasAnnouncements = tournament.announcements.length > 0;
   const isOpen = tournament.status === 'open';
   const isFull = tournament.confirmedCount >= tournament.teamCount;
@@ -197,9 +207,12 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
             <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
               {tournament.title}
             </h1>
-            <div style={{ marginTop: 5 }}>
+            <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <span className={`tm-badge ${status.badgeClass}`}>
                 {status.label}
+              </span>
+              <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
+                {getFormatLabel(tournament.format)}
               </span>
             </div>
           </div>
@@ -251,41 +264,8 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
         </section>
       ) : null}
 
-      {/* ── Section 3: Fixtures (schedule / bracket) ── */}
-      {hasFixtures ? (
-        <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
-          <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>일정 · 대진</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-            {tournament.fixtures.map((fixture) => (
-              <FixtureCard key={fixture.id} fixture={fixture} />
-            ))}
-          </div>
-        </section>
-      ) : (
-        <section aria-labelledby="fixtures-placeholder-heading" style={{ marginTop: 24 }}>
-          <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>일정 · 대진</div>
-          <Card pad={16} style={{ marginTop: 4, background: 'var(--grey50)' }}>
-            <div id="fixtures-placeholder-heading" className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-              대진표 준비 중
-            </div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              대회 시작 전에 대진표가 공개돼요.
-            </div>
-          </Card>
-        </section>
-      )}
-
-      {/* ── Section 4: Group standings ── */}
-      {hasGroups ? (
-        <section aria-labelledby="standings-heading" style={{ marginTop: 24 }}>
-          <div id="standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>조별 순위</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
-            {tournament.groups.map((group) => (
-              <GroupStandingsTable key={group.id} group={group} />
-            ))}
-          </div>
-        </section>
-      ) : null}
+      {/* ── Section 3 + 4: Format-aware fixtures / bracket / standings ── */}
+      <FormatSections tournament={tournament} />
 
       {/* ── Section 5: Announcements ── */}
       {hasAnnouncements ? (
@@ -368,6 +348,162 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
         ) : null}
       </div>
     </article>
+  );
+}
+
+/* ── FormatSections ──
+ * Renders the fixtures / bracket / standings area based on tournament.format:
+ *
+ *  league          → 순위표(phase=group 첫 그룹) + 전체 fixtures 리스트
+ *  knockout        → TournamentBracket(전체 fixtures). 조별 순위 숨김.
+ *  group_knockout  → 조별 순위(phase=group 그룹들) + TournamentBracket(준결승·결승·3위전 fixtures)
+ */
+
+function FormatSections({ tournament }: { tournament: V1TournamentDetail }) {
+  const { format, fixtures, groups } = tournament;
+
+  /* ── Partition groups and fixtures by phase ── */
+  const groupPhaseGroups = groups.filter((g) => g.phase === 'group');
+  const knockoutPhases = new Set(['semi', 'final', 'third_place']);
+  const knockoutGroupIds = new Set(
+    groups.filter((g) => knockoutPhases.has(g.phase)).map((g) => g.id),
+  );
+
+  /** Fixtures belonging to group-phase groups */
+  const groupFixtures = fixtures.filter((f) =>
+    f.groupId !== null && !knockoutGroupIds.has(f.groupId),
+  );
+
+  /** Fixtures belonging to knockout-phase groups, plus ungrouped fixtures for knockout format */
+  const knockoutFixtures =
+    format === 'knockout'
+      ? fixtures
+      : fixtures.filter((f) => f.groupId !== null && knockoutGroupIds.has(f.groupId));
+
+  /* ── Render helpers ── */
+
+  const hasGroupStandings = groupPhaseGroups.length > 0;
+  const hasGroupFixtures = groupFixtures.length > 0;
+  const hasKnockoutFixtures = knockoutFixtures.length > 0;
+  const hasAnyFixtures = fixtures.length > 0;
+
+  /* ── league: single standings table (first group or all) + full fixture list ── */
+  if (format === 'league') {
+    return (
+      <>
+        {hasGroupStandings ? (
+          <section aria-labelledby="standings-heading" style={{ marginTop: 24 }}>
+            <div id="standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+              순위표
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+              {groupPhaseGroups.map((group) => (
+                <GroupStandingsTable key={group.id} group={group} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {hasAnyFixtures ? (
+          <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
+            <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+              일정 · 대진
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              {fixtures.map((fixture) => (
+                <FixtureCard key={fixture.id} fixture={fixture} />
+              ))}
+            </div>
+          </section>
+        ) : (
+          <FixturesPlaceholder />
+        )}
+      </>
+    );
+  }
+
+  /* ── knockout: bracket only ── */
+  if (format === 'knockout') {
+    return (
+      <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
+        <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+          대진표
+        </div>
+        <div style={{ marginTop: 4 }}>
+          <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+        </div>
+      </section>
+    );
+  }
+
+  /* ── group_knockout: group standings + group fixtures, then knockout bracket ── */
+  return (
+    <>
+      {/* Group-phase standings */}
+      {hasGroupStandings ? (
+        <section aria-labelledby="standings-heading" style={{ marginTop: 24 }}>
+          <div id="standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+            조별 순위
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+            {groupPhaseGroups.map((group) => (
+              <GroupStandingsTable key={group.id} group={group} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Group-phase fixtures */}
+      {hasGroupFixtures ? (
+        <section aria-labelledby="group-fixtures-heading" style={{ marginTop: 24 }}>
+          <div id="group-fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+            조별 일정
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            {groupFixtures.map((fixture) => (
+              <FixtureCard key={fixture.id} fixture={fixture} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Knockout bracket */}
+      <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
+        <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+          결선 대진표
+        </div>
+        <div style={{ marginTop: 4 }}>
+          {hasKnockoutFixtures ? (
+            <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+          ) : (
+            <Card pad={16} style={{ background: 'var(--grey50)' }}>
+              <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+                결선 대진 준비 중
+              </div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                조별 리그가 끝나면 결선 대진표가 공개돼요.
+              </div>
+            </Card>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function FixturesPlaceholder() {
+  return (
+    <section aria-labelledby="fixtures-placeholder-heading" style={{ marginTop: 24 }}>
+      <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>일정 · 대진</div>
+      <Card pad={16} style={{ marginTop: 4, background: 'var(--grey50)' }}>
+        <div id="fixtures-placeholder-heading" className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+          대진표 준비 중
+        </div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          대회 시작 전에 대진표가 공개돼요.
+        </div>
+      </Card>
+    </section>
   );
 }
 

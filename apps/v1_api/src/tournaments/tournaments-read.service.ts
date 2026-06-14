@@ -124,6 +124,7 @@ export class TournamentsReadService {
       sportId: row.sportId,
       title: row.title,
       status: row.status,
+      format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       venue: row.venue,
@@ -208,6 +209,7 @@ export class TournamentsReadService {
       sportId: string;
       title: string;
       status: string;
+      format: string;
       registrationDeadlineAt: Date | null;
       scheduledAt: Date | null;
       venue: string | null;
@@ -223,6 +225,7 @@ export class TournamentsReadService {
       sportId: row.sportId,
       title: row.title,
       status: row.status,
+      format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       venue: row.venue,

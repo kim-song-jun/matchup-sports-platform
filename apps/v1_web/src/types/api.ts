@@ -1243,6 +1243,8 @@ export type V1TournamentStatus =
   | 'completed'
   | 'cancelled';
 
+export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout';
+
 export type V1PublicTournamentStatus = Extract<
   V1TournamentStatus,
   'open' | 'closed' | 'in_progress' | 'completed'
@@ -1281,6 +1283,7 @@ export type V1TournamentListItem = {
   sportId: string;
   title: string;
   status: V1TournamentStatus;
+  format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
   venue: string | null;
@@ -1297,6 +1300,7 @@ export type V1Tournament = {
   sportId: string;
   title: string;
   status: V1TournamentStatus;
+  format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
   venue: string | null;
@@ -1386,6 +1390,7 @@ export type V1TournamentDetail = {
   sportId: string;
   title: string;
   status: V1TournamentStatus;
+  format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
   venue: string | null;
@@ -1622,6 +1627,7 @@ export type V1AdminRegistrationListPage = {
 export type V1CreateTournamentPayload = {
   sportId: string;
   title: string;
+  format?: V1TournamentFormat;
   registrationDeadlineAt?: string;
   scheduledAt?: string;
   venue?: string;

@@ -218,12 +218,20 @@ function RegistrationDetailView({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <InfoRow label="신청일" value={formatDateShort(registration.createdAt)} />
+              <InfoRow
+                label="신청일"
+                value={formatDateShort(registration.createdAt)}
+                isLast={!registration.confirmedAt && !registration.cancelRequestedAt}
+              />
               {registration.confirmedAt ? (
-                <InfoRow label="확정일" value={formatDateShort(registration.confirmedAt)} />
+                <InfoRow
+                  label="확정일"
+                  value={formatDateShort(registration.confirmedAt)}
+                  isLast={!registration.cancelRequestedAt}
+                />
               ) : null}
               {registration.cancelRequestedAt ? (
-                <InfoRow label="취소 요청일" value={formatDateShort(registration.cancelRequestedAt)} />
+                <InfoRow label="취소 요청일" value={formatDateShort(registration.cancelRequestedAt)} isLast />
               ) : null}
             </div>
           </Card>
@@ -237,16 +245,24 @@ function RegistrationDetailView({
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <InfoRow label="결제 수단" value={paymentMethodLabel(registration.payment.method)} />
                 <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} valueColor="var(--blue500)" />
-                <InfoRow label="결제 상태" value={paymentStatusLabel(registration.payment.status)} />
+                <InfoRow
+                  label="결제 상태"
+                  value={paymentStatusLabel(registration.payment.status)}
+                  isLast={!registration.payment.paidAt}
+                />
                 {registration.payment.paidAt ? (
-                  <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} />
+                  <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast />
                 ) : null}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
+                <InfoRow
+                  label="참가비"
+                  value={formatEntryFee(tournament.entryFee)}
+                  isLast={!registration.depositorName}
+                />
                 {registration.depositorName ? (
-                  <InfoRow label="입금자명" value={registration.depositorName} />
+                  <InfoRow label="입금자명" value={registration.depositorName} isLast />
                 ) : null}
                 <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
                   {registration.status === 'awaiting_payment'
@@ -346,13 +362,19 @@ function InfoRow({
   label,
   value,
   valueColor,
+  isLast,
 }: {
   label: string;
   value: string;
   valueColor?: string;
+  /** Pass true on the final row of a card to remove the redundant bottom hairline. */
+  isLast?: boolean;
 }) {
   return (
-    <div className="tm-info-row" style={{ padding: '0' }}>
+    <div
+      className="tm-info-row"
+      style={{ padding: '0', ...(isLast ? { borderBottom: 'none' } : {}) }}
+    >
       <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
         {label}
       </span>

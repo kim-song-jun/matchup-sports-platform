@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
+  ClipboardList,
   Download,
   Lock,
   Unlock,
@@ -41,6 +42,7 @@ import type {
   V1AdminTournamentRegistration,
   V1AdminBracketGroup,
   V1AdminBracketFixture,
+  V1AdminBracketStanding,
   V1AdminTournamentAnnouncement,
   V1TournamentGroupPhase,
   V1AnnouncementAudience,
@@ -577,7 +579,7 @@ function RegistrationsTab({
                   setRosterRegistration(reg);
                   setRosterOpen(true);
                 }}
-                icon={<Check size={13} />}
+                icon={<ClipboardList size={13} />}
                 label="명단 검토"
                 tone="gray"
               />
@@ -907,42 +909,64 @@ function BracketTab({
           </div>
           {groups.map((group) => {
             const standings = bracket?.standings.filter((s) => s.groupId === group.id) ?? [];
+            const standingColumns: AdminTableColumn<V1AdminBracketStanding>[] = [
+              {
+                key: 'position',
+                header: '순위',
+                align: 'center',
+                render: (s) => <span className="tabular-nums text-gray-500">{s.position}</span>,
+              },
+              {
+                key: 'registrationId',
+                header: '팀',
+                render: (s) => <span className="font-medium text-gray-900">{s.registrationId}</span>,
+              },
+              {
+                key: 'wins',
+                header: '승',
+                align: 'center',
+                render: (s) => <span className="tabular-nums">{s.wins}</span>,
+              },
+              {
+                key: 'draws',
+                header: '무',
+                align: 'center',
+                render: (s) => <span className="tabular-nums">{s.draws}</span>,
+              },
+              {
+                key: 'losses',
+                header: '패',
+                align: 'center',
+                render: (s) => <span className="tabular-nums">{s.losses}</span>,
+              },
+              {
+                key: 'goalsFor',
+                header: '득점',
+                align: 'center',
+                render: (s) => <span className="tabular-nums">{s.goalsFor}</span>,
+              },
+              {
+                key: 'goalsAgainst',
+                header: '실점',
+                align: 'center',
+                render: (s) => <span className="tabular-nums">{s.goalsAgainst}</span>,
+              },
+              {
+                key: 'points',
+                header: '승점',
+                align: 'right',
+                render: (s) => <span className="tabular-nums font-semibold text-blue-600">{s.points}</span>,
+              },
+            ];
             return (
-              <div key={group.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-50 bg-gray-50">
-                  <h4 className="text-[13px] font-bold text-gray-700">{group.name}</h4>
-                </div>
-                {standings.length === 0 ? (
-                  <p className="px-4 py-3 text-[13px] text-gray-400">팀이 없어요.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-gray-700">
-                      <thead>
-                        <tr className="border-b border-gray-50">
-                          {['순위', '팀', '승', '무', '패', '득점', '실점', '승점'].map((h) => (
-                            <th key={h} scope="col" className="px-3 py-2 text-[12px] font-semibold text-gray-600 text-left whitespace-nowrap select-none">
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {standings.map((s) => (
-                          <tr key={s.id} className="transition-colors hover:bg-gray-50/60">
-                            <td className="px-3 py-3 tabular-nums text-gray-500">{s.position}</td>
-                            <td className="px-3 py-3 font-medium text-gray-900">{s.registrationId}</td>
-                            <td className="px-3 py-3 tabular-nums">{s.wins}</td>
-                            <td className="px-3 py-3 tabular-nums">{s.draws}</td>
-                            <td className="px-3 py-3 tabular-nums">{s.losses}</td>
-                            <td className="px-3 py-3 tabular-nums">{s.goalsFor}</td>
-                            <td className="px-3 py-3 tabular-nums">{s.goalsAgainst}</td>
-                            <td className="px-3 py-3 tabular-nums font-semibold text-blue-600">{s.points}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <div key={group.id} className="flex flex-col gap-2">
+                <h4 className="text-[13px] font-bold text-gray-700 px-1">{group.name}</h4>
+                <AdminDataTable<V1AdminBracketStanding>
+                  columns={standingColumns}
+                  rows={standings}
+                  keyExtractor={(s) => s.id}
+                  empty={<AdminEmpty title="팀이 없어요" description="배정된 팀이 없어요." />}
+                />
               </div>
             );
           })}

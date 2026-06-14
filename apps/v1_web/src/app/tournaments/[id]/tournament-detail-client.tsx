@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, SectionTitle } from '@/components/v1-ui/primitives';
-import { TrophyIcon } from '@/components/v1-ui/icons';
+import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type {
@@ -131,7 +131,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 
   if (isLoading) {
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false}>
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
         <TournamentDetailSkeleton />
       </AppChrome>
     );
@@ -140,7 +140,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false}>
+      <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
         <TournamentDetailError message={msg} />
       </AppChrome>
     );
@@ -151,6 +151,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
       title={data.title}
       backHref="/tournaments"
       bottomNav={false}
+      activeTab="tournaments"
       floatingSlot={<ApplyCTA tournament={data} />}
     >
       <TournamentDetailView tournament={data} />
@@ -228,6 +229,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
             <InfoRow
               label="선수단 규모"
               value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
+              isLast
             />
           </div>
         </Card>
@@ -320,6 +322,18 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
 
   return (
     <article style={{ padding: `0 20px ${bottomPad}px` }}>
+      {/* ── Desktop back navigation (hidden on mobile via .tm-show-desktop) ── */}
+      <div className="tm-desktop-page-head tm-show-desktop">
+        <Link
+          className="tm-desktop-back"
+          href="/tournaments"
+          aria-label="대회 목록으로 돌아가기"
+        >
+          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+        </Link>
+        <h1 className="tm-text-heading" style={{ margin: 0 }}>대회 상세</h1>
+      </div>
+
       {/* ── Desktop 2-column layout: left=body, right=sticky CTA ── */}
       {/* Reuses .tm-match-detail-desktop-layout (matches.css @media ≥1024px:
           grid-template-columns 1fr 360px, gap 32px). */}
@@ -337,15 +351,15 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
             role="complementary"
             aria-label="참가 신청"
           >
-            <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--grey100)' }}>
+            <div className="tm-match-detail-desktop-cta-label">
               <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
                 참가 신청
               </div>
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+              <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
                 {tournament.confirmedCount}/{tournament.teamCount}팀 확정
               </div>
             </div>
-            <div style={{ display: 'grid', gap: 8 }}>
+            <div className="tm-match-detail-desktop-cta-actions">
               <ApplyCTAButtons tournament={tournament} isFull={isFull} />
             </div>
           </aside>
@@ -361,13 +375,19 @@ function InfoRow({
   label,
   value,
   valueColor,
+  isLast,
 }: {
   label: string;
   value: string;
   valueColor?: string;
+  /** Pass true on the final row of a card to remove the redundant bottom hairline. */
+  isLast?: boolean;
 }) {
   return (
-    <div className="tm-info-row" style={{ padding: '0 16px' }}>
+    <div
+      className="tm-info-row"
+      style={{ padding: '0 16px', ...(isLast ? { borderBottom: 'none' } : {}) }}
+    >
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
         {label}
       </div>

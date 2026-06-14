@@ -127,26 +127,57 @@ function AddPlayerForm({
 
         <FormField id="player-eligibility" label="선출 여부" labelId="eligibility-label">
           <div role="radiogroup" aria-labelledby="eligibility-label" style={{ display: 'flex', gap: 10 }}>
-            {(['non_pro', 'pro'] as const).map((val) => (
-              <label
-                key={val}
-                htmlFor={`eligibility-${val}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 44 }}
-              >
-                <input
-                  id={`eligibility-${val}`}
-                  type="radio"
-                  name="eligibility-status"
-                  value={val}
-                  checked={form.eligibilityStatus === val}
-                  onChange={() => patch({ eligibilityStatus: val })}
-                  style={{ width: 16, height: 16, accentColor: 'var(--blue500)' }}
-                />
-                <span className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
-                  {eligibilityLabel(val)}
-                </span>
-              </label>
-            ))}
+            {(['non_pro', 'pro'] as const).map((val) => {
+              const selected = form.eligibilityStatus === val;
+              return (
+                <label
+                  key={val}
+                  htmlFor={`eligibility-${val}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 44 }}
+                >
+                  {/* sr-only native radio — keyboard + screen reader accessible */}
+                  <input
+                    id={`eligibility-${val}`}
+                    type="radio"
+                    name="eligibility-status"
+                    value={val}
+                    checked={selected}
+                    onChange={() => patch({ eligibilityStatus: val })}
+                    className="sr-only"
+                  />
+                  {/* Themed circular indicator — matches PaymentMethodRadio pattern */}
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      flexShrink: 0,
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      border: selected ? '2px solid var(--blue500)' : '1px solid var(--grey200)',
+                      background: selected ? 'var(--blue500)' : 'var(--bg)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                  >
+                    {selected && (
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: 'var(--static-white)',
+                          display: 'block',
+                        }}
+                      />
+                    )}
+                  </span>
+                  <span className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
+                    {eligibilityLabel(val)}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </FormField>
       </div>
@@ -244,13 +275,18 @@ function PlayerRow({
         borderTop: '1px solid var(--grey100)',
       }}
     >
-      {/* Avatar placeholder */}
+      {/* Avatar placeholder — inline styles avoid coupling to tm-review-avatar (review domain) */}
       <div
         aria-hidden="true"
-        className="tm-review-avatar"
         style={{
+          flexShrink: 0,
           width: 36,
           height: 36,
+          borderRadius: 12,
+          background: 'var(--grey100)',
+          color: 'var(--text-strong)',
+          display: 'grid',
+          placeItems: 'center',
           fontSize: 14,
           fontWeight: 700,
         }}
@@ -276,7 +312,7 @@ function PlayerRow({
         <button
           type="button"
           className="tm-btn tm-btn-sm tm-btn-danger"
-          style={{ flexShrink: 0, minHeight: 32, minWidth: 44, padding: '0 10px' }}
+          style={{ flexShrink: 0, minWidth: 44, padding: '0 10px' }}
           onClick={() => onRemove(player.id)}
           disabled={isRemoving}
           aria-label={`${player.realName} 삭제`}
@@ -424,7 +460,7 @@ export function TournamentRosterPageClient({
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-primary"
-              style={{ flexShrink: 0, minHeight: 36, minWidth: 64 }}
+              style={{ flexShrink: 0, minWidth: 64 }}
               onClick={() => { setAddError(null); setShowAddForm(true); }}
               aria-label="선수 추가하기"
             >

@@ -223,27 +223,73 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
           </div>
         </div>
 
+        {/* 핵심 3사실 메트릭 카드(정원 progress bar 내장) + 보조 정보 InfoRow */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 10 }}>
+          <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 4 }}>일정</div>
+            <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
+              {formatShortDate(tournament.scheduledAt)}
+            </div>
+          </div>
+          <div style={{ background: 'var(--blue50)', borderRadius: 12, padding: 12 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--blue600)', marginBottom: 4 }}>정원</div>
+            <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500, marginBottom: 5 }}>
+              {tournament.confirmedCount}/{tournament.teamCount}팀
+            </div>
+            <div
+              role="progressbar"
+              aria-valuenow={tournament.confirmedCount}
+              aria-valuemin={0}
+              aria-valuemax={tournament.teamCount}
+              aria-label={`정원 ${tournament.confirmedCount} / ${tournament.teamCount}팀`}
+              style={{ height: 5, background: 'var(--surface)', borderRadius: 3, overflow: 'hidden' }}
+            >
+              <div
+                style={{
+                  width: `${Math.min(100, Math.round((tournament.confirmedCount / Math.max(tournament.teamCount, 1)) * 100))}%`,
+                  height: '100%',
+                  background: 'var(--blue500)',
+                  borderRadius: 3,
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 4 }}>참가비</div>
+            <div className="tm-text-body" style={{ color: 'var(--blue500)', fontWeight: 500 }}>
+              {formatEntryFee(tournament.entryFee)}
+            </div>
+          </div>
+        </div>
+        {(() => {
+          const remaining = tournament.teamCount - tournament.confirmedCount;
+          if (remaining <= 0) {
+            return (
+              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 10 }}>
+                정원이 가득 찼어요
+              </div>
+            );
+          }
+          const pct = Math.round((tournament.confirmedCount / Math.max(tournament.teamCount, 1)) * 100);
+          const almostFull = pct >= 80;
+          return (
+            <div
+              className="tm-text-caption"
+              style={{ color: almostFull ? 'var(--orange500)' : 'var(--text-muted)', marginBottom: 10 }}
+            >
+              {almostFull ? '마감 임박! ' : '아직 '}
+              <b style={{ color: almostFull ? 'var(--orange500)' : 'var(--blue500)', fontWeight: 500 }}>{remaining}자리</b> 남았어요
+            </div>
+          );
+        })()}
         <Card pad={0}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <InfoRow label="일정" value={formatTournamentDate(tournament.scheduledAt)} />
             {tournament.registrationDeadlineAt ? (
-              <InfoRow
-                label="신청 마감"
-                value={formatTournamentDate(tournament.registrationDeadlineAt)}
-              />
+              <InfoRow label="신청 마감" value={formatTournamentDate(tournament.registrationDeadlineAt)} />
             ) : null}
             {tournament.venue ? (
               <InfoRow label="장소" value={tournament.venue} />
             ) : null}
-            <InfoRow
-              label="참가비"
-              value={formatEntryFee(tournament.entryFee)}
-              valueColor="var(--blue500)"
-            />
-            <InfoRow
-              label="정원"
-              value={`${tournament.confirmedCount}/${tournament.teamCount}팀 확정`}
-            />
             <InfoRow
               label="선수단 규모"
               value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}

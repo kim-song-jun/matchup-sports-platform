@@ -67,26 +67,22 @@ async function call(method, path, who, body) {
   const cf1 = await call('PATCH', `/admin/registrations/${reg1}/confirm`, ADMIN, { decision: 'confirm' });
   check('admin confirm → confirmed', cf1.data?.status === 'confirmed', JSON.stringify(cf1.json));
 
-  // ── 3. 팀 102 등록 → PG 결제 흐름 ────────────────────────────────────────
+  // ── 3. 팀 102 등록 → bank_transfer 결제 흐름 (PG 미운영 — 계좌이체만) ────────
   const r2 = await call('POST', `/tournaments/${tid}/registrations`, MGR102, { teamId: TEAM102 });
   const reg2 = r2.data?.id;
   check('reg team102 → draft', r2.data?.status === 'draft', JSON.stringify(r2.json));
 
-  await call('POST', `/tournaments/${tid}/registrations/${reg2}/submit`, MGR102, {
-    paymentMethod: 'pg',
+  const s2 = await call('POST', `/tournaments/${tid}/registrations/${reg2}/submit`, MGR102, {
+    paymentMethod: 'bank_transfer',
+    depositorName: '이호스트',
     agreedRules: true,
     agreedPrivacy: true,
     agreedRefund: true,
   });
-  const prep = await call('POST', `/tournaments/${tid}/registrations/${reg2}/payment/prepare`, MGR102);
-  check('pg prepare → paymentKey', !!prep.data?.paymentKey, JSON.stringify(prep.json));
+  check('submit bank team102 → awaiting_payment', s2.data?.status === 'awaiting_payment', JSON.stringify(s2.json));
 
-  const pgConf = await call('POST', `/tournaments/${tid}/registrations/${reg2}/payment/confirm`, MGR102, {
-    paymentKey: prep.data?.paymentKey,
-    orderId: prep.data?.orderId,
-    amount: prep.data?.amount,
-  });
-  check('pg confirm → registration paid', pgConf.data?.status === 'paid' || pgConf.status === 201, `${pgConf.status} ${JSON.stringify(pgConf.json)}`);
+  const cp2 = await call('PATCH', `/admin/registrations/${reg2}/confirm-payment`, ADMIN, { note: '입금확인' });
+  check('admin confirm-payment team102 → 200', cp2.status === 200, `${cp2.status}`);
 
   const cf2 = await call('PATCH', `/admin/registrations/${reg2}/confirm`, ADMIN, { decision: 'confirm' });
   check('admin confirm team102 → confirmed', cf2.data?.status === 'confirmed', JSON.stringify(cf2.json));

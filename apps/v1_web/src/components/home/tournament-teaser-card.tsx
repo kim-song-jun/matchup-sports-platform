@@ -38,9 +38,12 @@ export function TournamentTeaserCard() {
             {featured ? featured.title : '상금 걸린 풋살 대회, 팀과 함께 도전!'}
           </div>
           <div className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 3 }}>
-            {featured
-              ? [dateLabel, `${featured.confirmedCount}/${featured.teamCount}팀 확정`].filter(Boolean).join(' · ')
-              : '조별리그 → 토너먼트 · 곧 오픈 예정이에요'}
+            {featured ? (
+              <>
+                {dateLabel && <>{dateLabel} · </>}
+                <span className="tab-num">{featured.confirmedCount}/{featured.teamCount}</span>팀 확정
+              </>
+            ) : '조별리그 → 토너먼트 · 곧 오픈 예정이에요'}
           </div>
         </div>
 

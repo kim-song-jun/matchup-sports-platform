@@ -188,11 +188,10 @@ export default function AdminTournamentsNewPage() {
                 />
               </FormField>
 
-              <FormField id="scheduled-at" label="대회 일정" hint="형식: YYYY.MM.DD HH:MM">
+              <FormField id="scheduled-at" label="대회 일정" hint="캘린더에서 날짜·시간을 선택하세요">
                 <input
                   id="scheduled-at"
                   type="datetime-local"
-                  lang="ko"
                   value={scheduledAt}
                   onChange={(e) => setScheduledAt(e.target.value)}
                   disabled={isPending}
@@ -200,11 +199,10 @@ export default function AdminTournamentsNewPage() {
                 />
               </FormField>
 
-              <FormField id="registration-deadline-at" label="신청 마감일" hint="형식: YYYY.MM.DD HH:MM">
+              <FormField id="registration-deadline-at" label="신청 마감일" hint="캘린더에서 날짜·시간을 선택하세요">
                 <input
                   id="registration-deadline-at"
                   type="datetime-local"
-                  lang="ko"
                   value={registrationDeadlineAt}
                   onChange={(e) => setRegistrationDeadlineAt(e.target.value)}
                   disabled={isPending}

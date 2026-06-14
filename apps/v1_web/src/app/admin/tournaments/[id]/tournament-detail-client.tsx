@@ -778,11 +778,11 @@ function BracketTab({
   if (isPending) return <AdminTableSkeleton cols={4} />;
   if (isError) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 py-8 px-4 text-center">
+      <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 text-center">
         <p className="text-sm text-red-500 mb-3">
           {extractErrorMessage(error, '대진 정보를 불러오지 못했어요.')}
         </p>
-        <button type="button" onClick={() => void refetch()} className="text-sm text-blue-500 hover:text-blue-600 underline min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded">
+        <button type="button" onClick={() => void refetch()} className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded">
           다시 시도하기
         </button>
       </div>
@@ -797,10 +797,10 @@ function BracketTab({
 
       {/* ── 조 만들기 ───────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[14px] font-bold text-gray-800 mb-4">조 만들기</h3>
+        <h3 className="text-[15px] font-bold text-gray-900 mb-4">조 만들기</h3>
         <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row gap-3">
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-name" className="text-[12px] font-semibold text-gray-600 sr-only">
+            <label htmlFor="group-name" className="text-[13px] font-semibold text-gray-700 sr-only">
               조 이름
             </label>
             <input
@@ -815,7 +815,7 @@ function BracketTab({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-phase" className="text-[12px] font-semibold text-gray-600 sr-only">
+            <label htmlFor="group-phase" className="text-[13px] font-semibold text-gray-700 sr-only">
               단계
             </label>
             <select
@@ -845,10 +845,10 @@ function BracketTab({
       {/* ── 팀 배정 ─────────────────────────────────────────────────── */}
       {groups.length > 0 && confirmedRegistrations.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-          <h3 className="text-[14px] font-bold text-gray-800 mb-4">팀 배정</h3>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-4">팀 배정</h3>
           <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row gap-3">
             <div className="flex flex-col gap-1">
-              <label htmlFor="assign-group" className="text-[12px] font-semibold text-gray-600 sr-only">
+              <label htmlFor="assign-group" className="text-[13px] font-semibold text-gray-700 sr-only">
                 조 선택
               </label>
               <select
@@ -865,7 +865,7 @@ function BracketTab({
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="assign-team" className="text-[12px] font-semibold text-gray-600 sr-only">
+              <label htmlFor="assign-team" className="text-[13px] font-semibold text-gray-700 sr-only">
                 팀 선택
               </label>
               <select
@@ -896,12 +896,12 @@ function BracketTab({
       {groups.length > 0 && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-[14px] font-bold text-gray-800">조별 순위표</h3>
+            <h3 className="text-[15px] font-bold text-gray-900">조별 순위표</h3>
             <button
               type="button"
               onClick={handleRecalculate}
               disabled={recalculate.isPending}
-              className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <RefreshCw size={13} aria-hidden="true" />
               순위 재계산
@@ -975,19 +975,19 @@ function BracketTab({
 
       {/* ── 픽스처 만들기 ────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[14px] font-bold text-gray-800 mb-4">픽스처 만들기</h3>
+        <h3 className="text-[15px] font-bold text-gray-900 mb-4">픽스처 만들기</h3>
         <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-round" className="text-[12px] font-semibold text-gray-600">라운드</label>
+            <label htmlFor="fixture-round" className="text-[13px] font-semibold text-gray-700">라운드</label>
             <input id="fixture-round" type="text" value={fixtureRound} onChange={(e) => setFixtureRound(e.target.value)} placeholder="예: 조별 1라운드" disabled={createFixture.isPending} maxLength={30} className={inputCls} />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-number" className="text-[12px] font-semibold text-gray-600">번호</label>
+            <label htmlFor="fixture-number" className="text-[13px] font-semibold text-gray-700">번호</label>
             <input id="fixture-number" type="number" min="1" value={fixtureNumber} onChange={(e) => setFixtureNumber(e.target.value)} disabled={createFixture.isPending} className={inputCls} />
           </div>
           {groups.length > 0 && (
             <div className="flex flex-col gap-1">
-              <label htmlFor="fixture-group" className="text-[12px] font-semibold text-gray-600">소속 조 (선택)</label>
+              <label htmlFor="fixture-group" className="text-[13px] font-semibold text-gray-700">소속 조 (선택)</label>
               <select id="fixture-group" value={fixtureGroupId} onChange={(e) => setFixtureGroupId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
                 <option value="">조 없음</option>
                 {groups.map((g) => (<option key={g.id} value={g.id}>{g.name}</option>))}
@@ -995,14 +995,14 @@ function BracketTab({
             </div>
           )}
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-home" className="text-[12px] font-semibold text-gray-600">홈 팀 (선택)</label>
+            <label htmlFor="fixture-home" className="text-[13px] font-semibold text-gray-700">홈 팀 (선택)</label>
             <select id="fixture-home" value={fixtureHomeRegId} onChange={(e) => setFixtureHomeRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
               <option value="">미정</option>
               {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-away" className="text-[12px] font-semibold text-gray-600">어웨이 팀 (선택)</label>
+            <label htmlFor="fixture-away" className="text-[13px] font-semibold text-gray-700">어웨이 팀 (선택)</label>
             <select id="fixture-away" value={fixtureAwayRegId} onChange={(e) => setFixtureAwayRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
               <option value="">미정</option>
               {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
@@ -1019,7 +1019,7 @@ function BracketTab({
       {/* ── 픽스처 목록 (f13: AdminDataTable — 모바일 card reflow 자동 적용) ── */}
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-[14px] font-bold text-gray-800">픽스처 목록</h3>
+          <h3 className="text-[15px] font-bold text-gray-900">픽스처 목록</h3>
           <AdminDataTable<V1AdminBracketFixture>
             columns={[
               {
@@ -1237,7 +1237,7 @@ function AnnouncementsTab({
     <div className="flex flex-col gap-6">
       {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[14px] font-bold text-gray-800 mb-4">공지 작성</h3>
+        <h3 className="text-[15px] font-bold text-gray-900 mb-4">공지 작성</h3>
         <form onSubmit={handleCreate} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="ann-title" className="text-[13px] font-semibold text-gray-700">

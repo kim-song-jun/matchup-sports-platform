@@ -112,8 +112,7 @@ function TournamentsListContent() {
               className="tm-text-micro"
               style={{
                 color: 'rgba(255,255,255,0.75)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.12em',
+                letterSpacing: '-0.2px',
               }}
             >
               상금 대회
@@ -136,7 +135,9 @@ function TournamentsListContent() {
 
       {/* ── Tournament list ── */}
       <section aria-labelledby="tournament-list-heading" style={{ marginTop: 28 }}>
-        <SectionTitle title="대회 목록" />
+        <div style={{ marginLeft: -20, marginRight: -20 }}>
+          <SectionTitle title="대회 목록" />
+        </div>
         <div id="tournament-list-heading" className="sr-only">대회 목록</div>
 
         {isLoading ? (

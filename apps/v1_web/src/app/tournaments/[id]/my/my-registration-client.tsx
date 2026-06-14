@@ -206,7 +206,9 @@ function RegistrationDetailView({
       <div style={{ padding: '0 20px 32px', marginTop: 16 }}>
         {/* Status card */}
         <section aria-labelledby="reg-status-heading">
-          <SectionTitle title="신청 상태" />
+          <div style={{ marginLeft: -20, marginRight: -20 }}>
+            <SectionTitle title="신청 상태" />
+          </div>
           <Card pad={16} style={{ marginTop: 8 }}>
             <div id="reg-status-heading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
@@ -239,7 +241,9 @@ function RegistrationDetailView({
 
         {/* Payment info */}
         <section aria-labelledby="payment-info-heading" style={{ marginTop: 16 }}>
-          <SectionTitle id="payment-info-heading" title="결제 정보" />
+          <div style={{ marginLeft: -20, marginRight: -20 }}>
+            <SectionTitle id="payment-info-heading" title="결제 정보" />
+          </div>
           <Card pad={16} style={{ marginTop: 8 }}>
             {registration.payment ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -276,7 +280,9 @@ function RegistrationDetailView({
 
         {/* Roster */}
         <section aria-labelledby="roster-heading" style={{ marginTop: 16 }}>
-          <SectionTitle id="roster-heading" title="선수 명단" />
+          <div style={{ marginLeft: -20, marginRight: -20 }}>
+            <SectionTitle id="roster-heading" title="선수 명단" />
+          </div>
           <Card pad={16} style={{ marginTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
@@ -372,8 +378,15 @@ function InfoRow({
 }) {
   return (
     <div
-      className="tm-info-row"
-      style={{ padding: '0', ...(isLast ? { borderBottom: 'none' } : {}) }}
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 14,
+        paddingTop: 10,
+        paddingBottom: 10,
+        borderBottom: isLast ? 'none' : '1px solid var(--grey100)',
+      }}
     >
       <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
         {label}

@@ -321,7 +321,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
   );
 
   return (
-    <article style={{ padding: `0 20px ${bottomPad}px` }}>
+    <article style={{ paddingBottom: bottomPad }}>
       {/* ── Desktop back navigation (hidden on mobile via .tm-show-desktop) ── */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link
@@ -338,7 +338,12 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
       {/* Reuses .tm-match-detail-desktop-layout (matches.css @media ≥1024px:
           grid-template-columns 1fr 360px, gap 32px). */}
       <div className="tm-match-detail-desktop-layout">
-        {/* Left column: all body content */}
+        {/* Left column: all body content.
+            Horizontal padding comes solely from .tm-match-detail-body (globals.css: 20px),
+            which matches the .tm-fixed-cta gutter (--v1-shell-page-x: 20px).
+            article no longer adds its own 20px so there is no 20+20=40px double-gutter
+            on mobile. The desktop override (matches.css:175) zeroes body padding, so the
+            desktop grid gap provides the breathing room instead. */}
         <div className="tm-match-detail-body">
           {bodyContent}
         </div>

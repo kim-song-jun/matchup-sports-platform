@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import {
   useV1TournamentPlayers,
   useV1Tournament,
@@ -452,10 +452,14 @@ export function TournamentRosterPageClient({
 
         {/* Roster header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <SectionTitle
-            title={`선수 명단 (${players.length}명)`}
-            sub={`최소 ${minPlayers}명 · 최대 ${maxPlayers}명`}
-          />
+          <div>
+            <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>
+              {`선수 명단 (${players.length}명)`}
+            </div>
+            <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+              {`최소 ${minPlayers}명 · 최대 ${maxPlayers}명`}
+            </div>
+          </div>
           {!isRosterLocked && !showAddForm && !atMax ? (
             <button
               type="button"

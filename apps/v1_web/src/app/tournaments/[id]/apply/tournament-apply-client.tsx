@@ -83,7 +83,9 @@ function TeamSelectStep({
   return (
     <div style={{ padding: '0 20px 120px' }}>
       <section aria-labelledby="team-select-heading" style={{ marginTop: 20 }}>
-        <SectionTitle id="team-select-heading" title="참가 팀 선택" />
+        <div style={{ marginLeft: -20, marginRight: -20 }}>
+          <SectionTitle id="team-select-heading" title="참가 팀 선택" />
+        </div>
         <p
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', marginTop: 4, marginBottom: 12, lineHeight: 1.6 }}
@@ -174,7 +176,9 @@ function TeamSelectStep({
                         {team.logoUrl ? (
                           <img src={team.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          '⚽'
+                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-caption)' }}>
+                            {team.name?.charAt(0)}
+                          </span>
                         )}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -316,7 +320,9 @@ function AgreementsStep({
     <div style={{ padding: '0 20px 120px' }}>
       {/* Required consents */}
       <section aria-labelledby="consent-heading" style={{ marginTop: 20 }}>
-        <SectionTitle id="consent-heading" title="필수 동의" />
+        <div style={{ marginLeft: -20, marginRight: -20 }}>
+          <SectionTitle id="consent-heading" title="필수 동의" />
+        </div>
         <Card pad={0} style={{ marginTop: 8 }}>
           <CheckRow
             id="agree-rules"
@@ -343,7 +349,9 @@ function AgreementsStep({
 
       {/* Optional consents */}
       <section aria-labelledby="optional-consent-heading" style={{ marginTop: 16 }}>
-        <SectionTitle id="optional-consent-heading" title="선택 동의" />
+        <div style={{ marginLeft: -20, marginRight: -20 }}>
+          <SectionTitle id="optional-consent-heading" title="선택 동의" />
+        </div>
         <Card pad={0} style={{ marginTop: 8 }}>
           <CheckRow
             id="agree-media"
@@ -356,7 +364,9 @@ function AgreementsStep({
 
       {/* Payment method */}
       <section aria-labelledby="payment-method-heading" style={{ marginTop: 16 }}>
-        <SectionTitle id="payment-method-heading" title="결제 수단" />
+        <div style={{ marginLeft: -20, marginRight: -20 }}>
+          <SectionTitle id="payment-method-heading" title="결제 수단" />
+        </div>
         <div
           role="radiogroup"
           aria-labelledby="payment-method-heading"
@@ -589,7 +599,9 @@ function PaymentGuideStep({
     return (
       <div style={{ padding: '0 20px 120px' }}>
         <section aria-labelledby="bank-guide-heading" style={{ marginTop: 20 }}>
-          <SectionTitle title="입금 안내" />
+          <div style={{ marginLeft: -20, marginRight: -20 }}>
+            <SectionTitle title="입금 안내" />
+          </div>
           <Card pad={16} style={{ marginTop: 8 }}>
             <div
               id="bank-guide-heading"
@@ -662,7 +674,9 @@ function PaymentGuideStep({
   return (
     <div style={{ padding: '0 20px 120px' }}>
       <section aria-labelledby="pg-guide-heading" style={{ marginTop: 20 }}>
-        <SectionTitle title="결제하기" />
+        <div style={{ marginLeft: -20, marginRight: -20 }}>
+          <SectionTitle title="결제하기" />
+        </div>
         <Card pad={16} style={{ marginTop: 8 }}>
           <div
             id="pg-guide-heading"

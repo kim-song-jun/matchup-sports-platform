@@ -1281,6 +1281,8 @@ export type V1AnnouncementAudience =
 export type V1TournamentListItem = {
   id: string;
   sportId: string;
+  /** Enriched sport object — code + name; sportId retained for back-compat */
+  sport: { code: string; name: string };
   title: string;
   status: V1TournamentStatus;
   format: V1TournamentFormat;
@@ -1388,6 +1390,8 @@ export type V1TournamentAnnouncement = {
 export type V1TournamentDetail = {
   id: string;
   sportId: string;
+  /** Enriched sport object — code + name; sportId retained for back-compat */
+  sport: { code: string; name: string };
   title: string;
   status: V1TournamentStatus;
   format: V1TournamentFormat;

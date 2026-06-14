@@ -23,6 +23,7 @@ function tournamentCard(overrides: Record<string, unknown> = {}) {
   return {
     id: 'tournament-1',
     sportId: 'sport-1',
+    sport: { code: 'futsal', name: '풋살' },
     title: '봄 풋살 대회',
     status: 'open',
     registrationDeadlineAt: null,
@@ -42,6 +43,7 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'tournament-1',
     sportId: 'sport-1',
+    sport: { code: 'futsal', name: '풋살' },
     title: '봄 풋살 대회',
     status: 'open',
     registrationDeadlineAt: null,
@@ -103,6 +105,8 @@ describe('TournamentsReadService', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
       id: 'tournament-1',
+      sportId: 'sport-1',
+      sport: { code: 'futsal', name: '풋살' },
       status: 'open',
       confirmedCount: 3,
       entryFee: 60000,
@@ -252,6 +256,8 @@ describe('TournamentsReadService', () => {
 
     expect(result).toMatchObject({
       id: 'tournament-1',
+      sportId: 'sport-1',
+      sport: { code: 'futsal', name: '풋살' },
       confirmedCount: 4,
     });
     expect(result.groups).toHaveLength(1);

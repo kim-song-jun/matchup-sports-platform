@@ -10,6 +10,7 @@ import {
   useV1Registration,
   useV1AddPlayer,
   useV1RemovePlayer,
+  useV1TeamMembers,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TournamentPlayer, V1PlayerEligibilityStatus } from '@/types/api';
@@ -56,18 +57,37 @@ const EMPTY_FORM: AddPlayerFormState = {
   eligibilityStatus: 'non_pro',
 };
 
+/* Role label helper for the member picker */
+function memberRoleLabel(role: 'owner' | 'manager' | 'member'): string {
+  switch (role) {
+    case 'owner': return '팀장';
+    case 'manager': return '매니저';
+    case 'member': return '멤버';
+  }
+}
+
 function AddPlayerForm({
+  teamId,
   onSubmit,
   onCancel,
   isSubmitting,
   error,
 }: {
+  teamId: string;
   onSubmit: (data: AddPlayerFormState) => void;
   onCancel: () => void;
   isSubmitting: boolean;
   error: string | null;
 }) {
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
+
+  const {
+    data: membersData,
+    isLoading: membersLoading,
+    isError: membersError,
+  } = useV1TeamMembers(teamId);
+
+  const members = membersData?.items ?? [];
 
   function patch(partial: Partial<AddPlayerFormState>) {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -82,24 +102,47 @@ function AddPlayerForm({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* userId input — team member hook not available here, so userId is entered directly.
-            TODO: When a team-member search hook is available, replace this text field with
-            a dropdown of team members keyed by teamId from the registration. */}
-        <FormField
-          id="player-userid"
-          label="사용자 ID"
-          required
-          hint="팀원의 사용자 ID를 입력해 주세요."
-        >
-          <input
-            id="player-userid"
-            type="text"
-            value={form.userId}
-            onChange={(e) => patch({ userId: e.target.value.trim() })}
-            placeholder="userId 입력"
-            className="tm-input"
-            aria-required="true"
-          />
+        {/* Team member picker — replaces raw userId text input */}
+        <FormField id="player-member" label="팀원 선택" required>
+          {membersLoading ? (
+            <div
+              className="tm-input"
+              style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', minHeight: 44 }}
+              aria-busy="true"
+            >
+              팀원 목록 불러오는 중…
+            </div>
+          ) : membersError ? (
+            <div
+              className="tm-input"
+              style={{ color: 'var(--red500)', display: 'flex', alignItems: 'center', minHeight: 44 }}
+            >
+              팀원 목록을 불러오지 못했어요.
+            </div>
+          ) : members.length === 0 ? (
+            <div
+              className="tm-input"
+              style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', minHeight: 44 }}
+            >
+              팀원이 없어요.
+            </div>
+          ) : (
+            <select
+              id="player-member"
+              value={form.userId}
+              onChange={(e) => patch({ userId: e.target.value })}
+              className="tm-input"
+              style={{ minHeight: 44 }}
+              aria-required="true"
+            >
+              <option value="">팀원을 선택해 주세요</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.displayName} ({memberRoleLabel(m.role)})
+                </option>
+              ))}
+            </select>
+          )}
         </FormField>
 
         <FormField id="player-realname" label="실명" required>
@@ -486,6 +529,7 @@ export function TournamentRosterPageClient({
         {showAddForm && !isRosterLocked ? (
           <div style={{ marginBottom: 14 }}>
             <AddPlayerForm
+              teamId={registration?.teamId ?? ''}
               onSubmit={handleAddPlayer}
               onCancel={() => { setShowAddForm(false); setAddError(null); }}
               isSubmitting={addPlayer.isPending}

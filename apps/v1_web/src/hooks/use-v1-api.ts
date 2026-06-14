@@ -560,9 +560,9 @@ export function useV1MyTeams(filters?: ListFilters) {
   });
 }
 
-export function useV1TeamMembers(teamId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
+export function useV1TeamMembers(teamId: string | null, filters?: ListFilters, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: [...v1Keys.team(teamId), 'members', filters ?? {}] as const,
+    queryKey: [...v1Keys.team(teamId ?? ''), 'members', filters ?? {}] as const,
     queryFn: () => v1Get<V1TeamMembersPage>(`/teams/${teamId}/members`, filters),
     enabled: Boolean(teamId) && (options?.enabled ?? true),
   });

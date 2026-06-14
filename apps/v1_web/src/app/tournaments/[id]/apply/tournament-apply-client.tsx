@@ -37,6 +37,7 @@ const STEPS: Array<{ id: ApplyStep; label: string }> = [
 
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
+  const nextStep = STEPS[currentIndex + 1];
   // stepNumber is 1-based; bars are active for index <= currentIndex (1-based: item <= currentIndex+1)
   return (
     <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
@@ -53,6 +54,15 @@ function StepIndicator({ current }: { current: ApplyStep }) {
           />
         ))}
       </div>
+      {nextStep ? (
+        <p
+          className="tm-text-micro"
+          aria-label={`다음 단계: ${nextStep.label}`}
+          style={{ marginTop: 6, color: 'var(--text-caption)', textAlign: 'right' }}
+        >
+          다음: {nextStep.label}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -777,7 +787,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   return (
     <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
-      <div className="tm-tournament-apply-body">
+      <div
+        className="tm-tournament-apply-body"
+        style={{ maxWidth: 'var(--v1-app-chrome-frame-width)', marginInline: 'auto', width: '100%' }}
+      >
       <StepIndicator current={step} />
 
       {step === 'team' ? (

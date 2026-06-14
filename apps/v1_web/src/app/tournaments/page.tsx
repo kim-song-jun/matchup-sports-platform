@@ -7,6 +7,7 @@ import { Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/p
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { getSportAccent } from '@/lib/v1-sport-accent';
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 export default function TournamentsPage() {
@@ -187,6 +188,7 @@ function TournamentsListContent() {
 
 function TournamentCard({ item }: { item: V1TournamentListItem }) {
   const status = getTournamentStatusConfig(item.status);
+  const sportAccent = getSportAccent(item.sport.code);
 
   return (
     <div role="listitem">
@@ -194,7 +196,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
         className="tm-card tm-pressable"
         href={`/tournaments/${item.id}`}
         style={{ display: 'block', padding: '16px 16px 14px', textDecoration: 'none' }}
-        aria-label={`${item.title} — ${status.label}`}
+        aria-label={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
         {/* Top row: title + status badge */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
@@ -209,16 +211,58 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           </span>
         </div>
 
-        {/* Meta row */}
+        {/* Sport identity chip + meta row */}
         <div
-          className="tm-text-caption"
-          style={{ marginTop: 6, color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 10px' }}
+          style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px' }}
         >
+          {/* Sport chip: colored dot + Korean label */}
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: sportAccent.badgeBg,
+              flexShrink: 0,
+            }}
+            aria-label={`종목: ${sportAccent.label}`}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: sportAccent.dot,
+                flexShrink: 0,
+              }}
+            />
+            <span
+              className="tm-text-caption"
+              style={{ color: sportAccent.badgeText, fontWeight: 600, lineHeight: 1 }}
+            >
+              {sportAccent.label}
+            </span>
+          </span>
+
+          {/* Date + venue */}
           {item.scheduledAt ? (
-            <span>{formatTournamentDate(item.scheduledAt)}</span>
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              {formatTournamentDate(item.scheduledAt)}
+            </span>
           ) : null}
           {item.venue ? (
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+            <span
+              className="tm-text-caption"
+              style={{
+                color: 'var(--text-muted)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: 160,
+              }}
+            >
               {item.venue}
             </span>
           ) : null}

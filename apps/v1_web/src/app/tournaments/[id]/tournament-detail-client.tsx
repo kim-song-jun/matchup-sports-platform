@@ -6,6 +6,7 @@ import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import type {
   V1TournamentDetail,
@@ -180,6 +181,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 
 function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }) {
   const status = getTournamentStatusConfig(tournament.status);
+  const sportAccent = getSportAccent(tournament.sport.code);
   const hasAnnouncements = tournament.announcements.length > 0;
   const isOpen = tournament.status === 'open';
   const isFull = tournament.confirmedCount >= tournament.teamCount;
@@ -218,6 +220,31 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
               </span>
               <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
                 {getFormatLabel(tournament.format)}
+              </span>
+              {/* Sport identity chip — color dot + Korean label (color + text, not color-only) */}
+              <span
+                className="tm-badge"
+                aria-label={`종목: ${sportAccent.label}`}
+                style={{
+                  background: sportAccent.badgeBg,
+                  color: sportAccent.badgeText,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: sportAccent.dot,
+                    flexShrink: 0,
+                    display: 'inline-block',
+                  }}
+                />
+                {sportAccent.label}
               </span>
             </div>
           </div>

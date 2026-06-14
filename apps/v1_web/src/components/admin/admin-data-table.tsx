@@ -30,6 +30,13 @@ interface AdminDataTableProps<T> {
   onRetry?: () => void;
   /** Number of skeleton rows shown while loading (default: 5) */
   skeletonRows?: number;
+  /**
+   * When true, wraps the mobile card list in an overflow-x:auto container
+   * and applies a min-width to the table so stat-heavy tables don't reflow
+   * into tall stacks on narrow screens.
+   * Default false — existing behaviour unchanged.
+   */
+  scrollOnMobile?: boolean;
 }
 
 // ── Alignment utility ─────────────────────────────────────────────────────
@@ -51,6 +58,7 @@ export function AdminDataTable<T>({
   error,
   onRetry,
   skeletonRows = 5,
+  scrollOnMobile = false,
 }: AdminDataTableProps<T>) {
   // Error state
   if (error) {
@@ -154,28 +162,55 @@ export function AdminDataTable<T>({
       </div>
 
       {/* ── Mobile card list (<lg) ───────────────────────────────────────── */}
-      <ul className="lg:hidden flex flex-col gap-2" role="list">
-        {rows.map((row) => (
-          <li
-            key={keyExtractor(row)}
-            className="bg-white rounded-xl border border-gray-100 px-4 py-3"
-          >
-            <dl className="flex flex-col gap-1.5">
-              {columns.map((col) => (
-                <div key={col.key} className="flex items-start gap-2 text-[13px]">
-                  <dt className="shrink-0 text-gray-400 w-[90px] font-medium">{col.header}</dt>
-                  <dd className="text-gray-800 flex-1 tabular-nums">{col.render(row)}</dd>
+      {scrollOnMobile ? (
+        <div className="lg:hidden overflow-x-auto -mx-4 px-4">
+          <ul className="flex flex-col gap-2 min-w-[480px]" role="list">
+            {rows.map((row) => (
+              <li
+                key={keyExtractor(row)}
+                className="bg-white rounded-xl border border-gray-100 px-4 py-3"
+              >
+                <dl className="flex flex-col gap-1.5">
+                  {columns.map((col) => (
+                    <div key={col.key} className="flex items-start gap-2 text-[13px]">
+                      <dt className="shrink-0 text-gray-400 w-[90px] font-medium">{col.header}</dt>
+                      <dd className="text-gray-800 flex-1 tabular-nums">{col.render(row)}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {hasActions && (
+                  <div className="mt-3 flex items-center gap-2 justify-end border-t border-gray-50 pt-2.5">
+                    {renderActions!(row)}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <ul className="lg:hidden flex flex-col gap-2" role="list">
+          {rows.map((row) => (
+            <li
+              key={keyExtractor(row)}
+              className="bg-white rounded-xl border border-gray-100 px-4 py-3"
+            >
+              <dl className="flex flex-col gap-1.5">
+                {columns.map((col) => (
+                  <div key={col.key} className="flex items-start gap-2 text-[13px]">
+                    <dt className="shrink-0 text-gray-400 w-[90px] font-medium">{col.header}</dt>
+                    <dd className="text-gray-800 flex-1 tabular-nums">{col.render(row)}</dd>
+                  </div>
+                ))}
+              </dl>
+              {hasActions && (
+                <div className="mt-3 flex items-center gap-2 justify-end border-t border-gray-50 pt-2.5">
+                  {renderActions!(row)}
                 </div>
-              ))}
-            </dl>
-            {hasActions && (
-              <div className="mt-3 flex items-center gap-2 justify-end border-t border-gray-50 pt-2.5">
-                {renderActions!(row)}
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }

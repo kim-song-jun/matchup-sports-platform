@@ -958,15 +958,43 @@ function BracketTab({
                 render: (s) => <span className="tabular-nums font-semibold text-blue-600">{s.points}</span>,
               },
             ];
+            // #6a: knockout phases (semi/final/third_place) with no teams → slim hint row
+            //       group phase keeps AdminEmpty as-is (different table-level empty is fine)
+            const isKnockout = group.phase === 'semi' || group.phase === 'final' || group.phase === 'third_place';
+            const knockoutEmpty = isKnockout && standings.length === 0;
+
             return (
               <div key={group.id} className="flex flex-col gap-2">
                 <h4 className="tm-text-label font-bold text-[color:var(--text-muted)] px-1">{group.name}</h4>
-                <AdminDataTable<V1AdminBracketStanding>
-                  columns={standingColumns}
-                  rows={standings}
-                  keyExtractor={(s) => s.id}
-                  empty={<AdminEmpty title="팀이 없어요" description="배정된 팀이 없어요." />}
-                />
+                {knockoutEmpty ? (
+                  // #6a: single slim inline hint instead of tall AdminEmpty box
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-dashed border-gray-200">
+                    <span className="tm-text-caption text-[color:var(--text-caption)]" aria-label={`${group.name} 팀 배정 안내`}>
+                      아직 배정된 팀이 없어요
+                    </span>
+                    <span className="tm-text-caption text-[color:var(--text-caption)]" aria-hidden="true">·</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAssignGroupId(group.id);
+                        const el = document.getElementById('assign-group');
+                        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el?.focus();
+                      }}
+                      className="tm-text-caption text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] inline-flex items-center px-1 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                    >
+                      팀 배정하기
+                    </button>
+                  </div>
+                ) : (
+                  <AdminDataTable<V1AdminBracketStanding>
+                    columns={standingColumns}
+                    rows={standings}
+                    keyExtractor={(s) => s.id}
+                    scrollOnMobile
+                    empty={<AdminEmpty title="팀이 없어요" description="배정된 팀이 없어요." />}
+                  />
+                )}
               </div>
             );
           })}
@@ -1020,7 +1048,9 @@ function BracketTab({
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
           <h3 className="tm-text-body font-bold text-[color:var(--text-strong)]">픽스처 목록</h3>
+          {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens */}
           <AdminDataTable<V1AdminBracketFixture>
+            scrollOnMobile
             columns={[
               {
                 key: 'round',
@@ -1459,6 +1489,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       />
 
       {/* ── Status change actions (f9: separate row, flex-wrap, h-[44px]) ── */}
+      {/* #5: forward transitions = solid blue (primary); 취소하기 = outline red-text (not solid) */}
       {canWrite && nextStatuses.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {nextStatuses.map((s) => {
@@ -1468,7 +1499,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               s === 'closed' ? '접수 마감하기' :
               s === 'in_progress' ? '대회 시작하기' :
               s === 'completed' ? '대회 완료 처리' :
-              s === 'cancelled' ? '대회 취소하기' :
+              s === 'cancelled' ? '취소하기' :
               `${TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경`;
             return (
               <button
@@ -1481,7 +1512,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                   'transition-colors disabled:opacity-50',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap',
                   isDestructive
-                    ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                    ? 'text-red-600 border border-red-200 bg-transparent hover:bg-red-50'
                     : 'text-white bg-blue-500 hover:bg-blue-600',
                 ].join(' ')}
               >

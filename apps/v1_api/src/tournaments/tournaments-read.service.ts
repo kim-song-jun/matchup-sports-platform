@@ -32,6 +32,7 @@ export class TournamentsReadService {
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: {
+        sport: { select: { code: true, name: true } },
         _count: {
           select: {
             registrations: {
@@ -65,6 +66,7 @@ export class TournamentsReadService {
     const row = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null, status: PUBLIC_STATUSES },
       include: {
+        sport: { select: { code: true, name: true } },
         groups: {
           orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }],
           include: {
@@ -122,6 +124,7 @@ export class TournamentsReadService {
     return {
       id: row.id,
       sportId: row.sportId,
+      sport: { code: row.sport.code, name: row.sport.name },
       title: row.title,
       status: row.status,
       format: row.format,
@@ -207,6 +210,7 @@ export class TournamentsReadService {
     row: {
       id: string;
       sportId: string;
+      sport: { code: string; name: string };
       title: string;
       status: string;
       format: string;
@@ -223,6 +227,7 @@ export class TournamentsReadService {
     return {
       id: row.id,
       sportId: row.sportId,
+      sport: { code: row.sport.code, name: row.sport.name },
       title: row.title,
       status: row.status,
       format: row.format,

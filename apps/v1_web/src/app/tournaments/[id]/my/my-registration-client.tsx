@@ -9,6 +9,7 @@ import {
   useV1MyRegistration,
   useV1TournamentPlayers,
   useV1CancelRegistrationRequest,
+  useV1Team,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type {
@@ -67,6 +68,130 @@ function formatDateShort(dateStr: string | null): string {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatMonthDay(dateStr: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+/* ── Inline check icon (no CheckIcon in icons.tsx) ── */
+
+function CheckCircleIcon({
+  size = 28,
+  color,
+}: {
+  size?: number;
+  color: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+/* ── Confirmation hero card ── */
+
+function RegistrationHero({
+  status,
+  teamName,
+  scheduledAt,
+  venue,
+}: {
+  status: V1TournamentRegistrationStatus;
+  teamName: string | null;
+  scheduledAt: string | null;
+  venue: string | null;
+}) {
+  if (status !== 'confirmed' && status !== 'waitlisted') return null;
+
+  const isConfirmed = status === 'confirmed';
+
+  const bgColor = isConfirmed ? 'var(--green50)' : 'var(--orange50)';
+  const iconColor = isConfirmed ? 'var(--green500)' : 'var(--orange500)';
+  const heading = isConfirmed ? '참가가 확정됐어요!' : '대기자 명단에 등록됐어요';
+  const dateStr = formatMonthDay(scheduledAt);
+  const dateParts = [dateStr, venue].filter(Boolean);
+  const caption = isConfirmed
+    ? dateParts.length > 0
+      ? `${dateParts.join(', ')}에서 만나요`
+      : '곧 대회 일정을 확인해 주세요.'
+    : '앞 순위 팀이 취소하면 자동으로 확정 알림을 드려요.';
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        background: bgColor,
+        borderRadius: 16,
+        padding: '24px 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        gap: 10,
+        marginBottom: 24,
+      }}
+    >
+      {/* White circle with check */}
+      <div
+        aria-hidden="true"
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: '50%',
+          background: 'var(--static-white)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <CheckCircleIcon size={28} color={iconColor} />
+      </div>
+
+      {/* Team name (small, dark green / dark orange) */}
+      {teamName ? (
+        <div
+          className="tm-text-caption"
+          style={{ color: iconColor, fontWeight: 600 }}
+        >
+          {teamName}
+        </div>
+      ) : null}
+
+      {/* Heading */}
+      <div
+        className="tm-text-body-lg"
+        style={{ color: 'var(--text-strong)', fontWeight: 700 }}
+      >
+        {heading}
+      </div>
+
+      {/* Caption */}
+      {caption ? (
+        <p
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}
+        >
+          {caption}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /* ── Cancel confirmation modal ── */
@@ -170,11 +295,19 @@ function RegistrationDetailView({
   registration,
 }: {
   tournamentId: string;
-  tournament: { title: string; entryFee: number; minPlayers: number; maxPlayers: number };
+  tournament: {
+    title: string;
+    entryFee: number;
+    minPlayers: number;
+    maxPlayers: number;
+    scheduledAt: string | null;
+    venue: string | null;
+  };
   registration: V1TournamentRegistration;
 }) {
   const { data: rosterData } = useV1TournamentPlayers(tournamentId, registration.id);
   const cancelRequest = useV1CancelRegistrationRequest(tournamentId, registration.id);
+  const { data: teamData } = useV1Team(registration.teamId);
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -204,6 +337,14 @@ function RegistrationDetailView({
     <>
       <div className="tm-tournament-my-body">
       <div style={{ padding: '0 20px 32px', marginTop: 16 }}>
+        {/* Confirmation hero — shown only for confirmed / waitlisted */}
+        <RegistrationHero
+          status={registration.status}
+          teamName={teamData?.name ?? null}
+          scheduledAt={tournament.scheduledAt}
+          venue={tournament.venue}
+        />
+
         {/* Status card */}
         <section aria-labelledby="reg-status-heading">
           <div style={{ marginLeft: -20, marginRight: -20 }}>
@@ -502,6 +643,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           entryFee: tournament.entryFee,
           minPlayers: tournament.minPlayers,
           maxPlayers: tournament.maxPlayers,
+          scheduledAt: tournament.scheduledAt,
+          venue: tournament.venue,
         }}
         registration={registration}
       />

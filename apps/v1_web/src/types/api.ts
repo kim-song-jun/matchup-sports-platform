@@ -1226,7 +1226,13 @@ export type V1AdminGrantResult = V1AdminRow;
 // Upload
 // ---------------------------------------------------------------------------
 
-/** POST /api/v1/uploads  (multipart/form-data, field 'files')  → { urls: string[] } */
+/**
+ * POST /api/v1/uploads — 이미지 업로드
+ *  - Content-Type : multipart/form-data
+ *  - 필드 이름    : 'files' (최대 5개, 개당 5 MB, jpeg/png/webp)
+ *  - 응답 형식   : ApiEnvelope<V1UploadImagesResult>  즉, `data: { urls: string[] }`
+ *                  urls 값은 루트-상대 경로(/uploads/…)이며 웹 앱이 next.config rewrite로 프록시합니다.
+ */
 export type V1UploadImagesResult = {
   urls: string[];
 };

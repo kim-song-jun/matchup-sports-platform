@@ -138,7 +138,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       });
   };
 
-  /* Chat button — always render, disabled with notice when not yet eligible */
+  /* Chat button — rendered only when showChat is true (approved/mine/pending).
+   * disabled + notice when chatEnabled is false (pending, not yet approved). */
   const chatButton = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!chatEnabled || model.chatPending} onClick={model.onChat}>
@@ -570,11 +571,10 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
           ))}
         </div>
       )}
-      {(() => {
-        // 팀은 있으나 권한이 없는 경우, 별도 EmptyState("팀이 없어요" — 팀이 실제로
-        // 존재하므로 의미가 틀림)를 추가로 렌더하지 않고, 아래 '권한 기준' 카드 하나가
-        // 일반 규칙과 차단 상태(orange tone)를 모두 안내한다.
-        const blocked = !model.isLoadingTeams && hasTeams && !hasCreatableTeams;
+      {/* 팀이 없는 경우 EmptyState만 표시하고 권한 카드는 생략한다.
+          팀은 있으나 권한이 없는 경우에만 권한 카드를 표시한다. */}
+      {!model.isLoadingTeams && hasTeams ? (() => {
+        const blocked = !hasCreatableTeams;
         return (
           <Card pad={14} style={{ marginTop: 14, background: blocked ? 'var(--orange50)' : 'var(--grey50)' }}>
             <div className="tm-text-label" style={blocked ? { color: 'var(--orange500)' } : undefined}>권한 기준</div>
@@ -585,7 +585,7 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
             </div>
           </Card>
         );
-      })()}
+      })() : null}
     </div>
   );
 }

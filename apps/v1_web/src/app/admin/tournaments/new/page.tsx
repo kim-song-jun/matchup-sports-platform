@@ -150,7 +150,7 @@ export default function AdminTournamentsNewPage() {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
 
           {/* ── 기본 정보 ────────────────────────────────────────────── */}
-          <section className="px-5 py-6 border-b border-gray-50">
+          <section className="px-5 py-6 border-b border-gray-100">
             <h2 className="text-[14px] font-bold text-gray-800 mb-4">기본 정보</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -228,7 +228,7 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 팀 / 선수 설정 ───────────────────────────────────────── */}
-          <section className="px-5 py-6 border-b border-gray-50">
+          <section className="px-5 py-6 border-b border-gray-100">
             <h2 className="text-[14px] font-bold text-gray-800 mb-4">팀 · 선수 설정</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField id="team-count" label="참가 팀 수" hint="비우면 무제한">
@@ -274,7 +274,7 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 참가비 / 계좌 ────────────────────────────────────────── */}
-          <section className="px-5 py-6 border-b border-gray-50">
+          <section className="px-5 py-6 border-b border-gray-100">
             <h2 className="text-[14px] font-bold text-gray-800 mb-4">참가비 · 계좌</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">

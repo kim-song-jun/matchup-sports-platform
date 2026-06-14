@@ -83,11 +83,10 @@ function TournamentsListContent() {
     <div style={{ padding: '0 20px 48px' }}>
       {/* ── Hero banner ── */}
       <section aria-labelledby="tournament-hero-heading" style={{ marginTop: 24 }}>
-        <Card pad={0}>
+        <Card pad={0} style={{ overflow: 'hidden' }}>
           <div
             style={{
-              borderRadius: '14px 14px 0 0',
-              background: 'linear-gradient(135deg, var(--blue500) 0%, color-mix(in srgb, var(--blue500) 70%, #6366f1) 100%)',
+              background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
               height: 130,
               display: 'flex',
               alignItems: 'center',
@@ -99,9 +98,9 @@ function TournamentsListContent() {
           >
             <div
               style={{
-                width: 60,
-                height: 60,
-                borderRadius: 18,
+                width: 56,
+                height: 56,
+                borderRadius: 16,
                 background: 'rgba(255,255,255,0.18)',
                 display: 'grid',
                 placeItems: 'center',
@@ -111,12 +110,11 @@ function TournamentsListContent() {
               <TrophyIcon size={32} strokeWidth={1.6} />
             </div>
             <span
+              className="tm-text-micro"
               style={{
-                fontWeight: 800,
-                fontSize: 11,
-                letterSpacing: '0.12em',
                 color: 'rgba(255,255,255,0.75)',
                 textTransform: 'uppercase',
+                letterSpacing: '0.12em',
               }}
             >
               상금 대회
@@ -130,7 +128,7 @@ function TournamentsListContent() {
             >
               팀과 함께 대회에서 겨뤄보세요
             </h1>
-            <p className="tm-text-label" style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            <p className="tm-text-label" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
               조별 리그부터 결승 토너먼트까지, 상위 팀에게 실제 상금이 지급돼요.
             </p>
           </div>
@@ -211,7 +209,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
         {/* Meta row */}
         <div
           className="tm-text-caption"
-          style={{ marginTop: 6, color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: '4px 10px' }}
+          style={{ marginTop: 6, color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 10px' }}
         >
           {item.scheduledAt ? (
             <span>{formatTournamentDate(item.scheduledAt)}</span>
@@ -234,7 +232,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             borderTop: '1px solid var(--grey100)',
           }}
         >
-          <span className="tm-text-label" style={{ color: 'var(--blue500)', fontWeight: 700 }}>
+          <span className="tm-text-body-lg" style={{ color: 'var(--blue500)' }}>
             {formatEntryFee(item.entryFee)}
           </span>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>

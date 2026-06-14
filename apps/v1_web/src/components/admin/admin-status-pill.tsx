@@ -7,6 +7,8 @@ import {
   Ban,
   AlertCircle,
   UserX,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -103,6 +105,59 @@ export const STATUS_META: Record<string, StatusMeta> = {
   // cancelled already defined above
   // completed already defined above
   // archived already defined above
+
+  // ── Tournament ───────────────────────────────────────────────────────
+  // closed already defined above (amber/Clock — reused)
+  // cancelled already defined above (red/XCircle — reused)
+  // completed already defined above (gray/CheckCircle2 — reused; green variant not used to avoid match-domain conflict)
+  open: {
+    label: '접수중',
+    tone: 'blue',
+    icon: <CircleDot size={12} aria-hidden="true" />,
+  },
+  in_progress: {
+    label: '진행중',
+    tone: 'green',
+    icon: <Loader2 size={12} aria-hidden="true" />,
+  },
+  draft: {
+    label: '초안',
+    tone: 'gray',
+    icon: <FileText size={12} aria-hidden="true" />,
+  },
+
+  // ── Registration ─────────────────────────────────────────────────────
+  // cancelled already defined above (red/XCircle — reused)
+  awaiting_payment: {
+    label: '입금대기',
+    tone: 'amber',
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  payment_checking: {
+    label: '확인중',
+    tone: 'amber',
+    icon: <Clock size={12} aria-hidden="true" />,
+  },
+  paid: {
+    label: '결제완료',
+    tone: 'blue',
+    icon: <CircleDot size={12} aria-hidden="true" />,
+  },
+  confirmed: {
+    label: '참가 확정',
+    tone: 'green',
+    icon: <CheckCircle2 size={12} aria-hidden="true" />,
+  },
+  waitlisted: {
+    label: '대기',
+    tone: 'gray',
+    icon: <Archive size={12} aria-hidden="true" />,
+  },
+  cancel_requested: {
+    label: '취소요청',
+    tone: 'amber',
+    icon: <AlertCircle size={12} aria-hidden="true" />,
+  },
 };
 
 // ── Component ─────────────────────────────────────────────────────────────

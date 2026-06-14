@@ -48,12 +48,14 @@ import type {
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
+  AdminDataTable,
   AdminStatusPill,
   AdminTableSkeleton,
   AdminEmpty,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import type { AdminTableColumn } from '@/components/admin';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -127,6 +129,14 @@ function formatCurrency(n: number): string {
 }
 
 // ── Shared input styles ───────────────────────────────────────────────────
+
+/** h-[44px] unified submit button (f12) */
+const submitBtnCls = [
+  'inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl',
+  'text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600',
+  'transition-colors disabled:opacity-50',
+  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+].join(' ');
 
 const inputCls = [
   'h-[44px] px-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
@@ -454,236 +464,134 @@ function RegistrationsTab({
   };
 
 
-  if (isPending) return <AdminTableSkeleton cols={5} />;
-  if (isError) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 py-8 px-4 text-center">
-        <p className="text-sm text-red-500 mb-3">
-          {extractErrorMessage(error, '신청 목록을 불러오지 못했어요.')}
-        </p>
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-        >
-          다시 시도하기
-        </button>
-      </div>
-    );
-  }
-
-  if (registrations.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100">
-        <AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />
-      </div>
-    );
-  }
+  // ── AdminDataTable column definitions (f8) ───────────────────────────────
+  // loading/error/empty are delegated to AdminDataTable via props
+  const regColumns: AdminTableColumn<V1AdminTournamentRegistration>[] = [
+    {
+      key: 'teamName',
+      header: '팀명',
+      render: (r) => (
+        <span className="font-medium text-gray-900">{r.teamName ?? r.teamId}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: '상태',
+      render: (r) => (
+        <AdminStatusPill status={r.status} />
+      ),
+    },
+    {
+      key: 'payment',
+      header: '결제',
+      render: (r) =>
+        r.payment ? (
+          <span className="text-[13px] text-gray-600">
+            {r.payment.method === 'pg' ? 'PG' : '무통장'} · {r.payment.status}
+          </span>
+        ) : (
+          <span className="text-[13px] text-gray-400">—</span>
+        ),
+    },
+    {
+      key: 'depositorName',
+      header: '입금자',
+      render: (r) => (
+        <span className="text-[13px] text-gray-600">{r.depositorName ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'playerCount',
+      header: '선수수',
+      render: (r) => (
+        <span className="tabular-nums text-gray-600">{r.playerCount}명</span>
+      ),
+    },
+  ];
 
   return (
     <>
-      {/* Desktop table */}
-      <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-gray-700">
-            <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
-              <tr>
-                {['팀명', '상태', '결제', '입금자', '선수수'].map((h) => (
-                  <th
-                    key={h}
-                    scope="col"
-                    className="px-4 py-3 font-semibold text-gray-600 text-[12px] tracking-wide whitespace-nowrap text-left select-none"
-                  >
-                    {h}
-                  </th>
-                ))}
-                <th
-                  scope="col"
-                  className="px-4 py-3 font-semibold text-gray-600 text-[12px] tracking-wide text-right whitespace-nowrap"
-                >
-                  작업
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {registrations.map((reg) => {
-                const isLocked = !!reg.rosterLockedAt;
-                return (
-                  <tr key={reg.id} className="transition-colors hover:bg-gray-50/60">
-                    <td className="px-4 py-3 align-middle">
-                      <span className="font-medium text-gray-900">{reg.teamName ?? reg.teamId}</span>
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <AdminStatusPill
-                        status={reg.status}
-                        label={REGISTRATION_STATUS_LABEL[reg.status] ?? reg.status}
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      {reg.payment ? (
-                        <span className="text-[13px] text-gray-600">
-                          {reg.payment.method === 'pg' ? 'PG' : '무통장'} ·{' '}
-                          {reg.payment.status}
-                        </span>
-                      ) : (
-                        <span className="text-[13px] text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <span className="text-[13px] text-gray-600">
-                        {reg.depositorName ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-middle tabular-nums text-gray-600">
-                      {reg.playerCount}명
-                    </td>
-                    <td className="px-4 py-3 align-middle">
-                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                        {/* 입금확인 */}
-                        {reg.status === 'awaiting_payment' && (
-                          <ActionButton
-                            onClick={() => handleConfirmPayment(reg)}
-                            disabled={confirmPayment.isPending}
-                            icon={<Check size={13} />}
-                            label="입금확인"
-                            tone="blue"
-                          />
-                        )}
-                        {/* 확정 / 대기 */}
-                        {(reg.status === 'payment_checking' || reg.status === 'paid') && (
-                          <>
-                            <ActionButton
-                              onClick={() => handleConfirm(reg, 'confirm')}
-                              disabled={confirmRegistration.isPending}
-                              icon={<Check size={13} />}
-                              label="확정"
-                              tone="blue"
-                            />
-                            <ActionButton
-                              onClick={() => handleConfirm(reg, 'waitlist')}
-                              disabled={confirmRegistration.isPending}
-                              icon={<X size={13} />}
-                              label="대기"
-                              tone="gray"
-                            />
-                          </>
-                        )}
-                        {/* 명단 잠금/해제 */}
-                        {reg.status === 'confirmed' && (
-                          isLocked ? (
-                            <ActionButton
-                              onClick={() => handleRosterUnlock(reg)}
-                              disabled={rosterUnlock.isPending}
-                              icon={<Unlock size={13} />}
-                              label="잠금해제"
-                              tone="gray"
-                            />
-                          ) : (
-                            <ActionButton
-                              onClick={() => handleRosterLock(reg)}
-                              disabled={rosterLock.isPending}
-                              icon={<Lock size={13} />}
-                              label="명단잠금"
-                              tone="gray"
-                            />
-                          )
-                        )}
-                        {/* 명단 검토 */}
-                        <ActionButton
-                          onClick={() => {
-                            setRosterRegistration(reg);
-                            setRosterOpen(true);
-                          }}
-                          icon={<Check size={13} />}
-                          label="명단 검토"
-                          tone="gray"
-                        />
-                        {/* CSV 다운로드 */}
-                        <ExportCsvButton registrationId={reg.id} showToast={showToast} />
-                        {/* 취소 */}
-                        {reg.status !== 'cancelled' && (
-                          <ActionButton
-                            onClick={() => handleCancel(reg)}
-                            disabled={cancelRegistration.isPending}
-                            icon={<X size={13} />}
-                            label="취소"
-                            tone="red"
-                          />
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Mobile card list */}
-      <ul className="lg:hidden flex flex-col gap-2" role="list">
-        {registrations.map((reg) => {
+      {/* f8: AdminDataTable replaces custom desktop table + mobile card list */}
+      <AdminDataTable<V1AdminTournamentRegistration>
+        columns={regColumns}
+        rows={registrations}
+        keyExtractor={(r) => r.id}
+        loading={isPending}
+        error={isError ? extractErrorMessage(error, '신청 목록을 불러오지 못했어요.') : undefined}
+        onRetry={() => void refetch()}
+        empty={<AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />}
+        renderActions={(reg) => {
           const isLocked = !!reg.rosterLockedAt;
           return (
-            <li key={reg.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-              <dl className="flex flex-col gap-1.5 text-[13px] mb-3">
-                <div className="flex gap-2">
-                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">팀</dt>
-                  <dd className="text-gray-800 font-semibold">{reg.teamName ?? reg.teamId}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">상태</dt>
-                  <dd>
-                    <AdminStatusPill
-                      status={reg.status}
-                      label={REGISTRATION_STATUS_LABEL[reg.status] ?? reg.status}
-                    />
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">결제</dt>
-                  <dd className="text-gray-800">
-                    {reg.payment
-                      ? `${reg.payment.method === 'pg' ? 'PG' : '무통장'} · ${reg.payment.status}`
-                      : '—'}
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">입금자</dt>
-                  <dd className="text-gray-800">{reg.depositorName ?? '—'}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="shrink-0 text-gray-400 w-[72px] font-medium">선수</dt>
-                  <dd className="text-gray-800 tabular-nums">{reg.playerCount}명</dd>
-                </div>
-              </dl>
-              <div className="flex flex-wrap gap-1.5 border-t border-gray-50 pt-2.5">
-                {reg.status === 'awaiting_payment' && (
-                  <ActionButton onClick={() => handleConfirmPayment(reg)} disabled={confirmPayment.isPending} icon={<Check size={13} />} label="입금확인" tone="blue" />
-                )}
-                {(reg.status === 'payment_checking' || reg.status === 'paid') && (
-                  <>
-                    <ActionButton onClick={() => handleConfirm(reg, 'confirm')} disabled={confirmRegistration.isPending} icon={<Check size={13} />} label="확정" tone="blue" />
-                    <ActionButton onClick={() => handleConfirm(reg, 'waitlist')} disabled={confirmRegistration.isPending} icon={<X size={13} />} label="대기" tone="gray" />
-                  </>
-                )}
-                {reg.status === 'confirmed' && (
-                  isLocked ? (
-                    <ActionButton onClick={() => handleRosterUnlock(reg)} disabled={rosterUnlock.isPending} icon={<Unlock size={13} />} label="잠금해제" tone="gray" />
-                  ) : (
-                    <ActionButton onClick={() => handleRosterLock(reg)} disabled={rosterLock.isPending} icon={<Lock size={13} />} label="명단잠금" tone="gray" />
-                  )
-                )}
-                <ActionButton onClick={() => { setRosterRegistration(reg); setRosterOpen(true); }} icon={<Check size={13} />} label="명단 검토" tone="gray" />
-                <ExportCsvButton registrationId={reg.id} showToast={showToast} />
-                {reg.status !== 'cancelled' && (
-                  <ActionButton onClick={() => handleCancel(reg)} disabled={cancelRegistration.isPending} icon={<X size={13} />} label="취소" tone="red" />
-                )}
-              </div>
-            </li>
+            <>
+              {reg.status === 'awaiting_payment' && (
+                <ActionButton
+                  onClick={() => handleConfirmPayment(reg)}
+                  disabled={confirmPayment.isPending}
+                  icon={<Check size={13} />}
+                  label="입금확인"
+                  tone="blue"
+                />
+              )}
+              {(reg.status === 'payment_checking' || reg.status === 'paid') && (
+                <>
+                  <ActionButton
+                    onClick={() => handleConfirm(reg, 'confirm')}
+                    disabled={confirmRegistration.isPending}
+                    icon={<Check size={13} />}
+                    label="확정"
+                    tone="blue"
+                  />
+                  <ActionButton
+                    onClick={() => handleConfirm(reg, 'waitlist')}
+                    disabled={confirmRegistration.isPending}
+                    icon={<X size={13} />}
+                    label="대기"
+                    tone="gray"
+                  />
+                </>
+              )}
+              {reg.status === 'confirmed' &&
+                (isLocked ? (
+                  <ActionButton
+                    onClick={() => handleRosterUnlock(reg)}
+                    disabled={rosterUnlock.isPending}
+                    icon={<Unlock size={13} />}
+                    label="잠금해제"
+                    tone="gray"
+                  />
+                ) : (
+                  <ActionButton
+                    onClick={() => handleRosterLock(reg)}
+                    disabled={rosterLock.isPending}
+                    icon={<Lock size={13} />}
+                    label="명단잠금"
+                    tone="gray"
+                  />
+                ))}
+              <ActionButton
+                onClick={() => {
+                  setRosterRegistration(reg);
+                  setRosterOpen(true);
+                }}
+                icon={<Check size={13} />}
+                label="명단 검토"
+                tone="gray"
+              />
+              <ExportCsvButton registrationId={reg.id} showToast={showToast} />
+              {reg.status !== 'cancelled' && (
+                <ActionButton
+                  onClick={() => handleCancel(reg)}
+                  disabled={cancelRegistration.isPending}
+                  icon={<X size={13} />}
+                  label="취소"
+                  tone="red"
+                />
+              )}
+            </>
           );
-        })}
-      </ul>
+        }}
+      />
 
       {/* Roster modal */}
       <RosterModal
@@ -921,7 +829,7 @@ function BracketTab({
           <button
             type="submit"
             disabled={!groupName.trim() || createGroup.isPending}
-            className="inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className={submitBtnCls}
           >
             <Plus size={14} aria-hidden="true" />
             조 추가
@@ -971,7 +879,7 @@ function BracketTab({
             <button
               type="submit"
               disabled={!assignGroupId || !assignRegId || assignGroupTeam.isPending}
-              className="inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className={submitBtnCls}
             >
               배정
             </button>
@@ -1009,7 +917,7 @@ function BracketTab({
                       <thead>
                         <tr className="border-b border-gray-50">
                           {['순위', '팀', '승', '무', '패', '득점', '실점', '승점'].map((h) => (
-                            <th key={h} scope="col" className="px-3 py-2 text-[11px] font-semibold text-gray-500 text-left whitespace-nowrap">
+                            <th key={h} scope="col" className="px-3 py-2 text-[12px] font-semibold text-gray-600 text-left whitespace-nowrap select-none">
                               {h}
                             </th>
                           ))}
@@ -1017,15 +925,15 @@ function BracketTab({
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {standings.map((s) => (
-                          <tr key={s.id}>
-                            <td className="px-3 py-2 tabular-nums text-gray-500">{s.position}</td>
-                            <td className="px-3 py-2 font-medium text-gray-900">{s.registrationId}</td>
-                            <td className="px-3 py-2 tabular-nums">{s.wins}</td>
-                            <td className="px-3 py-2 tabular-nums">{s.draws}</td>
-                            <td className="px-3 py-2 tabular-nums">{s.losses}</td>
-                            <td className="px-3 py-2 tabular-nums">{s.goalsFor}</td>
-                            <td className="px-3 py-2 tabular-nums">{s.goalsAgainst}</td>
-                            <td className="px-3 py-2 tabular-nums font-semibold text-blue-600">{s.points}</td>
+                          <tr key={s.id} className="transition-colors hover:bg-gray-50/60">
+                            <td className="px-3 py-3 tabular-nums text-gray-500">{s.position}</td>
+                            <td className="px-3 py-3 font-medium text-gray-900">{s.registrationId}</td>
+                            <td className="px-3 py-3 tabular-nums">{s.wins}</td>
+                            <td className="px-3 py-3 tabular-nums">{s.draws}</td>
+                            <td className="px-3 py-3 tabular-nums">{s.losses}</td>
+                            <td className="px-3 py-3 tabular-nums">{s.goalsFor}</td>
+                            <td className="px-3 py-3 tabular-nums">{s.goalsAgainst}</td>
+                            <td className="px-3 py-3 tabular-nums font-semibold text-blue-600">{s.points}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1074,7 +982,7 @@ function BracketTab({
             </select>
           </div>
           <div className="flex items-end">
-            <button type="submit" disabled={!fixtureRound.trim() || !fixtureNumber || createFixture.isPending} className="inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 w-full sm:w-auto">
+            <button type="submit" disabled={!fixtureRound.trim() || !fixtureNumber || createFixture.isPending} className={submitBtnCls + ' w-full sm:w-auto'}>
               <Plus size={14} aria-hidden="true" />픽스처 추가
             </button>
           </div>
@@ -1144,11 +1052,17 @@ function BracketTab({
         pending={recordResult.isPending}
       >
         <form onSubmit={handleRecordResult} noValidate className="flex flex-col gap-4">
+          {/* f14: fixed labels '홈'/'어웨이' + identifier as small caption */}
           <div className="flex items-center gap-3">
             <div className="flex flex-col gap-1 flex-1">
               <label htmlFor="home-score" className="text-[13px] font-semibold text-gray-700">
-                홈 ({resultFixture?.homeRegistrationId ?? '홈'})
+                홈
               </label>
+              {resultFixture?.homeRegistrationId && (
+                <p className="text-[12px] text-gray-400 truncate max-w-[140px]">
+                  {resultFixture.homeRegistrationId}
+                </p>
+              )}
               <input
                 id="home-score"
                 type="number"
@@ -1162,8 +1076,13 @@ function BracketTab({
             <span className="text-[20px] font-bold text-gray-400 mt-5" aria-hidden="true">:</span>
             <div className="flex flex-col gap-1 flex-1">
               <label htmlFor="away-score" className="text-[13px] font-semibold text-gray-700">
-                어웨이 ({resultFixture?.awayRegistrationId ?? '어웨이'})
+                어웨이
               </label>
+              {resultFixture?.awayRegistrationId && (
+                <p className="text-[12px] text-gray-400 truncate max-w-[140px]">
+                  {resultFixture.awayRegistrationId}
+                </p>
+              )}
               <input
                 id="away-score"
                 type="number"
@@ -1206,14 +1125,14 @@ function BracketTab({
               type="button"
               onClick={() => setResultOpen(false)}
               disabled={recordResult.isPending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[44px] rounded-xl text-[14px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={recordResult.isPending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className={'flex-1 ' + submitBtnCls}
             >
               {recordResult.isPending ? '저장 중…' : '저장'}
             </button>
@@ -1356,7 +1275,7 @@ function AnnouncementsTab({
           <button
             type="submit"
             disabled={!annTitle.trim() || !annBody.trim() || createAnnouncement.isPending}
-            className="inline-flex items-center justify-center gap-1.5 h-[48px] px-6 rounded-xl text-[14px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className={submitBtnCls}
           >
             <Megaphone size={15} aria-hidden="true" />
             {createAnnouncement.isPending ? '작성 중…' : '공지 작성'}
@@ -1365,11 +1284,10 @@ function AnnouncementsTab({
       </div>
 
       {/* ── 공지 목록 ─────────────────────────────────────────────────── */}
-      {announcements.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100">
-          <AdminEmpty title="공지가 없어요" description="첫 공지를 작성해 보세요." />
-        </div>
-      ) : (
+      {/* f10: announcements is always [] (no backend endpoint yet). Do NOT render
+          permanent EmptyState — only render the list when data exists.
+          TODO: 백엔드 announcements 목록 연결 후 복원 */}
+      {announcements.length > 0 && (
         <div className="flex flex-col gap-3">
           {announcements.map((ann) => (
             <div key={ann.id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4">
@@ -1493,28 +1411,29 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       </div>
 
       {/* ── Header ────────────────────────────────────────────────────── */}
+      {/* f9: status buttons moved below header to avoid 6-line title wrap on mobile */}
       <AdminPageHeader
         eyebrow="대회 관리"
         title={tournament.title}
         description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${formatDate(tournament.scheduledAt)}`}
-        action={
-          canWrite && nextStatuses.length > 0 ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              {nextStatuses.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => handleStatusChange(s)}
-                  disabled={changeStatus.isPending}
-                  className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
-                >
-                  {TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경
-                </button>
-              ))}
-            </div>
-          ) : undefined
-        }
       />
+
+      {/* ── Status change actions (f9: separate row, flex-wrap, h-[44px]) ── */}
+      {canWrite && nextStatuses.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {nextStatuses.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => handleStatusChange(s)}
+              disabled={changeStatus.isPending}
+              className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+            >
+              {TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Info card ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6">
@@ -1537,7 +1456,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         </dl>
       </div>
 
-      {/* ── Tabs ──────────────────────────────────────────────────────── */}
+      {/* ── Tabs (f11: min-h-[44px], no shadow — active = border-b-2 blue-500) ── */}
       <div
         role="tablist"
         aria-label="대회 운영 탭"
@@ -1555,10 +1474,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={[
-                'inline-flex items-center h-[36px] px-4 rounded-lg text-[13px] font-medium transition-colors',
+                'inline-flex items-center min-h-[44px] px-4 rounded-lg text-[13px] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 active
-                  ? 'bg-white text-gray-900 shadow-sm font-semibold'
+                  ? 'bg-white text-gray-900 border-b-2 border-blue-500 font-semibold'
                   : 'text-gray-500 hover:text-gray-700',
               ].join(' ')}
             >

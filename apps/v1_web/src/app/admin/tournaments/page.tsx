@@ -11,6 +11,7 @@ import type { V1Tournament, V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
+  AdminFilterBar,
   AdminDataTable,
   AdminStatusPill,
   AdminEmpty,
@@ -203,28 +204,13 @@ export default function AdminTournamentsPage() {
 
       {/* Status chip filter */}
       <div className="mb-4">
-        <div role="group" aria-label="상태 필터" className="flex items-center gap-1.5 flex-wrap">
-          {STATUS_OPTIONS.map((opt) => {
-            const active = activeStatus === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleStatusChange(opt.value)}
-                aria-pressed={active}
-                className={[
-                  'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
-                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                  active
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
-                ].join(' ')}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <AdminFilterBar
+          searchValue=""
+          onSearchChange={() => {}}
+          statusOptions={STATUS_OPTIONS}
+          activeStatus={activeStatus}
+          onStatusChange={handleStatusChange}
+        />
       </div>
 
       {/* Data table */}

@@ -40,87 +40,38 @@ const STEPS: Array<{ id: ApplyStep; label: string }> = [
 
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
+  // stepNumber is 1-based; bars are active for index <= currentIndex (1-based: item <= currentIndex+1)
   return (
-    <div
-      role="list"
-      aria-label="신청 단계"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0,
-        padding: '14px 20px 0',
-      }}
-    >
-      {STEPS.map((step, index) => {
-        const isDone = index < currentIndex;
-        const isActive = index === currentIndex;
-        return (
-          <div
+    <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="tm-badge tm-badge-blue">{`Step ${currentIndex + 1}/${STEPS.length}`}</span>
+        <span className="tm-text-caption">{STEPS[currentIndex]?.label}</span>
+      </div>
+      <div className="tm-create-bars" style={{ gridTemplateColumns: `repeat(${STEPS.length}, 1fr)` }}>
+        {STEPS.map((step, index) => (
+          <span
             key={step.id}
-            role="listitem"
-            aria-current={isActive ? 'step' : undefined}
-            style={{ display: 'flex', alignItems: 'center', flex: index < STEPS.length - 1 ? 1 : 'none' }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div
-                aria-hidden="true"
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: '50%',
-                  background: isDone
-                    ? 'var(--blue500)'
-                    : isActive
-                    ? 'var(--blue500)'
-                    : 'var(--grey200)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: isDone || isActive ? '#fff' : 'var(--text-caption)',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  transition: 'background 0.2s',
-                }}
-              >
-                {isDone ? '✓' : index + 1}
-              </div>
-              <span
-                className="tm-text-micro"
-                style={{ color: isActive ? 'var(--blue500)' : 'var(--text-caption)', fontWeight: isActive ? 600 : 400, whiteSpace: 'nowrap' }}
-              >
-                {step.label}
-              </span>
-            </div>
-            {index < STEPS.length - 1 ? (
-              <div
-                aria-hidden="true"
-                style={{
-                  flex: 1,
-                  height: 1,
-                  background: isDone ? 'var(--blue500)' : 'var(--grey200)',
-                  margin: '0 6px',
-                  marginBottom: 20,
-                }}
-              />
-            ) : null}
-          </div>
-        );
-      })}
+            data-active={index <= currentIndex || undefined}
+            aria-current={index === currentIndex ? 'step' : undefined}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
 /* ── Error / info banner ── */
 
-function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' }) {
-  const bg = tone === 'error' ? 'var(--red50, #fff5f5)' : 'var(--blue50, #eff6ff)';
-  const border = tone === 'error' ? 'var(--red200, #fecaca)' : 'var(--blue200, #bfdbfe)';
-  const color = tone === 'error' ? 'var(--red600, #dc2626)' : 'var(--blue600, #2563eb)';
+function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
+  const bg = tone === 'error' ? 'var(--red50)' : tone === 'warning' ? 'var(--orange50)' : 'var(--blue50)';
+  const border = tone === 'error' ? 'var(--red500)' : tone === 'warning' ? 'var(--orange500)' : 'var(--blue500)';
+  const color = tone === 'error' ? 'var(--red500)' : tone === 'warning' ? 'var(--orange500)' : 'var(--blue500)';
   return (
     <div
       role="alert"
       style={{
         padding: '10px 14px',
-        borderRadius: 10,
+        borderRadius: 14,
         background: bg,
         border: `1px solid ${border}`,
         color,
@@ -159,7 +110,7 @@ function TeamSelectStep({
         <SectionTitle title="참가 팀 선택" />
         <p
           className="tm-text-caption"
-          style={{ color: 'var(--text-secondary)', marginTop: 4, marginBottom: 12, lineHeight: 1.6 }}
+          style={{ color: 'var(--text-muted)', marginTop: 4, marginBottom: 12, lineHeight: 1.6 }}
         >
           팀장 또는 관리자 권한이 있는 팀으로만 신청할 수 있어요.
         </p>
@@ -170,7 +121,7 @@ function TeamSelectStep({
               <div
                 key={i}
                 aria-hidden="true"
-                style={{ height: 72, borderRadius: 12, background: 'var(--grey100)' }}
+                style={{ height: 72, borderRadius: 14, background: 'var(--grey100)' }}
               />
             ))}
           </div>
@@ -220,12 +171,11 @@ function TeamSelectStep({
                 >
                   <Card
                     pad={14}
+                    className={isSelected ? 'tm-create-selected' : undefined}
                     style={{
                       opacity: isManager ? 1 : 0.55,
                       cursor: isManager ? 'pointer' : 'default',
-                      outline: isSelected ? `2px solid var(--blue500)` : undefined,
-                      outlineOffset: isSelected ? 1 : undefined,
-                      transition: 'outline 0.15s',
+                      transition: 'border-color 0.15s, background 0.15s',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -236,7 +186,7 @@ function TeamSelectStep({
                           flexShrink: 0,
                           width: 40,
                           height: 40,
-                          borderRadius: 10,
+                          borderRadius: 14,
                           background: 'var(--grey100)',
                           overflow: 'hidden',
                           display: 'grid',
@@ -298,7 +248,7 @@ function TeamSelectStep({
                             background: 'var(--blue500)',
                             display: 'grid',
                             placeItems: 'center',
-                            color: '#fff',
+                            color: 'var(--static-white)',
                             fontSize: 11,
                             fontWeight: 800,
                           }}
@@ -456,8 +406,8 @@ function AgreementsStep({
 
         {state.paymentMethod === 'bank_transfer' ? (
           <Card pad={14} style={{ marginTop: 10 }}>
-            <label htmlFor="depositor-name" className="tm-text-caption" style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-              입금자명 <span style={{ color: 'var(--red500, #ef4444)' }}>*</span>
+            <label htmlFor="depositor-name" className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+              입금자명 <span style={{ color: 'var(--red500)' }}>*</span>
             </label>
             <input
               id="depositor-name"
@@ -466,18 +416,8 @@ function AgreementsStep({
               onChange={(e) => onChange({ depositorName: e.target.value })}
               placeholder="입금자 이름을 입력해 주세요"
               maxLength={20}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '10px 12px',
-                borderRadius: 8,
-                border: '1px solid var(--grey200)',
-                background: 'var(--surface)',
-                color: 'var(--text-strong)',
-                fontSize: 'var(--font-size-sm)',
-                outline: 'none',
-                minHeight: 44,
-              }}
+              className="tm-input"
+              style={{ marginTop: 2 }}
               aria-required="true"
               aria-describedby="depositor-name-hint"
             />
@@ -553,7 +493,7 @@ function CheckRow({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 18, height: 18, flexShrink: 0, accentColor: 'var(--blue500)', cursor: 'pointer' }}
+        style={{ width: 20, height: 20, flexShrink: 0, accentColor: 'var(--blue500)', cursor: 'pointer' }}
         aria-checked={checked}
       />
       <label htmlFor={id} className="tm-text-body" style={{ color: 'var(--text-strong)', cursor: 'pointer', flex: 1 }}>
@@ -581,11 +521,10 @@ function PaymentMethodRadio({
   return (
     <Card
       pad={14}
+      className={selected ? 'tm-create-selected' : undefined}
       style={{
         cursor: 'pointer',
-        outline: selected ? `2px solid var(--blue500)` : undefined,
-        outlineOffset: selected ? 1 : undefined,
-        transition: 'outline 0.15s',
+        transition: 'border-color 0.15s, background 0.15s',
       }}
     >
       <label
@@ -599,7 +538,7 @@ function PaymentMethodRadio({
           value={value}
           checked={selected}
           onChange={onSelect}
-          style={{ width: 18, height: 18, flexShrink: 0, accentColor: 'var(--blue500)' }}
+          style={{ width: 20, height: 20, flexShrink: 0, accentColor: 'var(--blue500)' }}
         />
         <div>
           <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
@@ -661,7 +600,7 @@ function PaymentGuideStep({
           </Card>
 
           <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
-            <p className="tm-text-caption" style={{ color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
               입금 확인 후 신청이 최종 확정돼요. 입금자명이 일치하지 않으면 확인이 지연될 수 있어요.
             </p>
           </Card>
@@ -794,7 +733,7 @@ function LoadingSkeleton() {
         <div
           key={i}
           aria-hidden="true"
-          style={{ height: 64, borderRadius: 12, background: 'var(--grey100)', marginBottom: 10 }}
+          style={{ height: 64, borderRadius: 14, background: 'var(--grey100)', marginBottom: 10 }}
         />
       ))}
     </div>
@@ -941,7 +880,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               style={{
                 position: 'fixed',
                 inset: 0,
-                background: 'rgba(0,0,0,0.3)',
+                background: 'rgba(25,31,40,0.32)',
                 display: 'grid',
                 placeItems: 'center',
                 zIndex: 9999,
@@ -949,7 +888,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             >
               <div
                 className="tm-text-label"
-                style={{ color: '#fff', background: 'rgba(0,0,0,0.7)', padding: '12px 20px', borderRadius: 12 }}
+                style={{ color: 'var(--static-white)', background: 'rgba(25,31,40,0.72)', padding: '12px 20px', borderRadius: 14 }}
               >
                 신청 준비 중…
               </div>

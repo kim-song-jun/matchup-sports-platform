@@ -78,18 +78,7 @@ function ApplyCTA({ tournament }: { tournament: V1TournamentDetail }) {
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: 'sticky',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: '12px 20px calc(12px + env(safe-area-inset-bottom))',
-        background: 'var(--surface)',
-        borderTop: '1px solid var(--grey100)',
-        zIndex: 100,
-      }}
-    >
+    <div className="tm-fixed-cta">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
         <Link
           href={`/tournaments/${tournament.id}/my`}
@@ -177,13 +166,13 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
             aria-hidden="true"
             style={{
               flexShrink: 0,
-              width: 52,
-              height: 52,
+              width: 56,
+              height: 56,
               borderRadius: 16,
-              background: 'linear-gradient(135deg, var(--blue500) 0%, color-mix(in srgb, var(--blue500) 70%, #6366f1) 100%)',
+              background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
               display: 'grid',
               placeItems: 'center',
-              color: '#fff',
+              color: 'var(--static-white)',
             }}
           >
             <TrophyIcon size={28} strokeWidth={1.6} />
@@ -242,7 +231,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
             <p
               id="rules-heading"
               className="tm-text-body"
-              style={{ color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}
+              style={{ color: 'var(--text-body)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}
             >
               {tournament.rulesText}
             </p>
@@ -504,7 +493,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
 
 function GoalDiff({ goalsFor, goalsAgainst }: { goalsFor: number; goalsAgainst: number }) {
   const diff = goalsFor - goalsAgainst;
-  const color = diff > 0 ? 'var(--green500)' : diff < 0 ? 'var(--red500, #ef4444)' : 'var(--text-muted)';
+  const color = diff > 0 ? 'var(--green500)' : diff < 0 ? 'var(--red500)' : 'var(--text-muted)';
   const prefix = diff > 0 ? '+' : '';
   return (
     <span className="tab-num" style={{ color }}>
@@ -567,7 +556,7 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
           {group.name}
         </div>
       </div>
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', maxWidth: 420 }}>
         <table
           style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}
           aria-label={`${group.name} 순위표`}
@@ -577,7 +566,7 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
               <th
                 scope="col"
                 className="tm-text-micro"
-                style={{ padding: '6px 8px 6px 0', color: 'var(--text-caption)', textAlign: 'center', fontWeight: 600, width: 24 }}
+                style={{ padding: '6px 8px 6px 0', color: 'var(--text-caption)', textAlign: 'center', fontWeight: 600, width: 32, whiteSpace: 'nowrap' }}
               >
                 순위
               </th>
@@ -649,7 +638,7 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
       </div>
       <p
         className="tm-text-caption"
-        style={{ marginTop: 6, color: 'var(--text-secondary)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}
+        style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}
       >
         {announcement.body}
       </p>

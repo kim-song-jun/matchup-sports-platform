@@ -44,9 +44,9 @@ function formatDate(dateStr: string | null): string {
 
 function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
   const styles: Record<string, { bg: string; border: string; color: string }> = {
-    error: { bg: 'var(--red50, #fff5f5)', border: 'var(--red200, #fecaca)', color: 'var(--red600, #dc2626)' },
-    info: { bg: 'var(--blue50, #eff6ff)', border: 'var(--blue200, #bfdbfe)', color: 'var(--blue600, #2563eb)' },
-    warning: { bg: 'var(--orange50, #fff7ed)', border: 'var(--orange200, #fed7aa)', color: 'var(--orange600, #ea580c)' },
+    error: { bg: 'var(--red50)', border: 'var(--red500)', color: 'var(--red500)' },
+    info: { bg: 'var(--blue50)', border: 'var(--blue500)', color: 'var(--blue600)' },
+    warning: { bg: 'var(--orange50)', border: 'var(--orange500)', color: 'var(--orange500)' },
   };
   const s = styles[tone];
   return (
@@ -96,7 +96,7 @@ function AddPlayerForm({
   const canSubmit = form.realName.trim().length > 0 && form.userId.trim().length > 0;
 
   return (
-    <Card pad={16} style={{ border: '1px solid var(--blue200, #bfdbfe)' }}>
+    <Card pad={16} style={{ border: '1px solid var(--blue100)', background: 'var(--blue50)' }}>
       <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 14 }}>
         선수 추가
       </div>
@@ -209,7 +209,7 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid var(--grey200)',
   background: 'var(--surface)',
   color: 'var(--text-strong)',
-  fontSize: 'var(--font-size-sm)',
+  fontSize: undefined,
   outline: 'none',
   minHeight: 44,
 };
@@ -232,11 +232,11 @@ function FormField({
       <label
         htmlFor={id}
         className="tm-text-caption"
-        style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}
+        style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 5 }}
       >
         {label}
         {required ? (
-          <span style={{ color: 'var(--red500, #ef4444)', marginLeft: 2 }}>*</span>
+          <span style={{ color: 'var(--red500)', marginLeft: 2 }}>*</span>
         ) : null}
       </label>
       {children}
@@ -308,8 +308,8 @@ function PlayerRow({
       {!isLocked ? (
         <button
           type="button"
-          className="tm-btn tm-btn-sm tm-btn-neutral"
-          style={{ flexShrink: 0, minHeight: 32, minWidth: 44, padding: '0 10px', color: 'var(--red600, #dc2626)' }}
+          className="tm-btn tm-btn-sm tm-btn-danger"
+          style={{ flexShrink: 0, minHeight: 32, minWidth: 44, padding: '0 10px' }}
           onClick={() => onRemove(player.id)}
           disabled={isRemoving}
           aria-label={`${player.realName} 삭제`}

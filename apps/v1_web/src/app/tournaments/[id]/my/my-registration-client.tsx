@@ -20,28 +20,28 @@ import type {
 
 /* ── Status helpers ── */
 
-type StatusConfig = { badgeClass: string; label: string };
+type StatusConfig = { badgeClass: string; label: string; icon: string };
 
 function registrationStatusConfig(status: V1TournamentRegistrationStatus): StatusConfig {
   switch (status) {
     case 'draft':
-      return { badgeClass: 'tm-badge-grey', label: '임시저장' };
+      return { badgeClass: 'tm-badge-grey', label: '임시저장', icon: '○' };
     case 'awaiting_payment':
-      return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
+      return { badgeClass: 'tm-badge-orange', label: '입금 대기', icon: '○' };
     case 'payment_checking':
-      return { badgeClass: 'tm-badge-blue', label: '입금 확인 중' };
+      return { badgeClass: 'tm-badge-blue', label: '입금 확인 중', icon: '○' };
     case 'paid':
-      return { badgeClass: 'tm-badge-blue', label: '결제 완료' };
+      return { badgeClass: 'tm-badge-blue', label: '결제 완료', icon: '●' };
     case 'confirmed':
-      return { badgeClass: 'tm-badge-green', label: '참가 확정' };
+      return { badgeClass: 'tm-badge-green', label: '참가 확정', icon: '●' };
     case 'waitlisted':
-      return { badgeClass: 'tm-badge-orange', label: '대기팀' };
+      return { badgeClass: 'tm-badge-orange', label: '대기팀', icon: '○' };
     case 'cancel_requested':
-      return { badgeClass: 'tm-badge-red', label: '취소 요청 중' };
+      return { badgeClass: 'tm-badge-red', label: '취소 요청 중', icon: '○' };
     case 'cancelled':
-      return { badgeClass: 'tm-badge-grey', label: '취소' };
+      return { badgeClass: 'tm-badge-grey', label: '취소', icon: '✕' };
     default:
-      return { badgeClass: 'tm-badge-grey', label: status };
+      return { badgeClass: 'tm-badge-grey', label: status, icon: '○' };
   }
 }
 
@@ -74,9 +74,9 @@ function formatDateShort(dateStr: string | null): string {
 
 function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
   const styles: Record<string, { bg: string; border: string; color: string }> = {
-    error: { bg: 'var(--red50, #fff5f5)', border: 'var(--red200, #fecaca)', color: 'var(--red600, #dc2626)' },
-    info: { bg: 'var(--blue50, #eff6ff)', border: 'var(--blue200, #bfdbfe)', color: 'var(--blue600, #2563eb)' },
-    warning: { bg: 'var(--orange50, #fff7ed)', border: 'var(--orange200, #fed7aa)', color: 'var(--orange600, #ea580c)' },
+    error: { bg: 'var(--red50)', border: 'var(--red500)', color: 'var(--red500)' },
+    info: { bg: 'var(--blue50)', border: 'var(--blue500)', color: 'var(--blue600)' },
+    warning: { bg: 'var(--orange50)', border: 'var(--orange500)', color: 'var(--orange500)' },
   };
   const s = styles[tone];
   return (
@@ -106,98 +106,80 @@ function CancelModal({
   const [reason, setReason] = useState('');
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="cancel-modal-title"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9000,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-end',
-      }}
-    >
-      {/* Backdrop */}
+    <>
+      {/* Scrim — v1 pattern */}
       <div
         aria-hidden="true"
-        style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }}
+        className="tm-filter-scrim"
         onClick={onClose}
       />
-      {/* Sheet */}
-      <div
-        style={{
-          position: 'relative',
-          background: 'var(--surface)',
-          borderRadius: '20px 20px 0 0',
-          padding: '24px 20px 40px',
-          zIndex: 1,
-        }}
-      >
-        <h2
-          id="cancel-modal-title"
-          className="tm-text-body-lg"
-          style={{ color: 'var(--text-strong)', marginBottom: 8 }}
+      {/* Sheet layer */}
+      <div className="tm-filter-layer">
+        <section
+          className="tm-filter-sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-modal-title"
         >
-          취소 요청
-        </h2>
-        <p className="tm-text-caption" style={{ color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
-          취소 요청을 보내면 운영진이 검토 후 처리해요. 환불 정책에 따라 환불 금액이 달라질 수 있어요.
-        </p>
+          <div className="tm-filter-sheet-handle" />
 
-        <label htmlFor="cancel-reason" className="tm-text-caption" style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>
-          취소 사유 (선택)
-        </label>
-        <textarea
-          id="cancel-reason"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="취소 사유를 입력해 주세요."
-          maxLength={200}
-          rows={3}
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: '1px solid var(--grey200)',
-            background: 'var(--surface)',
-            color: 'var(--text-strong)',
-            fontSize: 'var(--font-size-sm)',
-            resize: 'vertical',
-            lineHeight: 1.5,
-          }}
-        />
-
-        {error ? (
-          <div style={{ marginTop: 10 }}>
-            <AlertBanner message={error} />
+          <div className="tm-filter-sheet-head" style={{ marginBottom: 8 }}>
+            <h2
+              id="cancel-modal-title"
+              className="tm-text-body-lg"
+              style={{ color: 'var(--text-strong)' }}
+            >
+              취소 요청
+            </h2>
           </div>
-        ) : null}
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <button
-            type="button"
-            className="tm-btn tm-btn-lg tm-btn-neutral"
-            style={{ flex: 1 }}
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            닫기
-          </button>
-          <button
-            type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
-            style={{ flex: 2, background: 'var(--red500, #ef4444)', borderColor: 'var(--red500, #ef4444)' }}
-            onClick={() => onConfirm(reason)}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? '처리 중…' : '취소 요청'}
-          </button>
-        </div>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 16 }}>
+            취소 요청을 보내면 운영진이 검토 후 처리해요. 환불 정책에 따라 환불 금액이 달라질 수 있어요.
+          </p>
+
+          <label htmlFor="cancel-reason" className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+            취소 사유 (선택)
+          </label>
+          <textarea
+            id="cancel-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="취소 사유를 입력해 주세요."
+            maxLength={200}
+            rows={3}
+            className="tm-input"
+            style={{ width: '100%', resize: 'vertical', lineHeight: 1.5 }}
+          />
+
+          {error ? (
+            <div style={{ marginTop: 10 }}>
+              <AlertBanner message={error} />
+            </div>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-neutral"
+              style={{ flex: 1 }}
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              닫기
+            </button>
+            <button
+              type="button"
+              className="tm-btn tm-btn-lg tm-btn-danger"
+              style={{ flex: 2 }}
+              onClick={() => onConfirm(reason)}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? '처리 중…' : '취소 요청'}
+            </button>
+          </div>
+        </section>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -251,6 +233,7 @@ function RegistrationDetailView({
                 {tournament.title}
               </span>
               <span className={`tm-badge ${statusConfig.badgeClass}`}>
+                <span aria-hidden="true">{statusConfig.icon} </span>
                 {statusConfig.label}
               </span>
             </div>
@@ -311,7 +294,7 @@ function RegistrationDetailView({
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {belowMinimum && !isRosterLocked ? (
-                  <span className="tm-badge tm-badge-red">인원 부족</span>
+                  <span className="tm-badge tm-badge-red"><span aria-hidden="true">▲ </span>인원 부족</span>
                 ) : null}
                 {isRosterLocked ? (
                   <span className="tm-badge tm-badge-grey">잠김</span>
@@ -319,8 +302,7 @@ function RegistrationDetailView({
                 {!isRosterLocked ? (
                   <Link
                     href={`/tournaments/${tournamentId}/registrations/${registration.id}/roster`}
-                    className="tm-btn tm-btn-sm tm-btn-primary"
-                    style={{ minHeight: 36 }}
+                    className="tm-btn tm-btn-md tm-btn-primary"
                     aria-label="선수 명단 수정하기"
                   >
                     명단 수정
@@ -350,8 +332,7 @@ function RegistrationDetailView({
           {canCancelRequest ? (
             <button
               type="button"
-              className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-              style={{ color: 'var(--red600, #dc2626)' }}
+              className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
               onClick={() => { setCancelError(null); setShowCancelModal(true); }}
             >
               취소 요청
@@ -392,7 +373,7 @@ function InfoRow({
   valueColor?: string;
 }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '92px minmax(0, 1fr)', alignItems: 'center', gap: 8 }}>
       <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
         {label}
       </span>

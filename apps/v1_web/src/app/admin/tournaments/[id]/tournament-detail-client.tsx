@@ -85,6 +85,20 @@ const ELIGIBILITY_LABEL: Record<string, string> = {
   needs_review: '검토필요',
 };
 
+// f9: 결제 상태·수단 한글 라벨 (my-registration-client 동일 기준)
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  paid: '결제 완료',
+  pending: '결제 대기',
+  cancelled: '취소됨',
+  refunded: '환불됨',
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  pg: '카드·간편결제',
+  bank_transfer: '계좌이체',
+  vbank: '가상계좌',
+};
+
 // ── Status transition guards ────────────────────────────────────────────────
 
 /** Returns next allowed statuses from the current one */
@@ -487,7 +501,7 @@ function RegistrationsTab({
       render: (r) =>
         r.payment ? (
           <span className="text-[13px] text-gray-600">
-            {r.payment.method === 'pg' ? 'PG' : '무통장'} · {r.payment.status}
+            {PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · {PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status}
           </span>
         ) : (
           <span className="text-[13px] text-gray-400">—</span>
@@ -633,7 +647,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap',
+        'inline-flex items-center gap-1 min-h-[44px] px-2.5 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
         'disabled:opacity-50',
         toneClass,
@@ -896,7 +910,7 @@ function BracketTab({
               type="button"
               onClick={handleRecalculate}
               disabled={recalculate.isPending}
-              className="inline-flex items-center gap-1.5 h-[36px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <RefreshCw size={13} aria-hidden="true" />
               순위 재계산
@@ -1031,7 +1045,7 @@ function BracketTab({
                           setResultOpen(true);
                         }}
                         aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
-                        className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                        className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                       >
                         결과 입력
                       </button>
@@ -1310,7 +1324,7 @@ function AnnouncementsTab({
                     onClick={() => handlePublish(ann.id)}
                     disabled={publishAnnouncement.isPending}
                     aria-label={`"${ann.title}" 발행`}
-                    className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-[12px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
                   >
                     <Send size={12} aria-hidden="true" />
                     발행
@@ -1477,7 +1491,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 'inline-flex items-center min-h-[44px] px-4 rounded-lg text-[13px] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 active
-                  ? 'bg-white text-gray-900 border-b-2 border-blue-500 font-semibold'
+                  ? 'bg-white text-gray-900 shadow-sm font-semibold'
                   : 'text-gray-500 hover:text-gray-700',
               ].join(' ')}
             >

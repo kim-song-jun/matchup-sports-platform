@@ -20,28 +20,28 @@ import type {
 
 /* ── Status helpers ── */
 
-type StatusConfig = { badgeClass: string; label: string; icon: string };
+type StatusConfig = { badgeClass: string; label: string };
 
 function registrationStatusConfig(status: V1TournamentRegistrationStatus): StatusConfig {
   switch (status) {
     case 'draft':
-      return { badgeClass: 'tm-badge-grey', label: '임시저장', icon: '○' };
+      return { badgeClass: 'tm-badge-grey', label: '임시저장' };
     case 'awaiting_payment':
-      return { badgeClass: 'tm-badge-orange', label: '입금 대기', icon: '○' };
+      return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
     case 'payment_checking':
-      return { badgeClass: 'tm-badge-blue', label: '입금 확인 중', icon: '○' };
+      return { badgeClass: 'tm-badge-blue', label: '입금 확인 중' };
     case 'paid':
-      return { badgeClass: 'tm-badge-blue', label: '결제 완료', icon: '●' };
+      return { badgeClass: 'tm-badge-blue', label: '결제 완료' };
     case 'confirmed':
-      return { badgeClass: 'tm-badge-green', label: '참가 확정', icon: '●' };
+      return { badgeClass: 'tm-badge-green', label: '참가 확정' };
     case 'waitlisted':
-      return { badgeClass: 'tm-badge-orange', label: '대기팀', icon: '○' };
+      return { badgeClass: 'tm-badge-orange', label: '대기팀' };
     case 'cancel_requested':
-      return { badgeClass: 'tm-badge-red', label: '취소 요청 중', icon: '○' };
+      return { badgeClass: 'tm-badge-red', label: '취소 요청 중' };
     case 'cancelled':
-      return { badgeClass: 'tm-badge-grey', label: '취소', icon: '✕' };
+      return { badgeClass: 'tm-badge-grey', label: '취소' };
     default:
-      return { badgeClass: 'tm-badge-grey', label: status, icon: '○' };
+      return { badgeClass: 'tm-badge-grey', label: status };
   }
 }
 
@@ -73,16 +73,16 @@ function formatDateShort(dateStr: string | null): string {
 /* ── Alert banner ── */
 
 function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
-  const styles: Record<string, { bg: string; border: string; color: string }> = {
-    error: { bg: 'var(--red50)', border: 'var(--red500)', color: 'var(--red500)' },
-    info: { bg: 'var(--blue50)', border: 'var(--blue500)', color: 'var(--blue600)' },
-    warning: { bg: 'var(--orange50)', border: 'var(--orange500)', color: 'var(--orange500)' },
+  const styles: Record<string, { bg: string; color: string }> = {
+    error: { bg: 'var(--red50)', color: 'var(--red500)' },
+    info: { bg: 'var(--blue50)', color: 'var(--blue500)' },
+    warning: { bg: 'var(--orange50)', color: 'var(--orange500)' },
   };
   const s = styles[tone];
   return (
     <div
       role="alert"
-      style={{ padding: '10px 14px', borderRadius: 10, background: s.bg, border: `1px solid ${s.border}`, color: s.color, lineHeight: 1.55 }}
+      style={{ padding: '10px 14px', borderRadius: 10, background: s.bg, color: s.color, lineHeight: 1.55 }}
       className="tm-text-caption"
     >
       {message}
@@ -233,12 +233,11 @@ function RegistrationDetailView({
                 {tournament.title}
               </span>
               <span className={`tm-badge ${statusConfig.badgeClass}`}>
-                <span aria-hidden="true">{statusConfig.icon} </span>
                 {statusConfig.label}
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               <InfoRow label="신청일" value={formatDateShort(registration.createdAt)} />
               {registration.confirmedAt ? (
                 <InfoRow label="확정일" value={formatDateShort(registration.confirmedAt)} />
@@ -255,7 +254,7 @@ function RegistrationDetailView({
           <SectionTitle title="결제 정보" />
           <Card pad={16} style={{ marginTop: 8 }}>
             {registration.payment ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <InfoRow label="결제 수단" value={paymentMethodLabel(registration.payment.method)} />
                 <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} valueColor="var(--blue500)" />
                 <InfoRow label="결제 상태" value={paymentStatusLabel(registration.payment.status)} />
@@ -264,7 +263,7 @@ function RegistrationDetailView({
                 ) : null}
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
                 {registration.depositorName ? (
                   <InfoRow label="입금자명" value={registration.depositorName} />
@@ -294,7 +293,7 @@ function RegistrationDetailView({
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {belowMinimum && !isRosterLocked ? (
-                  <span className="tm-badge tm-badge-red"><span aria-hidden="true">▲ </span>인원 부족</span>
+                  <span className="tm-badge tm-badge-red">인원 부족</span>
                 ) : null}
                 {isRosterLocked ? (
                   <span className="tm-badge tm-badge-grey">잠김</span>
@@ -373,11 +372,11 @@ function InfoRow({
   valueColor?: string;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '92px minmax(0, 1fr)', alignItems: 'center', gap: 8 }}>
-      <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+    <div className="tm-info-row" style={{ padding: '0' }}>
+      <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
         {label}
       </span>
-      <span className="tm-text-label" style={{ color: valueColor ?? 'var(--text-strong)', fontWeight: 600 }}>
+      <span className="tm-text-label" style={{ textAlign: 'right', color: valueColor ?? 'var(--text-strong)' }}>
         {value}
       </span>
     </div>

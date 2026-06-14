@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { TrophyIcon } from '@/components/v1-ui/icons';
+import { TrophyIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 
 /** 홈 "오늘의 추천"의 대회 슬롯 — 모집중 대회가 있으면 실데이터, 없으면 티저 fallback. */
@@ -27,8 +27,11 @@ export function TournamentTeaserCard() {
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-micro" style={{ color: 'var(--blue500)', marginBottom: 2 }}>
-            {featured ? '대회 · 모집중' : '대회 · 풋살'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
+              대회
+            </span>
+            {featured && <span className="tm-badge tm-badge-blue">모집중</span>}
           </div>
           <div className="tm-text-label line-clamp-1" style={{ color: 'var(--text-strong)' }}>
             {featured ? featured.title : '상금 걸린 풋살 대회, 팀과 함께 도전!'}
@@ -40,16 +43,7 @@ export function TournamentTeaserCard() {
           </div>
         </div>
 
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden="true"
-          style={{ flexShrink: 0, color: 'var(--text-muted)' }}
-        >
-          <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronRightIcon size={16} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
       </div>
     </Link>
   );

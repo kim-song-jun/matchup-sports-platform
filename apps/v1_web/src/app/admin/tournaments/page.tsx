@@ -11,7 +11,6 @@ import type { V1Tournament, V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
-  AdminFilterBar,
   AdminDataTable,
   AdminStatusPill,
   AdminEmpty,
@@ -53,17 +52,6 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'completed', label: '완료' },
   { value: 'cancelled', label: '취소됨' },
 ];
-
-// ── Tournament status labels/pills (extend STATUS_META pattern) ───────────
-
-const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
-  draft: '초안',
-  open: '접수중',
-  closed: '마감',
-  in_progress: '진행중',
-  completed: '완료',
-  cancelled: '취소됨',
-};
 
 // ── Page ──────────────────────────────────────────────────────────────────
 
@@ -140,10 +128,7 @@ export default function AdminTournamentsPage() {
       key: 'status',
       header: '상태',
       render: (row) => (
-        <AdminStatusPill
-          status={row.status}
-          label={TOURNAMENT_STATUS_LABEL[row.status] ?? row.status}
-        />
+        <AdminStatusPill status={row.status} />
       ),
     },
     {
@@ -202,15 +187,30 @@ export default function AdminTournamentsPage() {
         }
       />
 
-      {/* Status chip filter */}
+      {/* Status chip filter — no search box (backend has no q for tournaments) */}
       <div className="mb-4">
-        <AdminFilterBar
-          searchValue=""
-          onSearchChange={() => {}}
-          statusOptions={STATUS_OPTIONS}
-          activeStatus={activeStatus}
-          onStatusChange={handleStatusChange}
-        />
+        <div role="group" aria-label="상태 필터" className="flex items-center gap-1.5 flex-wrap">
+          {STATUS_OPTIONS.map((opt) => {
+            const active = activeStatus === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleStatusChange(opt.value)}
+                aria-pressed={active}
+                className={[
+                  'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
+                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                  active
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Data table */}

@@ -22,23 +22,22 @@ export default function TournamentsPage() {
 type StatusConfig = {
   badgeClass: string;
   label: string;
-  icon: string;
 };
 
 function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
   switch (status) {
     case 'open':
-      return { badgeClass: 'tm-badge-blue', label: '모집중', icon: '●' };
+      return { badgeClass: 'tm-badge-blue', label: '모집중' };
     case 'in_progress':
-      return { badgeClass: 'tm-badge-green', label: '진행중', icon: '▶' };
+      return { badgeClass: 'tm-badge-green', label: '진행중' };
     case 'completed':
-      return { badgeClass: 'tm-badge-grey', label: '종료', icon: '■' };
+      return { badgeClass: 'tm-badge-grey', label: '종료' };
     case 'closed':
-      return { badgeClass: 'tm-badge-grey', label: '마감', icon: '■' };
+      return { badgeClass: 'tm-badge-grey', label: '마감' };
     case 'cancelled':
-      return { badgeClass: 'tm-badge-red', label: '취소', icon: '✕' };
+      return { badgeClass: 'tm-badge-red', label: '취소' };
     default:
-      return { badgeClass: 'tm-badge-grey', label: status, icon: '○' };
+      return { badgeClass: 'tm-badge-grey', label: status };
   }
 }
 
@@ -201,7 +200,6 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             {item.title}
           </div>
           <span className={`tm-badge ${status.badgeClass}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-            <span aria-hidden="true">{status.icon}&nbsp;</span>
             {status.label}
           </span>
         </div>

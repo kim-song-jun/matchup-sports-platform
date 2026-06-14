@@ -17,22 +17,22 @@ import type {
 
 /* ── Status helpers ── */
 
-type StatusConfig = { badgeClass: string; label: string; icon: string };
+type StatusConfig = { badgeClass: string; label: string };
 
 function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
   switch (status) {
     case 'open':
-      return { badgeClass: 'tm-badge-blue', label: '모집중', icon: '●' };
+      return { badgeClass: 'tm-badge-blue', label: '모집중' };
     case 'in_progress':
-      return { badgeClass: 'tm-badge-green', label: '진행중', icon: '▶' };
+      return { badgeClass: 'tm-badge-green', label: '진행중' };
     case 'completed':
-      return { badgeClass: 'tm-badge-grey', label: '종료', icon: '■' };
+      return { badgeClass: 'tm-badge-grey', label: '종료' };
     case 'closed':
-      return { badgeClass: 'tm-badge-grey', label: '마감', icon: '■' };
+      return { badgeClass: 'tm-badge-grey', label: '마감' };
     case 'cancelled':
-      return { badgeClass: 'tm-badge-red', label: '취소', icon: '✕' };
+      return { badgeClass: 'tm-badge-red', label: '취소' };
     default:
-      return { badgeClass: 'tm-badge-grey', label: status, icon: '○' };
+      return { badgeClass: 'tm-badge-grey', label: status };
   }
 }
 
@@ -71,6 +71,45 @@ function formatPublishedAt(dateStr: string): string {
 
 /* ── Apply CTA ── */
 
+function ApplyCTAButtons({
+  tournament,
+  isFull,
+}: {
+  tournament: V1TournamentDetail;
+  isFull: boolean;
+}) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+      <Link
+        href={`/tournaments/${tournament.id}/my`}
+        className="tm-btn tm-btn-lg tm-btn-neutral"
+        aria-label="내 신청 상태 확인"
+      >
+        내 신청
+      </Link>
+      {isFull ? (
+        <button
+          type="button"
+          className="tm-btn tm-btn-lg tm-btn-primary"
+          disabled
+          aria-disabled="true"
+          aria-label="모집이 마감되었어요"
+        >
+          모집 마감
+        </button>
+      ) : (
+        <Link
+          href={`/tournaments/${tournament.id}/apply`}
+          className="tm-btn tm-btn-lg tm-btn-primary"
+          aria-label="참가 신청하기"
+        >
+          참가 신청하기
+        </Link>
+      )}
+    </div>
+  );
+}
+
 function ApplyCTA({ tournament }: { tournament: V1TournamentDetail }) {
   const isOpen = tournament.status === 'open';
   const isFull = tournament.confirmedCount >= tournament.teamCount;
@@ -78,35 +117,9 @@ function ApplyCTA({ tournament }: { tournament: V1TournamentDetail }) {
   if (!isOpen) return null;
 
   return (
-    <div className="tm-fixed-cta">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-        <Link
-          href={`/tournaments/${tournament.id}/my`}
-          className="tm-btn tm-btn-lg tm-btn-neutral"
-          aria-label="내 신청 상태 확인"
-        >
-          내 신청
-        </Link>
-        {isFull ? (
-          <button
-            type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
-            disabled
-            aria-disabled="true"
-            aria-label="모집이 마감되었어요"
-          >
-            모집 마감
-          </button>
-        ) : (
-          <Link
-            href={`/tournaments/${tournament.id}/apply`}
-            className="tm-btn tm-btn-lg tm-btn-primary"
-            aria-label="참가 신청하기"
-          >
-            참가 신청하기
-          </Link>
-        )}
-      </div>
+    /* Mobile-only fixed CTA — hidden on desktop via .tm-hide-desktop */
+    <div className="tm-fixed-cta tm-hide-desktop">
+      <ApplyCTAButtons tournament={tournament} isFull={isFull} />
     </div>
   );
 }
@@ -152,8 +165,11 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
   const hasGroups = tournament.groups.length > 0;
   const hasFixtures = tournament.fixtures.length > 0;
   const hasAnnouncements = tournament.announcements.length > 0;
-  // Extra bottom padding when sticky CTA is shown so content isn't occluded
-  const bottomPad = tournament.status === 'open' ? 96 : 48;
+  const isOpen = tournament.status === 'open';
+  const isFull = tournament.confirmedCount >= tournament.teamCount;
+  // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
+  // Desktop: .tm-hide-desktop removes the fixed CTA; inline CTA follows in document flow.
+  const bottomPad = isOpen ? 96 : 48;
 
   return (
     <article style={{ padding: `0 20px ${bottomPad}px` }}>
@@ -183,7 +199,6 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
             </h1>
             <div style={{ marginTop: 5 }}>
               <span className={`tm-badge ${status.badgeClass}`}>
-                <span aria-hidden="true">{status.icon}&nbsp;</span>
                 {status.label}
               </span>
             </div>
@@ -197,27 +212,23 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
               <InfoRow
                 label="신청 마감"
                 value={formatTournamentDate(tournament.registrationDeadlineAt)}
-                divider
               />
             ) : null}
             {tournament.venue ? (
-              <InfoRow label="장소" value={tournament.venue} divider />
+              <InfoRow label="장소" value={tournament.venue} />
             ) : null}
             <InfoRow
               label="참가비"
               value={formatEntryFee(tournament.entryFee)}
               valueColor="var(--blue500)"
-              divider
             />
             <InfoRow
               label="정원"
               value={`${tournament.confirmedCount}/${tournament.teamCount}팀 확정`}
-              divider
             />
             <InfoRow
               label="선수단 규모"
               value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
-              divider
             />
           </div>
         </Card>
@@ -305,6 +316,18 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
           </Card>
         </section>
       ) : null}
+
+      {/* ── Desktop inline CTA (replaces fixed bottom bar on ≥1024px) ── */}
+      {isOpen ? (
+        <div
+          className="tm-show-desktop"
+          role="complementary"
+          aria-label="참가 신청"
+          style={{ marginTop: 32 }}
+        >
+          <ApplyCTAButtons tournament={tournament} isFull={isFull} />
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -314,22 +337,14 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
 function InfoRow({
   label,
   value,
-  divider = false,
   valueColor,
 }: {
   label: string;
   value: string;
-  divider?: boolean;
   valueColor?: string;
 }) {
   return (
-    <div
-      className="tm-info-row"
-      style={{
-        borderTop: divider ? '1px solid var(--grey100)' : undefined,
-        padding: '12px 16px',
-      }}
-    >
+    <div className="tm-info-row" style={{ padding: '0 16px' }}>
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
         {label}
       </div>

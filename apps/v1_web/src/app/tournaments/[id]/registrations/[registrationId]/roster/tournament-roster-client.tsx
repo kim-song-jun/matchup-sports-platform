@@ -43,16 +43,16 @@ function formatDate(dateStr: string | null): string {
 /* ── Error / info banner ── */
 
 function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
-  const styles: Record<string, { bg: string; border: string; color: string }> = {
-    error: { bg: 'var(--red50)', border: 'var(--red500)', color: 'var(--red500)' },
-    info: { bg: 'var(--blue50)', border: 'var(--blue500)', color: 'var(--blue600)' },
-    warning: { bg: 'var(--orange50)', border: 'var(--orange500)', color: 'var(--orange500)' },
+  const styles: Record<string, { bg: string; color: string }> = {
+    error: { bg: 'var(--red50)', color: 'var(--red500)' },
+    info: { bg: 'var(--blue50)', color: 'var(--blue500)' },
+    warning: { bg: 'var(--orange50)', color: 'var(--orange500)' },
   };
   const s = styles[tone];
   return (
     <div
       role="alert"
-      style={{ padding: '10px 14px', borderRadius: 10, background: s.bg, border: `1px solid ${s.border}`, color: s.color, lineHeight: 1.55 }}
+      style={{ padding: '10px 14px', borderRadius: 10, background: s.bg, color: s.color, lineHeight: 1.55 }}
       className="tm-text-caption"
     >
       {message}
@@ -117,7 +117,7 @@ function AddPlayerForm({
             value={form.userId}
             onChange={(e) => patch({ userId: e.target.value.trim() })}
             placeholder="userId 입력"
-            style={inputStyle}
+            className="tm-input"
             aria-required="true"
           />
         </FormField>
@@ -130,7 +130,7 @@ function AddPlayerForm({
             onChange={(e) => patch({ realName: e.target.value })}
             placeholder="실명 입력"
             maxLength={30}
-            style={inputStyle}
+            className="tm-input"
             aria-required="true"
           />
         </FormField>
@@ -141,7 +141,7 @@ function AddPlayerForm({
             type="date"
             value={form.birthDate}
             onChange={(e) => patch({ birthDate: e.target.value })}
-            style={inputStyle}
+            className="tm-input"
           />
         </FormField>
 
@@ -201,18 +201,6 @@ function AddPlayerForm({
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid var(--grey200)',
-  background: 'var(--surface)',
-  color: 'var(--text-strong)',
-  fontSize: undefined,
-  outline: 'none',
-  minHeight: 44,
-};
 
 function FormField({
   id,
@@ -465,7 +453,7 @@ export function TournamentRosterPageClient({
             </button>
           ) : null}
           {atMax && !isRosterLocked ? (
-            <span className="tm-badge tm-badge-grey tm-text-micro" style={{ flexShrink: 0 }}>
+            <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>
               최대 인원 도달
             </span>
           ) : null}

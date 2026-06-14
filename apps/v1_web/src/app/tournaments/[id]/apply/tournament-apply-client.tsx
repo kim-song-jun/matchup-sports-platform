@@ -64,16 +64,14 @@ function StepIndicator({ current }: { current: ApplyStep }) {
 
 function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
   const bg = tone === 'error' ? 'var(--red50)' : tone === 'warning' ? 'var(--orange50)' : 'var(--blue50)';
-  const border = tone === 'error' ? 'var(--red500)' : tone === 'warning' ? 'var(--orange500)' : 'var(--blue500)';
   const color = tone === 'error' ? 'var(--red500)' : tone === 'warning' ? 'var(--orange500)' : 'var(--blue500)';
   return (
     <div
       role="alert"
       style={{
         padding: '10px 14px',
-        borderRadius: 14,
+        borderRadius: 10,
         background: bg,
-        border: `1px solid ${border}`,
         color,
         lineHeight: 1.55,
       }}

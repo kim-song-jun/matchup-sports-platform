@@ -29,6 +29,12 @@ export function TournamentTeaserCard() {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            {/* [f10] eyebrow 색 위계 통일 —
+                  추천매치 카드(home-page.tsx L240)의 eyebrow는 var(--blue500) 액센트.
+                  여기는 blue50 배경 위에 파랑 eyebrow를 추가하면 청색 과부하이므로
+                  eyebrow를 var(--text-muted) 중립으로 유지하고,
+                  파란 액세트 신호는 옆 tm-badge-blue('모집중')에 위임한다.
+                  → cross-card 위계 불일치 해소: 액센트 역할은 badge가 단독 담당. */}
             <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
               대회
             </span>

@@ -248,7 +248,7 @@ function TeamSelectStep({
         {tournament.entryFee > 0 ? (
           <Card pad={14} style={{ marginTop: 16, background: 'var(--grey50)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              <span className="tm-text-caption">
                 참가비
               </span>
               <span className="tm-text-label" style={{ color: 'var(--blue500)', fontWeight: 700 }}>
@@ -392,7 +392,7 @@ function AgreementsStep({
 
         {state.paymentMethod === 'bank_transfer' ? (
           <Card pad={14} style={{ marginTop: 10 }}>
-            <label htmlFor="depositor-name" className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>
+            <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 6 }}>
               입금자명 <span style={{ color: 'var(--red500)' }}>*</span>
             </label>
             <input
@@ -686,7 +686,7 @@ function PaymentGuideStep({
             결제 정보 확인
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            <span className="tm-text-caption">
               대회명
             </span>
             <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>
@@ -694,7 +694,7 @@ function PaymentGuideStep({
             </span>
           </div>
           <div style={{ borderTop: '1px solid var(--grey100)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+            <span className="tm-text-caption">
               결제 금액
             </span>
             <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue500)', fontWeight: 800 }}>
@@ -741,7 +741,7 @@ function BankInfoRow({
 }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+      <span className="tm-text-caption">
         {label}
       </span>
       <span className="tm-text-label" style={{ color: valueColor ?? 'var(--text-strong)', fontWeight: 600 }}>

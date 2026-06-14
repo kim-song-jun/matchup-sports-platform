@@ -775,17 +775,16 @@ function BracketTab({
     });
   };
 
-  if (isPending) return <AdminTableSkeleton cols={4} />;
-  if (isError) {
+  if (isPending || isError) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 text-center">
-        <p className="text-sm text-red-500 mb-3">
-          {extractErrorMessage(error, '대진 정보를 불러오지 못했어요.')}
-        </p>
-        <button type="button" onClick={() => void refetch()} className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded">
-          다시 시도하기
-        </button>
-      </div>
+      <AdminDataTable
+        columns={[]}
+        rows={[]}
+        keyExtractor={() => ''}
+        loading={isPending}
+        error={isError ? extractErrorMessage(error, '대진 정보를 불러오지 못했어요.') : undefined}
+        onRetry={() => void refetch()}
+      />
     );
   }
 
@@ -1494,7 +1493,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         role="tablist"
         aria-label="대회 운영 탭"
-        className="flex gap-0.5 bg-gray-100 rounded-xl p-1 mb-5 w-fit"
+        className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 w-fit"
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
@@ -1511,7 +1510,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 'inline-flex items-center min-h-[44px] px-4 rounded-lg text-[13px] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 active
-                  ? 'bg-white text-gray-900 shadow-sm font-semibold'
+                  ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700',
               ].join(' ')}
             >

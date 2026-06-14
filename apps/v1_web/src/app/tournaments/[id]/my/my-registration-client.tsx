@@ -378,22 +378,15 @@ function InfoRow({
 }) {
   return (
     <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 14,
-        paddingTop: 10,
-        paddingBottom: 10,
-        borderBottom: isLast ? 'none' : '1px solid var(--grey100)',
-      }}
+      className="tm-info-row"
+      style={{ ...(isLast ? { borderBottom: 'none' } : {}) }}
     >
-      <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
         {label}
-      </span>
-      <span className="tm-text-label" style={{ textAlign: 'right', color: valueColor ?? 'var(--text-strong)' }}>
+      </div>
+      <div className="tm-text-label" style={{ textAlign: 'right', color: valueColor ?? 'var(--text-strong)' }}>
         {value}
-      </span>
+      </div>
     </div>
   );
 }
@@ -402,20 +395,22 @@ function InfoRow({
 
 function NoRegistrationState({ tournamentId }: { tournamentId: string }) {
   return (
-    <div style={{ padding: '0 20px', marginTop: 40, textAlign: 'center' }}>
-      <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>
-        신청 내역이 없어요
-      </div>
-      <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-        신청 완료 후 이 페이지에서 상태를 확인할 수 있어요.
-      </p>
-      <Link
-        href={`/tournaments/${tournamentId}/apply`}
-        className="tm-btn tm-btn-lg tm-btn-primary"
-        style={{ marginTop: 24, display: 'inline-block' }}
-      >
-        참가 신청하기
-      </Link>
+    <div style={{ padding: '0 20px', marginTop: 16 }}>
+      <Card pad={32} style={{ textAlign: 'center' }}>
+        <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>
+          신청 내역이 없어요
+        </div>
+        <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          신청 완료 후 이 페이지에서 상태를 확인할 수 있어요.
+        </p>
+        <Link
+          href={`/tournaments/${tournamentId}/apply`}
+          className="tm-btn tm-btn-lg tm-btn-primary"
+          style={{ marginTop: 24, display: 'inline-block' }}
+        >
+          참가 신청하기
+        </Link>
+      </Card>
     </div>
   );
 }

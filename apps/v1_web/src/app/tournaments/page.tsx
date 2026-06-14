@@ -79,10 +79,10 @@ function TournamentsListContent() {
   };
 
   return (
-    <div style={{ padding: '0 20px 48px' }}>
+    <div className="tm-tournament-list" style={{ padding: '0 20px 48px' }}>
       {/* ── Hero banner ── */}
       <section aria-labelledby="tournament-hero-heading" style={{ marginTop: 24 }}>
-        <Card pad={0} style={{ overflow: 'hidden' }}>
+        <Card pad={0} className="tm-tournament-hero-card" style={{ overflow: 'hidden' }}>
           <div
             style={{
               background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
@@ -112,7 +112,6 @@ function TournamentsListContent() {
               className="tm-text-micro"
               style={{
                 color: 'rgba(255,255,255,0.75)',
-                letterSpacing: '-0.2px',
               }}
             >
               상금 대회
@@ -154,6 +153,7 @@ function TournamentsListContent() {
             <div
               role="list"
               aria-label="대회 목록"
+              className="tm-tournament-card-stack"
               style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}
             >
               {displayItems.map((item) => (

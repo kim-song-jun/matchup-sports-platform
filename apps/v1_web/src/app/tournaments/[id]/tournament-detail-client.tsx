@@ -357,7 +357,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
             aria-label="참가 신청"
           >
             <div className="tm-match-detail-desktop-cta-label">
-              <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
                 참가 신청
               </div>
               <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
@@ -447,7 +447,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span className="tm-text-caption" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+          <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             {roundLabel}
           </span>
           {fixture.scheduledAt ? (
@@ -502,8 +502,8 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
             </div>
           ) : (
             <div
-              className="tm-text-caption"
-              style={{ color: 'var(--text-caption)', fontWeight: 700, letterSpacing: 1 }}
+              className="tm-text-label"
+              style={{ color: 'var(--text-caption)', letterSpacing: 1 }}
             >
               VS
             </div>
@@ -576,7 +576,7 @@ function StandingRow({ standing, rank }: { standing: V1TournamentStanding; rank:
       >
         <span
           className="tm-text-caption tab-num"
-          style={{ fontWeight: isTop ? 700 : 400, color: isTop ? 'var(--blue500)' : 'var(--text-caption)' }}
+          style={{ color: isTop ? 'var(--blue500)' : 'var(--text-caption)' }}
         >
           {rank}
         </span>
@@ -584,12 +584,12 @@ function StandingRow({ standing, rank }: { standing: V1TournamentStanding; rank:
       <td
         style={{ padding: '8px 4px', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
       >
-        <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: isTop ? 600 : 400 }}>
+        <span className="tm-text-label" style={{ color: isTop ? 'var(--blue500)' : 'var(--text-strong)' }}>
           {standing.teamName}
         </span>
       </td>
       <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-caption tab-num" style={{ fontWeight: 700, color: 'var(--text-strong)' }}>
+        <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
           {standing.points}
         </span>
       </td>
@@ -613,7 +613,7 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
   return (
     <Card pad={0}>
       <div style={{ padding: '12px 14px 8px' }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+        <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
           {group.name}
         </div>
       </div>
@@ -627,35 +627,35 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
               <th
                 scope="col"
                 className="tm-text-micro"
-                style={{ padding: '6px 8px 6px 0', color: 'var(--text-caption)', textAlign: 'center', fontWeight: 600, width: 32, whiteSpace: 'nowrap' }}
+                style={{ padding: '6px 8px 6px 0', color: 'var(--text-caption)', textAlign: 'center', width: 32, whiteSpace: 'nowrap' }}
               >
                 순위
               </th>
               <th
                 scope="col"
                 className="tm-text-micro"
-                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'left', fontWeight: 600 }}
+                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'left' }}
               >
                 팀
               </th>
               <th
                 scope="col"
                 className="tm-text-micro"
-                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'center', fontWeight: 600 }}
+                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'center' }}
               >
                 승점
               </th>
               <th
                 scope="col"
                 className="tm-text-micro"
-                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'center', fontWeight: 600 }}
+                style={{ padding: '6px 4px', color: 'var(--text-caption)', textAlign: 'center' }}
               >
                 전적
               </th>
               <th
                 scope="col"
                 className="tm-text-micro"
-                style={{ padding: '6px 0 6px 4px', color: 'var(--text-caption)', textAlign: 'center', fontWeight: 600 }}
+                style={{ padding: '6px 0 6px 4px', color: 'var(--text-caption)', textAlign: 'center' }}
               >
                 득실
               </th>
@@ -690,7 +690,7 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
   return (
     <Card pad={16}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600, flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label" style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0 }}>
           {announcement.title}
         </div>
         <span className="tm-text-micro" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>

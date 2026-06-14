@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
 import {
   useV1Tournament,
   useV1MyTeams,
@@ -60,28 +60,6 @@ function StepIndicator({ current }: { current: ApplyStep }) {
   );
 }
 
-/* ── Error / info banner ── */
-
-function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
-  const bg = tone === 'error' ? 'var(--red50)' : tone === 'warning' ? 'var(--orange50)' : 'var(--blue50)';
-  const color = tone === 'error' ? 'var(--red500)' : tone === 'warning' ? 'var(--orange500)' : 'var(--blue500)';
-  return (
-    <div
-      role="alert"
-      style={{
-        padding: '10px 14px',
-        borderRadius: 10,
-        background: bg,
-        color,
-        lineHeight: 1.55,
-      }}
-      className="tm-text-caption"
-    >
-      {message}
-    </div>
-  );
-}
-
 /* ── Step 1: Team selection ── */
 
 function TeamSelectStep({
@@ -105,7 +83,7 @@ function TeamSelectStep({
   return (
     <div style={{ padding: '0 20px 120px' }}>
       <section aria-labelledby="team-select-heading" style={{ marginTop: 20 }}>
-        <SectionTitle title="참가 팀 선택" />
+        <SectionTitle id="team-select-heading" title="참가 팀 선택" />
         <p
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', marginTop: 4, marginBottom: 12, lineHeight: 1.6 }}
@@ -338,7 +316,7 @@ function AgreementsStep({
     <div style={{ padding: '0 20px 120px' }}>
       {/* Required consents */}
       <section aria-labelledby="consent-heading" style={{ marginTop: 20 }}>
-        <SectionTitle title="필수 동의" />
+        <SectionTitle id="consent-heading" title="필수 동의" />
         <Card pad={0} style={{ marginTop: 8 }}>
           <CheckRow
             id="agree-rules"
@@ -365,7 +343,7 @@ function AgreementsStep({
 
       {/* Optional consents */}
       <section aria-labelledby="optional-consent-heading" style={{ marginTop: 16 }}>
-        <SectionTitle title="선택 동의" />
+        <SectionTitle id="optional-consent-heading" title="선택 동의" />
         <Card pad={0} style={{ marginTop: 8 }}>
           <CheckRow
             id="agree-media"
@@ -378,7 +356,7 @@ function AgreementsStep({
 
       {/* Payment method */}
       <section aria-labelledby="payment-method-heading" style={{ marginTop: 16 }}>
-        <SectionTitle title="결제 수단" />
+        <SectionTitle id="payment-method-heading" title="결제 수단" />
         <div
           role="radiogroup"
           aria-labelledby="payment-method-heading"
@@ -476,7 +454,8 @@ function CheckRow({
   divider?: boolean;
 }) {
   return (
-    <div
+    <label
+      htmlFor={id}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -484,20 +463,28 @@ function CheckRow({
         padding: '13px 14px',
         borderTop: divider ? '1px solid var(--grey100)' : undefined,
         minHeight: 44,
+        cursor: 'pointer',
       }}
     >
+      {/* sr-only real checkbox for accessibility */}
       <input
         id={id}
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        style={{ width: 20, height: 20, flexShrink: 0, accentColor: 'var(--blue500)', cursor: 'pointer' }}
-        aria-checked={checked}
+        className="sr-only"
       />
-      <label htmlFor={id} className="tm-text-body" style={{ color: 'var(--text-strong)', cursor: 'pointer', flex: 1 }}>
+      {/* Themed visual indicator — matches auth/terms flow */}
+      <span
+        aria-hidden="true"
+        className={`tm-auth-check${checked ? ' tm-auth-check-on' : ''}`}
+      >
+        ✓
+      </span>
+      <span className="tm-text-body" style={{ color: 'var(--text-strong)', flex: 1 }}>
         {label}
-      </label>
-    </div>
+      </span>
+    </label>
   );
 }
 
@@ -529,6 +516,7 @@ function PaymentMethodRadio({
         htmlFor={id}
         style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', minHeight: 44 }}
       >
+        {/* sr-only real radio for accessibility */}
         <input
           id={id}
           type="radio"
@@ -536,8 +524,35 @@ function PaymentMethodRadio({
           value={value}
           checked={selected}
           onChange={onSelect}
-          style={{ width: 20, height: 20, flexShrink: 0, accentColor: 'var(--blue500)' }}
+          className="sr-only"
         />
+        {/* Themed circular radio indicator */}
+        <span
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
+            border: selected ? '2px solid var(--blue500)' : '1px solid var(--grey200)',
+            background: selected ? 'var(--blue500)' : 'var(--bg)',
+            display: 'grid',
+            placeItems: 'center',
+            transition: 'border-color 0.15s, background 0.15s',
+          }}
+        >
+          {selected && (
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'var(--static-white)',
+                display: 'block',
+              }}
+            />
+          )}
+        </span>
         <div>
           <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
             {label}

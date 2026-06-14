@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { TrophyIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
+import { formatTournamentDateShort } from '@/lib/date-utils';
 
 /** 홈 "오늘의 추천"의 대회 슬롯 — 모집중 대회가 있으면 실데이터, 없으면 티저 fallback. */
 export function TournamentTeaserCard() {
@@ -17,7 +18,7 @@ export function TournamentTeaserCard() {
   const ariaLabel = featured
     ? `대회 상세 — ${featured.title}`
     : '대회 페이지로 이동 — 상금 걸린 풋살 대회';
-  const dateLabel = formatTeaserDate(featured?.scheduledAt ?? null);
+  const dateLabel = formatTournamentDateShort(featured?.scheduledAt ?? null);
 
   return (
     <Link className="tm-pressable tm-tournament-teaser" href={href} aria-label={ariaLabel}>
@@ -47,12 +48,4 @@ export function TournamentTeaserCard() {
       </div>
     </Link>
   );
-}
-
-function formatTeaserDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
 }

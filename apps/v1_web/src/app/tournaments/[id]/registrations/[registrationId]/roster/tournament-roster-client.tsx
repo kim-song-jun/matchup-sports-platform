@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
 import {
   useV1TournamentPlayers,
   useV1Tournament,
@@ -38,26 +38,6 @@ function formatDate(dateStr: string | null): string {
   if (!dateStr) return '미입력';
   const d = new Date(dateStr);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/* ── Error / info banner ── */
-
-function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
-  const styles: Record<string, { bg: string; color: string }> = {
-    error: { bg: 'var(--red50)', color: 'var(--red500)' },
-    info: { bg: 'var(--blue50)', color: 'var(--blue500)' },
-    warning: { bg: 'var(--orange50)', color: 'var(--orange500)' },
-  };
-  const s = styles[tone];
-  return (
-    <div
-      role="alert"
-      style={{ padding: '10px 14px', borderRadius: 10, background: s.bg, color: s.color, lineHeight: 1.55 }}
-      className="tm-text-caption"
-    >
-      {message}
-    </div>
-  );
 }
 
 /* ── Add player form ── */
@@ -145,7 +125,7 @@ function AddPlayerForm({
           />
         </FormField>
 
-        <FormField id="player-eligibility" label="선출 여부">
+        <FormField id="player-eligibility" label="선출 여부" labelId="eligibility-label">
           <div role="radiogroup" aria-labelledby="eligibility-label" style={{ display: 'flex', gap: 10 }}>
             {(['non_pro', 'pro'] as const).map((val) => (
               <label
@@ -208,16 +188,20 @@ function FormField({
   required,
   hint,
   children,
+  labelId,
 }: {
   id: string;
   label: string;
   required?: boolean;
   hint?: string;
   children: React.ReactNode;
+  /** Optional id for the label element, used when the child is a radiogroup that needs aria-labelledby. */
+  labelId?: string;
 }) {
   return (
     <div>
       <label
+        id={labelId}
         htmlFor={id}
         className="tm-text-caption"
         style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 5 }}
@@ -263,15 +247,10 @@ function PlayerRow({
       {/* Avatar placeholder */}
       <div
         aria-hidden="true"
+        className="tm-review-avatar"
         style={{
-          flexShrink: 0,
           width: 36,
           height: 36,
-          borderRadius: '50%',
-          background: 'var(--grey100)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--text-caption)',
           fontSize: 14,
           fontWeight: 700,
         }}

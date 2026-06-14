@@ -188,10 +188,11 @@ export default function AdminTournamentsNewPage() {
                 />
               </FormField>
 
-              <FormField id="scheduled-at" label="대회 일정">
+              <FormField id="scheduled-at" label="대회 일정" hint="형식: YYYY.MM.DD HH:MM">
                 <input
                   id="scheduled-at"
                   type="datetime-local"
+                  lang="ko"
                   value={scheduledAt}
                   onChange={(e) => setScheduledAt(e.target.value)}
                   disabled={isPending}
@@ -199,10 +200,11 @@ export default function AdminTournamentsNewPage() {
                 />
               </FormField>
 
-              <FormField id="registration-deadline-at" label="신청 마감일">
+              <FormField id="registration-deadline-at" label="신청 마감일" hint="형식: YYYY.MM.DD HH:MM">
                 <input
                   id="registration-deadline-at"
                   type="datetime-local"
+                  lang="ko"
                   value={registrationDeadlineAt}
                   onChange={(e) => setRegistrationDeadlineAt(e.target.value)}
                   disabled={isPending}
@@ -377,9 +379,7 @@ export default function AdminTournamentsNewPage() {
             className={[
               'inline-flex items-center justify-center h-[48px] px-8 rounded-xl text-[15px] font-semibold transition-colors',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-              canSubmit
-                ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-blue-200 text-white cursor-not-allowed',
+              'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed',
             ].join(' ')}
             aria-disabled={!canSubmit}
           >

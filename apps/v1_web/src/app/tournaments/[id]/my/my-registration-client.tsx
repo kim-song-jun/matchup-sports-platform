@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
 import {
   useV1Tournament,
   useV1Registration,
@@ -68,26 +68,6 @@ function formatDateShort(dateStr: string | null): string {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/* ── Alert banner ── */
-
-function AlertBanner({ message, tone = 'error' }: { message: string; tone?: 'error' | 'info' | 'warning' }) {
-  const styles: Record<string, { bg: string; color: string }> = {
-    error: { bg: 'var(--red50)', color: 'var(--red500)' },
-    info: { bg: 'var(--blue50)', color: 'var(--blue500)' },
-    warning: { bg: 'var(--orange50)', color: 'var(--orange500)' },
-  };
-  const s = styles[tone];
-  return (
-    <div
-      role="alert"
-      style={{ padding: '10px 14px', borderRadius: 10, background: s.bg, color: s.color, lineHeight: 1.55 }}
-      className="tm-text-caption"
-    >
-      {message}
-    </div>
-  );
 }
 
 /* ── Cancel confirmation modal ── */
@@ -251,7 +231,7 @@ function RegistrationDetailView({
 
         {/* Payment info */}
         <section aria-labelledby="payment-info-heading" style={{ marginTop: 16 }}>
-          <SectionTitle title="결제 정보" />
+          <SectionTitle id="payment-info-heading" title="결제 정보" />
           <Card pad={16} style={{ marginTop: 8 }}>
             {registration.payment ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -280,7 +260,7 @@ function RegistrationDetailView({
 
         {/* Roster */}
         <section aria-labelledby="roster-heading" style={{ marginTop: 16 }}>
-          <SectionTitle title="선수 명단" />
+          <SectionTitle id="roster-heading" title="선수 명단" />
           <Card pad={16} style={{ marginTop: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>

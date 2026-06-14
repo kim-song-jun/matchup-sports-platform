@@ -68,17 +68,6 @@ const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
   cancelled: '취소됨',
 };
 
-const REGISTRATION_STATUS_LABEL: Record<string, string> = {
-  draft: '초안',
-  awaiting_payment: '입금대기',
-  payment_checking: '확인중',
-  paid: '결제완료',
-  confirmed: '확정',
-  waitlisted: '대기',
-  cancel_requested: '취소요청',
-  cancelled: '취소됨',
-};
-
 const ELIGIBILITY_LABEL: Record<string, string> = {
   non_pro: '아마추어',
   pro: '프로',
@@ -334,11 +323,11 @@ function RosterModal({
                 onChange={(e) => handleEligibilityChange(p.id, e.target.value)}
                 disabled={updateEligibility.isPending}
                 aria-label={`${p.realName} 자격 상태`}
-                className="h-[36px] px-2 text-[13px] bg-white border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+                className="h-[44px] px-3 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
               >
-                <option value="non_pro">아마추어</option>
-                <option value="pro">프로</option>
-                <option value="needs_review">검토필요</option>
+                {(Object.entries(ELIGIBILITY_LABEL) as [string, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
             </li>
           ))}
@@ -1003,58 +992,65 @@ function BracketTab({
         </form>
       </div>
 
-      {/* ── 픽스처 목록 ──────────────────────────────────────────────── */}
+      {/* ── 픽스처 목록 (f13: AdminDataTable — 모바일 card reflow 자동 적용) ── */}
       {fixtures.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-50 bg-gray-50">
-            <h3 className="text-[13px] font-bold text-gray-700">픽스처 목록</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-gray-700">
-              <thead>
-                <tr className="border-b border-gray-50">
-                  {['라운드', '번호', '홈', '어웨이', '결과', '작업'].map((h, i) => (
-                    <th key={h} scope="col" className={`px-4 py-3 text-[12px] font-semibold text-gray-600 whitespace-nowrap select-none ${i === 5 ? 'text-right' : 'text-left'}`}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {fixtures.map((f) => (
-                  <tr key={f.id} className="transition-colors hover:bg-gray-50/60">
-                    <td className="px-4 py-3 text-gray-600">{f.round}</td>
-                    <td className="px-4 py-3 tabular-nums text-gray-600">{f.fixtureNumber}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{f.homeRegistrationId ?? '—'}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{f.awayRegistrationId ?? '—'}</td>
-                    <td className="px-4 py-3 tabular-nums text-gray-600">
-                      {f.result
-                        ? `${f.result.homeScore} : ${f.result.awayScore}${f.result.hasPenalty ? ` (PK ${f.result.homePenaltyScore}:${f.result.awayPenaltyScore})` : ''}`
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setResultFixture(f);
-                          setHomeScore(String(f.result?.homeScore ?? 0));
-                          setAwayScore(String(f.result?.awayScore ?? 0));
-                          setHasPenalty(f.result?.hasPenalty ?? false);
-                          setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
-                          setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
-                          setResultOpen(true);
-                        }}
-                        aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
-                        className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                      >
-                        결과 입력
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-[14px] font-bold text-gray-800">픽스처 목록</h3>
+          <AdminDataTable<V1AdminBracketFixture>
+            columns={[
+              {
+                key: 'round',
+                header: '라운드',
+                render: (f) => <span className="text-gray-600">{f.round}</span>,
+              },
+              {
+                key: 'fixtureNumber',
+                header: '번호',
+                render: (f) => <span className="tabular-nums text-gray-600">{f.fixtureNumber}</span>,
+              },
+              {
+                key: 'homeRegistrationId',
+                header: '홈',
+                render: (f) => <span className="font-medium text-gray-900">{f.homeRegistrationId ?? '—'}</span>,
+              },
+              {
+                key: 'awayRegistrationId',
+                header: '어웨이',
+                render: (f) => <span className="font-medium text-gray-900">{f.awayRegistrationId ?? '—'}</span>,
+              },
+              {
+                key: 'result',
+                header: '결과',
+                render: (f) => (
+                  <span className="tabular-nums text-gray-600">
+                    {f.result
+                      ? `${f.result.homeScore} : ${f.result.awayScore}${f.result.hasPenalty ? ` (PK ${f.result.homePenaltyScore}:${f.result.awayPenaltyScore})` : ''}`
+                      : '—'}
+                  </span>
+                ),
+              },
+            ]}
+            rows={fixtures}
+            keyExtractor={(f) => f.id}
+            renderActions={(f) => (
+              <button
+                type="button"
+                onClick={() => {
+                  setResultFixture(f);
+                  setHomeScore(String(f.result?.homeScore ?? 0));
+                  setAwayScore(String(f.result?.awayScore ?? 0));
+                  setHasPenalty(f.result?.hasPenalty ?? false);
+                  setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
+                  setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
+                  setResultOpen(true);
+                }}
+                aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
+                className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                결과 입력
+              </button>
+            )}
+          />
         </div>
       )}
 

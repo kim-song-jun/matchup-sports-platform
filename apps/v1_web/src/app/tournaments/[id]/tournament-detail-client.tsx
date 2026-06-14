@@ -168,12 +168,11 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
   const isOpen = tournament.status === 'open';
   const isFull = tournament.confirmedCount >= tournament.teamCount;
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
-  // Desktop: .tm-hide-desktop removes the fixed CTA; inline CTA follows in document flow.
+  // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
   const bottomPad = isOpen ? 96 : 48;
 
-  return (
-    <article style={{ padding: `0 20px ${bottomPad}px` }}>
-
+  const bodyContent = (
+    <>
       {/* ── Section 1: Header ── */}
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {/* Hero icon + title */}
@@ -316,18 +315,42 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
           </Card>
         </section>
       ) : null}
+    </>
+  );
 
-      {/* ── Desktop inline CTA (replaces fixed bottom bar on ≥1024px) ── */}
-      {isOpen ? (
-        <div
-          className="tm-show-desktop"
-          role="complementary"
-          aria-label="참가 신청"
-          style={{ marginTop: 32 }}
-        >
-          <ApplyCTAButtons tournament={tournament} isFull={isFull} />
+  return (
+    <article style={{ padding: `0 20px ${bottomPad}px` }}>
+      {/* ── Desktop 2-column layout: left=body, right=sticky CTA ── */}
+      {/* Reuses .tm-match-detail-desktop-layout (matches.css @media ≥1024px:
+          grid-template-columns 1fr 360px, gap 32px). */}
+      <div className="tm-match-detail-desktop-layout">
+        {/* Left column: all body content */}
+        <div className="tm-match-detail-body">
+          {bodyContent}
         </div>
-      ) : null}
+
+        {/* Right column: sticky CTA card (desktop only, replaces fixed bottom bar).
+            .tm-match-detail-desktop-cta: position sticky top:80px, Card-style border+shadow. */}
+        {isOpen ? (
+          <aside
+            className="tm-match-detail-desktop-cta tm-show-desktop"
+            role="complementary"
+            aria-label="참가 신청"
+          >
+            <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--grey100)' }}>
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+                참가 신청
+              </div>
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                {tournament.confirmedCount}/{tournament.teamCount}팀 확정
+              </div>
+            </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <ApplyCTAButtons tournament={tournament} isFull={isFull} />
+            </div>
+          </aside>
+        ) : null}
+      </div>
     </article>
   );
 }
@@ -444,10 +467,8 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
         <div style={{ textAlign: 'center', minWidth: 52 }}>
           {hasResult ? (
             <div
-              className="tab-num"
+              className="tm-text-body-lg tab-num"
               style={{
-                fontSize: 18,
-                fontWeight: 800,
                 color: 'var(--text-strong)',
                 letterSpacing: 1,
               }}

@@ -103,7 +103,7 @@ function TournamentsListContent() {
                 background: 'rgba(255,255,255,0.18)',
                 display: 'grid',
                 placeItems: 'center',
-                color: '#fff',
+                color: 'var(--static-white)',
               }}
             >
               <TrophyIcon size={32} strokeWidth={1.6} />

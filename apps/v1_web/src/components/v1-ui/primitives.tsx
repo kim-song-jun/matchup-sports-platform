@@ -2,6 +2,41 @@ import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronRightIcon } from './icons';
 
+/* ── AlertBanner ── */
+
+type AlertBannerTone = 'error' | 'info' | 'warning';
+
+const ALERT_BANNER_STYLES: Record<AlertBannerTone, { bg: string; color: string }> = {
+  error:   { bg: 'var(--red50)',    color: 'var(--red500)'    },
+  info:    { bg: 'var(--blue50)',   color: 'var(--blue500)'   },
+  warning: { bg: 'var(--orange50)', color: 'var(--orange500)' },
+};
+
+export function AlertBanner({
+  message,
+  tone = 'error',
+}: {
+  message: string;
+  tone?: AlertBannerTone;
+}) {
+  const s = ALERT_BANNER_STYLES[tone];
+  return (
+    <div
+      role="alert"
+      style={{
+        padding: '10px 14px',
+        borderRadius: 12,
+        background: s.bg,
+        color: s.color,
+        lineHeight: 1.55,
+      }}
+      className="tm-text-caption"
+    >
+      {message}
+    </div>
+  );
+}
+
 type CardProps = {
   children: ReactNode;
   pad?: number;
@@ -71,9 +106,11 @@ type SectionTitleProps = {
   sub?: string;
   action?: string;
   actionHref?: string;
+  /** Optional id placed on the title element so aria-labelledby references resolve. */
+  id?: string;
 };
 
-export function SectionTitle({ title, sub, action, actionHref }: SectionTitleProps) {
+export function SectionTitle({ title, sub, action, actionHref, id }: SectionTitleProps) {
   const actionContent = (
     <>
       {action}
@@ -84,7 +121,7 @@ export function SectionTitle({ title, sub, action, actionHref }: SectionTitlePro
   return (
     <div className="tm-section-title" style={{ alignItems: sub ? 'flex-start' : 'center' }}>
       <div>
-        <div className="tm-text-body-lg">{title}</div>
+        <div id={id} className="tm-text-body-lg">{title}</div>
         {sub ? <div className="tm-text-caption" style={{ marginTop: 4 }}>{sub}</div> : null}
       </div>
       {action && actionHref ? (

@@ -51,3 +51,20 @@
     max-width: 800px;
   }
 }
+
+/* ─── Apply /tournaments/:id/apply · My /tournaments/:id/my ──────────────────
+ * Both pages were rendering single-column content at full ~1120px scroll-area
+ * width, causing label-value rows to stretch excessively on desktop.
+ * Cap at 640 px (same family as the detail page body) and centre it.
+ * Mobile path (< 1024px): zero added specificity — wrappers are transparent.
+ */
+
+@media (min-width: 1024px) {
+  .tm-tournament-apply-body,
+  .tm-tournament-my-body {
+    max-width: 640px;
+    margin: 0 auto;
+    /* Remove mobile side gutter — content cards carry their own internal pad. */
+    padding: 0 0 48px;
+  }
+}

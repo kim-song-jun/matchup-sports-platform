@@ -1408,8 +1408,8 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
   if (isError || !tournament) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 text-center max-w-[400px] mx-auto mt-8">
-        <p className="text-sm text-red-500 font-medium mb-3">
+      <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 flex flex-col items-center gap-3 text-center">
+        <p className="text-sm text-red-500 font-medium">
           {extractErrorMessage(error, '대회 정보를 불러오지 못했어요.')}
         </p>
         <button
@@ -1470,9 +1470,8 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
       {/* ── Info card ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6">
-        <dl className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3 text-[13px]">
+        <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3 text-[13px]">
           {[
-            { label: '상태', value: <AdminStatusPill status={tournament.status} label={TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} /> },
             { label: '참가비', value: formatCurrency(tournament.entryFee) },
             { label: '팀 수', value: `${tournament.teamCount}팀` },
             { label: '선수 수', value: `${tournament.minPlayers}~${tournament.maxPlayers}명` },

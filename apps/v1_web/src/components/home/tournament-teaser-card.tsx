@@ -38,7 +38,14 @@ export function TournamentTeaserCard() {
             <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
               대회
             </span>
-            {featured && <span className="tm-badge tm-badge-blue">모집중</span>}
+            {featured && (
+              <span
+                className="tm-badge tm-badge-blue"
+                style={{ background: 'var(--bg)' }}
+              >
+                모집중
+              </span>
+            )}
           </div>
           <div className="tm-text-label line-clamp-1" style={{ color: 'var(--text-strong)' }}>
             {featured ? featured.title : '상금 걸린 풋살 대회, 팀과 함께 도전!'}

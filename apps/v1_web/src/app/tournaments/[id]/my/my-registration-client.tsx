@@ -203,6 +203,7 @@ function RegistrationDetailView({
 
   return (
     <>
+      <div className="tm-tournament-my-body">
       <div style={{ padding: '0 20px 32px', marginTop: 16 }}>
         {/* Status card */}
         <section aria-labelledby="reg-status-heading">
@@ -349,6 +350,7 @@ function RegistrationDetailView({
             대회 상세 보기
           </Link>
         </div>
+      </div>
       </div>
 
       {/* Cancel modal */}

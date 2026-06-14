@@ -111,7 +111,7 @@ function TournamentsListContent() {
             <span
               className="tm-text-micro"
               style={{
-                color: 'rgba(255,255,255,0.75)',
+                color: 'rgba(255,255,255,0.92)',
               }}
             >
               상금 대회
@@ -231,7 +231,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             borderTop: '1px solid var(--grey100)',
           }}
         >
-          <span className="tm-text-body-lg" style={{ color: 'var(--blue500)' }}>
+          <span className="tm-text-label" style={{ color: 'var(--blue500)' }}>
             {formatEntryFee(item.entryFee)}
           </span>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>

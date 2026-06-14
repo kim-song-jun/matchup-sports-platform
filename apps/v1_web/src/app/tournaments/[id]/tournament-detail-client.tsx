@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, SectionTitle } from '@/components/v1-ui/primitives';
+import { Card } from '@/components/v1-ui/primitives';
 import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -238,7 +238,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
       {/* ── Section 2: Rules ── */}
       {tournament.rulesText ? (
         <section aria-labelledby="rules-heading" style={{ marginTop: 24 }}>
-          <SectionTitle title="대회 규정" />
+          <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>대회 규정</div>
           <Card pad={16} style={{ marginTop: 4 }}>
             <p
               id="rules-heading"
@@ -254,8 +254,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
       {/* ── Section 3: Fixtures (schedule / bracket) ── */}
       {hasFixtures ? (
         <section aria-labelledby="fixtures-heading" style={{ marginTop: 24 }}>
-          <SectionTitle title="일정 · 대진" />
-          <div id="fixtures-heading" className="sr-only">일정 및 대진표</div>
+          <div id="fixtures-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>일정 · 대진</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             {tournament.fixtures.map((fixture) => (
               <FixtureCard key={fixture.id} fixture={fixture} />
@@ -264,7 +263,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
         </section>
       ) : (
         <section aria-labelledby="fixtures-placeholder-heading" style={{ marginTop: 24 }}>
-          <SectionTitle title="일정 · 대진" />
+          <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>일정 · 대진</div>
           <Card pad={16} style={{ marginTop: 4, background: 'var(--grey50)' }}>
             <div id="fixtures-placeholder-heading" className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
               대진표 준비 중
@@ -279,8 +278,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
       {/* ── Section 4: Group standings ── */}
       {hasGroups ? (
         <section aria-labelledby="standings-heading" style={{ marginTop: 24 }}>
-          <SectionTitle title="조별 순위" />
-          <div id="standings-heading" className="sr-only">조별 리그 순위표</div>
+          <div id="standings-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>조별 순위</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
             {tournament.groups.map((group) => (
               <GroupStandingsTable key={group.id} group={group} />
@@ -292,8 +290,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
       {/* ── Section 5: Announcements ── */}
       {hasAnnouncements ? (
         <section aria-labelledby="announcements-heading" style={{ marginTop: 24 }}>
-          <SectionTitle title="공지사항" />
-          <div id="announcements-heading" className="sr-only">대회 공지사항</div>
+          <div id="announcements-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>공지사항</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             {tournament.announcements.map((announcement) => (
               <AnnouncementCard key={announcement.id} announcement={announcement} />
@@ -305,7 +302,7 @@ function TournamentDetailView({ tournament }: { tournament: V1TournamentDetail }
       {/* ── Refund policy ── */}
       {tournament.refundPolicyText ? (
         <section aria-labelledby="refund-heading" style={{ marginTop: 24 }}>
-          <SectionTitle title="환불 정책" />
+          <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>환불 정책</div>
           <Card pad={16} style={{ marginTop: 4, background: 'var(--grey50)' }}>
             <p
               id="refund-heading"
@@ -475,10 +472,9 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
         {/* Home team */}
         <div style={{ textAlign: 'right' }}>
           <div
-            className="tm-text-body"
+            className="tm-text-body-lg"
             style={{
               color: 'var(--text-strong)',
-              fontWeight: 600,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -513,10 +509,9 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
         {/* Away team */}
         <div style={{ textAlign: 'left' }}>
           <div
-            className="tm-text-body"
+            className="tm-text-body-lg"
             style={{
               color: 'var(--text-strong)',
-              fontWeight: 600,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',

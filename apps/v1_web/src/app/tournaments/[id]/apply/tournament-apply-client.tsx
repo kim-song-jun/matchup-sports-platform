@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import {
   useV1Tournament,
   useV1MyTeams,
@@ -246,15 +246,13 @@ function TeamSelectStep({
 
         {/* Info card: entry fee */}
         {tournament.entryFee > 0 ? (
-          <Card pad={14} style={{ marginTop: 16, background: 'var(--grey50)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="tm-text-caption">
-                참가비
-              </span>
-              <span className="tm-text-label" style={{ color: 'var(--blue500)', fontWeight: 700 }}>
-                {formatEntryFee(tournament.entryFee)}
-              </span>
-            </div>
+          <Card pad={0} style={{ marginTop: 16, background: 'var(--grey50)' }}>
+            <InfoRow
+              label="참가비"
+              value={formatEntryFee(tournament.entryFee)}
+              valueColor="var(--blue500)"
+              isLast
+            />
           </Card>
         ) : null}
       </section>
@@ -602,24 +600,24 @@ function PaymentGuideStep({
           <div style={{ marginLeft: -20, marginRight: -20 }}>
             <SectionTitle title="입금 안내" />
           </div>
-          <Card pad={16} style={{ marginTop: 8 }}>
+          <Card pad={0} style={{ marginTop: 8 }}>
             <div
               id="bank-guide-heading"
               className="tm-text-label"
-              style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 14 }}
+              style={{ color: 'var(--text-strong)', fontWeight: 700, padding: '14px 16px 10px' }}
             >
               아래 계좌로 참가비를 입금해 주세요
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* 공개 상세(V1TournamentDetail)에 주최자 입금 계좌가 포함된다. 미설정이면 안내 fallback. */}
-              <BankInfoRow label="은행" value={tournament.bankName ?? '신청 확인 후 안내'} />
-              <BankInfoRow label="계좌번호" value={tournament.bankAccount ?? '신청 확인 후 안내'} />
-              <BankInfoRow label="예금주" value={tournament.bankHolder ?? '신청 확인 후 안내'} />
-              <BankInfoRow
+            {/* 공개 상세(V1TournamentDetail)에 주최자 입금 계좌가 포함된다. 미설정이면 안내 fallback. */}
+            <div style={{ padding: '0 16px' }}>
+              <InfoRow label="은행" value={tournament.bankName ?? '신청 확인 후 안내'} />
+              <InfoRow label="계좌번호" value={tournament.bankAccount ?? '신청 확인 후 안내'} />
+              <InfoRow label="예금주" value={tournament.bankHolder ?? '신청 확인 후 안내'} />
+              <InfoRow
                 label="입금액"
                 value={formatEntryFee(tournament.entryFee)}
                 valueColor="var(--blue500)"
+                isLast
               />
             </div>
           </Card>
@@ -677,29 +675,22 @@ function PaymentGuideStep({
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle title="결제하기" />
         </div>
-        <Card pad={16} style={{ marginTop: 8 }}>
+        <Card pad={0} style={{ marginTop: 8 }}>
           <div
             id="pg-guide-heading"
             className="tm-text-label"
-            style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 14 }}
+            style={{ color: 'var(--text-strong)', fontWeight: 700, padding: '14px 16px 10px' }}
           >
             결제 정보 확인
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="tm-text-caption">
-              대회명
-            </span>
-            <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600, textAlign: 'right', maxWidth: '60%' }}>
-              {tournament.title}
-            </span>
-          </div>
-          <div style={{ borderTop: '1px solid var(--grey100)', marginTop: 10, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="tm-text-caption">
-              결제 금액
-            </span>
-            <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue500)', fontWeight: 800 }}>
-              {formatEntryFee(tournament.entryFee)}
-            </span>
+          <div style={{ padding: '0 16px' }}>
+            <InfoRow label="대회명" value={tournament.title} />
+            <InfoRow
+              label="결제 금액"
+              value={formatEntryFee(tournament.entryFee)}
+              valueColor="var(--blue500)"
+              isLast
+            />
           </div>
         </Card>
 
@@ -726,27 +717,6 @@ function PaymentGuideStep({
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function BankInfoRow({
-  label,
-  value,
-  valueColor,
-}: {
-  label: string;
-  value: string;
-  valueColor?: string;
-}) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span className="tm-text-caption">
-        {label}
-      </span>
-      <span className="tm-text-label" style={{ color: valueColor ?? 'var(--text-strong)', fontWeight: 600 }}>
-        {value}
-      </span>
     </div>
   );
 }
@@ -883,6 +853,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   return (
     <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
+      <div className="tm-tournament-apply-body">
       <StepIndicator current={step} />
 
       {step === 'team' ? (
@@ -940,6 +911,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           onBack={() => setStep('agreements')}
         />
       ) : null}
+      </div>
     </AppChrome>
   );
 }

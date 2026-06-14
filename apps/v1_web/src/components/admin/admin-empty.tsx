@@ -14,8 +14,8 @@ export function AdminEmpty({ icon, title, description, action }: AdminEmptyProps
       <span className="text-gray-300 mb-1" aria-hidden="true">
         {icon ?? <Inbox size={40} />}
       </span>
-      <p className="text-[15px] font-semibold text-gray-600">{title}</p>
-      {description && <p className="text-[13px] text-gray-400">{description}</p>}
+      <p className="tm-text-body font-semibold [color:var(--text-muted)]">{title}</p>
+      {description && <p className="tm-text-caption">{description}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>
   );

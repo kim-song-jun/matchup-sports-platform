@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { ChevronRightIcon } from './icons';
+import { InboxIcon } from 'lucide-react';
 
 /* ── AlertBanner ── */
 
@@ -20,9 +21,12 @@ export function AlertBanner({
   tone?: AlertBannerTone;
 }) {
   const s = ALERT_BANNER_STYLES[tone];
+  // error만 즉시 공지(assertive), info/warning은 비긴급이라 polite 공지로 스크린리더를 끊지 않음
+  const isError = tone === 'error';
   return (
     <div
-      role="alert"
+      role={isError ? 'alert' : 'status'}
+      aria-live={isError ? 'assertive' : 'polite'}
       style={{
         padding: '10px 14px',
         borderRadius: 12,
@@ -173,12 +177,16 @@ type EmptyStateProps = {
   sub: string;
   cta?: string;
   onCta?: () => void;
+  /** Lucide icon node rendered inside the blue circle. Defaults to InboxIcon. */
+  icon?: ReactNode;
 };
 
-export function EmptyState({ title, sub, cta, onCta }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta, icon }: EmptyStateProps) {
   return (
     <div className="tm-empty-state">
-      <div className="tm-empty-icon" />
+      <div className="tm-empty-icon" aria-hidden="true">
+        {icon ?? <InboxIcon size={36} strokeWidth={1.5} />}
+      </div>
       <div className="tm-text-body-lg">{title}</div>
       <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
         {sub}
@@ -186,6 +194,46 @@ export function EmptyState({ title, sub, cta, onCta }: EmptyStateProps) {
       {cta ? (
         <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 24 }} onClick={onCta}>
           {cta}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+type ErrorStateProps = {
+  title?: string;
+  message: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+};
+
+export function ErrorState({
+  title = '오류가 발생했어요',
+  message,
+  onRetry,
+  retryLabel = '다시 시도하기',
+}: ErrorStateProps) {
+  return (
+    <div className="tm-empty-state" role="alert">
+      <div className="tm-empty-icon" aria-hidden="true" style={{ background: 'var(--red50)', color: 'var(--red500)' }}>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      </div>
+      <div className="tm-text-body-lg">{title}</div>
+      <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+        {message}
+      </div>
+      {onRetry ? (
+        <button
+          className="tm-btn tm-btn-sm tm-btn-outline"
+          type="button"
+          style={{ marginTop: 24 }}
+          onClick={onRetry}
+        >
+          {retryLabel}
         </button>
       ) : null}
     </div>

@@ -138,21 +138,21 @@ function formatCurrency(n: number): string {
 /** h-[44px] unified submit button (f12) */
 const submitBtnCls = [
   'inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl',
-  'text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600',
+  'tm-text-label text-white bg-blue-500 hover:bg-blue-600',
   'transition-colors disabled:opacity-50',
   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
 ].join(' ');
 
 const inputCls = [
-  'h-[44px] px-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
-  'placeholder:text-gray-400',
+  'h-[44px] px-3 tm-text-label bg-white border border-gray-200 rounded-xl text-[color:var(--text-strong)]',
+  'placeholder:text-[color:var(--text-muted)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
 
 const textareaCls = [
-  'px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-xl text-gray-900 resize-none',
-  'placeholder:text-gray-400',
+  'px-3 py-2.5 tm-text-label bg-white border border-gray-200 rounded-xl text-[color:var(--text-strong)] resize-none',
+  'placeholder:text-[color:var(--text-muted)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
@@ -234,7 +234,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
         className="bg-white rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[480px] overflow-hidden"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 id="simple-modal-title" className="text-[16px] font-bold text-gray-900">
+          <h2 id="simple-modal-title" className="tm-text-body font-bold text-[color:var(--text-strong)]">
             {title}
           </h2>
           <button
@@ -242,7 +242,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg [color:var(--text-caption)] hover:text-[color:var(--text-muted)] hover:bg-gray-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -304,9 +304,9 @@ function RosterModal({
       onClose={onClose}
     >
       {isPending ? (
-        <p className="text-sm text-gray-400">불러오는 중…</p>
+        <p className="text-sm [color:var(--text-caption)]">불러오는 중…</p>
       ) : players.length === 0 ? (
-        <p className="text-sm text-gray-400">등록된 선수가 없어요.</p>
+        <p className="text-sm [color:var(--text-caption)]">등록된 선수가 없어요.</p>
       ) : (
         <ul className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto" role="list">
           {players.map((p) => (
@@ -315,9 +315,9 @@ function RosterModal({
               className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{p.realName}</p>
+                <p className="text-sm font-medium [color:var(--text-strong)] truncate">{p.realName}</p>
                 {p.birthDateSnapshot && (
-                  <p className="text-[12px] text-gray-400">{p.birthDateSnapshot}</p>
+                  <p className="tm-text-caption">{p.birthDateSnapshot}</p>
                 )}
               </div>
               <select
@@ -325,7 +325,7 @@ function RosterModal({
                 onChange={(e) => handleEligibilityChange(p.id, e.target.value)}
                 disabled={updateEligibility.isPending}
                 aria-label={`${p.realName} 자격 상태`}
-                className="h-[44px] px-3 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+                className="h-[44px] px-3 tm-text-label bg-white border border-gray-200 rounded-xl text-[color:var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
               >
                 {(Object.entries(ELIGIBILITY_LABEL) as [string, string][]).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -338,7 +338,7 @@ function RosterModal({
       <button
         type="button"
         onClick={onClose}
-        className="mt-4 w-full h-[44px] rounded-xl text-[14px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="mt-4 w-full h-[44px] rounded-xl tm-text-label text-[color:var(--text-muted)] bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         닫기
       </button>
@@ -476,7 +476,7 @@ function RegistrationsTab({
       key: 'teamName',
       header: '팀명',
       render: (r) => (
-        <span className="font-medium text-gray-900">{r.teamName ?? r.teamId}</span>
+        <span className="font-medium [color:var(--text-strong)]">{r.teamName ?? r.teamId}</span>
       ),
     },
     {
@@ -491,25 +491,25 @@ function RegistrationsTab({
       header: '결제',
       render: (r) =>
         r.payment ? (
-          <span className="text-[13px] text-gray-600">
+          <span className="tm-text-label text-[color:var(--text-muted)]">
             {PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · {PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status}
           </span>
         ) : (
-          <span className="text-[13px] text-gray-400">—</span>
+          <span className="tm-text-label text-[color:var(--text-caption)]">—</span>
         ),
     },
     {
       key: 'depositorName',
       header: '입금자',
       render: (r) => (
-        <span className="text-[13px] text-gray-600">{r.depositorName ?? '—'}</span>
+        <span className="tm-text-label text-[color:var(--text-muted)]">{r.depositorName ?? '—'}</span>
       ),
     },
     {
       key: 'playerCount',
       header: '선수수',
       render: (r) => (
-        <span className="tabular-nums text-gray-600">{r.playerCount}명</span>
+        <span className="tabular-nums [color:var(--text-muted)]">{r.playerCount}명</span>
       ),
     },
   ];
@@ -630,7 +630,7 @@ function ActionButton({
       ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
       : tone === 'red'
       ? 'text-red-600 bg-red-50 hover:bg-red-100'
-      : 'text-gray-600 bg-gray-100 hover:bg-gray-200';
+      : '[color:var(--text-muted)] bg-gray-100 hover:bg-gray-200';
 
   return (
     <button
@@ -638,7 +638,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'inline-flex items-center gap-1 min-h-[44px] px-2.5 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap',
+        'inline-flex items-center gap-1 min-h-[44px] px-2.5 rounded-lg tm-text-caption font-medium transition-colors whitespace-nowrap',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
         'disabled:opacity-50',
         toneClass,
@@ -796,10 +796,10 @@ function BracketTab({
 
       {/* ── 조 만들기 ───────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[15px] font-bold text-gray-900 mb-4">조 만들기</h3>
-        <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row gap-3">
+        <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">조 만들기</h3>
+        <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-name" className="text-[13px] font-semibold text-gray-700 sr-only">
+            <label htmlFor="group-name" className="tm-text-label text-[color:var(--text-strong)]">
               조 이름
             </label>
             <input
@@ -807,14 +807,14 @@ function BracketTab({
               type="text"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="조 이름 (예: A조)"
+              placeholder="예: A조"
               disabled={createGroup.isPending}
               maxLength={20}
               className={inputCls + ' sm:w-[180px]'}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-phase" className="text-[13px] font-semibold text-gray-700 sr-only">
+            <label htmlFor="group-phase" className="tm-text-label text-[color:var(--text-strong)]">
               단계
             </label>
             <select
@@ -844,10 +844,10 @@ function BracketTab({
       {/* ── 팀 배정 ─────────────────────────────────────────────────── */}
       {groups.length > 0 && confirmedRegistrations.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-          <h3 className="text-[15px] font-bold text-gray-900 mb-4">팀 배정</h3>
-          <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row gap-3">
+          <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">팀 배정</h3>
+          <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row gap-3 sm:items-end">
             <div className="flex flex-col gap-1">
-              <label htmlFor="assign-group" className="text-[13px] font-semibold text-gray-700 sr-only">
+              <label htmlFor="assign-group" className="tm-text-label text-[color:var(--text-strong)]">
                 조 선택
               </label>
               <select
@@ -857,14 +857,14 @@ function BracketTab({
                 disabled={assignGroupTeam.isPending}
                 className={inputCls + ' sm:w-[160px]'}
               >
-                <option value="">조 선택</option>
+                <option value="">조를 선택해 주세요</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label htmlFor="assign-team" className="text-[13px] font-semibold text-gray-700 sr-only">
+              <label htmlFor="assign-team" className="tm-text-label text-[color:var(--text-strong)]">
                 팀 선택
               </label>
               <select
@@ -874,7 +874,7 @@ function BracketTab({
                 disabled={assignGroupTeam.isPending}
                 className={inputCls + ' sm:w-[200px]'}
               >
-                <option value="">확정 팀 선택</option>
+                <option value="">확정 팀을 선택해 주세요</option>
                 {confirmedRegistrations.map((r) => (
                   <option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>
                 ))}
@@ -888,6 +888,7 @@ function BracketTab({
               배정
             </button>
           </form>
+          <p className="tm-text-caption mt-1" aria-live="polite">확정된 팀만 배정할 수 있어요.</p>
         </div>
       )}
 
@@ -895,12 +896,12 @@ function BracketTab({
       {groups.length > 0 && (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-[15px] font-bold text-gray-900">조별 순위표</h3>
+            <h3 className="tm-text-body font-bold text-[color:var(--text-strong)]">조별 순위표</h3>
             <button
               type="button"
               onClick={handleRecalculate}
               disabled={recalculate.isPending}
-              className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg tm-text-caption font-medium text-[color:var(--text-muted)] bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <RefreshCw size={13} aria-hidden="true" />
               순위 재계산
@@ -913,12 +914,12 @@ function BracketTab({
                 key: 'position',
                 header: '순위',
                 align: 'center',
-                render: (s) => <span className="tabular-nums text-gray-500">{s.position}</span>,
+                render: (s) => <span className="tabular-nums [color:var(--text-muted)]">{s.position}</span>,
               },
               {
                 key: 'teamName',
                 header: '팀',
-                render: (s) => <span className="font-medium text-gray-900">{s.teamName ?? s.registrationId}</span>,
+                render: (s) => <span className="font-medium [color:var(--text-strong)]">{s.teamName ?? s.registrationId}</span>,
               },
               {
                 key: 'wins',
@@ -959,7 +960,7 @@ function BracketTab({
             ];
             return (
               <div key={group.id} className="flex flex-col gap-2">
-                <h4 className="text-[13px] font-bold text-gray-700 px-1">{group.name}</h4>
+                <h4 className="tm-text-label font-bold text-[color:var(--text-muted)] px-1">{group.name}</h4>
                 <AdminDataTable<V1AdminBracketStanding>
                   columns={standingColumns}
                   rows={standings}
@@ -974,19 +975,19 @@ function BracketTab({
 
       {/* ── 픽스처 만들기 ────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[15px] font-bold text-gray-900 mb-4">픽스처 만들기</h3>
+        <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">픽스처 만들기</h3>
         <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-round" className="text-[13px] font-semibold text-gray-700">라운드</label>
+            <label htmlFor="fixture-round" className="tm-text-label text-[color:var(--text-strong)]">라운드</label>
             <input id="fixture-round" type="text" value={fixtureRound} onChange={(e) => setFixtureRound(e.target.value)} placeholder="예: 조별 1라운드" disabled={createFixture.isPending} maxLength={30} className={inputCls} />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-number" className="text-[13px] font-semibold text-gray-700">번호</label>
+            <label htmlFor="fixture-number" className="tm-text-label text-[color:var(--text-strong)]">번호</label>
             <input id="fixture-number" type="number" min="1" value={fixtureNumber} onChange={(e) => setFixtureNumber(e.target.value)} disabled={createFixture.isPending} className={inputCls} />
           </div>
           {groups.length > 0 && (
             <div className="flex flex-col gap-1">
-              <label htmlFor="fixture-group" className="text-[13px] font-semibold text-gray-700">소속 조 (선택)</label>
+              <label htmlFor="fixture-group" className="tm-text-label text-[color:var(--text-strong)]">소속 조 (선택)</label>
               <select id="fixture-group" value={fixtureGroupId} onChange={(e) => setFixtureGroupId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
                 <option value="">조 없음</option>
                 {groups.map((g) => (<option key={g.id} value={g.id}>{g.name}</option>))}
@@ -994,14 +995,14 @@ function BracketTab({
             </div>
           )}
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-home" className="text-[13px] font-semibold text-gray-700">홈 팀 (선택)</label>
+            <label htmlFor="fixture-home" className="tm-text-label text-[color:var(--text-strong)]">홈 팀 (선택)</label>
             <select id="fixture-home" value={fixtureHomeRegId} onChange={(e) => setFixtureHomeRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
               <option value="">미정</option>
               {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-away" className="text-[13px] font-semibold text-gray-700">어웨이 팀 (선택)</label>
+            <label htmlFor="fixture-away" className="tm-text-label text-[color:var(--text-strong)]">어웨이 팀 (선택)</label>
             <select id="fixture-away" value={fixtureAwayRegId} onChange={(e) => setFixtureAwayRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
               <option value="">미정</option>
               {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
@@ -1018,34 +1019,34 @@ function BracketTab({
       {/* ── 픽스처 목록 (f13: AdminDataTable — 모바일 card reflow 자동 적용) ── */}
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-[15px] font-bold text-gray-900">픽스처 목록</h3>
+          <h3 className="tm-text-body font-bold text-[color:var(--text-strong)]">픽스처 목록</h3>
           <AdminDataTable<V1AdminBracketFixture>
             columns={[
               {
                 key: 'round',
                 header: '라운드',
-                render: (f) => <span className="text-gray-600">{f.round}</span>,
+                render: (f) => <span className="[color:var(--text-muted)]">{f.round}</span>,
               },
               {
                 key: 'fixtureNumber',
                 header: '번호',
-                render: (f) => <span className="tabular-nums text-gray-600">{f.fixtureNumber}</span>,
+                render: (f) => <span className="tabular-nums [color:var(--text-muted)]">{f.fixtureNumber}</span>,
               },
               {
                 key: 'homeTeamName',
                 header: '홈',
-                render: (f) => <span className="font-medium text-gray-900">{f.homeTeamName ?? '—'}</span>,
+                render: (f) => <span className="font-medium [color:var(--text-strong)]">{f.homeTeamName ?? '—'}</span>,
               },
               {
                 key: 'awayTeamName',
                 header: '어웨이',
-                render: (f) => <span className="font-medium text-gray-900">{f.awayTeamName ?? '—'}</span>,
+                render: (f) => <span className="font-medium [color:var(--text-strong)]">{f.awayTeamName ?? '—'}</span>,
               },
               {
                 key: 'result',
                 header: '결과',
                 render: (f) => (
-                  <span className="tabular-nums text-gray-600">
+                  <span className="tabular-nums [color:var(--text-muted)]">
                     {f.result
                       ? `${f.result.homeScore} : ${f.result.awayScore}${f.result.hasPenalty ? ` (PK ${f.result.homePenaltyScore}:${f.result.awayPenaltyScore})` : ''}`
                       : '—'}
@@ -1068,7 +1069,7 @@ function BracketTab({
                   setResultOpen(true);
                 }}
                 aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
-                className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg tm-text-caption font-medium text-[color:var(--text-muted)] bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 결과 입력
               </button>
@@ -1088,11 +1089,11 @@ function BracketTab({
           {/* f14: fixed labels '홈'/'어웨이' + identifier as small caption */}
           <div className="flex items-center gap-3">
             <div className="flex flex-col gap-1 flex-1">
-              <label htmlFor="home-score" className="text-[13px] font-semibold text-gray-700">
+              <label htmlFor="home-score" className="tm-text-label text-[color:var(--text-strong)]">
                 홈
               </label>
               {(resultFixture?.homeTeamName ?? resultFixture?.homeRegistrationId) && (
-                <p className="text-[12px] text-gray-400 truncate max-w-[140px]">
+                <p className="tm-text-caption truncate max-w-[140px]">
                   {resultFixture?.homeTeamName ?? resultFixture?.homeRegistrationId}
                 </p>
               )}
@@ -1106,13 +1107,13 @@ function BracketTab({
                 className={inputCls}
               />
             </div>
-            <span className="text-[20px] font-bold text-gray-400 mt-5" aria-hidden="true">:</span>
+            <span className="text-xl font-bold text-[color:var(--text-caption)] mt-5" aria-hidden="true">:</span>
             <div className="flex flex-col gap-1 flex-1">
-              <label htmlFor="away-score" className="text-[13px] font-semibold text-gray-700">
+              <label htmlFor="away-score" className="tm-text-label text-[color:var(--text-strong)]">
                 어웨이
               </label>
               {(resultFixture?.awayTeamName ?? resultFixture?.awayRegistrationId) && (
-                <p className="text-[12px] text-gray-400 truncate max-w-[140px]">
+                <p className="tm-text-caption truncate max-w-[140px]">
                   {resultFixture?.awayTeamName ?? resultFixture?.awayRegistrationId}
                 </p>
               )}
@@ -1128,7 +1129,7 @@ function BracketTab({
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer min-h-[44px]">
+          <label className="flex items-center gap-2 tm-text-label text-[color:var(--text-strong)] cursor-pointer min-h-[44px]">
             <input
               type="checkbox"
               checked={hasPenalty}
@@ -1142,12 +1143,12 @@ function BracketTab({
           {hasPenalty && (
             <div className="flex items-center gap-3">
               <div className="flex flex-col gap-1 flex-1">
-                <label htmlFor="home-penalty" className="text-[13px] font-semibold text-gray-700">홈 PK</label>
+                <label htmlFor="home-penalty" className="tm-text-label text-[color:var(--text-strong)]">홈 PK</label>
                 <input id="home-penalty" type="number" min="0" value={homePenalty} onChange={(e) => setHomePenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
               </div>
-              <span className="text-[20px] font-bold text-gray-400 mt-5" aria-hidden="true">:</span>
+              <span className="text-xl font-bold text-[color:var(--text-caption)] mt-5" aria-hidden="true">:</span>
               <div className="flex flex-col gap-1 flex-1">
-                <label htmlFor="away-penalty" className="text-[13px] font-semibold text-gray-700">어웨이 PK</label>
+                <label htmlFor="away-penalty" className="tm-text-label text-[color:var(--text-strong)]">어웨이 PK</label>
                 <input id="away-penalty" type="number" min="0" value={awayPenalty} onChange={(e) => setAwayPenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
               </div>
             </div>
@@ -1158,7 +1159,7 @@ function BracketTab({
               type="button"
               onClick={() => setResultOpen(false)}
               disabled={recordResult.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[14px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[44px] rounded-xl tm-text-label text-[color:var(--text-muted)] bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -1236,10 +1237,10 @@ function AnnouncementsTab({
     <div className="flex flex-col gap-6">
       {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[15px] font-bold text-gray-900 mb-4">공지 작성</h3>
+        <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">공지 작성</h3>
         <form onSubmit={handleCreate} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="ann-title" className="text-[13px] font-semibold text-gray-700">
+            <label htmlFor="ann-title" className="tm-text-label text-[color:var(--text-strong)]">
               제목 <span className="text-red-500" aria-hidden="true">*</span>
               <span className="sr-only">(필수)</span>
             </label>
@@ -1258,7 +1259,7 @@ function AnnouncementsTab({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="ann-body" className="text-[13px] font-semibold text-gray-700">
+            <label htmlFor="ann-body" className="tm-text-label text-[color:var(--text-strong)]">
               내용 <span className="text-red-500" aria-hidden="true">*</span>
               <span className="sr-only">(필수)</span>
             </label>
@@ -1277,7 +1278,7 @@ function AnnouncementsTab({
 
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex flex-col gap-1.5 flex-1">
-              <label htmlFor="ann-audience" className="text-[13px] font-semibold text-gray-700">
+              <label htmlFor="ann-audience" className="tm-text-label text-[color:var(--text-strong)]">
                 대상
               </label>
               <select
@@ -1293,7 +1294,7 @@ function AnnouncementsTab({
               </select>
             </div>
 
-            <label className="flex items-center gap-2 text-[13px] text-gray-700 cursor-pointer min-h-[44px] self-end sm:pb-0.5">
+            <label className="flex items-center gap-2 tm-text-label text-[color:var(--text-strong)] cursor-pointer min-h-[44px] self-end sm:pb-0.5">
               <input
                 type="checkbox"
                 checked={annPublish}
@@ -1336,8 +1337,8 @@ function AnnouncementsTab({
             <div key={ann.id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-bold text-gray-900 mb-0.5 truncate">{ann.title}</p>
-                  <p className="text-[12px] text-gray-400">
+                  <p className="tm-text-label font-bold text-[color:var(--text-strong)] mb-0.5 truncate">{ann.title}</p>
+                  <p className="tm-text-caption">
                     {ann.publishedAt ? `발행 · ${formatDate(ann.publishedAt)}` : '미발행'}
                     {' '}·{' '}
                     {ann.audience === 'all_registered'
@@ -1353,14 +1354,14 @@ function AnnouncementsTab({
                     onClick={() => handlePublish(ann.id)}
                     disabled={publishAnnouncement.isPending}
                     aria-label={`"${ann.title}" 발행`}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-[12px] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg tm-text-caption font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
                   >
                     <Send size={12} aria-hidden="true" />
                     발행
                   </button>
                 )}
               </div>
-              <p className="mt-2 text-[13px] text-gray-600 whitespace-pre-wrap leading-relaxed">
+              <p className="mt-2 tm-text-label text-[color:var(--text-muted)] whitespace-pre-wrap leading-relaxed">
                 {ann.body}
               </p>
             </div>
@@ -1442,7 +1443,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 text-[13px] text-gray-400 hover:text-gray-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 tm-text-label text-[color:var(--text-caption)] hover:text-[color:var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -1460,23 +1461,40 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       {/* ── Status change actions (f9: separate row, flex-wrap, h-[44px]) ── */}
       {canWrite && nextStatuses.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-5">
-          {nextStatuses.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => handleStatusChange(s)}
-              disabled={changeStatus.isPending}
-              className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
-            >
-              {TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경
-            </button>
-          ))}
+          {nextStatuses.map((s) => {
+            const isDestructive = s === 'cancelled';
+            const label =
+              s === 'open' ? '접수 시작하기' :
+              s === 'closed' ? '접수 마감하기' :
+              s === 'in_progress' ? '대회 시작하기' :
+              s === 'completed' ? '대회 완료 처리' :
+              s === 'cancelled' ? '대회 취소하기' :
+              `${TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경`;
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handleStatusChange(s)}
+                disabled={changeStatus.isPending}
+                className={[
+                  'inline-flex items-center h-[44px] px-4 rounded-xl tm-text-label font-semibold',
+                  'transition-colors disabled:opacity-50',
+                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap',
+                  isDestructive
+                    ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                    : 'text-white bg-blue-500 hover:bg-blue-600',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       )}
 
       {/* ── Info card ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6">
-        <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3 text-[13px]">
+        <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
           {[
             { label: '참가비', value: formatCurrency(tournament.entryFee) },
             { label: '팀 수', value: `${tournament.teamCount}팀` },
@@ -1487,8 +1505,8 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             { label: '대회 일정', value: formatDate(tournament.scheduledAt) },
           ].map(({ label, value }) => (
             <div key={label}>
-              <dt className="text-gray-400 font-medium mb-0.5">{label}</dt>
-              <dd className="text-gray-900">{value}</dd>
+              <dt className="tm-text-caption text-[color:var(--text-muted)] font-medium mb-0.5">{label}</dt>
+              <dd className="tm-text-label text-[color:var(--text-strong)]">{value}</dd>
             </div>
           ))}
         </dl>
@@ -1512,11 +1530,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               type="button"
               onClick={() => setActiveTab(tab.id)}
               className={[
-                'inline-flex items-center min-h-[44px] px-4 rounded-lg text-[13px] font-medium transition-colors',
+                'inline-flex items-center min-h-[44px] px-4 rounded-lg tm-text-label font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 active
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
+                  ? 'bg-white [color:var(--text-strong)] shadow-sm'
+                  : '[color:var(--text-muted)] hover:text-[color:var(--text-strong)]',
               ].join(' ')}
             >
               {tab.label}

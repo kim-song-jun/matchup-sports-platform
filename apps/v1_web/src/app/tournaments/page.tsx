@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -62,7 +62,7 @@ function TournamentsListContent() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
 
-  const { data, isLoading, isError, error, isFetching } = useV1Tournaments({ cursor, limit: 20 });
+  const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({ cursor, limit: 20 });
 
   // Accumulate pages when cursor is set
   const pageItems = data?.items ?? [];
@@ -142,11 +142,15 @@ function TournamentsListContent() {
         {isLoading ? (
           <TournamentSkeletonList />
         ) : isError ? (
-          <TournamentErrorState message={extractErrorMessage(error, '대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')} />
+          <ErrorState
+            message={extractErrorMessage(error, '대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')}
+            onRetry={() => void refetch()}
+          />
         ) : displayItems.length === 0 ? (
           <EmptyState
             title="아직 열린 대회가 없어요"
             sub="새로운 대회가 열리면 앱 알림으로 안내드릴게요."
+            icon={<TrophyIcon size={36} strokeWidth={1.5} />}
           />
         ) : (
           <>
@@ -290,15 +294,3 @@ function TournamentSkeletonCard({ opacity }: { opacity: number }) {
   );
 }
 
-/* ── Error state ── */
-
-function TournamentErrorState({ message }: { message: string }) {
-  return (
-    <Card pad={16} style={{ marginTop: 8, background: 'var(--grey50)' }}>
-      <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>대회 목록을 불러오지 못했어요</div>
-      <div className="tm-text-caption" style={{ marginTop: 5, lineHeight: 1.55, color: 'var(--text-muted)' }}>
-        {message}
-      </div>
-    </Card>
-  );
-}

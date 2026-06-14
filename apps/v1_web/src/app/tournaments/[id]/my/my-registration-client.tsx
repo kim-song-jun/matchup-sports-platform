@@ -295,7 +295,12 @@ function RegistrationDetailView({
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {belowMinimum && !isRosterLocked ? (
-                  <span className="tm-badge tm-badge-red">인원 부족</span>
+                  /* P0: status-aware badge — red only when confirmation is still blocked */
+                  registration.status === 'confirmed' || registration.status === 'paid' ? (
+                    <span className="tm-badge tm-badge-orange">명단 보강 권장</span>
+                  ) : (
+                    <span className="tm-badge tm-badge-red">인원 부족</span>
+                  )
                 ) : null}
                 {isRosterLocked ? (
                   <span className="tm-badge tm-badge-grey">잠김</span>
@@ -312,9 +317,16 @@ function RegistrationDetailView({
               </div>
             </div>
             {belowMinimum && !isRosterLocked ? (
-              <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                최소 인원을 채워야 참가 확정이 가능해요.
-              </p>
+              /* P0: copy branches on whether confirmation is still blocked */
+              registration.status === 'confirmed' || registration.status === 'paid' ? (
+                <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  아직 자리가 남았어요. 대회 전까지 선수를 더 등록할 수 있어요.
+                </p>
+              ) : (
+                <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  최소 인원을 채워야 참가 확정이 가능해요.
+                </p>
+              )
             ) : null}
           </Card>
         </section>
@@ -330,13 +342,14 @@ function RegistrationDetailView({
             </Link>
           ) : null}
 
+          {/* P1: de-emphasised; red danger lives only inside CancelModal's confirm button */}
           {canCancelRequest ? (
             <button
               type="button"
-              className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
+              className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
               onClick={() => { setCancelError(null); setShowCancelModal(true); }}
             >
-              취소 요청
+              참가를 취소하고 싶어요
             </button>
           ) : null}
         </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, ErrorState } from '@/components/v1-ui/primitives';
 import {
   useV1TournamentPlayers,
   useV1Tournament,
@@ -340,6 +340,7 @@ export function TournamentRosterPageClient({
     isLoading,
     isError,
     error: rosterErr,
+    refetch: refetchRoster,
   } = useV1TournamentPlayers(tournamentId, registrationId);
 
   const addPlayer = useV1AddPlayer(tournamentId, registrationId);
@@ -381,8 +382,11 @@ export function TournamentRosterPageClient({
     const msg = extractErrorMessage(rosterErr, '명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
       <AppChrome title="선수 명단" backHref={backHref} bottomNav={false}>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
-          <AlertBanner message={msg} />
+        <div style={{ padding: '0 20px', marginTop: 40 }}>
+          <ErrorState
+            message={msg}
+            onRetry={() => void refetchRoster()}
+          />
         </div>
       </AppChrome>
     );

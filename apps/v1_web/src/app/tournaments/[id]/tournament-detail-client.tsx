@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -139,7 +139,7 @@ function ApplyCTA({ tournament }: { tournament: V1TournamentDetail }) {
 /* ── Entry point ── */
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
-  const { data, isLoading, isError, error } = useV1Tournament(tournamentId);
+  const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
 
   if (isLoading) {
     return (
@@ -153,7 +153,12 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
       <AppChrome title="대회 상세" backHref="/tournaments" bottomNav={false} activeTab="tournaments">
-        <TournamentDetailError message={msg} />
+        <div style={{ padding: '48px 20px 0' }}>
+          <ErrorState
+            message={msg}
+            onRetry={() => void refetch()}
+          />
+        </div>
       </AppChrome>
     );
   }
@@ -893,26 +898,3 @@ function TournamentDetailSkeleton() {
   );
 }
 
-/* ── Error ── */
-
-function TournamentDetailError({ message }: { message: string }) {
-  return (
-    <div style={{ padding: '0 20px' }}>
-      <Card pad={16} style={{ marginTop: 24, background: 'var(--grey50)' }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-          대회 정보를 불러오지 못했어요
-        </div>
-        <div className="tm-text-caption" style={{ marginTop: 5, lineHeight: 1.55, color: 'var(--text-muted)' }}>
-          {message}
-        </div>
-        <Link
-          className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-          href="/tournaments"
-          style={{ marginTop: 14 }}
-        >
-          목록으로 돌아가기
-        </Link>
-      </Card>
-    </div>
-  );
-}

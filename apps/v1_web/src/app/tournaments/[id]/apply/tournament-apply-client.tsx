@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
@@ -515,9 +515,43 @@ function PaymentGuideStep({
   registrationId: string;
   onBack: () => void;
 }) {
+  const hasBankInfo =
+    Boolean(tournament.bankName) &&
+    Boolean(tournament.bankAccount) &&
+    Boolean(tournament.bankHolder);
+
+  // aria-live region ref for clipboard confirmation
+  const copyLiveRef = useRef<HTMLSpanElement>(null);
+
+  function handleCopyAccount() {
+    if (!tournament.bankAccount) return;
+    navigator.clipboard.writeText(tournament.bankAccount).then(() => {
+      if (copyLiveRef.current) {
+        copyLiveRef.current.textContent = '계좌번호를 복사했어요.';
+        // Clear after 3 s so the same message can re-trigger the screen-reader
+        setTimeout(() => {
+          if (copyLiveRef.current) copyLiveRef.current.textContent = '';
+        }, 3000);
+      }
+    }).catch(() => {
+      if (copyLiveRef.current) {
+        copyLiveRef.current.textContent = '복사하지 못했어요. 길게 눌러 직접 복사해 주세요.';
+      }
+    });
+  }
+
   // Bank transfer is the only supported payment method.
   return (
     <div style={{ padding: '0 20px 120px' }}>
+      {/* aria-live region for clipboard confirmation — hidden visually */}
+      <span
+        ref={copyLiveRef}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      />
+
       <section aria-labelledby="bank-guide-heading" style={{ marginTop: 20 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle title="입금 안내" />
@@ -530,18 +564,62 @@ function PaymentGuideStep({
           >
             아래 계좌로 참가비를 입금해 주세요
           </div>
-          {/* V1TournamentDetail includes organizer bank info; fallback if unset */}
-          <div style={{ padding: '0 16px' }}>
-            <InfoRow label="은행" value={tournament.bankName ?? '신청 확인 후 안내'} />
-            <InfoRow label="계좌번호" value={tournament.bankAccount ?? '신청 확인 후 안내'} />
-            <InfoRow label="예금주" value={tournament.bankHolder ?? '신청 확인 후 안내'} />
-            <InfoRow
-              label="입금액"
-              value={formatEntryFee(tournament.entryFee)}
-              valueColor="var(--blue500)"
-              isLast
-            />
-          </div>
+
+          {hasBankInfo ? (
+            /* V1TournamentDetail includes organizer bank info */
+            <div style={{ padding: '0 16px' }}>
+              <InfoRow label="은행" value={tournament.bankName!} />
+              {/* Account number row with copy button */}
+              <div
+                className="tm-info-row"
+                style={{ alignItems: 'center' }}
+              >
+                <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+                  계좌번호
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    className="tm-text-label"
+                    style={{ color: 'var(--text-strong)', textAlign: 'right' }}
+                  >
+                    {tournament.bankAccount}
+                  </span>
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-outline"
+                    onClick={handleCopyAccount}
+                    aria-label={`계좌번호 ${tournament.bankAccount} 복사`}
+                    style={{ flexShrink: 0 }}
+                  >
+                    복사
+                  </button>
+                </div>
+              </div>
+              <InfoRow label="예금주" value={tournament.bankHolder!} />
+              <InfoRow
+                label="입금액"
+                value={formatEntryFee(tournament.entryFee)}
+                valueColor="var(--blue500)"
+                isLast
+              />
+            </div>
+          ) : (
+            /* Bank info not yet set — show reassuring info banner instead of cold placeholders */
+            <div style={{ padding: '0 16px 14px' }}>
+              <AlertBanner
+                tone="info"
+                message="입금 계좌는 신청 확인 후 알림으로 보내드려요. 먼저 신청만 완료해 주세요."
+              />
+              <div style={{ marginTop: 10 }}>
+                <InfoRow
+                  label="입금액"
+                  value={formatEntryFee(tournament.entryFee)}
+                  valueColor="var(--blue500)"
+                  isLast
+                />
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>

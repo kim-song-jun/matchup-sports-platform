@@ -257,10 +257,10 @@ function TrophyPlaceholder() {
           width: 40,
           height: 40,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #f0b429 0%, #d97706 100%)',
+          background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
           display: 'grid',
           placeItems: 'center',
-          color: '#fff',
+          color: 'var(--static-white)',
         }}
       >
         <TrophyIcon size={20} strokeWidth={1.8} />

@@ -201,6 +201,30 @@ type WeatherStripProps = {
   status?: string;
 };
 
+type InfoRowProps = {
+  label: string;
+  value: string;
+  valueColor?: string;
+  /** Pass true on the final row of a card to remove the redundant bottom hairline. */
+  isLast?: boolean;
+};
+
+export function InfoRow({ label, value, valueColor, isLast }: InfoRowProps) {
+  return (
+    <div
+      className="tm-info-row"
+      style={{ ...(isLast ? { borderBottom: 'none' } : {}) }}
+    >
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+        {label}
+      </div>
+      <div className="tm-text-label" style={{ textAlign: 'right', color: valueColor ?? 'var(--text-strong)' }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function WeatherStrip({ city, temp, cond, wind, feelsLike, status }: WeatherStripProps) {
   const displayedFeelsLike = feelsLike ?? temp;
 

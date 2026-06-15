@@ -48,6 +48,7 @@ import type {
   V1AnnouncementAudience,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
 import {
   AdminPageHeader,
   AdminDataTable,
@@ -795,23 +796,11 @@ function BracketTab({
           showToast('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
           return;
         }
-        // Determine rounds: round-robin has (n-1) rounds for n teams
-        const numTeams = teams.length;
-        // Assign each pair to a round using round-robin scheduling
-        // Rotate-schedule: teams[0] is fixed, rest rotate
+        // 라운드로빈: 모든 비순서 쌍 1회 (순수 함수 roundRobinRounds — circle method)
         const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
-        const rotatable = teams.slice(1);
-        const numRounds = numTeams % 2 === 0 ? numTeams - 1 : numTeams;
-        const paddedTeams = numTeams % 2 !== 0 ? [...teams, null] : teams;
-        const rotList = paddedTeams.slice(1);
-        for (let round = 0; round < numRounds; round++) {
+        roundRobinRounds(teams).forEach((pairs, round) => {
           const roundLabel = `조별 ${round + 1}라운드`;
-          const current = [paddedTeams[0], ...rotList];
-          const half = Math.floor(current.length / 2);
-          for (let i = 0; i < half; i++) {
-            const home = current[i];
-            const away = current[current.length - 1 - i];
-            if (!home || !away) continue; // bye
+          for (const [home, away] of pairs) {
             payloads.push({
               groupId: targetGroupId,
               round: roundLabel,
@@ -820,9 +809,7 @@ function BracketTab({
               awayRegistrationId: away.registrationId,
             });
           }
-          // rotate: move last element to position 1
-          rotList.unshift(rotList.pop()!);
-        }
+        });
         await mutateSequential(payloads);
         showToast(`조별리그 픽스처 ${payloads.length}개를 자동 생성했어요.`, 'success');
       } else {
@@ -847,29 +834,17 @@ function BracketTab({
           return;
         }
 
-        const sorted = [...teams]; // preserve seeding order (sortOrder)
+        // 시드순(sortOrder) 정렬 후 1vsN 페어링 (순수 함수 knockoutSeedPairs)
+        const sorted = [...teams].sort((a, b) => a.sortOrder - b.sortOrder);
         const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
-        const half = Math.ceil(sorted.length / 2);
-        for (let i = 0; i < half; i++) {
-          const home = sorted[i];
-          const away = sorted[sorted.length - 1 - i];
-          if (home === away) {
-            // odd team — create as TBD away
-            payloads.push({
-              groupId: targetGroupId,
-              round: roundLabel,
-              fixtureNumber: nextNum++,
-              homeRegistrationId: home.registrationId,
-            });
-          } else {
-            payloads.push({
-              groupId: targetGroupId,
-              round: roundLabel,
-              fixtureNumber: nextNum++,
-              homeRegistrationId: home.registrationId,
-              awayRegistrationId: away.registrationId,
-            });
-          }
+        for (const { home, away } of knockoutSeedPairs(sorted)) {
+          payloads.push({
+            groupId: targetGroupId,
+            round: roundLabel,
+            fixtureNumber: nextNum++,
+            homeRegistrationId: home.registrationId,
+            ...(away ? { awayRegistrationId: away.registrationId } : {}),
+          });
         }
         await mutateSequential(payloads);
         showToast(`${roundLabel} 픽스처 ${payloads.length}개를 자동 생성했어요.`, 'success');

@@ -5,14 +5,14 @@ export function getLoginViewModel(): LoginViewModel {
 
   return {
     heroTitle: '같이 뛸 사람을\n한 번에 찾아요',
-    heroSub: 'Teameet에 오신 걸 환영합니다',
+    heroSub: 'teameet에 오신 걸 환영해요',
     emailHref: '/login/email',
     guestHref: '/home',
     signupHref: '/terms',
     providers: [
       { label: '카카오', background: '#FEE500', color: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
-      { label: '네이버', background: 'var(--green500)', color: 'var(--static-white)', disabled: true },
-      { label: 'Apple', background: 'var(--static-black)', color: 'var(--static-white)', disabled: true },
+      { label: '네이버 (준비 중)', background: 'var(--green500)', color: 'var(--static-white)', disabled: true },
+      { label: 'Apple (준비 중)', background: 'var(--static-black)', color: 'var(--static-white)', disabled: true },
     ],
   };
 }

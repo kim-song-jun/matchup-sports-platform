@@ -654,15 +654,17 @@
 }
 
 .tm-tournament-promo-cta-ghost {
-  background: rgba(255, 255, 255, 0.15);
+  /* 어두운 네이비 오버레이 — 파란 히어로 위 흰 텍스트 대비 ≥4.5:1 확보(반투명 흰 fill은
+     텍스트 대비를 오히려 낮춰 AA 미달이었음). */
+  background: rgba(10, 30, 66, 0.4);
   color: var(--static-white);
-  font-weight: 600;
-  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  font-weight: 700;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
   min-height: 44px;
 }
 
 .tm-tournament-promo-cta-ghost:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(10, 30, 66, 0.55);
 }
 
 /* ── 2. Shared section wrapper ── */
@@ -694,12 +696,6 @@
   align-items: center;
   gap: 4px;
   text-align: center;
-}
-
-.tm-tournament-promo-prize-card-emoji {
-  font-size: 22px;
-  line-height: 1;
-  margin-bottom: 2px;
 }
 
 .tm-tournament-promo-prize-card-rank {
@@ -742,12 +738,14 @@
 }
 
 /* ── 3. Process steps ── */
+/* Mobile: 3-col × 2-row grid so all 6 steps sit evenly without orphaning */
 .tm-tournament-promo-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 4px;
-  align-items: center;
-  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 8px;
+  align-items: start;
+  margin-bottom: 24px;
+  padding-bottom: 4px;
 }
 
 .tm-tournament-promo-step {
@@ -756,7 +754,6 @@
   align-items: center;
   gap: 4px;
   position: relative;
-  min-width: 52px;
 }
 
 .tm-tournament-promo-step-icon {
@@ -783,14 +780,9 @@
   white-space: nowrap;
 }
 
+/* Connectors hidden in grid layout — grid spacing is the separator */
 .tm-tournament-promo-step-connector {
-  position: absolute;
-  right: -10px;
-  top: 13px;
-  width: 8px;
-  height: 2px;
-  background: var(--grey200);
-  display: block;
+  display: none;
 }
 
 /* Mini bracket preview */
@@ -972,20 +964,31 @@
 
   /* Prize cards: stay 3-col on desktop (already set) */
 
+  /* Desktop: revert to single-row flex so all 6 steps sit on one horizontal line */
   .tm-tournament-promo-steps {
+    display: flex;
+    grid-template-columns: unset;
     flex-wrap: nowrap;
     gap: 4px;
     justify-content: space-between;
+    align-items: center;
+    padding-bottom: 0;
+    margin-bottom: 20px;
   }
 
   .tm-tournament-promo-step {
     min-width: 70px;
   }
 
+  /* Restore connector visibility on desktop */
   .tm-tournament-promo-step-connector {
+    display: block;
+    position: absolute;
     right: -14px;
-    width: 12px;
     top: 13px;
+    width: 12px;
+    height: 2px;
+    background: var(--grey200);
   }
 
   .tm-tournament-promo-how-grid {

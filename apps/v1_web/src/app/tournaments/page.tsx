@@ -266,7 +266,7 @@ function TournamentsListContent() {
         <div className="tm-tournament-promo-steps">
           {PROCESS_STEPS.map((step, i) => (
             <div key={step.label} className="tm-tournament-promo-step">
-              <div className="tm-tournament-promo-step-icon" aria-hidden="true">
+              <div className="tm-tournament-promo-step-icon" aria-hidden="true" style={{ color: 'var(--blue500)' }}>
                 {step.icon}
               </div>
               <span className="tm-tournament-promo-step-num" aria-hidden="true">
@@ -313,7 +313,7 @@ function TournamentsListContent() {
         <div className="tm-tournament-promo-how-grid">
           {HOW_TO_STEPS.map((step, i) => (
             <div key={step.title} className="tm-tournament-promo-how-card">
-              <div className="tm-tournament-promo-how-icon" aria-hidden="true">
+              <div className="tm-tournament-promo-how-icon" aria-hidden="true" style={{ color: 'var(--blue500)' }}>
                 {step.icon}
               </div>
               <p className="tm-tournament-promo-how-step-num">STEP {i + 1}</p>
@@ -506,7 +506,11 @@ function PrizeBreakdownCards({
     return (
       <div className="tm-tournament-promo-prize-cards">
         {entries.slice(0, 3).map((e, i) => (
-          <div key={`${e.rank}-${i}`} className="tm-tournament-promo-prize-card">
+          <div
+            key={`${e.rank}-${i}`}
+            className="tm-tournament-promo-prize-card"
+            style={i === 0 ? { border: '1.5px solid var(--orange500)' } : undefined}
+          >
             <TrophyIcon size={22} color={i === 0 ? 'var(--orange500)' : 'var(--grey400)'} aria-hidden="true" />
             <p className="tm-tournament-promo-prize-card-rank">{e.rank}</p>
             <p className="tm-tournament-promo-prize-card-amount">{e.amount}</p>
@@ -568,32 +572,106 @@ function MiniBracketPreview() {
   );
 }
 
+/* ── Inline icon components (stroke=currentColor, 24 viewBox, 1.8 strokeWidth) ── */
+
+function IconClipboard({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </svg>
+  );
+}
+
+function IconCreditCard({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  );
+}
+
+function IconUsers({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+function IconSoccerBall({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+      <path d="M2 12h20" />
+    </svg>
+  );
+}
+
+function IconBracket({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h4v12H3" />
+      <path d="M7 12h5" />
+      <path d="M12 8h2v8h-2" />
+      <path d="M14 12h3" />
+      <path d="M17 10h3v4h-3" />
+    </svg>
+  );
+}
+
+function IconTeam({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+      <path d="M12 8v4l3 3" />
+    </svg>
+  );
+}
+
+function IconFileText({ size = 24 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </svg>
+  );
+}
+
 /* ── Static data ── */
 
 const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string }> = [
-  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">📋</span>, label: '신청' },
-  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">💳</span>, label: '결제' },
-  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">👥</span>, label: '선수 명단' },
-  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">⚽</span>, label: '조별 리그' },
-  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">🏆</span>, label: '결선 토너먼트' },
-  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">🎉</span>, label: '우승' },
+  { icon: <IconClipboard size={20} />, label: '신청' },
+  { icon: <IconCreditCard size={20} />, label: '결제' },
+  { icon: <IconUsers size={20} />, label: '선수 명단' },
+  { icon: <IconSoccerBall size={20} />, label: '조별 리그' },
+  { icon: <IconBracket size={20} />, label: '결선 토너먼트' },
+  { icon: <TrophyIcon size={20} strokeWidth={1.8} />, label: '우승' },
 ];
 
 const HOW_TO_STEPS: Array<{ icon: React.ReactNode; title: string; desc: string }> = [
   {
-    icon: <span style={{ fontSize: 24 }} aria-hidden="true">🏃</span>,
+    icon: <IconTeam size={28} />,
     title: '팀 선택/만들기',
-    desc: '내 팀으로 참가하거나, 새 팀을 만들어 대회를 준비하세요.',
+    desc: '내 팀으로 참가하거나 새 팀을 만들어 준비해요.',
   },
   {
-    icon: <span style={{ fontSize: 24 }} aria-hidden="true">📝</span>,
+    icon: <IconCreditCard size={28} />,
     title: '대회 신청·결제',
-    desc: '원하는 대회를 골라 참가 신청 후 참가비를 결제하세요.',
+    desc: '참가 신청 후 참가비를 결제해요.',
   },
   {
-    icon: <span style={{ fontSize: 24 }} aria-hidden="true">📋</span>,
+    icon: <IconFileText size={28} />,
     title: '선수 명단 등록',
-    desc: '대회 전까지 선수 명단을 등록하면 준비 완료!',
+    desc: '대회 전까지 선수 명단을 등록하면 준비 완료예요.',
   },
 ];
 

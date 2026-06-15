@@ -279,8 +279,13 @@
   /* Left brand panel */
   .tm-auth-split-brand {
     flex: 1;
+    max-width: 760px;
     min-height: 100dvh;
-    background: linear-gradient(160deg, var(--blue500) 0%, var(--blue600) 100%);
+    /* 어두운 오버레이로 파란 그라데이션을 낮춰 흰 텍스트 대비 ≥4.5:1 확보
+       (blue500/600 위 흰 텍스트는 3.0~3.7:1로 AA 미달이었음). max-width로 초광폭 비율 상한. */
+    background:
+      linear-gradient(160deg, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0.34) 100%),
+      linear-gradient(160deg, var(--blue500) 0%, var(--blue600) 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -314,8 +319,8 @@
 
   .tm-auth-split-brand-tagline {
     font-size: 16px;
-    font-weight: 400;
-    color: rgba(255, 255, 255, 0.82);
+    font-weight: 500;
+    color: var(--static-white);
     text-align: center;
     max-width: 280px;
     line-height: 1.6;
@@ -336,7 +341,8 @@
     align-items: center;
     gap: 10px;
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.88);
+    font-weight: 500;
+    color: var(--static-white);
   }
 
   .tm-auth-split-brand-feature::before {

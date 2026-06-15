@@ -32,7 +32,10 @@ export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devL
             </>
           ) : null}
           {devLogin}
-          <p className="tm-text-caption tm-auth-policy">계속하면 서비스 약관과 개인정보 처리방침에 동의합니다.</p>
+          <p className="tm-text-caption tm-auth-policy">
+            로그인 또는 가입을 진행하면 <Link href="/terms" style={{ color: 'var(--blue500)' }}>서비스 이용약관</Link>과{' '}
+            <Link href="/my/settings/legal" style={{ color: 'var(--blue500)' }}>개인정보 처리방침</Link>에 동의하는 것으로 간주돼요.
+          </p>
         </div>
       </div>
     </AuthFrame>

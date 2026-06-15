@@ -72,7 +72,7 @@ export class TournamentRegistrationsService {
     if (existing && existing.status !== 'cancelled') {
       throw new ConflictException({
         code: 'ALREADY_REGISTERED',
-        message: 'This team already has a registration for the tournament',
+        message: '이미 신청한 대회예요. 내 신청에서 확인해 주세요.',
       });
     }
 

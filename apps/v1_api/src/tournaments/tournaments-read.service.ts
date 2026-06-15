@@ -141,6 +141,8 @@ export class TournamentsReadService {
       bankHolder: row.bankHolder,
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
+      prizePool: row.prizePool,
+      prizeBreakdown: row.prizeBreakdown,
       confirmedCount: row._count.registrations,
       groups: row.groups.map((g) => ({
         id: g.id,
@@ -220,6 +222,8 @@ export class TournamentsReadService {
       venue: string | null;
       teamCount: number;
       entryFee: number;
+      prizePool: number | null;
+      prizeBreakdown: string | null;
       createdAt: Date;
       updatedAt: Date;
     },
@@ -237,6 +241,8 @@ export class TournamentsReadService {
       venue: row.venue,
       teamCount: row.teamCount,
       entryFee: row.entryFee,
+      prizePool: row.prizePool,
+      prizeBreakdown: row.prizeBreakdown,
       confirmedCount,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

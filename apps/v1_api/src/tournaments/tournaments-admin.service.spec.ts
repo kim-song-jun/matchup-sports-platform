@@ -37,6 +37,8 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     bankHolder: null,
     rulesText: null,
     refundPolicyText: null,
+    prizePool: null,
+    prizeBreakdown: null,
     createdByAdminUserId: 'owner-admin-id',
     createdAt: new Date('2026-06-14T00:00:00.000Z'),
     updatedAt: new Date('2026-06-14T00:00:00.000Z'),

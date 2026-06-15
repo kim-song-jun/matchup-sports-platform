@@ -1108,6 +1108,9 @@ model V1Tournament {
   minPlayers             Int                @default(6) @map("min_players")
   maxPlayers             Int                @default(10) @map("max_players")
   entryFee               Int                @default(0) @map("entry_fee")
+  // 상금: prizePool=총 상금(원), prizeBreakdown=순위별 안내 텍스트(예: "1위 100만원 · 2위 50만원"). null이면 상금 표시 없음.
+  prizePool              Int?               @map("prize_pool")
+  prizeBreakdown         String?            @map("prize_breakdown")
   bankName               String?            @map("bank_name")
   bankAccount            String?            @map("bank_account")
   bankHolder             String?            @map("bank_holder")

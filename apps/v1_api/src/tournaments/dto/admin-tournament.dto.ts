@@ -127,6 +127,17 @@ export class CreateTournamentDto {
   @IsString()
   @MaxLength(2000)
   refundPolicyText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  prizePool?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  prizeBreakdown?: string;
 }
 
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
@@ -205,6 +216,17 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(2000)
   refundPolicyText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  prizePool?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  prizeBreakdown?: string;
 }
 
 export class ChangeTournamentStatusDto {

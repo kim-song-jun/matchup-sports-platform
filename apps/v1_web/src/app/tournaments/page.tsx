@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
+import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
+import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 /* ── Sport filter chip data ── (codes must match v1Sport.code in DB) */
 const FILTER_SPORTS: Array<{ code: string; label: string }> = [
@@ -23,7 +24,6 @@ const FILTER_SPORTS: Array<{ code: string; label: string }> = [
   { code: 'cycling',    label: '사이클' },
   { code: 'golf',       label: '골프' },
 ];
-import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 export default function TournamentsPage() {
   return (
@@ -31,6 +31,17 @@ export default function TournamentsPage() {
       <TournamentsListContent />
     </AppChrome>
   );
+}
+
+/* ── Prize formatter ── */
+function formatPrize(amount: number): string {
+  if (amount >= 10000) {
+    const man = Math.floor(amount / 10000);
+    const rem = amount % 10000;
+    if (rem === 0) return `${man.toLocaleString('ko-KR')}만원`;
+    return `${man.toLocaleString('ko-KR')}만 ${rem.toLocaleString('ko-KR')}원`;
+  }
+  return `${amount.toLocaleString('ko-KR')}원`;
 }
 
 /* ── Status helpers ── */
@@ -94,6 +105,27 @@ function TournamentsListContent() {
 
   const hasNext = data?.pageInfo?.hasNext ?? false;
 
+  // Derive featured tournament: max prizePool among open items; tie-break by closest scheduledAt
+  const openWithPrize = pageItems.filter(
+    (item) => item.status === 'open' && item.prizePool != null && item.prizePool > 0,
+  );
+  const featured: V1TournamentListItem | null = openWithPrize.length > 0
+    ? openWithPrize.reduce((best, cur) => {
+        const bestPrize = best.prizePool ?? 0;
+        const curPrize = cur.prizePool ?? 0;
+        if (curPrize > bestPrize) return cur;
+        if (curPrize === bestPrize) {
+          // Tie-break: earlier scheduledAt wins (closer to now)
+          const bestDate = best.scheduledAt ? new Date(best.scheduledAt).getTime() : Infinity;
+          const curDate = cur.scheduledAt ? new Date(cur.scheduledAt).getTime() : Infinity;
+          return curDate < bestDate ? cur : best;
+        }
+        return best;
+      })
+    : null;
+
+  const maxPrize = featured?.prizePool ?? 0;
+
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor) return;
     setAllItems(displayItems);
@@ -108,78 +140,221 @@ function TournamentsListContent() {
   };
 
   return (
-    <div className="tm-tournament-list" style={{ padding: '0 20px 48px' }}>
-      {/* ── Hero banner ── */}
-      <section aria-labelledby="tournament-hero-heading" style={{ marginTop: 24 }}>
-        <Card pad={0} className="tm-tournament-hero-card" style={{ overflow: 'hidden' }}>
-          {/* Gradient visual strip */}
-          <div className="tm-tournament-hero-visual" aria-hidden="true">
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 16,
-                background: 'rgba(255,255,255,0.18)',
-                display: 'grid',
-                placeItems: 'center',
-                color: 'var(--static-white)',
-              }}
-            >
-              <TrophyIcon size={32} strokeWidth={1.6} />
-            </div>
+    <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
+
+      {/* ══════════════════════════════════════════════════════════════
+          PROMO SECTIONS (prize-led marketing landing)
+          ══════════════════════════════════════════════════════════════ */}
+
+      {/* ── 1. Prize-led Hero ── */}
+      <section
+        aria-labelledby="promo-hero-heading"
+        className="tm-tournament-promo-hero"
+      >
+        {/* Eyebrow chip */}
+        <div className="tm-tournament-promo-eyebrow" aria-hidden="true">
+          <TrophyIcon size={13} strokeWidth={2} aria-hidden="true" />
+          <span>상금 걸린 대회</span>
+        </div>
+
+        <p className="tm-tournament-promo-tagline">우승하면 상금을 드려요</p>
+
+        {/* Big prize amount */}
+        {featured ? (
+          <div className="tm-tournament-promo-prize-row">
+            <span className="tm-tournament-promo-prize-label">최대</span>
             <span
-              className="tm-text-micro"
-              style={{ color: 'rgba(255,255,255,0.92)' }}
+              id="promo-hero-heading"
+              className="tm-tournament-promo-prize-amount"
             >
-              상금 대회
+              {formatPrize(maxPrize)}
             </span>
           </div>
+        ) : (
+          <p
+            id="promo-hero-heading"
+            className="tm-tournament-promo-fallback-headline"
+          >
+            조별리그부터 결선 토너먼트까지,<br />
+            팀과 함께 겨뤄보세요
+          </p>
+        )}
 
-          {/* Body: copy (left) + stats (right on desktop) */}
-          <div className="tm-tournament-hero-body">
-            <div className="tm-tournament-hero-copy">
-              <h1
-                id="tournament-hero-heading"
-                className="tm-text-heading"
-                style={{ color: 'var(--text-strong)', marginBottom: 4 }}
-              >
-                팀과 함께 대회에서 겨뤄보세요
-              </h1>
-              <p className="tm-text-label" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                조별 리그부터 결승 토너먼트까지, 상위 팀에게 상금을 드려요.
-              </p>
-            </div>
+        {/* Featured tournament meta */}
+        {featured ? (
+          <>
+            <p className="tm-tournament-promo-featured-title">{featured.title}</p>
+            <p className="tm-tournament-promo-meta" aria-label="대회 정보">
+              {featured.scheduledAt ? formatTournamentDate(featured.scheduledAt) : '날짜 미정'}
+              {' · '}
+              <span aria-label={`${featured.confirmedCount}팀 확정 / ${featured.teamCount}팀`}>
+                {featured.confirmedCount}/{featured.teamCount}팀 확정
+              </span>
+              {featured.venue ? ` · ${featured.venue}` : ''}
+            </p>
+          </>
+        ) : null}
 
-            {/* Desktop-only right stats/CTA column */}
-            <div className="tm-tournament-hero-stats tm-show-desktop" aria-label="대회 안내">
-              <div className="tm-tournament-hero-stat-item">
-                <span className="tm-text-label" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>진행 방식</span>
-                <span className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>조별 리그 → 토너먼트</span>
-              </div>
-              <div className="tm-tournament-hero-stat-item">
-                <span className="tm-text-label" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>참가 대상</span>
-                <span className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>모든 종목 팀</span>
-              </div>
-              <Link
-                href="#tournament-list"
-                className="tm-btn tm-btn-md tm-btn-primary"
-                style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                aria-label="대회 목록으로 이동"
-              >
-                <TrophyIcon size={15} strokeWidth={1.8} aria-hidden="true" />
-                대회 둘러보기
-              </Link>
-            </div>
-          </div>
-        </Card>
+        {/* CTAs */}
+        <div className="tm-tournament-promo-cta-row">
+          {featured ? (
+            <Link
+              href={`/tournaments/${featured.id}/apply`}
+              className="tm-btn tm-btn-lg tm-tournament-promo-cta-primary"
+              aria-label={`${featured.title} 참가 신청`}
+            >
+              참가 신청
+            </Link>
+          ) : null}
+          <Link
+            href="#tournament-list"
+            className="tm-btn tm-btn-lg tm-tournament-promo-cta-ghost"
+            aria-label="대회 목록으로 이동"
+          >
+            대회 둘러보기
+          </Link>
+        </div>
       </section>
 
-      {/* ── Tournament list ── */}
-      <section id="tournament-list" aria-labelledby="tournament-list-heading" style={{ marginTop: 28 }}>
-        <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle title="대회 목록" />
+      {/* ── 2. Prize Breakdown (only when featured has a prize) ── */}
+      {featured && featured.prizePool != null && featured.prizePool > 0 ? (
+        <section
+          aria-labelledby="prize-breakdown-heading"
+          className="tm-tournament-promo-section"
+          style={{ paddingTop: 28, paddingBottom: 4 }}
+        >
+          <h2
+            id="prize-breakdown-heading"
+            className="tm-tournament-promo-section-title"
+          >
+            상금 배분
+          </h2>
+
+          {featured.prizeBreakdown ? (
+            <PrizeBreakdownCards
+              prizeBreakdown={featured.prizeBreakdown}
+              totalPrize={featured.prizePool}
+            />
+          ) : (
+            /* No breakdown detail — single total card */
+            <div className="tm-tournament-promo-prize-single">
+              <TrophyIcon size={32} color="var(--orange500)" aria-hidden="true" />
+              <div>
+                <p className="tm-tournament-promo-prize-single-label">총 상금</p>
+                <p className="tm-tournament-promo-prize-single-amount">
+                  {formatPrize(featured.prizePool)}
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {/* ── 3. 진행 방식 (Process Flow) ── */}
+      <section
+        aria-labelledby="process-flow-heading"
+        className="tm-tournament-promo-section"
+        style={{ paddingTop: 28, paddingBottom: 4 }}
+      >
+        <h2
+          id="process-flow-heading"
+          className="tm-tournament-promo-section-title"
+        >
+          진행 방식
+        </h2>
+
+        <div className="tm-tournament-promo-steps">
+          {PROCESS_STEPS.map((step, i) => (
+            <div key={step.label} className="tm-tournament-promo-step">
+              <div className="tm-tournament-promo-step-icon" aria-hidden="true">
+                {step.icon}
+              </div>
+              <span className="tm-tournament-promo-step-num" aria-hidden="true">
+                {i + 1}
+              </span>
+              <span className="tm-tournament-promo-step-label">{step.label}</span>
+              {i < PROCESS_STEPS.length - 1 ? (
+                <span
+                  className="tm-tournament-promo-step-connector"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </div>
+          ))}
         </div>
-        <div id="tournament-list-heading" className="sr-only">대회 목록</div>
+
+        {/* Mini bracket preview (static, decorative) */}
+        <div
+          className="tm-tournament-promo-bracket-preview"
+          aria-hidden="true"
+          role="img"
+          aria-label="대진표 예시"
+        >
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 8, display: 'block', textAlign: 'center' }}>
+            대진표 예시
+          </span>
+          <MiniBracketPreview />
+        </div>
+      </section>
+
+      {/* ── 4. 참가 방법 (How to Join) ── */}
+      <section
+        aria-labelledby="how-to-join-heading"
+        className="tm-tournament-promo-section"
+        style={{ paddingTop: 28, paddingBottom: 4 }}
+      >
+        <h2
+          id="how-to-join-heading"
+          className="tm-tournament-promo-section-title"
+        >
+          참가 방법
+        </h2>
+
+        <div className="tm-tournament-promo-how-grid">
+          {HOW_TO_STEPS.map((step, i) => (
+            <div key={step.title} className="tm-tournament-promo-how-card">
+              <div className="tm-tournament-promo-how-icon" aria-hidden="true">
+                {step.icon}
+              </div>
+              <p className="tm-tournament-promo-how-step-num">STEP {i + 1}</p>
+              <p className="tm-tournament-promo-how-title">{step.title}</p>
+              <p className="tm-tournament-promo-how-desc">{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 5. Final CTA ── */}
+      <section
+        aria-labelledby="final-cta-heading"
+        className="tm-tournament-promo-final-cta"
+      >
+        <p
+          id="final-cta-heading"
+          className="tm-tournament-promo-final-cta-text"
+        >
+          지금 참가할 대회를 찾아보세요
+        </p>
+        <Link
+          href="#tournament-list"
+          className="tm-btn tm-btn-lg tm-btn-primary"
+          aria-label="대회 목록으로 이동"
+        >
+          <TrophyIcon size={16} strokeWidth={1.8} aria-hidden="true" />
+          <span>대회 목록 보기</span>
+        </Link>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════
+          EXISTING TOURNAMENT LIST (preserved as-is)
+          ══════════════════════════════════════════════════════════════ */}
+
+      {/* ── Tournament list ── */}
+      <section id="tournament-list" aria-labelledby="tournament-list-heading" style={{ marginTop: 28, padding: '0 20px' }}>
+        <div style={{ marginLeft: -20, marginRight: -20 }}>
+          <SectionTitle title="진행 중인 대회" />
+        </div>
+        <div id="tournament-list-heading" className="sr-only">진행 중인 대회 목록</div>
 
         {/* D3: 종목 필터 칩 — 컬러+텍스트 병행으로 a11y 준수 */}
         <div
@@ -271,7 +446,7 @@ function TournamentsListContent() {
           />
         ) : displayItems.length === 0 ? (
           <EmptyState
-            title="아직 열린 대회가 없어요"
+            title="현재 모집 중인 대회가 없어요"
             sub="새로운 대회가 열리면 앱 알림으로 안내드릴게요."
             icon={<TrophyIcon size={36} strokeWidth={1.5} />}
           />
@@ -305,6 +480,122 @@ function TournamentsListContent() {
     </div>
   );
 }
+
+/* ── Prize Breakdown Cards ── */
+function PrizeBreakdownCards({
+  prizeBreakdown,
+  totalPrize,
+}: {
+  prizeBreakdown: string;
+  totalPrize: number;
+}) {
+  // breakdown 문자열('1위 100만원 · 2위 50만원 · 3위 30만원')을 세그먼트로 분리하고
+  // [순위 라벨, 금액 원문]으로만 나눈다. 금액은 절대 재파싱하지 않음 — 원문('100만원')을
+  // 그대로 표시해 만/원 단위를 보존하고 잘못된 숫자 변환을 방지한다.
+  const parts = prizeBreakdown.split(/[/·,\n]+/).map((s) => s.trim()).filter(Boolean);
+  const RANK_RE = /^(준우승|우승|\d+\s*위)\s*[:：]?\s*(.+)$/;
+  const entries = parts
+    .map((part) => {
+      const m = part.match(RANK_RE);
+      return m ? { rank: m[1].replace(/\s+/g, ''), amount: m[2].trim() } : null;
+    })
+    .filter((e): e is { rank: string; amount: string } => e != null);
+
+  // 순위 라벨이 2개 이상 인식되면 카드 그리드 (최대 3개)
+  if (entries.length >= 2) {
+    return (
+      <div className="tm-tournament-promo-prize-cards">
+        {entries.slice(0, 3).map((e, i) => (
+          <div key={`${e.rank}-${i}`} className="tm-tournament-promo-prize-card">
+            <TrophyIcon size={22} color={i === 0 ? 'var(--orange500)' : 'var(--grey400)'} aria-hidden="true" />
+            <p className="tm-tournament-promo-prize-card-rank">{e.rank}</p>
+            <p className="tm-tournament-promo-prize-card-amount">{e.amount}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Fallback: single large card showing total + breakdown text
+  return (
+    <div className="tm-tournament-promo-prize-single">
+      <TrophyIcon size={32} color="var(--orange500)" aria-hidden="true" />
+      <div>
+        <p className="tm-tournament-promo-prize-single-label">총 상금 {formatPrize(totalPrize)}</p>
+        <p className="tm-tournament-promo-prize-single-desc">{prizeBreakdown}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Static Mini Bracket Preview ── */
+function MiniBracketPreview() {
+  // Static 4팀 → 결승 mini graphic
+  const semis: Array<{ a: string; b: string }> = [
+    { a: 'A팀', b: 'B팀' },
+    { a: 'C팀', b: 'D팀' },
+  ];
+  return (
+    <div className="tm-tournament-promo-bracket">
+      {/* Semi-final column */}
+      <div className="tm-tournament-promo-bracket-col">
+        <p className="tm-tournament-promo-bracket-round">4강</p>
+        <div className="tm-tournament-promo-bracket-matches">
+          {semis.map((m, i) => (
+            <div key={i} className="tm-tournament-promo-bracket-match">
+              <span>{m.a}</span>
+              <span className="tm-tournament-promo-bracket-vs">vs</span>
+              <span>{m.b}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Connector */}
+      <div className="tm-tournament-promo-bracket-conn" aria-hidden="true" />
+
+      {/* Final column */}
+      <div className="tm-tournament-promo-bracket-col">
+        <p className="tm-tournament-promo-bracket-round">결승</p>
+        <div className="tm-tournament-promo-bracket-matches" style={{ justifyContent: 'center' }}>
+          <div className="tm-tournament-promo-bracket-match tm-tournament-promo-bracket-match--final">
+            <TrophyIcon size={14} color="var(--orange500)" aria-hidden="true" />
+            <span>결승전</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Static data ── */
+
+const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string }> = [
+  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">📋</span>, label: '신청' },
+  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">💳</span>, label: '결제' },
+  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">👥</span>, label: '선수 명단' },
+  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">⚽</span>, label: '조별 리그' },
+  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">🏆</span>, label: '결선 토너먼트' },
+  { icon: <span style={{ fontSize: 18 }} aria-hidden="true">🎉</span>, label: '우승' },
+];
+
+const HOW_TO_STEPS: Array<{ icon: React.ReactNode; title: string; desc: string }> = [
+  {
+    icon: <span style={{ fontSize: 24 }} aria-hidden="true">🏃</span>,
+    title: '팀 선택/만들기',
+    desc: '내 팀으로 참가하거나, 새 팀을 만들어 대회를 준비하세요.',
+  },
+  {
+    icon: <span style={{ fontSize: 24 }} aria-hidden="true">📝</span>,
+    title: '대회 신청·결제',
+    desc: '원하는 대회를 골라 참가 신청 후 참가비를 결제하세요.',
+  },
+  {
+    icon: <span style={{ fontSize: 24 }} aria-hidden="true">📋</span>,
+    title: '선수 명단 등록',
+    desc: '대회 전까지 선수 명단을 등록하면 준비 완료!',
+  },
+];
 
 /* ── Tournament card ── */
 
@@ -483,4 +774,3 @@ function TournamentSkeletonCard({ opacity }: { opacity: number }) {
     </div>
   );
 }
-

@@ -29,6 +29,7 @@ function makeGroup(
   return {
     name: overrides.phase,
     sortOrder: 0,
+    advanceCount: null,
     groupTeams: [],
     standings: [],
     ...overrides,

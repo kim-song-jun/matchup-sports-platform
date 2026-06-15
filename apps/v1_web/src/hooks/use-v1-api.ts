@@ -1277,6 +1277,7 @@ export function useV1UpdateAdminRole() {
 
 type TournamentListFilters = {
   status?: 'open' | 'closed' | 'in_progress' | 'completed';
+  sportId?: string;
   cursor?: string;
   limit?: number;
 };
@@ -1392,6 +1393,12 @@ export function useV1AddPlayer(tournamentId: string, registrationId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
       });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
     },
   });
 }
@@ -1407,6 +1414,12 @@ export function useV1RemovePlayer(tournamentId: string, registrationId: string) 
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistration(tournamentId),
       });
     },
   });
@@ -1507,10 +1520,11 @@ export function useV1ConfirmPayment() {
         `/admin/registrations/${registrationId}/confirm-payment`,
         body,
       ),
-    onSuccess: (_data, { registrationId }) => {
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
     },
   });
 }
@@ -1526,10 +1540,11 @@ export function useV1ConfirmRegistration() {
         `/admin/registrations/${registrationId}/confirm`,
         body,
       ),
-    onSuccess: () => {
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
     },
   });
 }
@@ -1545,10 +1560,11 @@ export function useV1CancelRegistrationAdmin() {
         `/admin/registrations/${registrationId}/cancel`,
         body,
       ),
-    onSuccess: () => {
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
     },
   });
 }
@@ -1564,10 +1580,11 @@ export function useV1RosterLock() {
         `/admin/registrations/${registrationId}/roster-lock`,
         body,
       ),
-    onSuccess: () => {
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
     },
   });
 }
@@ -1580,10 +1597,11 @@ export function useV1RosterUnlock() {
         `/admin/registrations/${registrationId}/roster-lock`,
         { method: 'DELETE' },
       ),
-    onSuccess: () => {
+    onSuccess: (_data) => {
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
     },
   });
 }

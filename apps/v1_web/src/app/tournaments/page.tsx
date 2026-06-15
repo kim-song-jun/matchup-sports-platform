@@ -8,6 +8,21 @@ import { TrophyIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
+
+/* ── Sport filter chip data ── (codes must match v1Sport.code in DB) */
+const FILTER_SPORTS: Array<{ code: string; label: string }> = [
+  { code: 'soccer',     label: '축구' },
+  { code: 'futsal',     label: '풋살' },
+  { code: 'basketball', label: '농구' },
+  { code: 'baseball',   label: '야구' },
+  { code: 'volleyball', label: '배구' },
+  { code: 'badminton',  label: '배드민턴' },
+  { code: 'tennis',     label: '테니스' },
+  { code: 'running',    label: '러닝' },
+  { code: 'swimming',   label: '수영' },
+  { code: 'cycling',    label: '사이클' },
+  { code: 'golf',       label: '골프' },
+];
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 export default function TournamentsPage() {
@@ -62,8 +77,14 @@ function formatEntryFee(fee: number): string {
 function TournamentsListContent() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
+  // D3: 종목 필터 — null = '전체'
+  const [activeSportCode, setActiveSportCode] = useState<string | null>(null);
 
-  const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({ cursor, limit: 20 });
+  const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({
+    cursor,
+    limit: 20,
+    sportId: activeSportCode ?? undefined,
+  });
 
   // Accumulate pages when cursor is set
   const pageItems = data?.items ?? [];
@@ -77,6 +98,13 @@ function TournamentsListContent() {
     if (!data?.pageInfo?.nextCursor) return;
     setAllItems(displayItems);
     setCursor(data.pageInfo.nextCursor);
+  };
+
+  /** D3: 종목 칩 선택 — 페이지/누적 목록 리셋 후 필터 적용 */
+  const handleSportFilter = (code: string | null) => {
+    setActiveSportCode(code);
+    setCursor(undefined);
+    setAllItems([]);
   };
 
   return (
@@ -152,6 +180,87 @@ function TournamentsListContent() {
           <SectionTitle title="대회 목록" />
         </div>
         <div id="tournament-list-heading" className="sr-only">대회 목록</div>
+
+        {/* D3: 종목 필터 칩 — 컬러+텍스트 병행으로 a11y 준수 */}
+        <div
+          role="group"
+          aria-label="종목 필터"
+          style={{
+            display: 'flex',
+            gap: 6,
+            flexWrap: 'wrap',
+            marginTop: 10,
+            marginBottom: 12,
+          }}
+        >
+          {/* 전체 칩 */}
+          <button
+            type="button"
+            onClick={() => handleSportFilter(null)}
+            aria-pressed={activeSportCode === null}
+            aria-label="전체 종목"
+            className="tm-btn"
+            style={{
+              padding: '4px 12px',
+              borderRadius: 999,
+              fontSize: 'var(--font-size-caption)',
+              fontWeight: activeSportCode === null ? 700 : 500,
+              background: activeSportCode === null ? 'var(--blue500)' : 'var(--grey100)',
+              color: activeSportCode === null ? 'var(--static-white)' : 'var(--text-body)',
+              border: 'none',
+              cursor: 'pointer',
+              minHeight: 32,
+              lineHeight: 1,
+              transition: 'background 0.15s, color 0.15s',
+            }}
+          >
+            전체
+          </button>
+
+          {FILTER_SPORTS.map(({ code, label }) => {
+            const accent = getSportAccent(code);
+            const isActive = activeSportCode === code;
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => handleSportFilter(code)}
+                aria-pressed={isActive}
+                aria-label={`${label} 종목만 보기`}
+                className="tm-btn"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '4px 10px',
+                  borderRadius: 999,
+                  fontSize: 'var(--font-size-caption)',
+                  fontWeight: isActive ? 700 : 500,
+                  background: isActive ? accent.badgeBg : 'var(--grey100)',
+                  color: isActive ? accent.badgeText : 'var(--text-body)',
+                  border: isActive ? `1.5px solid ${accent.dot}` : '1.5px solid transparent',
+                  cursor: 'pointer',
+                  minHeight: 32,
+                  lineHeight: 1,
+                  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+                }}
+              >
+                {/* 종목 색깔 점 — 컬러 단독이 아닌 텍스트와 병행 */}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: isActive ? accent.dot : 'var(--grey400)',
+                    flexShrink: 0,
+                  }}
+                />
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
         {isLoading ? (
           <TournamentSkeletonList />

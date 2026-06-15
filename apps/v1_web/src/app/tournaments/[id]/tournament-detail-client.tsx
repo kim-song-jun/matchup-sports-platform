@@ -716,10 +716,18 @@ export function partitionTournamentSections(
     f.groupId !== null && !knockoutGroupIds.has(f.groupId),
   );
 
+  // TB-3: group_knockout에서 groupId=null이지만 round가 녹아웃 단계인 픽스처가 결선 대진표에서
+  // 누락되는 문제 수정 — knockoutFixtures에 fallback으로 포함. round 는 표시 라벨이라 한글('4강'·
+  // '결승'·'3·4위전')이 정상값이므로 영문 키와 한글 라벨을 모두 매칭(어드민 자동생성은 한글 라벨 사용).
+  const knockoutRoundLabels = ['semi', 'final', 'third_place', '4강', '결승', '3·4위전'];
   const knockoutFixtures =
     format === 'knockout'
       ? fixtures
-      : fixtures.filter((f) => f.groupId !== null && knockoutGroupIds.has(f.groupId));
+      : fixtures.filter(
+          (f) =>
+            (f.groupId !== null && knockoutGroupIds.has(f.groupId)) ||
+            (f.groupId === null && knockoutRoundLabels.some((r) => f.round.includes(r))),
+        );
 
   return {
     groupPhaseGroups,
@@ -801,6 +809,33 @@ function fixtureStatusBadge(status: string): string {
   }
 }
 
+/**
+ * D4: Scheduled 예정 뱃지 — 회색 배경 + 파란 점으로 종료(completed)와 시각 구분.
+ * 점에만 의존하지 않고 '예정' 텍스트를 함께 유지 (a11y: 컬러+텍스트 병행).
+ */
+function FixtureStatusBadge({ status }: { status: string }) {
+  const badgeClass = fixtureStatusBadge(status);
+  const label = fixtureStatusLabel(status);
+  return (
+    <span className={`tm-badge ${badgeClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {status === 'scheduled' ? (
+        <span
+          aria-hidden="true"
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: 'var(--blue500)',
+            flexShrink: 0,
+            display: 'inline-block',
+          }}
+        />
+      ) : null}
+      {label}
+    </span>
+  );
+}
+
 function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const hasResult = fixture.result !== null;
   const homeScore = hasResult ? fixture.result!.homeScore : null;
@@ -830,9 +865,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
             </span>
           ) : null}
         </div>
-        <span className={`tm-badge ${fixtureStatusBadge(fixture.status)}`}>
-          {fixtureStatusLabel(fixture.status)}
-        </span>
+        <FixtureStatusBadge status={fixture.status} />
       </div>
 
       {/* VS row */}

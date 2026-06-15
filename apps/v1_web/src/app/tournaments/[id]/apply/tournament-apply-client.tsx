@@ -694,6 +694,14 @@ function AgreementsStep({
           </div>
         </Card>
 
+        {/* D2: PG(카드·간편결제) 미지원 안내 */}
+        <p
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.6 }}
+        >
+          카드 결제는 준비 중이에요. 계좌이체를 이용해 주세요.
+        </p>
+
         <Card pad={14} style={{ marginTop: 10 }}>
           <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 6 }}>
             입금자명 <span style={{ color: 'var(--red500)' }}>*</span>
@@ -1011,6 +1019,11 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   async function handleTeamNext() {
     if (!selectedTeamId) return;
+    // REG-02: 이미 registrationId가 있으면 create를 재호출하지 않고 바로 다음 단계로 진행
+    if (registrationId) {
+      setStep('agreements');
+      return;
+    }
     setSubmitError(null);
     try {
       const reg = await createRegistration.mutateAsync({ teamId: selectedTeamId });

@@ -14,11 +14,13 @@ import {
   Plus,
   Megaphone,
   Send,
+  Pencil,
 } from 'lucide-react';
 import {
   useV1AdminTournament,
   useV1AdminMe,
   useV1ChangeTournamentStatus,
+  useV1UpdateTournament,
   useV1AdminTournamentRegistrations,
   useV1ConfirmPayment,
   useV1ConfirmRegistration,
@@ -46,6 +48,7 @@ import type {
   V1AdminBracketStanding,
   V1TournamentGroupPhase,
   V1AnnouncementAudience,
+  V1UpdateTournamentPayload,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
@@ -77,19 +80,30 @@ const ELIGIBILITY_LABEL: Record<string, string> = {
   needs_review: '검토필요',
 };
 
-// f9: 결제 상태·수단 한글 라벨 (my-registration-client 동일 기준)
+// f9: 결제 상태·수단 한글 라벨 (schema enum=ready|paid|failed|cancelled|refunded, my-registration-client 동일 기준)
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  ready: '결제 대기',
   paid: '결제 완료',
-  pending: '결제 대기',
+  failed: '결제 실패',
   cancelled: '취소됨',
   refunded: '환불됨',
 };
 
+// schema enum=pg|bank_transfer only
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   pg: '카드·간편결제',
   bank_transfer: '계좌이체',
-  vbank: '가상계좌',
 };
+
+// AREG-04: 어드민이 취소할 수 있는 신청 상태 (draft·cancelled 제외 — BE 가드와 동일)
+const ADMIN_CANCELLABLE = new Set<string>([
+  'cancel_requested',
+  'awaiting_payment',
+  'payment_checking',
+  'paid',
+  'confirmed',
+  'waitlisted',
+]);
 
 // ── Status transition guards ────────────────────────────────────────────────
 
@@ -585,7 +599,7 @@ function RegistrationsTab({
                 tone="gray"
               />
               <ExportCsvButton registrationId={reg.id} showToast={showToast} />
-              {reg.status !== 'cancelled' && (
+              {ADMIN_CANCELLABLE.has(reg.status) && (
                 <ActionButton
                   onClick={() => handleCancel(reg)}
                   disabled={cancelRegistration.isPending}
@@ -859,6 +873,14 @@ function BracketTab({
   const handleRecordResult = (e: React.FormEvent) => {
     e.preventDefault();
     if (!resultFixture) return;
+    // AGF-2/AGF-4: 버튼 disabled로 1차 차단, 폼 submit 이중 방어
+    const hs = parseInt(homeScore, 10);
+    const as_ = parseInt(awayScore, 10);
+    const hp = parseInt(homePenalty, 10);
+    const ap = parseInt(awayPenalty, 10);
+    const draw = !Number.isNaN(hs) && !Number.isNaN(as_) && hs === as_;
+    if (hasPenalty && !draw) return; // 정규 동점 아닐 때 승부차기 차단
+    if (hasPenalty && !Number.isNaN(hp) && !Number.isNaN(ap) && hp === ap) return; // 승부차기 동점 차단
     recordResult.mutate(
       {
         fixtureId: resultFixture.id,
@@ -904,6 +926,28 @@ function BracketTab({
 
   const groups: V1AdminBracketGroup[] = bracket?.groups ?? [];
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
+
+  // AGF-2/AGF-4: 결과 입력 인라인 유효성 검사 (groups 선언 이후 계산)
+  const _rhs = parseInt(homeScore, 10);
+  const _ras = parseInt(awayScore, 10);
+  const _rhp = parseInt(homePenalty, 10);
+  const _rap = parseInt(awayPenalty, 10);
+  const isRegularDraw = !Number.isNaN(_rhs) && !Number.isNaN(_ras) && _rhs === _ras;
+  const isPenaltyDraw = hasPenalty && !Number.isNaN(_rhp) && !Number.isNaN(_rap) && _rhp === _rap;
+  // 승부차기 체크 시 정규 동점이 아니면 에러
+  const penaltyWithoutDraw = hasPenalty && !isRegularDraw;
+  // 녹아웃 경기 여부: resultFixture의 groupId로 group 조회
+  const resultFixtureGroup = resultFixture?.groupId
+    ? groups.find((g) => g.id === resultFixture.groupId)
+    : undefined;
+  const isKnockoutFixture =
+    resultFixtureGroup?.phase === 'semi' ||
+    resultFixtureGroup?.phase === 'final' ||
+    resultFixtureGroup?.phase === 'third_place';
+  // 녹아웃인데 정규 동점이고 승부차기 미입력 → 에러
+  const knockoutNeedsWinner = isKnockoutFixture && isRegularDraw && !hasPenalty;
+  // 저장 차단 조건
+  const resultFormBlocked = penaltyWithoutDraw || isPenaltyDraw || knockoutNeedsWinner;
 
   return (
     <div className="flex flex-col gap-6">
@@ -1384,24 +1428,35 @@ function BracketTab({
             ]}
             rows={fixtures}
             keyExtractor={(f) => f.id}
-            renderActions={(f) => (
-              <button
-                type="button"
-                onClick={() => {
-                  setResultFixture(f);
-                  setHomeScore(String(f.result?.homeScore ?? 0));
-                  setAwayScore(String(f.result?.awayScore ?? 0));
-                  setHasPenalty(f.result?.hasPenalty ?? false);
-                  setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
-                  setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
-                  setResultOpen(true);
-                }}
-                aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
-                className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                결과 입력
-              </button>
-            )}
+            renderActions={(f) => {
+              // AGF-1: 결과 입력은 home·away 모두 배정된 경우에만 활성
+              const bothAssigned = !!f.homeRegistrationId && !!f.awayRegistrationId;
+              const disabledTitle = !bothAssigned
+                ? '홈·어웨이 팀이 모두 배정되어야 결과를 입력할 수 있어요'
+                : undefined;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!bothAssigned) return;
+                    setResultFixture(f);
+                    setHomeScore(String(f.result?.homeScore ?? 0));
+                    setAwayScore(String(f.result?.awayScore ?? 0));
+                    setHasPenalty(f.result?.hasPenalty ?? false);
+                    setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
+                    setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
+                    setResultOpen(true);
+                  }}
+                  disabled={!bothAssigned}
+                  aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
+                  title={disabledTitle}
+                  aria-disabled={!bothAssigned}
+                  className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  결과 입력
+                </button>
+              );
+            }}
           />
         </div>
       )}
@@ -1457,6 +1512,13 @@ function BracketTab({
             </div>
           </div>
 
+          {/* AGF-4: 녹아웃 경기 정규 동점 → 승부차기 필요 경고 */}
+          {knockoutNeedsWinner && (
+            <p className="text-xs text-red-500" role="alert" aria-live="polite">
+              녹아웃 경기는 승자가 필요해요. 승부차기를 입력해 주세요.
+            </p>
+          )}
+
           <label className="flex items-center gap-2 text-[13px] text-gray-900 cursor-pointer min-h-[44px]">
             <input
               type="checkbox"
@@ -1468,17 +1530,32 @@ function BracketTab({
             승부차기 있음
           </label>
 
+          {/* AGF-2: 승부차기 체크 시 정규 동점 아니면 에러 */}
+          {penaltyWithoutDraw && (
+            <p className="text-xs text-red-500" role="alert" aria-live="polite">
+              정규 경기가 동점일 때만 승부차기를 입력할 수 있어요.
+            </p>
+          )}
+
           {hasPenalty && (
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col gap-1 flex-1">
-                <label htmlFor="home-penalty" className="text-[13px] text-gray-900">홈 PK</label>
-                <input id="home-penalty" type="number" min="0" value={homePenalty} onChange={(e) => setHomePenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1 flex-1">
+                  <label htmlFor="home-penalty" className="text-[13px] text-gray-900">홈 PK</label>
+                  <input id="home-penalty" type="number" min="0" value={homePenalty} onChange={(e) => setHomePenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
+                </div>
+                <span className="text-xl font-bold text-gray-500 mt-5" aria-hidden="true">:</span>
+                <div className="flex flex-col gap-1 flex-1">
+                  <label htmlFor="away-penalty" className="text-[13px] text-gray-900">어웨이 PK</label>
+                  <input id="away-penalty" type="number" min="0" value={awayPenalty} onChange={(e) => setAwayPenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
+                </div>
               </div>
-              <span className="text-xl font-bold text-gray-500 mt-5" aria-hidden="true">:</span>
-              <div className="flex flex-col gap-1 flex-1">
-                <label htmlFor="away-penalty" className="text-[13px] text-gray-900">어웨이 PK</label>
-                <input id="away-penalty" type="number" min="0" value={awayPenalty} onChange={(e) => setAwayPenalty(e.target.value)} disabled={recordResult.isPending} className={inputCls} />
-              </div>
+              {/* AGF-2: 승부차기 점수 동일 차단 */}
+              {isPenaltyDraw && (
+                <p className="text-xs text-red-500" role="alert" aria-live="polite">
+                  승부차기 점수가 같으면 승자를 가릴 수 없어요.
+                </p>
+              )}
             </div>
           )}
 
@@ -1493,7 +1570,7 @@ function BracketTab({
             </button>
             <button
               type="submit"
-              disabled={recordResult.isPending}
+              disabled={recordResult.isPending || resultFormBlocked}
               className={'flex-1 ' + submitBtnCls}
             >
               {recordResult.isPending ? '저장 중…' : '저장'}
@@ -1709,8 +1786,84 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const changeStatus = useV1ChangeTournamentStatus(id);
 
   const { toasts, showToast } = useAdminToast();
+  const updateTournament = useV1UpdateTournament(id);
 
   const [activeTab, setActiveTab] = useState<TabId>('registrations');
+
+  // ── Edit form state ──────────────────────────────────────────────────
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editScheduledAt, setEditScheduledAt] = useState('');
+  const [editDeadlineAt, setEditDeadlineAt] = useState('');
+  const [editVenue, setEditVenue] = useState('');
+  const [editEntryFee, setEditEntryFee] = useState('');
+  const [editTeamCount, setEditTeamCount] = useState('');
+  const [editMinPlayers, setEditMinPlayers] = useState('');
+  const [editMaxPlayers, setEditMaxPlayers] = useState('');
+  const [editPrizePool, setEditPrizePool] = useState('');
+  const [editPrizeBreakdown, setEditPrizeBreakdown] = useState('');
+  const [editBankName, setEditBankName] = useState('');
+  const [editBankAccount, setEditBankAccount] = useState('');
+  const [editBankHolder, setEditBankHolder] = useState('');
+  const [editRulesText, setEditRulesText] = useState('');
+  const [editRefundPolicyText, setEditRefundPolicyText] = useState('');
+
+  /** Open edit modal prefilled with current tournament values */
+  const openEdit = () => {
+    if (!tournament) return;
+    setEditTitle(tournament.title);
+    setEditScheduledAt(tournament.scheduledAt ? tournament.scheduledAt.slice(0, 16) : '');
+    setEditDeadlineAt(tournament.registrationDeadlineAt ? tournament.registrationDeadlineAt.slice(0, 16) : '');
+    setEditVenue(tournament.venue ?? '');
+    setEditEntryFee(String(tournament.entryFee));
+    setEditTeamCount(String(tournament.teamCount));
+    setEditMinPlayers(String(tournament.minPlayers));
+    setEditMaxPlayers(String(tournament.maxPlayers));
+    setEditPrizePool(tournament.prizePool != null ? String(tournament.prizePool) : '');
+    setEditPrizeBreakdown(tournament.prizeBreakdown ?? '');
+    setEditBankName(tournament.bankName ?? '');
+    setEditBankAccount(tournament.bankAccount ?? '');
+    setEditBankHolder(tournament.bankHolder ?? '');
+    setEditRulesText(tournament.rulesText ?? '');
+    setEditRefundPolicyText(tournament.refundPolicyText ?? '');
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload: V1UpdateTournamentPayload = {};
+    if (editTitle.trim()) payload.title = editTitle.trim();
+    if (editScheduledAt) payload.scheduledAt = new Date(editScheduledAt).toISOString();
+    if (editDeadlineAt) payload.registrationDeadlineAt = new Date(editDeadlineAt).toISOString();
+    if (editVenue.trim()) payload.venue = editVenue.trim();
+    const fee = Number(editEntryFee);
+    if (!Number.isNaN(fee)) payload.entryFee = fee;
+    const tc = Number(editTeamCount);
+    if (!Number.isNaN(tc) && tc > 0) payload.teamCount = tc;
+    const mn = Number(editMinPlayers);
+    if (!Number.isNaN(mn) && mn > 0) payload.minPlayers = mn;
+    const mx = Number(editMaxPlayers);
+    if (!Number.isNaN(mx) && mx > 0) payload.maxPlayers = mx;
+    if (editPrizePool !== '') {
+      const pp = Number(editPrizePool);
+      if (!Number.isNaN(pp)) payload.prizePool = pp;
+    }
+    if (editPrizeBreakdown.trim()) payload.prizeBreakdown = editPrizeBreakdown.trim();
+    if (editBankName.trim()) payload.bankName = editBankName.trim();
+    if (editBankAccount.trim()) payload.bankAccount = editBankAccount.trim();
+    if (editBankHolder.trim()) payload.bankHolder = editBankHolder.trim();
+    if (editRulesText.trim()) payload.rulesText = editRulesText.trim();
+    if (editRefundPolicyText.trim()) payload.refundPolicyText = editRefundPolicyText.trim();
+
+    updateTournament.mutate(payload, {
+      onSuccess: () => {
+        setEditOpen(false);
+        showToast('대회 정보를 수정했어요.', 'success');
+      },
+      onError: (err) =>
+        showToast(extractErrorMessage(err, '대회 정보 수정에 실패했어요.'), 'error'),
+    });
+  };
 
   // ── Registration data (needed by bracket tab for confirmed teams) ────
   const { data: regData } = useV1AdminTournamentRegistrations(id);
@@ -1821,8 +1974,21 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         </div>
       )}
 
-      {/* ── Info card ─────────────────────────────────────────────────── */}
+      {/* ── Info card (ADM-TOURN-05: prize/rules/refund read-back) ──── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[13px] font-bold text-gray-900">대회 정보</span>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={openEdit}
+              className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              <Pencil size={13} aria-hidden="true" />
+              대회 정보 수정
+            </button>
+          )}
+        </div>
         <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
           {[
             { label: '참가비', value: formatCurrency(tournament.entryFee) },
@@ -1832,6 +1998,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
             { label: '대회 일정', value: formatDate(tournament.scheduledAt) },
+            { label: '상금', value: tournament.prizePool != null ? formatCurrency(tournament.prizePool) : '—' },
           ].map(({ label, value }) => (
             <div key={label}>
               <dt className="text-xs text-gray-600 font-medium mb-0.5">{label}</dt>
@@ -1839,6 +2006,33 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             </div>
           ))}
         </dl>
+        {/* Long-form fields */}
+        {(tournament.prizeBreakdown || tournament.rulesText || tournament.refundPolicyText) && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4">
+            {tournament.prizeBreakdown && (
+              <div>
+                <p className="text-xs text-gray-600 font-medium mb-0.5">상금 배분</p>
+                <p className="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed">{tournament.prizeBreakdown}</p>
+              </div>
+            )}
+            {tournament.rulesText && (
+              <div>
+                <p className="text-xs text-gray-600 font-medium mb-0.5">대회 규정</p>
+                <p className="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed">{tournament.rulesText}</p>
+              </div>
+            )}
+            {tournament.refundPolicyText && (
+              <div>
+                <p className="text-xs text-gray-600 font-medium mb-0.5">환불 정책</p>
+                <p className="text-[13px] text-gray-900 whitespace-pre-wrap leading-relaxed">{tournament.refundPolicyText}</p>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Null-state hint when all long-form fields are absent */}
+        {!tournament.prizeBreakdown && !tournament.rulesText && !tournament.refundPolicyText && (
+          <p className="mt-3 text-xs text-gray-400">상금 배분·규정·환불 정책이 아직 입력되지 않았어요.</p>
+        )}
       </div>
 
       {/* ── Tabs (f11: min-h-[44px], no shadow — active = border-b-2 blue-500) ── */}
@@ -1908,6 +2102,236 @@ export default function TournamentDetailClient({ id }: { id: string }) {
           />
         )}
       </div>
+
+      {/* ── D1: 대회 정보 수정 모달 ──────────────────────────────────── */}
+      <SimpleModal
+        open={editOpen}
+        title="대회 정보 수정"
+        onClose={() => setEditOpen(false)}
+        pending={updateTournament.isPending}
+      >
+        <form onSubmit={handleEditSubmit} noValidate className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-title" className="text-[13px] text-gray-900">
+              대회명 <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="edit-title"
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              disabled={updateTournament.isPending}
+              maxLength={100}
+              required
+              className={inputCls}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-scheduled-at" className="text-[13px] text-gray-900">대회 일정</label>
+              <input
+                id="edit-scheduled-at"
+                type="datetime-local"
+                value={editScheduledAt}
+                onChange={(e) => setEditScheduledAt(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-deadline-at" className="text-[13px] text-gray-900">신청 마감</label>
+              <input
+                id="edit-deadline-at"
+                type="datetime-local"
+                value={editDeadlineAt}
+                onChange={(e) => setEditDeadlineAt(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-venue" className="text-[13px] text-gray-900">장소</label>
+            <input
+              id="edit-venue"
+              type="text"
+              value={editVenue}
+              onChange={(e) => setEditVenue(e.target.value)}
+              disabled={updateTournament.isPending}
+              maxLength={100}
+              className={inputCls}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-entry-fee" className="text-[13px] text-gray-900">참가비 (원)</label>
+              <input
+                id="edit-entry-fee"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={editEntryFee}
+                onChange={(e) => setEditEntryFee(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-team-count" className="text-[13px] text-gray-900">팀 수</label>
+              <input
+                id="edit-team-count"
+                type="number"
+                inputMode="numeric"
+                min={2}
+                value={editTeamCount}
+                onChange={(e) => setEditTeamCount(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-min-players" className="text-[13px] text-gray-900">최소 선수</label>
+              <input
+                id="edit-min-players"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={editMinPlayers}
+                onChange={(e) => setEditMinPlayers(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-max-players" className="text-[13px] text-gray-900">최대 선수</label>
+              <input
+                id="edit-max-players"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={editMaxPlayers}
+                onChange={(e) => setEditMaxPlayers(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-prize-pool" className="text-[13px] text-gray-900">상금 (원)</label>
+            <input
+              id="edit-prize-pool"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={editPrizePool}
+              onChange={(e) => setEditPrizePool(e.target.value)}
+              placeholder="없으면 비워두세요"
+              disabled={updateTournament.isPending}
+              className={inputCls}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-prize-breakdown" className="text-[13px] text-gray-900">상금 배분</label>
+            <textarea
+              id="edit-prize-breakdown"
+              value={editPrizeBreakdown}
+              onChange={(e) => setEditPrizeBreakdown(e.target.value)}
+              disabled={updateTournament.isPending}
+              rows={3}
+              placeholder="예: 1위 50만원, 2위 20만원"
+              className={textareaCls}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-bank-name" className="text-[13px] text-gray-900">은행명</label>
+              <input
+                id="edit-bank-name"
+                type="text"
+                value={editBankName}
+                onChange={(e) => setEditBankName(e.target.value)}
+                disabled={updateTournament.isPending}
+                maxLength={20}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-bank-account" className="text-[13px] text-gray-900">계좌번호</label>
+              <input
+                id="edit-bank-account"
+                type="text"
+                value={editBankAccount}
+                onChange={(e) => setEditBankAccount(e.target.value)}
+                disabled={updateTournament.isPending}
+                maxLength={30}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-bank-holder" className="text-[13px] text-gray-900">예금주</label>
+              <input
+                id="edit-bank-holder"
+                type="text"
+                value={editBankHolder}
+                onChange={(e) => setEditBankHolder(e.target.value)}
+                disabled={updateTournament.isPending}
+                maxLength={20}
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-rules-text" className="text-[13px] text-gray-900">대회 규정</label>
+            <textarea
+              id="edit-rules-text"
+              value={editRulesText}
+              onChange={(e) => setEditRulesText(e.target.value)}
+              disabled={updateTournament.isPending}
+              rows={4}
+              placeholder="대회 규정을 입력해 주세요."
+              className={textareaCls}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-refund-policy" className="text-[13px] text-gray-900">환불 정책</label>
+            <textarea
+              id="edit-refund-policy"
+              value={editRefundPolicyText}
+              onChange={(e) => setEditRefundPolicyText(e.target.value)}
+              disabled={updateTournament.isPending}
+              rows={3}
+              placeholder="환불 정책을 입력해 주세요."
+              className={textareaCls}
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1 sticky bottom-0 bg-white pb-1">
+            <button
+              type="button"
+              onClick={() => setEditOpen(false)}
+              disabled={updateTournament.isPending}
+              className="flex-1 h-[44px] rounded-xl text-[13px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={!editTitle.trim() || updateTournament.isPending}
+              className={'flex-1 ' + submitBtnCls}
+            >
+              {updateTournament.isPending ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </form>
+      </SimpleModal>
 
       <AdminToasts toasts={toasts} />
     </>

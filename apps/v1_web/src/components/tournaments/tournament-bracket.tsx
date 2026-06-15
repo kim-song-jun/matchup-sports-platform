@@ -125,6 +125,8 @@ function getWinner(fixture: V1TournamentFixture): WinnerSide {
   if (!fixture.result) return null;
   const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = fixture.result;
   if (hasPenalty && homePenaltyScore !== null && awayPenaltyScore !== null) {
+    // 승부차기 점수가 같으면 무승부/미결 처리 — 승자 강조 없음
+    if (homePenaltyScore === awayPenaltyScore) return null;
     return homePenaltyScore > awayPenaltyScore ? 'home' : 'away';
   }
   if (homeScore > awayScore) return 'home';
@@ -139,6 +141,33 @@ function fixtureStatusBadge(status: string): string {
     case 'cancelled': return 'tm-badge-red';
     default: return 'tm-badge-grey';
   }
+}
+
+/**
+ * D4: Scheduled 예정 뱃지 — 회색 배경 + 파란 점으로 종료(completed)와 시각 구분.
+ * 점에만 의존하지 않고 '예정' 텍스트를 함께 유지 (a11y: 컬러+텍스트 병행).
+ */
+function FixtureStatusBadge({ status }: { status: string }) {
+  const badgeClass = fixtureStatusBadge(status);
+  const label = fixtureStatusLabel(status);
+  return (
+    <span className={`tm-badge ${badgeClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {status === 'scheduled' ? (
+        <span
+          aria-hidden="true"
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: 'var(--blue500)',
+            flexShrink: 0,
+            display: 'inline-block',
+          }}
+        />
+      ) : null}
+      {label}
+    </span>
+  );
 }
 
 function fixtureStatusLabel(status: string): string {
@@ -164,9 +193,7 @@ function BracketFixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
     <Card pad={12}>
       {/* Status row */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-        <span className={`tm-badge ${fixtureStatusBadge(fixture.status)}`}>
-          {fixtureStatusLabel(fixture.status)}
-        </span>
+        <FixtureStatusBadge status={fixture.status} />
       </div>
 
       {/* VS row: home · score · away */}

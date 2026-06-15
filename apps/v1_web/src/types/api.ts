@@ -1271,6 +1271,7 @@ export type V1TournamentPaymentMethod = 'pg' | 'bank_transfer';
 export type V1TournamentPaymentStatus =
   | 'ready'
   | 'paid'
+  | 'failed'
   | 'cancelled'
   | 'refunded';
 

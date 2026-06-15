@@ -153,13 +153,37 @@ export default function AdminTournamentsNewPage() {
 
   const isPending = createMutation.isPending;
 
+  // ── Inline validation errors ────────────────────────────────────────
+  const teamCountNum = teamCount ? parseInt(teamCount, 10) : null;
+  const teamCountError =
+    teamCountNum !== null && (teamCountNum < 2 || teamCountNum > 64)
+      ? '참가 팀 수는 2~64개여야 해요.'
+      : null;
+
+  const minPlayersNum = minPlayers ? parseInt(minPlayers, 10) : null;
+  const maxPlayersNum = maxPlayers ? parseInt(maxPlayers, 10) : null;
+  const playersRangeError: string | null = (() => {
+    if (minPlayersNum !== null && (minPlayersNum < 1 || minPlayersNum > 50)) {
+      return '선수 수는 1~50명이어야 해요.';
+    }
+    if (maxPlayersNum !== null && (maxPlayersNum < 1 || maxPlayersNum > 50)) {
+      return '선수 수는 1~50명이어야 해요.';
+    }
+    if (minPlayersNum !== null && maxPlayersNum !== null && minPlayersNum > maxPlayersNum) {
+      return '최소 선수 수는 최대 선수 수보다 클 수 없어요.';
+    }
+    return null;
+  })();
+
   // ── Validation ───────────────────────────────────────────────────────
   const canSubmit =
     !isPending &&
     sportId.trim().length > 0 &&
     title.trim().length > 0 &&
     isValidDatetimeText(scheduledAt) &&
-    isValidDatetimeText(registrationDeadlineAt);
+    isValidDatetimeText(registrationDeadlineAt) &&
+    teamCountError === null &&
+    playersRangeError === null;
 
   // ── Submit ───────────────────────────────────────────────────────────
   const handleSubmit = (e: React.FormEvent) => {
@@ -327,13 +351,27 @@ export default function AdminTournamentsNewPage() {
                   id="team-count"
                   type="number"
                   min="2"
-                  max="128"
+                  max="64"
                   value={teamCount}
                   onChange={(e) => setTeamCount(e.target.value)}
                   disabled={isPending}
                   placeholder="예: 16"
-                  className={inputCls}
+                  aria-invalid={teamCountError !== null}
+                  aria-describedby={teamCountError !== null ? 'team-count-err' : undefined}
+                  className={[
+                    inputCls,
+                    teamCountError !== null
+                      ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                      : '',
+                  ]
+                    .join(' ')
+                    .trim()}
                 />
+                {teamCountError !== null && (
+                  <p id="team-count-err" role="alert" className="text-[12px] text-red-500 mt-0.5">
+                    {teamCountError}
+                  </p>
+                )}
               </FormField>
 
               <FormField id="min-players" label="최소 선수 수">
@@ -341,11 +379,21 @@ export default function AdminTournamentsNewPage() {
                   id="min-players"
                   type="number"
                   min="1"
+                  max="50"
                   value={minPlayers}
                   onChange={(e) => setMinPlayers(e.target.value)}
                   disabled={isPending}
                   placeholder="예: 5"
-                  className={inputCls}
+                  aria-invalid={playersRangeError !== null}
+                  aria-describedby={playersRangeError !== null ? 'players-range-err' : undefined}
+                  className={[
+                    inputCls,
+                    playersRangeError !== null
+                      ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                      : '',
+                  ]
+                    .join(' ')
+                    .trim()}
                 />
               </FormField>
 
@@ -354,12 +402,27 @@ export default function AdminTournamentsNewPage() {
                   id="max-players"
                   type="number"
                   min="1"
+                  max="50"
                   value={maxPlayers}
                   onChange={(e) => setMaxPlayers(e.target.value)}
                   disabled={isPending}
                   placeholder="예: 11"
-                  className={inputCls}
+                  aria-invalid={playersRangeError !== null}
+                  aria-describedby={playersRangeError !== null ? 'players-range-err' : undefined}
+                  className={[
+                    inputCls,
+                    playersRangeError !== null
+                      ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                      : '',
+                  ]
+                    .join(' ')
+                    .trim()}
                 />
+                {playersRangeError !== null && (
+                  <p id="players-range-err" role="alert" className="text-[12px] text-red-500 mt-0.5">
+                    {playersRangeError}
+                  </p>
+                )}
               </FormField>
             </div>
           </section>

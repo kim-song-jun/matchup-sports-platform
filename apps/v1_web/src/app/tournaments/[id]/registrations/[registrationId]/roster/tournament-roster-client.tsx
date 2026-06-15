@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, ErrorState } from '@/components/v1-ui/primitives';
@@ -10,10 +11,11 @@ import {
   useV1Registration,
   useV1AddPlayer,
   useV1RemovePlayer,
-  useV1TeamMembers,
 } from '@/hooks/use-v1-api';
+import { v1Get } from '@/lib/api-client';
+import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1TournamentPlayer, V1PlayerEligibilityStatus } from '@/types/api';
+import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
 
 /* ── Helpers ── */
 
@@ -88,13 +90,32 @@ function AddPlayerForm({
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
   const [birthDateError, setBirthDateError] = useState<string | null>(null);
 
+  // ROSTER-004: cursor-paginated team member fetch so 50+ member teams work.
+  // useInfiniteQuery accumulates all loaded pages; "더 보기" fetches the next page.
   const {
-    data: membersData,
+    data: membersPages,
     isLoading: membersLoading,
     isError: membersError,
-  } = useV1TeamMembers(teamId);
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
+    queryKey: [...v1Keys.team(teamId), 'members', { limit: 50 }] as const,
+    queryFn: ({ pageParam }) =>
+      v1Get<V1TeamMembersPage>(`/teams/${teamId}/members`, {
+        limit: 50,
+        ...(pageParam ? { cursor: pageParam } : {}),
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) =>
+      lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined,
+    enabled: Boolean(teamId),
+  });
 
-  const members = membersData?.items ?? [];
+  const members = useMemo(
+    () => membersPages?.pages.flatMap((p) => p.items) ?? [],
+    [membersPages],
+  );
 
   function patch(partial: Partial<AddPlayerFormState>) {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -158,21 +179,34 @@ function AddPlayerForm({
               팀원이 없어요.
             </div>
           ) : (
-            <select
-              id="player-member"
-              value={form.userId}
-              onChange={(e) => handleMemberChange(e.target.value)}
-              className="tm-input"
-              style={{ minHeight: 44 }}
-              aria-required="true"
-            >
-              <option value="">팀원을 선택해 주세요</option>
-              {members.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.displayName} ({memberRoleLabel(m.role)})
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                id="player-member"
+                value={form.userId}
+                onChange={(e) => handleMemberChange(e.target.value)}
+                className="tm-input"
+                style={{ minHeight: 44 }}
+                aria-required="true"
+              >
+                <option value="">팀원을 선택해 주세요</option>
+                {members.map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.displayName} ({memberRoleLabel(m.role)})
+                  </option>
+                ))}
+              </select>
+              {hasNextPage ? (
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ marginTop: 6, width: '100%', minHeight: 36 }}
+                  onClick={() => void fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                >
+                  {isFetchingNextPage ? '불러오는 중…' : `더 보기 (현재 ${members.length}명 로드됨)`}
+                </button>
+              ) : null}
+            </>
           )}
         </FormField>
 
@@ -184,7 +218,7 @@ function AddPlayerForm({
             value={form.realName}
             onChange={(e) => patch({ realName: e.target.value })}
             placeholder="실명 입력"
-            maxLength={30}
+            maxLength={40}
             className="tm-input"
             aria-required="true"
           />

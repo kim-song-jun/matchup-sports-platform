@@ -10,6 +10,7 @@ function makeGroup(
   return {
     name: overrides.phase,
     sortOrder: 0,
+    advanceCount: null,
     groupTeams: [],
     standings: [],
     ...overrides,
@@ -170,6 +171,24 @@ describe('partitionTournamentSections', () => {
       const result = partitionTournamentSections('group_knockout', [fThird], [groupThird]);
 
       expect(result.knockoutFixtures.map((f) => f.id)).toEqual(['ft']);
+    });
+
+    it('TB-3: groupId=null 픽스처도 round가 녹아웃 단계 문자열이면 knockoutFixtures에 포함', () => {
+      // group_knockout에서 groupId 없이 round='semi'/'final'/'third_place'로 직접
+      // 지정된 픽스처가 결선 대진표에 포함되어야 한다.
+      const fSemiOrphan = makeFixture({ id: 'f-semi-orphan', groupId: null, round: 'semi' });
+      const fFinalOrphan = makeFixture({ id: 'f-final-orphan', groupId: null, round: 'final' });
+      const fGroupOrphan = makeFixture({ id: 'f-group-orphan', groupId: null, round: 'round_1' });
+
+      const result = partitionTournamentSections(
+        'group_knockout',
+        [fSemiOrphan, fFinalOrphan, fGroupOrphan],
+        [],
+      );
+
+      // 녹아웃 round 문자열인 두 픽스처만 포함 — group round 문자열(round_1)은 제외
+      expect(result.knockoutFixtures.map((f) => f.id).sort()).toEqual(['f-final-orphan', 'f-semi-orphan']);
+      expect(result.hasKnockoutFixtures).toBe(true);
     });
   });
 });

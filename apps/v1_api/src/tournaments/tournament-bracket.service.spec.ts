@@ -5,9 +5,10 @@
  *   - Admin role gates (non-admin 403, support 403)
  *   - createGroup: tournament-not-found, happy path + audit log
  *   - createGroupTeam: group not found, registration not found, not confirmed, duplicate, happy path
- *   - createFixture: tournament not found, group mismatch, happy path
- *   - recordResult: fixture not found, hasPenalty without penalty scores 400, happy path upsert + status→completed
- *   - recalculateStandings: 승점/골득실 집계 + position 정렬 검증
+ *   - createFixture: tournament not found, group mismatch, same-team guard (AGF-3), happy path
+ *   - recordResult: fixture not found, unassigned teams (AGF-1), hasPenalty guards (AGF-2),
+ *       knockout draw guard (AGF-4), happy path upsert + status→completed
+ *   - recalculateStandings: 승점/골득실 집계 + position 정렬 검증 + deterministic tie-break (TB-4)
  *   - getBracket: 전체 구조 반환 검증
  *
  * 관찰 가능한 동작(반환 형태 또는 throw 종류)만 검증한다. Mock 자체를 검증하지 않는다.
@@ -498,6 +499,124 @@ describe('TournamentBracketService', () => {
     expect(result).toMatchObject({ hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 4 });
   });
 
+  // AGF-1: 미배정 픽스처 결과 입력 차단
+  it('recordResult: fixture without homeRegistrationId → 400 FIXTURE_TEAMS_UNASSIGNED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(
+      fixtureRow({ homeRegistrationId: null, awayRegistrationId: null }),
+    );
+
+    await expect(
+      service.recordResult(ownerUser, 'fixture-1', { homeScore: 1, awayScore: 0 }),
+    ).rejects.toMatchObject({ response: { code: 'FIXTURE_TEAMS_UNASSIGNED' } });
+  });
+
+  // AGF-2: 승부차기는 정규 동점일 때만
+  it('recordResult: hasPenalty with non-draw regular score → 400 PENALTY_REQUIRES_DRAW', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());
+
+    await expect(
+      service.recordResult(ownerUser, 'fixture-1', {
+        homeScore: 2,
+        awayScore: 1,
+        hasPenalty: true,
+        homePenaltyScore: 5,
+        awayPenaltyScore: 4,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PENALTY_REQUIRES_DRAW' } });
+  });
+
+  // AGF-2: 승부차기 점수 동점 불가
+  it('recordResult: hasPenalty with equal penalty scores → 400 PENALTY_SCORES_MUST_DIFFER', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());
+
+    await expect(
+      service.recordResult(ownerUser, 'fixture-1', {
+        homeScore: 1,
+        awayScore: 1,
+        hasPenalty: true,
+        homePenaltyScore: 4,
+        awayPenaltyScore: 4,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PENALTY_SCORES_MUST_DIFFER' } });
+  });
+
+  // AGF-4: 녹아웃 라운드 동점 + 승부차기 없음 → 차단
+  it('recordResult: knockout draw without hasPenalty → 400 KNOCKOUT_REQUIRES_WINNER', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(
+      fixtureRow({ round: 'semi' }),
+    );
+
+    await expect(
+      service.recordResult(ownerUser, 'fixture-1', {
+        homeScore: 1,
+        awayScore: 1,
+        // hasPenalty 미제공 → 무승부이므로 knockout에서 차단
+      }),
+    ).rejects.toMatchObject({ response: { code: 'KNOCKOUT_REQUIRES_WINNER' } });
+  });
+
+  // AGF-4: 녹아웃 동점이어도 hasPenalty 제공 시 통과
+  it('recordResult: knockout draw with hasPenalty → succeeds', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow({ round: 'final' }));
+    prisma.v1TournamentFixtureResult.upsert.mockResolvedValue(
+      resultRow({ homeScore: 1, awayScore: 1, hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 3 }),
+    );
+    prisma.v1TournamentFixture.update.mockResolvedValue(fixtureRow({ status: 'completed' }));
+
+    const result = await service.recordResult(ownerUser, 'fixture-1', {
+      homeScore: 1,
+      awayScore: 1,
+      hasPenalty: true,
+      homePenaltyScore: 5,
+      awayPenaltyScore: 3,
+    });
+
+    expect(result).toMatchObject({ hasPenalty: true });
+  });
+
+  // AGF-4: 조별리그 동점 → 허용 (무승부 가능)
+  it('recordResult: group-phase draw without hasPenalty → succeeds', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow({ round: 'group_a' }));
+    prisma.v1TournamentFixtureResult.upsert.mockResolvedValue(
+      resultRow({ homeScore: 1, awayScore: 1, hasPenalty: false }),
+    );
+    prisma.v1TournamentFixture.update.mockResolvedValue(fixtureRow({ status: 'completed' }));
+
+    const result = await service.recordResult(ownerUser, 'fixture-1', {
+      homeScore: 1,
+      awayScore: 1,
+    });
+
+    expect(result).toMatchObject({ homeScore: 1, awayScore: 1 });
+  });
+
+  // AGF-3: createFixture — 같은 팀 홈/어웨이 배정 차단
+  it('createFixture: same team for home and away → 400 FIXTURE_SAME_TEAM', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow());
+    // 동일 registrationId에 대한 confirmed 등록 mock
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ id: 'reg-1' }),
+    );
+
+    await expect(
+      service.createFixture(ownerUser, 'tournament-1', {
+        groupId: 'group-1',
+        round: 'group_a',
+        fixtureNumber: 1,
+        homeRegistrationId: 'reg-1',
+        awayRegistrationId: 'reg-1',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'FIXTURE_SAME_TEAM' } });
+  });
+
   // ─── recalculateStandings ─────────────────────────────────────────────────
 
   it('recalculateStandings: 2 fixtures → wins/draws/losses/points/position 올바르게 집계', async () => {
@@ -566,6 +685,37 @@ describe('TournamentBracketService', () => {
       expect(call[0].create.points).toBe(1);
       expect(call[0].create.draws).toBe(1);
     }
+  });
+
+  // TB-4: 완전 동점 시 registrationId asc로 안정적 순위 결정
+  it('recalculateStandings: complete tie → registrationId asc decides position (TB-4)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+
+    // 3팀 모두 0점 0골 — 완전 동점
+    prisma.v1TournamentGroup.findMany.mockResolvedValue([
+      {
+        ...groupRow(),
+        groupTeams: [
+          { registrationId: 'reg-c' },
+          { registrationId: 'reg-a' },
+          { registrationId: 'reg-b' },
+        ],
+        fixtures: [], // 경기 없음
+      },
+    ]);
+    prisma.v1TournamentStanding.upsert.mockResolvedValue({});
+
+    await service.recalculateStandings(ownerUser, 'tournament-1');
+
+    const upsertCalls = (prisma.v1TournamentStanding.upsert as jest.Mock).mock.calls;
+    const pos1 = upsertCalls.find((c) => c[0].create.position === 1);
+    const pos2 = upsertCalls.find((c) => c[0].create.position === 2);
+    const pos3 = upsertCalls.find((c) => c[0].create.position === 3);
+    // registrationId asc: reg-a(1위) < reg-b(2위) < reg-c(3위)
+    expect(pos1?.[0].create.registrationId).toBe('reg-a');
+    expect(pos2?.[0].create.registrationId).toBe('reg-b');
+    expect(pos3?.[0].create.registrationId).toBe('reg-c');
   });
 
   // ─── getBracket ───────────────────────────────────────────────────────────

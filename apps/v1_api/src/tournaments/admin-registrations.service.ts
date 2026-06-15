@@ -48,7 +48,7 @@ export class AdminRegistrationsService {
     // 대회 존재 여부 간단 확인 (deleted 포함 어드민은 볼 수 있어야 함).
     const tournament = await this.prisma.v1Tournament.findFirst({ where: { id: tournamentId } });
     if (!tournament) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
     const where: Prisma.V1TournamentRegistrationWhereInput = {
@@ -90,7 +90,7 @@ export class AdminRegistrationsService {
     if (registration.status !== 'awaiting_payment') {
       throw new ConflictException({
         code: 'REGISTRATION_STATUS_INVALID',
-        message: `Cannot confirm payment: registration is in status ${registration.status}`,
+        message: '현재 상태에서는 입금 확인을 할 수 없어요.',
       });
     }
 
@@ -98,13 +98,13 @@ export class AdminRegistrationsService {
     if (!payment) {
       throw new ConflictException({
         code: 'PAYMENT_NOT_FOUND',
-        message: 'Payment record was not found for this registration',
+        message: '결제 정보를 찾을 수 없어요.',
       });
     }
     if (payment.status !== 'ready') {
       throw new ConflictException({
         code: 'PAYMENT_STATUS_INVALID',
-        message: `Payment is already in status ${payment.status}`,
+        message: '이미 처리된 결제예요.',
       });
     }
 
@@ -157,11 +157,28 @@ export class AdminRegistrationsService {
     if (!ADMIN_CONFIRMABLE_STATUSES.includes(registration.status)) {
       throw new ConflictException({
         code: 'REGISTRATION_STATUS_INVALID',
-        message: `Cannot confirm/waitlist registration in status ${registration.status}`,
+        message: '현재 상태에서는 확정·대기 처리를 할 수 없어요.',
       });
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // AREG-03: confirm 분기에서 정원 초과 여부 확인.
+      if (dto.decision === 'confirm') {
+        const confirmedCount = await tx.v1TournamentRegistration.count({
+          where: { tournamentId: registration.tournamentId, status: 'confirmed' },
+        });
+        const tournament = await tx.v1Tournament.findUnique({
+          where: { id: registration.tournamentId },
+          select: { teamCount: true },
+        });
+        if (tournament && confirmedCount >= tournament.teamCount) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_CAPACITY_FULL',
+            message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
+          });
+        }
+      }
+
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {
@@ -208,7 +225,7 @@ export class AdminRegistrationsService {
     if (!ADMIN_CANCELLABLE_STATUSES.includes(registration.status)) {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_CANCELLABLE',
-        message: `Registration in status ${registration.status} cannot be cancelled by admin`,
+        message: '현재 상태에서는 취소할 수 없어요.',
       });
     }
 
@@ -268,7 +285,7 @@ export class AdminRegistrationsService {
       // 여기서는 confirmed 상태에서만 허용하는 엄격 정책 적용.
       throw new ConflictException({
         code: 'REGISTRATION_NOT_CONFIRMED',
-        message: 'Roster can only be locked for confirmed registrations',
+        message: '확정된 신청만 명단을 잠글 수 있어요.',
       });
     }
 
@@ -330,7 +347,7 @@ export class AdminRegistrationsService {
     if (!registration) {
       throw new NotFoundException({
         code: 'REGISTRATION_NOT_FOUND',
-        message: 'Registration was not found',
+        message: '신청 내역을 찾을 수 없어요.',
       });
     }
     return registration;

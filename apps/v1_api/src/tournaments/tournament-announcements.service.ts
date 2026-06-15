@@ -25,7 +25,7 @@ export class TournamentAnnouncementsService {
     if (!tournament) {
       throw new NotFoundException({
         code: 'TOURNAMENT_NOT_FOUND',
-        message: 'Tournament was not found',
+        message: '대회를 찾을 수 없어요.',
       });
     }
 
@@ -57,7 +57,7 @@ export class TournamentAnnouncementsService {
     if (!tournament) {
       throw new NotFoundException({
         code: 'TOURNAMENT_NOT_FOUND',
-        message: 'Tournament was not found',
+        message: '대회를 찾을 수 없어요.',
       });
     }
 
@@ -109,7 +109,7 @@ export class TournamentAnnouncementsService {
     if (!announcement) {
       throw new NotFoundException({
         code: 'ANNOUNCEMENT_NOT_FOUND',
-        message: 'Announcement was not found',
+        message: '공지를 찾을 수 없어요.',
       });
     }
 

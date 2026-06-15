@@ -35,7 +35,7 @@ export class TournamentBracketService {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
     return tournament;
   }
@@ -45,7 +45,7 @@ export class TournamentBracketService {
       where: { id: fixtureId },
     });
     if (!fixture) {
-      throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: 'Fixture was not found' });
+      throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     }
     return fixture;
   }
@@ -95,7 +95,7 @@ export class TournamentBracketService {
     if (!group) {
       throw new NotFoundException({
         code: 'GROUP_NOT_FOUND',
-        message: 'Group was not found in this tournament',
+        message: '해당 대회의 조를 찾을 수 없어요.',
       });
     }
 
@@ -106,13 +106,13 @@ export class TournamentBracketService {
     if (!registration) {
       throw new NotFoundException({
         code: 'REGISTRATION_NOT_FOUND',
-        message: 'Registration was not found in this tournament',
+        message: '해당 대회의 신청을 찾을 수 없어요.',
       });
     }
     if (registration.status !== 'confirmed') {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_CONFIRMED',
-        message: 'Only confirmed registrations can be assigned to a group',
+        message: '확정된 신청만 조에 배정할 수 있어요.',
       });
     }
 
@@ -123,7 +123,7 @@ export class TournamentBracketService {
     if (existing) {
       throw new ConflictException({
         code: 'TEAM_ALREADY_IN_GROUP',
-        message: 'This registration is already assigned to the group',
+        message: '이미 해당 조에 배정된 팀이에요.',
       });
     }
 
@@ -165,9 +165,43 @@ export class TournamentBracketService {
       if (!group) {
         throw new NotFoundException({
           code: 'GROUP_NOT_FOUND',
-          message: 'Group was not found in this tournament',
+          message: '해당 대회의 조를 찾을 수 없어요.',
         });
       }
+    }
+
+    // AGF-3: homeRegistrationId / awayRegistrationId 유효성 검증
+    if (dto.homeRegistrationId !== undefined && dto.homeRegistrationId !== null) {
+      const homeReg = await this.prisma.v1TournamentRegistration.findFirst({
+        where: { id: dto.homeRegistrationId, tournamentId, status: 'confirmed' },
+      });
+      if (!homeReg) {
+        throw new BadRequestException({
+          code: 'HOME_REGISTRATION_INVALID',
+          message: '홈 팀 신청이 해당 대회에 존재하지 않거나 확정되지 않았어요.',
+        });
+      }
+    }
+    if (dto.awayRegistrationId !== undefined && dto.awayRegistrationId !== null) {
+      const awayReg = await this.prisma.v1TournamentRegistration.findFirst({
+        where: { id: dto.awayRegistrationId, tournamentId, status: 'confirmed' },
+      });
+      if (!awayReg) {
+        throw new BadRequestException({
+          code: 'AWAY_REGISTRATION_INVALID',
+          message: '어웨이 팀 신청이 해당 대회에 존재하지 않거나 확정되지 않았어요.',
+        });
+      }
+    }
+    if (
+      dto.homeRegistrationId &&
+      dto.awayRegistrationId &&
+      dto.homeRegistrationId === dto.awayRegistrationId
+    ) {
+      throw new BadRequestException({
+        code: 'FIXTURE_SAME_TEAM',
+        message: '같은 팀끼리 경기를 만들 수 없어요.',
+      });
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -213,14 +247,50 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const fixture = await this.loadFixture(fixtureId);
 
+    // AGF-1: 양 팀이 배정된 경기만 결과 입력 가능
+    if (!fixture.homeRegistrationId || !fixture.awayRegistrationId) {
+      throw new BadRequestException({
+        code: 'FIXTURE_TEAMS_UNASSIGNED',
+        message: '양 팀이 배정된 경기만 결과를 입력할 수 있어요.',
+      });
+    }
+
     // 승부차기(hasPenalty) 시 penalty 점수 양쪽 모두 필수
     if (dto.hasPenalty) {
       if (dto.homePenaltyScore === undefined || dto.awayPenaltyScore === undefined) {
         throw new BadRequestException({
           code: 'PENALTY_SCORES_REQUIRED',
-          message: 'homePenaltyScore and awayPenaltyScore are required when hasPenalty is true',
+          message: '승부차기를 선택하면 양 팀 승부차기 점수를 모두 입력해야 해요.',
         });
       }
+      // AGF-2: 승부차기는 정규 스코어 동점일 때만 허용
+      if (dto.homeScore !== dto.awayScore) {
+        throw new BadRequestException({
+          code: 'PENALTY_REQUIRES_DRAW',
+          message: '승부차기는 정규 점수가 동점일 때만 입력할 수 있어요.',
+        });
+      }
+      // AGF-2: 승부차기 점수는 서로 달라야 함
+      if (dto.homePenaltyScore === dto.awayPenaltyScore) {
+        throw new BadRequestException({
+          code: 'PENALTY_SCORES_MUST_DIFFER',
+          message: '승부차기 점수는 서로 달라야 해요.',
+        });
+      }
+    }
+
+    // AGF-4: 녹아웃 라운드 동점 + 승부차기 없음 → 거부.
+    // fixture.round 는 표시 라벨이라 정식 영문 키('semi'/'final'/'third_place')와 어드민 자동생성·
+    // 시드가 쓰는 한글 라벨('4강'/'결승'/'3·4위전')이 모두 존재 → 둘 다 매칭해야 실데이터에서 동작한다.
+    // (group-stage round 는 'group_a'·'조별 N라운드'라 아래 라벨과 겹치지 않아 오탐 없음)
+    const knockoutLabels = ['semi', 'final', 'third_place', '4강', '결승', '3·4위전'];
+    const isKnockout =
+      fixture.round != null && knockoutLabels.some((r) => fixture.round!.includes(r));
+    if (isKnockout && dto.homeScore === dto.awayScore && !dto.hasPenalty) {
+      throw new BadRequestException({
+        code: 'KNOCKOUT_REQUIRES_WINNER',
+        message: '토너먼트 경기는 승자가 필요해요. 동점이면 승부차기 점수를 입력해 주세요.',
+      });
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -301,7 +371,9 @@ export class TournamentBracketService {
     const groups = await this.prisma.v1TournamentGroup.findMany({
       where: { tournamentId, phase: 'group' },
       include: {
-        groupTeams: true,
+        groupTeams: {
+          orderBy: { registrationId: 'asc' },
+        },
         fixtures: {
           where: { status: 'completed' },
           include: { result: true },
@@ -377,15 +449,18 @@ export class TournamentBracketService {
           awayStats.goalsAgainst += homeGoals;
         }
 
-        // 순위 정렬: 승점 desc → 골득실 desc → 다득점 desc
-        const sorted = Array.from(statsMap.entries()).sort(([, a], [, b]) => {
+        // 순위 정렬: 승점 desc → 골득실 desc → 다득점 desc → registrationId asc (완전 동점 결정키)
+        const sorted = Array.from(statsMap.entries()).sort(([regIdA, a], [regIdB, b]) => {
           const pointsDiff = b.points - a.points;
           if (pointsDiff !== 0) return pointsDiff;
           const gdA = a.goalsFor - a.goalsAgainst;
           const gdB = b.goalsFor - b.goalsAgainst;
           const gdDiff = gdB - gdA;
           if (gdDiff !== 0) return gdDiff;
-          return b.goalsFor - a.goalsFor;
+          const gfDiff = b.goalsFor - a.goalsFor;
+          if (gfDiff !== 0) return gfDiff;
+          // 완전 동점 결정키: registrationId asc (안정적 순위 보장)
+          return regIdA < regIdB ? -1 : regIdA > regIdB ? 1 : 0;
         });
 
         // upsert (groupId + registrationId unique)

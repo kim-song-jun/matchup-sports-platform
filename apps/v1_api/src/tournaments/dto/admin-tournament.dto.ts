@@ -41,9 +41,9 @@ export class AdminTournamentListQueryDto {
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
+  @IsInt({ message: '페이지 크기는 정수여야 해요.' })
+  @Min(1, { message: '페이지 크기는 1 이상이어야 해요.' })
+  @Max(50, { message: '페이지 크기는 50을 넘을 수 없어요.' })
   limit?: number;
 }
 
@@ -51,11 +51,11 @@ export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout'] as co
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
 
 export class CreateTournamentDto {
-  @IsUUID()
+  @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
   sportId!: string;
 
-  @IsString()
-  @MaxLength(120)
+  @IsString({ message: '대회 이름을 입력해 주세요.' })
+  @MaxLength(120, { message: '대회 이름은 120자를 넘을 수 없어요.' })
   title!: string;
 
   @IsOptional()
@@ -72,35 +72,35 @@ export class CreateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(2)
-  @Max(64)
+  @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
+  @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })
+  @Max(64, { message: '참가 팀 수는 64개를 넘을 수 없어요.' })
   teamCount?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
+  @IsInt({ message: '최소 선수 수는 정수여야 해요.' })
+  @Min(1, { message: '최소 선수 수는 1명 이상이어야 해요.' })
+  @Max(50, { message: '최소 선수 수는 50명을 넘을 수 없어요.' })
   minPlayers?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
+  @IsInt({ message: '최대 선수 수는 정수여야 해요.' })
+  @Min(1, { message: '최대 선수 수는 1명 이상이어야 해요.' })
+  @Max(50, { message: '최대 선수 수는 50명을 넘을 수 없어요.' })
   maxPlayers?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(100_000_000)
+  @IsInt({ message: '참가비는 정수여야 해요.' })
+  @Min(0, { message: '참가비는 0원 이상이어야 해요.' })
+  @Max(100_000_000, { message: '참가비는 1억 원을 넘을 수 없어요.' })
   entryFee?: number;
 
   @IsOptional()
@@ -143,8 +143,8 @@ export class CreateTournamentDto {
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
 export class UpdateTournamentDto {
   @IsOptional()
-  @IsString()
-  @MaxLength(120)
+  @IsString({ message: '대회 이름을 입력해 주세요.' })
+  @MaxLength(120, { message: '대회 이름은 120자를 넘을 수 없어요.' })
   title?: string;
 
   @IsOptional()
@@ -161,35 +161,35 @@ export class UpdateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(200)
+  @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(2)
-  @Max(64)
+  @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
+  @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })
+  @Max(64, { message: '참가 팀 수는 64개를 넘을 수 없어요.' })
   teamCount?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
+  @IsInt({ message: '최소 선수 수는 정수여야 해요.' })
+  @Min(1, { message: '최소 선수 수는 1명 이상이어야 해요.' })
+  @Max(50, { message: '최소 선수 수는 50명을 넘을 수 없어요.' })
   minPlayers?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
+  @IsInt({ message: '최대 선수 수는 정수여야 해요.' })
+  @Min(1, { message: '최대 선수 수는 1명 이상이어야 해요.' })
+  @Max(50, { message: '최대 선수 수는 50명을 넘을 수 없어요.' })
   maxPlayers?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(100_000_000)
+  @IsInt({ message: '참가비는 정수여야 해요.' })
+  @Min(0, { message: '참가비는 0원 이상이어야 해요.' })
+  @Max(100_000_000, { message: '참가비는 1억 원을 넘을 수 없어요.' })
   entryFee?: number;
 
   @IsOptional()

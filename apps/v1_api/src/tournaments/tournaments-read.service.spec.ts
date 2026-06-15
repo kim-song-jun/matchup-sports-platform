@@ -165,6 +165,24 @@ describe('TournamentsReadService', () => {
     expect(callArgs.skip).toBe(1);
   });
 
+  it('list: sportId filter is forwarded as sportId UUID condition', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({ sportId: 'sport-uuid-1' });
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.where.sportId).toBe('sport-uuid-1');
+  });
+
+  it('list: no sportId → sportId condition absent from where', async () => {
+    prisma.v1Tournament.findMany.mockResolvedValue([]);
+
+    await service.list({});
+
+    const callArgs = prisma.v1Tournament.findMany.mock.calls[0][0];
+    expect(callArgs.where.sportId).toBeUndefined();
+  });
+
   // ─── get — not found / hidden ────────────────────────────────────────────────
 
   it('get: tournament not found → 404 TOURNAMENT_NOT_FOUND', async () => {

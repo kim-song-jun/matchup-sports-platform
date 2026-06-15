@@ -24,6 +24,7 @@ export class TournamentsReadService {
     const where: Prisma.V1TournamentWhereInput = {
       deletedAt: null,
       status: query.status ? query.status : PUBLIC_STATUSES,
+      ...(query.sportId ? { sportId: query.sportId } : {}),
     };
 
     const rows = await this.prisma.v1Tournament.findMany({
@@ -117,7 +118,7 @@ export class TournamentsReadService {
     if (!row) {
       throw new NotFoundException({
         code: 'TOURNAMENT_NOT_FOUND',
-        message: 'Tournament was not found',
+        message: '대회를 찾을 수 없어요.',
       });
     }
 

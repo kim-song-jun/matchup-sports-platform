@@ -477,4 +477,47 @@ describe('TournamentPlayersService', () => {
     });
     await expect(service.exportCsv(adminUser, 'ghost-reg')).rejects.toThrow(NotFoundException);
   });
+
+  // ─── 12. CSV 수식 인젝션 차단 (ROSTER-002) ────────────────────────────────
+  it('exportCsv: realName starting with = → prefixed with single-quote to neutralise injection', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      team: { name: '테스트팀' },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      {
+        ...playerRow({ realName: '=CMD|"/C calc"!A0' }),
+        user: { profile: { nickname: '+악성닉네임' } },
+      },
+    ]);
+
+    const result = await service.exportCsv(adminUser, 'reg-1');
+
+    // = 로 시작하는 realName → 작은따옴표 prefix 처리되어야 함
+    expect(result.csv).toContain("'=CMD|");
+    // + 로 시작하는 nickname → 작은따옴표 prefix 처리되어야 함
+    expect(result.csv).toContain("'+악성닉네임");
+    // 원본 수식 문자가 따옴표 없이 그대로 노출되면 안 됨
+    expect(result.csv).not.toMatch(/^=CMD/m);
+  });
+
+  it('exportCsv: realName starting with - or @ → prefixed with single-quote', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      team: { name: '테스트팀' },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      {
+        ...playerRow({ realName: '-1+2' }),
+        user: { profile: { nickname: '@악성닉' } },
+      },
+    ]);
+
+    const result = await service.exportCsv(adminUser, 'reg-1');
+
+    expect(result.csv).toContain("'-1+2");
+    expect(result.csv).toContain("'@악성닉");
+  });
 });

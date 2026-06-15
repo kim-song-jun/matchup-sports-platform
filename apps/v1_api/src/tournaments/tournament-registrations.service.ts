@@ -41,7 +41,7 @@ export class TournamentRegistrationsService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: 'Only team owners or managers can manage tournament registration',
+        message: '팀장 또는 매니저만 신청을 관리할 수 있어요.',
       });
     }
   }
@@ -51,13 +51,13 @@ export class TournamentRegistrationsService {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
     if (tournament.status !== 'open') {
-      throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: 'Tournament is not open for registration' });
+      throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
     }
     if (tournament.registrationDeadlineAt && tournament.registrationDeadlineAt.getTime() < Date.now()) {
-      throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: 'Registration deadline has passed' });
+      throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
     }
     return tournament;
   }
@@ -106,19 +106,19 @@ export class TournamentRegistrationsService {
     if (registration.status !== 'draft') {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_DRAFT',
-        message: 'Only a draft registration can be submitted',
+        message: '이미 제출된 신청이에요.',
       });
     }
     if (!dto.agreedRules || !dto.agreedPrivacy || !dto.agreedRefund) {
       throw new BadRequestException({
         code: 'AGREEMENTS_REQUIRED',
-        message: 'Rules, privacy and refund agreements are required',
+        message: '필수 동의 항목에 모두 동의해 주세요.',
       });
     }
     if (dto.paymentMethod === 'bank_transfer' && !dto.depositorName?.trim()) {
       throw new BadRequestException({
         code: 'DEPOSITOR_NAME_REQUIRED',
-        message: 'Depositor name is required for bank transfer',
+        message: '계좌이체는 입금자명을 입력해 주세요.',
       });
     }
 
@@ -185,7 +185,7 @@ export class TournamentRegistrationsService {
     if (!CANCELLABLE_VIA_REQUEST.includes(registration.status)) {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_CANCELLABLE',
-        message: `Registration in status ${registration.status} cannot be cancelled`,
+        message: '현재 상태에서는 취소할 수 없어요.',
       });
     }
 
@@ -219,7 +219,7 @@ export class TournamentRegistrationsService {
     if (!registration) {
       throw new NotFoundException({
         code: 'TOURNAMENT_REGISTRATION_NOT_FOUND',
-        message: 'No registration found for this user in the tournament',
+        message: '신청 내역이 없어요.',
       });
     }
     const registrationId = registration.id;
@@ -235,7 +235,7 @@ export class TournamentRegistrationsService {
       where: { id: registrationId, tournamentId },
     });
     if (!registration) {
-      throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: 'Registration was not found' });
+      throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '신청 내역을 찾을 수 없어요.' });
     }
     return registration;
   }

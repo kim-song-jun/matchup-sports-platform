@@ -71,7 +71,7 @@ export class TournamentsAdminService {
       include: { _count: { select: { registrations: true } } },
     });
     if (!row) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
     return this.serialize(row, row._count.registrations);
   }
@@ -82,7 +82,7 @@ export class TournamentsAdminService {
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
     if (!sport) {
-      throw new BadRequestException({ code: 'SPORT_NOT_FOUND', message: 'Sport was not found' });
+      throw new BadRequestException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -131,7 +131,7 @@ export class TournamentsAdminService {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
     // 변경 후 최종 min/max 기준으로 검증(둘 중 하나만 들어와도 일관성 보장).
@@ -184,7 +184,7 @@ export class TournamentsAdminService {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
     const from = existing.status as TournamentStatus;
@@ -196,7 +196,7 @@ export class TournamentsAdminService {
     if (!TOURNAMENT_TRANSITIONS[from].includes(to)) {
       throw new ConflictException({
         code: 'TOURNAMENT_STATUS_TRANSITION_INVALID',
-        message: `Cannot transition tournament from ${from} to ${to}`,
+        message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
       });
     }
 
@@ -223,7 +223,7 @@ export class TournamentsAdminService {
     if (min !== undefined && max !== undefined && min > max) {
       throw new BadRequestException({
         code: 'TOURNAMENT_PLAYER_RANGE_INVALID',
-        message: 'minPlayers cannot exceed maxPlayers',
+        message: '최소 선수 수는 최대 선수 수보다 클 수 없어요.',
       });
     }
   }

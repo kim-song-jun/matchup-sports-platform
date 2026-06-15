@@ -34,7 +34,7 @@ export class TournamentPlayersService {
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: 'Only team owners or managers can manage tournament players',
+        message: '팀장 또는 매니저만 명단을 관리할 수 있어요.',
       });
     }
   }
@@ -51,7 +51,7 @@ export class TournamentPlayersService {
     if (!registration) {
       throw new NotFoundException({
         code: 'REGISTRATION_NOT_FOUND',
-        message: 'Registration was not found',
+        message: '신청 내역을 찾을 수 없어요.',
       });
     }
     return registration;
@@ -68,7 +68,7 @@ export class TournamentPlayersService {
       select: { minPlayers: true },
     });
     if (!tournament) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
@@ -95,7 +95,7 @@ export class TournamentPlayersService {
 
     // 잠금 가드
     if (registration.rosterLockedAt) {
-      throw new ConflictException({ code: 'ROSTER_LOCKED', message: 'Roster is locked — contact admin' });
+      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
     }
 
     const tournament = await this.prisma.v1Tournament.findFirst({
@@ -103,7 +103,7 @@ export class TournamentPlayersService {
       select: { maxPlayers: true, minPlayers: true },
     });
     if (!tournament) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: 'Tournament was not found' });
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
     // 활성 선수 수 < maxPlayers 가드
@@ -113,7 +113,7 @@ export class TournamentPlayersService {
     if (activeCount >= tournament.maxPlayers) {
       throw new ConflictException({
         code: 'ROSTER_FULL',
-        message: `Cannot exceed maxPlayers (${tournament.maxPlayers})`,
+        message: `최대 인원(${tournament.maxPlayers}명)을 초과할 수 없어요.`,
       });
     }
 
@@ -129,7 +129,7 @@ export class TournamentPlayersService {
     if (!teamMembership) {
       throw new BadRequestException({
         code: 'USER_NOT_TEAM_MEMBER',
-        message: 'The user is not an active member of this team',
+        message: '해당 팀의 활성 멤버가 아니에요.',
       });
     }
 
@@ -140,7 +140,7 @@ export class TournamentPlayersService {
     if (existingActive) {
       throw new ConflictException({
         code: 'PLAYER_ALREADY_REGISTERED',
-        message: 'This user is already registered as a player in this registration',
+        message: '이미 명단에 등록된 선수예요.',
       });
     }
 
@@ -181,14 +181,14 @@ export class TournamentPlayersService {
 
     // 잠금 가드
     if (registration.rosterLockedAt) {
-      throw new ConflictException({ code: 'ROSTER_LOCKED', message: 'Roster is locked — contact admin' });
+      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
     }
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, registrationId, removedAt: null },
     });
     if (!player) {
-      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: 'Player was not found' });
+      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
     }
 
     const removed = await this.prisma.v1TournamentPlayer.update({
@@ -214,7 +214,7 @@ export class TournamentPlayersService {
       include: { team: { select: { name: true } } },
     });
     if (!registration) {
-      throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: 'Registration was not found' });
+      throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '신청 내역을 찾을 수 없어요.' });
     }
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
@@ -252,7 +252,7 @@ export class TournamentPlayersService {
       where: { id: playerId, removedAt: null },
     });
     if (!player) {
-      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: 'Player was not found' });
+      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
     }
 
     const before = { eligibilityStatus: player.eligibilityStatus, eligibilityNote: player.eligibilityNote };
@@ -298,10 +298,15 @@ export class TournamentPlayersService {
   }
 
   private escapeCsvField(value: string): string {
-    // RFC 4180: 콤마·쌍따옴표·줄바꿈 포함 시 쌍따옴표로 감싸기
-    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-      return `"${value.replace(/"/g, '""')}"`;
+    // ROSTER-002: CSV 수식 인젝션 차단 — =·+·-·@ 로 시작하는 값에 작은따옴표 prefix 삽입
+    let sanitized = value;
+    if (/^[=+\-@]/.test(sanitized)) {
+      sanitized = `'${sanitized}`;
     }
-    return value;
+    // RFC 4180: 콤마·쌍따옴표·줄바꿈 포함 시 쌍따옴표로 감싸기
+    if (sanitized.includes(',') || sanitized.includes('"') || sanitized.includes('\n')) {
+      return `"${sanitized.replace(/"/g, '""')}"`;
+    }
+    return sanitized;
   }
 }

@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -26,6 +27,10 @@ export class TournamentListQueryDto {
   @IsOptional()
   @IsIn(PUBLIC_TOURNAMENT_STATUSES)
   status?: PublicTournamentStatus;
+
+  @IsOptional()
+  @IsUUID()
+  sportId?: string;
 
   @IsOptional()
   @IsString()

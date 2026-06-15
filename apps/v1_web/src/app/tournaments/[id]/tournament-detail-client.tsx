@@ -236,22 +236,39 @@ function TournamentDetailView({
     myRegistration !== null && myRegistration.status !== 'cancelled';
 
   /* ── Prize card — rendered in left column just after metric strip ── */
+  const prizeChips = tournament.prizeBreakdown
+    ? tournament.prizeBreakdown.split(/[/·,\n]+/).map((s) => s.trim()).filter(Boolean)
+    : [];
   const prizeCard = hasPrize ? (
     <section aria-label="상금 안내" style={{ marginTop: 16 }}>
-      <Card pad={16} style={{ background: 'var(--orange50)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <TrophyIcon size={22} color="var(--orange500)" aria-hidden="true" />
+      <Card pad={18} style={{ background: 'var(--orange50)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div
+            aria-hidden="true"
+            style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--orange500)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
+          >
+            <TrophyIcon size={24} color="var(--static-white)" />
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
-              총 상금 {formatPrize(tournament.prizePool!)}
+            <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상금</div>
+            <div className="tm-text-subhead" style={{ color: 'var(--text-strong)', fontWeight: 800, lineHeight: 1.2 }}>
+              총 {formatPrize(tournament.prizePool!)}
             </div>
-            {tournament.prizeBreakdown ? (
-              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>
-                {tournament.prizeBreakdown}
-              </div>
-            ) : null}
           </div>
         </div>
+        {prizeChips.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
+            {prizeChips.map((seg, i) => (
+              <span
+                key={i}
+                className="tm-text-micro"
+                style={{ background: 'var(--surface)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
+              >
+                {seg}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </Card>
     </section>
   ) : null;

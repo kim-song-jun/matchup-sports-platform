@@ -134,6 +134,17 @@ function getWinner(fixture: V1TournamentFixture): WinnerSide {
   return null;
 }
 
+/** 결승이 종료됐으면 우승 팀명을 반환(없으면 null) — 우승 슬롯에 챔피언 표시용. */
+function getChampion(rounds: RoundGroup[]): string | null {
+  const finalRound = rounds.find((r) => r.key === 'final');
+  const finalFixture = finalRound?.fixtures[0];
+  if (!finalFixture || finalFixture.status !== 'completed') return null;
+  const w = getWinner(finalFixture);
+  if (w === 'home') return finalFixture.homeTeamName ?? null;
+  if (w === 'away') return finalFixture.awayTeamName ?? null;
+  return null;
+}
+
 function fixtureStatusBadge(status: string): string {
   switch (status) {
     case 'in_progress': return 'tm-badge-green';
@@ -276,7 +287,8 @@ function BracketFixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
 
 /* ── Trophy placeholder: shown after the final round ── */
 
-function TrophyPlaceholder() {
+function TrophyPlaceholder({ champion }: { champion?: string | null }) {
+  const decided = Boolean(champion);
   return (
     <div
       style={{
@@ -286,25 +298,34 @@ function TrophyPlaceholder() {
         gap: 6,
         padding: '12px 0',
       }}
-      aria-label="우승"
+      aria-label={decided ? `우승 ${champion}` : '우승'}
     >
       <div
         aria-hidden="true"
         style={{
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+          background: decided
+            ? 'linear-gradient(135deg, var(--orange500) 0%, #f08a00 100%)'
+            : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
           display: 'grid',
           placeItems: 'center',
           color: 'var(--static-white)',
         }}
       >
-        <TrophyIcon size={20} strokeWidth={1.8} />
+        <TrophyIcon size={22} strokeWidth={1.8} />
       </div>
-      <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
-        우승
-      </span>
+      {decided ? (
+        <>
+          <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>우승</span>
+          <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700, textAlign: 'center' }}>
+            {champion}
+          </span>
+        </>
+      ) : (
+        <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>우승</span>
+      )}
     </div>
   );
 }
@@ -322,6 +343,7 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
   const mainRounds = rounds.filter((r) => r.key !== 'third_place');
   const thirdPlaceRound = rounds.find((r) => r.key === 'third_place') ?? null;
   const finalIndex = mainRounds.findIndex((r) => r.key === 'final');
+  const champion = getChampion(rounds);
 
   return (
     <div
@@ -359,7 +381,7 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
 
           {/* Trophy after the final round; connector line between earlier rounds */}
           {idx === finalIndex ? (
-            <TrophyPlaceholder />
+            <TrophyPlaceholder champion={champion} />
           ) : idx < mainRounds.length - 1 ? (
             /* Vertical connector line — styled via .tm-bracket-mobile-connector
                in desktop/tournaments.css (visible at all breakpoints) */
@@ -464,6 +486,7 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
 function DesktopBracket({ rounds }: { rounds: RoundGroup[] }) {
   const mainRounds = rounds.filter((r) => r.key !== 'third_place');
   const thirdPlaceRound = rounds.find((r) => r.key === 'third_place') ?? null;
+  const champion = getChampion(rounds);
 
   return (
     <div className="tm-show-desktop" role="region" aria-label="대진표">
@@ -494,7 +517,7 @@ function DesktopBracket({ rounds }: { rounds: RoundGroup[] }) {
                 {/* Trophy at the right end of the final column — tournament endpoint */}
                 {isFinal ? (
                   <div className="tm-bracket-trophy">
-                    <TrophyPlaceholder />
+                    <TrophyPlaceholder champion={champion} />
                   </div>
                 ) : null}
               </div>

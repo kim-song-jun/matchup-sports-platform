@@ -401,6 +401,17 @@ button:disabled {
   flex: 1;
 }
 
+.tm-auth-provider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tm-auth-provider-note {
+  text-align: center;
+  color: var(--text-caption);
+}
+
 .tm-auth-provider-disabled,
 .tm-auth-provider-disabled:disabled {
   border: 1px solid var(--grey100);

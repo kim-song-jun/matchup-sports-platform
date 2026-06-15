@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
@@ -12,6 +12,89 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+
+// ── 작성 단계 스태퍼 (스크롤스파이) ─────────────────────────────────────────
+
+const FORM_SECTIONS = [
+  { id: 'tsec-basic', label: '기본 정보' },
+  { id: 'tsec-team', label: '팀·선수' },
+  { id: 'tsec-fee', label: '참가비·계좌' },
+  { id: 'tsec-rules', label: '규정·환불' },
+] as const;
+
+function SectionStepper({ sections }: { sections: ReadonlyArray<{ id: string; label: string }> }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const els = sections
+      .map((section) => document.getElementById(section.id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (els.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length === 0) return;
+        const idx = sections.findIndex((section) => section.id === visible[0].target.id);
+        if (idx >= 0) setActiveIndex(idx);
+      },
+      { rootMargin: '-40% 0px -55% 0px', threshold: 0 },
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [sections]);
+
+  const jumpTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  return (
+    <nav
+      aria-label="작성 단계"
+      className="max-w-3xl mx-auto sticky top-0 z-20 mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-3"
+    >
+      <ol className="flex items-start">
+        {sections.map((section, index) => {
+          const reached = index <= activeIndex;
+          const isActive = index === activeIndex;
+          return (
+            <li key={section.id} className="relative flex flex-1 flex-col items-center">
+              {index < sections.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className={`absolute left-1/2 top-[13px] h-[2px] w-full ${index < activeIndex ? 'bg-[var(--blue500)]' : 'bg-[var(--border)]'}`}
+                />
+              ) : null}
+              <button
+                type="button"
+                onClick={() => jumpTo(section.id)}
+                aria-current={isActive ? 'step' : undefined}
+                className="relative z-10 flex flex-col items-center gap-1.5 rounded focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold ${
+                    reached ? 'bg-[var(--blue500)] text-[var(--static-white)]' : 'bg-[var(--grey100)] text-[var(--text-caption)]'
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <span
+                  className={`text-[11px] leading-tight break-keep ${
+                    isActive ? 'font-semibold text-[var(--text-strong)]' : 'text-[var(--text-caption)]'
+                  }`}
+                >
+                  {section.label}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 // ── Form field component (shared within this file) ─────────────────────────
 
@@ -30,17 +113,17 @@ function FormField({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[13px] font-semibold text-gray-700">
+      <label htmlFor={id} className="text-[13px] font-semibold text-[var(--text-body)]">
         {label}
         {required && (
           <>
-            <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+            <span className="text-[var(--red500)] ml-0.5" aria-hidden="true">*</span>
             <span className="sr-only">(필수)</span>
           </>
         )}
       </label>
       {children}
-      {hint && <p className="text-[12px] text-gray-400">{hint}</p>}
+      {hint && <p className="text-[12px] text-[var(--text-caption)]">{hint}</p>}
     </div>
   );
 }
@@ -48,15 +131,15 @@ function FormField({
 // ── Input class ───────────────────────────────────────────────────────────
 
 const inputCls = [
-  'h-[44px] px-3 text-sm bg-white border border-gray-200 rounded-xl text-gray-900',
-  'placeholder:text-gray-400',
+  'h-[44px] px-3 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
+  'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
 
 const textareaCls = [
-  'px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-xl text-gray-900 resize-none',
-  'placeholder:text-gray-400',
+  'px-3 py-2.5 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+  'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
@@ -109,14 +192,14 @@ function DatetimeTextInput({
         className={[
           inputCls,
           invalid
-            ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+            ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
             : '',
         ]
           .join(' ')
           .trim()}
       />
       {invalid && (
-        <p id={`${id}-err`} role="alert" className="text-[12px] text-red-500 mt-0.5">
+        <p id={`${id}-err`} role="alert" className="text-[12px] text-[var(--red500)] mt-0.5">
           날짜 형식이 맞지 않아요 (YYYY-MM-DD HH:MM)
         </p>
       )}
@@ -229,7 +312,7 @@ export default function AdminTournamentsNewPage() {
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 text-[13px] text-gray-400 hover:text-gray-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 text-[13px] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -243,11 +326,12 @@ export default function AdminTournamentsNewPage() {
       />
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="max-w-3xl bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <SectionStepper sections={FORM_SECTIONS} />
+        <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
 
           {/* ── 기본 정보 ────────────────────────────────────────────── */}
-          <section className="px-5 py-6 border-b border-gray-100">
-            <h2 className="text-[15px] font-bold text-gray-900 mb-4">기본 정보</h2>
+          <section id="tsec-basic" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-24">
+            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">기본 정보</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
               <FormField id="sport-id" label="종목" required>
@@ -343,8 +427,8 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 팀 / 선수 설정 ───────────────────────────────────────── */}
-          <section className="px-5 py-6 border-b border-gray-100">
-            <h2 className="text-[15px] font-bold text-gray-900 mb-4">팀 · 선수 설정</h2>
+          <section id="tsec-team" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-24">
+            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">팀 · 선수 설정</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField id="team-count" label="참가 팀 수" hint="비우면 무제한">
                 <input
@@ -361,14 +445,14 @@ export default function AdminTournamentsNewPage() {
                   className={[
                     inputCls,
                     teamCountError !== null
-                      ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                      ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
                       : '',
                   ]
                     .join(' ')
                     .trim()}
                 />
                 {teamCountError !== null && (
-                  <p id="team-count-err" role="alert" className="text-[12px] text-red-500 mt-0.5">
+                  <p id="team-count-err" role="alert" className="text-[12px] text-[var(--red500)] mt-0.5">
                     {teamCountError}
                   </p>
                 )}
@@ -389,7 +473,7 @@ export default function AdminTournamentsNewPage() {
                   className={[
                     inputCls,
                     playersRangeError !== null
-                      ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                      ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
                       : '',
                   ]
                     .join(' ')
@@ -412,14 +496,14 @@ export default function AdminTournamentsNewPage() {
                   className={[
                     inputCls,
                     playersRangeError !== null
-                      ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                      ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
                       : '',
                   ]
                     .join(' ')
                     .trim()}
                 />
                 {playersRangeError !== null && (
-                  <p id="players-range-err" role="alert" className="text-[12px] text-red-500 mt-0.5">
+                  <p id="players-range-err" role="alert" className="text-[12px] text-[var(--red500)] mt-0.5">
                     {playersRangeError}
                   </p>
                 )}
@@ -428,8 +512,8 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 참가비 / 계좌 ────────────────────────────────────────── */}
-          <section className="px-5 py-6 border-b border-gray-100">
-            <h2 className="text-[15px] font-bold text-gray-900 mb-4">참가비 · 계좌</h2>
+          <section id="tsec-fee" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-24">
+            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">참가비 · 계좌</h2>
             <div className="flex flex-col gap-4">
               {/* 참가비 + 총 상금 — 2열 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -525,8 +609,8 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 규정 / 환불 ──────────────────────────────────────────── */}
-          <section className="px-5 py-6">
-            <h2 className="text-[15px] font-bold text-gray-900 mb-4">규정 · 환불 정책</h2>
+          <section id="tsec-rules" className="px-5 py-6 scroll-mt-24">
+            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">규정 · 환불 정책</h2>
             <div className="flex flex-col gap-4">
               <FormField id="rules-text" label="대회 규정">
                 <textarea
@@ -556,10 +640,10 @@ export default function AdminTournamentsNewPage() {
         </div>
 
         {/* ── Footer actions ───────────────────────────────────────────── */}
-        <div className="max-w-3xl flex items-center gap-3 mt-5">
+        <div className="max-w-3xl mx-auto flex items-center gap-3 mt-5">
           <Link
             href="/admin/tournaments"
-            className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[15px] font-semibold text-gray-600 bg-white border border-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             취소
           </Link>

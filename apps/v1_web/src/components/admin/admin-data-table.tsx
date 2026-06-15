@@ -195,7 +195,7 @@ export function AdminDataTable<T>({
                   ))}
                 </dl>
                 {hasActions && (
-                  <div className="mt-3 flex items-center gap-2 justify-end border-t border-gray-50 pt-2.5">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 justify-end border-t border-gray-50 pt-2.5">
                     {renderActions!(row)}
                   </div>
                 )}

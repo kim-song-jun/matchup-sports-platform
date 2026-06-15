@@ -576,7 +576,7 @@ export function TournamentRosterPageClient({
 
   return (
     <AppChrome title="선수 명단" backHref={backHref} bottomNav={false} activeTab="tournaments">
-      <div style={{ padding: '0 20px 48px', marginTop: 12 }}>
+      <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
         {/* Locked banner */}
         {isRosterLocked ? (

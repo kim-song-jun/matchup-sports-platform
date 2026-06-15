@@ -4,6 +4,44 @@
  * Mobile (<768) is UNCHANGED — never edit existing mobile rules here.
  * ============================================================ */
 
+/* ─── Mobile-default spacing for greeting + featured blocks ───────────────── */
+/*
+ * These values were previously encoded as inline style="..." on the JSX elements.
+ * Moving them to class rules lets the desktop @media overrides (below) win by
+ * specificity rather than fighting inline style declarations they can never beat.
+ */
+.tm-home-greeting-block {
+  padding: 8px 20px 24px;
+}
+
+.tm-home-featured-block {
+  margin: 0 20px 28px;
+}
+
+/* ─── Mobile-default spacing for sidebar anonymous wrappers ───────────────── */
+/*
+ * The QuickGrid and Weather sections previously had their padding on anonymous
+ * div elements with no class — CSS had no hook to override them on desktop.
+ * Now each wrapper has a class; mobile padding is expressed here, desktop resets below.
+ */
+.tm-home-sidebar-quickgrid-wrap {
+  padding: 0 20px 28px;
+}
+
+.tm-home-sidebar-weather-wrap {
+  padding: 0 20px 24px;
+}
+
+/* ─── Mobile-default spacing for sidebar notices ──────────────────────────── */
+/*
+ * .tm-home-sidebar-notices is already used on mobile, but its padding was
+ * provided via inline style. Moved here so the desktop card-surface rule
+ * (padding: 16px) can override it correctly.
+ */
+.tm-home-sidebar-notices {
+  padding: 20px 20px 24px;
+}
+
 /* ─── Desktop 2-column dashboard wrapper ──────────────────────────────────── */
 /*
  * .tm-home-desktop wraps the entire home content in JSX.
@@ -142,6 +180,19 @@
   .tm-match-rail {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 16px;
+  }
+}
+
+/* ─── Sidebar: remove mobile wrapper padding on desktop ───────────────────── */
+/*
+ * On desktop the sidebar flex gap (20px) owns vertical rhythm.
+ * The per-section horizontal padding (20px) is also gone — the sidebar column
+ * itself provides the visual boundary, so double-padding disappears.
+ */
+@media (min-width: 1024px) {
+  .tm-home-sidebar-quickgrid-wrap,
+  .tm-home-sidebar-weather-wrap {
+    padding: 0;
   }
 }
 

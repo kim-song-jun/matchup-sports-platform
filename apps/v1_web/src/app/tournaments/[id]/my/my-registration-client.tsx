@@ -247,7 +247,7 @@ function RegistrationPass({
       {showRosterFooter ? (
         <div
           style={{
-            borderTop: '1px solid var(--grey100)',
+            borderTop: '1px solid var(--border)',
             padding: '13px 18px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
           }}
@@ -279,7 +279,7 @@ function RegistrationPass({
           ) : null}
         </div>
       ) : (
-        <div style={{ borderTop: '1px solid var(--grey100)', padding: '12px 18px' }}>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
             앞 순위 팀이 취소하면 자동으로 확정 알림을 드려요.
           </p>
@@ -496,7 +496,7 @@ function RegistrationDetailView({
       {/* Roster status summary */}
       <div
         style={{
-          borderTop: '1px solid var(--grey100)',
+          borderTop: '1px solid var(--border)',
           paddingTop: 14,
           marginBottom: 16,
         }}
@@ -542,7 +542,7 @@ function RegistrationDetailView({
       {/* Secondary CTAs */}
       <Link
         href={`/tournaments/${tournamentId}`}
-        className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+        className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
         style={{ marginBottom: 8 }}
       >
         대회 상세 보기
@@ -551,7 +551,7 @@ function RegistrationDetailView({
       {registration.status === 'cancelled' || registration.status === 'draft' ? (
         <Link
           href={`/tournaments/${tournamentId}/apply`}
-          className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
           style={{ marginBottom: 8 }}
         >
           다시 신청하기
@@ -561,7 +561,7 @@ function RegistrationDetailView({
       {canCancelRequest ? (
         <button
           type="button"
-          className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
           onClick={() => { setCancelError(null); setShowCancelModal(true); }}
           style={{ marginTop: 4 }}
         >
@@ -623,7 +623,7 @@ function RegistrationDetailView({
                 </div>
 
                 {/* 결제 group */}
-                <div style={{ borderTop: '1px solid var(--grey100)', marginTop: 12, paddingTop: 12 }}>
+                <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 12 }}>
                   <div className="tm-text-micro" style={{ color: 'var(--text-caption)', fontWeight: 600, marginBottom: 6 }}>
                     결제
                   </div>

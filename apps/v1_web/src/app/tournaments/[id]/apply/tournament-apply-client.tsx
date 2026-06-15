@@ -44,9 +44,9 @@ function StepIndicator({ current }: { current: ApplyStep }) {
   const nextStep = STEPS[currentIndex + 1];
   return (
     <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span className="tm-badge tm-badge-blue">{`Step ${currentIndex + 1}/${STEPS.length}`}</span>
-        <span className="tm-text-caption">{STEPS[currentIndex]?.label}</span>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <span className="tm-badge tm-badge-blue">{`${currentIndex + 1}/${STEPS.length} 단계`}</span>
+        <span className="tm-text-caption" style={{ marginLeft: 8 }}>{STEPS[currentIndex]?.label}</span>
       </div>
       <div className="tm-create-bars" style={{ gridTemplateColumns: `repeat(${STEPS.length}, 1fr)` }}>
         {STEPS.map((step, index) => (
@@ -61,7 +61,7 @@ function StepIndicator({ current }: { current: ApplyStep }) {
         <p
           className="tm-text-micro"
           aria-label={`다음 단계: ${nextStep.label}`}
-          style={{ marginTop: 6, color: 'var(--text-caption)', textAlign: 'right' }}
+          style={{ marginTop: 4, color: 'var(--text-caption)' }}
         >
           다음: {nextStep.label}
         </p>

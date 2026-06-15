@@ -246,7 +246,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
         role="dialog"
         aria-modal="true"
         aria-labelledby="simple-modal-title"
-        className="bg-white rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[480px] overflow-hidden"
+        className="bg-white rounded-2xl shadow-[var(--shadow-2)] w-full max-w-[480px] overflow-hidden"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 id="simple-modal-title" className="text-sm font-bold text-gray-900">
@@ -949,8 +949,13 @@ function BracketTab({
   // 저장 차단 조건
   const resultFormBlocked = penaltyWithoutDraw || isPenaltyDraw || knockoutNeedsWinner;
 
+  const hasData = groups.length > 0 || fixtures.length > 0;
+
   return (
-    <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6">
+    <div className={[
+      'flex flex-col gap-6',
+      hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_1fr] lg:items-start lg:gap-6' : '',
+    ].join(' ')}>
 
       {/* ── 좌측 컬럼: 관리 폼 (조 만들기 · 팀 배정 · 픽스처 만들기) ── */}
       <div className="flex flex-col gap-6">
@@ -1997,7 +2002,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             </button>
           )}
         </div>
-        <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
+        <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-3">
           {[
             { label: '참가비', value: formatCurrency(tournament.entryFee) },
             { label: '팀 수', value: `${tournament.teamCount}팀` },

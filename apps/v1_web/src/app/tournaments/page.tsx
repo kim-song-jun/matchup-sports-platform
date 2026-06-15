@@ -316,7 +316,7 @@ function TournamentsListContent() {
               <div className="tm-tournament-promo-how-icon" aria-hidden="true" style={{ color: 'var(--blue500)' }}>
                 {step.icon}
               </div>
-              <p className="tm-tournament-promo-how-step-num">STEP {i + 1}</p>
+              <p className="tm-tournament-promo-how-step-num">{i + 1}단계</p>
               <p className="tm-tournament-promo-how-title">{step.title}</p>
               <p className="tm-tournament-promo-how-desc">{step.desc}</p>
             </div>

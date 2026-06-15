@@ -49,6 +49,9 @@
     position: static;
     /* Add top padding for the sticky desktop nav (64px) */
     padding-top: 64px;
+    /* Flex column so scroll-area stretches and footer stays at the bottom */
+    display: flex;
+    flex-direction: column;
   }
 
   /*
@@ -71,6 +74,7 @@
     overflow: visible;
     width: 100%;
     min-height: 0;
+    flex: 1; /* Fills remaining height so footer is pushed to the viewport bottom */
     /* Center content at max 1120px with comfortable horizontal padding */
     max-width: 1120px;
     margin-left: auto;

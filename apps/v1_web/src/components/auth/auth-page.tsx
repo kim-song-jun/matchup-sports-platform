@@ -26,8 +26,15 @@ export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devL
           {model.providers.length > 0 ? (
             <>
               <AuthDivider />
-              <div className="tm-auth-provider-row">
-                {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
+              <div className="tm-auth-provider-group">
+                <div className="tm-auth-provider-row">
+                  {model.providers.map((provider) => <ProviderButton key={provider.label} provider={provider} />)}
+                </div>
+                {model.providers.some((provider) => provider.disabled) ? (
+                  <p className="tm-text-caption tm-auth-provider-note">
+                    {model.providers.filter((provider) => provider.disabled).map((provider) => provider.label).join('·')} 로그인은 준비 중이에요
+                  </p>
+                ) : null}
               </div>
             </>
           ) : null}
@@ -247,7 +254,13 @@ function ProviderButton({ provider }: { provider: LoginProvider }) {
       {provider.label}
     </Link>
   ) : (
-    <button className={`tm-btn tm-btn-md ${provider.disabled ? 'tm-auth-provider-disabled' : 'tm-pressable'}`} disabled={provider.disabled} style={provider.disabled ? undefined : style} type="button">
+    <button
+      className={`tm-btn tm-btn-md ${provider.disabled ? 'tm-auth-provider-disabled' : 'tm-pressable'}`}
+      disabled={provider.disabled}
+      aria-label={provider.disabled ? `${provider.label} 로그인 (준비 중)` : undefined}
+      style={provider.disabled ? undefined : style}
+      type="button"
+    >
       {provider.label}
     </button>
   );
@@ -315,7 +328,7 @@ function CheckMark({ checked }: { checked?: boolean }) {
 function ProgressHeader({ stepNo, total }: { stepNo: number; total: number }) {
   return (
     <div className="tm-auth-progress">
-      <span className="tm-text-micro">{stepNo > 0 ? `STEP ${stepNo} / ${total}` : 'RESUME'}</span>
+      <span className="tm-text-micro">{stepNo > 0 ? `${stepNo}단계 / ${total}` : '이어하기'}</span>
       <div className="tm-auth-progress-bars">
         {Array.from({ length: total }).map((_, index) => <span key={index} data-active={stepNo > 0 && index < stepNo} />)}
       </div>

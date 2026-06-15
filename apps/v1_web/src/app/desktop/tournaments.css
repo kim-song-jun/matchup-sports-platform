@@ -299,6 +299,12 @@
   .tm-tournament-form-main h3 {
     margin-left: 0;
   }
+
+  /* Roster form page: cap content to readable width and centre on wide viewports. */
+  .tm-tournament-roster-body {
+    max-width: 640px;
+    margin-inline: auto;
+  }
 }
 
 /* ─── Apply /tournaments/:id/apply · My /tournaments/:id/my ──────────────────
@@ -900,7 +906,6 @@
   font-weight: 700;
   color: var(--blue500);
   margin: 0;
-  letter-spacing: 0.03em;
 }
 
 .tm-tournament-promo-how-title {
@@ -985,7 +990,7 @@
     display: block;
     position: absolute;
     right: -14px;
-    top: 13px;
+    top: 22px;
     width: 12px;
     height: 2px;
     background: var(--grey200);

@@ -52,11 +52,175 @@
   }
 }
 
+/* ─── TASK A: Desktop layout classes ─────────────────────────────────────────
+ *
+ * .tm-tournament-list-grid
+ *   List page card grid. Mobile: single column (untouched).
+ *   Desktop ≥1024: auto-fill columns min 300px, gap 16px.
+ *   Usage: replace / augment .tm-tournament-card-stack on the list page.
+ *
+ * .tm-tournament-detail-grid
+ *   Detail page 2-column grid (content + sticky rail). Mobile: single column.
+ *   Desktop ≥1024: minmax(0,1fr) 340px, gap 32px, align-items start.
+ *   NOTE: The tournament detail page currently reuses .tm-match-detail-desktop-layout
+ *   (matches.css: grid-template-columns 1fr 360px).  .tm-tournament-detail-grid is
+ *   the tournament-native equivalent — use it when migrating from the shared class.
+ *
+ * .tm-tournament-rail
+ *   Right sticky panel within .tm-tournament-detail-grid. Mobile: static block.
+ *   Desktop ≥1024: position sticky, top 88px (64px nav + 24px breathing).
+ *
+ * .tm-tournament-bleed
+ *   A child of any tournament grid that must span the full width (e.g. the bracket).
+ *   Mobile: normal flow. Desktop ≥1024: grid-column 1 / -1.
+ *
+ * .tm-tournament-form-grid
+ *   Apply and My pages: 2-column grid, content left + summary/CTA right.
+ *   Mobile: single column. Desktop ≥1024: minmax(0,1fr) 320px, gap 28px.
+ *   REPLACES the old max-width:640 / margin:0 auto caps for apply/my bodies.
+ *   The fixed bottom CTA (.tm-fixed-cta) is hidden on desktop via .tm-hide-desktop
+ *   because the right rail hosts the CTA instead (see component contract below).
+ */
+
+/* .tm-tournament-list-grid */
+.tm-tournament-list-grid {
+  /* Mobile: single column, matches existing list behaviour */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (min-width: 1024px) {
+  .tm-tournament-list-grid {
+    display: grid;
+    flex-direction: unset;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .tm-tournament-list-grid .tm-card {
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+
+  .tm-tournament-list-grid .tm-card:hover {
+    box-shadow: var(--shadow-2);
+    transform: translateY(-2px);
+  }
+}
+
+/* .tm-tournament-detail-grid */
+.tm-tournament-detail-grid {
+  /* Mobile: single-column block — children stack naturally */
+}
+
+@media (min-width: 1024px) {
+  .tm-tournament-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 32px;
+    align-items: start;
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-tournament-detail-grid {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 40px;
+  }
+}
+
+/* .tm-tournament-rail */
+.tm-tournament-rail {
+  /* Mobile: static, in normal flow */
+}
+
+@media (min-width: 1024px) {
+  .tm-tournament-rail {
+    position: sticky;
+    top: 88px; /* 64px desktop nav + 24px breathing */
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-1);
+  }
+}
+
+/* .tm-tournament-bleed — breaks out of the 2-col to span full width */
+@media (min-width: 1024px) {
+  .tm-tournament-bleed {
+    grid-column: 1 / -1;
+  }
+}
+
+/* .tm-tournament-form-grid
+ * Apply (/tournaments/:id/apply) and My (/tournaments/:id/my) desktop layout.
+ * Left column: multi-step form. Right column: summary/CTA card.
+ * COMPONENT CONTRACT:
+ *   <div className="tm-tournament-form-grid">
+ *     <div className="tm-tournament-form-main">{/* form steps *\/}</div>
+ *     <aside className="tm-tournament-form-rail tm-show-desktop">{/* summary + CTA *\/}</aside>
+ *   </div>
+ *   The inline .tm-fixed-cta inside each step must carry .tm-hide-desktop so
+ *   it is invisible on desktop (the rail's CTA button takes over).
+ */
+.tm-tournament-form-grid {
+  /* Mobile: single column, no-op wrapper */
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  /* Replace the old max-width:640 single-column cap with a 2-column grid. */
+  .tm-tournament-apply-body,
+  .tm-tournament-my-body {
+    max-width: unset;
+    margin: unset;
+    padding: 0 0 48px;
+  }
+
+  .tm-tournament-form-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 28px;
+    align-items: start;
+    padding: 0 0 48px;
+  }
+
+  /* Left column: remove inner side padding (grid gap takes over). */
+  .tm-tournament-form-main {
+    min-width: 0;
+  }
+
+  /* Right column (desktop only — .tm-show-desktop or explicit display). */
+  .tm-tournament-form-rail {
+    position: sticky;
+    top: 88px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: var(--shadow-1);
+  }
+
+  /* Hide the fixed bottom CTA on desktop — the rail takes over.
+     Components should already mark .tm-fixed-cta with .tm-hide-desktop;
+     this scoped rule is a belt-and-suspenders guard. */
+  .tm-tournament-form-grid .tm-fixed-cta {
+    display: none !important;
+  }
+
+  /* Overall max-width cap so the 2-col does not explode on ultra-wide screens. */
+  .tm-tournament-form-grid {
+    max-width: 960px;
+  }
+}
+
 /* ─── Apply /tournaments/:id/apply · My /tournaments/:id/my ──────────────────
- * Both pages were rendering single-column content at full ~1120px scroll-area
- * width, causing label-value rows to stretch excessively on desktop.
- * Cap at 640 px (same family as the detail page body) and centre it.
- * Mobile path (< 1024px): zero added specificity — wrappers are transparent.
+ * LEGACY single-column max-width cap — preserved for backwards compatibility
+ * until those pages adopt .tm-tournament-form-grid.  When both pages are
+ * migrated the block below (lines 62-70 in the original) can be removed.
+ * NOTE: The @media block above inside .tm-tournament-form-grid overrides these
+ * rules when .tm-tournament-form-grid is present.
  */
 
 @media (min-width: 1024px) {
@@ -72,34 +236,67 @@
 /* ─── Bracket — desktop horizontal layout ─────────────────────────────────────
  * .tm-tournament-bracket-h renders on desktop only (via .tm-show-desktop).
  * On mobile the .tm-hide-desktop vertical layout is used instead.
+ *
+ * TASK B: Real connector lines replace the bare → arrow glyph.
+ *
  * Structure:
  *   .tm-tournament-bracket-h           — outer flex row, overflow-x auto
- *     .tm-bracket-column               — per-round column, flex column
- *       .tm-bracket-column-label       — round name header
- *       .tm-bracket-column-fixtures    — stacked fixture cards
- *       .tm-bracket-trophy             — trophy placeholder (final column only)
- *     .tm-bracket-connector            — → arrow between columns
+ *     .tm-bracket-col-wrapper          — column + connector pair
+ *       .tm-bracket-column             — per-round column
+ *         .tm-bracket-column-label     — round name header
+ *         .tm-bracket-column-fixtures  — stacked fixture cards
+ *         .tm-bracket-trophy           — trophy placeholder (final column only)
+ *       .tm-bracket-connector          — elbow + arrow connector (not on last column)
+ *     (last .tm-bracket-col-wrapper has no .tm-bracket-connector child)
+ *
+ * Connector geometry (CSS pseudo-elements, no extra DOM nodes):
+ *   .tm-bracket-connector::before — vertical centre bar (top half → branch up)
+ *   .tm-bracket-connector::after  — horizontal arm pointing right
+ *
+ * For a simple 2-round bracket (semi → final) the connector draws a horizontal
+ * line at mid-height that visually joins the pair of semi-final cards to the
+ * single final card.  For 3+ rounds the same line joins each column pair.
  */
 
 @media (min-width: 1024px) {
   .tm-tournament-bracket-h {
     display: flex;
     flex-direction: row;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 0;
     overflow-x: auto;
     padding-bottom: 8px;
     /* Smooth scrollbar appearance */
     scrollbar-width: thin;
+    /* Ensure bracket fills available width so columns size naturally */
+    width: 100%;
+  }
+
+  /* col-wrapper: column + its right-hand connector as a unit */
+  .tm-bracket-col-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    /* Each column + connector pair grows to fill available space */
+    flex: 1 1 200px;
+    min-width: 200px;
+    max-width: 320px;
+  }
+
+  /* Last wrapper has no connector — let it shrink to just the column */
+  .tm-bracket-col-wrapper:last-child {
+    flex: 0 0 auto;
+    min-width: 180px;
+    max-width: 300px;
   }
 
   .tm-bracket-column {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    min-width: 220px;
-    max-width: 260px;
-    flex-shrink: 0;
+    /* Column grows to fill the wrapper, connector takes fixed width */
+    flex: 1 1 0;
+    min-width: 0;
     position: relative;
   }
 
@@ -108,6 +305,7 @@
     padding: 6px 8px 10px;
     border-bottom: 1px solid var(--grey100);
     margin-bottom: 12px;
+    flex-shrink: 0;
   }
 
   .tm-bracket-column-fixtures {
@@ -115,7 +313,7 @@
     flex-direction: column;
     gap: 10px;
     padding: 0 8px;
-    /* Vertically center the cards when column heights differ */
+    /* Vertically center the cards in the available space */
     justify-content: center;
     flex: 1;
   }
@@ -124,24 +322,133 @@
     display: flex;
     justify-content: center;
     padding-top: 12px;
+    flex-shrink: 0;
   }
 
-  /* Arrow connector: absolutely positioned between columns */
+  /* ── Connector: real elbow lines ─────────────────────────────────────────────
+   * Sits between two consecutive columns and draws two lines:
+   *   ::before — a short horizontal arm from the source column edge to centre
+   *   ::after  — a short horizontal arm from centre to the target column edge
+   *   The background gives the vertical centre bar joining them.
+   *
+   * For readability we use a simple horizontal rule that hits the vertical
+   * midpoint of the connector area, supplemented by short upward/downward
+   * branches at the source side.  This covers the common 2-fixture-to-1-fixture
+   * transition naturally.
+   */
   .tm-bracket-connector {
+    /* Fixed-width column between each pair of round-columns */
+    flex: 0 0 44px;
+    width: 44px;
+    position: relative;
+    /* Push connector content below the label row (label ≈ 43px) */
+    padding-top: 43px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    flex-shrink: 0;
-    /* Vertically align with the column fixture area */
-    padding-top: 46px;
-    color: var(--text-caption);
+  }
+
+  /* Centre horizontal bar */
+  .tm-bracket-connector::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--grey200);
+    transform: translateY(-50%);
+  }
+
+  /* Arrow head at the right end of the connector */
+  .tm-bracket-connector::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid var(--grey300);
+    border-right: 2px solid var(--grey300);
+    transform: translateY(-50%) rotate(45deg);
+    border-radius: 0 2px 0 0;
+  }
+
+  /* Dark-mode connector colours */
+  @media (prefers-color-scheme: dark) {
+    .tm-bracket-connector::before {
+      background: var(--grey300);
+    }
+    .tm-bracket-connector::after {
+      border-color: var(--grey400);
+    }
   }
 }
 
 @media (min-width: 1440px) {
-  .tm-bracket-column {
-    min-width: 240px;
-    max-width: 300px;
+  .tm-bracket-col-wrapper {
+    min-width: 220px;
+    max-width: 360px;
+  }
+}
+
+/* ─── Mobile vertical bracket connector ─────────────────────────────────────
+ * Replace the "↓ 승자 진출" text with a clean vertical line.
+ * The connector lives in .tm-bracket-mobile-connector (set via inline element
+ * in MobileBracket).
+ */
+.tm-bracket-mobile-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 32px;
+  position: relative;
+}
+
+.tm-bracket-mobile-connector::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: var(--grey200);
+  transform: translateX(-50%);
+}
+
+/* Arrow tip at the bottom of the vertical connector */
+.tm-bracket-mobile-connector::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid var(--grey300);
+  border-right: 2px solid var(--grey300);
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 0 0 2px 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tm-bracket-mobile-connector::before {
+    background: var(--grey300);
+  }
+  .tm-bracket-mobile-connector::after {
+    border-color: var(--grey400);
+  }
+}
+
+/* ─── prefers-reduced-motion: bracket transitions ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .tm-tournament-card-stack .tm-card,
+  .tm-tournament-list-grid .tm-card {
+    transition: none;
+  }
+
+  .tm-tournament-card-stack .tm-card:hover,
+  .tm-tournament-list-grid .tm-card:hover {
+    transform: none;
   }
 }

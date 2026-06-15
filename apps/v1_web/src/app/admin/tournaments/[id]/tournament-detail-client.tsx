@@ -683,6 +683,9 @@ function BracketTab({
   const [fixtureNumber, setFixtureNumber] = useState('1');
   const [fixtureHomeRegId, setFixtureHomeRegId] = useState('');
   const [fixtureAwayRegId, setFixtureAwayRegId] = useState('');
+  // auto-generate state
+  const [autoGenGroupId, setAutoGenGroupId] = useState('');
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
 
   // ── Record result state ─────────────────────────────────────────────
   const [resultFixture, setResultFixture] = useState<V1AdminBracketFixture | null>(null);
@@ -724,6 +727,11 @@ function BracketTab({
   const handleCreateFixture = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fixtureRound.trim() || !fixtureNumber) return;
+    // double-booking guard: home === away
+    if (fixtureHomeRegId && fixtureHomeRegId === fixtureAwayRegId) {
+      showToast('홈과 어웨이에 같은 팀을 선택할 수 없어요.', 'error');
+      return;
+    }
     createFixture.mutate(
       {
         round: fixtureRound.trim(),
@@ -743,6 +751,134 @@ function BracketTab({
         onError: (err) => showToast(extractErrorMessage(err, '픽스처 생성에 실패했어요.'), 'error'),
       },
     );
+  };
+
+  // ── Auto-generate fixtures ───────────────────────────────────────────
+  // Sequential mutation helper — fires each payload one at a time to avoid
+  // race conditions on the server's auto-increment fixtureNumber logic.
+  async function mutateSequential(payloads: Parameters<typeof createFixture.mutate>[0][]) {
+    for (const payload of payloads) {
+      await new Promise<void>((resolve, reject) => {
+        createFixture.mutate(payload, { onSuccess: () => resolve(), onError: reject });
+      });
+    }
+  }
+
+  const handleAutoGenerate = async (targetGroupId: string) => {
+    // Find the group (use bracket directly to avoid temporal dependency on groups/fixtures)
+    const allGroups: V1AdminBracketGroup[] = bracket?.groups ?? [];
+    const allFixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
+    const group = allGroups.find((g) => g.id === targetGroupId);
+    if (!group) return;
+
+    const isKnockout = group.phase === 'semi' || group.phase === 'final' || group.phase === 'third_place';
+
+    // Check for existing fixtures in this group
+    const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
+    if (existingInGroup.length > 0) {
+      const ok = window.confirm(
+        `"${group.name}"에 이미 픽스처 ${existingInGroup.length}개가 있어요. 추가로 생성할까요?`,
+      );
+      if (!ok) return;
+    }
+
+    // Determine next fixtureNumber base (global across all fixtures)
+    const maxNum = allFixtures.reduce((m, f) => Math.max(m, f.fixtureNumber), 0);
+    let nextNum = maxNum + 1;
+
+    setIsAutoGenerating(true);
+    try {
+      if (!isKnockout) {
+        // GROUP phase — round-robin: every unordered pair once
+        const teams = group.groupTeams;
+        if (teams.length < 2) {
+          showToast('조에 팀이 2개 이상 있어야 자동 생성할 수 있어요.', 'error');
+          return;
+        }
+        // Determine rounds: round-robin has (n-1) rounds for n teams
+        const numTeams = teams.length;
+        // Assign each pair to a round using round-robin scheduling
+        // Rotate-schedule: teams[0] is fixed, rest rotate
+        const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
+        const rotatable = teams.slice(1);
+        const numRounds = numTeams % 2 === 0 ? numTeams - 1 : numTeams;
+        const paddedTeams = numTeams % 2 !== 0 ? [...teams, null] : teams;
+        const rotList = paddedTeams.slice(1);
+        for (let round = 0; round < numRounds; round++) {
+          const roundLabel = `조별 ${round + 1}라운드`;
+          const current = [paddedTeams[0], ...rotList];
+          const half = Math.floor(current.length / 2);
+          for (let i = 0; i < half; i++) {
+            const home = current[i];
+            const away = current[current.length - 1 - i];
+            if (!home || !away) continue; // bye
+            payloads.push({
+              groupId: targetGroupId,
+              round: roundLabel,
+              fixtureNumber: nextNum++,
+              homeRegistrationId: home.registrationId,
+              awayRegistrationId: away.registrationId,
+            });
+          }
+          // rotate: move last element to position 1
+          rotList.unshift(rotList.pop()!);
+        }
+        await mutateSequential(payloads);
+        showToast(`조별리그 픽스처 ${payloads.length}개를 자동 생성했어요.`, 'success');
+      } else {
+        // KNOCKOUT phase — seed-pair: 1 vs N, 2 vs N-1, …
+        const teams = group.groupTeams;
+        const roundLabel =
+          group.phase === 'semi'
+            ? '4강'
+            : group.phase === 'final'
+            ? '결승'
+            : '3·4위전';
+
+        if (teams.length === 0) {
+          // Produce a single TBD fixture for the phase
+          await new Promise<void>((resolve, reject) => {
+            createFixture.mutate(
+              { groupId: targetGroupId, round: roundLabel, fixtureNumber: nextNum++ },
+              { onSuccess: () => resolve(), onError: reject },
+            );
+          });
+          showToast(`${roundLabel} 픽스처(TBD)를 생성했어요.`, 'success');
+          return;
+        }
+
+        const sorted = [...teams]; // preserve seeding order (sortOrder)
+        const payloads: Parameters<typeof createFixture.mutate>[0][] = [];
+        const half = Math.ceil(sorted.length / 2);
+        for (let i = 0; i < half; i++) {
+          const home = sorted[i];
+          const away = sorted[sorted.length - 1 - i];
+          if (home === away) {
+            // odd team — create as TBD away
+            payloads.push({
+              groupId: targetGroupId,
+              round: roundLabel,
+              fixtureNumber: nextNum++,
+              homeRegistrationId: home.registrationId,
+            });
+          } else {
+            payloads.push({
+              groupId: targetGroupId,
+              round: roundLabel,
+              fixtureNumber: nextNum++,
+              homeRegistrationId: home.registrationId,
+              awayRegistrationId: away.registrationId,
+            });
+          }
+        }
+        await mutateSequential(payloads);
+        showToast(`${roundLabel} 픽스처 ${payloads.length}개를 자동 생성했어요.`, 'success');
+      }
+    } catch (err) {
+      showToast(extractErrorMessage(err, '자동 생성에 실패했어요.'), 'error');
+    } finally {
+      setIsAutoGenerating(false);
+    }
   };
 
   const handleRecordResult = (e: React.FormEvent) => {
@@ -1027,44 +1163,196 @@ function BracketTab({
       {/* ── 픽스처 만들기 ────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
         <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">픽스처 만들기</h3>
-        <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-round" className="tm-text-label text-[color:var(--text-strong)]">라운드</label>
-            <input id="fixture-round" type="text" value={fixtureRound} onChange={(e) => setFixtureRound(e.target.value)} placeholder="예: 조별 1라운드" disabled={createFixture.isPending} maxLength={30} className={inputCls} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-number" className="tm-text-label text-[color:var(--text-strong)]">번호</label>
-            <input id="fixture-number" type="number" min="1" value={fixtureNumber} onChange={(e) => setFixtureNumber(e.target.value)} disabled={createFixture.isPending} className={inputCls} />
-          </div>
-          {groups.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <label htmlFor="fixture-group" className="tm-text-label text-[color:var(--text-strong)]">소속 조 (선택)</label>
-              <select id="fixture-group" value={fixtureGroupId} onChange={(e) => setFixtureGroupId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
-                <option value="">조 없음</option>
-                {groups.map((g) => (<option key={g.id} value={g.id}>{g.name}</option>))}
-              </select>
+
+        {/* ── 대진 자동 생성 ── */}
+        {groups.length > 0 && (
+          <div className="mb-5 pb-5 border-b border-gray-100">
+            <p className="tm-text-caption text-[color:var(--text-caption)] mb-2">
+              조를 선택하면 라운드로빈(조별) 또는 시드 페어링(토너먼트) 픽스처를 자동으로 만들어요.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="auto-gen-group" className="tm-text-label text-[color:var(--text-strong)]">
+                  자동 생성할 조
+                </label>
+                <select
+                  id="auto-gen-group"
+                  value={autoGenGroupId}
+                  onChange={(e) => setAutoGenGroupId(e.target.value)}
+                  disabled={isAutoGenerating || createFixture.isPending}
+                  className={inputCls + ' sm:w-[200px]'}
+                >
+                  <option value="">조를 선택해 주세요</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                disabled={!autoGenGroupId || isAutoGenerating || createFixture.isPending}
+                onClick={() => void handleAutoGenerate(autoGenGroupId)}
+                className={submitBtnCls}
+                aria-label="선택한 조의 픽스처 자동 생성"
+              >
+                <RefreshCw size={14} aria-hidden="true" />
+                {isAutoGenerating ? '생성 중…' : '대진 자동 생성'}
+              </button>
             </div>
-          )}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-home" className="tm-text-label text-[color:var(--text-strong)]">홈 팀 (선택)</label>
-            <select id="fixture-home" value={fixtureHomeRegId} onChange={(e) => setFixtureHomeRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
-              <option value="">미정</option>
-              {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
-            </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fixture-away" className="tm-text-label text-[color:var(--text-strong)]">어웨이 팀 (선택)</label>
-            <select id="fixture-away" value={fixtureAwayRegId} onChange={(e) => setFixtureAwayRegId(e.target.value)} disabled={createFixture.isPending} className={inputCls}>
-              <option value="">미정</option>
-              {confirmedRegistrations.map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button type="submit" disabled={!fixtureRound.trim() || !fixtureNumber || createFixture.isPending} className={submitBtnCls + ' w-full sm:w-auto'}>
-              <Plus size={14} aria-hidden="true" />픽스처 추가
-            </button>
-          </div>
-        </form>
+        )}
+
+        {/* ── 수동 픽스처 생성 폼 ── */}
+        {(() => {
+          // Determine phase of the currently selected group for round options
+          const selectedGroup = groups.find((g) => g.id === fixtureGroupId);
+          const selectedPhase = selectedGroup?.phase ?? 'group';
+          const isKnockoutPhase =
+            selectedPhase === 'semi' || selectedPhase === 'final' || selectedPhase === 'third_place';
+
+          // Round options per phase
+          const roundOptions: string[] = isKnockoutPhase
+            ? ['16강', '8강', '4강', '결승', '3·4위전']
+            : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
+
+          // Double-booking detection: which reg IDs are already used in fixtureRound in selected group
+          const bookedInRound = new Set<string>();
+          if (fixtureRound) {
+            fixtures
+              .filter((f) => f.round === fixtureRound && (!fixtureGroupId || f.groupId === fixtureGroupId))
+              .forEach((f) => {
+                if (f.homeRegistrationId) bookedInRound.add(f.homeRegistrationId);
+                if (f.awayRegistrationId) bookedInRound.add(f.awayRegistrationId);
+              });
+          }
+
+          const homeBooked = fixtureHomeRegId ? bookedInRound.has(fixtureHomeRegId) : false;
+          const awayBooked = fixtureAwayRegId ? bookedInRound.has(fixtureAwayRegId) : false;
+          const sameTeam = !!(fixtureHomeRegId && fixtureHomeRegId === fixtureAwayRegId);
+          const hasBookingWarn = !sameTeam && (homeBooked || awayBooked);
+
+          return (
+            <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* Round select */}
+              <div className="flex flex-col gap-1">
+                <label htmlFor="fixture-round" className="tm-text-label text-[color:var(--text-strong)]">라운드</label>
+                <select
+                  id="fixture-round"
+                  value={fixtureRound}
+                  onChange={(e) => setFixtureRound(e.target.value)}
+                  disabled={createFixture.isPending}
+                  className={inputCls}
+                >
+                  <option value="">라운드 선택</option>
+                  {roundOptions.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fixture number */}
+              <div className="flex flex-col gap-1">
+                <label htmlFor="fixture-number" className="tm-text-label text-[color:var(--text-strong)]">번호</label>
+                <input
+                  id="fixture-number"
+                  type="number"
+                  min="1"
+                  value={fixtureNumber}
+                  onChange={(e) => setFixtureNumber(e.target.value)}
+                  disabled={createFixture.isPending}
+                  className={inputCls}
+                />
+              </div>
+
+              {/* Group select */}
+              {groups.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="fixture-group" className="tm-text-label text-[color:var(--text-strong)]">소속 조 (선택)</label>
+                  <select
+                    id="fixture-group"
+                    value={fixtureGroupId}
+                    onChange={(e) => {
+                      setFixtureGroupId(e.target.value);
+                      // reset round when group/phase changes
+                      setFixtureRound('');
+                    }}
+                    disabled={createFixture.isPending}
+                    className={inputCls}
+                  >
+                    <option value="">조 없음</option>
+                    {groups.map((g) => (<option key={g.id} value={g.id}>{g.name}</option>))}
+                  </select>
+                </div>
+              )}
+
+              {/* Home team — exclude away selection */}
+              <div className="flex flex-col gap-1">
+                <label htmlFor="fixture-home" className="tm-text-label text-[color:var(--text-strong)]">
+                  홈 팀 (선택)
+                  {homeBooked && (
+                    <span className="ml-1 tm-text-caption text-amber-600" aria-live="polite">
+                      이미 해당 라운드에 배정됨
+                    </span>
+                  )}
+                </label>
+                <select
+                  id="fixture-home"
+                  value={fixtureHomeRegId}
+                  onChange={(e) => setFixtureHomeRegId(e.target.value)}
+                  disabled={createFixture.isPending}
+                  className={inputCls + (homeBooked ? ' border-amber-400 focus:border-amber-500 focus:ring-amber-400/20' : '')}
+                >
+                  <option value="">미정</option>
+                  {confirmedRegistrations
+                    .filter((r) => r.id !== fixtureAwayRegId)
+                    .map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
+                </select>
+              </div>
+
+              {/* Away team — exclude home selection */}
+              <div className="flex flex-col gap-1">
+                <label htmlFor="fixture-away" className="tm-text-label text-[color:var(--text-strong)]">
+                  어웨이 팀 (선택)
+                  {awayBooked && (
+                    <span className="ml-1 tm-text-caption text-amber-600" aria-live="polite">
+                      이미 해당 라운드에 배정됨
+                    </span>
+                  )}
+                </label>
+                <select
+                  id="fixture-away"
+                  value={fixtureAwayRegId}
+                  onChange={(e) => setFixtureAwayRegId(e.target.value)}
+                  disabled={createFixture.isPending}
+                  className={inputCls + (awayBooked ? ' border-amber-400 focus:border-amber-500 focus:ring-amber-400/20' : '')}
+                >
+                  <option value="">미정</option>
+                  {confirmedRegistrations
+                    .filter((r) => r.id !== fixtureHomeRegId)
+                    .map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1 items-start">
+                {/* Booking / same-team warning */}
+                {(sameTeam || hasBookingWarn) && (
+                  <p className="tm-text-caption text-amber-600" role="alert">
+                    {sameTeam
+                      ? '홈과 어웨이에 같은 팀을 선택할 수 없어요.'
+                      : '해당 라운드에 이미 배정된 팀이 있어요. 확인 후 추가해 주세요.'}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={!fixtureRound || !fixtureNumber || sameTeam || createFixture.isPending}
+                  className={submitBtnCls + ' w-full sm:w-auto mt-auto'}
+                >
+                  <Plus size={14} aria-hidden="true" />픽스처 추가
+                </button>
+              </div>
+            </form>
+          );
+        })()}
       </div>
 
       {/* ── 픽스처 목록 (f13: AdminDataTable — 모바일 card reflow 자동 적용) ── */}

@@ -25,6 +25,10 @@ function formatEntryFee(fee: number): string {
   return `${fee.toLocaleString('ko-KR')}원`;
 }
 
+function formatPrizePool(prize: number): string {
+  return `${prize.toLocaleString('ko-KR')}원`;
+}
+
 /* ── Step indicator ── */
 
 type ApplyStep = 'team' | 'agreements' | 'payment';
@@ -38,7 +42,6 @@ const STEPS: Array<{ id: ApplyStep; label: string }> = [
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
   const nextStep = STEPS[currentIndex + 1];
-  // stepNumber is 1-based; bars are active for index <= currentIndex (1-based: item <= currentIndex+1)
   return (
     <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -67,6 +70,113 @@ function StepIndicator({ current }: { current: ApplyStep }) {
   );
 }
 
+/* ── Order Summary Card (shared between desktop rail + mobile recap) ── */
+
+function OrderSummaryCard({
+  tournament,
+  selectedTeam,
+  depositorName,
+  compact = false,
+}: {
+  tournament: V1TournamentDetail;
+  selectedTeam: V1MyTeam | undefined;
+  depositorName: string;
+  compact?: boolean;
+}) {
+  return (
+    <Card
+      pad={compact ? 12 : 16}
+      style={compact ? { background: 'var(--grey50)' } : undefined}
+      aria-label="신청 요약"
+    >
+      {!compact && (
+        <div
+          className="tm-text-label"
+          style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 12 }}
+        >
+          신청 요약
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <InfoRow label="대회명" value={tournament.title} />
+        <InfoRow
+          label="참가 팀"
+          value={selectedTeam ? selectedTeam.name : '—'}
+        />
+        <InfoRow
+          label="참가비"
+          value={formatEntryFee(tournament.entryFee)}
+          valueColor={tournament.entryFee > 0 ? 'var(--blue500)' : undefined}
+        />
+        {tournament.prizePool != null && tournament.prizePool > 0 ? (
+          <InfoRow
+            label="상금"
+            value={formatPrizePool(tournament.prizePool)}
+            valueColor="var(--orange500)"
+          />
+        ) : null}
+        <InfoRow label="결제 수단" value="계좌이체" />
+        {depositorName.trim().length > 0 ? (
+          <InfoRow label="입금자명" value={depositorName.trim()} isLast />
+        ) : (
+          <InfoRow label="입금자명" value="—" isLast />
+        )}
+      </div>
+    </Card>
+  );
+}
+
+/* ── Desktop Rail: persistent summary + CTA ── */
+
+function DesktopRailSummary({
+  tournament,
+  selectedTeam,
+  depositorName,
+  step,
+  canSubmit,
+  isSubmitting,
+  onSubmitFromRail,
+}: {
+  tournament: V1TournamentDetail;
+  selectedTeam: V1MyTeam | undefined;
+  depositorName: string;
+  step: ApplyStep;
+  canSubmit: boolean;
+  isSubmitting: boolean;
+  onSubmitFromRail: () => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <OrderSummaryCard
+        tournament={tournament}
+        selectedTeam={selectedTeam}
+        depositorName={depositorName}
+      />
+
+      {step === 'agreements' && (
+        <button
+          type="button"
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          disabled={!canSubmit || isSubmitting}
+          onClick={onSubmitFromRail}
+          aria-label="신청 제출하기"
+        >
+          {isSubmitting ? '처리 중…' : '신청하기'}
+        </button>
+      )}
+
+      {step === 'payment' && tournament && (
+        <Link
+          href={`/tournaments/${tournament.id}/my`}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        >
+          내 신청 확인하기
+        </Link>
+      )}
+    </div>
+  );
+}
+
 /* ── Step 1: Team selection ── */
 
 function TeamSelectStep({
@@ -76,6 +186,7 @@ function TeamSelectStep({
   selectedTeamId,
   onSelectTeam,
   onNext,
+  isCreating,
 }: {
   tournament: V1TournamentDetail;
   teams: V1MyTeam[];
@@ -83,6 +194,7 @@ function TeamSelectStep({
   selectedTeamId: string;
   onSelectTeam: (teamId: string) => void;
   onNext: () => void;
+  isCreating: boolean;
 }) {
   const managerTeams = teams.filter((t) => t.role === 'owner' || t.role === 'manager');
   const hasManagerTeam = managerTeams.length > 0;
@@ -264,8 +376,8 @@ function TeamSelectStep({
         ) : null}
       </section>
 
-      {/* Fixed CTA */}
-      <div className="tm-fixed-cta">
+      {/* Fixed CTA — hidden on desktop (rail takes over) */}
+      <div className="tm-fixed-cta tm-hide-desktop">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           <Link
             href={`/tournaments/${tournament.id}`}
@@ -276,14 +388,153 @@ function TeamSelectStep({
           <button
             type="button"
             className="tm-btn tm-btn-lg tm-btn-primary"
-            disabled={!selectedTeamId || !hasManagerTeam}
+            disabled={!selectedTeamId || !hasManagerTeam || isCreating}
             onClick={onNext}
             aria-label="다음 단계: 동의 및 결제수단 선택"
           >
-            다음
+            {isCreating ? '준비 중…' : '다음'}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Expandable consent row ── */
+
+function ExpandableCheckRow({
+  id,
+  label,
+  checked,
+  onChange,
+  bodyText,
+  divider = false,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  bodyText: string | null | undefined;
+  divider?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const bodyId = `${id}-body`;
+
+  return (
+    <div
+      style={{
+        borderTop: divider ? '1px solid var(--grey100)' : undefined,
+      }}
+    >
+      {/* Main row: checkbox label + expand toggle */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '13px 14px',
+          minHeight: 44,
+        }}
+      >
+        {/* sr-only real checkbox for accessibility */}
+        <input
+          id={id}
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only"
+        />
+        {/* Themed visual indicator */}
+        <label
+          htmlFor={id}
+          style={{ display: 'contents', cursor: 'pointer' }}
+          aria-label={label}
+        >
+          <span
+            aria-hidden="true"
+            className={`tm-auth-check${checked ? ' tm-auth-check-on' : ''}`}
+          >
+            ✓
+          </span>
+          <span className="tm-text-body" style={{ color: 'var(--text-strong)', flex: 1 }}>
+            {label}
+          </span>
+        </label>
+        {/* Expand toggle — only shown when there is body text */}
+        {bodyText ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+            aria-controls={bodyId}
+            aria-label={expanded ? '내용 접기' : '내용 보기'}
+            style={{
+              flexShrink: 0,
+              background: 'none',
+              border: 'none',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              color: 'var(--text-caption)',
+              minWidth: 44,
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 8,
+              outline: 'none',
+            }}
+            onFocus={(e) => (e.currentTarget.style.outline = '2px solid var(--blue500)')}
+            onBlur={(e) => (e.currentTarget.style.outline = 'none')}
+          >
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{
+                transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s',
+                display: 'block',
+              }}
+            >
+              <path
+                d="M4 6l4 4 4-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : null}
+      </div>
+
+      {/* Expandable body */}
+      {bodyText && expanded ? (
+        <div
+          id={bodyId}
+          role="region"
+          aria-label={`${label} 전문`}
+          style={{
+            padding: '0 14px 14px',
+            background: 'var(--grey50)',
+            borderTop: '1px solid var(--grey100)',
+          }}
+        >
+          <p
+            className="tm-text-caption"
+            style={{
+              color: 'var(--text-muted)',
+              lineHeight: 1.7,
+              marginTop: 12,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {bodyText}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -301,6 +552,7 @@ type AgreementsState = {
 
 function AgreementsStep({
   tournament,
+  selectedTeam,
   state,
   onChange,
   onBack,
@@ -309,6 +561,7 @@ function AgreementsStep({
   error,
 }: {
   tournament: V1TournamentDetail;
+  selectedTeam: V1MyTeam | undefined;
   state: AgreementsState;
   onChange: (patch: Partial<AgreementsState>) => void;
   onBack: () => void;
@@ -329,24 +582,27 @@ function AgreementsStep({
           <SectionTitle id="consent-heading" title="필수 동의" />
         </div>
         <Card pad={0} style={{ marginTop: 8 }}>
-          <CheckRow
+          <ExpandableCheckRow
             id="agree-rules"
             label="대회 규정 동의 (필수)"
             checked={state.agreedRules}
             onChange={(v) => onChange({ agreedRules: v })}
+            bodyText={tournament.rulesText}
           />
-          <CheckRow
+          <ExpandableCheckRow
             id="agree-privacy"
             label="개인정보 수집·이용 동의 (필수)"
             checked={state.agreedPrivacy}
             onChange={(v) => onChange({ agreedPrivacy: v })}
+            bodyText={null}
             divider
           />
-          <CheckRow
+          <ExpandableCheckRow
             id="agree-refund"
             label="환불 정책 동의 (필수)"
             checked={state.agreedRefund}
             onChange={(v) => onChange({ agreedRefund: v })}
+            bodyText={tournament.refundPolicyText}
             divider
           />
         </Card>
@@ -358,11 +614,12 @@ function AgreementsStep({
           <SectionTitle id="optional-consent-heading" title="선택 동의" />
         </div>
         <Card pad={0} style={{ marginTop: 8 }}>
-          <CheckRow
+          <ExpandableCheckRow
             id="agree-media"
             label="사진·영상 촬영 및 활용 동의 (선택)"
             checked={state.agreedMediaConsent}
             onChange={(v) => onChange({ agreedMediaConsent: v })}
+            bodyText={null}
           />
         </Card>
       </section>
@@ -439,14 +696,30 @@ function AgreementsStep({
         </Card>
       ) : null}
 
+      {/* Mobile recap before CTA — shows total before committing */}
+      <div style={{ marginTop: 20 }}>
+        <p
+          className="tm-text-micro"
+          style={{ color: 'var(--text-caption)', marginBottom: 8, fontWeight: 600 }}
+        >
+          신청 내용을 확인해 주세요
+        </p>
+        <OrderSummaryCard
+          tournament={tournament}
+          selectedTeam={selectedTeam}
+          depositorName={state.depositorName}
+          compact
+        />
+      </div>
+
       {error ? (
         <div style={{ marginTop: 12 }}>
           <AlertBanner message={error} />
         </div>
       ) : null}
 
-      {/* Fixed CTA */}
-      <div className="tm-fixed-cta">
+      {/* Fixed CTA — hidden on desktop (rail takes over) */}
+      <div className="tm-fixed-cta tm-hide-desktop">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onBack}>
             이전
@@ -463,54 +736,6 @@ function AgreementsStep({
         </div>
       </div>
     </div>
-  );
-}
-
-function CheckRow({
-  id,
-  label,
-  checked,
-  onChange,
-  divider = false,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  divider?: boolean;
-}) {
-  return (
-    <label
-      htmlFor={id}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '13px 14px',
-        borderTop: divider ? '1px solid var(--grey100)' : undefined,
-        minHeight: 44,
-        cursor: 'pointer',
-      }}
-    >
-      {/* sr-only real checkbox for accessibility */}
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="sr-only"
-      />
-      {/* Themed visual indicator — matches auth/terms flow */}
-      <span
-        aria-hidden="true"
-        className={`tm-auth-check${checked ? ' tm-auth-check-on' : ''}`}
-      >
-        ✓
-      </span>
-      <span className="tm-text-body" style={{ color: 'var(--text-strong)', flex: 1 }}>
-        {label}
-      </span>
-    </label>
   );
 }
 
@@ -538,7 +763,6 @@ function PaymentGuideStep({
     navigator.clipboard.writeText(tournament.bankAccount).then(() => {
       if (copyLiveRef.current) {
         copyLiveRef.current.textContent = '계좌번호를 복사했어요.';
-        // Clear after 3 s so the same message can re-trigger the screen-reader
         setTimeout(() => {
           if (copyLiveRef.current) copyLiveRef.current.textContent = '';
         }, 3000);
@@ -550,7 +774,6 @@ function PaymentGuideStep({
     });
   }
 
-  // Bank transfer is the only supported payment method.
   return (
     <div style={{ padding: '0 20px 120px' }}>
       {/* aria-live region for clipboard confirmation — hidden visually */}
@@ -576,7 +799,6 @@ function PaymentGuideStep({
           </div>
 
           {hasBankInfo ? (
-            /* V1TournamentDetail includes organizer bank info */
             <div style={{ padding: '0 16px' }}>
               <InfoRow label="은행" value={tournament.bankName!} />
               {/* Account number row with copy button */}
@@ -614,7 +836,6 @@ function PaymentGuideStep({
               />
             </div>
           ) : (
-            /* Bank info not yet set — show reassuring info banner instead of cold placeholders */
             <div style={{ padding: '0 16px 14px' }}>
               <AlertBanner
                 tone="info"
@@ -639,7 +860,8 @@ function PaymentGuideStep({
         </Card>
       </section>
 
-      <div className="tm-fixed-cta">
+      {/* Fixed CTA — hidden on desktop (rail takes over) */}
+      <div className="tm-fixed-cta tm-hide-desktop">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onBack}>
             이전
@@ -694,7 +916,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const createRegistration = useV1CreateRegistration(tournamentId);
-  // SubmitRegistration requires registrationId — use '' as guard; hook is only called when registrationId is non-empty.
   const submitRegistration = useV1SubmitRegistration(tournamentId, registrationId ?? '');
 
   // Auto-select first manager team
@@ -703,6 +924,15 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     const first = myTeams.find((t) => t.role === 'owner' || t.role === 'manager');
     if (first) setSelectedTeamId(first.teamId);
   }, [myTeams, selectedTeamId]);
+
+  const selectedTeam = myTeams.find((t) => t.teamId === selectedTeamId);
+
+  const allRequiredAgreed = agreements.agreedRules && agreements.agreedPrivacy && agreements.agreedRefund;
+  const bankTransferValid =
+    agreements.paymentMethod !== 'bank_transfer' || agreements.depositorName.trim().length > 0;
+  const canSubmitAgreements = allRequiredAgreed && bankTransferValid;
+
+  const isCreating = createRegistration.isPending;
 
   if (loadingTournament) {
     return (
@@ -757,8 +987,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     try {
       const reg = await createRegistration.mutateAsync({ teamId: selectedTeamId });
       setRegistrationId(reg.id);
-      // If draft already existed (idempotent), the returned registration carries
-      // the existing id — we overwrite registrationId with it.
       setStep('agreements');
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '신청 초기화 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
@@ -783,70 +1011,95 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     }
   }
 
-  const isCreating = createRegistration.isPending;
-
   return (
     <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
       <div
         className="tm-tournament-apply-body"
         style={{ maxWidth: 'var(--v1-app-chrome-frame-width)', marginInline: 'auto', width: '100%' }}
       >
-      <StepIndicator current={step} />
+        <StepIndicator current={step} />
 
-      {step === 'team' ? (
-        <>
-          {submitError ? (
-            <div style={{ padding: '12px 20px 0' }}>
-              <AlertBanner message={submitError} />
-            </div>
-          ) : null}
-          <TeamSelectStep
-            tournament={tournament}
-            teams={myTeams}
-            isLoadingTeams={loadingTeams}
-            selectedTeamId={selectedTeamId}
-            onSelectTeam={setSelectedTeamId}
-            onNext={handleTeamNext}
-          />
-          {isCreating ? (
+        {/* Desktop 2-column layout via .tm-tournament-form-grid */}
+        <div className="tm-tournament-form-grid">
+          {/* Left column: step content */}
+          <div className="tm-tournament-form-main">
+            {step === 'team' ? (
+              <>
+                {submitError ? (
+                  <div style={{ padding: '12px 20px 0' }}>
+                    <AlertBanner message={submitError} />
+                  </div>
+                ) : null}
+                <TeamSelectStep
+                  tournament={tournament}
+                  teams={myTeams}
+                  isLoadingTeams={loadingTeams}
+                  selectedTeamId={selectedTeamId}
+                  onSelectTeam={setSelectedTeamId}
+                  onNext={handleTeamNext}
+                  isCreating={isCreating}
+                />
+              </>
+            ) : step === 'agreements' ? (
+              <AgreementsStep
+                tournament={tournament}
+                selectedTeam={selectedTeam}
+                state={agreements}
+                onChange={(patch) => setAgreements((prev) => ({ ...prev, ...patch }))}
+                onBack={() => setStep('team')}
+                onSubmit={handleAgreementsSubmit}
+                isSubmitting={submitRegistration.isPending}
+                error={submitError}
+              />
+            ) : registrationId ? (
+              <PaymentGuideStep
+                tournament={tournament}
+                registrationId={registrationId}
+                onBack={() => setStep('agreements')}
+              />
+            ) : null}
+          </div>
+
+          {/* Right rail: order summary + CTA — desktop only */}
+          <aside
+            className="tm-tournament-form-rail tm-show-desktop"
+            role="complementary"
+            aria-label="신청 요약"
+          >
+            <DesktopRailSummary
+              tournament={tournament}
+              selectedTeam={selectedTeam}
+              depositorName={agreements.depositorName}
+              step={step}
+              canSubmit={canSubmitAgreements}
+              isSubmitting={submitRegistration.isPending}
+              onSubmitFromRail={handleAgreementsSubmit}
+            />
+          </aside>
+        </div>
+
+        {/* Full-screen creating overlay */}
+        {isCreating ? (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(25,31,40,0.32)',
+              display: 'grid',
+              placeItems: 'center',
+              zIndex: 9999,
+            }}
+          >
             <div
-              role="status"
-              aria-live="polite"
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(25,31,40,0.32)',
-                display: 'grid',
-                placeItems: 'center',
-                zIndex: 9999,
-              }}
+              className="tm-text-label"
+              style={{ color: 'var(--static-white)', background: 'rgba(25,31,40,0.72)', padding: '12px 20px', borderRadius: 14 }}
             >
-              <div
-                className="tm-text-label"
-                style={{ color: 'var(--static-white)', background: 'rgba(25,31,40,0.72)', padding: '12px 20px', borderRadius: 14 }}
-              >
-                신청 준비 중…
-              </div>
+              신청 준비 중…
             </div>
-          ) : null}
-        </>
-      ) : step === 'agreements' ? (
-        <AgreementsStep
-          tournament={tournament}
-          state={agreements}
-          onChange={(patch) => setAgreements((prev) => ({ ...prev, ...patch }))}
-          onBack={() => setStep('team')}
-          onSubmit={handleAgreementsSubmit}
-          isSubmitting={submitRegistration.isPending}
-          error={submitError}
-        />
-      ) : registrationId ? (
-        <PaymentGuideStep
-          tournament={tournament}
-          registrationId={registrationId}
-          onBack={() => setStep('agreements')}
-        />
-      ) : null}
+          </div>
+        ) : null}
       </div>
     </AppChrome>
   );

@@ -61,6 +61,69 @@ const textareaCls = [
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
 
+// ── Datetime text input helpers ───────────────────────────────────────────
+
+/** Accepts "YYYY-MM-DD HH:MM" — returns true if it looks valid */
+function isValidDatetimeText(value: string): boolean {
+  if (!value.trim()) return true; // empty is valid (optional field)
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value.trim());
+}
+
+/** Converts "YYYY-MM-DD HH:MM" → ISO string, or returns null for empty/invalid */
+function datetimeTextToIso(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!isValidDatetimeText(trimmed)) return null;
+  // Replace space with "T" so Date can parse it
+  const iso = new Date(trimmed.replace(' ', 'T')).toISOString();
+  return iso;
+}
+
+// ── Styled datetime text input ────────────────────────────────────────────
+
+function DatetimeTextInput({
+  id,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const invalid = value.trim().length > 0 && !isValidDatetimeText(value);
+  return (
+    <>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder="YYYY-MM-DD HH:MM"
+        maxLength={16}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? `${id}-err` : undefined}
+        className={[
+          inputCls,
+          invalid
+            ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+            : '',
+        ]
+          .join(' ')
+          .trim()}
+      />
+      {invalid && (
+        <p id={`${id}-err`} role="alert" className="text-[12px] text-red-500 mt-0.5">
+          날짜 형식이 맞지 않아요 (YYYY-MM-DD HH:MM)
+        </p>
+      )}
+    </>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTournamentsNewPage() {
@@ -83,6 +146,8 @@ export default function AdminTournamentsNewPage() {
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [bankHolder, setBankHolder] = useState('');
+  const [prizePool, setPrizePool] = useState('');
+  const [prizeBreakdown, setPrizeBreakdown] = useState('');
   const [rulesText, setRulesText] = useState('');
   const [refundPolicyText, setRefundPolicyText] = useState('');
 
@@ -92,7 +157,9 @@ export default function AdminTournamentsNewPage() {
   const canSubmit =
     !isPending &&
     sportId.trim().length > 0 &&
-    title.trim().length > 0;
+    title.trim().length > 0 &&
+    isValidDatetimeText(scheduledAt) &&
+    isValidDatetimeText(registrationDeadlineAt);
 
   // ── Submit ───────────────────────────────────────────────────────────
   const handleSubmit = (e: React.FormEvent) => {
@@ -104,15 +171,17 @@ export default function AdminTournamentsNewPage() {
         sportId: sportId.trim(),
         title: title.trim(),
         format,
-        ...(scheduledAt ? { scheduledAt: new Date(scheduledAt).toISOString() } : {}),
-        ...(registrationDeadlineAt
-          ? { registrationDeadlineAt: new Date(registrationDeadlineAt).toISOString() }
+        ...(datetimeTextToIso(scheduledAt) ? { scheduledAt: datetimeTextToIso(scheduledAt)! } : {}),
+        ...(datetimeTextToIso(registrationDeadlineAt)
+          ? { registrationDeadlineAt: datetimeTextToIso(registrationDeadlineAt)! }
           : {}),
         ...(venue.trim() ? { venue: venue.trim() } : {}),
         ...(teamCount ? { teamCount: parseInt(teamCount, 10) } : {}),
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
         entryFee: parseInt(entryFee || '0', 10),
+        ...(prizePool ? { prizePool: parseInt(prizePool, 10) } : {}),
+        ...(prizeBreakdown.trim() ? { prizeBreakdown: prizeBreakdown.trim() } : {}),
         ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
         ...(bankAccount.trim() ? { bankAccount: bankAccount.trim() } : {}),
         ...(bankHolder.trim() ? { bankHolder: bankHolder.trim() } : {}),
@@ -212,25 +281,21 @@ export default function AdminTournamentsNewPage() {
                 </select>
               </FormField>
 
-              <FormField id="scheduled-at" label="대회 일정" hint="캘린더에서 날짜·시간을 선택하세요">
-                <input
+              <FormField id="scheduled-at" label="대회 일정" hint="예: 2026-08-15 09:00">
+                <DatetimeTextInput
                   id="scheduled-at"
-                  type="datetime-local"
                   value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
+                  onChange={setScheduledAt}
                   disabled={isPending}
-                  className={inputCls}
                 />
               </FormField>
 
-              <FormField id="registration-deadline-at" label="신청 마감일" hint="캘린더에서 날짜·시간을 선택하세요">
-                <input
+              <FormField id="registration-deadline-at" label="신청 마감일" hint="예: 2026-08-01 23:59">
+                <DatetimeTextInput
                   id="registration-deadline-at"
-                  type="datetime-local"
                   value={registrationDeadlineAt}
-                  onChange={(e) => setRegistrationDeadlineAt(e.target.value)}
+                  onChange={setRegistrationDeadlineAt}
                   disabled={isPending}
-                  className={inputCls}
                 />
               </FormField>
 
@@ -314,6 +379,39 @@ export default function AdminTournamentsNewPage() {
                   className={inputCls}
                 />
               </FormField>
+
+              <FormField id="prize-pool" label="총 상금 (원)" hint="비우면 상금 없음으로 표시돼요">
+                <input
+                  id="prize-pool"
+                  type="number"
+                  min="0"
+                  step="10000"
+                  value={prizePool}
+                  onChange={(e) => setPrizePool(e.target.value)}
+                  disabled={isPending}
+                  placeholder="예: 1000000"
+                  className={inputCls}
+                />
+              </FormField>
+
+              <div className="md:col-span-2">
+                <FormField
+                  id="prize-breakdown"
+                  label="순위별 상금 안내"
+                  hint="참가자에게 공개되는 상금 안내 문구예요"
+                >
+                  <input
+                    id="prize-breakdown"
+                    type="text"
+                    value={prizeBreakdown}
+                    onChange={(e) => setPrizeBreakdown(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 1위 100만원 · 2위 50만원 · 3위 30만원"
+                    maxLength={200}
+                    className={inputCls}
+                  />
+                </FormField>
+              </div>
 
               <FormField id="bank-name" label="은행명">
                 <input

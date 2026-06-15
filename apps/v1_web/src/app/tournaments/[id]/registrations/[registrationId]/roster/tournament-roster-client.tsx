@@ -57,6 +57,12 @@ const EMPTY_FORM: AddPlayerFormState = {
   eligibilityStatus: 'non_pro',
 };
 
+/** Loose YYYY-MM-DD validation (accepts partial input, blocks obviously wrong strings) */
+function isValidBirthDate(v: string): boolean {
+  if (!v) return true; // optional field — empty is valid
+  return /^\d{4}-\d{2}-\d{2}$/.test(v);
+}
+
 /* Role label helper for the member picker */
 function memberRoleLabel(role: 'owner' | 'manager' | 'member'): string {
   switch (role) {
@@ -80,6 +86,7 @@ function AddPlayerForm({
   error: string | null;
 }) {
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
+  const [birthDateError, setBirthDateError] = useState<string | null>(null);
 
   const {
     data: membersData,
@@ -93,10 +100,34 @@ function AddPlayerForm({
     setForm((prev) => ({ ...prev, ...partial }));
   }
 
-  const canSubmit = form.realName.trim().length > 0 && form.userId.trim().length > 0;
+  /** When a member is chosen from the dropdown, pre-fill 실명 with their displayName. */
+  function handleMemberChange(userId: string) {
+    const member = members.find((m) => m.userId === userId);
+    patch({
+      userId,
+      // Pre-fill only when a real selection is made; clear when deselected.
+      realName: member ? member.displayName : '',
+    });
+  }
 
+  function handleBirthDateChange(v: string) {
+    patch({ birthDate: v });
+    if (v && !isValidBirthDate(v)) {
+      setBirthDateError('YYYY-MM-DD 형식으로 입력해 주세요.');
+    } else {
+      setBirthDateError(null);
+    }
+  }
+
+  const birthDateValid = isValidBirthDate(form.birthDate);
+  const canSubmit =
+    form.realName.trim().length > 0 &&
+    form.userId.trim().length > 0 &&
+    birthDateValid;
+
+  /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
   return (
-    <Card pad={16} style={{ border: '1px solid var(--blue100)', background: 'var(--blue50)' }}>
+    <Card pad={16} style={{ border: '1px solid var(--grey200)', background: 'var(--surface)' }}>
       <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 14 }}>
         선수 추가
       </div>
@@ -130,7 +161,7 @@ function AddPlayerForm({
             <select
               id="player-member"
               value={form.userId}
-              onChange={(e) => patch({ userId: e.target.value })}
+              onChange={(e) => handleMemberChange(e.target.value)}
               className="tm-input"
               style={{ minHeight: 44 }}
               aria-required="true"
@@ -145,6 +176,7 @@ function AddPlayerForm({
           )}
         </FormField>
 
+        {/* #8: realName pre-filled from selected member; still fully editable */}
         <FormField id="player-realname" label="실명" required>
           <input
             id="player-realname"
@@ -158,13 +190,25 @@ function AddPlayerForm({
           />
         </FormField>
 
-        <FormField id="player-birthdate" label="생년월일" hint="선택 사항 · YYYY-MM-DD">
+        {/* #7b: Tokenized text input — Pretendard, blue focus ring, no OS date picker chrome */}
+        <FormField
+          id="player-birthdate"
+          label="생년월일"
+          hint="선택 사항 · YYYY-MM-DD (예: 1995-03-21)"
+          errorMessage={birthDateError ?? undefined}
+        >
           <input
             id="player-birthdate"
-            type="date"
+            type="text"
+            inputMode="numeric"
             value={form.birthDate}
-            onChange={(e) => patch({ birthDate: e.target.value })}
+            onChange={(e) => handleBirthDateChange(e.target.value)}
+            placeholder="YYYY-MM-DD"
+            maxLength={10}
             className="tm-input"
+            aria-describedby={birthDateError ? 'player-birthdate-error' : undefined}
+            aria-invalid={birthDateError ? true : undefined}
+            style={{ fontFamily: 'var(--font-pretendard, inherit)' }}
           />
         </FormField>
 
@@ -231,7 +275,21 @@ function AddPlayerForm({
         </div>
       ) : null}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+      {/* #8: Sticky CTA bar — stays in view even when the form is taller than the viewport */}
+      <div
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          marginTop: 16,
+          paddingTop: 10,
+          paddingBottom: 8,
+          background: 'var(--surface)',
+          borderTop: '1px solid var(--grey100)',
+          display: 'flex',
+          gap: 8,
+          zIndex: 10,
+        }}
+      >
         <button
           type="button"
           className="tm-btn tm-btn-md tm-btn-neutral"
@@ -239,7 +297,7 @@ function AddPlayerForm({
           onClick={onCancel}
           disabled={isSubmitting}
         >
-          취소
+          닫기
         </button>
         <button
           type="button"
@@ -261,6 +319,7 @@ function FormField({
   label,
   required,
   hint,
+  errorMessage,
   children,
   labelId,
 }: {
@@ -268,6 +327,8 @@ function FormField({
   label: string;
   required?: boolean;
   hint?: string;
+  /** Inline validation error shown below the field in red. */
+  errorMessage?: string;
   children: React.ReactNode;
   /** Optional id for the label element, used when the child is a radiogroup that needs aria-labelledby. */
   labelId?: string;
@@ -286,7 +347,16 @@ function FormField({
         ) : null}
       </label>
       {children}
-      {hint ? (
+      {errorMessage ? (
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="tm-text-micro"
+          style={{ color: 'var(--red500)', marginTop: 4 }}
+        >
+          {errorMessage}
+        </p>
+      ) : hint ? (
         <p className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
           {hint}
         </p>
@@ -390,6 +460,8 @@ export function TournamentRosterPageClient({
   const removePlayer = useV1RemovePlayer(tournamentId, registrationId);
 
   const [showAddForm, setShowAddForm] = useState(false);
+  // Incremented on each successful add to remount the form (clears internal state).
+  const [addFormKey, setAddFormKey] = useState(0);
   const [addError, setAddError] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
@@ -449,7 +521,9 @@ export function TournamentRosterPageClient({
         birthDate: formData.birthDate || undefined,
         eligibilityStatus: formData.eligibilityStatus,
       });
-      setShowAddForm(false);
+      // #8: Keep form open so operator can add the next player immediately.
+      // Remounting via key resets all internal form state cleanly.
+      setAddFormKey((k) => k + 1);
     } catch (err) {
       setAddError(extractErrorMessage(err, '선수 추가에 실패했어요. 잠시 후 다시 시도해 주세요.'));
     }
@@ -525,10 +599,11 @@ export function TournamentRosterPageClient({
           ) : null}
         </div>
 
-        {/* Add player form */}
+        {/* Add player form — key remounts on each successful add to reset internal state */}
         {showAddForm && !isRosterLocked ? (
           <div style={{ marginBottom: 14 }}>
             <AddPlayerForm
+              key={addFormKey}
               teamId={registration?.teamId ?? ''}
               onSubmit={handleAddPlayer}
               onCancel={() => { setShowAddForm(false); setAddError(null); }}

@@ -158,8 +158,8 @@ function TournamentsListContent() {
             <div
               role="list"
               aria-label="대회 목록"
-              className="tm-tournament-card-stack"
-              style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}
+              className="tm-tournament-list-grid"
+              style={{ marginTop: 4 }}
             >
               {displayItems.map((item) => (
                 <TournamentCard key={item.id} item={item} />
@@ -268,6 +268,30 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           ) : null}
         </div>
 
+        {/* Prize pool line — shown only when present */}
+        {item.prizePool != null ? (
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              marginTop: 8,
+              padding: '3px 8px',
+              borderRadius: 999,
+              background: 'var(--orange50)',
+            }}
+            aria-label={`총 상금 ${item.prizePool.toLocaleString('ko-KR')}원`}
+          >
+            <span aria-hidden="true" style={{ fontSize: 12 }}>🏆</span>
+            <span
+              className="tm-text-caption"
+              style={{ color: 'var(--orange500)', fontWeight: 600 }}
+            >
+              총 상금 {item.prizePool.toLocaleString('ko-KR')}원
+            </span>
+          </div>
+        ) : null}
+
         {/* Bottom row: entry fee + team count */}
         <div
           style={{
@@ -279,8 +303,8 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             borderTop: '1px solid var(--grey100)',
           }}
         >
-          <span className="tm-text-label" style={{ color: 'var(--blue500)' }}>
-            {formatEntryFee(item.entryFee)}
+          <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+            참가비 {formatEntryFee(item.entryFee)}
           </span>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
             <span className="tab-num">{item.confirmedCount}</span>

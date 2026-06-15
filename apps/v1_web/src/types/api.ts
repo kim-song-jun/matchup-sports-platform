@@ -1297,6 +1297,8 @@ export type V1TournamentListItem = {
   venue: string | null;
   teamCount: number;
   entryFee: number;
+  prizePool: number | null;
+  prizeBreakdown: string | null;
   confirmedCount: number;
   createdAt: string;
   updatedAt: string;
@@ -1316,6 +1318,8 @@ export type V1Tournament = {
   minPlayers: number;
   maxPlayers: number;
   entryFee: number;
+  prizePool: number | null;
+  prizeBreakdown: string | null;
   bankName: string | null;
   bankAccount: string | null;
   bankHolder: string | null;
@@ -1409,6 +1413,8 @@ export type V1TournamentDetail = {
   minPlayers: number;
   maxPlayers: number;
   entryFee: number;
+  prizePool: number | null;
+  prizeBreakdown: string | null;
   bankName: string | null;
   bankAccount: string | null;
   bankHolder: string | null;
@@ -1631,6 +1637,8 @@ export type V1CreateTournamentPayload = {
   minPlayers?: number;
   maxPlayers?: number;
   entryFee?: number;
+  prizePool?: number;
+  prizeBreakdown?: string;
   bankName?: string;
   bankAccount?: string;
   bankHolder?: string;

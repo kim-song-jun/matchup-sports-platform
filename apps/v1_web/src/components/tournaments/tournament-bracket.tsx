@@ -5,8 +5,10 @@
  *
  * Renders knockout fixtures in round order.
  *
- * Mobile (default — .tm-hide-desktop): vertical stacked rounds, top→bottom.
- * Desktop (≥1024px — .tm-show-desktop): horizontal bracket columns left→right.
+ * Mobile (default — .tm-hide-desktop): vertical stacked rounds, top→bottom,
+ *   with CSS pseudo-element vertical connector lines between rounds.
+ * Desktop (≥1024px — .tm-show-desktop): horizontal bracket columns left→right,
+ *   with CSS pseudo-element elbow connector lines between columns.
  *
  * Round grouping logic:
  *  1. For each fixture, look up its groupId in the provided `groups` array.
@@ -310,22 +312,16 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
             ))}
           </div>
 
-          {/* Trophy after the final round; connector hint between other rounds */}
+          {/* Trophy after the final round; real CSS connector line between other rounds */}
           {idx === finalIndex ? (
             <TrophyPlaceholder />
           ) : idx < rounds.length - 1 ? (
+            /* Real vertical connector line — styled via .tm-bracket-mobile-connector
+               in desktop/tournaments.css (visible at all breakpoints) */
             <div
+              className="tm-bracket-mobile-connector"
               aria-hidden="true"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: 28,
-                color: 'var(--text-caption)',
-              }}
-            >
-              <span className="tm-text-micro">↓ 승자 진출</span>
-            </div>
+            />
           ) : null}
         </div>
       ))}
@@ -333,41 +329,60 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
   );
 }
 
-/* ── Desktop horizontal layout — columnar bracket ── */
+/* ── Desktop horizontal layout — columnar bracket with real connector lines ── */
 
+/**
+ * Each round column is wrapped with its right-hand connector in a
+ * .tm-bracket-col-wrapper flex row. The CSS in desktop/tournaments.css gives
+ * .tm-bracket-connector its real elbow lines via ::before / ::after pseudo-elements.
+ *
+ * Structure:
+ *   .tm-tournament-bracket-h
+ *     .tm-bracket-col-wrapper (×n)
+ *       .tm-bracket-column
+ *         .tm-bracket-column-label
+ *         .tm-bracket-column-fixtures
+ *         .tm-bracket-trophy (final only)
+ *       .tm-bracket-connector (omitted on the last wrapper)
+ */
 function DesktopBracket({ rounds }: { rounds: RoundGroup[] }) {
   return (
-    <div className="tm-show-desktop tm-tournament-bracket-h">
+    <div className="tm-show-desktop tm-tournament-bracket-h" role="region" aria-label="대진표">
       {rounds.map((round, idx) => {
         const isFinal = round.key === 'final';
+        const isLast = idx === rounds.length - 1;
+
         return (
-          <div key={round.key} className="tm-bracket-column">
-            {/* Column header */}
-            <div className="tm-bracket-column-label">
-              <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                {round.label}
-              </span>
+          <div key={round.key} className="tm-bracket-col-wrapper">
+            {/* Column */}
+            <div className="tm-bracket-column">
+              {/* Column header */}
+              <div className="tm-bracket-column-label">
+                <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+                  {round.label}
+                </span>
+              </div>
+
+              {/* Fixtures */}
+              <div className="tm-bracket-column-fixtures">
+                {round.fixtures.map((fixture) => (
+                  <BracketFixtureCard key={fixture.id} fixture={fixture} />
+                ))}
+              </div>
+
+              {/* Trophy appended after the final column */}
+              {isFinal ? (
+                <div className="tm-bracket-trophy">
+                  <TrophyPlaceholder />
+                </div>
+              ) : null}
             </div>
 
-            {/* Fixtures */}
-            <div className="tm-bracket-column-fixtures">
-              {round.fixtures.map((fixture) => (
-                <BracketFixtureCard key={fixture.id} fixture={fixture} />
-              ))}
-            </div>
-
-            {/* Trophy appended after the final column */}
-            {isFinal ? (
-              <div className="tm-bracket-trophy">
-                <TrophyPlaceholder />
-              </div>
-            ) : null}
-
-            {/* Arrow connector between columns (not after last) */}
-            {idx < rounds.length - 1 ? (
-              <div className="tm-bracket-connector" aria-hidden="true">
-                <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>→</span>
-              </div>
+            {/* Real CSS elbow connector — present for all columns except the last.
+                CSS ::before gives the horizontal bar; ::after gives the arrow head.
+                aria-hidden so screen readers see only fixture content. */}
+            {!isLast ? (
+              <div className="tm-bracket-connector" aria-hidden="true" />
             ) : null}
           </div>
         );
@@ -439,7 +454,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
     <div>
       {/* Mobile: vertical */}
       <MobileBracket rounds={rounds} />
-      {/* Desktop: horizontal — styled via desktop/tournaments.css .tm-tournament-bracket-h */}
+      {/* Desktop: horizontal columns — styled via desktop/tournaments.css */}
       <DesktopBracket rounds={rounds} />
     </div>
   );

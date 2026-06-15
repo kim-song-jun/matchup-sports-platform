@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
+import { BrandMark } from '@/components/v1-ui/brand-logo';
 import type { AuthAction, AuthExceptionViewModel, EmailLoginViewModel, LoginProvider, LoginViewModel, OnboardingOption, OnboardingViewModel, SignupCompleteViewModel, SignupField, SignupFormViewModel, TermsViewModel } from './auth.types';
 
 export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devLogin?: ReactNode }) {
@@ -9,7 +10,9 @@ export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devL
     <AuthFrame>
       <div className="tm-auth-login">
         <div>
-          <div className="tm-auth-logo">T</div>
+          <div className="tm-auth-logo" style={{ background: 'var(--surface)', boxShadow: 'inset 0 0 0 1px var(--grey200)' }}>
+            <BrandMark size={42} alt="Teameet" />
+          </div>
           <h1 className="tm-text-heading tm-auth-title">{model.heroTitle}</h1>
           <p className="tm-text-body tm-auth-sub">{model.heroSub}</p>
           <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
@@ -39,7 +42,9 @@ export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devL
     <div className="tm-auth-login-split">
       {/* Brand panel — hidden on mobile (display:none), shown as left pane on desktop */}
       <div className="tm-auth-split-brand" aria-hidden="true">
-        <div className="tm-auth-split-brand-logo">T</div>
+        <div className="tm-auth-split-brand-logo" style={{ background: 'var(--surface)' }}>
+          <BrandMark size={52} />
+        </div>
         <div className="tm-auth-split-brand-wordmark">teameet</div>
         <p className="tm-auth-split-brand-tagline">생활체육 동호인을 위한 AI 스포츠 매칭 플랫폼</p>
         <ul className="tm-auth-split-brand-features" role="list">

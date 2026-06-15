@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { clearStoredV1Session, hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import { BrandMark } from '@/components/v1-ui/brand-logo';
 
 type SessionEntryGateProps = {
   mode: 'root' | 'login';
@@ -53,7 +54,9 @@ export function SessionFallback() {
       <div className="tm-auth-scroll tm-auth-scroll-full">
         <div className="tm-auth-login">
           <div>
-            <div className="tm-auth-logo">T</div>
+            <div className="tm-auth-logo" style={{ background: 'var(--surface)', boxShadow: 'inset 0 0 0 1px var(--grey200)' }}>
+              <BrandMark size={42} alt="Teameet" />
+            </div>
             <h1 className="tm-text-heading tm-auth-title">Teameet</h1>
             <p className="tm-text-body tm-auth-sub">Checking your session.</p>
           </div>

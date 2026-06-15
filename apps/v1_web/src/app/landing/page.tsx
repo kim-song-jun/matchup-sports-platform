@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { BellIcon, HomeIcon, MatchIcon, TeamsIcon, TeamMatchIcon, SearchIcon } from '@/components/v1-ui/icons';
+import { BrandMark } from '@/components/v1-ui/brand-logo';
 
 export default function LandingPage() {
   return (
@@ -7,7 +8,13 @@ export default function LandingPage() {
       {/* ── Top navigation ── */}
       <header className="tm-landing-nav" role="banner">
         <div className="tm-landing-nav-inner">
-          <Link className="tm-landing-brand" href="/landing" aria-label="teameet 홈">
+          <Link
+            className="tm-landing-brand"
+            href="/landing"
+            aria-label="teameet 홈"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+          >
+            <BrandMark size={26} />
             teameet
           </Link>
           <nav className="tm-landing-nav-links" aria-label="랜딩 내비게이션">
@@ -245,7 +252,10 @@ export default function LandingPage() {
         <div className="tm-landing-section-inner">
           <div className="tm-landing-footer-inner">
             <div className="tm-landing-footer-brand">
-              <span className="tm-landing-brand">teameet</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <BrandMark size={24} />
+                <span className="tm-landing-brand">teameet</span>
+              </span>
               <p className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-caption)' }}>
                 AI 기반 멀티스포츠 소셜 매칭 플랫폼
               </p>

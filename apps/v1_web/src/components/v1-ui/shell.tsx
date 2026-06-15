@@ -11,6 +11,7 @@ import {
   TrophyIcon,
 } from './icons';
 import { DesktopScrollTop } from './desktop-scroll-top';
+import { BrandMark } from './brand-logo';
 
 export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
 
@@ -113,7 +114,10 @@ function DesktopFooter() {
     <footer className="tm-desktop-footer" aria-label="사이트 정보">
       <div className="tm-desktop-footer-inner">
         <div className="tm-desktop-footer-brand">
-          <span className="tm-desktop-footer-wordmark">teameet</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <BrandMark size={22} />
+            <span className="tm-desktop-footer-wordmark">teameet</span>
+          </span>
           <span className="tm-desktop-footer-tagline">같이 뛸 사람을 한 번에</span>
         </div>
         <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
@@ -156,7 +160,13 @@ function DesktopNav({
 }) {
   return (
     <nav className="tm-desktop-nav" aria-label="데스크톱 주요 메뉴">
-      <Link className="tm-desktop-nav-brand" href="/home">
+      <Link
+        className="tm-desktop-nav-brand"
+        href="/home"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+        aria-label="teameet 홈"
+      >
+        <BrandMark size={24} />
         teameet
       </Link>
       <div className="tm-desktop-nav-tabs">

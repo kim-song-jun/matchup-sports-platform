@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
+import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { getSportAccent } from '@/lib/v1-sport-accent';
 import {
   useV1Tournament,
   useV1MyRegistration,
@@ -85,207 +87,204 @@ function formatMonthDay(dateStr: string | null): string {
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
-/* ── Inline check icon (no CheckIcon in icons.tsx) ── */
+/* ── Inline fact icons for the registration pass (none of these exist in icons.tsx) ── */
 
-function CheckCircleIcon({
-  size = 28,
-  color,
-}: {
-  size?: number;
-  color: string;
-}) {
+function FactIconBase({ size = 15, children }: { size?: number; children: React.ReactNode }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={color}
-      strokeWidth={2.2}
+      stroke="currentColor"
+      strokeWidth={1.9}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <polyline points="20 6 9 17 4 12" />
+      {children}
     </svg>
   );
 }
 
-/* ── Alert triangle icon for roster nudge ── */
-
-function AlertTriangleIcon({ size = 22 }: { size?: number }) {
+function CalendarIcon({ size }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="var(--orange500)"
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
+    <FactIconBase size={size}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </FactIconBase>
   );
 }
 
-/* ── Confirmation hero card ── */
+function MapPinIcon({ size }: { size?: number }) {
+  return (
+    <FactIconBase size={size}>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </FactIconBase>
+  );
+}
 
-function RegistrationHero({
+function ReceiptIcon({ size }: { size?: number }) {
+  return (
+    <FactIconBase size={size}>
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1V2l-2 1-2-1-2 1-2-1-2 1-2-1z" />
+      <line x1="8" y1="8" x2="16" y2="8" />
+      <line x1="8" y1="12" x2="14" y2="12" />
+    </FactIconBase>
+  );
+}
+
+/* ── Registration pass card (Direction A) — confirmed / waitlisted / paid ──
+ * Replaces the old colored-box hero + orange roster-nudge box with a single
+ * white "참가권" pass: sport chip + status pill + title, a dashed ticket-stub
+ * divider, the show-up facts (일정·장소·결제), and a roster next-step footer. */
+
+function PassFact({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ color: 'var(--text-caption)', display: 'inline-flex', flexShrink: 0 }}>{icon}</span>
+      <span className="tm-text-caption" style={{ color: 'var(--text-caption)', width: 38, flexShrink: 0 }}>{label}</span>
+      <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{value}</span>
+    </div>
+  );
+}
+
+function RegistrationPass({
+  tournamentId,
+  registrationId,
   status,
+  sportCode,
+  title,
   teamName,
   scheduledAt,
   venue,
+  paymentSummary,
+  rosterCount,
+  minPlayers,
+  isRosterLocked,
+  belowMinimum,
 }: {
+  tournamentId: string;
+  registrationId: string;
   status: V1TournamentRegistrationStatus;
+  sportCode: string;
+  title: string;
   teamName: string | null;
   scheduledAt: string | null;
   venue: string | null;
+  paymentSummary: string | null;
+  rosterCount: number;
+  minPlayers: number;
+  isRosterLocked: boolean;
+  belowMinimum: boolean;
 }) {
-  if (status !== 'confirmed' && status !== 'waitlisted') return null;
+  if (status !== 'confirmed' && status !== 'waitlisted' && status !== 'paid') return null;
 
-  const isConfirmed = status === 'confirmed';
-
-  const bgColor = isConfirmed ? 'var(--green50)' : 'var(--orange50)';
-  const iconColor = isConfirmed ? 'var(--green500)' : 'var(--orange500)';
-  const heading = isConfirmed ? '참가가 확정됐어요!' : '대기자 명단에 등록됐어요';
+  const accent = getSportAccent(sportCode);
+  const statusCfg = registrationStatusConfig(status);
+  const topAccent =
+    status === 'waitlisted' ? 'var(--orange500)' : status === 'paid' ? 'var(--blue500)' : 'var(--green500)';
   const dateStr = formatMonthDay(scheduledAt);
-  const dateParts = [dateStr, venue].filter(Boolean);
-  const caption = isConfirmed
-    ? dateParts.length > 0
-      ? `${dateParts.join(', ')}에서 만나요`
-      : '곧 대회 일정을 확인해 주세요.'
-    : '앞 순위 팀이 취소하면 자동으로 확정 알림을 드려요.';
+  /* Roster next-step applies to active registrations; waitlisted shows a status note instead. */
+  const showRosterFooter = status === 'confirmed' || status === 'paid';
 
   return (
     <div
       role="status"
       aria-live="polite"
       style={{
-        background: bgColor,
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderTop: `3px solid ${topAccent}`,
         borderRadius: 16,
-        padding: '24px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        textAlign: 'center',
-        gap: 10,
+        overflow: 'hidden',
         marginBottom: 16,
       }}
     >
-      {/* White circle with check */}
+      {/* Header: sport chip + status pill, title, team */}
+      <div style={{ padding: '16px 18px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
+          <span
+            className="tm-text-micro"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: accent.badgeBg, color: accent.badgeText,
+              fontWeight: 600, padding: '3px 9px', borderRadius: 999, flexShrink: 0,
+            }}
+          >
+            <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: accent.dot }} />
+            {accent.label}
+          </span>
+          <span className={`tm-badge ${statusCfg.badgeClass}`}>{statusCfg.label}</span>
+        </div>
+        <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.35 }}>
+          {title}
+        </div>
+        {teamName ? (
+          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+            {teamName}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Facts: 일정 · 장소 · 결제 (dashed ticket-stub divider) */}
       <div
-        aria-hidden="true"
         style={{
-          width: 52,
-          height: 52,
-          borderRadius: '50%',
-          background: 'var(--static-white)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
+          borderTop: '1px dashed var(--border)',
+          padding: '13px 18px',
+          display: 'flex', flexDirection: 'column', gap: 9,
         }}
       >
-        <CheckCircleIcon size={28} color={iconColor} />
+        <PassFact icon={<CalendarIcon />} label="일정" value={dateStr || '일정 미정'} />
+        <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
+        {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="결제" value={paymentSummary} /> : null}
       </div>
 
-      {/* Team name (small, dark green / dark orange) */}
-      {teamName ? (
+      {/* Footer: roster next-step (confirmed/paid) or waitlist note */}
+      {showRosterFooter ? (
         <div
-          className="tm-text-caption"
-          style={{ color: iconColor, fontWeight: 600 }}
+          style={{
+            borderTop: '1px solid var(--grey100)',
+            padding: '13px 18px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}
         >
-          {teamName}
-        </div>
-      ) : null}
-
-      {/* Heading */}
-      <div
-        className="tm-text-body-lg"
-        style={{ color: 'var(--text-strong)', fontWeight: 700 }}
-      >
-        {heading}
-      </div>
-
-      {/* Caption */}
-      {caption ? (
-        <p
-          className="tm-text-caption"
-          style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}
-        >
-          {caption}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/* ── Prominent roster nudge card ── */
-/* Shown when status is confirmed/paid AND roster is below minimum. */
-
-function RosterNudgeCard({
-  tournamentId,
-  registrationId,
-  currentCount,
-  minPlayers,
-  rosterLockedAt,
-}: {
-  tournamentId: string;
-  registrationId: string;
-  currentCount: number;
-  minPlayers: number;
-  rosterLockedAt: string | null;
-}) {
-  const deadline = rosterLockedAt ? formatDateShort(rosterLockedAt) : null;
-
-  return (
-    <div
-      role="alert"
-      style={{
-        background: 'var(--orange50)',
-        borderRadius: 16,
-        padding: '20px 20px 16px',
-        marginBottom: 16,
-      }}
-    >
-      {/* Header row: icon + title */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-        <span style={{ flexShrink: 0, marginTop: 1 }}>
-          <AlertTriangleIcon size={22} />
-        </span>
-        <div>
-          <div
-            className="tm-text-label"
-            style={{ color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.4 }}
-          >
-            선수 명단을 등록해 주세요
+          <div style={{ minWidth: 0 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>선수 명단</div>
+            <div className="tm-text-micro" style={{ color: 'var(--text-body)', marginTop: 1 }}>
+              {isRosterLocked
+                ? `${rosterCount}명 · 마감`
+                : belowMinimum
+                  ? `${rosterCount} / 최소 ${minPlayers}명 등록`
+                  : `${rosterCount}명 등록 완료`}
+            </div>
           </div>
-          <p
-            className="tm-text-caption"
-            style={{ color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}
-          >
-            {currentCount === 0
-              ? `아직 선수를 등록하지 않았어요. 최소 ${minPlayers}명이 필요해요.`
-              : `${currentCount}명 등록됐어요. 최소 ${minPlayers}명을 채워야 참가가 확정돼요.`}
-            {deadline ? ` 마감일 ${deadline}까지 완료해 주세요.` : ''}
+          {!isRosterLocked ? (
+            <Link
+              href={`/tournaments/${tournamentId}/registrations/${registrationId}/roster`}
+              className="tm-text-label"
+              aria-label={belowMinimum ? '선수 명단 등록하기' : '선수 명단 수정하기'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 1,
+                color: 'var(--blue500)', fontWeight: 700, flexShrink: 0,
+                minHeight: 44, paddingLeft: 8,
+              }}
+            >
+              {belowMinimum ? '명단 등록' : '명단 수정'}
+              <ChevronRightIcon size={16} />
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        <div style={{ borderTop: '1px solid var(--grey100)', padding: '12px 18px' }}>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+            앞 순위 팀이 취소하면 자동으로 확정 알림을 드려요.
           </p>
         </div>
-      </div>
-
-      {/* Primary CTA — hidden on desktop (rail takes over) */}
-      <Link
-        href={`/tournaments/${tournamentId}/registrations/${registrationId}/roster`}
-        className="tm-btn tm-btn-md tm-btn-primary tm-btn-block tm-hide-desktop"
-        aria-label={`선수 명단 등록하기 — 현재 ${currentCount}명 등록, 최소 ${minPlayers}명 필요`}
-        style={{ marginTop: 4 }}
-      >
-        명단 등록하기
-      </Link>
+      )}
     </div>
   );
 }
@@ -421,6 +420,7 @@ function RegistrationDetailView({
 }: {
   tournamentId: string;
   tournament: {
+    sportCode: string;
     title: string;
     entryFee: number;
     minPlayers: number;
@@ -453,6 +453,16 @@ function RegistrationDetailView({
     (registration.status === 'confirmed' || registration.status === 'paid') &&
     belowMinimum &&
     !isRosterLocked;
+
+  /* Compact payment summary for the pass facts (full breakdown lives in the 신청 내역 card). */
+  const paymentSummary = registration.payment
+    ? `${formatEntryFee(registration.payment.amount)} · ${paymentStatusLabel(registration.payment.status)}`
+    : formatEntryFee(tournament.entryFee);
+
+  /* The pass owns the roster glance+action for active states; the standalone roster
+   * card only renders for states without a pass (e.g. awaiting_payment). */
+  const passShowsRoster =
+    registration.status === 'confirmed' || registration.status === 'paid';
 
   async function handleCancelConfirm(reason: string) {
     setCancelError(null);
@@ -569,41 +579,32 @@ function RegistrationDetailView({
 
           {/* LEFT: main content */}
           <div className="tm-tournament-form-main">
-            {/* Confirmation hero — shown only for confirmed / waitlisted */}
-            <RegistrationHero
+            {/* Registration pass (Direction A) — confirmation + facts + roster next-step.
+                Replaces the old colored hero box + orange roster-nudge box (color collision removed). */}
+            <RegistrationPass
+              tournamentId={tournamentId}
+              registrationId={registration.id}
               status={registration.status}
+              sportCode={tournament.sportCode}
+              title={tournament.title}
               teamName={teamData?.name ?? null}
               scheduledAt={tournament.scheduledAt}
               venue={tournament.venue}
+              paymentSummary={paymentSummary}
+              rosterCount={players.length}
+              minPlayers={tournament.minPlayers}
+              isRosterLocked={isRosterLocked}
+              belowMinimum={belowMinimum}
             />
 
-            {/* #8 ROSTER NUDGE: prominent primary card near top for confirmed/paid with below-minimum roster */}
-            {showRosterNudge ? (
-              <RosterNudgeCard
-                tournamentId={tournamentId}
-                registrationId={registration.id}
-                currentCount={players.length}
-                minPlayers={tournament.minPlayers}
-                rosterLockedAt={registration.rosterLockedAt}
-              />
-            ) : null}
-
-            {/* Status card */}
-            <section aria-labelledby="reg-status-heading">
+            {/* Registration record — 신청 + 결제 consolidated into one "신청 내역" card */}
+            <section aria-labelledby="reg-detail-heading">
               <div style={{ marginLeft: -20, marginRight: -20 }}>
-                <SectionTitle title="신청 상태" />
+                <SectionTitle title="신청 내역" />
               </div>
               <Card pad={16} style={{ marginTop: 8 }}>
-                <div id="reg-status-heading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
-                    {tournament.title}
-                  </span>
-                  <span className={`tm-badge ${statusConfig.badgeClass}`}>
-                    {statusConfig.label}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {/* 신청 group */}
+                <div id="reg-detail-heading" style={{ display: 'flex', flexDirection: 'column' }}>
                   <InfoRow
                     label="신청일"
                     value={formatDateShort(registration.createdAt)}
@@ -620,49 +621,48 @@ function RegistrationDetailView({
                     <InfoRow label="취소 요청일" value={formatDateShort(registration.cancelRequestedAt)} isLast />
                   ) : null}
                 </div>
-              </Card>
-            </section>
 
-            {/* Payment info */}
-            <section aria-labelledby="payment-info-heading" style={{ marginTop: 16 }}>
-              <div style={{ marginLeft: -20, marginRight: -20 }}>
-                <SectionTitle id="payment-info-heading" title="결제 정보" />
-              </div>
-              <Card pad={16} style={{ marginTop: 8 }}>
-                {registration.payment ? (
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <InfoRow label="결제 수단" value={paymentMethodLabel(registration.payment.method)} />
-                    <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} />
-                    <InfoRow
-                      label="결제 상태"
-                      value={paymentStatusLabel(registration.payment.status)}
-                      isLast={!registration.payment.paidAt}
-                    />
-                    {registration.payment.paidAt ? (
-                      <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast />
-                    ) : null}
+                {/* 결제 group */}
+                <div style={{ borderTop: '1px solid var(--grey100)', marginTop: 12, paddingTop: 12 }}>
+                  <div className="tm-text-micro" style={{ color: 'var(--text-caption)', fontWeight: 600, marginBottom: 6 }}>
+                    결제
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <InfoRow
-                      label="참가비"
-                      value={formatEntryFee(tournament.entryFee)}
-                      isLast={!registration.depositorName}
-                    />
-                    {registration.depositorName ? (
-                      <InfoRow label="입금자명" value={registration.depositorName} isLast />
-                    ) : null}
-                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
-                      {registration.status === 'awaiting_payment'
-                        ? '입금 완료 후 자동으로 상태가 변경돼요.'
-                        : '결제 정보가 없어요.'}
+                  {registration.payment ? (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <InfoRow label="결제 수단" value={paymentMethodLabel(registration.payment.method)} />
+                      <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} />
+                      <InfoRow
+                        label="결제 상태"
+                        value={paymentStatusLabel(registration.payment.status)}
+                        isLast={!registration.payment.paidAt}
+                      />
+                      {registration.payment.paidAt ? (
+                        <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast />
+                      ) : null}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <InfoRow
+                        label="참가비"
+                        value={formatEntryFee(tournament.entryFee)}
+                        isLast={!registration.depositorName}
+                      />
+                      {registration.depositorName ? (
+                        <InfoRow label="입금자명" value={registration.depositorName} isLast />
+                      ) : null}
+                      <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
+                        {registration.status === 'awaiting_payment'
+                          ? '입금 완료 후 자동으로 상태가 변경돼요.'
+                          : '결제 정보가 없어요.'}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Card>
             </section>
 
-            {/* Roster */}
+            {/* Roster — only for states without a pass (the pass footer owns roster for confirmed/paid) */}
+            {!passShowsRoster ? (
             <section aria-labelledby="roster-heading" style={{ marginTop: 16 }}>
               <div style={{ marginLeft: -20, marginRight: -20 }}>
                 <SectionTitle id="roster-heading" title="선수 명단" />
@@ -713,6 +713,7 @@ function RegistrationDetailView({
                 ) : null}
               </Card>
             </section>
+            ) : null}
 
             {/* Mobile-only: Cancel / Reapply actions (hidden on desktop — rail handles them) */}
             <div className="tm-hide-desktop" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -864,6 +865,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
       <RegistrationDetailView
         tournamentId={tournamentId}
         tournament={{
+          sportCode: tournament.sport.code,
           title: tournament.title,
           entryFee: tournament.entryFee,
           minPlayers: tournament.minPlayers,

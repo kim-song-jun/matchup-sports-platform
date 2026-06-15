@@ -157,15 +157,19 @@
 @media (min-width: 1024px) {
   .tm-tournament-detail-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    /* Content column capped to a comfortable reading width and placed flush to the
+       rail (no large gap), the whole grid centered — a balanced reading layout.
+       (Replaces minmax(0,1fr) which stretched content and left a body↔rail gap.) */
+    grid-template-columns: minmax(0, 640px) 340px;
     gap: 32px;
     align-items: start;
+    justify-content: center;
   }
 }
 
 @media (min-width: 1440px) {
   .tm-tournament-detail-grid {
-    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-columns: minmax(0, 680px) 360px;
     gap: 40px;
   }
 }
@@ -215,11 +219,11 @@
   }
 }
 
-/* Left column body: cap width so long prose/tables don't stretch uncomfortably
-   on the left side of the 2-col grid. The right rail handles the summary. */
+/* Left column body fills the 640px content column (the grid column itself caps the
+   width now — no separate max-width needed). */
 @media (min-width: 1024px) {
   .tm-tournament-detail-grid > .tm-match-detail-body {
-    max-width: 740px;
+    min-width: 0;
   }
 }
 

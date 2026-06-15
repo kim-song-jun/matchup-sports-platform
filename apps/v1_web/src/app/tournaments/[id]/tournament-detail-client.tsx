@@ -318,7 +318,10 @@ function TournamentDetailView({
           </div>
         </div>
 
-        {/* 핵심 3사실 메트릭 카드(정원 progress bar 내장) + 보조 정보 InfoRow */}
+        {/* 핵심 3사실 메트릭 카드(정원 progress bar 내장) + 자리 남았어요 cue.
+            데스크탑에서는 우측 sticky 레일이 동일 정보(일정·정원·참가비)를 보여주므로
+            중복 방지를 위해 모바일 전용으로 숨긴다(tm-hide-desktop). */}
+        <div className="tm-hide-desktop">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 10 }}>
           <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-body)', marginBottom: 4 }}>일정</div>
@@ -378,6 +381,7 @@ function TournamentDetailView({
             </div>
           );
         })()}
+        </div>
         <Card pad={0}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {tournament.registrationDeadlineAt ? (
@@ -471,25 +475,8 @@ function TournamentDetailView({
         <ApplyCTAButtons tournament={tournament} isFull={isFull} myRegistration={myRegistration} />
       </div>
 
-      {/* Compact prize summary in rail (only when prize exists) */}
-      {hasPrize ? (
-        <div
-          style={{
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: '1px solid var(--border)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <TrophyIcon size={16} color="var(--orange500)" aria-hidden="true" />
-            <div className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
-              총 상금 {formatPrize(tournament.prizePool!)}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Key facts: schedule, capacity, entry fee */}
+      {/* Key facts: schedule, capacity, entry fee (the canonical desktop facts panel —
+          the mobile metric strip is hidden on desktop to avoid duplication). */}
       <div
         style={{
           marginTop: 14,
@@ -1050,7 +1037,9 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table
-          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}
+          /* maxWidth keeps columns tight on the wide desktop column (팀 칸이 늘어나
+             승점/전적/득실이 멀리 밀리는 현상 방지). 모바일은 카드가 더 좁아 100%로 채움. */
+          style={{ width: '100%', maxWidth: 460, borderCollapse: 'collapse', minWidth: 280 }}
           aria-label={`${group.name} 순위표`}
         >
           <thead>

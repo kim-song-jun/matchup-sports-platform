@@ -12,7 +12,7 @@ export function AdminPageHeader({ eyebrow, title, description, action }: AdminPa
     <div className="flex justify-between items-start mb-6 md:mb-7">
       <div>
         {eyebrow && (
-          <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-wide uppercase mb-1">
+          <p className="text-[11px] md:text-[12px] font-semibold text-blue-500 tracking-normal mb-1">
             {eyebrow}
           </p>
         )}

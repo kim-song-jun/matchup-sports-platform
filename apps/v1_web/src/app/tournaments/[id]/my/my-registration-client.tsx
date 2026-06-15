@@ -261,16 +261,18 @@ function RosterNudgeCard({
             className="tm-text-caption"
             style={{ color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.6 }}
           >
-            최소 {minPlayers}명 중 현재 {currentCount}명이 등록됐어요.
-            {deadline ? ` 마감일 ${deadline}까지 완료해 주세요.` : ' 대회 시작 전까지 선수를 추가해 주세요.'}
+            {currentCount === 0
+              ? `아직 선수를 등록하지 않았어요. 최소 ${minPlayers}명이 필요해요.`
+              : `${currentCount}명 등록됐어요. 최소 ${minPlayers}명을 채워야 참가가 확정돼요.`}
+            {deadline ? ` 마감일 ${deadline}까지 완료해 주세요.` : ''}
           </p>
         </div>
       </div>
 
-      {/* Primary CTA */}
+      {/* Primary CTA — hidden on desktop (rail takes over) */}
       <Link
         href={`/tournaments/${tournamentId}/registrations/${registrationId}/roster`}
-        className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
+        className="tm-btn tm-btn-md tm-btn-primary tm-btn-block tm-hide-desktop"
         aria-label={`선수 명단 등록하기 — 현재 ${currentCount}명 등록, 최소 ${minPlayers}명 필요`}
         style={{ marginTop: 4 }}
       >
@@ -680,7 +682,7 @@ function RegistrationDetailView({
                     {!isRosterLocked ? (
                       <Link
                         href={`/tournaments/${tournamentId}/registrations/${registration.id}/roster`}
-                        className="tm-btn tm-btn-md tm-btn-primary"
+                        className="tm-btn tm-btn-md tm-btn-neutral"
                         aria-label="선수 명단 수정하기"
                         style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                       >

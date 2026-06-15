@@ -46,7 +46,7 @@ function getFormatLabel(format: V1TournamentFormat): string {
   switch (format) {
     case 'league': return '리그';
     case 'knockout': return '토너먼트';
-    case 'group_knockout': return '조별리그+토너먼트';
+    case 'group_knockout': return '조별리그 후 토너먼트';
   }
 }
 
@@ -111,9 +111,8 @@ function ApplyCTAButtons({
     return (
       <Link
         href={`/tournaments/${tournament.id}/my`}
-        className="tm-btn tm-btn-lg tm-btn-primary"
+        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
         aria-label="내 신청 내역 보기"
-        style={{ display: 'block', textAlign: 'center' }}
       >
         내 신청 보기
       </Link>
@@ -241,7 +240,7 @@ function TournamentDetailView({
     <section aria-label="상금 안내" style={{ marginTop: 16 }}>
       <Card pad={16} style={{ background: 'var(--orange50)', border: '1px solid var(--orange200, var(--orange500))' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span aria-hidden="true" style={{ fontSize: 22, lineHeight: 1 }}>🏆</span>
+          <TrophyIcon size={22} color="var(--orange500)" aria-hidden="true" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-body-lg" style={{ color: 'var(--orange500)', fontWeight: 700 }}>
               총 상금 {formatPrize(tournament.prizePool!)}
@@ -327,8 +326,8 @@ function TournamentDetailView({
               {formatShortDate(tournament.scheduledAt)}
             </div>
           </div>
-          <div style={{ background: 'var(--blue50)', borderRadius: 12, padding: 12 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--blue600)', marginBottom: 4 }}>정원</div>
+          <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 4 }}>정원</div>
             <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500, marginBottom: 5 }}>
               {tournament.confirmedCount}/{tournament.teamCount}팀
             </div>
@@ -476,7 +475,7 @@ function TournamentDetailView({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span aria-hidden="true" style={{ fontSize: 16, lineHeight: 1 }}>🏆</span>
+            <TrophyIcon size={16} color="var(--orange500)" aria-hidden="true" />
             <div className="tm-text-caption" style={{ color: 'var(--orange500)', fontWeight: 600 }}>
               총 상금 {formatPrize(tournament.prizePool!)}
             </div>
@@ -1003,7 +1002,7 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
           {group.name}
         </div>
       </div>
-      <div style={{ overflowX: 'auto', maxWidth: 420 }}>
+      <div style={{ overflowX: 'auto' }}>
         <table
           style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}
           aria-label={`${group.name} 순위표`}

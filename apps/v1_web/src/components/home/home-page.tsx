@@ -1,8 +1,19 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { ChatIcon, RefreshIcon } from '@/components/v1-ui/icons';
+import {
+  ChatIcon,
+  ChevronRightIcon,
+  MatchIcon,
+  MyIcon,
+  RefreshIcon,
+  TeamMatchIcon,
+  TeamsIcon,
+  TrophyIcon,
+} from '@/components/v1-ui/icons';
 import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
+import { formatTournamentDateShort } from '@/lib/date-utils';
+import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { TournamentTeaserCard } from './tournament-teaser-card';
 import type { HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
@@ -50,7 +61,12 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   value={dash ? '-' : model.stats.mannerScore}
                   unit={dash ? '' : '점'}
                   size={36}
-                  sub={dash ? '상위 -' : model.stats.mannerScoreSub}
+                  sub={
+                    /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
+                    dash || model.stats.mannerScoreSub === '-'
+                      ? '리뷰 누적 후 표시'
+                      : model.stats.mannerScoreSub
+                  }
                 />
               </div>
             </div>
@@ -130,6 +146,9 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             </div>
           </div>
 
+          {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
+          <SidebarTournamentsWidget />
+
         </div>{/* /tm-home-sidebar */}
 
       </div>{/* /tm-home-desktop */}
@@ -146,11 +165,29 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   );
 }
 
+/** 진입점별 SVG 아이콘 — label 첫 글자 텍스트 대체 금지(a11y: 컬러만으로 정보 전달 방지). */
+function QuickActionIcon({ item }: { item: HomeQuickAction }) {
+  const iconProps = { size: 20, strokeWidth: 2, 'aria-hidden': true } as const;
+  switch (item.key) {
+    case 'matches':
+      return <MatchIcon {...iconProps} />;
+    case 'team_matches':
+      return <TeamMatchIcon {...iconProps} />;
+    case 'teams':
+      return <TeamsIcon {...iconProps} />;
+    case 'my_team':
+      return <MyIcon {...iconProps} />;
+    default:
+      // key 미지정 항목은 MatchIcon을 기본값으로 사용(라벨 텍스트 아이콘 금지).
+      return <MatchIcon {...iconProps} />;
+  }
+}
+
 function QuickAction({ item }: { item: HomeQuickAction }) {
   const content = (
     <>
       <div className="tm-quick-icon" style={{ background: item.background, color: item.color }}>
-        {item.label[0].toUpperCase()}
+        <QuickActionIcon item={item} />
       </div>
       <span className="tm-text-micro" style={{ color: 'var(--text-strong)', textAlign: 'center', lineHeight: 1.2 }}>
         {item.label}
@@ -167,7 +204,7 @@ function QuickAction({ item }: { item: HomeQuickAction }) {
   }
 
   return (
-    <Link className="tm-pressable tm-quick-action" href={item.href}>
+    <Link className="tm-pressable tm-quick-action" href={item.href} aria-label={item.label}>
       {content}
     </Link>
   );
@@ -227,6 +264,107 @@ function FeaturedMatchCard({
     <Link className="tm-featured-link tm-pressable" href={`/matches/${match.id}`}>
       {card}
     </Link>
+  );
+}
+
+/**
+ * 사이드바 대회 위젯 — open/in_progress 대회 목록(최대 4개).
+ * 우측 사이드바 하단의 빈 공간(~830px)을 채워 레이아웃 균형을 맞춘다.
+ * 모바일(<1024px)에서는 display:contents인 .tm-home-sidebar 덕분에 DOM 순서상 notices 아래에 자연스럽게 흐른다.
+ */
+function SidebarTournamentsWidget() {
+  const { data, isLoading } = useV1Tournaments({ status: 'open', limit: 4 });
+  const items = (data?.items ?? []).slice(0, 4);
+
+  return (
+    <div className="tm-home-sidebar-notices" style={{ padding: '20px 20px 24px' }}>
+      <div className="tm-notice-head">
+        <div className="tm-text-body-lg">진행 중인 대회</div>
+        <Link
+          className="tm-btn tm-btn-sm tm-btn-ghost"
+          href="/tournaments"
+          style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}
+        >
+          전체보기
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+          aria-busy="true"
+        >
+          대회 목록을 불러오는 중이에요…
+        </div>
+      ) : items.length === 0 ? (
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+        >
+          현재 모집 중인 대회가 없어요.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {items.map((t) => {
+            const dateLabel = formatTournamentDateShort(t.scheduledAt);
+            return (
+              <Link
+                key={t.id}
+                href={`/tournaments/${t.id}`}
+                className="tm-pressable"
+                aria-label={`대회 상세 — ${t.title}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  minHeight: 44,
+                }}
+              >
+                <span
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: 'var(--blue50)',
+                    color: 'var(--blue500)',
+                  }}
+                  aria-hidden="true"
+                >
+                  <TrophyIcon size={16} strokeWidth={2} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    className="tm-text-label line-clamp-1"
+                    style={{ color: 'var(--text-strong)' }}
+                  >
+                    {t.title}
+                  </div>
+                  <div
+                    className="tm-text-micro tab-num"
+                    style={{ color: 'var(--text-muted)', marginTop: 2 }}
+                  >
+                    {t.sport.name}
+                    {dateLabel ? ` · ${dateLabel}` : ''}
+                    {' · '}
+                    <span>{t.confirmedCount}/{t.teamCount}팀</span>
+                  </div>
+                </div>
+                <ChevronRightIcon size={14} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--text-muted)' }} aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

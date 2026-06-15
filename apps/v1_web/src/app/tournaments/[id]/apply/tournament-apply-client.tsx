@@ -35,7 +35,7 @@ type ApplyStep = 'team' | 'agreements' | 'payment';
 
 const STEPS: Array<{ id: ApplyStep; label: string }> = [
   { id: 'team', label: '팀 선택' },
-  { id: 'agreements', label: '동의 · 결제수단' },
+  { id: 'agreements', label: '동의 · 결제 수단' },
   { id: 'payment', label: '결제 안내' },
 ];
 
@@ -76,13 +76,18 @@ function OrderSummaryCard({
   tournament,
   selectedTeam,
   depositorName,
+  step,
   compact = false,
 }: {
   tournament: V1TournamentDetail;
   selectedTeam: V1MyTeam | undefined;
   depositorName: string;
+  step?: ApplyStep;
   compact?: boolean;
 }) {
+  // Hide payment-related rows on step 'team' (not yet entered)
+  const showPaymentRows = step !== 'team';
+
   return (
     <Card
       pad={compact ? 12 : 16}
@@ -107,20 +112,26 @@ function OrderSummaryCard({
           label="참가비"
           value={formatEntryFee(tournament.entryFee)}
           valueColor={tournament.entryFee > 0 ? 'var(--blue500)' : undefined}
+          isLast={!showPaymentRows && !(tournament.prizePool != null && tournament.prizePool > 0)}
         />
         {tournament.prizePool != null && tournament.prizePool > 0 ? (
           <InfoRow
             label="상금"
             value={formatPrizePool(tournament.prizePool)}
             valueColor="var(--orange500)"
+            isLast={!showPaymentRows}
           />
         ) : null}
-        <InfoRow label="결제 수단" value="계좌이체" />
-        {depositorName.trim().length > 0 ? (
-          <InfoRow label="입금자명" value={depositorName.trim()} isLast />
-        ) : (
-          <InfoRow label="입금자명" value="—" isLast />
-        )}
+        {showPaymentRows ? (
+          <>
+            <InfoRow label="결제 수단" value="계좌이체" />
+            <InfoRow
+              label="입금자명"
+              value={depositorName.trim().length > 0 ? depositorName.trim() : '—'}
+              isLast
+            />
+          </>
+        ) : null}
       </div>
     </Card>
   );
@@ -136,6 +147,10 @@ function DesktopRailSummary({
   canSubmit,
   isSubmitting,
   onSubmitFromRail,
+  selectedTeamId,
+  hasManagerTeam,
+  isCreating,
+  onNext,
 }: {
   tournament: V1TournamentDetail;
   selectedTeam: V1MyTeam | undefined;
@@ -144,6 +159,10 @@ function DesktopRailSummary({
   canSubmit: boolean;
   isSubmitting: boolean;
   onSubmitFromRail: () => void;
+  selectedTeamId: string;
+  hasManagerTeam: boolean;
+  isCreating: boolean;
+  onNext: () => void;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -151,7 +170,20 @@ function DesktopRailSummary({
         tournament={tournament}
         selectedTeam={selectedTeam}
         depositorName={depositorName}
+        step={step}
       />
+
+      {step === 'team' && (
+        <button
+          type="button"
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          disabled={!selectedTeamId || !hasManagerTeam || isCreating}
+          onClick={onNext}
+          aria-label="다음 단계: 동의 및 결제 수단 선택"
+        >
+          {isCreating ? '준비 중…' : '다음'}
+        </button>
+      )}
 
       {step === 'agreements' && (
         <button
@@ -708,6 +740,7 @@ function AgreementsStep({
           tournament={tournament}
           selectedTeam={selectedTeam}
           depositorName={state.depositorName}
+          step="agreements"
           compact
         />
       </div>
@@ -1074,6 +1107,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               canSubmit={canSubmitAgreements}
               isSubmitting={submitRegistration.isPending}
               onSubmitFromRail={handleAgreementsSubmit}
+              selectedTeamId={selectedTeamId}
+              hasManagerTeam={myTeams.some((t) => t.role === 'owner' || t.role === 'manager')}
+              isCreating={isCreating}
+              onNext={handleTeamNext}
             />
           </aside>
         </div>

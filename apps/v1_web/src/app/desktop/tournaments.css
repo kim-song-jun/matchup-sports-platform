@@ -4,8 +4,42 @@
 /* ─── List /tournaments ───────────────────────────────────────────────────────
  * Kill the stretched single-column. Convert .tm-tournament-card-stack to a
  * 2-up card grid at ≥1024 and 3-up at ≥1440.
- * Hero card is constrained so it does not letterbox across the full 1120px.
+ * Hero fills the full body width on desktop (2-col layout, taller strip).
  */
+
+/* ── Hero visual strip: mobile baseline ── */
+.tm-tournament-hero-visual {
+  background: linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%);
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Hero body: mobile single-column */
+.tm-tournament-hero-body {
+  padding: 16px 18px 18px;
+}
+
+.tm-tournament-hero-copy {
+  /* Full-width on mobile */
+}
+
+/* Stats panel hidden on mobile — only shown via .tm-show-desktop */
+.tm-tournament-hero-stats {
+  display: none;
+}
+
+.tm-tournament-hero-stat-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--grey100);
+}
+
+.tm-tournament-hero-stat-item:first-child {
+  border-top: 1px solid var(--grey100);
+}
 
 @media (min-width: 1024px) {
   /* Remove mobile side padding from the list wrapper — the scroll area already
@@ -14,41 +48,48 @@
     padding: 0 0 48px;
   }
 
-  /* Hero card: cap width so it doesn't stretch across the full desktop column. */
+  /* Hero card: fill the full desktop body width — remove the letterbox cap. */
   .tm-tournament-hero-card {
-    max-width: 720px;
+    max-width: unset;
   }
 
-  /* Convert the vertical card stack → 2-up grid. */
-  .tm-tournament-card-stack {
-    display: grid !important;
-    flex-direction: unset;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 4px;
+  /* Hero visual strip: taller on desktop, horizontal layout with icon left-aligned. */
+  .tm-tournament-hero-visual {
+    height: 200px;
+    flex-direction: row;
+    gap: 20px;
+    padding: 0 48px;
+    justify-content: flex-start;
   }
 
-  /* Each card gets a hover lift. */
-  .tm-tournament-card-stack .tm-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+  /* Hero body: 2-column — copy left, stats/CTA panel right. */
+  .tm-tournament-hero-body {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 40px;
+    padding: 20px 32px 24px;
   }
 
-  .tm-tournament-card-stack .tm-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+  .tm-tournament-hero-copy {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* Stats panel: show on desktop, fixed width. */
+  .tm-tournament-hero-stats {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 240px;
+    width: 240px;
   }
 }
 
 @media (min-width: 1440px) {
-  /* 3-up grid at ≥1440. */
-  .tm-tournament-card-stack {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 20px;
-  }
-
-  /* At max width relax hero constraint to match the wider column. */
-  .tm-tournament-hero-card {
-    max-width: 800px;
+  /* Slightly wider stats panel at 1440. */
+  .tm-tournament-hero-stats {
+    flex: 0 0 280px;
+    width: 280px;
   }
 }
 
@@ -153,6 +194,14 @@
   }
 }
 
+/* Left column body: cap width so long prose/tables don't stretch uncomfortably
+   on the left side of the 2-col grid. The right rail handles the summary. */
+@media (min-width: 1024px) {
+  .tm-tournament-detail-grid > .tm-match-detail-body {
+    max-width: 740px;
+  }
+}
+
 /* .tm-tournament-form-grid
  * Apply (/tournaments/:id/apply) and My (/tournaments/:id/my) desktop layout.
  * Left column: multi-step form. Right column: summary/CTA card.
@@ -209,29 +258,28 @@
     display: none !important;
   }
 
-  /* Overall max-width cap so the 2-col does not explode on ultra-wide screens. */
+  /* Overall max-width cap so the 2-col does not explode on ultra-wide screens.
+     margin-inline: auto centres the grid within the 1120px desktop column. */
   .tm-tournament-form-grid {
-    max-width: 960px;
+    max-width: 1060px;
+    margin-inline: auto;
+  }
+
+  /* Section titles inside the left form column sometimes carry a negative
+     margin-left inherited from mobile card styles.  Zero that out here so
+     they don't poke left of the card edge on desktop. */
+  .tm-tournament-form-main [class*="tm-section-title"],
+  .tm-tournament-form-main [class*="tm-card-title"],
+  .tm-tournament-form-main h2,
+  .tm-tournament-form-main h3 {
+    margin-left: 0;
   }
 }
 
 /* ─── Apply /tournaments/:id/apply · My /tournaments/:id/my ──────────────────
- * LEGACY single-column max-width cap — preserved for backwards compatibility
- * until those pages adopt .tm-tournament-form-grid.  When both pages are
- * migrated the block below (lines 62-70 in the original) can be removed.
- * NOTE: The @media block above inside .tm-tournament-form-grid overrides these
- * rules when .tm-tournament-form-grid is present.
+ * LEGACY 640px single-column cap removed — both pages now use
+ * .tm-tournament-form-grid which provides the correct 2-column layout.
  */
-
-@media (min-width: 1024px) {
-  .tm-tournament-apply-body,
-  .tm-tournament-my-body {
-    max-width: 640px;
-    margin: 0 auto;
-    /* Remove mobile side gutter — content cards carry their own internal pad. */
-    padding: 0 0 48px;
-  }
-}
 
 /* ─── Bracket — desktop horizontal layout ─────────────────────────────────────
  * .tm-tournament-bracket-h renders on desktop only (via .tm-show-desktop).
@@ -442,12 +490,10 @@
 
 /* ─── prefers-reduced-motion: bracket transitions ─────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .tm-tournament-card-stack .tm-card,
   .tm-tournament-list-grid .tm-card {
     transition: none;
   }
 
-  .tm-tournament-card-stack .tm-card:hover,
   .tm-tournament-list-grid .tm-card:hover {
     transform: none;
   }

@@ -909,7 +909,7 @@ function BracketTab({
     <div className="flex flex-col gap-6">
 
       {/* ── 조 만들기 ───────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5 max-w-2xl">
         <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">조 만들기</h3>
         <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex flex-col gap-1">
@@ -977,7 +977,7 @@ function BracketTab({
 
       {/* ── 팀 배정 ─────────────────────────────────────────────────── */}
       {groups.length > 0 && confirmedRegistrations.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
+        <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5 max-w-2xl">
           <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">팀 배정</h3>
           <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row gap-3 sm:items-end">
             <div className="flex flex-col gap-1">
@@ -1048,6 +1048,7 @@ function BracketTab({
                 key: 'position',
                 header: '순위',
                 align: 'center',
+                width: 'w-[56px]',
                 render: (s) => <span className="tabular-nums [color:var(--text-muted)]">{s.position}</span>,
               },
               {
@@ -1059,36 +1060,42 @@ function BracketTab({
                 key: 'wins',
                 header: '승',
                 align: 'center',
+                width: 'w-[52px]',
                 render: (s) => <span className="tabular-nums">{s.wins}</span>,
               },
               {
                 key: 'draws',
                 header: '무',
                 align: 'center',
+                width: 'w-[52px]',
                 render: (s) => <span className="tabular-nums">{s.draws}</span>,
               },
               {
                 key: 'losses',
                 header: '패',
                 align: 'center',
+                width: 'w-[52px]',
                 render: (s) => <span className="tabular-nums">{s.losses}</span>,
               },
               {
                 key: 'goalsFor',
                 header: '득점',
                 align: 'center',
+                width: 'w-[60px]',
                 render: (s) => <span className="tabular-nums">{s.goalsFor}</span>,
               },
               {
                 key: 'goalsAgainst',
                 header: '실점',
                 align: 'center',
+                width: 'w-[60px]',
                 render: (s) => <span className="tabular-nums">{s.goalsAgainst}</span>,
               },
               {
                 key: 'points',
                 header: '승점',
                 align: 'right',
+                width: 'w-[64px]',
                 render: (s) => <span className="tabular-nums font-semibold text-blue-600">{s.points}</span>,
               },
             ];
@@ -1126,6 +1133,7 @@ function BracketTab({
                     rows={standings}
                     keyExtractor={(s) => s.id}
                     scrollOnMobile
+                    tableMaxWidth="max-w-2xl"
                     empty={<AdminEmpty title="팀이 없어요" description="배정된 팀이 없어요." />}
                   />
                 )}
@@ -1136,7 +1144,7 @@ function BracketTab({
       )}
 
       {/* ── 픽스처 만들기 ────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5 max-w-3xl">
         <h3 className="tm-text-body font-bold text-[color:var(--text-strong)] mb-4">픽스처 만들기</h3>
 
         {/* ── 대진 자동 생성 ── */}
@@ -1337,6 +1345,7 @@ function BracketTab({
           {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens */}
           <AdminDataTable<V1AdminBracketFixture>
             scrollOnMobile
+            tableMaxWidth="max-w-3xl"
             columns={[
               {
                 key: 'round',
@@ -1346,6 +1355,8 @@ function BracketTab({
               {
                 key: 'fixtureNumber',
                 header: '번호',
+                width: 'w-[64px]',
+                align: 'center',
                 render: (f) => <span className="tabular-nums [color:var(--text-muted)]">{f.fixtureNumber}</span>,
               },
               {
@@ -1361,6 +1372,7 @@ function BracketTab({
               {
                 key: 'result',
                 header: '결과',
+                width: 'w-[140px]',
                 render: (f) => (
                   <span className="tabular-nums [color:var(--text-muted)]">
                     {f.result
@@ -1385,7 +1397,7 @@ function BracketTab({
                   setResultOpen(true);
                 }}
                 aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
-                className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg tm-text-caption font-medium text-[color:var(--text-muted)] bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg tm-text-caption font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 결과 입력
               </button>

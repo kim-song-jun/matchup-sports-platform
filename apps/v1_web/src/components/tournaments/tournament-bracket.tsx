@@ -17,6 +17,14 @@
  *     fixture.round string. These are sorted lexicographically after the
  *     phase-keyed rounds.
  *  3. Within each round, fixtures are sorted by fixtureNumber ascending.
+ *
+ * Rendering note — third_place is a PARALLEL section, NOT the next bracket column:
+ *  - "결승" is the final column; the trophy is placed at its right end.
+ *  - "3·4위전" is rendered in a visually separated section (mobile: below trophy;
+ *    desktop: below the main bracket row) with a divider label so the reader
+ *    understands it is a consolation match between the two semi-final losers,
+ *    NOT a round that follows the final.
+ *  - No connector arrow is drawn between "결승" and "3·4위전".
  */
 
 import { TrophyIcon } from '@/components/v1-ui/icons';
@@ -276,15 +284,25 @@ function TrophyPlaceholder() {
 
 /* ── Mobile vertical layout ── */
 
+/**
+ * MobileBracket splits rounds into:
+ *  - mainRounds: semi, final, and any non-third_place rounds (connected by arrows,
+ *    trophy after final)
+ *  - thirdPlaceRound: rendered separately below the trophy with a divider so the
+ *    user sees it as a parallel consolation match, NOT as a round after the final.
+ */
 function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
-  const finalIndex = rounds.findIndex((r) => r.key === 'final');
+  const mainRounds = rounds.filter((r) => r.key !== 'third_place');
+  const thirdPlaceRound = rounds.find((r) => r.key === 'third_place') ?? null;
+  const finalIndex = mainRounds.findIndex((r) => r.key === 'final');
 
   return (
     <div
       className="tm-hide-desktop"
       style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
     >
-      {rounds.map((round, idx) => (
+      {/* ── Main bracket: semi → final → trophy ── */}
+      {mainRounds.map((round, idx) => (
         <div key={round.key}>
           {/* Round label */}
           <div
@@ -312,11 +330,11 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
             ))}
           </div>
 
-          {/* Trophy after the final round; real CSS connector line between other rounds */}
+          {/* Trophy after the final round; connector line between earlier rounds */}
           {idx === finalIndex ? (
             <TrophyPlaceholder />
-          ) : idx < rounds.length - 1 ? (
-            /* Real vertical connector line — styled via .tm-bracket-mobile-connector
+          ) : idx < mainRounds.length - 1 ? (
+            /* Vertical connector line — styled via .tm-bracket-mobile-connector
                in desktop/tournaments.css (visible at all breakpoints) */
             <div
               className="tm-bracket-mobile-connector"
@@ -325,6 +343,67 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
           ) : null}
         </div>
       ))}
+
+      {/* ── 3·4위전: parallel section — 4강 패자 consolation match ── */}
+      {thirdPlaceRound !== null ? (
+        <div
+          style={{ marginTop: 24 }}
+          aria-label="3·4위전 — 4강 패자 경기"
+        >
+          {/* Divider with label */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+            }}
+            aria-hidden="true"
+          >
+            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
+            <span
+              className="tm-text-micro"
+              style={{
+                color: 'var(--text-caption)',
+                whiteSpace: 'nowrap',
+                padding: '2px 8px',
+                border: '1px solid var(--grey200)',
+                borderRadius: 99,
+                background: 'var(--grey50)',
+              }}
+            >
+              3·4위전 — 4강 패자 경기
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
+          </div>
+
+          {/* Round label row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 8,
+              padding: '4px 0',
+            }}
+          >
+            <span
+              className="tm-text-body-lg"
+              style={{ color: 'var(--text-strong)' }}
+            >
+              {thirdPlaceRound.label}
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--grey100)' }} aria-hidden="true" />
+          </div>
+
+          {/* Fixture cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {thirdPlaceRound.fixtures.map((fixture) => (
+              <BracketFixtureCard key={fixture.id} fixture={fixture} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -332,61 +411,130 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
 /* ── Desktop horizontal layout — columnar bracket with real connector lines ── */
 
 /**
- * Each round column is wrapped with its right-hand connector in a
- * .tm-bracket-col-wrapper flex row. The CSS in desktop/tournaments.css gives
- * .tm-bracket-connector its real elbow lines via ::before / ::after pseudo-elements.
+ * DesktopBracket splits rounds into two groups:
+ *
+ *  mainRounds  — semi, final, and any non-third_place rounds rendered as
+ *                sequential bracket columns with connector arrows between them.
+ *                Trophy is placed at the right end of the "final" column.
+ *
+ *  thirdPlaceRound — "3·4위전" rendered as a separate section BELOW the main
+ *                bracket row, with a pill-style divider label.
+ *                NO connector is drawn between final and third_place.
  *
  * Structure:
- *   .tm-tournament-bracket-h
- *     .tm-bracket-col-wrapper (×n)
- *       .tm-bracket-column
- *         .tm-bracket-column-label
- *         .tm-bracket-column-fixtures
- *         .tm-bracket-trophy (final only)
- *       .tm-bracket-connector (omitted on the last wrapper)
+ *   .tm-bracket-desktop-wrapper                 — outer flex column
+ *     .tm-tournament-bracket-h                  — main bracket row (semi → final → trophy)
+ *       .tm-bracket-col-wrapper (×n)
+ *         .tm-bracket-column
+ *           .tm-bracket-column-label
+ *           .tm-bracket-column-fixtures
+ *           .tm-bracket-trophy (final column only)
+ *         .tm-bracket-connector (omitted on last wrapper)
+ *     .tm-bracket-third-place-section (optional) — parallel consolation section
+ *       divider label
+ *       .tm-tournament-bracket-h (single column)
  */
 function DesktopBracket({ rounds }: { rounds: RoundGroup[] }) {
+  const mainRounds = rounds.filter((r) => r.key !== 'third_place');
+  const thirdPlaceRound = rounds.find((r) => r.key === 'third_place') ?? null;
+
   return (
-    <div className="tm-show-desktop tm-tournament-bracket-h" role="region" aria-label="대진표">
-      {rounds.map((round, idx) => {
-        const isFinal = round.key === 'final';
-        const isLast = idx === rounds.length - 1;
+    <div className="tm-show-desktop" role="region" aria-label="대진표">
+      {/* ── Main bracket: semi → final → trophy ── */}
+      <div className="tm-tournament-bracket-h">
+        {mainRounds.map((round, idx) => {
+          const isFinal = round.key === 'final';
+          const isLast = idx === mainRounds.length - 1;
 
-        return (
-          <div key={round.key} className="tm-bracket-col-wrapper">
-            {/* Column */}
-            <div className="tm-bracket-column">
-              {/* Column header */}
-              <div className="tm-bracket-column-label">
-                <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                  {round.label}
-                </span>
-              </div>
-
-              {/* Fixtures */}
-              <div className="tm-bracket-column-fixtures">
-                {round.fixtures.map((fixture) => (
-                  <BracketFixtureCard key={fixture.id} fixture={fixture} />
-                ))}
-              </div>
-
-              {/* Trophy appended after the final column */}
-              {isFinal ? (
-                <div className="tm-bracket-trophy">
-                  <TrophyPlaceholder />
+          return (
+            <div key={round.key} className="tm-bracket-col-wrapper">
+              {/* Column */}
+              <div className="tm-bracket-column">
+                {/* Column header */}
+                <div className="tm-bracket-column-label">
+                  <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+                    {round.label}
+                  </span>
                 </div>
+
+                {/* Fixtures */}
+                <div className="tm-bracket-column-fixtures">
+                  {round.fixtures.map((fixture) => (
+                    <BracketFixtureCard key={fixture.id} fixture={fixture} />
+                  ))}
+                </div>
+
+                {/* Trophy at the right end of the final column — tournament endpoint */}
+                {isFinal ? (
+                  <div className="tm-bracket-trophy">
+                    <TrophyPlaceholder />
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Connector arrow between consecutive main-bracket columns.
+                  Omitted on the last main column — no arrow after the final.
+                  aria-hidden so screen readers see only fixture content. */}
+              {!isLast ? (
+                <div className="tm-bracket-connector" aria-hidden="true" />
               ) : null}
             </div>
+          );
+        })}
+      </div>
 
-            {/* Real CSS elbow connector — present for all columns except the last.
-                CSS ::before gives the horizontal bar; ::after gives the arrow head.
-                aria-hidden so screen readers see only fixture content. */}
-            {!isLast ? (
-              <div className="tm-bracket-connector" aria-hidden="true" />
-            ) : null}
+      {/* ── 3·4위전: parallel consolation section — 4강 패자 경기 ── */}
+      {thirdPlaceRound !== null ? (
+        <div
+          style={{ marginTop: 24 }}
+          aria-label="3·4위전 — 4강 패자 경기"
+        >
+          {/* Pill divider label */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 16,
+            }}
+            aria-hidden="true"
+          >
+            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
+            <span
+              className="tm-text-micro"
+              style={{
+                color: 'var(--text-caption)',
+                whiteSpace: 'nowrap',
+                padding: '2px 10px',
+                border: '1px solid var(--grey200)',
+                borderRadius: 99,
+                background: 'var(--grey50)',
+              }}
+            >
+              3·4위전 — 4강 패자 경기
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
           </div>
-        );
-      })}
+
+          {/* Single column — no connectors, no trophy */}
+          <div className="tm-tournament-bracket-h" style={{ maxWidth: 300 }}>
+            <div className="tm-bracket-col-wrapper">
+              <div className="tm-bracket-column">
+                <div className="tm-bracket-column-label">
+                  <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+                    {thirdPlaceRound.label}
+                  </span>
+                </div>
+                <div className="tm-bracket-column-fixtures">
+                  {thirdPlaceRound.fixtures.map((fixture) => (
+                    <BracketFixtureCard key={fixture.id} fixture={fixture} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

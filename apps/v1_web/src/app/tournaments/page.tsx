@@ -84,18 +84,8 @@ function TournamentsListContent() {
       {/* ── Hero banner ── */}
       <section aria-labelledby="tournament-hero-heading" style={{ marginTop: 24 }}>
         <Card pad={0} className="tm-tournament-hero-card" style={{ overflow: 'hidden' }}>
-          <div
-            style={{
-              background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
-              height: 130,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-            aria-hidden="true"
-          >
+          {/* Gradient visual strip */}
+          <div className="tm-tournament-hero-visual" aria-hidden="true">
             <div
               style={{
                 width: 56,
@@ -111,30 +101,53 @@ function TournamentsListContent() {
             </div>
             <span
               className="tm-text-micro"
-              style={{
-                color: 'rgba(255,255,255,0.92)',
-              }}
+              style={{ color: 'rgba(255,255,255,0.92)' }}
             >
               상금 대회
             </span>
           </div>
-          <div style={{ padding: '16px 18px 18px' }}>
-            <h1
-              id="tournament-hero-heading"
-              className="tm-text-heading"
-              style={{ color: 'var(--text-strong)', marginBottom: 4 }}
-            >
-              팀과 함께 대회에서 겨뤄보세요
-            </h1>
-            <p className="tm-text-label" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              조별 리그부터 결승 토너먼트까지, 상위 팀에게 실제 상금이 지급돼요.
-            </p>
+
+          {/* Body: copy (left) + stats (right on desktop) */}
+          <div className="tm-tournament-hero-body">
+            <div className="tm-tournament-hero-copy">
+              <h1
+                id="tournament-hero-heading"
+                className="tm-text-heading"
+                style={{ color: 'var(--text-strong)', marginBottom: 4 }}
+              >
+                팀과 함께 대회에서 겨뤄보세요
+              </h1>
+              <p className="tm-text-label" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                조별 리그부터 결승 토너먼트까지, 상위 팀에게 상금을 드려요.
+              </p>
+            </div>
+
+            {/* Desktop-only right stats/CTA column */}
+            <div className="tm-tournament-hero-stats tm-show-desktop" aria-label="대회 안내">
+              <div className="tm-tournament-hero-stat-item">
+                <span className="tm-text-label" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>진행 방식</span>
+                <span className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>조별 리그 → 토너먼트</span>
+              </div>
+              <div className="tm-tournament-hero-stat-item">
+                <span className="tm-text-label" style={{ color: 'var(--text-muted)', display: 'block', marginBottom: 2 }}>참가 대상</span>
+                <span className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>모든 종목 팀</span>
+              </div>
+              <Link
+                href="#tournament-list"
+                className="tm-btn tm-btn-md tm-btn-primary"
+                style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                aria-label="대회 목록으로 이동"
+              >
+                <TrophyIcon size={15} strokeWidth={1.8} aria-hidden="true" />
+                대회 둘러보기
+              </Link>
+            </div>
           </div>
         </Card>
       </section>
 
       {/* ── Tournament list ── */}
-      <section aria-labelledby="tournament-list-heading" style={{ marginTop: 28 }}>
+      <section id="tournament-list" aria-labelledby="tournament-list-heading" style={{ marginTop: 28 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle title="대회 목록" />
         </div>
@@ -282,7 +295,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             }}
             aria-label={`총 상금 ${item.prizePool.toLocaleString('ko-KR')}원`}
           >
-            <span aria-hidden="true" style={{ fontSize: 12 }}>🏆</span>
+            <TrophyIcon size={12} color="var(--orange500)" aria-hidden="true" />
             <span
               className="tm-text-caption"
               style={{ color: 'var(--orange500)', fontWeight: 600 }}

@@ -219,7 +219,7 @@ export default function AdminTournamentsNewPage() {
       />
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="max-w-3xl bg-white rounded-2xl border border-gray-100 overflow-hidden">
 
           {/* ── 기본 정보 ────────────────────────────────────────────── */}
           <section className="px-5 py-6 border-b border-gray-100">
@@ -290,14 +290,16 @@ export default function AdminTournamentsNewPage() {
                 />
               </FormField>
 
-              <FormField id="registration-deadline-at" label="신청 마감일" hint="예: 2026-08-01 23:59">
-                <DatetimeTextInput
-                  id="registration-deadline-at"
-                  value={registrationDeadlineAt}
-                  onChange={setRegistrationDeadlineAt}
-                  disabled={isPending}
-                />
-              </FormField>
+              <div className="md:col-span-2">
+                <FormField id="registration-deadline-at" label="신청 마감일" hint="예: 2026-08-01 23:59">
+                  <DatetimeTextInput
+                    id="registration-deadline-at"
+                    value={registrationDeadlineAt}
+                    onChange={setRegistrationDeadlineAt}
+                    disabled={isPending}
+                  />
+                </FormField>
+              </div>
 
               <div className="md:col-span-2">
                 <FormField id="venue" label="장소">
@@ -365,92 +367,97 @@ export default function AdminTournamentsNewPage() {
           {/* ── 참가비 / 계좌 ────────────────────────────────────────── */}
           <section className="px-5 py-6 border-b border-gray-100">
             <h2 className="text-[15px] font-bold text-gray-900 mb-4">참가비 · 계좌</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">
-                <input
-                  id="entry-fee"
-                  type="number"
-                  min="0"
-                  step="1000"
-                  value={entryFee}
-                  onChange={(e) => setEntryFee(e.target.value)}
-                  disabled={isPending}
-                  placeholder="0"
-                  className={inputCls}
-                />
-              </FormField>
-
-              <FormField id="prize-pool" label="총 상금 (원)" hint="비우면 상금 없음으로 표시돼요">
-                <input
-                  id="prize-pool"
-                  type="number"
-                  min="0"
-                  step="10000"
-                  value={prizePool}
-                  onChange={(e) => setPrizePool(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 1000000"
-                  className={inputCls}
-                />
-              </FormField>
-
-              <div className="md:col-span-2">
-                <FormField
-                  id="prize-breakdown"
-                  label="순위별 상금 안내"
-                  hint="참가자에게 공개되는 상금 안내 문구예요"
-                >
+            <div className="flex flex-col gap-4">
+              {/* 참가비 + 총 상금 — 2열 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">
                   <input
-                    id="prize-breakdown"
-                    type="text"
-                    value={prizeBreakdown}
-                    onChange={(e) => setPrizeBreakdown(e.target.value)}
+                    id="entry-fee"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={entryFee}
+                    onChange={(e) => setEntryFee(e.target.value)}
                     disabled={isPending}
-                    placeholder="예: 1위 100만원 · 2위 50만원 · 3위 30만원"
-                    maxLength={200}
+                    placeholder="0"
+                    className={inputCls}
+                  />
+                </FormField>
+
+                <FormField id="prize-pool" label="총 상금 (원)" hint="비우면 상금 없음으로 표시돼요">
+                  <input
+                    id="prize-pool"
+                    type="number"
+                    min="0"
+                    step="10000"
+                    value={prizePool}
+                    onChange={(e) => setPrizePool(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 1000000"
                     className={inputCls}
                   />
                 </FormField>
               </div>
 
-              <FormField id="bank-name" label="은행명">
+              {/* 순위별 상금 안내 — 전체 너비 */}
+              <FormField
+                id="prize-breakdown"
+                label="순위별 상금 안내"
+                hint="참가자에게 공개되는 상금 안내 문구예요"
+              >
                 <input
-                  id="bank-name"
+                  id="prize-breakdown"
                   type="text"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
+                  value={prizeBreakdown}
+                  onChange={(e) => setPrizeBreakdown(e.target.value)}
                   disabled={isPending}
-                  placeholder="예: 국민은행"
-                  maxLength={20}
+                  placeholder="예: 1위 100만원 · 2위 50만원 · 3위 30만원"
+                  maxLength={200}
                   className={inputCls}
                 />
               </FormField>
 
-              <FormField id="bank-account" label="계좌번호">
-                <input
-                  id="bank-account"
-                  type="text"
-                  value={bankAccount}
-                  onChange={(e) => setBankAccount(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 123-456-789012"
-                  maxLength={30}
-                  className={inputCls}
-                />
-              </FormField>
+              {/* 은행/계좌/예금주 — 3열 한 행 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField id="bank-name" label="은행명">
+                  <input
+                    id="bank-name"
+                    type="text"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 국민은행"
+                    maxLength={20}
+                    className={inputCls}
+                  />
+                </FormField>
 
-              <FormField id="bank-holder" label="예금주">
-                <input
-                  id="bank-holder"
-                  type="text"
-                  value={bankHolder}
-                  onChange={(e) => setBankHolder(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 티밋 주식회사"
-                  maxLength={30}
-                  className={inputCls}
-                />
-              </FormField>
+                <FormField id="bank-account" label="계좌번호">
+                  <input
+                    id="bank-account"
+                    type="text"
+                    value={bankAccount}
+                    onChange={(e) => setBankAccount(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 123-456-789012"
+                    maxLength={30}
+                    className={inputCls}
+                  />
+                </FormField>
+
+                <FormField id="bank-holder" label="예금주">
+                  <input
+                    id="bank-holder"
+                    type="text"
+                    value={bankHolder}
+                    onChange={(e) => setBankHolder(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 티밋 주식회사"
+                    maxLength={30}
+                    className={inputCls}
+                  />
+                </FormField>
+              </div>
             </div>
           </section>
 
@@ -486,7 +493,7 @@ export default function AdminTournamentsNewPage() {
         </div>
 
         {/* ── Footer actions ───────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 mt-5">
+        <div className="max-w-3xl flex items-center gap-3 mt-5">
           <Link
             href="/admin/tournaments"
             className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[15px] font-semibold text-gray-600 bg-white border border-gray-200 hover:border-gray-300 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"

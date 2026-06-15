@@ -13,6 +13,12 @@ export interface AdminTableColumn<T> {
   align?: 'left' | 'center' | 'right';
   /** Additional Tailwind classes applied to both th and td */
   className?: string;
+  /**
+   * Fixed-width Tailwind class applied to both th and td (e.g. 'w-[64px]').
+   * Use this to prevent short numeric columns from spreading across wide
+   * viewports when the table is w-full.
+   */
+  width?: string;
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────
@@ -37,6 +43,13 @@ interface AdminDataTableProps<T> {
    * Default false — existing behaviour unchanged.
    */
   scrollOnMobile?: boolean;
+  /**
+   * Tailwind max-width class applied to the desktop <table> element so
+   * stat-heavy tables don't stretch across the full 1440 px viewport.
+   * Example: 'max-w-3xl'. When omitted the table stays w-full (existing
+   * behaviour unchanged — additive prop).
+   */
+  tableMaxWidth?: string;
 }
 
 // ── Alignment utility ─────────────────────────────────────────────────────
@@ -59,6 +72,7 @@ export function AdminDataTable<T>({
   onRetry,
   skeletonRows = 5,
   scrollOnMobile = false,
+  tableMaxWidth,
 }: AdminDataTableProps<T>) {
   // Error state
   if (error) {
@@ -103,7 +117,7 @@ export function AdminDataTable<T>({
       {/* ── Desktop table (lg+) ─────────────────────────────────────────── */}
       <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-gray-700">
+          <table className={['w-full text-sm text-gray-700', tableMaxWidth ?? ''].join(' ').trim()}>
             <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
               <tr>
                 {columns.map((col) => (
@@ -113,6 +127,7 @@ export function AdminDataTable<T>({
                     className={[
                       'px-4 py-3 font-semibold text-gray-600 text-[12px] tracking-wide whitespace-nowrap select-none',
                       alignClass(col.align),
+                      col.width ?? '',
                       col.className ?? '',
                     ].join(' ')}
                   >
@@ -141,6 +156,7 @@ export function AdminDataTable<T>({
                       className={[
                         'px-4 py-3 tabular-nums align-middle',
                         alignClass(col.align),
+                        col.width ?? '',
                         col.className ?? '',
                       ].join(' ')}
                     >

@@ -14,7 +14,7 @@ import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, Weath
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
-import { TournamentTeaserCard } from './tournament-teaser-card';
+import { TournamentHeroCard } from './tournament-hero-card';
 import type { HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
@@ -76,7 +76,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           <div className="tm-home-featured-block" style={{ margin: '0 20px 28px' }}>
             <div className="tm-text-label" style={{ marginBottom: 8 }}>오늘의 추천</div>
             <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
-            <TournamentTeaserCard />
+            <TournamentHeroCard />
           </div>
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}

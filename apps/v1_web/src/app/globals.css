@@ -1135,36 +1135,6 @@ button:disabled {
   display: block;
 }
 
-/* ── Tournament teaser card (홈 오늘의 추천 하단) ─────────────────── */
-.tm-tournament-teaser {
-  display: block;
-  margin-top: 10px;
-  border-radius: 16px;
-  border: 1px solid var(--blue100);
-  background: var(--blue50);
-  text-decoration: none;
-  color: inherit;
-}
-
-.tm-tournament-teaser-inner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 14px 14px 12px;
-  min-height: 44px;
-}
-
-.tm-tournament-teaser-badge {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--blue500);
-  color: var(--static-white);
-  display: grid;
-  place-items: center;
-}
-
 .tm-quick-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

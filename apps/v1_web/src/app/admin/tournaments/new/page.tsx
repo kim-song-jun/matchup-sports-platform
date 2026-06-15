@@ -534,7 +534,7 @@ export default function AdminTournamentsNewPage() {
                   value={rulesText}
                   onChange={(e) => setRulesText(e.target.value)}
                   disabled={isPending}
-                  rows={5}
+                  rows={4}
                   placeholder="대회 참가 규정을 입력해 주세요."
                   className={textareaCls}
                 />
@@ -546,7 +546,7 @@ export default function AdminTournamentsNewPage() {
                   value={refundPolicyText}
                   onChange={(e) => setRefundPolicyText(e.target.value)}
                   disabled={isPending}
-                  rows={4}
+                  rows={3}
                   placeholder="환불 정책을 입력해 주세요."
                   className={textareaCls}
                 />

@@ -187,6 +187,27 @@
   }
 }
 
+/* .tm-tournament-detail-aside — right column wrapper holding the sticky CTA rail +
+   공지/환불. Mobile: normal flow after the body (rail hidden via .tm-show-desktop),
+   matching the body's horizontal padding. Desktop: the 2nd grid column; rail stays
+   sticky, 공지/환불 stack below to fill the area and balance the 2-col. */
+.tm-tournament-detail-aside {
+  margin-top: 24px;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .tm-tournament-detail-aside {
+    margin-top: 0;
+    padding: 0;
+    gap: 20px;
+    min-width: 0;
+  }
+}
+
 /* .tm-tournament-bleed — breaks out of the 2-col to span full width */
 @media (min-width: 1024px) {
   .tm-tournament-bleed {

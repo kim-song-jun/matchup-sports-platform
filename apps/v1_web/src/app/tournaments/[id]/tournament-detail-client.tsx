@@ -417,11 +417,18 @@ function TournamentDetailView({
       {/* ── Section 3 + 4: Format-aware fixtures / standings (non-bracket portions) ── */}
       <FormatLeftSections tournament={tournament} />
 
-      {/* ── Section 5: Announcements ── */}
+    </>
+  );
+
+  /* ── Aside extra: 공지/환불 — 데스크탑에서 우측 컬럼(스티키 CTA 레일 아래)으로 배치해
+     2단 레이아웃 우측 하단 빈 공간을 채우고 좌우 균형을 맞춘다. 모바일에서는 좌측 본문 다음·
+     대진표 앞에 자연 흐름으로 표시(읽기 순서 유지). 간격은 .tm-tournament-detail-aside flex gap. ── */
+  const asideExtra = (
+    <>
       {hasAnnouncements ? (
-        <section aria-labelledby="announcements-heading" style={{ marginTop: 24 }}>
+        <section aria-labelledby="announcements-heading">
           <div id="announcements-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>공지사항</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {tournament.announcements.map((announcement) => (
               <AnnouncementCard key={announcement.id} announcement={announcement} />
             ))}
@@ -429,11 +436,10 @@ function TournamentDetailView({
         </section>
       ) : null}
 
-      {/* ── Refund policy ── */}
       {tournament.refundPolicyText ? (
-        <section aria-labelledby="refund-heading" style={{ marginTop: 24 }}>
+        <section aria-labelledby="refund-heading">
           <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>환불 정책</div>
-          <Card pad={16} style={{ marginTop: 4, background: 'var(--grey50)' }}>
+          <Card pad={16} style={{ background: 'var(--grey50)' }}>
             <p
               id="refund-heading"
               className="tm-text-caption"
@@ -534,13 +540,20 @@ function TournamentDetailView({
           .tm-tournament-detail-grid: minmax(0,1fr) 340px (≥1440: 360px), gap 32px.
           Mobile: single-column, no grid applied. */}
       <div className="tm-tournament-detail-grid">
-        {/* Left column: header + metrics + prize + rules + standings + group fixtures + announcements + refund */}
+        {/* Left column: header + metrics + prize + rules + standings + group fixtures */}
         <div className="tm-match-detail-body">
           {leftContent}
         </div>
 
-        {/* Right column: sticky CTA rail (desktop only — .tm-show-desktop hides it on mobile) */}
-        {railCTA}
+        {/* Right column: sticky CTA rail (desktop, open only) + 공지/환불.
+            On desktop these fill the area below the short rail and balance the 2-col;
+            on mobile the rail is hidden (.tm-show-desktop) and 공지/환불 flow naturally. */}
+        {(railCTA || hasAnnouncements || tournament.refundPolicyText) ? (
+          <div className="tm-tournament-detail-aside">
+            {railCTA}
+            {asideExtra}
+          </div>
+        ) : null}
 
         {/* Bracket: direct grid child spanning both columns via .tm-tournament-bleed
             (grid-column 1/-1) — full-width below the 2-col on desktop; normal flow on mobile. */}

@@ -298,7 +298,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <TrophyIcon size={12} color="var(--orange500)" aria-hidden="true" />
             <span
               className="tm-text-caption"
-              style={{ color: 'var(--orange500)', fontWeight: 600 }}
+              style={{ color: 'var(--text-strong)', fontWeight: 600 }}
             >
               총 상금 {item.prizePool.toLocaleString('ko-KR')}원
             </span>

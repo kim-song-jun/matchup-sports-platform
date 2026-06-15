@@ -238,11 +238,11 @@ function TournamentDetailView({
   /* ── Prize card — rendered in left column just after metric strip ── */
   const prizeCard = hasPrize ? (
     <section aria-label="상금 안내" style={{ marginTop: 16 }}>
-      <Card pad={16} style={{ background: 'var(--orange50)', border: '1px solid var(--orange200, var(--orange500))' }}>
+      <Card pad={16} style={{ background: 'var(--orange50)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <TrophyIcon size={22} color="var(--orange500)" aria-hidden="true" />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="tm-text-body-lg" style={{ color: 'var(--orange500)', fontWeight: 700 }}>
+            <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
               총 상금 {formatPrize(tournament.prizePool!)}
             </div>
             {tournament.prizeBreakdown ? (
@@ -321,13 +321,13 @@ function TournamentDetailView({
         {/* 핵심 3사실 메트릭 카드(정원 progress bar 내장) + 보조 정보 InfoRow */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 10 }}>
           <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 4 }}>일정</div>
+            <div className="tm-text-caption" style={{ color: 'var(--text-body)', marginBottom: 4 }}>일정</div>
             <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
               {formatShortDate(tournament.scheduledAt)}
             </div>
           </div>
           <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 4 }}>정원</div>
+            <div className="tm-text-caption" style={{ color: 'var(--text-body)', marginBottom: 4 }}>정원</div>
             <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500, marginBottom: 5 }}>
               {tournament.confirmedCount}/{tournament.teamCount}팀
             </div>
@@ -351,7 +351,7 @@ function TournamentDetailView({
           </div>
           {/* 참가비: color var(--text-strong), NOT var(--blue500) — prize tint must not dress cost */}
           <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 4 }}>참가비</div>
+            <div className="tm-text-caption" style={{ color: 'var(--text-body)', marginBottom: 4 }}>참가비</div>
             <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
               {formatEntryFee(tournament.entryFee)}
             </div>
@@ -476,7 +476,7 @@ function TournamentDetailView({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <TrophyIcon size={16} color="var(--orange500)" aria-hidden="true" />
-            <div className="tm-text-caption" style={{ color: 'var(--orange500)', fontWeight: 600 }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
               총 상금 {formatPrize(tournament.prizePool!)}
             </div>
           </div>
@@ -797,7 +797,7 @@ function fixtureStatusBadge(status: string): string {
     case 'in_progress': return 'tm-badge-green';
     case 'completed': return 'tm-badge-grey';
     case 'cancelled': return 'tm-badge-red';
-    default: return 'tm-badge-blue';
+    default: return 'tm-badge-grey';
   }
 }
 
@@ -955,7 +955,7 @@ function StandingRow({
       >
         <span
           className="tm-text-caption tab-num"
-          style={{ color: isQualifying ? 'var(--blue500)' : 'var(--text-caption)' }}
+          style={{ color: isQualifying ? 'var(--text-strong)' : 'var(--text-caption)' }}
         >
           {rank}
         </span>
@@ -963,7 +963,7 @@ function StandingRow({
       <td
         style={{ padding: '8px 4px', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
       >
-        <span className="tm-text-label" style={{ color: isQualifying ? 'var(--blue500)' : 'var(--text-strong)' }}>
+        <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
           {standing.teamName}
         </span>
         {isQualifying ? (

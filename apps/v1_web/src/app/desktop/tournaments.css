@@ -373,43 +373,92 @@
     flex-shrink: 0;
   }
 
-  /* ── Connector: real elbow lines ─────────────────────────────────────────────
-   * Sits between two consecutive columns and draws two lines:
-   *   ::before — a short horizontal arm from the source column edge to centre
-   *   ::after  — a short horizontal arm from centre to the target column edge
-   *   The background gives the vertical centre bar joining them.
+  /* ── Connector: elbow 2-source → 1-target ────────────────────────────────────
+   * Draws a bracket elbow joining two source fixtures (top/bottom halves of the
+   * previous column) to a single target fixture centred vertically.  Pure CSS.
    *
-   * For readability we use a simple horizontal rule that hits the vertical
-   * midpoint of the connector area, supplemented by short upward/downward
-   * branches at the source side.  This covers the common 2-fixture-to-1-fixture
-   * transition naturally.
+   * Schematic (connector box below the label row, width=48px):
+   *
+   *   x=0   x=2px         x=48px
+   *    │                     │
+   *    │←──stub──┐           │   (top stub at y≈25%)
+   *    │          │           │
+   *    │          ├──── arm ──►   (horizontal arm at y=50%, arrowhead at right)
+   *    │          │           │
+   *    │←──stub──┘           │   (bottom stub at y≈75%)
+   *    │
+   *   (vertical bar, x=0, y=25%→75%)
+   *
+   * ::before — elbow shape via border-left + border-top + border-bottom on a box
+   *            that spans 25%→75% of height and is 22px wide (left=0 to left=22px).
+   *            border-left = vertical merge bar; border-top/border-bottom = stubs.
+   * ::after  — horizontal arm bar (2px high) at y=50%, left=0 to right=12px.
+   *            A right-pointing chevron arrowhead via border-top+border-right+rotate
+   *            is not possible in the same pseudo (bar needs background, chevron
+   *            needs border+rotate at a point).  Instead the arrowhead is a
+   *            separate 8×8px rotated square positioned at right=4px via ::after
+   *            using border-top+border-right (same as original, just reusing the slot).
+   *
+   * Since we have only two pseudos, split duty:
+   *   ::before = the three-sided elbow box (left bar + top stub + bottom stub)
+   *   ::after  = the arrowhead chevron only (positioned at right=4px, y=50%)
+   * The horizontal arm is drawn as a thin background line on the connector itself
+   * via a border-bottom on the top-half clip.  Simpler: use the connector's own
+   * background with a gradient stripe at 50%.  Most reliable: draw the arm as
+   * the connector's border-top on a :not(:last-child) scoped rule.
+   *
+   * FINAL clean design (2 pseudos only, no extra DOM):
+   *   connector div: no background.  Sets up the positioning context.
+   *   ::before:  box  left=0, top=25%, width=22px, height=50%
+   *              border-left: 2px solid grey200    (vertical bar)
+   *              border-top:  2px solid grey200    (top horizontal stub)
+   *              border-bottom: 2px solid grey200  (bottom horizontal stub)
+   *              border-right: none                (open right side)
+   *   arm:       drawn as a CSS gradient on the connector div background
+   *              (linear-gradient at 50% — no pseudo needed)
+   *              background: linear-gradient(transparent calc(50% - 1px),
+   *                           grey200 calc(50% - 1px),
+   *                           grey200 calc(50% + 1px),
+   *                           transparent calc(50% + 1px));
+   *   ::after:   right-pointing chevron at right=4px, y=50%
+   *              width/height: 8px; border-top: 2px grey300; border-right: 2px grey300;
+   *              rotate(45deg); translateY(-50%)
    */
   .tm-bracket-connector {
-    /* Fixed-width column between each pair of round-columns */
-    flex: 0 0 44px;
-    width: 44px;
+    flex: 0 0 48px;
+    width: 48px;
     position: relative;
-    /* Push connector content below the label row (label ≈ 43px) */
+    overflow: visible;
     padding-top: 43px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    /* Horizontal arm at 50%: drawn as a 2px gradient stripe on the connector bg */
+    background:
+      linear-gradient(
+        transparent         calc(50% - 1px),
+        var(--grey200)      calc(50% - 1px),
+        var(--grey200)      calc(50% + 1px),
+        transparent         calc(50% + 1px)
+      );
   }
 
-  /* Centre horizontal bar */
+  /* Three-sided elbow box: vertical bar on left + top stub + bottom stub.
+     Box sits at left=0, top=25%, width=22px, height=50%.
+     border-left = 2px vertical bar; border-top/border-bottom = stubs.
+     border-right intentionally absent (open toward the arm/arrowhead). */
   .tm-bracket-connector::before {
     content: "";
     position: absolute;
-    top: 50%;
     left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--grey200);
-    transform: translateY(-50%);
+    top: 25%;
+    width: 22px;
+    height: 50%;
+    border-left:   2px solid var(--grey200);
+    border-top:    2px solid var(--grey200);
+    border-bottom: 2px solid var(--grey200);
+    border-right:  none;
   }
 
-  /* Arrow head at the right end of the connector */
+  /* Right-pointing chevron arrowhead at the far right of the horizontal arm.
+     An 8×8px square with two visible borders, rotated 45°, placed at right=4px. */
   .tm-bracket-connector::after {
     content: "";
     position: absolute;
@@ -417,20 +466,10 @@
     right: 4px;
     width: 8px;
     height: 8px;
-    border-top: 2px solid var(--grey300);
+    border-top:   2px solid var(--grey300);
     border-right: 2px solid var(--grey300);
     transform: translateY(-50%) rotate(45deg);
     border-radius: 0 2px 0 0;
-  }
-
-  /* Dark-mode connector colours */
-  @media (prefers-color-scheme: dark) {
-    .tm-bracket-connector::before {
-      background: var(--grey300);
-    }
-    .tm-bracket-connector::after {
-      border-color: var(--grey400);
-    }
   }
 }
 
@@ -477,15 +516,6 @@
   border-right: 2px solid var(--grey300);
   transform: translateX(-50%) rotate(45deg);
   border-radius: 0 0 2px 0;
-}
-
-@media (prefers-color-scheme: dark) {
-  .tm-bracket-mobile-connector::before {
-    background: var(--grey300);
-  }
-  .tm-bracket-mobile-connector::after {
-    border-color: var(--grey400);
-  }
 }
 
 /* ─── prefers-reduced-motion: bracket transitions ─────────────────────────── */

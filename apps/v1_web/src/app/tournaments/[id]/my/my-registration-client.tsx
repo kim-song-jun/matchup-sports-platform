@@ -64,6 +64,15 @@ function formatEntryFee(fee: number): string {
   return `${fee.toLocaleString('ko-KR')}원`;
 }
 
+/** Returns the badge class + label for the roster shortage badge.
+ *  Mirrors the body-card logic: confirmed/paid → softer orange; else → hard red. */
+function rosterShortagebadge(status: V1TournamentRegistrationStatus): { badgeClass: string; label: string } {
+  if (status === 'confirmed' || status === 'paid') {
+    return { badgeClass: 'tm-badge-orange', label: '명단 보강 권장' };
+  }
+  return { badgeClass: 'tm-badge-red', label: '인원 부족' };
+}
+
 function formatDateShort(dateStr: string | null): string {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
@@ -239,7 +248,6 @@ function RosterNudgeCard({
       role="alert"
       style={{
         background: 'var(--orange50)',
-        border: '1.5px solid var(--orange500)',
         borderRadius: 16,
         padding: '20px 20px 16px',
         marginBottom: 16,
@@ -486,7 +494,9 @@ function RegistrationDetailView({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>선수 명단</span>
           {belowMinimum && !isRosterLocked ? (
-            <span className="tm-badge tm-badge-orange">인원 부족</span>
+            <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
+              {rosterShortagebadge(registration.status).label}
+            </span>
           ) : isRosterLocked ? (
             <span className="tm-badge tm-badge-grey">잠김</span>
           ) : (
@@ -622,7 +632,7 @@ function RegistrationDetailView({
                 {registration.payment ? (
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <InfoRow label="결제 수단" value={paymentMethodLabel(registration.payment.method)} />
-                    <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} valueColor="var(--blue500)" />
+                    <InfoRow label="결제 금액" value={formatEntryFee(registration.payment.amount)} />
                     <InfoRow
                       label="결제 상태"
                       value={paymentStatusLabel(registration.payment.status)}
@@ -669,12 +679,10 @@ function RegistrationDetailView({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {belowMinimum && !isRosterLocked ? (
-                      /* P0: status-aware badge — orange only when confirmed/paid (nudge already shown above) */
-                      registration.status === 'confirmed' || registration.status === 'paid' ? (
-                        <span className="tm-badge tm-badge-orange">명단 보강 권장</span>
-                      ) : (
-                        <span className="tm-badge tm-badge-red">인원 부족</span>
-                      )
+                      /* P0: status-aware badge — shared helper keeps rail and body in sync */
+                      <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
+                        {rosterShortagebadge(registration.status).label}
+                      </span>
                     ) : null}
                     {isRosterLocked ? (
                       <span className="tm-badge tm-badge-grey">잠김</span>

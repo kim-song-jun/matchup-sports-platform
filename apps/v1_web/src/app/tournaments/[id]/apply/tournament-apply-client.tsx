@@ -111,14 +111,12 @@ function OrderSummaryCard({
         <InfoRow
           label="참가비"
           value={formatEntryFee(tournament.entryFee)}
-          valueColor={tournament.entryFee > 0 ? 'var(--blue500)' : undefined}
           isLast={!showPaymentRows && !(tournament.prizePool != null && tournament.prizePool > 0)}
         />
         {tournament.prizePool != null && tournament.prizePool > 0 ? (
           <InfoRow
             label="상금"
             value={formatPrizePool(tournament.prizePool)}
-            valueColor="var(--orange500)"
             isLast={!showPaymentRows}
           />
         ) : null}
@@ -401,7 +399,6 @@ function TeamSelectStep({
             <InfoRow
               label="참가비"
               value={formatEntryFee(tournament.entryFee)}
-              valueColor="var(--blue500)"
               isLast
             />
           </Card>
@@ -464,7 +461,7 @@ function ExpandableCheckRow({
           display: 'flex',
           alignItems: 'center',
           gap: 10,
-          padding: '13px 14px',
+          padding: '12px 14px',
           minHeight: 44,
         }}
       >
@@ -864,7 +861,6 @@ function PaymentGuideStep({
               <InfoRow
                 label="입금액"
                 value={formatEntryFee(tournament.entryFee)}
-                valueColor="var(--blue500)"
                 isLast
               />
             </div>
@@ -878,7 +874,6 @@ function PaymentGuideStep({
                 <InfoRow
                   label="입금액"
                   value={formatEntryFee(tournament.entryFee)}
-                  valueColor="var(--blue500)"
                   isLast
                 />
               </div>

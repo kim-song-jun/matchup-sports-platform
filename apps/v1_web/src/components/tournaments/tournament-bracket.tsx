@@ -137,7 +137,7 @@ function fixtureStatusBadge(status: string): string {
     case 'in_progress': return 'tm-badge-green';
     case 'completed': return 'tm-badge-grey';
     case 'cancelled': return 'tm-badge-red';
-    default: return 'tm-badge-blue';
+    default: return 'tm-badge-grey';
   }
 }
 

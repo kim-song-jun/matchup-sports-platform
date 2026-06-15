@@ -1139,16 +1139,11 @@ button:disabled {
 .tm-tournament-teaser {
   display: block;
   margin-top: 10px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid var(--blue100);
   background: var(--blue50);
   text-decoration: none;
   color: inherit;
-}
-
-.dark .tm-tournament-teaser {
-  border-color: color-mix(in srgb, var(--blue500) 25%, transparent);
-  background: color-mix(in srgb, var(--blue500) 10%, transparent);
 }
 
 .tm-tournament-teaser-inner {

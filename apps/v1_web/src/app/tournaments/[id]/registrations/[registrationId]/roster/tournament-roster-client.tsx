@@ -384,7 +384,7 @@ function PlayerRow({
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        padding: '11px 14px',
+        padding: '12px 14px',
         borderTop: '1px solid var(--grey100)',
       }}
     >

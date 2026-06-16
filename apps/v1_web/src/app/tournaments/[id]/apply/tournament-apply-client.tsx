@@ -1002,7 +1002,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
-            message={`현재 참가 신청을 받지 않아요. (상태: ${tournament.status === 'closed' ? '마감' : tournament.status === 'in_progress' ? '진행중' : '종료'})`}
+            message={`현재 참가 신청을 받지 않아요. (상태: ${tournament.status === 'closed' ? '마감' : tournament.status === 'in_progress' ? '진행 중' : '종료'})`}
             tone="info"
           />
           <Link

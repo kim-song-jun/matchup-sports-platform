@@ -184,7 +184,7 @@ function FixtureStatusBadge({ status }: { status: string }) {
 function fixtureStatusLabel(status: string): string {
   switch (status) {
     case 'scheduled': return '예정';
-    case 'in_progress': return '진행중';
+    case 'in_progress': return '진행 중';
     case 'completed': return '종료';
     case 'cancelled': return '취소';
     default: return status;
@@ -210,7 +210,7 @@ function BracketFixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
       {/* VS row: home · score · away */}
       <div
         role="group"
-        aria-label={`${fixture.homeTeamName || 'TBD'} 대 ${fixture.awayTeamName || 'TBD'}`}
+        aria-label={`${fixture.homeTeamName || '미정'} 대 ${fixture.awayTeamName || '미정'}`}
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr auto 1fr',
@@ -231,7 +231,7 @@ function BracketFixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
               display: 'block',
             }}
           >
-            {fixture.homeTeamName || 'TBD'}
+            {fixture.homeTeamName || '미정'}
           </span>
         </div>
 
@@ -249,7 +249,7 @@ function BracketFixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
               className="tm-text-label"
               style={{ color: 'var(--text-caption)', letterSpacing: 1 }}
             >
-              VS
+              vs
             </span>
           )}
         </div>
@@ -267,7 +267,7 @@ function BracketFixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
               display: 'block',
             }}
           >
-            {fixture.awayTeamName || 'TBD'}
+            {fixture.awayTeamName || '미정'}
           </span>
         </div>
       </div>

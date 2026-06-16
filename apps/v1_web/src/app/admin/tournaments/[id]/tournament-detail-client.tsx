@@ -67,9 +67,9 @@ import type { AdminTableColumn } from '@/components/admin';
 
 const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
   draft: '초안',
-  open: '접수중',
+  open: '접수 중',
   closed: '마감',
-  in_progress: '진행중',
+  in_progress: '진행 중',
   completed: '완료',
   cancelled: '취소됨',
 };
@@ -77,7 +77,7 @@ const TOURNAMENT_STATUS_LABEL: Record<string, string> = {
 const ELIGIBILITY_LABEL: Record<string, string> = {
   non_pro: '아마추어',
   pro: '프로',
-  needs_review: '검토필요',
+  needs_review: '검토 필요',
 };
 
 // f9: 결제 상태·수단 한글 라벨 (schema enum=ready|paid|failed|cancelled|refunded, my-registration-client 동일 기준)
@@ -522,7 +522,7 @@ function RegistrationsTab({
     },
     {
       key: 'playerCount',
-      header: '선수수',
+      header: '선수 수',
       render: (r) => (
         <span className="tabular-nums text-gray-600">{r.playerCount}명</span>
       ),
@@ -844,7 +844,7 @@ function BracketTab({
               { onSuccess: () => resolve(), onError: reject },
             );
           });
-          showToast(`${roundLabel} 픽스처(TBD)를 생성했어요.`, 'success');
+          showToast(`${roundLabel} 픽스처(대진 미정)를 생성했어요.`, 'success');
           return;
         }
 
@@ -1962,7 +1962,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               s === 'open' ? '접수 시작하기' :
               s === 'closed' ? '접수 마감하기' :
               s === 'in_progress' ? '대회 시작하기' :
-              s === 'completed' ? '대회 완료 처리' :
+              s === 'completed' ? '대회 완료하기' :
               s === 'cancelled' ? '취소하기' :
               `${TOURNAMENT_STATUS_LABEL[s] ?? s}(으)로 변경`;
             return (

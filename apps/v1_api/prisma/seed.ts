@@ -1581,7 +1581,7 @@ async function seedCoverageMatches(
   await prisma.v1Match.upsert({
     where: { id: '00000000-0000-4000-8000-000000001306' },
     update: {
-      title: '개인 매치 expired 표시 커버리지',
+      title: '개인 매치 만료 표시 커버리지',
       hostUserId: userIds['coverage-active@teameet.v1'],
       sportId: sportIds.running,
       regionId,
@@ -1596,7 +1596,7 @@ async function seedCoverageMatches(
       hostUserId: userIds['coverage-active@teameet.v1'],
       sportId: sportIds.running,
       regionId,
-      title: '개인 매치 expired 표시 커버리지',
+      title: '개인 매치 만료 표시 커버리지',
       description: 'DB status는 recruiting이지만 API display status가 expired인 샘플입니다.',
       placeName: '과거 운동장',
       placeAddress: '서울 강남구',
@@ -1721,7 +1721,7 @@ async function seedCoverageTeamMatches(
   await prisma.v1TeamMatch.upsert({
     where: { id: '00000000-0000-4000-8000-000000001406' },
     update: {
-      title: '팀 매치 expired 표시 커버리지',
+      title: '팀 매치 만료 표시 커버리지',
       hostTeamId: '00000000-0000-4000-8000-000000001201',
       createdByUserId: userIds['coverage-active@teameet.v1'],
       sportId: sportIds.futsal,
@@ -1738,7 +1738,7 @@ async function seedCoverageTeamMatches(
       createdByUserId: userIds['coverage-active@teameet.v1'],
       sportId: sportIds.futsal,
       regionId,
-      title: '팀 매치 expired 표시 커버리지',
+      title: '팀 매치 만료 표시 커버리지',
       description: 'DB status는 recruiting이지만 API display status가 expired인 팀 매치 샘플입니다.',
       placeName: '과거 풋살장',
       placeAddress: '서울 송파구',

@@ -37,7 +37,7 @@ function registrationStatusConfig(status: V1TournamentRegistrationStatus): Statu
     case 'confirmed':
       return { badgeClass: 'tm-badge-green', label: '참가 확정' };
     case 'waitlisted':
-      return { badgeClass: 'tm-badge-orange', label: '대기팀' };
+      return { badgeClass: 'tm-badge-orange', label: '대기 중' };
     case 'cancel_requested':
       return { badgeClass: 'tm-badge-red', label: '취소 요청 중' };
     case 'cancelled':
@@ -70,7 +70,7 @@ function formatEntryFee(fee: number): string {
  *  Mirrors the body-card logic: confirmed/paid → softer orange; else → hard red. */
 function rosterShortagebadge(status: V1TournamentRegistrationStatus): { badgeClass: string; label: string } {
   if (status === 'confirmed' || status === 'paid') {
-    return { badgeClass: 'tm-badge-orange', label: '명단 보강 권장' };
+    return { badgeClass: 'tm-badge-orange', label: '명단 부족' };
   }
   return { badgeClass: 'tm-badge-red', label: '인원 부족' };
 }
@@ -258,7 +258,7 @@ function RegistrationPass({
               {isRosterLocked
                 ? `${rosterCount}명 · 마감`
                 : belowMinimum
-                  ? `${rosterCount} / 최소 ${minPlayers}명 등록`
+                  ? `${rosterCount}명 / 최소 ${minPlayers}명 등록`
                   : `${rosterCount}명 등록 완료`}
             </div>
           </div>

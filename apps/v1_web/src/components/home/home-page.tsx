@@ -52,7 +52,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   value={dash ? '-' : model.stats.monthlyActivity}
                   unit={dash ? '' : '경기'}
                   size={36}
-                  sub={dash ? '지난달 비교 -' : model.stats.monthlyActivitySub}
+                  sub={dash ? undefined : model.stats.monthlyActivitySub}
                 />
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -81,10 +81,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
           <div className="tm-home-matches-block">
-            <SectionTitle title="추천 매치" sub={model.network ? '다시 불러오기가 필요합니다' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
+            <SectionTitle title="추천 매치" sub={model.network ? '다시 불러와야 해요' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
             {model.network ? (
               <div style={{ padding: '0 20px 8px' }}>
-                <EmptyState title="새로고침이 필요합니다" sub="추천 목록과 대표 매치를 다시 불러올 수 있어야 합니다." cta="다시 불러오기" onCta={model.retry} />
+                <EmptyState title="새로고침이 필요해요" sub="추천 목록과 대표 매치를 다시 불러와야 해요." cta="다시 불러오기" onCta={model.retry} />
               </div>
             ) : (
               <RecommendedMatchRail matches={model.recommendedMatches} />
@@ -239,7 +239,7 @@ function FeaturedMatchCard({
       <div style={{ padding: 16 }}>
         {network ? (
           <>
-            <div className="tm-text-body-lg">새로고침이 필요합니다</div>
+            <div className="tm-text-body-lg">새로고침이 필요해요</div>
             <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 10 }} onClick={onRetry}>
               다시 불러오기
             </button>

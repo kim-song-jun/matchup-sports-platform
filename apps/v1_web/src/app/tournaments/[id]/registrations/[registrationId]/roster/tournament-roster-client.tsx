@@ -134,7 +134,7 @@ function AddPlayerForm({
   function handleBirthDateChange(v: string) {
     patch({ birthDate: v });
     if (v && !isValidBirthDate(v)) {
-      setBirthDateError('YYYY-MM-DD 형식으로 입력해 주세요.');
+      setBirthDateError('날짜를 1995-03-21 형식으로 입력해 주세요.');
     } else {
       setBirthDateError(null);
     }
@@ -203,7 +203,7 @@ function AddPlayerForm({
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
                 >
-                  {isFetchingNextPage ? '불러오는 중…' : `더 보기 (현재 ${members.length}명 로드됨)`}
+                  {isFetchingNextPage ? '불러오는 중…' : `더 보기 (현재 ${members.length}명 불러옴)`}
                 </button>
               ) : null}
             </>
@@ -228,7 +228,7 @@ function AddPlayerForm({
         <FormField
           id="player-birthdate"
           label="생년월일"
-          hint="선택 사항 · YYYY-MM-DD (예: 1995-03-21)"
+          hint="선택 사항 · 예: 1995-03-21"
           errorMessage={birthDateError ?? undefined}
         >
           <input
@@ -237,7 +237,7 @@ function AddPlayerForm({
             inputMode="numeric"
             value={form.birthDate}
             onChange={(e) => handleBirthDateChange(e.target.value)}
-            placeholder="YYYY-MM-DD"
+            placeholder="예: 1995-03-21"
             maxLength={10}
             className="tm-input"
             aria-describedby={birthDateError ? 'player-birthdate-error' : undefined}

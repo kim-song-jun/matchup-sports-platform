@@ -57,7 +57,7 @@ async function call(method, path, who, body) {
   await call('POST', `/admin/tournaments/${tid}/standings/recalculate`, ADMIN);
 
   // 공지
-  await call('POST', `/admin/tournaments/${tid}/announcements`, ADMIN, { title: '대진표가 발표되었습니다', body: 'A조 일정을 확인해 주세요. 경기 30분 전 도착 부탁드립니다.', publish: true });
+  await call('POST', `/admin/tournaments/${tid}/announcements`, ADMIN, { title: '대진표가 발표됐어요', body: 'A조 일정을 확인해 주세요. 경기 30분 전까지 도착해 주세요.', publish: true });
 
   console.log(`SEEDED tournament id=${tid}`);
 })();

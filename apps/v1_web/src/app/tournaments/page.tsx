@@ -54,9 +54,9 @@ type StatusConfig = {
 function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
   switch (status) {
     case 'open':
-      return { badgeClass: 'tm-badge-blue', label: '모집중' };
+      return { badgeClass: 'tm-badge-blue', label: '모집 중' };
     case 'in_progress':
-      return { badgeClass: 'tm-badge-green', label: '진행중' };
+      return { badgeClass: 'tm-badge-green', label: '진행 중' };
     case 'completed':
       return { badgeClass: 'tm-badge-grey', label: '종료' };
     case 'closed':
@@ -175,7 +175,7 @@ function TournamentsListContent() {
             id="promo-hero-heading"
             className="tm-tournament-promo-fallback-headline"
           >
-            조별리그부터 결선 토너먼트까지,<br />
+            조별 리그부터 결선 토너먼트까지,<br />
             팀과 함께 겨뤄보세요
           </p>
         )}
@@ -548,7 +548,7 @@ function MiniBracketPreview() {
           {semis.map((m, i) => (
             <div key={i} className="tm-tournament-promo-bracket-match">
               <span>{m.a}</span>
-              <span className="tm-tournament-promo-bracket-vs">vs</span>
+              <span className="tm-tournament-promo-bracket-vs">VS</span>
               <span>{m.b}</span>
             </div>
           ))}
@@ -660,7 +660,7 @@ const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string }> = [
 const HOW_TO_STEPS: Array<{ icon: React.ReactNode; title: string; desc: string }> = [
   {
     icon: <IconTeam size={28} />,
-    title: '팀 선택/만들기',
+    title: '팀 선택·만들기',
     desc: '내 팀으로 참가하거나 새 팀을 만들어 준비해요.',
   },
   {
@@ -771,14 +771,14 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
               borderRadius: 999,
               background: 'var(--orange50)',
             }}
-            aria-label={`총 상금 ${item.prizePool.toLocaleString('ko-KR')}원`}
+            aria-label={`총 상금 ${formatPrize(item.prizePool)}`}
           >
             <TrophyIcon size={12} color="var(--orange500)" aria-hidden="true" />
             <span
               className="tm-text-caption"
               style={{ color: 'var(--text-strong)', fontWeight: 600 }}
             >
-              총 상금 {item.prizePool.toLocaleString('ko-KR')}원
+              총 상금 {formatPrize(item.prizePool)}
             </span>
           </div>
         ) : null}

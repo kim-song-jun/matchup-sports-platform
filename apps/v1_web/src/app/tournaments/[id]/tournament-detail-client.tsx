@@ -26,9 +26,9 @@ type StatusConfig = { badgeClass: string; label: string };
 function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
   switch (status) {
     case 'open':
-      return { badgeClass: 'tm-badge-blue', label: '모집중' };
+      return { badgeClass: 'tm-badge-blue', label: '모집 중' };
     case 'in_progress':
-      return { badgeClass: 'tm-badge-green', label: '진행중' };
+      return { badgeClass: 'tm-badge-green', label: '진행 중' };
     case 'completed':
       return { badgeClass: 'tm-badge-grey', label: '종료' };
     case 'closed':
@@ -126,7 +126,7 @@ function ApplyCTAButtons({
         className="tm-btn tm-btn-lg tm-btn-neutral"
         aria-label="내 신청 상태 확인"
       >
-        내 신청
+        내 신청 보기
       </Link>
       {isFull ? (
         <button
@@ -810,7 +810,7 @@ function InfoRow({
 function fixtureStatusLabel(status: string): string {
   switch (status) {
     case 'scheduled': return '예정';
-    case 'in_progress': return '진행중';
+    case 'in_progress': return '진행 중';
     case 'completed': return '종료';
     case 'cancelled': return '취소';
     default: return status;
@@ -888,7 +888,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
       {/* VS row */}
       <div
         role="group"
-        aria-label={`${fixture.homeTeamName || 'TBD'} 대 ${fixture.awayTeamName || 'TBD'}`}
+        aria-label={`${fixture.homeTeamName || '미정'} 대 ${fixture.awayTeamName || '미정'}`}
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr auto 1fr',
@@ -907,7 +907,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
               whiteSpace: 'nowrap',
             }}
           >
-            {fixture.homeTeamName || 'TBD'}
+            {fixture.homeTeamName || '미정'}
           </div>
         </div>
 
@@ -928,7 +928,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
               className="tm-text-label"
               style={{ color: 'var(--text-caption)', letterSpacing: 1 }}
             >
-              VS
+              vs
             </div>
           )}
         </div>
@@ -944,7 +944,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
               whiteSpace: 'nowrap',
             }}
           >
-            {fixture.awayTeamName || 'TBD'}
+            {fixture.awayTeamName || '미정'}
           </div>
         </div>
       </div>

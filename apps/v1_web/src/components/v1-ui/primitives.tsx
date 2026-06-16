@@ -273,8 +273,15 @@ export function InfoRow({ label, value, valueColor, isLast }: InfoRowProps) {
   );
 }
 
+/** '-' 또는 빈 값은 "정보 없음"으로 간주한다. */
+function isMissing(v: number | string | undefined): boolean {
+  return v === undefined || v === null || String(v).trim() === '-' || String(v).trim() === '';
+}
+
 export function WeatherStrip({ city, temp, cond, wind, feelsLike, status }: WeatherStripProps) {
-  const displayedFeelsLike = feelsLike ?? temp;
+  const feelsLikeVal = feelsLike ?? temp;
+  const feelsLikeText = isMissing(feelsLikeVal) ? '체감 정보 없음' : `체감 ${feelsLikeVal}°`;
+  const windText = isMissing(wind) ? '바람 정보 없음' : `바람 ${wind}m/s`;
 
   return (
     <div className="tm-weather-strip">
@@ -284,7 +291,7 @@ export function WeatherStrip({ city, temp, cond, wind, feelsLike, status }: Weat
           {city} {temp}° · {cond}
         </div>
         <div className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 1 }}>
-          체감 {displayedFeelsLike}° · 바람 {wind}m/s{status ? ` · ${status}` : ''}
+          {feelsLikeText} · {windText}{status ? ` · ${status}` : ''}
         </div>
       </div>
     </div>

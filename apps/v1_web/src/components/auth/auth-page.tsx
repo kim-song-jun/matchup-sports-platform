@@ -16,7 +16,7 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           <h1 className="tm-text-heading tm-auth-title">{model.heroTitle}</h1>
           <p className="tm-text-body tm-auth-sub">{model.heroSub}</p>
           <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
-          <p className="tm-text-caption tm-auth-helper">기존 계정이 있으면 이메일 로그인 후 종목, 레벨, 지역 확인으로 이어집니다.</p>
+          <p className="tm-text-caption tm-auth-helper">기존 계정이 있으면 이메일 로그인 후 종목, 실력, 지역 확인으로 이어져요.</p>
         </div>
         <div>
           <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={model.guestHref}>로그인 없이 시작하기</Link>
@@ -102,8 +102,8 @@ export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.body}</p>
         <Card pad={16} className={`tm-auth-exception-card tm-auth-exception-card-${model.tone}`}>
-          <div className="tm-text-label">처리 기준</div>
-          <div className="tm-text-caption">입력값과 온보딩 임시 선택값은 보존하고, 계정 상태를 성공처럼 처리하지 않습니다.</div>
+          <div className="tm-text-label">안내</div>
+          <div className="tm-text-caption">입력하신 정보는 안전하게 유지돼요. 다시 시도해 주세요.</div>
         </Card>
       </div>
     </AuthFrame>
@@ -142,7 +142,7 @@ export function SignupFormPageView({ model }: { model: SignupFormViewModel }) {
   return (
     <AuthFrame topTitle="회원가입" backHref={model.backHref} fixedAction={<AuthActionButton action={model.primary} />}>
       <div className="tm-auth-body">
-        <span className="tm-badge tm-badge-blue">SIGN UP</span>
+        <span className="tm-badge tm-badge-blue">회원가입</span>
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
         <div className="tm-auth-form tm-auth-signup-form">
@@ -183,7 +183,7 @@ export function SignupCompletePageView({ model }: { model: SignupCompleteViewMod
 export function OnboardingPageView({ model }: { model: OnboardingViewModel }) {
   return (
     <AuthFrame
-      topTitle={model.step === 'resume' ? '이어하기' : '운동 설정'}
+      topTitle={model.step === 'resume' ? '이어가기' : '운동 설정'}
       backHref={model.backHref}
       skipHref={model.skipHref}
       fixedAction={<OnboardingActions primary={model.primary} secondary={model.secondary} />}
@@ -327,7 +327,7 @@ function CheckMark({ checked }: { checked?: boolean }) {
 function ProgressHeader({ stepNo, total }: { stepNo: number; total: number }) {
   return (
     <div className="tm-auth-progress">
-      <span className="tm-text-micro">{stepNo > 0 ? `${stepNo}단계 / ${total}` : '이어하기'}</span>
+      <span className="tm-text-micro">{stepNo > 0 ? `${stepNo}단계 / ${total}` : '이어가기'}</span>
       <div className="tm-auth-progress-bars">
         {Array.from({ length: total }).map((_, index) => <span key={index} data-active={stepNo > 0 && index < stepNo} />)}
       </div>

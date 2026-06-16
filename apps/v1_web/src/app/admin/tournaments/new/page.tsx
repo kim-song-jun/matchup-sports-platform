@@ -17,9 +17,9 @@ import {
 
 const FORM_SECTIONS = [
   { id: 'tsec-basic', label: '기본 정보' },
-  { id: 'tsec-team', label: '팀·선수' },
+  { id: 'tsec-team', label: '팀·선수 설정' },
   { id: 'tsec-fee', label: '참가비·계좌' },
-  { id: 'tsec-rules', label: '규정·환불' },
+  { id: 'tsec-rules', label: '규정·환불 정책' },
 ] as const;
 
 function SectionStepper({ sections }: { sections: ReadonlyArray<{ id: string; label: string }> }) {
@@ -169,11 +169,13 @@ function DatetimeTextInput({
   value,
   onChange,
   disabled,
+  placeholder = '예: 2026-08-15 09:00',
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   const invalid = value.trim().length > 0 && !isValidDatetimeText(value);
   return (
@@ -185,7 +187,7 @@ function DatetimeTextInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        placeholder="YYYY-MM-DD HH:MM"
+        placeholder={placeholder}
         maxLength={16}
         aria-invalid={invalid}
         aria-describedby={invalid ? `${id}-err` : undefined}
@@ -200,7 +202,7 @@ function DatetimeTextInput({
       />
       {invalid && (
         <p id={`${id}-err`} role="alert" className="text-[12px] text-[var(--red500)] mt-0.5">
-          날짜 형식이 맞지 않아요 (YYYY-MM-DD HH:MM)
+          날짜 형식이 맞지 않아요 (예: 2026-08-15 09:00)
         </p>
       )}
     </>
@@ -322,7 +324,7 @@ export default function AdminTournamentsNewPage() {
       <AdminPageHeader
         eyebrow="대회 관리"
         title="새 대회 만들기"
-        description="대회 기본 정보를 입력하면 초안(draft) 상태로 생성돼요."
+        description="대회 기본 정보를 입력하면 초안 상태로 생성돼요."
       />
 
       <form onSubmit={handleSubmit} noValidate>
@@ -395,6 +397,7 @@ export default function AdminTournamentsNewPage() {
                   value={scheduledAt}
                   onChange={setScheduledAt}
                   disabled={isPending}
+                  placeholder="예: 2026-08-15 09:00"
                 />
               </FormField>
 
@@ -405,6 +408,7 @@ export default function AdminTournamentsNewPage() {
                     value={registrationDeadlineAt}
                     onChange={setRegistrationDeadlineAt}
                     disabled={isPending}
+                    placeholder="예: 2026-08-01 23:59"
                   />
                 </FormField>
               </div>

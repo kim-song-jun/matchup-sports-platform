@@ -43,27 +43,27 @@ const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub
   resume: {
     stepNo: 0,
     title: '운동 설정을 이어갈까요?',
-    sub: '저장된 선택값을 불러와 완료하지 않은 단계부터 다시 시작합니다.',
+    sub: '저장된 선택값을 불러와 완료하지 않은 단계부터 다시 시작해요.',
   },
   sport: {
     stepNo: 1,
     title: '관심 종목을 선택해 주세요',
-    sub: '선택한 종목을 기준으로 다음 실력 입력 단계가 구성됩니다.',
+    sub: '선택한 종목을 기준으로 다음 실력 입력 단계가 구성돼요.',
   },
   level: {
     stepNo: 2,
     title: '종목별 실력을 입력해 주세요',
-    sub: '무리 없는 매칭을 위해 종목마다 현재 실력을 선택합니다.',
+    sub: '무리 없는 매칭을 위해 종목마다 현재 실력을 선택해 주세요.',
   },
   region: {
     stepNo: 3,
     title: '주 활동 지역을 선택해 주세요',
-    sub: '위치 권한 없이도 수동 지역 선택으로 계속할 수 있습니다. 지역은 선택 사항입니다.',
+    sub: '위치 권한 없이도 수동 지역 선택으로 계속할 수 있어요. 지역은 선택 사항이에요.',
   },
   confirm: {
     stepNo: 3,
     title: '준비가 끝났어요',
-    sub: '선택한 종목, 실력, 지역을 기준으로 홈 추천과 필터가 시작됩니다.',
+    sub: '선택한 종목, 실력, 지역을 기준으로 홈 추천과 필터가 시작돼요.',
   },
 };
 
@@ -276,7 +276,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         ) : null}
         {step === 'level' ? (
           <div className="tm-auth-stack">
-            {selectedSports.length === 0 ? <Notice title="종목 선택 필요" body="먼저 관심 종목을 선택해야 실력을 입력할 수 있습니다." tone="orange" /> : null}
+            {selectedSports.length === 0 ? <Notice title="종목 선택 필요" body="먼저 관심 종목을 선택해야 실력을 입력할 수 있어요." tone="orange" /> : null}
             {selectedSports.map(({ sportId, levelId, sport }) => (
               <Card key={sportId} pad={15}>
                 <div className="tm-text-body-lg">{sport?.name}</div>
@@ -388,7 +388,7 @@ function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboar
       <Card pad={15}><div className="tm-text-body-lg">현재 단계</div><div className="tm-text-caption">{onboardingStep ?? 'sport'}</div></Card>
       <Card pad={15}><div className="tm-text-body-lg">선택한 종목</div><div className="tm-text-caption">{draft.sports.length}개</div></Card>
       <Card pad={15}><div className="tm-text-body-lg">선택한 지역</div><div className="tm-text-caption">{draft.regions.length ? `${draft.regions.length}개` : '선택 전'}</div></Card>
-      <Notice title="입력값 보존" body="중단 복귀 시 저장된 선택값을 불러오고, 완료 전 단계만 다시 요청합니다." />
+      <Notice title="입력값 보존" body="중단 복귀 시 저장된 선택값을 불러오고, 완료 전 단계만 다시 요청해요." />
     </div>
   );
 }
@@ -430,11 +430,11 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
   }
 
   if (status === 'denied') {
-    return <Notice title="위치 권한 거부" body="브라우저에서 위치 권한이 거부되었습니다. 지역을 직접 선택해 계속할 수 있습니다." tone="orange" />;
+    return <Notice title="위치 권한 거부" body="브라우저에서 위치 권한이 거부됐어요. 지역을 직접 선택해 계속할 수 있어요." tone="orange" />;
   }
 
   if (status === 'unsupported') {
-    return <Notice title="위치 확인 불가" body="이 브라우저에서는 현재 위치 확인을 지원하지 않습니다. 지역을 직접 선택해 주세요." tone="orange" />;
+    return <Notice title="위치 확인 불가" body="이 브라우저에서는 현재 위치 확인을 지원하지 않아요. 지역을 직접 선택해 주세요." tone="orange" />;
   }
 
   if (status === 'unmatched' && location) {
@@ -445,7 +445,7 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
     return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · ${location.matchedRegionName ?? '가까운 지역'}을 선택했습니다.`} tone="green" />;
   }
 
-  return <Notice title="위치 권한" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택합니다. 거부해도 직접 선택할 수 있습니다." />;
+  return <Notice title="위치 권한" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택해요. 거부해도 직접 선택할 수 있어요." />;
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {
@@ -526,5 +526,5 @@ function clearDraft() {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '요청을 처리하지 못했습니다.';
+  return error instanceof Error ? error.message : '요청을 처리하지 못했어요.';
 }

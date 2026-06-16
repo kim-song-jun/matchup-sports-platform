@@ -48,15 +48,15 @@ export function SignupClient() {
   const emailVerified = emailCheck.status === 'available' && emailCheck.value === email.trim().toLowerCase();
   const isBlocked = register.isPending || checkNickname.isPending || checkEmail.isPending || passwordMismatch || !requiredTermsAccepted || !gender || !nicknameVerified || !emailVerified;
   const disabledReason = !requiredTermsAccepted
-    ? '필수 약관 동의 후 가입할 수 있습니다.'
+    ? '필수 약관에 동의하면 가입할 수 있어요.'
     : passwordMismatch
       ? '비밀번호 확인을 먼저 해결해주세요.'
       : !gender
         ? '성별을 선택해주세요.'
         : !nicknameVerified
-          ? '닉네임 중복 확인이 필요합니다.'
+          ? '닉네임 중복 확인이 필요해요.'
           : !emailVerified
-            ? '이메일 중복 확인이 필요합니다.'
+            ? '이메일 중복 확인이 필요해요.'
             : null;
 
   const runNicknameCheck = () => {
@@ -75,7 +75,7 @@ export function SignupClient() {
       },
       onError: () => {
         setNicknameCheck({ status: 'error', value: nextNickname });
-        setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했습니다. 다시 시도해 주세요.' }));
+        setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했어요. 다시 시도해 주세요.' }));
       },
     });
   };
@@ -96,7 +96,7 @@ export function SignupClient() {
       },
       onError: () => {
         setEmailCheck({ status: 'error', value: nextEmail });
-        setFieldErrors((current) => ({ ...current, email: '중복 확인에 실패했습니다. 다시 시도해 주세요.' }));
+        setFieldErrors((current) => ({ ...current, email: '중복 확인에 실패했어요. 다시 시도해 주세요.' }));
       },
     });
   };
@@ -107,7 +107,7 @@ export function SignupClient() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있습니다.' }));
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있어요.' }));
       event.target.value = '';
       return;
     }
@@ -137,7 +137,7 @@ export function SignupClient() {
     setFieldErrors({});
 
     if (!requiredTermsAccepted) {
-      setFieldErrors({ terms: '필수 약관에 동의해야 회원가입할 수 있습니다.' });
+      setFieldErrors({ terms: '필수 약관에 동의해야 회원가입할 수 있어요.' });
       return;
     }
 
@@ -147,12 +147,12 @@ export function SignupClient() {
     }
 
     if (!nicknameVerified) {
-      setFieldErrors({ nickname: '닉네임 중복 확인이 필요합니다.' });
+      setFieldErrors({ nickname: '닉네임 중복 확인이 필요해요.' });
       return;
     }
 
     if (!emailVerified) {
-      setFieldErrors({ email: '이메일 중복 확인이 필요합니다.' });
+      setFieldErrors({ email: '이메일 중복 확인이 필요해요.' });
       return;
     }
 
@@ -186,7 +186,7 @@ export function SignupClient() {
           router.replace('/signup/complete');
         },
         onError: (nextError) => {
-          const nextMessage = nextError instanceof Error ? nextError.message : '회원가입에 실패했습니다.';
+          const nextMessage = nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.';
 
           if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
             const duplicateField = nextError.code === 'NICKNAME_CONFLICT' ? 'nickname' : nextError.code === 'PHONE_CONFLICT' ? 'phone' : 'email';
@@ -202,13 +202,13 @@ export function SignupClient() {
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'VALIDATION_ERROR') {
-            setError('입력값을 다시 확인해주세요. 필수 약관과 입력 형식을 유지한 채 다시 시도할 수 있습니다.');
+            setError('입력값을 다시 확인해 주세요. 필수 약관과 입력 형식을 맞춰 다시 시도해 주세요.');
             return;
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
-            setFieldErrors({ terms: '필수 약관 문서가 아직 준비되지 않았습니다.' });
-            setError('필수 약관을 저장할 수 없어 가입을 완료하지 못했습니다.');
+            setFieldErrors({ terms: '필수 약관 문서가 아직 준비되지 않았어요.' });
+            setError('필수 약관을 저장할 수 없어 가입을 완료하지 못했어요.');
             return;
           }
 
@@ -340,7 +340,7 @@ export function SignupClient() {
                 setBirthDateDigits(toDigits(event.target.value, 8));
                 setFieldErrors((current) => ({ ...current, birthDate: undefined }));
               }}
-              placeholder="YYYY-MM-DD"
+              placeholder="예: 1995-03-21"
               type="text"
               value={formatBirthDate(birthDateDigits)}
             />

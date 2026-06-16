@@ -395,14 +395,14 @@ function toApplicantTeamsWithActions(
   actionPending: boolean,
 ): TeamMatchDetailViewModel['match']['applicantTeams'] {
   if (match.approvedOpponentTeam) {
-    return [{ name: match.approvedOpponentTeam.name, meta: '승인된 상대팀', status: '승인완료', href: manageHref, applicationId: match.approvedOpponentTeam.applicationId }];
+    return [{ name: match.approvedOpponentTeam.name, meta: '승인된 상대팀', status: '승인 완료', href: manageHref, applicationId: match.approvedOpponentTeam.applicationId }];
   }
 
   if (applications?.items.length) {
     return applications.items.map((app) => ({
       name: app.applicantTeam.name,
       meta: `매너 ${app.applicantTeam.score?.toFixed(1) ?? '-'} · ${app.applicantTeam.matchCount}전`,
-      status: app.status === 'requested' ? '승인 대기' : app.status === 'approved' ? '승인완료' : app.status === 'rejected' ? '거절' : app.status,
+      status: app.status === 'requested' ? '승인 대기' : app.status === 'approved' ? '승인 완료' : app.status === 'rejected' ? '미승인' : app.status,
       href: manageHref,
       applicationId: app.applicationId,
       actionPending,
@@ -505,11 +505,11 @@ function getApplyAction({
 }
 
 function reasonLabel(reasonCode?: string) {
-  if (reasonCode === 'HOST_TEAM_CANNOT_APPLY') return '호스트 팀은 신청 불가';
+  if (reasonCode === 'HOST_TEAM_CANNOT_APPLY') return '내가 만든 팀매치예요';
   if (reasonCode === 'ALREADY_APPROVED') return '승인 완료';
-  if (reasonCode === 'MATCHED_ALREADY') return '매칭 완료';
-  if (reasonCode === 'NOT_RECRUITING') return '신청 불가';
-  return '신청할 팀 없음';
+  if (reasonCode === 'MATCHED_ALREADY') return '이미 상대팀이 정해진 매치예요';
+  if (reasonCode === 'NOT_RECRUITING') return '신청 마감된 매치예요';
+  return '신청 가능한 팀이 없어요';
 }
 
 function parseRules(value: string | null | undefined, fallback: TeamMatchModel) {

@@ -71,7 +71,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
       if (!payload) {
-        setError('종목, 지역, 제목, 장소, 날짜와 신청 마감시간을 확인해주세요.');
+        setError('종목, 지역, 제목, 장소, 날짜를 모두 입력해 주세요.');
         return;
       }
       createMatch.mutate(payload, {
@@ -80,7 +80,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
           window.localStorage.removeItem(storageKey);
           router.push(result.detailRoute || `/matches/${result.matchId}`);
         },
-        onError: (err) => setError(err instanceof Error ? err.message : '매치를 만들 수 없습니다.'),
+        onError: (err) => setError(err instanceof Error ? err.message : '매치를 만들지 못했어요. 다시 시도해 주세요.'),
       });
     },
   });
@@ -116,8 +116,8 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     regionId,
     sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
     regions: editQuery.data?.form.regionId ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
-    error: editQuery.isError ? '수정 권한이 없거나 매치를 불러오지 못했습니다.' : error,
-    lockedReason: editQuery.data?.editable === false ? editQuery.data.lockedReason ?? '현재 상태에서는 수정할 수 없습니다.' : null,
+    error: editQuery.isError ? '수정 권한이 없거나 매치를 불러오지 못했어요.' : error,
+    lockedReason: editQuery.data?.editable === false ? editQuery.data.lockedReason ?? '지금은 수정할 수 없어요.' : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
     onSelectSport: () => undefined,
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
@@ -134,14 +134,14 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
       if (!payload || !version) {
-        setError('수정에 필요한 매치 정보를 확인해주세요.');
+        setError('수정에 필요한 정보가 빠져 있어요. 다시 확인해 주세요.');
         return;
       }
       updateMatch.mutate(
         { ...payload, version },
         {
           onSuccess: (result) => router.push(result.detailRoute || `/matches/${matchId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '매치를 수정할 수 없습니다.'),
+          onError: (err) => setError(err instanceof Error ? err.message : '매치를 수정하지 못했어요. 다시 시도해 주세요.'),
         },
       );
     },
@@ -151,7 +151,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
         { reason: 'host_cancelled_from_v1_web' },
         {
           onSuccess: () => router.push(`/matches/${matchId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '매치를 취소할 수 없습니다.'),
+          onError: (err) => setError(err instanceof Error ? err.message : '매치를 취소하지 못했어요. 다시 시도해 주세요.'),
         },
       );
     },

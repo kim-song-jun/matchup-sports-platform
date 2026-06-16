@@ -53,7 +53,7 @@ const USER_STATUS_FILTER_OPTIONS = [
   { value: 'active', label: '활성' },
   { value: 'suspended', label: '정지' },
   { value: 'blocked', label: '차단' },
-  { value: 'withdrawal_pending', label: '탈퇴대기' },
+  { value: 'withdrawal_pending', label: '탈퇴 대기' },
   { value: 'deleted', label: '삭제' },
 ];
 
@@ -158,7 +158,7 @@ export default function AdminUsersPage() {
           // re-fetched fresh instead of left stale in extraRows.
           setExtraRows([]);
           setNextCursor(null);
-          showToast('처리했어요.', 'success');
+          showToast('회원 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '상태 변경에 실패했어요.'), 'error');

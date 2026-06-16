@@ -577,7 +577,7 @@ function RegistrationsTab({
                     onClick={() => handleRosterUnlock(reg)}
                     disabled={rosterUnlock.isPending}
                     icon={<Unlock size={13} />}
-                    label="잠금해제"
+                    label="잠금 해제"
                     tone="gray"
                   />
                 ) : (
@@ -585,7 +585,7 @@ function RegistrationsTab({
                     onClick={() => handleRosterLock(reg)}
                     disabled={rosterLock.isPending}
                     icon={<Lock size={13} />}
-                    label="명단잠금"
+                    label="명단 잠금"
                     tone="gray"
                   />
                 ))}
@@ -761,9 +761,9 @@ function BracketTab({
           setFixtureNumber('1');
           setFixtureHomeRegId('');
           setFixtureAwayRegId('');
-          showToast('픽스처를 만들었어요.', 'success');
+          showToast('경기 일정을 추가했어요.', 'success');
         },
-        onError: (err) => showToast(extractErrorMessage(err, '픽스처 생성에 실패했어요.'), 'error'),
+        onError: (err) => showToast(extractErrorMessage(err, '경기 일정 추가에 실패했어요.'), 'error'),
       },
     );
   };
@@ -792,7 +792,7 @@ function BracketTab({
     const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
     if (existingInGroup.length > 0) {
       const ok = window.confirm(
-        `"${group.name}"에 이미 픽스처 ${existingInGroup.length}개가 있어요. 추가로 생성할까요?`,
+        `"${group.name}"에 이미 경기 일정 ${existingInGroup.length}개가 있어요. 추가로 만들까요?`,
       );
       if (!ok) return;
     }
@@ -825,7 +825,7 @@ function BracketTab({
           }
         });
         await mutateSequential(payloads);
-        showToast(`조별리그 픽스처 ${payloads.length}개를 자동 생성했어요.`, 'success');
+        showToast(`조별리그 경기 일정 ${payloads.length}개를 자동으로 만들었어요.`, 'success');
       } else {
         // KNOCKOUT phase — seed-pair: 1 vs N, 2 vs N-1, …
         const teams = group.groupTeams;
@@ -844,7 +844,7 @@ function BracketTab({
               { onSuccess: () => resolve(), onError: reject },
             );
           });
-          showToast(`${roundLabel} 픽스처(대진 미정)를 생성했어요.`, 'success');
+          showToast(`${roundLabel} 경기 일정(대진 미정)을 추가했어요.`, 'success');
           return;
         }
 
@@ -861,7 +861,7 @@ function BracketTab({
           });
         }
         await mutateSequential(payloads);
-        showToast(`${roundLabel} 픽스처 ${payloads.length}개를 자동 생성했어요.`, 'success');
+        showToast(`${roundLabel} 경기 일정 ${payloads.length}개를 자동으로 만들었어요.`, 'success');
       }
     } catch (err) {
       showToast(extractErrorMessage(err, '자동 생성에 실패했어요.'), 'error');
@@ -993,7 +993,7 @@ function BracketTab({
               <option value="group">조별</option>
               <option value="semi">준결승</option>
               <option value="final">결승</option>
-              <option value="third_place">3위결정</option>
+              <option value="third_place">3위 결정전</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
@@ -1080,13 +1080,13 @@ function BracketTab({
 
       {/* ── 픽스처 만들기 ────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[15px] font-bold text-gray-900 mb-4">픽스처 만들기</h3>
+        <h3 className="text-[15px] font-bold text-gray-900 mb-4">경기 일정 만들기</h3>
 
         {/* ── 대진 자동 생성 ── */}
         {groups.length > 0 && (
           <div className="mb-5 pb-5 border-b border-gray-100">
             <p className="text-xs text-gray-500 mb-2">
-              조를 선택하면 라운드로빈(조별) 또는 시드 페어링(토너먼트) 픽스처를 자동으로 만들어요.
+              조를 선택하면 조별 라운드로빈 또는 토너먼트 시드 배정 경기 일정을 자동으로 만들어요.
             </p>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
               <div className="flex flex-col gap-1">
@@ -1111,7 +1111,7 @@ function BracketTab({
                 disabled={!autoGenGroupId || isAutoGenerating || createFixture.isPending}
                 onClick={() => void handleAutoGenerate(autoGenGroupId)}
                 className={submitBtnCls}
-                aria-label="선택한 조의 픽스처 자동 생성"
+                aria-label="선택한 조의 경기 일정 자동 생성"
               >
                 <RefreshCw size={14} aria-hidden="true" />
                 {isAutoGenerating ? '생성 중…' : '대진 자동 생성'}
@@ -1265,7 +1265,7 @@ function BracketTab({
                   disabled={!fixtureRound || !fixtureNumber || sameTeam || createFixture.isPending}
                   className={submitBtnCls + ' w-full sm:w-auto'}
                 >
-                  <Plus size={14} aria-hidden="true" />픽스처 추가
+                  <Plus size={14} aria-hidden="true" />경기 일정 추가
                 </button>
               </div>
             </form>
@@ -1397,7 +1397,7 @@ function BracketTab({
       {/* ── 픽스처 목록 (f13: AdminDataTable — 모바일 card reflow 자동 적용) ── */}
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-[15px] font-bold text-gray-900">픽스처 목록</h3>
+          <h3 className="text-[15px] font-bold text-gray-900">경기 일정</h3>
           {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens */}
           <AdminDataTable<V1AdminBracketFixture>
             scrollOnMobile
@@ -1757,7 +1757,7 @@ function AnnouncementsTab({
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-bold text-gray-900 mb-0.5 truncate">{ann.title}</p>
                   <p className="text-xs text-gray-500">
-                    {ann.publishedAt ? `발행 · ${formatDate(ann.publishedAt)}` : '미발행'}
+                    {ann.publishedAt ? `발행됨 · ${formatDate(ann.publishedAt)}` : '미발행'}
                     {' '}·{' '}
                     {ann.audience === 'all_registered'
                       ? '모든 신청팀'
@@ -1889,7 +1889,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       {
         onSuccess: (res) => {
           if (res.alreadyInStatus) {
-            showToast('이미 해당 상태예요.', 'success');
+            showToast('이미 이 상태예요.', 'success');
           } else {
             showToast('상태를 변경했어요.', 'success');
           }
@@ -2044,7 +2044,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         )}
         {/* Null-state hint when all long-form fields are absent */}
         {!tournament.prizeBreakdown && !tournament.rulesText && !tournament.refundPolicyText && (
-          <p className="mt-3 text-xs text-gray-400">상금 배분·규정·환불 정책이 아직 입력되지 않았어요.</p>
+          <p className="mt-3 text-xs text-gray-400">상금 배분, 대회 규정, 환불 정책을 아직 입력하지 않았어요.</p>
         )}
       </div>
 

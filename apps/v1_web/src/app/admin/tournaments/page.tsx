@@ -46,9 +46,9 @@ function formatCurrency(n: number): string {
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '전체' },
   { value: 'draft', label: '초안' },
-  { value: 'open', label: '접수중' },
+  { value: 'open', label: '접수 중' },
   { value: 'closed', label: '마감' },
-  { value: 'in_progress', label: '진행중' },
+  { value: 'in_progress', label: '진행 중' },
   { value: 'completed', label: '완료' },
   { value: 'cancelled', label: '취소됨' },
 ];
@@ -157,7 +157,7 @@ export default function AdminTournamentsPage() {
     },
     {
       key: 'registrationCount',
-      header: '신청수',
+      header: '신청 수',
       align: 'right',
       render: (row) => (
         <span className="text-gray-600 tabular-nums">{row.registrationCount}팀</span>

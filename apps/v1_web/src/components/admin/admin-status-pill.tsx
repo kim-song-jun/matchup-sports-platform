@@ -53,7 +53,7 @@ export const STATUS_META: Record<string, StatusMeta> = {
     icon: <Ban size={12} aria-hidden="true" />,
   },
   withdrawal_pending: {
-    label: '탈퇴대기',
+    label: '탈퇴 대기',
     tone: 'amber',
     icon: <Clock size={12} aria-hidden="true" />,
   },
@@ -65,7 +65,7 @@ export const STATUS_META: Record<string, StatusMeta> = {
 
   // ── Match ────────────────────────────────────────────────────────────
   recruiting: {
-    label: '모집중',
+    label: '모집 중',
     tone: 'blue',
     icon: <CircleDot size={12} aria-hidden="true" />,
   },
@@ -111,12 +111,12 @@ export const STATUS_META: Record<string, StatusMeta> = {
   // cancelled already defined above (red/XCircle — reused)
   // completed already defined above (gray/CheckCircle2 — reused; green variant not used to avoid match-domain conflict)
   open: {
-    label: '접수중',
+    label: '접수 중',
     tone: 'blue',
     icon: <CircleDot size={12} aria-hidden="true" />,
   },
   in_progress: {
-    label: '진행중',
+    label: '진행 중',
     tone: 'green',
     icon: <Loader2 size={12} aria-hidden="true" />,
   },
@@ -129,17 +129,17 @@ export const STATUS_META: Record<string, StatusMeta> = {
   // ── Registration ─────────────────────────────────────────────────────
   // cancelled already defined above (red/XCircle — reused)
   awaiting_payment: {
-    label: '입금대기',
+    label: '입금 대기',
     tone: 'amber',
     icon: <Clock size={12} aria-hidden="true" />,
   },
   payment_checking: {
-    label: '확인중',
+    label: '확인 중',
     tone: 'amber',
     icon: <Clock size={12} aria-hidden="true" />,
   },
   paid: {
-    label: '결제완료',
+    label: '결제 완료',
     tone: 'blue',
     icon: <CircleDot size={12} aria-hidden="true" />,
   },
@@ -154,7 +154,7 @@ export const STATUS_META: Record<string, StatusMeta> = {
     icon: <Archive size={12} aria-hidden="true" />,
   },
   cancel_requested: {
-    label: '취소요청',
+    label: '취소 요청',
     tone: 'amber',
     icon: <AlertCircle size={12} aria-hidden="true" />,
   },

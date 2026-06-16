@@ -399,7 +399,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                   'transition-colors disabled:opacity-50',
                 ].join(' ')}
               >
-                <option value="ops">운영 — 변이 기능 포함</option>
+                <option value="ops">운영 — 상태 변경 등 쓰기 권한 포함</option>
                 <option value="support">지원 — 읽기 전용</option>
               </select>
             </div>
@@ -750,7 +750,7 @@ export default function AdminAdminsPage() {
           empty={
             <AdminEmpty
               title="운영자가 없어요"
-              description="운영자 추가 버튼으로 운영자를 부여해 보세요."
+              description="운영자 추가 버튼을 눌러 운영자를 등록해 보세요."
             />
           }
           error={errorMessage}

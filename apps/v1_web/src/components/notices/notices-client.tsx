@@ -50,7 +50,7 @@ export function NoticeDetailPageClient({ noticeId }: { noticeId: string }) {
 }
 
 function toNotice(notice: V1Notice): NoticeModel {
-  const body = notice.body ?? '공지 본문을 불러왔지만 상세 내용은 아직 등록되지 않았습니다.';
+  const body = notice.body ?? '공지 내용이 아직 등록되지 않았어요.';
 
   return {
     id: notice.noticeId ?? notice.id ?? 'notice',

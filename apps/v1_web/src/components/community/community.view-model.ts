@@ -41,24 +41,24 @@ export function getChatRoomViewModel(): ChatRoomViewModel {
   return {
     title: '주말 풋살 매치',
     context: {
-      title: '개인매치 상세조회',
-      sub: '카테고리에 맞는 맥락 바로가기 박스를 상단에 고정합니다.',
+      title: '개인매치 상세',
+      sub: '이 채팅방과 연결된 개인매치예요',
       href: '/matches/match-1',
     },
     messages: [
-      { id: 'm1', who: 'other', label: '상대', body: '오늘 14:00 경기 인원 확인 부탁드려요.' },
+      { id: 'm1', who: 'other', label: '상대', body: '오늘 14:00 경기 인원 확인해 주세요' },
       { id: 'm2', who: 'me', label: '나', body: '네. 20분 전에 도착하겠습니다.' },
-      { id: 'm3', who: 'other', label: '상대', body: '참가 승인 완료했습니다. 현장 준비 내용도 확인했어요.' },
-      { id: 'm4', who: 'system', label: '시스템', body: '수아님이 참가 승인되었습니다.' },
+      { id: 'm3', who: 'other', label: '상대', body: '참가가 승인됐어요. 현장 준비 내용도 확인해 주세요.' },
+      { id: 'm4', who: 'system', label: '시스템', body: '수아님이 참가 승인됐어요' },
     ],
   };
 }
 
 export function getNotificationsViewModel(readAll = false): NotificationsViewModel {
   const notifications = [
-    { id: 'n1', group: '오늘' as const, title: '매치 참가 확정', body: '성수 풋살파크 · 10명 · 현장 준비 필요', time: '방금 전', unread: !readAll, href: '/matches/match-1', actionLabel: '매치 보기' },
+    { id: 'n1', group: '오늘' as const, title: '매치 참가 확정', body: '성수 풋살파크 · 10명 · 준비물 있음', time: '방금 전', unread: !readAll, href: '/matches/match-1', actionLabel: '매치 보기' },
     { id: 'n2', group: '오늘' as const, title: '팀 초대', body: '성수 러너스 FC · 풋살 · 신입 환영', time: '10분 전', unread: !readAll, href: '/teams/team-1', actionLabel: '팀 보기' },
-    { id: 'n3', group: '어제' as const, title: '리뷰 요청', body: '지난 경기 후기를 남겨주세요', time: '어제', unread: false, href: '/my/reviews', actionLabel: '리뷰 확인' },
+    { id: 'n3', group: '어제' as const, title: '리뷰 요청', body: '지난 경기 후기를 남겨 주세요', time: '어제', unread: false, href: '/my/reviews', actionLabel: '리뷰 확인' },
     { id: 'n4', group: '어제' as const, title: '새 메시지', body: '강동 위클리 풋살에서 메시지를 보냈어요.', time: '어제', unread: false, href: '/chat/room-1', actionLabel: '채팅 열기' },
   ];
 

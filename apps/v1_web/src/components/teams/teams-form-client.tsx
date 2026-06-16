@@ -50,12 +50,12 @@ export function TeamCreatePageClient() {
       setError(null);
       const payload = buildPayload(draft, sportId, regionId, joinPolicy);
       if (!payload) {
-        setError('팀명, 종목, 지역을 확인해주세요.');
+        setError('팀 이름, 종목, 지역을 모두 입력해 주세요.');
         return;
       }
       createTeam.mutate(payload, {
         onSuccess: (result) => router.push(result.detailRoute || `/teams/${result.teamId}`),
-        onError: (err) => setError(err instanceof Error ? err.message : '팀을 만들 수 없습니다.'),
+        onError: (err) => setError(err instanceof Error ? err.message : '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'),
       });
     },
   });
@@ -107,7 +107,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     membersVisibilityEnabled,
     sports: query.data ? [{ id: query.data.sport.sportId, name: query.data.sport.name }] : [],
     regions: query.data?.region ? [{ id: query.data.region.regionId, name: query.data.region.name }] : [],
-    error: query.isError ? '팀 정보를 불러오지 못했습니다.' : error,
+    error: query.isError ? '팀 정보를 불러오지 못했어요.' : error,
     submitting: query.isLoading || updateTeam.isPending,
     setDraft,
     setSportId,
@@ -118,14 +118,14 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       setError(null);
       const payload = buildPayload(draft, sportId, regionId, joinPolicy);
       if (!payload || !version) {
-        setError('수정에 필요한 팀 정보를 확인해주세요.');
+        setError('팀 정보를 다시 확인하고 저장해 주세요.');
         return;
       }
       updateTeam.mutate(
         { ...payload, version, membersVisibilityEnabled },
         {
           onSuccess: (result) => router.push(result.detailRoute || `/teams/${teamId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '팀을 수정할 수 없습니다.'),
+          onError: (err) => setError(err instanceof Error ? err.message : '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'),
         },
       );
     },

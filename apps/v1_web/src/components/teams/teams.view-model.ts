@@ -17,7 +17,7 @@ const teams = [
     members: 18,
     capacity: 24,
     status: 'open' as const,
-    statusLabel: '모집중',
+    statusLabel: '모집 중',
     tags: ['초보-중수', '주 1회', '친선'],
     genderRule: '성별 무관',
     intro: '주 1회 정기적으로 풋살을 즐기는 동네 팀입니다. 초보-중수 멤버와 빠른 응답을 중요하게 봅니다.',
@@ -33,11 +33,11 @@ const teams = [
     members: 22,
     capacity: 28,
     status: 'reviewing' as const,
-    statusLabel: '검토중',
+    statusLabel: '검토 중',
     tags: ['중수', '평일 저녁', '리그 준비'],
     genderRule: '여',
     intro: '평일 저녁 풋살 위주로 운영하는 팀입니다. 가입 신청은 운영진 검토 후 확정합니다.',
-    next: '가입 신청 검토중',
+    next: '가입 신청 검토 중',
   },
   {
     id: 'team-3',
@@ -66,7 +66,7 @@ const teams = [
     capacity: 20,
     status: 'mine' as const,
     statusLabel: '내 팀',
-    tags: ['팀장', '팀매치 운영', '친선'],
+    tags: ['팀장', '팀매치 운영 중', '친선'],
     genderRule: '성별 무관',
     intro: '내가 관리하는 풋살 팀입니다. 팀 소개, 멤버 권한, 모집 상태와 팀매치 생성을 관리할 수 있습니다.',
     next: '신청 3명 검토 필요',
@@ -104,7 +104,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     county: '강동구',
     level: '중수',
     membersList: [
-      { name: '운영진', role: '관리자', meta: '가입 신청 검토중', status: '검토중', visibility: '공개' },
+      { name: '운영진', role: '관리자', meta: '가입 신청 검토 중', status: '검토 중', visibility: '공개' },
       { name: '나', role: '신청자', meta: '가입 승인 대기', status: '검토중', visibility: '비공개' },
     ],
   },
@@ -122,7 +122,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
   },
   mine: {
     description: '내가 관리하는 팀입니다. 팀 정보, 멤버 권한, 가입 신청, 팀매치 생성과 수정 흐름으로 이동할 수 있습니다.',
-    activity: '팀매치 운영중 · 가입 신청 3명 검토 필요',
+    activity: '팀매치 운영 중 · 가입 신청 3명 검토 필요',
     condition: '풋살 초보-중수 · 구로/영등포권',
     schedule: '매주 금 21:00 · 신도림 풋살파크',
     city: '서울',
@@ -164,7 +164,7 @@ export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamS
     },
     error: {
       title: '팀 목록을 불러오지 못했어요',
-      description: '일시적으로 목록을 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+      description: '목록을 일시적으로 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
       query: '풋살',
       teams: [],
     },
@@ -210,8 +210,8 @@ export function getTeamDetailViewModel(mode: TeamDetailViewModel['mode'] = 'defa
         canView: mode === 'mine',
         enabled: mode === 'mine',
         message: mode === 'mine'
-          ? '멤버 현황 조회가 활성화되어 있습니다.'
-          : '팀 멤버만 멤버 현황을 볼 수 있습니다.',
+          ? '멤버 목록을 볼 수 있어요.'
+          : '팀 멤버만 멤버 목록을 볼 수 있어요.',
       },
     },
   };
@@ -251,8 +251,8 @@ export function getTeamMembersViewModel(): TeamMembersViewModel {
       { name: '이하나', role: '멤버', meta: 'MF · 최근 4경기', actions: [] },
     ],
     requests: [
-      { name: '정하늘', meta: '초보-중수 · 성동 · 풋살 2년', status: '검토중', actions: [] },
-      { name: '최유진', meta: '초보 · 광진 · 평일 가능', status: '검토중', actions: [] },
+      { name: '정하늘', meta: '초보-중수 · 성동 · 풋살 2년', status: '검토 중', actions: [] },
+      { name: '최유진', meta: '초보 · 광진 · 평일 가능', status: '검토 중', actions: [] },
     ],
   };
 }

@@ -64,7 +64,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   sub={
                     /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
                     dash || model.stats.mannerScoreSub === '-'
-                      ? '리뷰 누적 후 표시'
+                      ? '경기 후 리뷰가 쌓이면 보여요'
                       : model.stats.mannerScoreSub
                   }
                 />
@@ -81,7 +81,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
           <div className="tm-home-matches-block">
-            <SectionTitle title="추천 매치" sub={model.network ? '다시 불러와야 해요' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
+            <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
             {model.network ? (
               <div style={{ padding: '0 20px 8px' }}>
                 <EmptyState title="새로고침이 필요해요" sub="추천 목록과 대표 매치를 다시 불러와야 해요." cta="다시 불러오기" onCta={model.retry} />
@@ -154,7 +154,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
 function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   return (
-    <Link className="tm-floating-fab tm-home-chat-fab" href={model.chatHref} aria-label={`채팅 ${model.chatUnreadCount}개 읽지 않음`}>
+    <Link className="tm-floating-fab tm-home-chat-fab" href={model.chatHref} aria-label={`읽지 않은 채팅 ${model.chatUnreadCount}개`}>
       <ChatIcon size={22} strokeWidth={2.2} />
       {model.chatUnreadCount > 0 ? <span className="tm-floating-count tab-num">{model.chatUnreadCount}</span> : null}
     </Link>
@@ -193,7 +193,7 @@ function QuickAction({ item }: { item: HomeQuickAction }) {
 
   if (item.disabled || !item.href) {
     return (
-      <button className="tm-pressable tm-quick-action" disabled type="button" aria-label={`${item.label} 이용 불가`}>
+      <button className="tm-pressable tm-quick-action" disabled type="button" aria-label={`${item.label} - 현재 이용할 수 없어요`}>
         {content}
       </button>
     );
@@ -309,7 +309,7 @@ function SidebarTournamentsWidget() {
                 key={t.id}
                 href={`/tournaments/${t.id}`}
                 className="tm-pressable"
-                aria-label={`대회 상세 — ${t.title}`}
+                aria-label={`대회 상세 보기 — ${t.title}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

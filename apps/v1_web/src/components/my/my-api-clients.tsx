@@ -222,7 +222,7 @@ export function ProfileEditPageClient() {
       },
       onError: () => {
         setNicknameCheck({ status: 'error', value: normalizedNickname });
-        setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했습니다. 다시 시도해 주세요.' }));
+        setFieldErrors((current) => ({ ...current, nickname: '확인하지 못했어요. 다시 시도해 주세요.' }));
       },
     });
   };
@@ -246,7 +246,7 @@ export function ProfileEditPageClient() {
       },
       onError: () => {
         setEmailCheck({ status: 'error', value: normalizedEmail });
-        setFieldErrors((current) => ({ ...current, email: '중복 확인에 실패했습니다. 다시 시도해 주세요.' }));
+        setFieldErrors((current) => ({ ...current, email: '확인하지 못했어요. 다시 시도해 주세요.' }));
       },
     });
   };
@@ -315,7 +315,7 @@ export function ProfileEditPageClient() {
     }
 
     if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
-      setFieldErrors({ birthDate: '생년월일은 YYYYMMDD 형식의 유효한 날짜로 입력해 주세요.' });
+      setFieldErrors({ birthDate: '올바른 생년월일을 입력해 주세요. (예: 1995-01-15)' });
       return;
     }
 
@@ -344,7 +344,7 @@ export function ProfileEditPageClient() {
         });
         return;
       }
-      setFieldErrors({ form: nextError instanceof Error ? nextError.message : '프로필 저장에 실패했습니다.' });
+      setFieldErrors({ form: nextError instanceof Error ? nextError.message : '저장하지 못했어요. 다시 시도해 주세요.' });
     }
   };
 
@@ -364,7 +364,7 @@ export function ProfileEditPageClient() {
           </div>
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>목록과 신청 화면에 함께 표시됩니다.</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 목록과 신청서에 함께 보여요.</div>
             <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
               <label className="tm-btn tm-btn-md tm-btn-neutral">
                 {profileImageUrl ? '사진 변경' : '사진 선택'}
@@ -400,7 +400,7 @@ export function ProfileEditPageClient() {
               required
             />
             <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || !nicknameChanged || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button">
-              {checkNickname.isPending ? '확인중' : nicknameChanged ? '중복확인' : '변경 없음'}
+              {checkNickname.isPending ? '확인 중' : nicknameChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
           {fieldErrors.nickname || (nicknameVerified && nicknameChanged) ? (
@@ -424,7 +424,7 @@ export function ProfileEditPageClient() {
               required
             />
             <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button">
-              {checkEmail.isPending ? '확인중' : emailChanged ? '중복확인' : '변경 없음'}
+              {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
           {fieldErrors.email || (emailVerified && emailChanged) ? (
@@ -454,7 +454,7 @@ export function ProfileEditPageClient() {
             className={`tm-input ${fieldErrors.birthDate ? 'tm-auth-input-error' : ''}`}
             inputMode="numeric"
             maxLength={10}
-            placeholder="YYYY-MM-DD"
+            placeholder="예: 1995-01-15"
             value={formatBirthDate(birthDateDigits)}
             onChange={(event) => {
               setBirthDateDigits(toDigits(event.target.value, 8));
@@ -477,8 +477,8 @@ export function ProfileEditPageClient() {
         </label>
 
         <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
-          <div className="tm-text-label">{fieldErrors.form ?? '프로필만 저장합니다.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>종목, 난이도, 활동 지역은 마이페이지의 운동 정보에서 따로 관리합니다.</div>
+          <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
         </Card>
       </form>
       <div className="tm-fixed-cta tm-my-profile-edit-cta">
@@ -553,7 +553,7 @@ export function SportsSettingsPageClient() {
         </div>
         <Card pad={16}>
           <div className="tm-text-body-lg">운동 종목</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>추천과 모집 조건에 사용할 종목을 선택합니다.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 추천과 모집 조건에 쓸 종목을 선택해 주세요.</div>
           <div className="tm-auth-sport-grid" style={{ marginTop: 14 }}>
             {sports.map((sport) => {
               const selected = selectedSports.some((item) => item.sportId === sport.id);
@@ -601,8 +601,8 @@ export function SportsSettingsPageClient() {
         </Card>
 
         <Card pad={14} style={{ marginTop: 14, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
-          <div className="tm-text-label">{message ?? '운동 정보를 따로 저장합니다.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>저장 후 마이페이지의 종목 칩과 추천 기준에 바로 반영됩니다.</div>
+          <div className="tm-text-label">{message ?? '운동 정보만 별도로 저장돼요.'}</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
         </Card>
       </form>
       <div className="tm-fixed-cta tm-my-sports-cta">
@@ -665,12 +665,12 @@ export function LocationSettingsPageClient() {
   const [selectedRegionId, setSelectedRegionId] = useState('');
   const [matchedLabel, setMatchedLabel] = useState<string | null>(null);
   const [status, setStatus] = useState<LocationStatus>('idle');
-  const [message, setMessage] = useState('현재 위치를 한 번만 확인해 활동 지역으로 변환합니다.');
+  const [message, setMessage] = useState('현재 위치를 한 번 확인해 활동 지역으로 설정해요.');
 
   const requestCurrentLocation = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setStatus('unsupported');
-      setMessage('이 브라우저에서는 현재 위치를 확인할 수 없습니다. 지역을 직접 선택해 주세요.');
+      setMessage('이 브라우저에서는 위치를 확인할 수 없어요. 아래에서 지역을 직접 선택해 주세요.');
       return;
     }
 
@@ -687,7 +687,7 @@ export function LocationSettingsPageClient() {
             onSuccess: (result) => {
               if (!result.region?.id) {
                 setStatus('unmatched');
-                setMessage('현재 위치와 일치하는 지원 지역을 찾지 못했습니다. 지역을 직접 선택해 주세요.');
+                setMessage('현재 위치에 맞는 지역을 찾지 못했어요. 아래에서 직접 선택해 주세요.');
                 return;
               }
 
@@ -699,14 +699,14 @@ export function LocationSettingsPageClient() {
             },
             onError: () => {
               setStatus('unmatched');
-              setMessage('현재 위치를 지역으로 변환하지 못했습니다. 지역을 직접 선택해 주세요.');
+              setMessage('현재 위치로 지역을 찾지 못했어요. 아래에서 직접 선택해 주세요.');
             },
           },
         );
       },
       () => {
         setStatus('denied');
-        setMessage('위치 권한이 거부됐습니다. 지역을 직접 선택해 주세요.');
+        setMessage('위치 접근이 거부됐어요. 아래에서 지역을 직접 선택해 주세요.');
       },
       { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 },
     );
@@ -744,14 +744,14 @@ export function LocationSettingsPageClient() {
             <div className="tm-text-label">현재 활동 지역</div>
             <div className="tm-text-heading" style={{ marginTop: 6 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
             <div className="tm-text-caption" style={{ marginTop: 6 }}>
-              매치, 팀매치, 팀 추천의 기본 지역 기준으로 사용됩니다.
+              매치·팀매치·팀 추천의 기준 지역으로 사용돼요.
             </div>
           </Card>
 
           <Card pad={16}>
             <div className="tm-text-body-lg">현재 위치로 찾기</div>
             <div className="tm-text-caption" style={{ marginTop: 5 }}>
-              좌표는 저장하지 않고 지원 지역으로 변환할 때만 사용합니다.
+              좌표는 저장하지 않고 지역을 찾을 때만 사용해요.
             </div>
             <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" onClick={requestCurrentLocation} disabled={status === 'requesting' || resolveLocation.isPending}>
               {status === 'requesting' || resolveLocation.isPending ? '현재 위치 확인 중' : '현재 위치로 지역 찾기'}
@@ -774,7 +774,7 @@ export function LocationSettingsPageClient() {
           </label>
 
           <Card pad={14} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
-            <div className="tm-text-label">{matchedLabel ?? '지역 확인 필요'}</div>
+            <div className="tm-text-label">{matchedLabel ?? '지역을 선택해 주세요'}</div>
             <div className="tm-text-caption" style={{ marginTop: 5 }}>{message}</div>
           </Card>
         </div>
@@ -869,17 +869,17 @@ export function WithdrawalPageClient() {
           </div>
           <section className="tm-danger-panel">
             <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
-            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 남아 있으면 탈퇴가 제한될 수 있습니다.</p>
+            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 있으면 탈퇴가 제한될 수 있어요.</p>
           </section>
           <Card pad={16}>
-            <ListItem title="요청 상태" sub="탈퇴 요청 후에는 계정 검토가 진행됩니다" trailing="검토" />
-            <ListItem title="보관 데이터" sub="법적 보관 기간 이후 삭제됩니다" trailing="필수" />
+            <ListItem title="요청 상태" sub="탈퇴 신청 후 계정 확인 절차가 진행돼요" trailing="검토" />
+            <ListItem title="보관 데이터" sub="법령에 따른 보관 기간이 지나면 삭제돼요" trailing="필수" />
           </Card>
           <label className="tm-create-field">
             <span className="tm-text-label">탈퇴 사유</span>
             <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
           </label>
-          {withdrawal.isError ? <Card pad={14} className="tm-auth-soft-card-error"><div className="tm-text-label">탈퇴 요청에 실패했습니다</div></Card> : null}
+          {withdrawal.isError ? <Card pad={14} className="tm-auth-soft-card-error"><div className="tm-text-label">탈퇴 요청에 실패했어요</div></Card> : null}
         </div>
       </div>
       <div className="tm-fixed-cta tm-my-withdrawal-cta">
@@ -956,7 +956,7 @@ function toMyTeam(item: V1MyTeam): MyTeam {
     roleLabel: roleLabel(item.role),
     members: item.memberCount,
     manner: item.trust?.score != null && hasTrustValue(item.trust.trustState) ? String(item.trust.score) : '-',
-    next: item.canCreateTeamMatch ? '팀매치 생성 가능' : '팀매치 참여 가능',
+    next: item.canCreateTeamMatch ? '팀매치 만들 수 있어요' : '팀매치에 참여할 수 있어요',
     description: `${item.sport.name} 팀입니다.`,
   };
 }
@@ -972,8 +972,8 @@ function toTeamDetailModel(team: V1TeamDetail): MyTeam {
     roleLabel: roleLabel(team.viewer.role),
     members: team.memberCount,
     manner: team.trust.score && hasTrustValue(team.trust.trustState) ? String(team.trust.score) : '-',
-    next: team.profile.activityAreaText ?? '예정된 팀 일정은 팀매치에서 확인하세요',
-    description: team.profile.introduction ?? '팀 소개가 아직 없습니다.',
+    next: team.profile.activityAreaText ?? '팀매치에서 일정을 확인해 보세요',
+    description: team.profile.introduction ?? '아직 팀 소개가 없어요.',
   };
 }
 
@@ -1005,7 +1005,7 @@ function toMyMember(
     name: member.displayName,
     role: roleLabel(member.role),
     meta: new Date(member.joinedAt).toLocaleDateString('ko-KR'),
-    status: member.status === 'active' ? '활동중' : member.status,
+    status: member.status === 'active' ? '활동 중' : member.status,
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions?.actionPending,
@@ -1024,7 +1024,7 @@ function toMyJoinRequest(
     name: application.applicant.displayName,
     role: '가입 요청',
     meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),
-    status: application.status === 'requested' ? '검토' : application.status,
+    status: application.status === 'requested' ? '대기' : application.status,
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },
@@ -1045,7 +1045,7 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
     title: match.title,
     meta: `${new Date(match.startsAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} · ${match.sportName}`,
     status,
-    statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집중',
+    statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집 중',
     note: match.teamName ? `${match.teamName} 관련 팀매치입니다.` : '내 팀 관련 팀매치입니다.',
     href: match.detailRoute,
   };
@@ -1059,7 +1059,7 @@ function fallbackTeamDetail(teamId: string): MyTeamDetailViewModel {
 function buildTeamSummary(teams: MyTeam[]) {
   return [
     { label: '소속 팀', value: teams.length, unit: '팀' },
-    { label: '운영 권한', value: teams.filter((team) => team.role === 'owner' || team.role === 'manager' || team.role === 'admin').length, unit: '팀' },
+    { label: '운영 중인 팀', value: teams.filter((team) => team.role === 'owner' || team.role === 'manager' || team.role === 'admin').length, unit: '팀' },
     { label: '평균 매너', value: '-' },
   ];
 }

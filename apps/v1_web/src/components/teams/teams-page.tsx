@@ -73,7 +73,7 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
             <EmptyState title={model.title} sub={model.description} />
             {model.state === 'error' ? (
               <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18, background: 'var(--grey50)' }}>
-                <div className="tm-text-label">목록으로 돌아가 다시 확인해 주세요</div>
+                <div className="tm-text-label">팀 목록으로 돌아가 다시 확인해 주세요</div>
                 <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
                   새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
                 </div>
@@ -142,7 +142,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         window.setTimeout(() => setHeroMessage(''), 1800);
       })
       .catch(() => {
-        setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        setHeroMessage('잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 1800);
       });
   };
@@ -198,9 +198,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 <div className="tm-text-body-lg">주요 멤버</div>
                 <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
               </div>
-              {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비활성</button>}
+              {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>보기 불가</button>}
             </div>
-            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀에 소속되어 있고 멤버 현황 조회가 활성화된 경우에만 목록을 볼 수 있습니다.</div>}
+            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
           </Card>
         </div>
 
@@ -219,7 +219,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <span className="tm-badge tm-badge-grey">{team.members}명</span>
           </div>
           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            {locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}
+            {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
           </div>
           {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
@@ -274,9 +274,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <div className="tm-text-body-lg">주요 멤버</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
             </div>
-            {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비활성</button>}
+            {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>보기 불가</button>}
           </div>
-          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀에 소속되어 있고 멤버 현황 조회가 활성화된 경우에만 목록을 볼 수 있습니다.</div>}
+          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
         </Card>
       </article>
       <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택합니다.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인합니다.'}</div>{heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}<button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>{model.ctaPending ? '처리 중' : cta}</button></div>
@@ -309,9 +309,9 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
           <Card pad={16}>
             <div className="tm-my-toggle-row">
               <div>
-                <div className="tm-text-body-lg">멤버 현황 조회</div>
+                <div className="tm-text-body-lg">멤버 목록 공개</div>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                  활성화하면 팀 멤버가 팀 상세에서 멤버 현황을 볼 수 있습니다. 비멤버는 항상 조회할 수 없습니다.
+                  켜면 팀 멤버가 멤버 목록을 볼 수 있어요. 팀에 속하지 않은 사람에게는 공개되지 않아요.
                 </div>
               </div>
               <button
@@ -360,7 +360,7 @@ export function TeamMembersPageView({ model }: { model: TeamMembersViewModel }) 
         </div>
         <Card pad={14} style={{ background: 'var(--grey50)', marginTop: 14 }}>
           <div className="tm-text-label">권한 규칙</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>멤버는 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 가능합니다. 모든 최종 동작은 확인 후 처리됩니다.</div>
+          <div className="tm-text-caption" style={{ marginTop: 5 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
         </Card>
         <div className="tm-team-form-chip-row" style={{ marginTop: 14 }}>
           {model.tabs.map((tab) => (
@@ -370,11 +370,11 @@ export function TeamMembersPageView({ model }: { model: TeamMembersViewModel }) 
           ))}
         </div>
         {model.activeTab === 'members' ? (
-          <MemberSection title="팀 멤버" sub="이미 팀에 속한 멤버의 역할과 권한을 관리합니다." desktopGrid>
+          <MemberSection title="팀 멤버" sub="팀에 속한 멤버의 역할과 권한을 관리해요." desktopGrid>
             {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
           </MemberSection>
         ) : (
-          <MemberSection title="가입 요청" sub="아직 팀원이 아닌 신청자는 승인 또는 거절로 처리합니다." desktopGrid>
+          <MemberSection title="가입 요청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
             {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
           </MemberSection>
         )}
@@ -418,8 +418,8 @@ function TeamSearchBar({ model }: { model: TeamListViewModel }) {
         {model.search?.isOpen ? (
           <div className="tm-list-search-dropdown">
             <div className="tm-list-search-dropdown-title">최근 검색</div>
-            {model.search.isLoading ? <div className="tm-list-search-empty">불러오는 중</div> : null}
-            {!model.search.isLoading && model.search.recentItems.length === 0 ? <div className="tm-list-search-empty">최근 검색어가 없습니다</div> : null}
+            {model.search.isLoading ? <div className="tm-list-search-empty">검색 기록을 불러오는 중이에요</div> : null}
+            {!model.search.isLoading && model.search.recentItems.length === 0 ? <div className="tm-list-search-empty">최근 검색어가 없어요</div> : null}
             {model.search.recentItems.map((item) => (
               <button key={item.id} className="tm-list-search-recent" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => model.search?.onSelectRecent(item.query)}>
                 <span>{item.query}</span>
@@ -449,7 +449,7 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
         <div className="tm-filter-sheet-head">
           <div>
             <div className="tm-text-subhead">필터</div>
-            <div className="tm-text-caption" style={{ marginTop: 2 }}>정렬과 팀 조건을 sheet에서 조정합니다.</div>
+            <div className="tm-text-caption" style={{ marginTop: 2 }}>정렬과 팀 조건을 조정해 보세요.</div>
           </div>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={sheet.resetHref} style={{ color: 'var(--text-caption)' }}>초기화</Link>
         </div>
@@ -540,7 +540,7 @@ function TeamCard({ team }: { team: TeamModel }) {
         <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><span className={`tm-badge ${team.status === 'closed' ? 'tm-badge-grey' : team.status === 'reviewing' ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{team.statusLabel}</span></div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · {team.members}명</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
       </div>
       <div className="tm-team-intro-box">
-        <div className="tm-text-label">팀소개</div>
+        <div className="tm-text-label">팀 소개</div>
         <div className="tm-text-body" style={{ marginTop: 6, color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
       </div>
       <div className="tm-team-card-footer"><span className="tm-text-caption">{team.next}</span><span className={`tm-btn tm-btn-sm ${team.status === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary'}`}>{team.status === 'closed' ? '알림받기' : '팀 보기'}</span></div>
@@ -680,5 +680,5 @@ function CreateField({ label, value, placeholder, suffix, multiline, type = 'tex
 }
 
 function RegionSelect({ value, regions, onChange }: { value: string; regions: Array<{ id: string; name: string }>; onChange?: (regionId: string) => void }) {
-  return <label className="tm-create-field"><div className="tm-text-label">활동 지역</div><select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>팀 추천과 지역 검색에 사용할 기준 지역입니다. 상세 활동 장소는 활동 방식에 적어주세요.</div></label>;
+  return <label className="tm-create-field"><div className="tm-text-label">활동 지역</div><select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">활동 지역을 선택해 주세요</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>팀 추천과 지역 검색에 쓰여요. 활동 장소는 아래 '활동 방식'에 자유롭게 적어 주세요.</div></label>;
 }

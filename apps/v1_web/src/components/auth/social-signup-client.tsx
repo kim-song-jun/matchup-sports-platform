@@ -33,9 +33,9 @@ export function SocialSignupClient() {
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
   const isBlocked = completeProfile.isPending || checkNickname.isPending || !gender || !nicknameVerified;
   const disabledReason = !gender
-      ? '성별을 선택해주세요.'
+      ? '성별을 선택해 주세요.'
       : !nicknameVerified
-        ? '닉네임 중복 확인이 필요합니다.'
+        ? '닉네임 중복 확인이 필요해요.'
         : null;
 
   const runNicknameCheck = () => {
@@ -54,7 +54,7 @@ export function SocialSignupClient() {
       },
       onError: () => {
         setNicknameCheck({ status: 'error', value: nextNickname });
-        setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했습니다. 다시 시도해 주세요.' }));
+        setFieldErrors((current) => ({ ...current, nickname: '중복 확인에 실패했어요. 다시 시도해 주세요.' }));
       },
     });
   };
@@ -65,7 +65,7 @@ export function SocialSignupClient() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있습니다.' }));
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있어요.' }));
       event.target.value = '';
       return;
     }
@@ -84,7 +84,7 @@ export function SocialSignupClient() {
       }
     };
     reader.onerror = () => {
-      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했습니다. 다시 선택해 주세요.' }));
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했어요. 다시 선택해 주세요.' }));
     };
     reader.readAsDataURL(file);
   };
@@ -95,12 +95,12 @@ export function SocialSignupClient() {
     setFieldErrors({});
 
     if (!gender) {
-      setFieldErrors({ gender: '성별을 선택해주세요.' });
+      setFieldErrors({ gender: '성별을 선택해 주세요.' });
       return;
     }
 
     if (!nicknameVerified) {
-      setFieldErrors({ nickname: '닉네임 중복 확인이 필요합니다.' });
+      setFieldErrors({ nickname: '닉네임 중복 확인이 필요해요.' });
       return;
     }
 
@@ -110,7 +110,7 @@ export function SocialSignupClient() {
     }
 
     if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
-      setFieldErrors({ birthDate: '생년월일은 YYYYMMDD 형식의 유효한 날짜로 입력해 주세요.' });
+      setFieldErrors({ birthDate: '생년월일 형식이 맞지 않아요. 예: 1995-03-21' });
       return;
     }
 
@@ -131,18 +131,18 @@ export function SocialSignupClient() {
         onError: (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
             setFieldErrors({ nickname: '이미 사용 중인 닉네임이에요.' });
-            setError('다른 닉네임으로 다시 시도해주세요.');
+            setError('다른 닉네임으로 다시 시도해 주세요.');
             return;
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'PHONE_CONFLICT') {
             setFieldErrors({ phone: '이미 가입된 휴대폰 번호예요.' });
-            setError('이미 가입된 정보가 있어요. 기존 계정으로 로그인하거나 다른 휴대폰 번호를 사용해주세요.');
+            setError('이미 가입된 정보가 있어요. 기존 계정으로 로그인하거나 다른 휴대폰 번호를 사용해 주세요.');
             return;
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
-            setError('필수 약관을 저장할 수 없어 가입을 완료하지 못했습니다.');
+            setError('필수 약관을 저장할 수 없어 가입을 완료하지 못했어요.');
             return;
           }
 
@@ -152,11 +152,11 @@ export function SocialSignupClient() {
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
-            setError('가입 시간이 만료되었습니다. 카카오 로그인부터 다시 진행해 주세요.');
+            setError('가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.');
             return;
           }
 
-          setError(nextError instanceof Error ? nextError.message : '소셜 가입을 완료하지 못했습니다.');
+          setError(nextError instanceof Error ? nextError.message : '가입을 완료하지 못했어요.');
         },
       },
     );
@@ -176,7 +176,7 @@ export function SocialSignupClient() {
     >
       <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={submit}>
         <h1 className="tm-text-heading tm-auth-heading">프로필을 완성하고 운동 설정을 이어가요</h1>
-        <p className="tm-text-body tm-auth-sub">카카오 계정은 확인됐습니다. Teameet에서 사용할 정보만 입력해 주세요.</p>
+        <p className="tm-text-body tm-auth-sub">카카오 계정 확인이 됐어요. Teameet에서 사용할 정보만 입력해 주세요.</p>
         <div className="tm-auth-form tm-auth-signup-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">닉네임</span>
@@ -194,7 +194,7 @@ export function SocialSignupClient() {
                 type="text"
                 value={nickname}
               />
-              <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || nickname.trim().length < 2} onClick={runNicknameCheck} type="button">{checkNickname.isPending ? '확인중' : '중복확인'}</button>
+              <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || nickname.trim().length < 2} onClick={runNicknameCheck} type="button">{checkNickname.isPending ? '확인 중' : '중복 확인'}</button>
             </span>
             {fieldErrors.nickname || nicknameVerified ? (
               <span className={`tm-text-caption tm-auth-field-helper ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
@@ -261,7 +261,7 @@ export function SocialSignupClient() {
                 setBirthDateDigits(toDigits(event.target.value, 8));
                 setFieldErrors((current) => ({ ...current, birthDate: undefined }));
               }}
-              placeholder="YYYY-MM-DD"
+              placeholder="예: 1995-03-21"
               type="text"
               value={formatBirthDate(birthDateDigits)}
             />

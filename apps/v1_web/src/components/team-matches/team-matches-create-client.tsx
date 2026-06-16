@@ -89,7 +89,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       setError(null);
       const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload) {
-        setError('팀, 종목, 지역, 제목, 장소, 날짜와 시간을 확인해주세요.');
+        setError('팀, 종목, 지역, 제목, 장소, 날짜와 시간을 확인해 주세요.');
         return;
       }
       createTeamMatch.mutate(payload, {
@@ -97,7 +97,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
           window.localStorage.removeItem(storageKey);
           router.push(result.detailRoute || `/team-matches/${result.teamMatchId}`);
         },
-        onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 만들 수 없습니다.'),
+        onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 만들 수 없어요. 다시 시도해 주세요.'),
       });
     },
   });
@@ -135,8 +135,8 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     teams: editQuery.data ? [{ id: editQuery.data.form.hostTeamId, name: '현재 팀', sport: '팀매치', members: 0, role: '관리 권한' }] : [],
     sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
     regions: editQuery.data ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
-    error: editQuery.isError ? '수정 권한이 없거나 팀매치를 불러오지 못했습니다.' : error,
-    lockedReason: editQuery.data?.editable === false ? editQuery.data.lockedReason ?? '현재 상태에서는 수정할 수 없습니다.' : null,
+    error: editQuery.isError ? '수정 권한이 없거나 팀매치를 불러오지 못했어요.' : error,
+    lockedReason: editQuery.data?.editable === false ? editQuery.data.lockedReason ?? '지금은 수정할 수 없어요.' : null,
     submitting: editQuery.isLoading || updateTeamMatch.isPending || cancelTeamMatch.isPending,
     onSelectTeam: () => undefined,
     onSelectSport: () => undefined,
@@ -148,14 +148,14 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       setError(null);
       const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload || !version) {
-        setError('수정에 필요한 팀매치 정보를 확인해주세요.');
+        setError('수정에 필요한 팀매치 정보를 확인해 주세요.');
         return;
       }
       updateTeamMatch.mutate(
         { ...payload, version },
         {
           onSuccess: (result) => router.push(result.detailRoute || `/team-matches/${teamMatchId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 수정할 수 없습니다.'),
+          onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 수정할 수 없어요. 다시 시도해 주세요.'),
         },
       );
     },
@@ -164,7 +164,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
         { reason: 'host_cancelled_from_v1_web' },
         {
           onSuccess: () => router.push(`/team-matches/${teamMatchId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 취소할 수 없습니다.'),
+          onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 취소할 수 없어요. 다시 시도해 주세요.'),
         },
       );
     },

@@ -134,7 +134,7 @@ export default function AdminTeamsPage() {
       {
         onSuccess: () => {
           setModalRow(null);
-          showToast('처리했어요.', 'success');
+          showToast('팀 상태를 변경했어요.', 'success');
           // Reset to first page so updated row is re-fetched
           setAccumulatedRows([]);
           setCursor(null);
@@ -174,7 +174,7 @@ export default function AdminTeamsPage() {
       className: 'tabular-nums',
       render: (row) => (
         <span className="text-gray-600">
-          멤버 {row.memberCount} · 운영 {row.managerCount}
+          멤버 {row.memberCount} · 매니저 {row.managerCount}
         </span>
       ),
     },

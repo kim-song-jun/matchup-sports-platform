@@ -84,7 +84,7 @@ function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {
   return {
     ...fallback.stats,
     monthlyActivity: monthlyMatches,
-    monthlyActivitySub: summary.pendingLabel ?? '신청과 참가 기준으로 집계',
+    monthlyActivitySub: summary.pendingLabel ?? '신청·참가 합산',
     mannerScore: mannerScore === null ? '-' : mannerScore.toFixed(1),
     mannerScoreSub: trustStateLabel(summary.trustState),
     joined: monthlyMatches,
@@ -196,12 +196,12 @@ function useCurrentLocationWeather() {
               cond: weatherCodeLabel(current.weather_code),
               wind: roundOne(current.wind_speed_10m),
               feelsLike: Math.round(current.apparent_temperature),
-              status: '실시간 위치 기준',
+              status: '현재 위치 기준',
             });
           }
         } catch {
           if (!cancelled) {
-            setWeather((current) => current ?? { city: '현재 위치', temp: '-', cond: '날씨 불러오기 실패', wind: '-' });
+            setWeather((current) => current ?? { city: '현재 위치', temp: '-', cond: '날씨를 불러오지 못했어요', wind: '-' });
           }
         } finally {
           if (!cancelled) setRefreshing(false);
@@ -248,7 +248,7 @@ function weatherCodeLabel(code: number) {
   if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return '비';
   if ([71, 73, 75, 77, 85, 86].includes(code)) return '눈';
   if ([95, 96, 99].includes(code)) return '뇌우';
-  return '날씨 확인됨';
+  return '날씨 정보 없음';
 }
 
 function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard): HomeMatchCard {
@@ -320,12 +320,12 @@ function shortcutKeyFromLabel(label: string): V1HomeShortcut['key'] {
 }
 
 function disabledReasonLabel(reason: string | null) {
-  if (reason === 'joined_team_required') return '가입 팀 필요';
-  return '이용 불가';
+  if (reason === 'joined_team_required') return '팀에 가입한 뒤 이용할 수 있어요';
+  return '현재 이용할 수 없어요';
 }
 
 function trustStateLabel(value: string) {
-  if (value === 'verified') return '검증됨';
-  if (value === 'estimated') return '추정';
+  if (value === 'verified') return '인증 완료';
+  if (value === 'estimated') return '누적 중';
   return '-';
 }

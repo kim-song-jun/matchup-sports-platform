@@ -146,7 +146,7 @@ export const settingsModel: SettingsViewModel = {
     {
       title: '계정',
       items: [
-        { label: '위치 및 활동 지역', sub: '현재 위치로 추천 기준 지역을 갱신해요', href: '/my/settings/location', icon: 'L' },
+        { label: '위치 및 활동 지역', sub: '현재 위치로 활동 지역을 업데이트해요', href: '/my/settings/location', icon: 'L' },
         { label: '알림 설정', sub: '매치와 채팅 알림을 관리해요', href: '/my/settings/notifications', icon: 'N' },
       ],
     },
@@ -154,7 +154,7 @@ export const settingsModel: SettingsViewModel = {
       title: '서비스',
       items: [
         { label: '약관 및 정책', sub: '이용약관과 개인정보 처리방침', href: '/my/settings/legal', icon: 'L' },
-        { label: '회원 탈퇴', sub: '계정 삭제 전 유의사항 확인', href: '/my/settings/withdrawal', icon: 'W' },
+        { label: '회원 탈퇴', sub: '탈퇴 전 꼭 확인해 주세요', href: '/my/settings/withdrawal', icon: 'W' },
       ],
     },
   ],

@@ -32,7 +32,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: '팀', href: '/admin/teams', icon: <UsersRound size={18} /> },
   { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
   { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
-  { label: '감사로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
+  { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
 ];
 
 const OWNER_NAV_ITEM: NavItem = {

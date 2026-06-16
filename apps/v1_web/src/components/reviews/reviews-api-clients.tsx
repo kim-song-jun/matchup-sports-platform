@@ -112,7 +112,7 @@ export function ReviewSourcePageClient({
       }
       router.replace(`/my/reviews/${sourceType}/${sourceId}?complete=1`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '리뷰 전송에 실패했습니다.');
+      setMessage(error instanceof Error ? error.message : '리뷰 전송에 실패했어요. 다시 시도해 주세요.');
     }
   };
 

@@ -273,7 +273,7 @@ function RegistrationPass({
                 minHeight: 44, paddingLeft: 8,
               }}
             >
-              {belowMinimum ? '명단 등록' : '명단 수정'}
+              {belowMinimum ? '선수 등록' : '선수 수정'}
               <ChevronRightIcon size={16} />
             </Link>
           ) : null}
@@ -373,7 +373,7 @@ function CancelModal({
               onClick={() => onConfirm(reason)}
               disabled={isSubmitting}
             >
-              {isSubmitting ? '처리 중…' : '취소 요청'}
+              {isSubmitting ? '취소 요청 중…' : '참가 취소 요청'}
             </button>
           </div>
         </section>
@@ -508,9 +508,9 @@ function RegistrationDetailView({
               {rosterShortagebadge(registration.status).label}
             </span>
           ) : isRosterLocked ? (
-            <span className="tm-badge tm-badge-grey">잠김</span>
+            <span className="tm-badge tm-badge-grey">마감</span>
           ) : (
-            <span className="tm-badge tm-badge-green">등록 가능</span>
+            <span className="tm-badge tm-badge-green">수정 가능</span>
           )}
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
@@ -526,7 +526,7 @@ function RegistrationDetailView({
           aria-label="선수 명단 등록하기"
           style={{ marginBottom: 8 }}
         >
-          명단 등록하기
+          선수 등록하기
         </Link>
       ) : !isRosterLocked ? (
         <Link
@@ -535,7 +535,7 @@ function RegistrationDetailView({
           aria-label="선수 명단 수정하기"
           style={{ marginBottom: 8 }}
         >
-          명단 수정
+          선수 수정
         </Link>
       ) : null}
 
@@ -565,7 +565,7 @@ function RegistrationDetailView({
           onClick={() => { setCancelError(null); setShowCancelModal(true); }}
           style={{ marginTop: 4 }}
         >
-          참가를 취소하고 싶어요
+          참가 취소 신청
         </button>
       ) : null}
     </>
@@ -653,7 +653,7 @@ function RegistrationDetailView({
                       <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
                         {registration.status === 'awaiting_payment'
                           ? '입금 완료 후 자동으로 상태가 변경돼요.'
-                          : '결제 정보가 없어요.'}
+                          : '아직 결제 정보가 없어요.'}
                       </div>
                     </div>
                   )}
@@ -685,7 +685,7 @@ function RegistrationDetailView({
                       </span>
                     ) : null}
                     {isRosterLocked ? (
-                      <span className="tm-badge tm-badge-grey">잠김</span>
+                      <span className="tm-badge tm-badge-grey">마감</span>
                     ) : null}
                     {!isRosterLocked ? (
                       <Link
@@ -694,7 +694,7 @@ function RegistrationDetailView({
                         aria-label="선수 명단 수정하기"
                         style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                       >
-                        명단 수정
+                        선수 수정
                       </Link>
                     ) : null}
                   </div>
@@ -703,7 +703,7 @@ function RegistrationDetailView({
                   /* P0: copy branches on whether confirmation is still blocked */
                   registration.status === 'confirmed' || registration.status === 'paid' ? (
                     <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      아직 자리가 남았어요. 대회 전까지 선수를 더 등록할 수 있어요.
+                      대회 전까지 선수를 더 등록할 수 있어요.
                     </p>
                   ) : (
                     <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -733,7 +733,7 @@ function RegistrationDetailView({
                   className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
                   onClick={() => { setCancelError(null); setShowCancelModal(true); }}
                 >
-                  참가를 취소하고 싶어요
+                  참가 취소 신청
                 </button>
               ) : null}
             </div>

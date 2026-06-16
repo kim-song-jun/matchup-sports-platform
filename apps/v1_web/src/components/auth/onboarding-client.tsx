@@ -58,7 +58,7 @@ const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub
   region: {
     stepNo: 3,
     title: '주 활동 지역을 선택해 주세요',
-    sub: '위치 권한 없이도 수동 지역 선택으로 계속할 수 있어요. 지역은 선택 사항이에요.',
+    sub: '위치 권한 없어도 괜찮아요. 아래에서 지역을 직접 고르거나 건너뛸 수 있어요.',
   },
   confirm: {
     stepNo: 3,
@@ -256,8 +256,8 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
         {skipAction ? <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={skipAction} type="button">나중에 설정하기</button> : null}
-        {onboarding.isLoading || sportsQuery.isLoading || regionsQuery.isLoading ? <Notice title="불러오는 중" body="저장된 온보딩 정보를 확인하고 있습니다." /> : null}
-        {error ? <Notice title="저장 실패" body={error} tone="orange" /> : null}
+        {onboarding.isLoading || sportsQuery.isLoading || regionsQuery.isLoading ? <Notice title="불러오는 중" body="저장된 정보를 불러오고 있어요." /> : null}
+        {error ? <Notice title="저장하지 못했어요" body={error} tone="orange" /> : null}
         {step === 'resume' ? <ResumePanel onboardingStep={onboarding.data?.currentStep} draft={draft} /> : null}
         {step === 'sport' ? (
           <div className="tm-auth-sport-grid">
@@ -269,7 +269,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                 type="button"
               >
                 <div className="tm-text-body-lg">{sport.name}</div>
-                <div className="tm-text-caption">{selectedSportIds.has(sport.id) ? '선택됨' : '선택 가능'}</div>
+                <div className="tm-text-caption">{selectedSportIds.has(sport.id) ? '선택됨' : '탭해서 선택'}</div>
               </button>
             ))}
           </div>
@@ -372,14 +372,14 @@ function OnboardingFixedAction({
   if (step === 'region') {
     return (
       <>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '선택 확인하기'}</button>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '다음으로'}</button>
         <div style={{ height: 8 }} />
         <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
       </>
     );
   }
 
-  return <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={complete} type="button">{pending ? '완료 중' : '홈으로 시작하기'}</button>;
+  return <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={complete} type="button">{pending ? '저장 중' : '홈으로 시작하기'}</button>;
 }
 
 function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboardingStep?: V1OnboardingStep }) {
@@ -387,8 +387,8 @@ function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboar
     <div className="tm-auth-stack">
       <Card pad={15}><div className="tm-text-body-lg">현재 단계</div><div className="tm-text-caption">{onboardingStep ?? 'sport'}</div></Card>
       <Card pad={15}><div className="tm-text-body-lg">선택한 종목</div><div className="tm-text-caption">{draft.sports.length}개</div></Card>
-      <Card pad={15}><div className="tm-text-body-lg">선택한 지역</div><div className="tm-text-caption">{draft.regions.length ? `${draft.regions.length}개` : '선택 전'}</div></Card>
-      <Notice title="입력값 보존" body="중단 복귀 시 저장된 선택값을 불러오고, 완료 전 단계만 다시 요청해요." />
+      <Card pad={15}><div className="tm-text-body-lg">선택한 지역</div><div className="tm-text-caption">{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
+      <Notice title="잠깐 나가도 괜찮아요" body="설정을 나가도 선택한 내용이 저장돼요. 돌아오면 멈춘 단계부터 이어서 할 수 있어요." />
     </div>
   );
 }
@@ -409,7 +409,7 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
 
   return (
     <div className="tm-auth-stack tm-onboarding-confirm-grid">
-      <Card pad={15}><div className="tm-text-label">관심 종목과 실력</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{sportSummary || '선택 필요'}</div></Card>
+      <Card pad={15}><div className="tm-text-label">관심 종목과 실력</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{sportSummary || '선택하지 않음'}</div></Card>
       <Card pad={15}><div className="tm-text-label">활동 지역</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{regionSummary || '선택 안 함'}</div></Card>
       {draft.currentLocation ? (
         <Card pad={15} className="tm-onboarding-confirm-full">
@@ -419,14 +419,14 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
           </div>
         </Card>
       ) : null}
-      <Notice title="완료 상태" body="홈 진입 후에도 설정에서 종목, 실력, 지역을 수정할 수 있습니다." tone="green" />
+      <Notice title="설정 완료" body="홈에 들어간 뒤에도 설정에서 종목, 실력, 지역을 바꿀 수 있어요." tone="green" />
     </div>
   );
 }
 
 function LocationNotice({ location, status }: { location: CurrentLocationDraft | null; status: LocationStatus }) {
   if (status === 'requesting') {
-    return <Notice title="현재 위치 확인 중" body="브라우저 위치 권한을 확인하고 있습니다." />;
+    return <Notice title="현재 위치 확인 중" body="위치 권한을 확인하고 있어요." />;
   }
 
   if (status === 'denied') {
@@ -442,10 +442,10 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
   }
 
   if (location) {
-    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · ${location.matchedRegionName ?? '가까운 지역'}을 선택했습니다.`} tone="green" />;
+    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · ${location.matchedRegionName ?? '가까운 지역'}을 선택했어요.`} tone="green" />;
   }
 
-  return <Notice title="위치 권한" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택해요. 거부해도 직접 선택할 수 있어요." />;
+  return <Notice title="현재 위치 사용하기" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택해요. 거부해도 직접 선택할 수 있어요." />;
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {
@@ -455,7 +455,7 @@ function Notice({ body, title, tone = 'blue' }: { body: string; title: string; t
 function ProgressHeader({ stepNo, total }: { stepNo: number; total: number }) {
   return (
     <div className="tm-auth-progress">
-      <span className="tm-text-micro">{stepNo > 0 ? `STEP ${stepNo} / ${total}` : 'RESUME'}</span>
+      <span className="tm-text-micro">{stepNo > 0 ? `${stepNo} / ${total}단계` : null}</span>
       <div className="tm-auth-progress-bars">{Array.from({ length: total }).map((_, index) => <span key={index} data-active={stepNo > 0 && index < stepNo} />)}</div>
     </div>
   );

@@ -62,7 +62,7 @@ export function TournamentHeroCard() {
               className="tm-text-micro"
               style={{ color: 'var(--static-white)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
-              <TrophyIcon size={13} strokeWidth={2} aria-hidden="true" /> 상금 대회 · 모집중
+              <TrophyIcon size={13} strokeWidth={2} aria-hidden="true" /> 상금 대회 · 모집 중
             </div>
             <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
               {featured.title}

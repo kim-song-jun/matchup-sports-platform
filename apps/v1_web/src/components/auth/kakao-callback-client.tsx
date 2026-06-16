@@ -33,7 +33,7 @@ export function KakaoCallbackClient() {
     const providerError = searchParams.get('error');
 
     if (providerError || !code) {
-      setError('카카오 로그인을 완료하지 못했습니다.');
+      setError('카카오 로그인을 완료하지 못했어요.');
       return;
     }
 
@@ -58,17 +58,17 @@ export function KakaoCallbackClient() {
           }
 
           if (nextError.code === 'OAUTH_NOT_CONFIGURED') {
-            setError('카카오 로그인 설정이 완료되지 않았습니다.');
+            setError('카카오 로그인 설정이 아직 완료되지 않았어요.');
             return;
           }
 
           if (nextError.code === 'UNAUTHENTICATED') {
-            setError('카카오 인증 시간이 만료되었거나 인증 코드가 유효하지 않습니다. 다시 로그인해 주세요.');
+            setError('카카오 인증 시간이 만료됐거나 인증 코드가 유효하지 않아요. 다시 로그인해 주세요.');
             return;
           }
         }
 
-        setError(nextError instanceof Error ? nextError.message : '카카오 로그인에 실패했습니다.');
+        setError(nextError instanceof Error ? nextError.message : '카카오 로그인에 실패했어요.');
       });
   }, [router, searchParams]);
 
@@ -76,7 +76,7 @@ export function KakaoCallbackClient() {
     return (
       <AuthFrame topTitle="카카오 로그인" backHref="/login">
         <div className="tm-auth-body">
-          <span className="tm-badge tm-badge-orange">LOGIN ERROR</span>
+          <span className="tm-badge tm-badge-orange">로그인 오류</span>
           <h1 className="tm-text-heading tm-auth-heading">로그인을 완료하지 못했어요</h1>
           <p className="tm-text-body tm-auth-sub">{error}</p>
           <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login">

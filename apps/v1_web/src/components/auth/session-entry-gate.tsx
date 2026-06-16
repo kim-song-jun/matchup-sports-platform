@@ -58,7 +58,7 @@ export function SessionFallback() {
               <BrandMark size={42} alt="Teameet" />
             </div>
             <h1 className="tm-text-heading tm-auth-title">Teameet</h1>
-            <p className="tm-text-body tm-auth-sub">Checking your session.</p>
+            <p className="tm-text-body tm-auth-sub">로그인 정보를 확인하고 있어요.</p>
           </div>
         </div>
       </div>

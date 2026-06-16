@@ -32,13 +32,13 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
     cards: items.map((item) => ({
       ...item,
       href: `/my/reviews/${item.sourceType}/${item.sourceId}`,
-      badgeLabel: item.state === 'done' ? '완료' : item.sourceType === 'team_match' ? '상대팀' : 'D+',
+      badgeLabel: item.state === 'done' ? '완료' : item.sourceType === 'team_match' ? '상대팀' : '작성 전',
       kindLabel: item.sourceType === 'team_match' ? '팀매치' : '개인매치',
       meta: buildListMeta(item.completedAt, item.reviewedCount, item.targetCount, item.remainingCount),
-      ctaLabel: item.state === 'done' ? '보기' : item.reviewedCount > 0 ? '이어쓰기' : '리뷰',
+      ctaLabel: item.state === 'done' ? '보기' : item.reviewedCount > 0 ? '이어서 작성' : '리뷰',
     })),
     emptyTitle: tab === 'pending' ? '작성할 리뷰가 없어요' : '작성된 리뷰가 없어요',
-    emptySub: tab === 'pending' ? '종료된 일정에서 리뷰 가능 대상이 생기면 여기에 표시됩니다.' : '보낸 리뷰는 완료된 경기 단위로 정리됩니다.',
+    emptySub: tab === 'pending' ? '종료된 경기에 리뷰할 상대가 생기면 여기에 나타나요.' : '보낸 리뷰는 경기별로 정리돼요.',
   };
 }
 
@@ -89,9 +89,9 @@ export function sourceTypeLabel(sourceType: V1ReviewSourceType) {
 }
 
 export function formatDateTime(value: string | null) {
-  if (!value) return '종료 일정';
+  if (!value) return '날짜 미정';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '종료 일정';
+  if (Number.isNaN(date.getTime())) return '날짜 미정';
   return date.toLocaleString('ko-KR', {
     month: 'long',
     day: 'numeric',

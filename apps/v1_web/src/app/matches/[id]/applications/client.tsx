@@ -117,7 +117,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
             {/* eligibility 미도착 시 기본값 '자동 승인'을 보여주면 호스트가 승인 방식을
                 오인할 수 있어, 데이터가 준비될 때까지 중립 문구를 표시한다. */}
             {!eligibilityData
-              ? '승인 방식 확인 중'
+              ? '승인 방식 불러오는 중'
               : eligibilityData.requiresApproval
                 ? '수동 승인 매치'
                 : '자동 승인 매치'} ·
@@ -140,7 +140,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
           <div style={{ marginTop: 14 }}>
             <EmptyState
               title="신청자가 없어요"
-              sub="아직 이 매치에 신청한 사람이 없습니다. 신청자가 생기면 여기서 승인하거나 거절할 수 있어요."
+              sub="신청자가 생기면 여기서 바로 승인하거나 거절할 수 있어요."
             />
           </div>
         ) : (
@@ -366,8 +366,8 @@ function ErrorCard({ message }: { message: string }) {
 
 function applicationStatusLabel(status: string): string {
   switch (status) {
-    case 'requested': return '대기중';
-    case 'approved': return '승인완료';
+    case 'requested': return '대기 중';
+    case 'approved': return '승인 완료';
     case 'rejected': return '거절됨';
     case 'withdrawn': return '취소됨';
     case 'cancelled_by_host': return '호스트 취소';

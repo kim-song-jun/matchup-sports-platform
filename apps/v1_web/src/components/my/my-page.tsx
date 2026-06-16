@@ -209,24 +209,6 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
   );
 }
 
-export function ProfileEditPageView({ model }: { model: ProfileEditViewModel }) {
-  return (
-    <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-create-shell">
-        <section className="tm-my-profile-head">
-          <div className="tm-my-avatar">{model.user.initials}</div>
-          <div>
-            <div className="tm-text-body-lg">프로필 사진</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>목록과 신청 화면에 함께 표시됩니다.</div>
-          </div>
-        </section>
-        {model.fields.map((field) => <CreateField key={field.label} {...field} />)}
-        <Card pad={14} style={{ marginTop: 14, background: 'var(--blue50)' }}><div className="tm-text-label">프로필 저장</div><div className="tm-text-caption" style={{ marginTop: 5 }}>저장에 실패하면 입력한 내용을 유지한 채 다시 시도할 수 있습니다.</div></Card>
-      </div>
-      <div className="tm-fixed-cta"><button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>저장 불가</button></div>
-    </AppChrome>
-  );
-}
 
 export function SettingsPageView({ model }: { model: SettingsViewModel }) {
   return (
@@ -248,33 +230,6 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
   );
 }
 
-export function NotificationSettingsPageView({ model }: { model: NotificationSettingsViewModel }) {
-  return (
-    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
-        <div className="tm-my-settings-desktop">
-          <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
-              <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
-            <h1 className="tm-text-heading">알림 설정</h1>
-          </div>
-          {model.settings.map((setting) => (
-            <Card key={setting.label} pad={16}>
-              <div className="tm-my-toggle-row">
-                <div>
-                  <div className="tm-text-body-lg">{setting.label}</div>
-                  <div className="tm-text-caption" style={{ marginTop: 4 }}>{setting.sub}</div>
-                </div>
-                <span className={`tm-toggle ${setting.enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </AppChrome>
-  );
-}
 
 export function LegalPageView({ model }: { model: SettingsViewModel }) {
   return (
@@ -288,9 +243,9 @@ export function LegalPageView({ model }: { model: SettingsViewModel }) {
             <h1 className="tm-text-heading">약관 및 정책</h1>
           </div>
           <Card pad={16}>
-            <ListItem title="이용약관" sub="서비스 이용에 필요한 기본 약관" trailing="2026.05" chev />
-            <ListItem title="개인정보 처리방침" sub="개인정보 수집과 보관 기준" trailing="2026.05" chev />
-            <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산 기준" trailing="선택" chev />
+            <ListItem title="이용약관" sub="서비스 이용 전 꼭 확인해야 하는 약관이에요" trailing="2026.05" chev />
+            <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" chev />
+            <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" chev />
           </Card>
           <MenuSection section={model.groups[0]} />
         </div>
@@ -299,34 +254,6 @@ export function LegalPageView({ model }: { model: SettingsViewModel }) {
   );
 }
 
-export function WithdrawalPageView() {
-  return (
-    <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
-        <div className="tm-my-withdrawal-desktop">
-          <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
-              <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
-            <h1 className="tm-text-heading">회원 탈퇴</h1>
-          </div>
-          <section className="tm-danger-panel">
-            <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
-            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 남아 있으면 탈퇴가 제한될 수 있습니다.</p>
-          </section>
-          <Card pad={16}>
-            <ListItem title="참여 예정 매치" sub="2건이 남아 있어요" trailing="정리 필요" />
-            <ListItem title="팀장 권한" sub="FC 발빠른놈들" trailing="위임 필요" />
-            <ListItem title="보관 데이터" sub="법적 보관 기간 이후 삭제됩니다" trailing="필수" />
-          </Card>
-        </div>
-      </div>
-      <div className="tm-fixed-cta tm-hide-desktop">
-        <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" type="button" disabled>탈퇴 요청 불가</button>
-      </div>
-    </AppChrome>
-  );
-}
 
 function MenuSection({ section }: { section: { title: string; items: MyMenuItem[] } }) {
   return (
@@ -362,7 +289,7 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
       <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
-        {manage ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>관리 불가</button> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
+        {manage ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>관리할 수 없어요</button> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
       </div>
     </Card>
   );

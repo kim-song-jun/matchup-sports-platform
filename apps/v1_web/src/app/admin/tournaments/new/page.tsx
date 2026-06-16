@@ -374,7 +374,7 @@ export default function AdminTournamentsNewPage() {
                 id="format"
                 label="대회 형식"
                 required
-                hint="리그: 모든 팀이 순위전 / 토너먼트: 녹아웃 대진 / 조별리그+토너먼트: 혼합"
+                hint="리그: 모든 팀이 순위를 겨루는 방식 / 토너먼트: 탈락 대진 방식 / 조별리그+토너먼트: 혼합 방식"
               >
                 <select
                   id="format"

@@ -153,7 +153,7 @@ function MatchParticipantsPageView() {
           {participants.map((person) => <ListItem key={person.name} title={person.name} sub={person.meta} trailing={person.status} />)}
         </div>
         <Card pad={14} style={{ marginTop: 16, background: 'var(--grey50)' }}>
-          <div className="tm-text-label">참가자 관리는 상세/수정 플로우에서 연결됩니다</div>
+          <div className="tm-text-label">참가자 승인은 매치 상세 페이지에서 관리할 수 있어요</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>참가자 승인 상태와 모집 정원을 한곳에서 확인할 수 있습니다.</div>
         </Card>
       </div>
@@ -181,8 +181,8 @@ function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: Match
   if (mode === 'pending') return '승인중';
   if (mode === 'approved') return '승인완료';
   if (mode === 'mine') return '내 매치';
-  if (status === 'full') return '모집완료';
-  return '모집중';
+  if (status === 'full') return '모집 완료';
+  return '모집 중';
 }
 
 export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
@@ -205,7 +205,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         window.setTimeout(() => setHeroMessage(''), 1800);
       })
       .catch(() => {
-        setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
+        setHeroMessage('일시적인 오류가 생겼어요. 잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 1800);
       });
   };
@@ -229,7 +229,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
               <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}><ShareIcon size={20} /></button>
+                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림 목록" onClick={model.onNotify}><BellIcon size={20} /></button>
               </div>
             </div>
@@ -255,11 +255,11 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
             <InfoRow label="장소" value={match.venue} sub={match.address} />
-            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 포함)`} />
+            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 1명 포함)`} />
             <InfoRow label="레벨" value={match.level} />
             <InfoRow label="성별 조건" value={match.gender} />
             {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
-            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었습니다. 경기 당일 제시간에 방문해 주세요." /> : null}
+            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었습니다. 경기 당일 늦지 않게 방문해 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 10 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -308,11 +308,11 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
-          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 포함)`} />
+          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 1명 포함)`} />
           <InfoRow label="레벨" value={match.level} />
           <InfoRow label="성별 조건" value={match.gender} />
           {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있습니다." /> : null}
-          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었습니다. 경기 당일 제시간에 방문해 주세요." /> : null}
+          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었습니다. 경기 당일 늦지 않게 방문해 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 10 }}>
             <div className="tm-text-body-lg">참가자</div>
@@ -440,7 +440,7 @@ function MatchSearchBar({ query, filterCount, search, filterHref = '/matches?fil
           <div className="tm-list-search-dropdown">
             <div className="tm-list-search-dropdown-title">최근 검색</div>
             {search.isLoading ? <div className="tm-list-search-empty">불러오는 중</div> : null}
-            {!search.isLoading && search.recentItems.length === 0 ? <div className="tm-list-search-empty">최근 검색어가 없습니다</div> : null}
+            {!search.isLoading && search.recentItems.length === 0 ? <div className="tm-list-search-empty">최근 검색어가 없어요</div> : null}
             {search.recentItems.map((item) => (
               <button key={item.id} className="tm-list-search-recent" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => search.onSelectRecent(item.query)}>
                 <span>{item.query}</span>
@@ -470,7 +470,7 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
         <div className="tm-filter-sheet-head">
           <div>
             <div className="tm-text-subhead">필터</div>
-            <div className="tm-text-caption" style={{ marginTop: 2 }}>정렬 조건을 조정합니다</div>
+            <div className="tm-text-caption" style={{ marginTop: 2 }}>원하는 조건으로 매치를 걸러볼 수 있어요</div>
           </div>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={sheet.resetHref} style={{ color: 'var(--text-caption)' }}>초기화</Link>
         </div>
@@ -642,7 +642,7 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
   return (
     <div className="tm-create-progress">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-        <span className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{edit ? '수정' : `Step ${step}/4`}</span>
+        <span className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{edit ? '수정' : `${step}/4단계`}</span>
         <span className="tm-text-caption">{edit ? '기존 값 유지 · 변경사항만 저장' : ['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][step - 1]}</span>
       </div>
       {!edit ? <div className="tm-create-bars">{[1, 2, 3, 4].map((item) => <span key={item} data-active={item <= step} />)}</div> : null}
@@ -806,7 +806,7 @@ function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
         <CreateField label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>비워두면 경기 시작 전까지 신청을 받을 수 있습니다.</div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>비워두면 경기 시작 전까지 신청을 받아요.</div>
     </div>
   );
 }
@@ -819,7 +819,7 @@ function RegionSelect({ value, regions, onChange }: { value: string; regions: Ar
         <option value="">시/군/구 선택</option>
         {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
       </select>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색과 추천 기준이고, 장소와 상세 주소는 직접 입력합니다.</div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천에 쓰이고, 장소와 주소는 아래에 직접 입력해 주세요.</div>
     </label>
   );
 }
@@ -828,7 +828,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const draft = model.draft;
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   const deadlineText = draft.deadlineDate && draft.deadlineTime ? `${draft.deadlineDate} ${draft.deadlineTime}` : '경기 시작 전까지';
-  return <div><h1 className="tm-text-heading">작성된 내용을 확인해주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용됩니다" /><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시됩니다" /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={`${draft.date} ${draft.startTime}-${draft.endTime}`} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {
@@ -842,10 +842,10 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         <h1 className="tm-text-heading" style={{ margin: 0 }}>매치 만들기 완료</h1>
       </div>
       <div className="tm-create-shell tm-match-create-shell">
-        <EmptyState title="매치가 만들어졌어요" sub="개인매치도 먼저 내 팀에게 공유해서 팀원 참여 가능 여부를 확인할 수 있습니다." />
+        <EmptyState title="매치가 만들어졌어요" sub="매치를 만들었어요! 팀원들에게 먼저 공유해 참여 의사를 확인해 보세요." />
         <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
           <div className="tm-text-body-lg">FC 발빠른놈들 팀 채팅</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>24명에게 개인매치 링크와 일정 정보를 공유</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>24명에게 매치 링크와 일정을 공유해요</div>
         </Card>
         {['내 팀에 공유', '초대 링크 복사', '관심 멤버에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 일정 정보를 공유합니다.</div></Card>)}
       </div>

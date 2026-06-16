@@ -56,11 +56,11 @@ export function TermsClient() {
           onSuccess: (result) => router.push(result.next?.route ?? '/signup/social'),
           onError: (nextError) => {
             if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
-              setError('가입 시간이 만료되었습니다. 카카오 로그인부터 다시 진행해 주세요.');
+              setError('가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.');
               return;
             }
 
-            setError(nextError instanceof Error ? nextError.message : '약관 동의를 저장하지 못했습니다.');
+            setError(nextError instanceof Error ? nextError.message : '약관 동의를 저장하지 못했어요.');
           },
         },
       );
@@ -77,7 +77,7 @@ export function TermsClient() {
       backHref={isSocialMode ? undefined : model.backHref}
       fixedAction={
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!requiredAccepted || socialTerms.isPending} onClick={continueToSignup} type="button">
-          {socialTerms.isPending ? '저장 중' : requiredAccepted ? model.primary.label : '필수 약관 동의 후 가능'}
+          {socialTerms.isPending ? '저장 중' : requiredAccepted ? model.primary.label : '필수 약관에 동의해 주세요'}
         </button>
       }
     >
@@ -154,7 +154,7 @@ function LocationConsentStatus({ checked }: { checked: boolean }) {
 
   return (
     <div className="tm-auth-location-status tm-auth-location-status-allowed tm-text-caption">
-      위치 기반 서비스 약관에 동의했습니다. 브라우저 위치 권한은 지역 설정 화면에서 별도로 선택할 수 있습니다.
+      위치 기반 서비스 약관에 동의했어요. 브라우저 위치 권한은 지역 설정 화면에서 따로 선택할 수 있어요.
     </div>
   );
 }

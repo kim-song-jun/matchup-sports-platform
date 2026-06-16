@@ -81,7 +81,7 @@ function ReviewsReceivedContent({
       <ReviewStats stats={model.stats} />
       {loading ? <ReviewSkeleton count={2} /> : null}
       {!loading && errorMessage ? <ReviewNotice title="받은 리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
-      {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대가 보낸 리뷰가 생기면 경기 단위로 정리됩니다." /> : null}
+      {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대방이 리뷰를 보내면 경기별로 정리돼서 보여요." /> : null}
       {!loading && !errorMessage && model.userGroups.length > 0 ? <ReceivedGroupSection title="내가 받은 리뷰" groups={model.userGroups} /> : null}
       {!loading && !errorMessage && model.teamGroups.length > 0 ? <ReceivedGroupSection title="내 팀이 받은 리뷰" groups={model.teamGroups} /> : null}
     </>
@@ -144,7 +144,7 @@ export function ReviewSourcePageView({
               })}
             </div>
             <Card pad={14} style={{ background: message ? 'var(--red50)' : 'var(--grey50)' }}>
-              <div className="tm-text-label">{message ?? '진행 상황'}</div>
+              <div className="tm-text-label">{message ?? '작성 현황'}</div>
               <div className="tm-text-caption" style={{ marginTop: 5 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
             </Card>
           </>
@@ -189,13 +189,13 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
     <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews">
       <div className="tm-review-complete">
         <div className="tm-review-complete-icon">✓</div>
-        <div className="tm-text-heading" style={{ marginTop: 22 }}>리뷰를 보냈습니다</div>
+        <div className="tm-text-heading" style={{ marginTop: 22 }}>리뷰를 보냈어요</div>
         <Card pad={16} style={{ marginTop: 24, textAlign: 'left' }}>
           <div className="tm-text-label">{model.source.title}</div>
           <div className="tm-review-chip-row">
             <span className="tm-badge tm-badge-blue">{reviewed}명 전송</span>
-            <span className="tm-badge tm-badge-blue">별점 저장</span>
-            <span className="tm-badge tm-badge-blue">복수 태그 저장</span>
+            <span className="tm-badge tm-badge-blue">별점 완료</span>
+            <span className="tm-badge tm-badge-blue">태그 완료</span>
             <span className="tm-badge tm-badge-grey">{remaining}명 남음</span>
           </div>
         </Card>
@@ -338,7 +338,7 @@ function ReceivedGroupSection({ groups, title }: { groups: ReviewsReceivedPageMo
 }
 
 function ReceivedReviewRow({ review }: { review: V1ReviewDetail }) {
-  const firstTag = review.tags[0]?.label ?? '별점 리뷰';
+  const firstTag = review.tags[0]?.label ?? '별점만';
   return (
     <div className="tm-review-received-row">
       <Avatar imageUrl={review.reviewerUser.imageUrl} initials={review.reviewerUser.name.slice(0, 2)} size={34} />
@@ -386,5 +386,5 @@ function targetKey(targetType: V1ReviewTargetType, targetUserId: string | null, 
 }
 
 function targetTypeLabel(targetType: V1ReviewTargetType) {
-  return targetType === 'team' ? '팀 리뷰 대상' : '참가자';
+  return targetType === 'team' ? '상대 팀' : '참가자';
 }

@@ -25,16 +25,16 @@ export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
 function getApiNotice(isLoading: boolean, isError: boolean): MyMatchesViewModel['apiNotice'] {
   if (isLoading) {
     return {
-      title: '내 매치를 불러오는 중입니다',
-      body: '서버에서 내 참여/생성 상태를 확인하고 있습니다.',
+      title: '내 매치를 불러오고 있어요',
+      body: '잠깐만 기다려 주세요.',
       tone: 'info',
     };
   }
 
   if (isError) {
     return {
-      title: '내 매치를 불러오지 못했습니다',
-      body: '일시적으로 최신 내역을 확인하지 못했습니다. 새로고침 후에도 반복되면 잠시 뒤 다시 시도해 주세요.',
+      title: '매치 목록을 불러오지 못했어요',
+      body: '잠시 후 다시 시도해 주세요. 계속되면 새로고침해 보세요.',
       tone: 'warning',
     };
   }
@@ -62,7 +62,7 @@ function toMyMatch(match: V1Match): MyMatch {
 function buildSummary(mode: 'joined' | 'created', matches: MyMatch[]) {
   return [
     { label: '전체', value: matches.length, unit: '건' },
-    { label: mode === 'joined' ? '승인 대기' : '모집중', value: matches.filter((item) => item.status === 'pending' || item.status === 'recruiting').length, unit: '건' },
+    { label: mode === 'joined' ? '승인 대기' : '모집 중', value: matches.filter((item) => item.status === 'pending' || item.status === 'recruiting').length, unit: '건' },
     { label: '확정', value: matches.filter((item) => item.status === 'approved').length, unit: '건' },
   ];
 }
@@ -88,14 +88,14 @@ function statusLabel(status: MyMatchStatus) {
   if (status === 'pending') return '승인 대기';
   if (status === 'approved') return '승인 완료';
   if (status === 'ended') return '종료';
-  return '모집중';
+  return '모집 중';
 }
 
 function buildNote(match: V1Match, status: MyMatchStatus) {
   if (status === 'pending') return '호스트가 신청을 검토 중입니다.';
-  if (status === 'approved') return '참가가 확정되었습니다. 상세에서 장소와 시간을 확인하세요.';
+  if (status === 'approved') return '참가가 확정됐어요. 장소와 시간을 확인해 보세요.';
   if (status === 'ended' && isReviewableMatch(match)) return '상대 평가와 리뷰를 남길 수 있어요.';
-  if (status === 'ended') return '종료되었거나 더 이상 모집하지 않는 매치입니다.';
+  if (status === 'ended') return '종료됐거나 모집이 마감된 매치예요.';
   return `${match.participantCount ?? 0}/${match.capacity ?? 0}명이 참가 확정했어요.`;
 }
 

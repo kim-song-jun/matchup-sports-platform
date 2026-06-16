@@ -216,10 +216,10 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             canView: query.data.canViewMembers,
             enabled: query.data.membersVisibilityEnabled,
             message: query.data.canViewMembers
-              ? '멤버 현황 조회가 활성화되어 있습니다.'
+              ? '멤버 목록을 볼 수 있어요.'
               : query.data.viewer.role === 'member'
-                ? '팀 운영진이 멤버 현황 조회를 비활성화했습니다.'
-                : '팀에 소속된 사용자만 멤버 현황을 볼 수 있습니다.',
+                ? '운영진이 멤버 목록을 비공개로 설정했어요.'
+                : '팀 멤버만 멤버 목록을 볼 수 있어요.',
           },
         },
         mode: toDetailMode(query.data),
@@ -318,10 +318,10 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     members: team.memberCount,
     capacity: team.memberCount,
     status: team.joinPolicy === 'closed' ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '마감' : '모집중',
+    statusLabel: team.joinPolicy === 'closed' ? '마감' : '모집 중',
     tags: [team.levelLabel ?? team.skillLevelText ?? fallback.tags[0] ?? '전체 레벨', fallback.tags[1] ?? '주 1회', team.genderRule ?? fallback.genderRule],
     genderRule: team.genderRule ?? fallback.genderRule,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀입니다. 가입은 팀 운영 정책에 따라 처리됩니다.`,
+    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀입니다. 가입은 운영진이 검토한 후 확정돼요.`,
   };
 }
 
@@ -433,7 +433,7 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     members: team.memberCount,
     capacity: team.profile.memberGoalCount ?? team.memberCount,
     status: team.profile.joinPolicy === 'closed' ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
-    statusLabel: team.profile.joinPolicy === 'closed' ? '마감' : team.viewer.joinState === 'requested' ? '검토중' : team.viewer.role !== 'none' ? '내 팀' : '모집중',
+    statusLabel: team.profile.joinPolicy === 'closed' ? '마감' : team.viewer.joinState === 'requested' ? '검토 중' : team.viewer.role !== 'none' ? '내 팀' : '모집 중',
     genderRule: team.profile.genderRule ?? fallback.genderRule,
     intro: team.profile.introduction ?? fallback.intro,
   };
@@ -449,7 +449,7 @@ function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {
 function ctaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
   if (team.viewer.role === 'owner' || team.viewer.role === 'manager') return '팀 관리';
   if (team.viewer.role === 'member') return '내 팀';
-  if (eligibility?.joinState === 'requested') return '가입 신청 취소';
+  if (eligibility?.joinState === 'requested') return '신청 취소';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
 }
@@ -546,7 +546,7 @@ function toRequestModel(
   return {
     name: application.applicant.displayName,
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
-    status: application.status === 'requested' ? '검토중' : application.status,
+    status: application.status === 'requested' ? '검토 중' : application.status,
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },

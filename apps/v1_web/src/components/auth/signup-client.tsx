@@ -50,9 +50,9 @@ export function SignupClient() {
   const disabledReason = !requiredTermsAccepted
     ? '필수 약관에 동의하면 가입할 수 있어요.'
     : passwordMismatch
-      ? '비밀번호 확인을 먼저 해결해주세요.'
+      ? '비밀번호가 일치하지 않아요.'
       : !gender
-        ? '성별을 선택해주세요.'
+        ? '성별을 선택해 주세요.'
         : !nicknameVerified
           ? '닉네임 중복 확인이 필요해요.'
           : !emailVerified
@@ -126,7 +126,7 @@ export function SignupClient() {
       }
     };
     reader.onerror = () => {
-      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했습니다. 다시 선택해 주세요.' }));
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했어요. 다시 선택해 주세요.' }));
     };
     reader.readAsDataURL(file);
   };
@@ -142,7 +142,7 @@ export function SignupClient() {
     }
 
     if (!gender) {
-      setFieldErrors({ gender: '성별을 선택해주세요.' });
+      setFieldErrors({ gender: '성별을 선택해 주세요.' });
       return;
     }
 
@@ -167,7 +167,7 @@ export function SignupClient() {
     }
 
     if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
-      setFieldErrors({ birthDate: '생년월일은 YYYYMMDD 형식의 유효한 날짜로 입력해 주세요.' });
+      setFieldErrors({ birthDate: '생년월일 형식이 맞지 않아요. 예: 1995-03-21' });
       return;
     }
 
@@ -197,12 +197,12 @@ export function SignupClient() {
                   ? '이미 가입된 휴대폰 번호예요.'
                   : '이미 가입된 이메일이에요.',
             });
-            setError('이미 가입된 정보가 있어요. 기존 계정으로 로그인하거나 다른 정보를 사용해주세요.');
+            setError('이미 가입된 정보예요. 기존 계정으로 로그인하거나 다른 정보를 사용해 주세요.');
             return;
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'VALIDATION_ERROR') {
-            setError('입력값을 다시 확인해 주세요. 필수 약관과 입력 형식을 맞춰 다시 시도해 주세요.');
+            setError('입력 내용을 다시 확인해 주세요.');
             return;
           }
 
@@ -225,7 +225,7 @@ export function SignupClient() {
       fixedAction={
         <>
           <button className={`tm-btn tm-btn-lg ${isBlocked ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`} disabled={isBlocked} form="v1-signup-form" type="submit">
-            {register.isPending ? '가입 중' : isBlocked ? '오류 수정 후 가입 가능' : model.primary.label}
+            {register.isPending ? '가입하는 중…' : isBlocked ? '입력을 확인해 주세요' : model.primary.label}
           </button>
           {disabledReason ? <div className="tm-text-micro tm-auth-fixed-reason">{disabledReason}</div> : null}
         </>
@@ -250,7 +250,7 @@ export function SignupClient() {
                 type="text"
                 value={nickname}
               />
-              <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || nickname.trim().length < 2} onClick={runNicknameCheck} type="button">{checkNickname.isPending ? '확인중' : '중복확인'}</button>
+              <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || nickname.trim().length < 2} onClick={runNicknameCheck} type="button">{checkNickname.isPending ? '확인 중' : '중복 확인'}</button>
             </span>
             {fieldErrors.nickname || nicknameVerified ? (
               <span className={`tm-text-caption tm-auth-field-helper ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
@@ -273,7 +273,7 @@ export function SignupClient() {
                 type="email"
                 value={email}
               />
-              <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !email.includes('@')} onClick={runEmailCheck} type="button">{checkEmail.isPending ? '확인중' : '중복확인'}</button>
+              <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !email.includes('@')} onClick={runEmailCheck} type="button">{checkEmail.isPending ? '확인 중' : '중복 확인'}</button>
             </span>
             {fieldErrors.email || emailVerified ? (
               <span className={`tm-text-caption tm-auth-field-helper ${fieldErrors.email ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>

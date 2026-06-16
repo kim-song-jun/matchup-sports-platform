@@ -105,7 +105,7 @@ export function AdminDataTable<T>({
   if (rows.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        {empty ?? <AdminEmpty title="결과가 없어요" description="검색 조건을 변경해 보세요." />}
+        {empty ?? <AdminEmpty title="항목이 없어요" description="다른 조건으로 검색해 보세요." />}
       </div>
     );
   }

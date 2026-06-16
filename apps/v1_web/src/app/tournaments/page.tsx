@@ -548,7 +548,7 @@ function MiniBracketPreview() {
           {semis.map((m, i) => (
             <div key={i} className="tm-tournament-promo-bracket-match">
               <span>{m.a}</span>
-              <span className="tm-tournament-promo-bracket-vs">VS</span>
+              <span className="tm-tournament-promo-bracket-vs">vs</span>
               <span>{m.b}</span>
             </div>
           ))}

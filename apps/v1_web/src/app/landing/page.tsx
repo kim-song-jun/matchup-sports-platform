@@ -17,7 +17,7 @@ export default function LandingPage() {
             <BrandMark size={26} />
             teameet
           </Link>
-          <nav className="tm-landing-nav-links" aria-label="랜딩 내비게이션">
+          <nav className="tm-landing-nav-links" aria-label="메뉴">
             <Link className="tm-landing-nav-link" href="#features">기능</Link>
             <Link className="tm-landing-nav-link" href="#sports">종목</Link>
             <Link className="tm-landing-nav-link" href="#how">이용 방법</Link>
@@ -40,7 +40,7 @@ export default function LandingPage() {
                 가장 빠르게 찾는 방법
               </h1>
               <p className="tm-landing-hero-sub">
-                풋살·농구·아이스하키·배드민턴 등 생활체육 종목의 개인 및 팀을 AI로 최적 매칭합니다.
+                풋살·농구·아이스하키·배드민턴 등 11개 종목에서 나에게 맞는 경기를 찾아드려요.
                 지금 내 주변 매치를 찾아보세요.
               </p>
               <div className="tm-landing-hero-actions">
@@ -52,7 +52,7 @@ export default function LandingPage() {
                 </Link>
               </div>
               <p className="tm-landing-hero-disclaimer">
-                회원가입 없이 매치 목록을 확인할 수 있습니다
+                회원가입 없이도 매치를 둘러볼 수 있어요
               </p>
             </div>
             {/* Hero stat strip */}
@@ -79,9 +79,9 @@ export default function LandingPage() {
         <section id="features" className="tm-landing-section tm-landing-section-alt" aria-labelledby="features-heading">
           <div className="tm-landing-section-inner">
             <div className="tm-landing-section-header">
-              <h2 id="features-heading" className="tm-text-heading">teameet으로 할 수 있는 것</h2>
+              <h2 id="features-heading" className="tm-text-heading">Teameet에서 할 수 있는 것</h2>
               <p className="tm-text-body" style={{ color: 'var(--text-muted)' }}>
-                개인 매치부터 팀 경기, 용병 모집까지 생활체육의 모든 것을 한곳에서
+                개인 매치부터 팀 경기, 용병 모집까지 생활체육의 모든 것을 한곳에서 해결해요
               </p>
             </div>
             <ul className="tm-landing-features" aria-label="주요 기능 목록">
@@ -93,7 +93,7 @@ export default function LandingPage() {
                   <h3 className="tm-text-body-lg tm-landing-feature-title">개인 매치</h3>
                   <p className="tm-text-caption tm-landing-feature-desc">
                     오늘 당장 뛸 수 있는 매치를 찾거나 직접 만들어 참가자를 모집하세요.
-                    AI가 실력·지역·시간 기반으로 최적 매치를 추천합니다.
+                    AI가 실력·지역·시간에 맞는 매치를 추천해 줘요.
                   </p>
                 </div>
               </li>
@@ -105,7 +105,7 @@ export default function LandingPage() {
                   <h3 className="tm-text-body-lg tm-landing-feature-title">팀 매치</h3>
                   <p className="tm-text-caption tm-landing-feature-desc">
                     우리 팀과 비슷한 실력의 상대 팀을 찾아 경기를 신청하세요.
-                    2단계 상호확인으로 안전하게 경기를 확정합니다.
+                    2단계 상호 확인으로 안전하게 경기를 잡아요.
                   </p>
                 </div>
               </li>
@@ -150,7 +150,7 @@ export default function LandingPage() {
                 <div>
                   <h3 className="tm-text-body-lg tm-landing-feature-title">장터·강좌</h3>
                   <p className="tm-text-caption tm-landing-feature-desc">
-                    중고 장비 거래, 구장 대여, 전문 코치 강좌까지 생활체육 생태계 전체를 지원합니다.
+                    중고 장비 거래부터 구장 대여, 코치 강좌까지 생활체육의 모든 것을 한곳에서 해결해요.
                   </p>
                 </div>
               </li>
@@ -196,35 +196,35 @@ export default function LandingPage() {
             <div className="tm-landing-section-header">
               <h2 id="how-heading" className="tm-text-heading">이용 방법</h2>
               <p className="tm-text-body" style={{ color: 'var(--text-muted)' }}>
-                세 단계로 간단하게 매치에 참여하세요
+                세 단계면 바로 뛸 수 있어요
               </p>
             </div>
             <ol className="tm-landing-steps" aria-label="이용 단계">
               <li className="tm-landing-step">
                 <span className="tm-landing-step-num" aria-label="1단계">1</span>
                 <div>
-                  <h3 className="tm-text-body-lg tm-landing-step-title">가입 및 프로필 설정</h3>
+                  <h3 className="tm-text-body-lg tm-landing-step-title">가입하고 프로필 설정</h3>
                   <p className="tm-text-caption tm-landing-step-desc">
-                    카카오·네이버로 간편 가입 후 종목·수준·활동 지역을 설정하면 AI가 맞춤 매치를 추천합니다.
+                    카카오·네이버로 간편하게 가입하고 종목·수준·활동 지역을 입력하면 AI가 맞춤 매치를 추천해 줘요.
                   </p>
                 </div>
               </li>
               <li className="tm-landing-step">
                 <span className="tm-landing-step-num" aria-label="2단계">2</span>
                 <div>
-                  <h3 className="tm-text-body-lg tm-landing-step-title">매치 탐색 및 참가 신청</h3>
+                  <h3 className="tm-text-body-lg tm-landing-step-title">매치 찾고 신청하기</h3>
                   <p className="tm-text-caption tm-landing-step-desc">
-                    오늘 열린 매치를 지도·리스트 뷰로 탐색하고 참가 신청을 보내세요.
-                    호스트 수락 후 토스로 간편하게 참가비를 결제합니다.
+                    오늘 열린 매치를 지도·목록으로 찾아보고 참가 신청을 보내세요.
+                    호스트가 수락하면 토스로 간편하게 참가비를 내면 돼요.
                   </p>
                 </div>
               </li>
               <li className="tm-landing-step">
                 <span className="tm-landing-step-num" aria-label="3단계">3</span>
                 <div>
-                  <h3 className="tm-text-body-lg tm-landing-step-title">경기 후 상호 리뷰</h3>
+                  <h3 className="tm-text-body-lg tm-landing-step-title">경기 후 서로 리뷰하기</h3>
                   <p className="tm-text-caption tm-landing-step-desc">
-                    경기 후 상대방의 매너·실력을 평가하면 서로의 ELO 레이팅이 업데이트됩니다.
+                    서로 매너·실력을 평가하면 실력 레이팅이 업데이트돼요.
                     쌓인 매너 점수로 신뢰할 수 있는 플레이어로 성장하세요.
                   </p>
                 </div>
@@ -238,7 +238,7 @@ export default function LandingPage() {
           <div className="tm-landing-section-inner">
             <h2 id="cta-heading" className="tm-landing-cta-heading">지금 바로 시작하세요</h2>
             <p className="tm-landing-cta-sub">
-              오늘도 전국 곳곳에서 새로운 매치가 열리고 있습니다
+              오늘도 전국 곳곳에서 새로운 매치가 열리고 있어요
             </p>
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/login">
               무료로 시작하기
@@ -257,10 +257,10 @@ export default function LandingPage() {
                 <span className="tm-landing-brand">teameet</span>
               </span>
               <p className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-caption)' }}>
-                AI 기반 멀티스포츠 소셜 매칭 플랫폼
+                AI 스포츠 매칭 플랫폼
               </p>
             </div>
-            <nav className="tm-landing-footer-links" aria-label="푸터 링크">
+            <nav className="tm-landing-footer-links" aria-label="하단 링크">
               <Link className="tm-landing-footer-link" href="/terms">이용약관</Link>
               <Link className="tm-landing-footer-link" href="/notices">공지사항</Link>
               <Link className="tm-landing-footer-link" href="/matches">매치 찾기</Link>

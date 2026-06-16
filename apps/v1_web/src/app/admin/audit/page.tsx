@@ -38,7 +38,7 @@ const TARGET_TYPE_OPTIONS: FilterOption[] = [
 ];
 
 const TABS: Tab[] = [
-  { key: 'action', label: '관리자 액션' },
+  { key: 'action', label: '운영 활동' },
   { key: 'status', label: '상태 변경' },
 ];
 
@@ -237,7 +237,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
         empty={
           <AdminEmpty
             title="로그가 없어요"
-            description="해당 조건의 관리자 액션이 없어요."
+            description="해당 조건의 운영 활동이 없어요."
           />
         }
       />

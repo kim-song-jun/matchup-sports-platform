@@ -5,7 +5,7 @@ export function getLoginViewModel(): LoginViewModel {
 
   return {
     heroTitle: '같이 뛸 사람을\n한 번에 찾아요',
-    heroSub: 'teameet에 오신 걸 환영해요',
+    heroSub: 'Teameet에 오신 걸 환영해요',
     emailHref: '/login/email',
     guestHref: '/home',
     signupHref: '/terms',
@@ -34,7 +34,7 @@ function buildKakaoAuthUrl() {
 export function getEmailLoginViewModel(): EmailLoginViewModel {
   return {
     backHref: '/login',
-    title: '이메일로\n로그인하세요',
+    title: '이메일로\n로그인해요',
     sub: '',
     fields: [
       { label: '이메일', placeholder: 'you@example.com', type: 'email' },
@@ -91,14 +91,14 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       title: '현재 위치를 사용할 수 없어요',
       body: '위치 권한을 거부해도 종목과 실력은 그대로 유지돼요. 지역을 직접 선택해서 계속할 수 있어요.',
       tone: 'orange',
-      primary: { label: '수동으로 지역 선택', href: '/onboarding/region' },
+      primary: { label: '지역 직접 선택하기', href: '/onboarding/region' },
       secondary: { label: '설정에서 권한 열기', disabled: true, tone: 'neutral' },
     },
     'password-reset': {
       backHref: '/login/email',
       badge: '비밀번호 찾기',
       title: '이메일 로그인으로 다시 시도해 주세요',
-      body: '비밀번호를 잊었다면 이메일 가입 정보를 확인한 뒤 다시 로그인해 주세요. 계정 접근이 어려우면 새 이메일 계정으로 가입할 수 있습니다.',
+      body: '비밀번호를 잊었다면 이메일 가입 정보를 확인한 뒤 다시 로그인해 주세요. 계정에 접근하기 어려우면 새 이메일로 가입할 수 있어요.',
       tone: 'orange',
       primary: { label: '이메일 로그인으로 돌아가기', href: '/login/email' },
       secondary: { label: '간편 로그인으로 이동', href: '/login', tone: 'neutral' },

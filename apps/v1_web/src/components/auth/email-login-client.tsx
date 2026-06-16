@@ -30,7 +30,7 @@ export function EmailLoginClient() {
           router.replace(redirect ?? '/home');
         },
         onError: (nextError) => {
-          setError(nextError instanceof Error ? nextError.message : '로그인에 실패했습니다.');
+          setError(nextError instanceof Error ? nextError.message : '로그인에 실패했어요.');
         },
       },
     );

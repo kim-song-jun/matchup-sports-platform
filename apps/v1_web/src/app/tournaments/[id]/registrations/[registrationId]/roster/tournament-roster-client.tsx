@@ -23,7 +23,7 @@ function eligibilityLabel(status: V1PlayerEligibilityStatus): string {
   switch (status) {
     case 'non_pro': return '아마추어';
     case 'pro': return '선출';
-    case 'needs_review': return '검토 필요';
+    case 'needs_review': return '확인 중';
     default: return status;
   }
 }
@@ -69,7 +69,7 @@ function isValidBirthDate(v: string): boolean {
 function memberRoleLabel(role: 'owner' | 'manager' | 'member'): string {
   switch (role) {
     case 'owner': return '팀장';
-    case 'manager': return '매니저';
+    case 'manager': return '관리자';
     case 'member': return '멤버';
   }
 }
@@ -134,7 +134,7 @@ function AddPlayerForm({
   function handleBirthDateChange(v: string) {
     patch({ birthDate: v });
     if (v && !isValidBirthDate(v)) {
-      setBirthDateError('날짜를 1995-03-21 형식으로 입력해 주세요.');
+      setBirthDateError('생년월일을 YYYY-MM-DD 형식으로 입력해 주세요. (예: 1995-03-21)');
     } else {
       setBirthDateError(null);
     }
@@ -203,7 +203,7 @@ function AddPlayerForm({
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
                 >
-                  {isFetchingNextPage ? '불러오는 중…' : `더 보기 (현재 ${members.length}명 불러옴)`}
+                  {isFetchingNextPage ? '불러오는 중…' : `더 불러오기 (지금까지 ${members.length}명)`}
                 </button>
               ) : null}
             </>
@@ -217,7 +217,7 @@ function AddPlayerForm({
             type="text"
             value={form.realName}
             onChange={(e) => patch({ realName: e.target.value })}
-            placeholder="실명 입력"
+            placeholder="홍길동"
             maxLength={40}
             className="tm-input"
             aria-required="true"
@@ -582,7 +582,7 @@ export function TournamentRosterPageClient({
         {isRosterLocked ? (
           <div style={{ marginBottom: 14 }}>
             <AlertBanner
-              message="명단이 잠겼어요. 대회 운영진에게 문의해 주세요."
+              message="선수 명단이 마감됐어요. 변경이 필요하면 운영진에게 문의해 주세요."
               tone="info"
             />
           </div>
@@ -628,7 +628,7 @@ export function TournamentRosterPageClient({
           ) : null}
           {atMax && !isRosterLocked ? (
             <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>
-              최대 인원 도달
+              최대 인원이에요
             </span>
           ) : null}
         </div>
@@ -663,7 +663,7 @@ export function TournamentRosterPageClient({
           <Card pad={0}>
             <div style={{ padding: '8px 14px' }}>
               <div className="tm-text-micro" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
-                총 {players.length}명 · {isRosterLocked ? '명단 잠김' : '명단 수정 가능'}
+                총 {players.length}명 · {isRosterLocked ? '잠김' : '수정 가능'}
               </div>
             </div>
             {players.map((player) => (
@@ -684,7 +684,7 @@ export function TournamentRosterPageClient({
             href={`/tournaments/${tournamentId}/my`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
           >
-            내 신청 상태로 돌아가기
+            내 신청으로 돌아가기
           </Link>
         </div>
       </div>

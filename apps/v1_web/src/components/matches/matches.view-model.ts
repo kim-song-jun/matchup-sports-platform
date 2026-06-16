@@ -43,8 +43,8 @@ const matches = [
     gender: '남',
     host: '박서준',
     image: '/mock/generated/team-huddle.webp',
-    deadline: '호스트 검토중',
-    deadlineDetail: '호스트 검토중',
+    deadline: '호스트 검토 중',
+    deadlineDetail: '호스트 검토 중',
     status: 'pending' as const,
   },
   {

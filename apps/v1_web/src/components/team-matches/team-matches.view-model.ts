@@ -34,14 +34,14 @@ const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailV
     address: '서울 구로구 새말로 97',
     applicantTeams: [
       { name: '우리 팀', meta: '신청 완료 · 홈팀 검토 대기', status: '승인 대기' },
-      { name: '다이나믹 FS', meta: '홈팀 · 매너 4.6 · 15승', status: '검토중' },
+      { name: '다이나믹 FS', meta: '홈팀 · 매너 4.6 · 15승', status: '검토 중' },
     ],
   },
   approved: {
     description: '상대팀 승인이 완료된 팀매치입니다. 경기 전 팀 채팅과 준비물 안내를 계속 확인할 수 있습니다.',
     address: '서울 송파구 올림픽로 25',
     applicantTeams: [
-      { name: '우리 팀', meta: '승인된 상대팀 · 참가 확정', status: '승인완료' },
+      { name: '우리 팀', meta: '승인된 상대팀 · 참가 확정', status: '승인 완료' },
       { name: '퇴근후풋살', meta: '홈팀 · 매너 4.7 · 11승', status: '확정' },
     ],
   },
@@ -50,8 +50,8 @@ const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailV
     address: '서울 강남구 테헤란로 120',
     applicantTeams: [
       { name: '서초 풋살클럽', meta: 'B등급 · 매너 4.8 · 16명', status: '승인 대기' },
-      { name: '마포 애슬레틱', meta: 'A등급 · 매너 4.7 · 21명', status: '검토중' },
-      { name: '성수 러너스 FC', meta: 'B등급 · 매너 4.9 · 18명', status: '승인완료' },
+      { name: '마포 애슬레틱', meta: 'A등급 · 매너 4.7 · 21명', status: '검토 중' },
+      { name: '성수 러너스 FC', meta: 'B등급 · 매너 4.9 · 18명', status: '승인 완료' },
     ],
   },
 };
@@ -99,7 +99,7 @@ export function getTeamMatchStateViewModel(state: TeamMatchStateViewModel['state
     },
     error: {
       title: '팀매치 목록을 불러오지 못했어요',
-      description: '일시적으로 목록을 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+      description: '일시적으로 목록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
       matches: [],
     },
     filter: {
@@ -141,7 +141,7 @@ export function getTeamMatchCreateViewModel(step: TeamMatchCreateStep): TeamMatc
     teams: [
       { name: 'FC 발빠른놈들', sport: '축구', members: 24, role: '주장 권한' },
       { name: '다이나믹 FS', sport: '풋살', members: 14, role: '주장 권한', selected: true },
-      { name: '강남 러너스', sport: '러닝', members: 12, role: '멤버 · 생성 권한 확인 필요' },
+      { name: '강남 러너스', sport: '러닝', members: 12, role: '멤버 · 팀장 또는 관리자만 매치 생성 가능' },
     ],
     sports: ['축구', '풋살', '러닝', '수영'],
     draft,

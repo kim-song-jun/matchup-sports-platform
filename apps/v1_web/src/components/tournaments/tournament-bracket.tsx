@@ -397,7 +397,7 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
       {thirdPlaceRound !== null ? (
         <div
           style={{ marginTop: 24 }}
-          aria-label="3·4위전 — 4강 패자 경기"
+          aria-label="3·4위전"
         >
           {/* Divider with label */}
           <div
@@ -421,7 +421,7 @@ function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
                 background: 'var(--grey50)',
               }}
             >
-              3·4위전 — 4강 패자 경기
+              3·4위전
             </span>
             <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
           </div>
@@ -537,7 +537,7 @@ function DesktopBracket({ rounds }: { rounds: RoundGroup[] }) {
       {thirdPlaceRound !== null ? (
         <div
           style={{ marginTop: 24 }}
-          aria-label="3·4위전 — 4강 패자 경기"
+          aria-label="3·4위전"
         >
           {/* Pill divider label */}
           <div
@@ -561,7 +561,7 @@ function DesktopBracket({ rounds }: { rounds: RoundGroup[] }) {
                 background: 'var(--grey50)',
               }}
             >
-              3·4위전 — 4강 패자 경기
+              3·4위전
             </span>
             <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
           </div>

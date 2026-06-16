@@ -23,7 +23,7 @@ const quickFilters = [
 
 const baseResults = [
   { type: '매치', title: '성수 저녁 풋살', meta: '성수 풋살파크 · 오늘 20:00 · 8/10명', href: '/matches/sample' },
-  { type: '팀매치', title: '마포 풋살 팀매치', meta: '마포 실내체육관 · 토요일 · 상대팀 모집중', href: '/team-matches/sample' },
+  { type: '팀매치', title: '마포 풋살 팀매치', meta: '마포 실내체육관 · 토요일 · 상대팀 모집 중', href: '/team-matches/sample' },
   { type: '팀', title: '성수 러너스 FC', meta: '풋살 · 성동구 · 신입 환영', href: '/teams/sample' },
 ];
 
@@ -162,10 +162,10 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
                 </button>
               ))}
               {!recentSearches.isLoading && !recentSearches.data?.items.length ? (
-                <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>최근 검색어가 없습니다.</span>
+                <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>최근 검색어가 없어요.</span>
               ) : null}
               {recentSearches.isLoading ? (
-                <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>검색어 불러오는 중</span>
+                <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>최근 검색어를 불러오는 중이에요</span>
               ) : null}
             </div>
 
@@ -187,9 +187,11 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
             <div style={{ height: 1, background: 'var(--grey100)', margin: '20px 0 18px' }} className="tm-hide-desktop" />
             <div className="tm-search-results-header">
               <div className="tm-text-label">검색 결과</div>
-              <div className="tm-text-caption" style={{ marginTop: 2 }}>
-                {submittedQuery || '입력 전'} · 매치/팀매치/팀 통합 조회
-              </div>
+              {submittedQuery ? (
+                <div className="tm-text-caption" style={{ marginTop: 2 }}>
+                  {submittedQuery} · 매치/팀매치/팀 통합 조회
+                </div>
+              ) : null}
             </div>
 
             {effectiveViewState === 'results' ? (
@@ -212,7 +214,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
                   <Search size={22} />
                 </div>
                 <div className="tm-text-body-lg">검색어를 입력하거나 조건을 선택해 주세요</div>
-                <div className="tm-text-caption" style={{ marginTop: 6 }}>최근 검색과 빠른 조건은 검색 전에도 유지됩니다.</div>
+                <div className="tm-text-caption" style={{ marginTop: 6 }}>최근 검색과 빠른 조건은 검색 전에도 그대로 있어요.</div>
               </div>
             ) : null}
 
@@ -221,8 +223,8 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
                 <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
                   {effectiveViewState === 'stale' ? <Clock size={22} /> : effectiveViewState === 'error' ? <AlertCircle size={22} /> : <Search size={22} />}
                 </div>
-                <div className="tm-text-body-lg">{effectiveViewState === 'stale' ? '최신 검색 결과를 확인 중입니다.' : effectiveViewState === 'error' ? '검색 결과를 불러오지 못했습니다.' : '검색 결과가 없습니다.'}</div>
-                <div className="tm-text-caption" style={{ marginTop: 6 }}>검색어와 조건은 유지됩니다.</div>
+                <div className="tm-text-body-lg">{effectiveViewState === 'stale' ? '최신 결과를 불러오는 중이에요.' : effectiveViewState === 'error' ? '검색 결과를 불러오지 못했어요.' : '검색 결과가 없어요.'}</div>
+                <div className="tm-text-caption" style={{ marginTop: 6 }}>검색어와 조건은 그대로 남아 있어요.</div>
               </div>
             ) : null}
           </div>
@@ -231,7 +233,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
 
       {effectiveViewState === 'error' ? (
         <div className="tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 14, background: 'rgba(25,31,40,.94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 14px', fontSize: 13, fontWeight: 700 }}>
-          새로고침이 필요합니다. 잠시 후 다시 검색해 주세요.
+          검색 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : null}
     </div>

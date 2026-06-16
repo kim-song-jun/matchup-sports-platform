@@ -179,7 +179,7 @@ function DesktopRailSummary({
           onClick={onNext}
           aria-label="다음 단계: 동의 및 결제 수단 선택"
         >
-          {isCreating ? '준비 중…' : '다음'}
+          {isCreating ? '잠깐만요…' : '다음'}
         </button>
       )}
 
@@ -191,7 +191,7 @@ function DesktopRailSummary({
           onClick={onSubmitFromRail}
           aria-label="신청 제출하기"
         >
-          {isSubmitting ? '처리 중…' : '신청하기'}
+          {isSubmitting ? '신청 중…' : '신청하기'}
         </button>
       )}
 
@@ -421,7 +421,7 @@ function TeamSelectStep({
             onClick={onNext}
             aria-label="다음 단계: 동의 및 결제수단 선택"
           >
-            {isCreating ? '준비 중…' : '다음'}
+            {isCreating ? '잠깐만요…' : '다음'}
           </button>
         </div>
       </div>
@@ -688,7 +688,7 @@ function AgreementsStep({
                 계좌이체
               </div>
               <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-                신청 후 안내된 계좌로 입금해요
+                신청하면 안내해 드리는 계좌로 입금하면 돼요.
               </div>
             </div>
           </div>
@@ -769,7 +769,7 @@ function AgreementsStep({
             onClick={onSubmit}
             aria-label="신청 제출하기"
           >
-            {isSubmitting ? '처리 중…' : '신청하기'}
+            {isSubmitting ? '신청 중…' : '신청하기'}
           </button>
         </div>
       </div>
@@ -891,7 +891,7 @@ function PaymentGuideStep({
 
         <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-            입금 확인 후 신청이 최종 확정돼요. 입금자명이 일치하지 않으면 확인이 지연될 수 있어요.
+            입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
           </p>
         </Card>
       </section>
@@ -1002,7 +1002,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
-            message={`현재 참가 신청을 받지 않아요. (상태: ${tournament.status === 'closed' ? '마감' : tournament.status === 'in_progress' ? '진행 중' : '종료'})`}
+            message="지금은 참가 신청을 받지 않아요."
             tone="info"
           />
           <Link
@@ -1030,7 +1030,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       setRegistrationId(reg.id);
       setStep('agreements');
     } catch (err) {
-      setSubmitError(extractErrorMessage(err, '신청 초기화 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
+      setSubmitError(extractErrorMessage(err, '신청을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.'));
     }
   }
 
@@ -1141,7 +1141,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               className="tm-text-label"
               style={{ color: 'var(--static-white)', background: 'rgba(25,31,40,0.72)', padding: '12px 20px', borderRadius: 14 }}
             >
-              신청 준비 중…
+              잠깐만요…
             </div>
           </div>
         ) : null}

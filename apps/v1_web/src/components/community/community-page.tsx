@@ -25,7 +25,7 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
       <div className="tm-chat-desktop-wrap">
         <div className="tm-chat-list">
           <div className="tm-sport-chip-row">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect}>{category.label} {category.count}</button>)}</div>
-          {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오는 중입니다" body="잠시만 기다려주세요." /> : null}
+          {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오고 있어요" body="잠시만 기다려 주세요." /> : null}
           {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
           {hasRooms ? (
             <>
@@ -80,7 +80,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
           </Link>
         </div>
         <div className="tm-chat-thread">
-          {model.status === 'loading' ? <ChatEmptyState title="메시지를 불러오는 중입니다" body="잠시만 기다려 주세요." /> : null}
+          {model.status === 'loading' ? <ChatEmptyState title="메시지를 불러오고 있어요" body="잠시만 기다려 주세요." /> : null}
           {model.status !== 'loading' && model.messages.length === 0 ? <ChatEmptyState title={model.emptyTitle ?? '아직 메시지가 없어요'} body={model.emptyBody ?? '첫 메시지를 보내 대화를 시작할 수 있습니다.'} onRetry={model.onRetry} /> : null}
           {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
         </div>
@@ -108,7 +108,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
           disabled={allRead || !model.onReadAll || model.readAllPending}
           onClick={model.onReadAll}
         >
-          {model.readAllPending ? '처리중' : '모두읽음'}
+          {model.readAllPending ? '읽는 중' : '모두 읽기'}
         </button>
       )}
     >
@@ -138,7 +138,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
               disabled={allRead || !model.onReadAll || model.readAllPending}
               onClick={model.onReadAll}
             >
-              {model.readAllPending ? '처리중' : '모두읽음'}
+              {model.readAllPending ? '읽는 중' : '모두 읽기'}
             </button>
           </div>
         </div>
@@ -160,7 +160,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
           })}
         </div>
       </div>
-      {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽음 처리했습니다</div> : null}
+      {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽었어요</div> : null}
     </AppChrome>
   );
 }
@@ -259,7 +259,7 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
           <div className="tm-chat-row-meta"><div className="tm-text-micro">{room.time}</div></div>
         </Link>
         <div className="tm-chat-row-actions" aria-label={`${room.title} 채팅방 작업`}>
-          <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onTogglePin}><Pin size={18} strokeWidth={2.1} /><span>{room.pinned ? '고정해제' : '고정'}</span></button>
+          <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onTogglePin}><Pin size={18} strokeWidth={2.1} /><span>{room.pinned ? '고정 해제' : '고정'}</span></button>
           <button className="tm-chat-row-action tm-chat-row-action-danger" type="button" disabled={room.actionPending} onClick={room.onRequestLeave}><X size={18} strokeWidth={2.2} /><span>나가기</span></button>
         </div>
       </div>

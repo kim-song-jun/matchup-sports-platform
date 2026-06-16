@@ -25,7 +25,7 @@ interface AdminFilterBarProps {
 // ── Component ─────────────────────────────────────────────────────────────
 export function AdminFilterBar({
   searchLabel = '검색',
-  searchPlaceholder = '검색어를 입력하세요',
+  searchPlaceholder = '검색어 입력',
   searchValue,
   onSearchChange,
   statusOptions,

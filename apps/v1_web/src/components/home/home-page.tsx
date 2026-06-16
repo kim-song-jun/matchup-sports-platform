@@ -41,7 +41,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         <div className="tm-home-main">
 
           {/* Greeting + activity stats */}
-          <div className="tm-home-greeting-block" style={{ padding: '8px 20px 24px' }}>
+          <div className="tm-home-greeting-block">
             <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
               {dash ? '안녕하세요' : `안녕하세요, ${model.viewerName}님`}
             </div>
@@ -73,7 +73,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           </div>
 
           {/* Featured recommendation hero */}
-          <div className="tm-home-featured-block" style={{ margin: '0 20px 28px' }}>
+          <div className="tm-home-featured-block">
             <div className="tm-text-label" style={{ marginBottom: 8 }}>오늘의 추천</div>
             <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
             <TournamentHeroCard />
@@ -97,41 +97,37 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         <div className="tm-home-sidebar">
 
           {/* Quick-action shortcuts: 매치 / 팀매치 / 팀 / 나의팀 */}
-          <div>
-            <div style={{ padding: '0 20px 28px' }}>
-              <div className="tm-quick-grid">
-                {model.quickActions.map((item) => (
-                  <QuickAction key={item.label} item={item} />
-                ))}
-              </div>
+          <div className="tm-home-sidebar-quickgrid-wrap">
+            <div className="tm-quick-grid">
+              {model.quickActions.map((item) => (
+                <QuickAction key={item.label} item={item} />
+              ))}
             </div>
           </div>
 
           {/* Weather strip */}
-          <div>
-            <div style={{ padding: '0 20px 24px' }}>
-              <div className="tm-home-weather-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
-                <div className="tm-text-label">현재 위치 날씨</div>
-                <button
-                  className="tm-btn tm-btn-icon tm-btn-neutral"
-                  type="button"
-                  onClick={model.refreshWeather}
-                  disabled={!model.refreshWeather || model.weatherRefreshing}
-                  aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 위치 날씨 새로고침'}
-                  title={model.weatherRefreshing ? '확인 중' : '새로고침'}
-                >
-                  <RefreshIcon size={18} strokeWidth={2.1} />
-                </button>
-              </div>
-              <WeatherStrip {...model.weather} />
+          <div className="tm-home-sidebar-weather-wrap">
+            <div className="tm-home-weather-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
+              <div className="tm-text-label">현재 위치 날씨</div>
+              <button
+                className="tm-btn tm-btn-icon tm-btn-neutral"
+                type="button"
+                onClick={model.refreshWeather}
+                disabled={!model.refreshWeather || model.weatherRefreshing}
+                aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 위치 날씨 새로고침'}
+                title={model.weatherRefreshing ? '확인 중' : '새로고침'}
+              >
+                <RefreshIcon size={18} strokeWidth={2.1} />
+              </button>
             </div>
+            <WeatherStrip {...model.weather} />
           </div>
 
           {/* Notices */}
           <div>
             {/* .tm-home-sidebar-notices gives the panel a card surface on desktop.
                 The inner div retains the original mobile inline padding. */}
-            <div className="tm-home-sidebar-notices" style={{ padding: '20px 20px 24px' }}>
+            <div className="tm-home-sidebar-notices">
               <div className="tm-notice-head">
                 <div className="tm-text-body-lg">공지사항</div>
                 <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>
@@ -277,7 +273,7 @@ function SidebarTournamentsWidget() {
   const items = (data?.items ?? []).slice(0, 4);
 
   return (
-    <div className="tm-home-sidebar-notices" style={{ padding: '20px 20px 24px' }}>
+    <div className="tm-home-sidebar-notices">
       <div className="tm-notice-head">
         <div className="tm-text-body-lg">진행 중인 대회</div>
         <Link

@@ -5,7 +5,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import type { AuthAction, AuthExceptionViewModel, EmailLoginViewModel, LoginProvider, LoginViewModel, OnboardingOption, OnboardingViewModel, SignupCompleteViewModel, SignupField, SignupFormViewModel, TermsViewModel } from './auth.types';
 
-export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devLogin?: ReactNode }) {
+export function LoginPageView({ model }: { model: LoginViewModel }) {
   const card = (
     <AuthFrame>
       <div className="tm-auth-login">
@@ -38,7 +38,6 @@ export function LoginPageView({ model, devLogin }: { model: LoginViewModel; devL
               </div>
             </>
           ) : null}
-          {devLogin}
           <p className="tm-text-caption tm-auth-policy">
             로그인 또는 가입을 진행하면 <Link href="/terms" style={{ color: 'var(--blue500)' }}>서비스 이용약관</Link>과{' '}
             <Link href="/my/settings/legal" style={{ color: 'var(--blue500)' }}>개인정보 처리방침</Link>에 동의하는 것으로 간주돼요.

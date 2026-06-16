@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
-import { DevLoginDto } from './dto/dev-login.dto';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -17,11 +16,6 @@ export class AuthController {
   @UseGuards(V1AuthGuard)
   me(@CurrentUser() user: V1AuthUser) {
     return this.authService.me(user.id);
-  }
-
-  @Post('dev-login')
-  devLogin(@Body() dto: DevLoginDto) {
-    return this.authService.devLogin(dto.email);
   }
 
   @Post('login')

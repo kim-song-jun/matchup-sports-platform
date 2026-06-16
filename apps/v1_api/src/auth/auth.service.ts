@@ -584,45 +584,6 @@ export class AuthService {
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
-  async devLogin(email: string) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new ForbiddenException({
-        code: 'DEV_LOGIN_DISABLED',
-        message: '개발 전용 로그인은 프로덕션에서 사용할 수 없어요.',
-      });
-    }
-
-    const user = await this.prisma.v1User.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        email: true,
-        accountStatus: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException({
-        code: 'NOT_FOUND',
-        message: 'V1 seed user was not found',
-      });
-    }
-
-    if (user.accountStatus !== 'active') {
-      throw new ForbiddenException({
-        code: 'PERMISSION_DENIED',
-        message: 'Only active v1 users can use dev login',
-      });
-    }
-
-    await this.prisma.v1User.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
-    return this.sessionResponse(user.id, user.email);
-  }
-
   async me(userId: string) {
     const user = await this.prisma.v1User.findUnique({
       where: { id: userId },

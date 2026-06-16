@@ -14,9 +14,6 @@ describe('AuthController', () => {
             me: jest.fn().mockResolvedValue({
               user: { id: 'user-1', email: 'host@teameet.v1' },
             }),
-            devLogin: jest.fn().mockResolvedValue({
-              session: { userId: 'user-1', userEmail: 'host@teameet.v1' },
-            }),
             kakaoLogin: jest.fn(),
             completeSocialTerms: jest.fn(),
             completeSocialProfile: jest.fn(),
@@ -45,44 +42,9 @@ describe('AuthController', () => {
     });
   });
 
-  it('starts a v1 dev session for a seed user', async () => {
-    const authService = {
-      me: jest.fn(),
-      devLogin: jest.fn().mockResolvedValue({
-        session: { userId: 'user-1', userEmail: 'host@teameet.v1' },
-      }),
-      kakaoLogin: jest.fn(),
-      completeSocialTerms: jest.fn(),
-      completeSocialProfile: jest.fn(),
-      login: jest.fn(),
-      register: jest.fn(),
-    };
-    const moduleRef = await Test.createTestingModule({
-      controllers: [AuthController],
-      providers: [
-        {
-          provide: AuthService,
-          useValue: authService,
-        },
-        {
-          provide: PrismaService,
-          useValue: {},
-        },
-      ],
-    }).compile();
-
-    const controller = moduleRef.get(AuthController);
-
-    await expect(controller.devLogin({ email: 'host@teameet.v1' })).resolves.toEqual({
-      session: { userId: 'user-1', userEmail: 'host@teameet.v1' },
-    });
-    expect(authService.devLogin).toHaveBeenCalledWith('host@teameet.v1');
-  });
-
   it('starts a v1 email login session', async () => {
     const authService = {
       me: jest.fn(),
-      devLogin: jest.fn(),
       kakaoLogin: jest.fn(),
       completeSocialTerms: jest.fn(),
       completeSocialProfile: jest.fn(),
@@ -111,7 +73,6 @@ describe('AuthController', () => {
   it('registers a v1 email user session', async () => {
     const authService = {
       me: jest.fn(),
-      devLogin: jest.fn(),
       kakaoLogin: jest.fn(),
       completeSocialTerms: jest.fn(),
       completeSocialProfile: jest.fn(),
@@ -150,7 +111,6 @@ describe('AuthController', () => {
   it('starts a v1 Kakao login session', async () => {
     const authService = {
       me: jest.fn(),
-      devLogin: jest.fn(),
       kakaoLogin: jest.fn().mockResolvedValue({
         session: { userId: 'user-1', userEmail: 'user@example.com' },
       }),
@@ -182,7 +142,6 @@ describe('AuthController', () => {
   it('completes v1 social terms', async () => {
     const authService = {
       me: jest.fn(),
-      devLogin: jest.fn(),
       kakaoLogin: jest.fn(),
       completeSocialTerms: jest.fn().mockResolvedValue({
         session: { userId: 'user-1', userEmail: null },
@@ -219,7 +178,6 @@ describe('AuthController', () => {
   it('completes a v1 social profile', async () => {
     const authService = {
       me: jest.fn(),
-      devLogin: jest.fn(),
       kakaoLogin: jest.fn(),
       completeSocialTerms: jest.fn(),
       completeSocialProfile: jest.fn().mockResolvedValue({

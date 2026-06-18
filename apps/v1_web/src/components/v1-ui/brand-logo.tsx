@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { publicAssetPath } from '@/lib/assets';
 
 /**
  * Teameet 로고 마크.
@@ -19,7 +20,7 @@ export function BrandMark({
   alt?: string;
   style?: CSSProperties;
 }) {
-  const src = variant === 'tile' ? '/brand/teameet-logo.png' : '/brand/teameet-mark.png';
+  const src = publicAssetPath(variant === 'tile' ? '/brand/teameet-logo.png' : '/brand/teameet-mark.png');
   return (
     <img
       src={src}

@@ -804,3 +804,288 @@
     transition: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Knockout bracket (hand-authored — see components/tournaments/tournament-bracket)
+ * Mobile: rounds stacked vertically. Desktop ≥768: columns fill the width L→R.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+.tm-bracket-wrap {
+  margin-top: 4px;
+}
+
+.tm-bracket {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tm-bracket-col-head {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 4px 0 8px;
+}
+
+.tm-bracket-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Mobile downward connector between rounds. */
+.tm-bracket-col:not(:last-child)::after {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 18px;
+  margin: 6px 0 6px 22px;
+  background: var(--grey200);
+}
+
+.tm-bk-match {
+  border: 1px solid var(--grey200);
+  border-radius: 12px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.tm-bk-match-live {
+  border-color: var(--green500);
+}
+
+.tm-bk-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+}
+
+.tm-bk-row-win {
+  background: var(--blue50);
+}
+
+.tm-bk-divider {
+  height: 1px;
+  background: var(--grey100);
+}
+
+.tm-bk-team {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-bk-team-tbd {
+  color: var(--text-caption);
+  font-weight: 500;
+}
+
+.tm-bk-score {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+  flex-shrink: 0;
+}
+
+.tm-bk-row-win .tm-bk-team,
+.tm-bk-row-win .tm-bk-score {
+  color: var(--blue500);
+}
+
+.tm-bk-status {
+  font-size: 11px;
+  color: var(--text-caption);
+  text-align: center;
+  padding: 5px 0;
+  border-top: 1px solid var(--grey100);
+  background: var(--grey50);
+}
+
+/* Champion slot at the end of the bracket. */
+.tm-bk-champ {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border: 1px solid var(--grey200);
+  border-radius: 12px;
+  background: var(--grey50);
+}
+
+.tm-bk-champ-decided {
+  background: var(--orange50, var(--grey50));
+  border-color: var(--orange500);
+}
+
+.tm-bk-champ-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--grey200);
+  color: var(--text-caption);
+}
+
+.tm-bk-champ-decided .tm-bk-champ-icon {
+  background: linear-gradient(135deg, var(--orange500), #f08a00);
+  color: var(--static-white);
+}
+
+.tm-bk-champ-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-bk-champ:not(.tm-bk-champ-decided) .tm-bk-champ-name {
+  color: var(--text-caption);
+  font-weight: 600;
+}
+
+/* 3·4위전 — consolation match, separate from the main tree. */
+.tm-bracket-third {
+  margin-top: 20px;
+}
+
+.tm-bracket-third-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tm-bracket-third-pill {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--grey200);
+  background: var(--grey50);
+}
+
+.tm-bracket-third-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+}
+
+@media (min-width: 768px) {
+  .tm-bracket {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .tm-bracket-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .tm-bracket-col-head {
+    text-align: center;
+    border-bottom: 1px solid var(--grey100);
+    margin-bottom: 16px;
+  }
+
+  .tm-bracket-col-body {
+    flex: 1;
+    justify-content: center;
+    gap: 18px;
+    padding: 0 26px;
+  }
+
+  /* drop the mobile vertical connector on desktop */
+  .tm-bracket-col:not(:last-child)::after {
+    content: none;
+  }
+
+  /* horizontal arms joining each column to the next at mid-height */
+  .tm-bracket-col:not(:last-child) .tm-bracket-col-body::after,
+  .tm-bracket-col:not(:first-child) .tm-bracket-col-body::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 26px;
+    height: 2px;
+    background: var(--grey300);
+    transform: translateY(-50%);
+  }
+
+  .tm-bracket-col:not(:last-child) .tm-bracket-col-body::after {
+    right: 0;
+  }
+
+  .tm-bracket-col:not(:first-child) .tm-bracket-col-body::before {
+    left: 0;
+  }
+
+  .tm-bracket-third-body {
+    max-width: 340px;
+    margin: 0 auto;
+  }
+}
+
+/* ── 대회 진행 방식 — numbered step timeline ─────────────────────────────── */
+.tm-tourn-flow-format {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue500);
+  margin-bottom: 16px;
+}
+
+.tm-tourn-flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tm-tourn-flow-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  position: relative;
+}
+
+.tm-tourn-flow-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 30px;
+  bottom: -18px;
+  width: 2px;
+  background: var(--grey100);
+}
+
+.tm-tourn-flow-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--blue50);
+  color: var(--blue500);
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.tm-tourn-flow-text {
+  padding-top: 3px;
+  min-width: 0;
+}

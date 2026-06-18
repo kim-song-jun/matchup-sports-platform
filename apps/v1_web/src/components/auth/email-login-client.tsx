@@ -37,15 +37,7 @@ export function EmailLoginClient() {
   };
 
   return (
-    <AuthFrame
-      topTitle="이메일 로그인"
-      backHref={model.backHref}
-      fixedAction={
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={login.isPending} form="v1-email-login-form" type="submit">
-          {login.isPending ? '로그인 중' : model.primary.label}
-        </button>
-      }
-    >
+    <AuthFrame topTitle="이메일 로그인" backHref={model.backHref} className="tm-auth-email-frame">
       <form className="tm-auth-body" id="v1-email-login-form" onSubmit={submit}>
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         {model.sub ? <p className="tm-text-body tm-auth-sub">{model.sub}</p> : null}
@@ -59,11 +51,14 @@ export function EmailLoginClient() {
             <input className="tm-input tm-auth-input" minLength={8} onChange={(event) => setPassword(event.target.value)} placeholder="비밀번호" required type="password" value={password} />
           </label>
         </div>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block tm-auth-email-submit" disabled={login.isPending} type="submit">
+          {login.isPending ? '로그인 중' : model.primary.label}
+        </button>
+        {error ? <p className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">{error}</p> : null}
         <div className="tm-auth-link-row">
           <button className="tm-btn tm-btn-sm tm-btn-ghost tm-btn-disabled" disabled type="button">비밀번호 찾기</button>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>
         </div>
-        {error ? <p className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">{error}</p> : null}
         {!error && model.notice ? (
           <Card pad={16} className="tm-auth-soft-card">
             <div className="tm-text-body-lg">{model.notice.title}</div>

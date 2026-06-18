@@ -401,6 +401,9 @@ function TournamentDetailView({
       {/* ── Prize card — shown HIGH in left column, right after metric strip ── */}
       {prizeCard}
 
+      {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
+      <TournamentFlowSection tournament={tournament} />
+
       {/* ── Section 2: Rules ── */}
       {tournament.rulesText ? (
         <section aria-labelledby="rules-heading" style={{ marginTop: 24 }}>
@@ -546,6 +549,64 @@ function TournamentDetailView({
         <BracketSection tournament={tournament} />
       </div>
     </article>
+  );
+}
+
+/* ── TournamentFlowSection — explains how the tournament progresses ──
+ * The format badge alone ("조별리그 후 토너먼트") doesn't tell a participant how it
+ * actually runs, so spell it out as numbered steps, format-aware, in 해요체.
+ */
+function tournamentFormatLabel(format: V1TournamentFormat): string {
+  switch (format) {
+    case 'group_knockout': return '조별 리그 후 토너먼트';
+    case 'knockout': return '토너먼트 (단판 승부)';
+    case 'league': return '리그전 (풀리그)';
+    default: return '대회';
+  }
+}
+
+function getFlowSteps(format: V1TournamentFormat): Array<{ title: string; body: string }> {
+  if (format === 'group_knockout') {
+    return [
+      { title: '조별 리그', body: '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.' },
+      { title: '결선 진출', body: '각 조 상위 팀이 결선 토너먼트에 올라가요.' },
+      { title: '결선 토너먼트', body: '4강·결승 단판 승부로 우승팀을 가려요. 4강에서 진 두 팀은 3·4위전을 치러요.' },
+    ];
+  }
+  if (format === 'knockout') {
+    return [
+      { title: '대진 편성', body: '참가 팀을 토너먼트 대진표에 배치해요.' },
+      { title: '토너먼트', body: '단판 승부로 이긴 팀만 다음 라운드에 올라가요.' },
+      { title: '결승 · 시상', body: '마지막까지 이긴 팀이 우승해요. 3·4위전도 함께 진행돼요.' },
+    ];
+  }
+  return [
+    { title: '풀리그', body: '참가한 모든 팀이 서로 한 번씩 맞붙어요.' },
+    { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
+    { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
+  ];
+}
+
+function TournamentFlowSection({ tournament }: { tournament: V1TournamentDetail }) {
+  const steps = getFlowSteps(tournament.format);
+  return (
+    <section aria-labelledby="flow-heading" style={{ marginTop: 24 }}>
+      <div id="flow-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>대회 진행 방식</div>
+      <Card pad={16} style={{ marginTop: 4 }}>
+        <div className="tm-tourn-flow-format">{tournamentFormatLabel(tournament.format)}</div>
+        <ol className="tm-tourn-flow">
+          {steps.map((step, index) => (
+            <li key={step.title} className="tm-tourn-flow-step">
+              <span className="tm-tourn-flow-num" aria-hidden="true">{index + 1}</span>
+              <div className="tm-tourn-flow-text">
+                <div className="tm-text-label">{step.title}</div>
+                <div className="tm-text-caption" style={{ marginTop: 2, lineHeight: 1.5 }}>{step.body}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Card>
+    </section>
   );
 }
 

@@ -383,9 +383,9 @@ button:disabled {
 }
 
 .tm-auth-feature-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   background: var(--blue50);
   color: var(--blue500);
   display: grid;
@@ -393,9 +393,24 @@ button:disabled {
   flex-shrink: 0;
 }
 
-/* The guest button sits under the email helper in the bottom CTA group. */
+/* The guest button sits under the primary login button in the bottom CTA group. */
 .tm-auth-guest-link {
   margin-top: 14px;
+}
+
+/* Email login — short form vertically centred in the card so the submit button
+   isn't stranded at the bottom of a tall frame (no big empty gap). */
+.tm-auth-email-frame .tm-auth-scroll {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-auth-email-frame .tm-auth-body {
+  margin-block: auto;
+}
+
+.tm-auth-email-submit {
+  margin-top: 22px;
 }
 
 .tm-auth-center {

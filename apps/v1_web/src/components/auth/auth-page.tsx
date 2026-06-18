@@ -17,22 +17,21 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           <p className="tm-text-body tm-auth-sub">{model.heroSub}</p>
           <ul className="tm-auth-features">
             <li className="tm-auth-feature">
-              <span className="tm-auth-feature-icon" aria-hidden="true"><MatchIcon size={18} strokeWidth={2} /></span>
+              <span className="tm-auth-feature-icon" aria-hidden="true"><MatchIcon size={16} strokeWidth={2} /></span>
               <span className="tm-text-body">내 종목·실력·지역에 맞는 매치를 추천받아요</span>
             </li>
             <li className="tm-auth-feature">
-              <span className="tm-auth-feature-icon" aria-hidden="true"><TeamMatchIcon size={18} strokeWidth={2} /></span>
+              <span className="tm-auth-feature-icon" aria-hidden="true"><TeamMatchIcon size={16} strokeWidth={2} /></span>
               <span className="tm-text-body">팀을 만들고 다른 팀과 경기를 잡아요</span>
             </li>
             <li className="tm-auth-feature">
-              <span className="tm-auth-feature-icon" aria-hidden="true"><TrophyIcon size={18} strokeWidth={2} /></span>
+              <span className="tm-auth-feature-icon" aria-hidden="true"><TrophyIcon size={16} strokeWidth={2} /></span>
               <span className="tm-text-body">대회에 참가하고 기록을 쌓아요</span>
             </li>
           </ul>
         </div>
         <div>
           <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
-          <p className="tm-text-caption tm-auth-helper">기존 계정이 있으면 이메일 로그인 후 종목, 실력, 지역 확인으로 이어져요.</p>
           <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-guest-link" href={model.guestHref}>로그인 없이 시작하기</Link>
           <p className="tm-text-body tm-auth-center">
             아직 계정이 없나요? <Link href={model.signupHref}>회원가입</Link>

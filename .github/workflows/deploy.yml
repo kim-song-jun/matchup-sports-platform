@@ -164,6 +164,7 @@ jobs:
           KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
+          V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
         run: |
           TOSS_CLIENT_KEY_B64="$(printf '%s' "${TOSS_CLIENT_KEY_SECRET:-}" | base64 | tr -d '\n')"
           TOSS_SECRET_KEY_B64="$(printf '%s' "${TOSS_SECRET_KEY_SECRET:-}" | base64 | tr -d '\n')"
@@ -175,8 +176,9 @@ jobs:
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
+          V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
 
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' TOSS_CLIENT_KEY_B64='${TOSS_CLIENT_KEY_B64}' TOSS_SECRET_KEY_B64='${TOSS_SECRET_KEY_B64}' TOSS_WEBHOOK_SECRET_B64='${TOSS_WEBHOOK_SECRET_B64}' VAPID_PUBLIC_KEY_B64='${VAPID_PUBLIC_KEY_B64}' VAPID_PRIVATE_KEY_B64='${VAPID_PRIVATE_KEY_B64}' VAPID_SUBJECT_B64='${VAPID_SUBJECT_B64}' OPS_ALERT_WEBHOOK_URL_B64='${OPS_ALERT_WEBHOOK_URL_B64}' KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' bash -se" <<'EOF'
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' TOSS_CLIENT_KEY_B64='${TOSS_CLIENT_KEY_B64}' TOSS_SECRET_KEY_B64='${TOSS_SECRET_KEY_B64}' TOSS_WEBHOOK_SECRET_B64='${TOSS_WEBHOOK_SECRET_B64}' VAPID_PUBLIC_KEY_B64='${VAPID_PUBLIC_KEY_B64}' VAPID_PRIVATE_KEY_B64='${VAPID_PRIVATE_KEY_B64}' VAPID_SUBJECT_B64='${VAPID_SUBJECT_B64}' OPS_ALERT_WEBHOOK_URL_B64='${OPS_ALERT_WEBHOOK_URL_B64}' KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' V1_HOST_ADMIN_PASSWORD_B64='${V1_HOST_ADMIN_PASSWORD_B64}' bash -se" <<'EOF'
           set -euo pipefail
 
           RESET_DB="${RESET_DB:-false}"
@@ -234,6 +236,7 @@ jobs:
           sync_env_from_github_secret "KAKAO_CLIENT_ID" "${KAKAO_CLIENT_ID_B64:-}"
           sync_env_from_github_secret "KAKAO_CLIENT_SECRET" "${KAKAO_CLIENT_SECRET_B64:-}"
           sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
+          sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
 
           # Harden deploy/.env perms against EC2 umask 022 — contains VAPID_PRIVATE_KEY and other secrets
           chmod 600 deploy/.env

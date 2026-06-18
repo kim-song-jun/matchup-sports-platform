@@ -7,6 +7,8 @@ import {
   V1TeamMembershipRole,
   V1TermsKind,
 } from '@prisma/client';
+import { randomBytes, scrypt as scryptCallback } from 'crypto';
+import { promisify } from 'util';
 
 const prisma = new PrismaClient();
 
@@ -38,6 +40,11 @@ const futureStart = new Date('2026-06-20T10:00:00.000Z');
 const futureEnd = new Date('2026-06-20T11:00:00.000Z');
 const pastStart = new Date('2026-05-01T10:00:00.000Z');
 const pastEnd = new Date('2026-05-01T11:00:00.000Z');
+const hostAdminEmail = 'host@teameet.v1';
+const hostAdminPassword = process.env.V1_HOST_ADMIN_PASSWORD?.trim() || '11111111';
+const scrypt = promisify(scryptCallback);
+const passwordKeyLength = 64;
+const passwordScheme = 'scrypt';
 
 async function seedRuntimeCheck() {
   await prisma.v1RuntimeCheck.upsert({
@@ -1177,6 +1184,60 @@ async function seedAdmin(userIds: Record<string, string>) {
       grantedAt: new Date('2026-05-18T00:00:00.000Z'),
     },
   });
+
+  await prisma.v1AdminUser.upsert({
+    where: { userId: userIds[hostAdminEmail] },
+    update: { adminRole: V1AdminRole.owner, status: 'active', revokedAt: null },
+    create: {
+      userId: userIds[hostAdminEmail],
+      adminRole: V1AdminRole.owner,
+      status: 'active',
+      grantedByAdminUserId: userIds['admin@teameet.v1'],
+      grantedAt: new Date('2026-05-18T00:00:00.000Z'),
+    },
+  });
+
+  await seedHostAdminPassword(userIds[hostAdminEmail]);
+}
+
+async function seedHostAdminPassword(userId: string) {
+  if (!hostAdminPassword) {
+    return;
+  }
+
+  if (hostAdminPassword.length < 8) {
+    throw new Error('V1_HOST_ADMIN_PASSWORD must be at least 8 characters.');
+  }
+
+  const passwordHash = await hashSeedPassword(hostAdminPassword);
+  await prisma.v1AuthIdentity.upsert({
+    where: {
+      provider_providerUserKey: {
+        provider: V1AuthProvider.email,
+        providerUserKey: hostAdminEmail,
+      },
+    },
+    update: {
+      userId,
+      email: hostAdminEmail,
+      passwordHash,
+      status: 'active',
+    },
+    create: {
+      userId,
+      provider: V1AuthProvider.email,
+      providerUserKey: hostAdminEmail,
+      email: hostAdminEmail,
+      passwordHash,
+      status: 'active',
+    },
+  });
+}
+
+async function hashSeedPassword(password: string) {
+  const salt = randomBytes(16).toString('hex');
+  const key = (await scrypt(password, salt, passwordKeyLength)) as Buffer;
+  return `${passwordScheme}:${salt}:${key.toString('hex')}`;
 }
 
 async function upsertCoverageUser(input: {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useV1AdminActionLogs, useV1AdminStatusChangeLogs } from '@/hooks/use-v1-api';
 import type { AdminListFilters, V1AdminLog, V1AdminStatusChangeLog } from '@/types/api';
-import { adminActionLabel } from '@/lib/admin-labels';
+import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
 import {
   AdminDataTable,
   AdminEmpty,
@@ -14,7 +14,7 @@ import {
 import type { AdminTableColumn } from '@/components/admin';
 
 // ── Types ─────────────────────────────────────────────────────────────────
-type TargetTypeFilter = '' | 'user' | 'match' | 'team' | 'team_match';
+type TargetTypeFilter = '' | 'user' | 'match' | 'team' | 'team_match' | 'tournament';
 
 interface FilterOption {
   value: TargetTypeFilter;
@@ -35,6 +35,7 @@ const TARGET_TYPE_OPTIONS: FilterOption[] = [
   { value: 'match', label: '매치' },
   { value: 'team', label: '팀' },
   { value: 'team_match', label: '팀매치' },
+  { value: 'tournament', label: '대회' },
 ];
 
 const TABS: Tab[] = [
@@ -91,7 +92,7 @@ const ACTION_LOG_COLUMNS: AdminTableColumn<V1AdminLog>[] = [
     header: '대상',
     render: (row) => (
       <span className="flex items-center gap-1.5">
-        <AdminStatusPill status={row.targetType} label={row.targetType} />
+        <AdminStatusPill status={row.targetType} label={adminTargetTypeLabel(row.targetType)} />
         <span className="font-mono text-[12px] text-gray-400">{shortId(row.targetId)}</span>
       </span>
     ),
@@ -121,7 +122,7 @@ const STATUS_LOG_COLUMNS: AdminTableColumn<V1AdminStatusChangeLog>[] = [
   {
     key: 'targetType',
     header: '대상',
-    render: (row) => <AdminStatusPill status={row.targetType} label={row.targetType} />,
+    render: (row) => <AdminStatusPill status={row.targetType} label={adminTargetTypeLabel(row.targetType)} />,
   },
   {
     key: 'statusChange',

@@ -9,7 +9,7 @@ import {
   AdminPageHeader,
   AdminStatusPill,
 } from '@/components/admin';
-import { adminActionLabel } from '@/lib/admin-labels';
+import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
 
 // ── Date helpers ──────────────────────────────────────────────────────────
 function formatRelativeTime(dateStr: string): string {
@@ -30,15 +30,6 @@ function formatRelativeTime(dateStr: string): string {
   }
 }
 
-function targetTypeLabel(targetType: string): string {
-  const map: Record<string, string> = {
-    user: '회원',
-    match: '매치',
-    team: '팀',
-    team_match: '팀매치',
-  };
-  return map[targetType] ?? targetType;
-}
 
 // ── Warning card ──────────────────────────────────────────────────────────
 interface WarningCardProps {
@@ -195,7 +186,7 @@ export default function AdminOverviewPage() {
                   className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-50 last:border-0"
                 >
                   {/* Status pill for targetType */}
-                  <AdminStatusPill status={action.targetType} label={targetTypeLabel(action.targetType)} />
+                  <AdminStatusPill status={action.targetType} label={adminTargetTypeLabel(action.targetType)} />
 
                   {/* Action description */}
                   <span className="flex-1 text-[13px] text-gray-700 truncate">

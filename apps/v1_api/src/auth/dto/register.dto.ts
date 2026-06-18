@@ -13,8 +13,9 @@ export class RegisterDto {
   @MinLength(8)
   password!: string;
 
+  @IsOptional()
   @IsIn(['male', 'female'])
-  gender!: 'male' | 'female';
+  gender?: 'male' | 'female';
 
   @IsOptional()
   @IsString()

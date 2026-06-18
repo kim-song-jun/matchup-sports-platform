@@ -335,21 +335,16 @@ function TournamentDetailView({
           </div>
         </div>
 
-        {/* 핵심 3사실 메트릭 카드(정원 progress bar 내장) + 자리 남았어요 cue.
-            데스크탑에서는 우측 sticky 레일이 동일 정보(일정·정원·참가비)를 보여주므로
-            중복 방지를 위해 모바일 전용으로 숨긴다(tm-hide-desktop). */}
-        <div className="tm-hide-desktop">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginBottom: 10 }}>
-          <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-body)', marginBottom: 4 }}>일정</div>
-            <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-              {formatShortDate(tournament.scheduledAt)}
-            </div>
-          </div>
-          <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-body)', marginBottom: 4 }}>정원</div>
-            <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500, marginBottom: 5 }}>
-              {tournament.confirmedCount}/{tournament.teamCount}팀
+        {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
+            일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
+        <Card pad={0}>
+          {/* 정원 진행 + 잔여 (모바일 전용) */}
+          <div className="tm-hide-desktop" style={{ padding: '14px 16px', borderBottom: '1px solid var(--grey100)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
+              <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
+                {tournament.confirmedCount}/{tournament.teamCount}팀
+              </span>
             </div>
             <div
               role="progressbar"
@@ -357,7 +352,7 @@ function TournamentDetailView({
               aria-valuemin={0}
               aria-valuemax={tournament.teamCount}
               aria-label={`정원 ${tournament.confirmedCount} / ${tournament.teamCount}팀`}
-              style={{ height: 5, background: 'var(--surface)', borderRadius: 3, overflow: 'hidden' }}
+              style={{ height: 5, background: 'var(--grey100)', borderRadius: 3, overflow: 'hidden', marginTop: 8 }}
             >
               <div
                 style={{
@@ -368,51 +363,38 @@ function TournamentDetailView({
                 }}
               />
             </div>
+            {(() => {
+              const remaining = tournament.teamCount - tournament.confirmedCount;
+              if (remaining <= 0) {
+                return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6 }}>정원이 가득 찼어요</div>;
+              }
+              const pct = Math.round((tournament.confirmedCount / Math.max(tournament.teamCount, 1)) * 100);
+              const almostFull = pct >= 80;
+              return (
+                <div className="tm-text-caption" style={{ color: almostFull ? 'var(--orange500)' : 'var(--text-muted)', marginTop: 6 }}>
+                  {almostFull ? '마감 임박! ' : '아직 '}
+                  <b style={{ color: almostFull ? 'var(--orange500)' : 'var(--blue500)', fontWeight: 500 }}>{remaining}자리</b> 남았어요
+                </div>
+              );
+            })()}
           </div>
-          {/* 참가비: color var(--text-strong), NOT var(--blue500) — prize tint must not dress cost */}
-          <div style={{ background: 'var(--grey50)', borderRadius: 12, padding: 12 }}>
-            <div className="tm-text-caption" style={{ color: 'var(--text-body)', marginBottom: 4 }}>참가비</div>
-            <div className="tm-text-body" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-              {formatEntryFee(tournament.entryFee)}
-            </div>
+          {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
+          <div className="tm-hide-desktop">
+            <InfoRow label="일정" value={formatShortDate(tournament.scheduledAt)} />
+            <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
-        </div>
-        {(() => {
-          const remaining = tournament.teamCount - tournament.confirmedCount;
-          if (remaining <= 0) {
-            return (
-              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 10 }}>
-                정원이 가득 찼어요
-              </div>
-            );
-          }
-          const pct = Math.round((tournament.confirmedCount / Math.max(tournament.teamCount, 1)) * 100);
-          const almostFull = pct >= 80;
-          return (
-            <div
-              className="tm-text-caption"
-              style={{ color: almostFull ? 'var(--orange500)' : 'var(--text-muted)', marginBottom: 10 }}
-            >
-              {almostFull ? '마감 임박! ' : '아직 '}
-              <b style={{ color: almostFull ? 'var(--orange500)' : 'var(--blue500)', fontWeight: 500 }}>{remaining}자리</b> 남았어요
-            </div>
-          );
-        })()}
-        </div>
-        <Card pad={0}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {tournament.registrationDeadlineAt ? (
-              <InfoRow label="신청 마감" value={formatTournamentDate(tournament.registrationDeadlineAt)} />
-            ) : null}
-            {tournament.venue ? (
-              <InfoRow label="장소" value={tournament.venue} />
-            ) : null}
-            <InfoRow
-              label="선수단 규모"
-              value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
-              isLast
-            />
-          </div>
+          {/* 항상 표시 */}
+          {tournament.registrationDeadlineAt ? (
+            <InfoRow label="신청 마감" value={formatTournamentDate(tournament.registrationDeadlineAt)} />
+          ) : null}
+          {tournament.venue ? (
+            <InfoRow label="장소" value={tournament.venue} />
+          ) : null}
+          <InfoRow
+            label="선수단 규모"
+            value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
+            isLast
+          />
         </Card>
       </section>
 

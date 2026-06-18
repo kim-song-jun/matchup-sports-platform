@@ -447,7 +447,6 @@ export type V1TeamMutationPayload = {
   name: string;
   logoUrl?: string | null;
   coverImageUrl?: string | null;
-  photos?: string[];
   introduction?: string | null;
   activityAreaText?: string | null;
   skillLevelText?: string | null;

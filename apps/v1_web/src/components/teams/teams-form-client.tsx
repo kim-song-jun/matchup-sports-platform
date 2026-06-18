@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam } from '@/hooks/use-v1-api';
+import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
@@ -17,6 +17,13 @@ export function TeamCreatePageClient() {
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const createTeam = useV1CreateTeam();
+  const uploadImages = useV1UploadImages();
+  const uploadImage = async (file: File) => {
+    const result = await uploadImages.mutateAsync([file]);
+    const url = result.urls[0];
+    if (!url) throw new Error('이미지를 올리지 못했어요. 다시 시도해 주세요.');
+    return url;
+  };
   const [draft, setDraft] = useState<TeamDraft>(() => getTeamFormViewModel('create').team);
   const [sportId, setSportId] = useState('');
   const [regionId, setRegionId] = useState('');
@@ -34,6 +41,7 @@ export function TeamCreatePageClient() {
 
   const model = buildModel({
     mode: 'create',
+    uploadImage,
     draft,
     sportId,
     regionId,
@@ -67,6 +75,13 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
   const query = useV1TeamDetail(teamId);
   const updateTeam = useV1UpdateTeam(teamId);
+  const uploadImages = useV1UploadImages();
+  const uploadImage = async (file: File) => {
+    const result = await uploadImages.mutateAsync([file]);
+    const url = result.urls[0];
+    if (!url) throw new Error('이미지를 올리지 못했어요. 다시 시도해 주세요.');
+    return url;
+  };
   const [draft, setDraft] = useState<TeamDraft>(() => getTeamFormViewModel('edit').team);
   const [sportId, setSportId] = useState('');
   const [regionId, setRegionId] = useState('');
@@ -80,6 +95,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     setDraft({
       ...getTeamFormViewModel('edit').team,
       name: query.data.name,
+      logoUrl: query.data.profile.logoUrl ?? null,
       sport: query.data.sport.name,
       region: query.data.region?.name ?? '지역 미정',
       description: query.data.profile.introduction ?? '',
@@ -100,6 +116,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
 
   const model = buildModel({
     mode: 'edit',
+    uploadImage,
     draft,
     sportId,
     regionId,
@@ -136,6 +153,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
 
 function buildModel({
   mode,
+  uploadImage,
   draft,
   sportId,
   regionId,
@@ -153,6 +171,7 @@ function buildModel({
   onSubmit,
 }: {
   mode: 'create' | 'edit';
+  uploadImage?: (file: File) => Promise<string>;
   draft: TeamDraft;
   sportId: string;
   regionId: string;
@@ -195,6 +214,7 @@ function buildModel({
       },
       onJoinPolicyChange: setJoinPolicy,
       onMembersVisibilityChange: setMembersVisibilityEnabled,
+      uploadImage,
       onSubmit,
       submitting,
       error,
@@ -209,9 +229,8 @@ function buildPayload(draft: TeamDraft, sportId: string, regionId: string, joinP
     sportId,
     regionId,
     name: draft.name.trim(),
-    logoUrl: null,
+    logoUrl: draft.logoUrl || null,
     coverImageUrl: null,
-    photos: [],
     introduction: draft.description.trim() || null,
     activityAreaText: draft.activity.trim() || null,
     skillLevelText: draft.level.trim() || null,

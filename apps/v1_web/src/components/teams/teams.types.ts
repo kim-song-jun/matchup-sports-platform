@@ -80,6 +80,9 @@ export type TeamDetailViewModel = {
   ctaPending?: boolean;
   onCta?: () => void;
   onShare?: () => void | Promise<void>;
+  /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
+  openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
+  openMatchesLoading?: boolean;
 };
 
 export type TeamFormMode = 'create' | 'edit';
@@ -88,6 +91,7 @@ export type TeamFormViewModel = {
   mode: TeamFormMode;
   team: {
     name: string;
+    logoUrl: string | null;
     sport: string;
     region: string;
     description: string;
@@ -111,6 +115,7 @@ export type TeamFormViewModel = {
     onRegionChange: (regionId: string) => void;
     onJoinPolicyChange: (joinPolicy: 'approval_required' | 'closed') => void;
     onMembersVisibilityChange?: (enabled: boolean) => void;
+    uploadImage?: (file: File) => Promise<string>;
     onSubmit: () => void;
     submitting?: boolean;
     error?: string | null;

@@ -127,6 +127,64 @@ function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
   );
 }
 
+/**
+ * "이 팀의 열린 매치" — this team's recruiting team-matches (GET /team-matches?teamId).
+ * Lets a prospective member judge the team's activity before requesting to join.
+ * Clean v1 card style + 해요체 copy.
+ */
+function TeamOpenMatchesSection({
+  matches,
+  loading,
+}: {
+  matches?: TeamDetailViewModel['openMatches'];
+  loading?: boolean;
+}) {
+  const items = matches ?? [];
+  return (
+    <>
+      <SectionTitle title="이 팀의 열린 매치" sub="이 팀이 지금 모집 중인 경기예요." />
+      {loading ? (
+        <Card pad={16}>
+          <div className="tm-text-caption">열린 매치를 불러오고 있어요.</div>
+        </Card>
+      ) : items.length ? (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {items.map((match) => (
+            <Link
+              key={match.id}
+              className="tm-pressable"
+              href={`/team-matches/${match.id}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                border: '1px solid var(--grey100)',
+                borderRadius: 14,
+                padding: '14px 16px',
+                background: 'var(--bg)',
+                textDecoration: 'none',
+                color: 'inherit',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.title}</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>{[match.dateLabel, match.venue].filter(Boolean).join(' · ')}</div>
+              </div>
+              <span className="tm-badge tm-badge-blue" style={{ flexShrink: 0 }}>모집중</span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <Card pad={16} style={{ background: 'var(--grey50)' }}>
+          <div className="tm-text-label">아직 열어둔 매치가 없어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>이 팀이 새 경기를 모집하면 여기에서 보여드릴게요.</div>
+        </Card>
+      )}
+    </>
+  );
+}
+
 export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
@@ -179,6 +237,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <span className="tm-badge tm-badge-grey">{team.members}명</span>
             </div>
           </Card>
+          <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
           <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />
@@ -255,6 +314,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <span className="tm-badge tm-badge-grey">{team.members}명</span>
           </div>
         </Card>
+        <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
         <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
         <Card pad={16}>
           <InfoRow label="팀명" value={team.name} />
@@ -295,6 +355,8 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
   const edit = model.mode === 'edit';
   const team = model.team;
   const form = model.form;
+  const previewSport = form?.sports.find((sport) => sport.id === form.sportId)?.name ?? team.sports[0] ?? '';
+  const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
   return (
     <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false} backHref="/teams">
       {/* Desktop back header */}
@@ -304,49 +366,202 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
         </Link>
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
       </div>
-      <div className="tm-create-shell tm-team-form-shell">
-        {edit ? (
-          <Card pad={16}>
-            <div className="tm-my-toggle-row">
-              <div>
-                <div className="tm-text-body-lg">멤버 목록 공개</div>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                  켜면 팀 멤버가 멤버 목록을 볼 수 있어요. 팀에 속하지 않은 사람에게는 공개되지 않아요.
+      <div className="tm-team-form-grid">
+        <div className="tm-create-shell tm-team-form-main">
+          {edit ? (
+            <Card pad={16}>
+              <div className="tm-my-toggle-row">
+                <div>
+                  <div className="tm-text-body-lg">멤버 목록 공개</div>
+                  <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                    켜면 팀 멤버가 멤버 목록을 볼 수 있어요. 팀에 속하지 않은 사람에게는 공개되지 않아요.
+                  </div>
                 </div>
+                <button
+                  aria-pressed={Boolean(form?.membersVisibilityEnabled)}
+                  className={`tm-toggle ${form?.membersVisibilityEnabled ? 'tm-toggle-on' : ''}`}
+                  onClick={() => form?.onMembersVisibilityChange?.(!form.membersVisibilityEnabled)}
+                  type="button"
+                />
               </div>
-              <button
-                aria-pressed={Boolean(form?.membersVisibilityEnabled)}
-                className={`tm-toggle ${form?.membersVisibilityEnabled ? 'tm-toggle-on' : ''}`}
-                onClick={() => form?.onMembersVisibilityChange?.(!form.membersVisibilityEnabled)}
-                type="button"
-              />
-            </div>
-          </Card>
-        ) : null}
-        <h2 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h2>
-        {form?.error ? <Card pad={14} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
-        <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
-        <div className="tm-create-field">
-          <div className="tm-text-label">종목</div>
-          <div className="tm-team-form-chip-row">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '러닝', '수영']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
+            </Card>
+          ) : null}
+          <h2 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h2>
+          {form?.error ? <Card pad={14} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
+          <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
+          <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
+          <div className="tm-create-field">
+            <div className="tm-text-label">종목</div>
+            <div className="tm-team-form-chip-row">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '러닝', '수영']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
+          </div>
+          <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
+          <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾습니다." multiline onChange={(value) => form?.onFieldChange('description', value)} />
+          <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
+          <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
+          <CreateField label="활동 방식" value={team.activity} placeholder="예: 평일 저녁 · 주 1회" onChange={(value) => form?.onFieldChange('activity', value)} />
         </div>
-        <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
-        <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾습니다." multiline onChange={(value) => form?.onFieldChange('description', value)} />
-        <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
-        <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
-        <CreateField label="활동 방식" value={team.activity} placeholder="예: 평일 저녁 · 주 1회" onChange={(value) => form?.onFieldChange('activity', value)} />
+        {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
+        <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
+          <TeamFormPreview team={team} sportName={previewSport} regionName={previewRegion} />
+          <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams">{edit ? '취소' : '이전'}</Link>
+        </aside>
       </div>
-      <div className="tm-fixed-cta tm-team-form-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
+      <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </AppChrome>
   );
 }
 
-export function TeamMembersPageView({ model }: { model: TeamMembersViewModel }) {
+/**
+ * Optional team-logo upload. Uploads via form.uploadImage (→ /uploads) and stores
+ * the returned URL in draft.logoUrl. Skippable — without a logo the team falls back
+ * to its first character, matching the listing card.
+ */
+function TeamLogoField({
+  logoUrl,
+  teamName,
+  uploadImage,
+  onChange,
+}: {
+  logoUrl: string | null;
+  teamName: string;
+  uploadImage?: (file: File) => Promise<string>;
+  onChange: (url: string | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const trimmedName = teamName.trim();
+  const fallbackChar = trimmedName ? Array.from(trimmedName)[0] : '팀';
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file || !uploadImage) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      onChange(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '이미지를 올리지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
   return (
-    <AppChrome title="멤버 관리" activeTab="teams" bottomNav={false}>
+    <div className="tm-create-field">
+      <div className="tm-text-label">
+        팀 로고 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
+        <div className="tm-team-logo tm-team-logo-large" style={{ overflow: 'hidden' }} aria-hidden="true">
+          {logoUrl ? (
+            <img src={logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            fallbackChar
+          )}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="tm-btn tm-btn-sm tm-btn-neutral"
+              disabled={uploading || !uploadImage}
+              onClick={() => inputRef.current?.click()}
+            >
+              {uploading ? '올리는 중…' : logoUrl ? '변경' : '이미지 선택'}
+            </button>
+            {logoUrl ? (
+              <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={uploading} onClick={() => onChange(null)}>
+                삭제
+              </button>
+            ) : null}
+          </div>
+          <div className="tm-text-caption">정사각형 이미지를 권장해요. 안 올려도 첫 글자로 표시돼요.</div>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(event) => handleFile(event.target.files?.[0])}
+        />
+      </div>
+      {error ? (
+        <div className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 6 }}>{error}</div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Desktop live preview of the team being created/edited — mirrors the real
+ * TeamCard visuals (logo + name + sport·region + level/정원/성별 badges + intro)
+ * bound to the form draft so input is reflected instantly. aria-hidden because it
+ * is a redundant visual mirror of the form fields; the CTA beside it stays focusable.
+ */
+function TeamFormPreview({
+  team,
+  sportName,
+  regionName,
+}: {
+  team: TeamFormViewModel['team'];
+  sportName: string;
+  regionName: string;
+}) {
+  const trimmedName = team.name.trim();
+  const hasName = trimmedName.length > 0;
+  const sport = sportName || team.sports[0] || '종목 미정';
+  const region = regionName || team.region || '지역 미정';
+  const level = team.level.trim() || '전체 레벨';
+  const capacity = team.capacity ? `${team.capacity}명` : '정원 미정';
+  const gender = team.genderRule || '성별 무관';
+  const intro = team.description.trim();
+  const logoChar = hasName ? Array.from(trimmedName)[0] : '팀';
+  return (
+    <div aria-hidden="true">
+      <div className="tm-text-caption" style={{ fontWeight: 600, color: 'var(--text-caption)', marginBottom: 8 }}>
+        실시간 미리보기
+      </div>
+      <div className="tm-team-card" style={{ cursor: 'default' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div className="tm-team-logo" style={{ overflow: 'hidden' }}>
+            {team.logoUrl ? (
+              <img src={team.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              logoChar
+            )}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="tm-text-body-lg line-clamp-2" style={{ color: hasName ? 'var(--text-strong)' : 'var(--text-caption)' }}>
+              {hasName ? trimmedName : '팀 이름'}
+            </div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>{sport} · {region}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              <span className="tm-badge tm-badge-grey">{level}</span>
+              <span className="tm-badge tm-badge-grey">{capacity}</span>
+              <span className="tm-badge tm-badge-grey">{gender}</span>
+            </div>
+          </div>
+        </div>
+        <div className="tm-team-intro-box">
+          <div className="tm-text-label">팀 소개</div>
+          <div className="tm-text-body" style={{ marginTop: 6, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            {intro || '팀 소개를 입력하면 여기에 보여요.'}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function TeamMembersPageView({ model, backHref = '/teams' }: { model: TeamMembersViewModel; backHref?: string }) {
+  return (
+    <AppChrome title="멤버 관리" activeTab="teams" bottomNav={false} backHref={backHref}>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+        <Link className="tm-desktop-back" href={backHref} aria-label="팀으로 돌아가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
         </Link>
         <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
@@ -610,11 +825,11 @@ function TeamCapacityField({ value, onChange }: { value: number; onChange?: (val
     <div className="tm-create-field">
       <div className="tm-text-label">정원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" onClick={() => onChange?.(Math.max(2, normalized - 1))}>-</button>
-        <select className="tm-create-input tm-create-select-control" value={normalized} onChange={(event) => onChange?.(Number(event.target.value))}>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 줄이기" onClick={() => onChange?.(Math.max(2, normalized - 1))}>−</button>
+        <select className="tm-create-input tm-create-select-control" aria-label="정원" value={normalized} onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>
-        <button className="tm-create-stepper-button" type="button" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="정원 한 명 늘리기" onClick={() => onChange?.(Math.min(50, normalized + 1))}>+</button>
       </div>
     </div>
   );

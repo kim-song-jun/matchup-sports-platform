@@ -72,11 +72,16 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             </div>
           </div>
 
-          {/* Featured recommendation hero */}
+          {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
           <div className="tm-home-featured-block">
-            <div className="tm-text-label" style={{ marginBottom: 8 }}>오늘의 추천</div>
-            <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
-            <TournamentHeroCard />
+            <div style={{ marginBottom: 10 }}>
+              <div className="tm-text-label">오늘의 추천</div>
+              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
+            </div>
+            <div className="tm-home-featured-carousel">
+              <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+              <TournamentHeroCard />
+            </div>
           </div>
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
@@ -185,9 +190,14 @@ function QuickAction({ item }: { item: HomeQuickAction }) {
       <div className="tm-quick-icon" style={{ background: item.background, color: item.color }}>
         <QuickActionIcon item={item} />
       </div>
-      <span className="tm-text-micro" style={{ color: 'var(--text-strong)', textAlign: 'center', lineHeight: 1.2 }}>
-        {item.label}
-      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <span className="tm-text-label" style={{ color: 'var(--text-strong)', textAlign: 'center', lineHeight: 1.2 }}>
+          {item.label}
+        </span>
+        <span className="tm-text-micro" style={{ color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.2 }}>
+          {item.sub}
+        </span>
+      </div>
     </>
   );
 

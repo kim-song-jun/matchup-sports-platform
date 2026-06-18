@@ -160,7 +160,7 @@ export function useV1Register() {
       nickname: string;
       email: string;
       password: string;
-      gender: 'male' | 'female';
+      gender?: 'male' | 'female';
       displayName?: string;
       phone?: string;
       birthDate?: string;
@@ -177,7 +177,7 @@ export function useV1CompleteSocialProfile() {
   return useMutation({
     mutationFn: (body: {
       nickname: string;
-      gender: 'male' | 'female';
+      gender?: 'male' | 'female';
       displayName?: string;
       phone?: string;
       birthDate?: string;

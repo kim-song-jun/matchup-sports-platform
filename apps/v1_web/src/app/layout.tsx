@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Providers } from './providers';
+import { RouteProgressBar } from '@/components/v1-ui/route-progress';
 import './globals.css';
 import './desktop/index.css';
 
@@ -25,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
+        <RouteProgressBar />
         <Providers>{children}</Providers>
       </body>
     </html>

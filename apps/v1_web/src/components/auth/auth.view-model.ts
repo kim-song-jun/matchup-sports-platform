@@ -11,7 +11,7 @@ export function getLoginViewModel(): LoginViewModel {
     signupHref: '/terms',
     providers: [
       { label: '카카오', background: '#FEE500', color: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
-      { label: '네이버', background: 'var(--green500)', color: 'var(--static-white)', disabled: true },
+      { label: '네이버', background: '#03C75A', color: 'var(--static-white)', disabled: true },
       { label: 'Apple', background: 'var(--static-black)', color: 'var(--static-white)', disabled: true },
     ],
   };

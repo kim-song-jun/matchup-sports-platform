@@ -19,6 +19,7 @@ import { SearchModule } from './search/search.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
+import { VerificationModule } from './verification/verification.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { TournamentsModule } from './tournaments/tournaments.module';
     ReviewsModule,
     UploadsModule,
     TournamentsModule,
+    VerificationModule,
   ],
 })
 export class AppModule {}

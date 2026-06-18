@@ -58,6 +58,10 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>
+            {/* Logout surfaced directly on 마이페이지 (also in 계정 설정) for discoverability. */}
+            <div className="tm-my-logout-row">
+              <LogoutButton />
+            </div>
           </div>
         </div>
       </div>

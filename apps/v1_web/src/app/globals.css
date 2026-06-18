@@ -365,6 +365,39 @@ button:disabled {
   margin-top: 0;
 }
 
+/* Landing value props in the login hero — fills the frame so the page reads as
+   a landing page, with the auth CTAs pushed to the bottom group. */
+.tm-auth-features {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tm-auth-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tm-auth-feature-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--blue50);
+  color: var(--blue500);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+/* The guest button sits under the email helper in the bottom CTA group. */
+.tm-auth-guest-link {
+  margin-top: 14px;
+}
+
 .tm-auth-center {
   margin-top: 12px;
   text-align: center;
@@ -1146,6 +1179,26 @@ button:disabled {
   display: block;
 }
 
+/* 헤더와 인사 사이 숨 트이게 (헤더에 붙어 겹쳐 보이던 문제) */
+.tm-home-greeting-block {
+  padding-top: 16px;
+}
+
+/* 오늘의 추천 — 세로 스택 대신 가로 캐러셀(스와이프, 다음 카드 살짝 peek). 스크롤바는 전역 숨김. */
+.tm-home-featured-carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.tm-home-featured-carousel > * {
+  /* 88% (card + peek) on mobile, capped so the hero cards don't balloon on
+     wider/tablet widths — keeps it reading as a carousel, not one giant card. */
+  flex: 0 0 min(88%, 400px);
+  scroll-snap-align: start;
+}
+
 .tm-quick-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1235,6 +1288,8 @@ button:disabled {
   padding: 0;
   text-align: left;
   color: inherit;
+  /* hairline shadow 로 이미지+내용을 한 카드로 묶어 '붕 떠' 보이지 않게 */
+  box-shadow: var(--shadow-2);
 }
 
 .tm-match-card-media {
@@ -1754,7 +1809,7 @@ button:disabled {
 }
 
 .tm-create-shell {
-  padding: 0 20px 124px;
+  padding: 12px 20px 124px;
 }
 
 .tm-create-progress {
@@ -1795,7 +1850,7 @@ button:disabled {
 }
 
 .tm-create-field {
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 .tm-create-input {
@@ -1832,28 +1887,63 @@ button:disabled {
   min-width: 0;
   color: var(--text-strong);
   font: inherit;
-  padding-right: 10px;
-}
-
-select.tm-create-input {
-  appearance: auto;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  /* Custom themed chevron (icon asset — data-URI can't take a CSS var); muted grey
+     matches the palette, fixed 14px from the right edge for a consistent position. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%238b95a1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  cursor: pointer;
 }
 
 .tm-create-stepper {
   margin-top: 8px;
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  /* flex (not grid): a native <select> reports a taller intrinsic height that
+     skews grid row sizing; flex centres each control by its own 48px height. */
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
 .tm-create-stepper-button {
-  min-height: 48px;
-  border: 1px solid var(--grey100);
+  flex: 0 0 48px;
+  height: 48px;
+  border: 1px solid var(--grey200);
   border-radius: 12px;
-  background: var(--bg);
+  background: var(--grey50);
   color: var(--blue500);
-  font-size: 18px;
-  font-weight: 900;
+  font-size: 22px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+
+.tm-create-stepper-button:active {
+  background: var(--grey100);
+}
+
+/* Capacity stepper: the middle <select> sits between −/+ buttons, so drop its
+   chevron and centre the value — the steppers are the primary control.
+   Pin its height to 48px so all three controls match exactly. */
+.tm-create-stepper .tm-create-select-control {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 48px;
+  /* .tm-create-input adds margin-top:10px for standalone fields; inside the flex
+     stepper that pushes the select below the −/+ buttons, so zero it out. */
+  margin-top: 0;
+  background-image: none;
+  /* centred value needs no side padding — minimise it so "24명" never clips in
+     the narrow mobile two-col column. */
+  padding: 0 4px;
+  text-align: center;
+  text-align-last: center;
+  font-weight: 600;
 }
 
 .tm-create-image-preview {
@@ -3839,4 +3929,178 @@ select.tm-create-input {
     min-height: auto;
     padding-top: 20px;
   }
+}
+
+/* ── 전역 라우트 진행 바 (components/v1-ui/route-progress.tsx) ───────────── */
+.tm-route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.tm-route-progress-bar {
+  height: 100%;
+  background: var(--blue500);
+  box-shadow: 0 0 8px rgba(49, 130, 246, 0.5);
+  border-radius: 0 2px 2px 0;
+  transition: width 180ms ease;
+}
+
+/* ── 스켈레톤 블록 (components/v1-ui/page-skeleton.tsx) ──────────────────── */
+.tm-skeleton {
+  background: var(--grey100);
+  animation: tm-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tm-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-route-progress-bar {
+    transition: none;
+  }
+  .tm-skeleton {
+    animation: none;
+  }
+}
+
+/* ── 회원가입 멀티스텝 위저드 (signup-client) ─────────────────────────────── */
+/* 진행 바: 카드(모바일은 화면) 최상단 풀폭 — body 패딩(24/20)만큼 음수 마진으로 가장자리까지 */
+.tm-signup-progress {
+  display: grid;
+  grid-template-columns: repeat(var(--signup-steps, 5), 1fr);
+  gap: 6px;
+  height: 5px;
+  margin-bottom: 26px;
+}
+
+.tm-signup-progress span {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--grey150);
+  transition: background 240ms ease;
+}
+
+.tm-signup-progress span[data-on='true'] {
+  background: var(--blue500);
+}
+
+/* 관심 운동 카드 아이콘 */
+.tm-signup-sport-icon {
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.tm-auth-option-selected .tm-signup-sport-icon {
+  color: var(--blue500);
+}
+
+.tm-signup-back {
+  align-self: flex-start;
+  margin-bottom: 14px;
+  padding-inline: 0;
+  color: var(--text-muted);
+}
+
+.tm-signup-hero {
+  margin-bottom: 30px;
+}
+
+.tm-signup-hero .tm-auth-heading {
+  font-size: 27px;
+  line-height: 36px;
+  letter-spacing: -0.4px;
+}
+
+.tm-signup-hero .tm-auth-sub {
+  margin-top: 10px;
+}
+
+.tm-signup-skip {
+  margin-top: 12px;
+  width: 100%;
+  text-align: center;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+@media (min-width: 1024px) {
+  .tm-signup-hero .tm-auth-heading {
+    font-size: 28px;
+    line-height: 38px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-signup-progress span {
+    transition: none;
+  }
+}
+
+/* ── 비밀번호 보기 토글 (signup-client) ───────────────────────────────────── */
+.tm-auth-password-field {
+  position: relative;
+}
+
+.tm-auth-password-field .tm-auth-input {
+  /* 우측 눈 아이콘 버튼 공간 확보 */
+  padding-right: 48px;
+}
+
+.tm-auth-password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-caption);
+  cursor: pointer;
+  border-radius: 12px;
+  transition: color 120ms ease;
+}
+
+.tm-auth-password-toggle:hover {
+  color: var(--text-body);
+}
+
+/* 표시 중일 때 우리 브랜드 블루로 강조 */
+.tm-auth-password-toggle[aria-pressed='true'] {
+  color: var(--blue500);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-auth-password-toggle {
+    transition: none;
+  }
+}
+
+/* ── 스크롤바 숨김 — 스크롤은 되지만 바는 보이지 않게 (모바일 우선 느낌) ──────────
+ * 데스크톱 브라우저의 두꺼운 네이티브 스크롤바를 완전히 숨긴다(휠/트랙패드 스크롤은 유지).
+ * 전 폭에 적용 — 좁은 데스크톱 창에서 모바일 레이아웃을 볼 때도 바가 안 보이게.
+ * 실제 모바일은 원래 오버레이라 변화 없음. 세로 문서 스크롤 + .tm-match-rail 같은
+ * 가로 캐러셀의 바까지 모두 숨겨 "스크롤처럼 보이지 않게" 한다. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }

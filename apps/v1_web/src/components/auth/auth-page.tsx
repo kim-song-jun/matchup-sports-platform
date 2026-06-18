@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
-import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
 
@@ -15,11 +15,25 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           </div>
           <h1 className="tm-text-heading tm-auth-title">{model.heroTitle}</h1>
           <p className="tm-text-body tm-auth-sub">{model.heroSub}</p>
-          <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
-          <p className="tm-text-caption tm-auth-helper">기존 계정이 있으면 이메일 로그인 후 종목, 실력, 지역 확인으로 이어져요.</p>
+          <ul className="tm-auth-features">
+            <li className="tm-auth-feature">
+              <span className="tm-auth-feature-icon" aria-hidden="true"><MatchIcon size={18} strokeWidth={2} /></span>
+              <span className="tm-text-body">내 종목·실력·지역에 맞는 매치를 추천받아요</span>
+            </li>
+            <li className="tm-auth-feature">
+              <span className="tm-auth-feature-icon" aria-hidden="true"><TeamMatchIcon size={18} strokeWidth={2} /></span>
+              <span className="tm-text-body">팀을 만들고 다른 팀과 경기를 잡아요</span>
+            </li>
+            <li className="tm-auth-feature">
+              <span className="tm-auth-feature-icon" aria-hidden="true"><TrophyIcon size={18} strokeWidth={2} /></span>
+              <span className="tm-text-body">대회에 참가하고 기록을 쌓아요</span>
+            </li>
+          </ul>
         </div>
         <div>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={model.guestHref}>로그인 없이 시작하기</Link>
+          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block tm-auth-email-link" href={model.emailHref}>이메일로 로그인</Link>
+          <p className="tm-text-caption tm-auth-helper">기존 계정이 있으면 이메일 로그인 후 종목, 실력, 지역 확인으로 이어져요.</p>
+          <Link className="tm-btn tm-btn-lg tm-btn-outline tm-btn-block tm-auth-guest-link" href={model.guestHref}>로그인 없이 시작하기</Link>
           <p className="tm-text-body tm-auth-center">
             아직 계정이 없나요? <Link href={model.signupHref}>회원가입</Link>
           </p>
@@ -47,27 +61,9 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
     </AuthFrame>
   );
 
-  return (
-    <div className="tm-auth-login-split">
-      {/* Brand panel — hidden on mobile (display:none), shown as left pane on desktop */}
-      <div className="tm-auth-split-brand" aria-hidden="true">
-        <div className="tm-auth-split-brand-logo" style={{ background: 'var(--surface)' }}>
-          <BrandMark size={52} />
-        </div>
-        <div className="tm-auth-split-brand-wordmark">teameet</div>
-        <p className="tm-auth-split-brand-tagline">생활체육 동호인을 위한 AI 스포츠 매칭 플랫폼</p>
-        <ul className="tm-auth-split-brand-features" role="list">
-          <li className="tm-auth-split-brand-feature">풋살 · 농구 · 배드민턴 등 11개 종목</li>
-          <li className="tm-auth-split-brand-feature">AI 기반 실력 · 지역 · 시간 매칭</li>
-          <li className="tm-auth-split-brand-feature">팀 매칭 · 용병 · 강좌 · 장터</li>
-        </ul>
-      </div>
-      {/* Card side — on mobile this is the entire page; on desktop it's the right pane */}
-      <div className="tm-auth-split-card-side">
-        {card}
-      </div>
-    </div>
-  );
+  // 모바일 우선 — 데스크톱에서도 모바일 폭 프레임(가운데), 모바일은 풀스크린.
+  // (이전 50/50 split 은 이 원칙에 맞춰 폐기)
+  return card;
 }
 
 export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel }) {
@@ -139,7 +135,10 @@ function AuthActionButton({ action }: { action: AuthAction }) {
 }
 
 function ProviderButton({ provider }: { provider: LoginProvider }) {
-  const style = { background: provider.background, color: provider.color };
+  // 준비 중(disabled)에도 provider 브랜드색을 그대로 노출 — 회색 비활성 대신
+  // 브랜드 배경/텍스트를 인라인으로 적용(tm-auth-provider-disabled 의 grey100 을 덮음).
+  // disabled 의미는 cursor:not-allowed + 하단 "준비 중" 안내 + aria-label 로 전달.
+  const style = { background: provider.background, color: provider.color, border: 0 };
 
   if (provider.href?.startsWith('http') && !provider.disabled) {
     return (
@@ -158,7 +157,7 @@ function ProviderButton({ provider }: { provider: LoginProvider }) {
       className={`tm-btn tm-btn-md ${provider.disabled ? 'tm-auth-provider-disabled' : 'tm-pressable'}`}
       disabled={provider.disabled}
       aria-label={provider.disabled ? `${provider.label} 로그인 (준비 중)` : undefined}
-      style={provider.disabled ? undefined : style}
+      style={style}
       type="button"
     >
       {provider.label}

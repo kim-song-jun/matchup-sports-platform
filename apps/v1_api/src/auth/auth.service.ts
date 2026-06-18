@@ -115,7 +115,7 @@ export class AuthService {
           create: {
             nickname,
             displayName,
-            gender: dto.gender,
+            gender: dto.gender ?? null,
             birthDate,
             profileImageUrl,
             visibility: 'public',
@@ -555,7 +555,7 @@ export class AuthService {
         update: {
           nickname,
           displayName,
-          gender: dto.gender,
+          gender: dto.gender ?? null,
           birthDate,
           profileImageUrl,
           visibility: 'public',
@@ -564,7 +564,7 @@ export class AuthService {
           userId,
           nickname,
           displayName,
-          gender: dto.gender,
+          gender: dto.gender ?? null,
           birthDate,
           profileImageUrl,
           visibility: 'public',
@@ -645,6 +645,10 @@ export class AuthService {
         onboardingStatus: user.onboardingStatus,
         lastLoginAt: user.lastLoginAt,
         createdAt: user.createdAt,
+      },
+      verification: {
+        emailVerified: Boolean(user.emailVerifiedAt),
+        phoneVerified: Boolean(user.phoneVerifiedAt),
       },
       profile: {
         displayName: user.profile?.displayName ?? user.profile?.nickname ?? 'Teameet user',

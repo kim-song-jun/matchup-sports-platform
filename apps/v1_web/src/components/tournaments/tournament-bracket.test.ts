@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupFixturesByRound } from './tournament-bracket';
+import { buildBracketData, groupFixturesByRound } from './tournament-bracket';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── Fixture / group factories ── */
@@ -163,5 +163,141 @@ describe('groupFixturesByRound', () => {
 
     expect(rounds).toHaveLength(1);
     expect(rounds[0].fixtures.map((f) => f.id)).toEqual(['f2', 'f1']);
+  });
+});
+
+/* ── bracketry mapping ── */
+
+function makeResult(
+  overrides: Partial<V1TournamentFixture['result'] & object> = {},
+): NonNullable<V1TournamentFixture['result']> {
+  return {
+    homeScore: 0,
+    awayScore: 0,
+    hasPenalty: false,
+    homePenaltyScore: null,
+    awayPenaltyScore: null,
+    note: null,
+    recordedAt: '2026-06-18T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('buildBracketData', () => {
+  const semi = makeGroup({ id: 'g-semi', phase: 'semi' });
+  const final = makeGroup({ id: 'g-final', phase: 'final' });
+  const third = makeGroup({ id: 'g-third', phase: 'third_place' });
+
+  it('maps main rounds to bracketry rounds and assigns roundIndex/order', () => {
+    const s1 = makeFixture({ id: 's1', fixtureNumber: 1, groupId: 'g-semi' });
+    const s2 = makeFixture({ id: 's2', fixtureNumber: 2, groupId: 'g-semi' });
+    const f1 = makeFixture({ id: 'f1', fixtureNumber: 1, groupId: 'g-final' });
+
+    const data = buildBracketData([s1, s2, f1], [semi, final]);
+
+    expect(data.rounds).toEqual([{ name: '4강' }, { name: '결승' }]);
+    const main = data.matches.filter((m) => !m.isBronzeMatch);
+    expect(main.map((m) => [m.roundIndex, m.order])).toEqual([
+      [0, 0], // s1
+      [0, 1], // s2
+      [1, 0], // final
+    ]);
+  });
+
+  it('emits third_place as a bronze match pinned to the final round index, order 1', () => {
+    const s1 = makeFixture({ id: 's1', fixtureNumber: 1, groupId: 'g-semi' });
+    const s2 = makeFixture({ id: 's2', fixtureNumber: 2, groupId: 'g-semi' });
+    const f1 = makeFixture({ id: 'f1', fixtureNumber: 1, groupId: 'g-final' });
+    const t1 = makeFixture({ id: 't1', fixtureNumber: 1, groupId: 'g-third' });
+
+    const data = buildBracketData([s1, s2, f1, t1], [semi, final, third]);
+
+    // third_place is NOT a separate round — final index is 1 (semi=0, final=1)
+    expect(data.rounds).toEqual([{ name: '4강' }, { name: '결승' }]);
+    const bronze = data.matches.find((m) => m.isBronzeMatch);
+    expect(bronze).toBeDefined();
+    expect(bronze!.roundIndex).toBe(1);
+    expect(bronze!.order).toBe(1);
+  });
+
+  it('marks the winning side and carries scores', () => {
+    const f1 = makeFixture({
+      id: 'f1', fixtureNumber: 1, groupId: 'g-final', status: 'completed',
+      homeTeamName: 'A', awayTeamName: 'B',
+      result: makeResult({ homeScore: 3, awayScore: 1 }),
+    });
+
+    const data = buildBracketData([f1], [final]);
+    const m = data.matches[0];
+
+    expect(m.sides[0].isWinner).toBe(true);
+    expect(m.sides[1].isWinner).toBeUndefined();
+    expect(m.sides[0].scores).toEqual([{ mainScore: 3, isWinner: true }]);
+    expect(m.sides[1].scores).toEqual([{ mainScore: 1, isWinner: false }]);
+    expect(m.matchStatus).toBe('종료');
+  });
+
+  it('appends 승부차기 to matchStatus on a penalty shootout', () => {
+    const f1 = makeFixture({
+      id: 'f1', fixtureNumber: 1, groupId: 'g-final', status: 'completed',
+      result: makeResult({ homeScore: 1, awayScore: 1, hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 4 }),
+    });
+
+    const data = buildBracketData([f1], [final]);
+    expect(data.matches[0].matchStatus).toBe('종료 · 승부차기 5:4');
+    expect(data.matches[0].sides[0].isWinner).toBe(true);
+  });
+
+  it('dedupes a team that advances across rounds into one contestant (by registrationId)', () => {
+    const s1 = makeFixture({
+      id: 's1', fixtureNumber: 1, groupId: 'g-semi', status: 'completed',
+      homeRegistrationId: 'reg-A', homeTeamName: 'A',
+      awayRegistrationId: 'reg-X', awayTeamName: 'X',
+      result: makeResult({ homeScore: 2, awayScore: 0 }),
+    });
+    const f1 = makeFixture({
+      id: 'f1', fixtureNumber: 1, groupId: 'g-final',
+      homeRegistrationId: 'reg-A', homeTeamName: 'A',
+      awayRegistrationId: 'reg-Y', awayTeamName: 'Y',
+    });
+
+    const data = buildBracketData([s1, f1], [semi, final]);
+
+    // 'reg-A' appears in both semi and final but is registered once
+    expect(data.contestants['reg-A']).toEqual({ players: [{ title: 'A' }] });
+    expect(Object.keys(data.contestants).sort()).toEqual(['reg-A', 'reg-X', 'reg-Y']);
+  });
+
+  it('renders an empty side (no contestantId) for a 미정/TBD slot', () => {
+    const f1 = makeFixture({
+      id: 'f1', fixtureNumber: 1, groupId: 'g-final',
+      homeRegistrationId: 'reg-A', homeTeamName: 'A',
+      awayRegistrationId: null, awayTeamName: '',
+    });
+
+    const data = buildBracketData([f1], [final]);
+    const m = data.matches[0];
+
+    expect(m.sides[0].contestantId).toBe('reg-A');
+    expect(m.sides[1].contestantId).toBeUndefined();
+    // empty slot is not registered as a contestant
+    expect(Object.keys(data.contestants)).toEqual(['reg-A']);
+  });
+
+  it('falls back to a name-based contestant id when registrationId is null', () => {
+    const f1 = makeFixture({
+      id: 'f1', fixtureNumber: 1, groupId: 'g-final',
+      homeRegistrationId: null, homeTeamName: '강남 러닝 크루',
+      awayRegistrationId: null, awayTeamName: '송파 풋살 모임',
+    });
+
+    const data = buildBracketData([f1], [final]);
+    expect(data.matches[0].sides[0].contestantId).toBe('name:강남 러닝 크루');
+    expect(data.contestants['name:강남 러닝 크루']).toEqual({ players: [{ title: '강남 러닝 크루' }] });
+  });
+
+  it('returns no matches when there are no fixtures', () => {
+    const data = buildBracketData([], []);
+    expect(data).toEqual({ rounds: [], matches: [], contestants: {} });
   });
 });

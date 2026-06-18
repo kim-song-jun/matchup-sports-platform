@@ -14,10 +14,12 @@ import {
   useV1TeamDetail,
   useV1TeamJoinEligibility,
   useV1TeamJoinApplications,
+  useV1TeamMatches,
   useV1TeamMembers,
   useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
+import { formatTournamentDateShort } from '@/lib/date-utils';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -187,6 +189,16 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
+  const openMatchesQuery = useV1TeamMatches(
+    { teamId, status: 'recruiting', limit: 5 },
+    { enabled: Boolean(query.data) },
+  );
+  const openMatches = (openMatchesQuery.data?.items ?? []).map((match) => ({
+    id: match.teamMatchId ?? match.id,
+    title: match.title,
+    dateLabel: formatTournamentDateShort(match.startsAt) ?? '',
+    venue: match.place?.name ?? match.placeName ?? '',
+  }));
   const fallback = getTeamDetailViewModel();
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
@@ -234,6 +246,8 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
         onShare: () => shareTeam(query.data),
+        openMatches,
+        openMatchesLoading: openMatchesQuery.isLoading,
       }
     : fallback;
 
@@ -299,7 +313,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   // 멤버 목록 비공개는 일시적 오류가 아니므로 '다시 시도' 대신 전용 안내 상태로 분기한다.
   if (team.data && !team.data.canViewMembers) return <TeamStatePageView model={getTeamStateViewModel('restricted')} />;
 
-  return <TeamMembersPageView model={model} />;
+  return <TeamMembersPageView model={model} backHref={`/teams/${teamId}`} />;
 }
 
 function toTeam(team: V1Team, fallback: TeamModel): TeamModel {

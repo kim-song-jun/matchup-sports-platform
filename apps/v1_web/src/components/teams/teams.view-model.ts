@@ -222,6 +222,7 @@ export function getTeamFormViewModel(mode: TeamFormViewModel['mode']): TeamFormV
     mode,
     team: {
       name: mode === 'edit' ? '성수 러너스 FC' : '',
+      logoUrl: null,
       sport: '풋살',
       region: '서울 성동구',
       description: mode === 'edit' ? '주 1회 꾸준히 함께 경기할 멤버를 찾습니다.' : '',

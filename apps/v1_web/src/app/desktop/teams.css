@@ -299,35 +299,63 @@
 }
 
 /* ─── new/edit forms /teams/new  /teams/[id]/edit ─────────────────────────────
- * Center the form column at ~600px — don't stretch inputs full 1120px.
- * Chip rows wrap (no horizontal scroll).
+ * Desktop: 2-column grid — left form column + right sticky live-preview rail
+ * (mirrors the tournament apply .tm-tournament-form-grid pattern so 팀 만들기 fills
+ * the desktop canvas instead of floating as a narrow centered column).
+ * Mobile: single column; the rail is hidden (.tm-show-desktop) and the fixed
+ * bottom CTA (.tm-fixed-cta.tm-hide-desktop) takes over.
+ *
+ * COMPONENT CONTRACT:
+ *   <div className="tm-team-form-grid">
+ *     <div className="tm-create-shell tm-team-form-main">{/* fields *\/}</div>
+ *     <aside className="tm-team-form-rail tm-show-desktop">{/* preview + CTA *\/}</aside>
+ *   </div>
+ *   <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop">{/* mobile CTA *\/}</div>
  */
+.tm-team-form-grid {
+  width: 100%;
+}
 
 @media (min-width: 1024px) {
-  /* Scope via .tm-team-form-shell (added to .tm-create-shell in JSX) */
-  .tm-team-form-shell {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-    padding-bottom: 120px;
+  .tm-team-form-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 28px;
+    align-items: start;
   }
 
-  /* Chip rows inside the form: allow wrapping */
-  .tm-team-form-shell .tm-sport-chip-row,
-  .tm-team-form-shell .tm-team-form-chip-row {
+  /* Left form column: fill the 1fr track. Reset the GLOBAL .tm-create-shell
+     desktop cap (team-matches.css sets max-width:560 + margin:auto, which would
+     otherwise leak in and re-strand the form) and drop mobile padding/clearance. */
+  .tm-team-form-grid .tm-create-shell {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0 0 48px;
+    min-width: 0;
+  }
+
+  /* Chip rows inside the form wrap (no horizontal scroll) on desktop. */
+  .tm-team-form-main .tm-sport-chip-row,
+  .tm-team-form-main .tm-team-form-chip-row {
     flex-wrap: wrap;
     overflow-x: visible;
   }
-
-  /* Fixed CTA stays within the centered 600px column */
-  .tm-team-form-cta {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+  .tm-team-form-main .tm-create-two-col {
+    gap: 14px;
   }
 
-  /* Two-col layout inside the form looks fine at desktop, no adjustment needed */
-  .tm-team-form-shell .tm-create-two-col {
-    gap: 14px;
+  /* Right rail: sticky live team-card preview + CTA. */
+  .tm-team-form-grid .tm-team-form-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: 88px;
+  }
+
+  /* Belt-and-suspenders: the mobile fixed CTA already carries .tm-hide-desktop. */
+  .tm-team-form-cta.tm-hide-desktop {
+    display: none !important;
   }
 }

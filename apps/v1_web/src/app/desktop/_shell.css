@@ -469,9 +469,14 @@
   }
 
   .tm-auth-frame {
-    width: min(100%, 420px);
+    /* 메인 앱 프레임과 동일 폭으로 통일 (모바일 우선: 데스크톱=가운데 모바일 폭 프레임) */
+    width: min(100%, var(--v1-app-chrome-frame-width));
     height: auto;
-    min-height: auto;
+    /* 폰 프레임: 데스크톱에서도 최소 아이폰 정도 높이(뷰포트보다 크면 캡).
+       내용이 짧아도 짧은 카드로 뜨지 않고 폰 비율 프레임을 채운다. */
+    min-height: min(844px, calc(100dvh - 80px));
+    display: flex;
+    flex-direction: column;
     overflow: visible;
     position: static;
     margin: 0 auto;

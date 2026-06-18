@@ -42,19 +42,18 @@ export function TournamentHeroCard() {
       className="tm-featured-link tm-pressable"
       href={`/tournaments/${featured.id}`}
       aria-label={`대회 상세 — ${featured.title}`}
-      style={{ marginTop: 10 }}
     >
       <Card pad={0} style={{ overflow: 'hidden' }}>
         <div
           className="tm-featured-media"
           style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
         >
-          {/* 은은한 트로피 워터마크 (장식) */}
+          {/* 은은한 트로피 워터마크 (장식) — 세로 중앙·우측 살짝 블리드(상단 잘림 방지) */}
           <div
             aria-hidden="true"
-            style={{ position: 'absolute', right: -10, top: -8, opacity: 0.16, color: 'var(--static-white)' }}
+            style={{ position: 'absolute', right: -16, top: '50%', transform: 'translateY(-50%)', opacity: 0.18, color: 'var(--static-white)' }}
           >
-            <TrophyIcon size={134} strokeWidth={1.4} />
+            <TrophyIcon size={120} strokeWidth={1.4} />
           </div>
           <div className="tm-featured-overlay" />
           <div className="tm-featured-text">

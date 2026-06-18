@@ -228,6 +228,8 @@ model V1User {
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
   deletedAt        DateTime?          @map("deleted_at")
+  emailVerifiedAt  DateTime?          @map("email_verified_at")
+  phoneVerifiedAt  DateTime?          @map("phone_verified_at")
 
   authIdentities                 V1AuthIdentity[]
   profile                        V1UserProfile?
@@ -260,6 +262,7 @@ model V1User {
   postEventUserReviewsReceived   V1PostEventReview[]        @relation("V1PostEventReviewTargetUser")
   tournamentRegistrationsApplied V1TournamentRegistration[] @relation("V1TournamentRegistrationApplicant")
   tournamentPlayerEntries        V1TournamentPlayer[]
+  verificationTokens             V1VerificationToken[]
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -286,6 +289,28 @@ model V1AuthIdentity {
   @@index([userId])
   @@index([status])
   @@map("v1_auth_identities")
+}
+
+enum V1VerificationChannel {
+  email
+  phone
+}
+
+model V1VerificationToken {
+  id           String                @id @default(uuid())
+  userId       String                @map("user_id")
+  channel      V1VerificationChannel
+  target       String
+  codeHash     String                @map("code_hash")
+  expiresAt    DateTime              @map("expires_at")
+  consumedAt   DateTime?             @map("consumed_at")
+  attemptCount Int                   @default(0) @map("attempt_count")
+  createdAt    DateTime              @default(now()) @map("created_at")
+
+  user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel])
+  @@map("v1_verification_tokens")
 }
 
 model V1UserProfile {

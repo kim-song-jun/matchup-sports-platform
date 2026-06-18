@@ -158,3 +158,22 @@ export function TrophyIcon(props: IconProps) {
     </SvgIcon>
   );
 }
+
+export function EyeIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M2 12 C4 7 8 4.5 12 4.5 C16 4.5 20 7 22 12 C20 17 16 19.5 12 19.5 C8 19.5 4 17 2 12 Z" />
+      <circle cx="12" cy="12" r="3" />
+    </SvgIcon>
+  );
+}
+
+export function EyeOffIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M2 12 C4 7 8 4.5 12 4.5 C16 4.5 20 7 22 12 C20 17 16 19.5 12 19.5 C8 19.5 4 17 2 12 Z" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M4 4 L20 20" />
+    </SvgIcon>
+  );
+}

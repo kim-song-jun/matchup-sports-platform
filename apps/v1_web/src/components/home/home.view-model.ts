@@ -79,10 +79,10 @@ export function getHomeViewModel(): HomeViewModel {
     featuredMatch: sortedMatches[0],
     recommendedMatches: matches,
     quickActions: [
-      { label: '매치', sub: '함께 뛸 사람 찾기', href: '/matches', color: 'var(--blue500)', background: 'var(--blue50)' },
-      { label: '팀매치', sub: '상대 팀 찾기', href: '/team-matches', color: 'var(--orange500)', background: 'var(--orange50)' },
-      { label: '팀', sub: '팀 둘러보기', href: '/teams', color: 'var(--green500)', background: 'var(--green50)' },
-      { label: '나의 팀', sub: '내 팀 관리', href: '/my/teams', color: 'var(--grey500)', background: 'var(--grey100)' },
+      { key: 'matches', label: '매치', sub: '개인 경기', href: '/matches', color: 'var(--blue500)', background: 'var(--blue50)' },
+      { key: 'team_matches', label: '팀매치', sub: '팀 대항전', href: '/team-matches', color: 'var(--orange500)', background: 'var(--orange50)' },
+      { key: 'teams', label: '팀', sub: '팀 둘러보기', href: '/teams', color: 'var(--green500)', background: 'var(--green50)' },
+      { key: 'my_team', label: '나의 팀', sub: '내 소속 팀', href: '/my/teams', color: 'var(--grey500)', background: 'var(--grey100)' },
     ],
     weather: {
       city: '마포',

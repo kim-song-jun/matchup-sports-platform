@@ -1,4 +1,4 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, Logger, ValidationError, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -33,6 +33,19 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
+      // 검증 실패를 일관된 코드/한글 메시지로 — class-validator 의 raw 영어 메시지가
+      // 그대로 프론트에 노출되던 문제 해결. 필드별 상세는 details 로 전달.
+      exceptionFactory: (errors: ValidationError[]) => {
+        const details = errors.map((error) => ({
+          field: error.property,
+          messages: error.constraints ? Object.values(error.constraints) : [],
+        }));
+        return new BadRequestException({
+          code: 'VALIDATION_ERROR',
+          message: '입력값을 다시 확인해 주세요.',
+          details,
+        });
+      },
     }),
   );
   app.useGlobalFilters(new AllExceptionsFilter());

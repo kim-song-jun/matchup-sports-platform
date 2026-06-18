@@ -55,6 +55,7 @@ export class TeamMatchesService {
         ...(status === 'expired' ? { startAt: { lt: new Date() } } : { status }),
         ...(query.sportId ? { sportId: query.sportId } : {}),
         ...(query.regionId ? { regionId: query.regionId } : {}),
+        ...(query.teamId ? { hostTeamId: query.teamId } : {}),
         ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
         ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
         ...(query.query

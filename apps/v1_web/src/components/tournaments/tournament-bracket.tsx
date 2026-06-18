@@ -3,35 +3,33 @@
 /**
  * TournamentBracket
  *
- * Renders knockout fixtures in round order.
+ * Renders knockout fixtures as a proper tournament tree using the `bracketry`
+ * library (zero-dependency, framework-agnostic — mounted imperatively into a
+ * wrapper element). bracketry draws the round columns, the contestant cards,
+ * scores, winner highlight, connector lines, and (natively) the 3·4위전 as a
+ * "bronze match" below the final.
  *
- * Mobile (default — .tm-hide-desktop): vertical stacked rounds, top→bottom,
- *   with CSS pseudo-element vertical connector lines between rounds.
- * Desktop (≥1024px — .tm-show-desktop): horizontal bracket columns left→right,
- *   with CSS pseudo-element elbow connector lines between columns.
+ * Why bracketry (not @g-loot/react-tournament-brackets): the React bracket
+ * libraries are all pre-React-19 and pull styled-components, which clashes with
+ * this app's hand-authored CSS and React 19.2. bracketry is vanilla JS with no
+ * peer deps, so it drops in cleanly and is themed entirely through options.
  *
- * Round grouping logic:
- *  1. For each fixture, look up its groupId in the provided `groups` array.
- *     Use group.phase as the round key. Phase sort order: semi → final → third_place.
- *  2. If groupId is null (fixture not assigned to a group), fall back to
- *     fixture.round string. These are sorted lexicographically after the
- *     phase-keyed rounds.
- *  3. Within each round, fixtures are sorted by fixtureNumber ascending.
- *
- * Rendering note — third_place is a PARALLEL section, NOT the next bracket column:
- *  - "결승" is the final column; the trophy is placed at its right end.
- *  - "3·4위전" is rendered in a visually separated section (mobile: below trophy;
- *    desktop: below the main bracket row) with a divider label so the reader
- *    understands it is a consolation match between the two semi-final losers,
- *    NOT a round that follows the final.
- *  - No connector arrow is drawn between "결승" and "3·4위전".
+ * Data flow:
+ *  1. `groupFixturesByRound` groups fixtures into ordered rounds
+ *     (semi → final → third_place) — same pure logic as before, still unit-tested.
+ *  2. `buildBracketData` maps those rounds into bracketry's { rounds, matches,
+ *     contestants } shape. The third_place round becomes a bronze match attached
+ *     to the final round's index (bracketry renders it below the final).
+ *  3. The component mounts bracketry in a useEffect (client-only, dynamic import
+ *     so SSR never touches the DOM) and tears it down via `uninstall()`.
  */
 
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { Card } from '@/components/v1-ui/primitives';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
-/* ── Types ── */
+/* ── Round-grouping types & helpers (pure — unit-tested) ── */
 
 interface RoundGroup {
   key: string;
@@ -39,8 +37,6 @@ interface RoundGroup {
   sortIndex: number;
   fixtures: V1TournamentFixture[];
 }
-
-/* ── Helpers ── */
 
 const PHASE_ORDER: Record<string, number> = {
   semi: 0,
@@ -117,7 +113,7 @@ export function groupFixturesByRound(
   });
 }
 
-/* ── Score/winner helpers ── */
+/* ── Score / winner helpers ── */
 
 type WinnerSide = 'home' | 'away' | null;
 
@@ -134,51 +130,15 @@ function getWinner(fixture: V1TournamentFixture): WinnerSide {
   return null;
 }
 
-/** 결승이 종료됐으면 우승 팀명을 반환(없으면 null) — 우승 슬롯에 챔피언 표시용. */
+/** 결승이 종료됐으면 우승 팀명을 반환(없으면 null) — 챔피언 배너 표시용. */
 function getChampion(rounds: RoundGroup[]): string | null {
   const finalRound = rounds.find((r) => r.key === 'final');
   const finalFixture = finalRound?.fixtures[0];
   if (!finalFixture || finalFixture.status !== 'completed') return null;
   const w = getWinner(finalFixture);
-  if (w === 'home') return finalFixture.homeTeamName ?? null;
-  if (w === 'away') return finalFixture.awayTeamName ?? null;
+  if (w === 'home') return finalFixture.homeTeamName || null;
+  if (w === 'away') return finalFixture.awayTeamName || null;
   return null;
-}
-
-function fixtureStatusBadge(status: string): string {
-  switch (status) {
-    case 'in_progress': return 'tm-badge-green';
-    case 'completed': return 'tm-badge-grey';
-    case 'cancelled': return 'tm-badge-red';
-    default: return 'tm-badge-grey';
-  }
-}
-
-/**
- * D4: Scheduled 예정 뱃지 — 회색 배경 + 파란 점으로 종료(completed)와 시각 구분.
- * 점에만 의존하지 않고 '예정' 텍스트를 함께 유지 (a11y: 컬러+텍스트 병행).
- */
-function FixtureStatusBadge({ status }: { status: string }) {
-  const badgeClass = fixtureStatusBadge(status);
-  const label = fixtureStatusLabel(status);
-  return (
-    <span className={`tm-badge ${badgeClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      {status === 'scheduled' ? (
-        <span
-          aria-hidden="true"
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            background: 'var(--blue500)',
-            flexShrink: 0,
-            display: 'inline-block',
-          }}
-        />
-      ) : null}
-      {label}
-    </span>
-  );
 }
 
 function fixtureStatusLabel(status: string): string {
@@ -191,400 +151,252 @@ function fixtureStatusLabel(status: string): string {
   }
 }
 
-/* ── Fixture card shared between mobile and desktop ── */
+/* ── bracketry data shape (locally typed — bracketry ships no usable Data type) ── */
 
-function BracketFixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
-  const hasResult = fixture.result !== null;
-  const winner = getWinner(fixture);
-
-  const homeColor = winner === 'home' ? 'var(--blue500)' : 'var(--text-strong)';
-  const awayColor = winner === 'away' ? 'var(--blue500)' : 'var(--text-strong)';
-
-  return (
-    <Card pad={12}>
-      {/* Status row */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-        <FixtureStatusBadge status={fixture.status} />
-      </div>
-
-      {/* VS row: home · score · away */}
-      <div
-        role="group"
-        aria-label={`${fixture.homeTeamName || '미정'} 대 ${fixture.awayTeamName || '미정'}`}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr auto 1fr',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        {/* Home */}
-        <div style={{ textAlign: 'right', minWidth: 0 }}>
-          <span
-            className="tm-text-label"
-            style={{
-              color: homeColor,
-              fontWeight: winner === 'home' ? 700 : undefined,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              display: 'block',
-            }}
-          >
-            {fixture.homeTeamName || '미정'}
-          </span>
-        </div>
-
-        {/* Score / VS */}
-        <div style={{ textAlign: 'center', minWidth: 44 }}>
-          {hasResult ? (
-            <span
-              className="tm-text-body-lg tab-num"
-              style={{ color: 'var(--text-strong)', letterSpacing: 1 }}
-            >
-              {fixture.result!.homeScore} : {fixture.result!.awayScore}
-            </span>
-          ) : (
-            <span
-              className="tm-text-label"
-              style={{ color: 'var(--text-caption)', letterSpacing: 1 }}
-            >
-              vs
-            </span>
-          )}
-        </div>
-
-        {/* Away */}
-        <div style={{ textAlign: 'left', minWidth: 0 }}>
-          <span
-            className="tm-text-label"
-            style={{
-              color: awayColor,
-              fontWeight: winner === 'away' ? 700 : undefined,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              display: 'block',
-            }}
-          >
-            {fixture.awayTeamName || '미정'}
-          </span>
-        </div>
-      </div>
-
-      {/* Penalty */}
-      {hasResult && fixture.result!.hasPenalty ? (
-        <div
-          className="tm-text-micro"
-          style={{ textAlign: 'center', marginTop: 6, color: 'var(--text-caption)' }}
-        >
-          승부차기 {fixture.result!.homePenaltyScore} : {fixture.result!.awayPenaltyScore}
-        </div>
-      ) : null}
-    </Card>
-  );
+interface BracketScore {
+  mainScore: number | string;
+  isWinner?: boolean;
+}
+interface BracketSide {
+  contestantId?: string;
+  scores?: BracketScore[];
+  isWinner?: boolean;
+}
+interface BracketMatch {
+  roundIndex: number;
+  order: number;
+  sides: [BracketSide, BracketSide];
+  matchStatus?: string;
+  isLive?: boolean;
+  isBronzeMatch?: boolean;
+}
+interface BracketContestant {
+  entryStatus?: string;
+  players: { title: string }[];
+}
+export interface BracketData {
+  rounds: { name: string }[];
+  matches: BracketMatch[];
+  contestants: Record<string, BracketContestant>;
 }
 
-/* ── Trophy placeholder: shown after the final round ── */
+/**
+ * Maps grouped knockout rounds → bracketry data.
+ *
+ * - Each fixture becomes a match; sides reference contestants by a stable id
+ *   (registrationId, or `name:<team>` when no registration id) so a team that
+ *   advances from 4강 to 결승 reuses one contestant (enables path highlight).
+ * - Empty / 미정 sides carry no contestantId → bracketry renders an empty slot.
+ * - third_place is emitted as a bronze match pinned to the final round index
+ *   (bracketry positions it below the final). Degenerate case (no main rounds)
+ *   falls back to rendering it as a normal round.
+ *
+ * Exported for unit testing.
+ */
+export function buildBracketData(
+  fixtures: V1TournamentFixture[],
+  groups: V1TournamentGroup[],
+): BracketData {
+  const rounds = groupFixturesByRound(fixtures, groups);
+  const mainRounds = rounds.filter((r) => r.key !== 'third_place');
+  const thirdPlace = rounds.find((r) => r.key === 'third_place') ?? null;
 
-function TrophyPlaceholder({ champion }: { champion?: string | null }) {
-  const decided = Boolean(champion);
+  const contestants: Record<string, BracketContestant> = {};
+
+  function makeSide(name: string, regId: string | null, hasResult: boolean, isWinner: boolean, score?: number): BracketSide {
+    const title = (name ?? '').trim();
+    if (!title) {
+      // 미정 / TBD — empty slot, no contestant, no score
+      return {};
+    }
+    const id = regId ?? `name:${title}`;
+    if (!contestants[id]) {
+      contestants[id] = { players: [{ title }] };
+    }
+    const side: BracketSide = { contestantId: id };
+    if (isWinner) side.isWinner = true;
+    if (hasResult && score !== undefined) {
+      side.scores = [{ mainScore: score, isWinner }];
+    }
+    return side;
+  }
+
+  function makeMatch(
+    fixture: V1TournamentFixture,
+    roundIndex: number,
+    order: number,
+    isBronze: boolean,
+  ): BracketMatch {
+    const winner = getWinner(fixture);
+    const hasResult = fixture.result !== null;
+    const home = makeSide(
+      fixture.homeTeamName, fixture.homeRegistrationId, hasResult, winner === 'home',
+      fixture.result?.homeScore,
+    );
+    const away = makeSide(
+      fixture.awayTeamName, fixture.awayRegistrationId, hasResult, winner === 'away',
+      fixture.result?.awayScore,
+    );
+
+    const penalty = fixture.result?.hasPenalty
+      && fixture.result.homePenaltyScore !== null
+      && fixture.result.awayPenaltyScore !== null
+      ? ` · 승부차기 ${fixture.result.homePenaltyScore}:${fixture.result.awayPenaltyScore}`
+      : '';
+    // 예정 경기는 상태 텍스트를 비워 깔끔하게(점수 부재로 미경기임이 드러남).
+    const matchStatus = fixture.status === 'scheduled'
+      ? undefined
+      : `${fixtureStatusLabel(fixture.status)}${penalty}`;
+
+    const match: BracketMatch = {
+      roundIndex,
+      order,
+      sides: [home, away],
+      isLive: fixture.status === 'in_progress',
+    };
+    if (matchStatus) match.matchStatus = matchStatus;
+    if (isBronze) match.isBronzeMatch = true;
+    return match;
+  }
+
+  const outRounds: { name: string }[] = mainRounds.map((r) => ({ name: r.label }));
+  const matches: BracketMatch[] = [];
+
+  mainRounds.forEach((round, ri) => {
+    round.fixtures.forEach((fixture, oi) => {
+      matches.push(makeMatch(fixture, ri, oi, false));
+    });
+  });
+
+  if (thirdPlace) {
+    if (mainRounds.length > 0) {
+      // bronze match attaches to the final (last) round, order 1 (final is order 0)
+      const bronzeRoundIndex = mainRounds.length - 1;
+      thirdPlace.fixtures.forEach((fixture) => {
+        matches.push(makeMatch(fixture, bronzeRoundIndex, 1, true));
+      });
+    } else {
+      // No main rounds at all — render third_place as a standalone round.
+      outRounds.push({ name: thirdPlace.label });
+      thirdPlace.fixtures.forEach((fixture, oi) => {
+        matches.push(makeMatch(fixture, 0, oi, false));
+      });
+    }
+  }
+
+  return { rounds: outRounds, matches, contestants };
+}
+
+/* ── bracketry theming (v1 design tokens via nested CSS vars) ── */
+
+/**
+ * bracketry sizes its tree to content (it does not stretch to fill a wide
+ * container), so on desktop we widen each match and the gaps to give the small
+ * 2-round bracket real presence; on mobile we keep it compact so both rounds fit.
+ */
+function buildBracketOptions(isWide: boolean) {
+  return {
+    rootBgColor: 'transparent',
+    rootBorderColor: 'transparent',
+    wrapperBorderColor: 'transparent',
+    mainVerticalPadding: 8,
+
+    // Round titles
+    roundTitleColor: 'var(--text-muted)',
+    roundTitlesFontSize: isWide ? 14 : 13,
+    roundTitlesFontFamily: 'inherit',
+    roundTitlesVerticalPadding: 10,
+    roundTitlesBorderColor: 'var(--grey100)',
+
+    // Matches — responsive width/margins
+    matchTextColor: 'var(--text-strong)',
+    matchFontSize: 14,
+    matchMaxWidth: isWide ? 230 : 156,
+    matchAxisMargin: isWide ? 16 : 8,
+    matchHorMargin: isWide ? 28 : 8,
+    matchMinVerticalGap: isWide ? 20 : 14,
+    hoveredMatchBorderColor: 'var(--grey300)',
+    matchStatusBgColor: 'var(--grey50)',
+
+    // Localize the bronze (3·4위전) match label — bracketry's default getMatchTopHTML
+    // hardcodes a large black English "3RD PLACE"; replace with a muted Korean caption.
+    getMatchTopHTML: (match: { isBronzeMatch?: boolean }) =>
+      match?.isBronzeMatch
+        ? '<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-align:center;padding-bottom:6px;">3·4위전</div>'
+        : '',
+
+    // Connectors
+    connectionLinesColor: 'var(--grey300)',
+    connectionLinesWidth: 2,
+    highlightedConnectionLinesColor: 'var(--blue500)',
+
+    // Path highlight (on click) + winner emphasis
+    highlightedPlayerTitleColor: 'var(--blue500)',
+
+    // Live match
+    liveMatchBorderColor: 'var(--green500)',
+
+    // Fonts inherit Pretendard from the app shell
+    rootFontFamily: 'inherit',
+    playerTitleFontFamily: 'inherit',
+    scoreFontFamily: 'inherit',
+
+    // Navigation — small bracket; show subtle nav only when rounds overflow (mobile)
+    navButtonsPosition: 'overTitles' as const,
+    navButtonSvgColor: 'var(--text-muted)',
+    navButtonArrowSize: 9,
+    navGutterBorderColor: 'transparent',
+
+    // Vertical overflow scrolls natively; scrollbar hidden app-wide already
+    verticalScrollMode: 'native' as const,
+    showScrollbar: false,
+  };
+}
+
+/* bracketry's createBracket — typed loosely (the shipped Data type is unusable). */
+type BracketInstance = { uninstall: () => void };
+type CreateBracket = (
+  data: BracketData,
+  el: Element,
+  options?: Record<string, unknown>,
+) => BracketInstance;
+
+/* ── Champion banner — celebrates the decided winner above the tree ── */
+
+function ChampionBanner({ champion }: { champion: string }) {
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
+        display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '12px 0',
+        gap: 8,
+        padding: '6px 12px',
+        borderRadius: 99,
+        background: 'var(--orange50, var(--grey50))',
+        border: '1px solid var(--orange500)',
+        marginBottom: 12,
       }}
-      aria-label={decided ? `우승 ${champion}` : '우승'}
+      aria-label={`우승 ${champion}`}
     >
-      <div
+      <span
         aria-hidden="true"
         style={{
-          width: 44,
-          height: 44,
+          width: 22,
+          height: 22,
           borderRadius: '50%',
-          background: decided
-            ? 'linear-gradient(135deg, var(--orange500) 0%, #f08a00 100%)'
-            : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+          background: 'linear-gradient(135deg, var(--orange500) 0%, #f08a00 100%)',
           display: 'grid',
           placeItems: 'center',
           color: 'var(--static-white)',
+          flexShrink: 0,
         }}
       >
-        <TrophyIcon size={22} strokeWidth={1.8} />
-      </div>
-      {decided ? (
-        <>
-          <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>우승</span>
-          <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700, textAlign: 'center' }}>
-            {champion}
-          </span>
-        </>
-      ) : (
-        <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>우승</span>
-      )}
-    </div>
-  );
-}
-
-/* ── Mobile vertical layout ── */
-
-/**
- * MobileBracket splits rounds into:
- *  - mainRounds: semi, final, and any non-third_place rounds (connected by arrows,
- *    trophy after final)
- *  - thirdPlaceRound: rendered separately below the trophy with a divider so the
- *    user sees it as a parallel consolation match, NOT as a round after the final.
- */
-function MobileBracket({ rounds }: { rounds: RoundGroup[] }) {
-  const mainRounds = rounds.filter((r) => r.key !== 'third_place');
-  const thirdPlaceRound = rounds.find((r) => r.key === 'third_place') ?? null;
-  const finalIndex = mainRounds.findIndex((r) => r.key === 'final');
-  const champion = getChampion(rounds);
-
-  return (
-    <div
-      className="tm-hide-desktop"
-      style={{ display: 'flex', flexDirection: 'column', gap: 0 }}
-    >
-      {/* ── Main bracket: semi → final → trophy ── */}
-      {mainRounds.map((round, idx) => (
-        <div key={round.key}>
-          {/* Round label */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 8,
-              padding: '4px 0',
-            }}
-          >
-            <span
-              className="tm-text-body-lg"
-              style={{ color: 'var(--text-strong)' }}
-            >
-              {round.label}
-            </span>
-            <div style={{ flex: 1, height: 1, background: 'var(--grey100)' }} aria-hidden="true" />
-          </div>
-
-          {/* Fixture cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {round.fixtures.map((fixture) => (
-              <BracketFixtureCard key={fixture.id} fixture={fixture} />
-            ))}
-          </div>
-
-          {/* Trophy after the final round; connector line between earlier rounds */}
-          {idx === finalIndex ? (
-            <TrophyPlaceholder champion={champion} />
-          ) : idx < mainRounds.length - 1 ? (
-            /* Vertical connector line — styled via .tm-bracket-mobile-connector
-               in desktop/tournaments.css (visible at all breakpoints) */
-            <div
-              className="tm-bracket-mobile-connector"
-              aria-hidden="true"
-            />
-          ) : null}
-        </div>
-      ))}
-
-      {/* ── 3·4위전: parallel section — 4강 패자 consolation match ── */}
-      {thirdPlaceRound !== null ? (
-        <div
-          style={{ marginTop: 24 }}
-          aria-label="3·4위전"
-        >
-          {/* Divider with label */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 12,
-            }}
-            aria-hidden="true"
-          >
-            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
-            <span
-              className="tm-text-micro"
-              style={{
-                color: 'var(--text-caption)',
-                whiteSpace: 'nowrap',
-                padding: '2px 8px',
-                border: '1px solid var(--grey200)',
-                borderRadius: 99,
-                background: 'var(--grey50)',
-              }}
-            >
-              3·4위전
-            </span>
-            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
-          </div>
-
-          {/* Round label row */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 8,
-              padding: '4px 0',
-            }}
-          >
-            <span
-              className="tm-text-body-lg"
-              style={{ color: 'var(--text-strong)' }}
-            >
-              {thirdPlaceRound.label}
-            </span>
-            <div style={{ flex: 1, height: 1, background: 'var(--grey100)' }} aria-hidden="true" />
-          </div>
-
-          {/* Fixture cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {thirdPlaceRound.fixtures.map((fixture) => (
-              <BracketFixtureCard key={fixture.id} fixture={fixture} />
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/* ── Desktop horizontal layout — columnar bracket with real connector lines ── */
-
-/**
- * DesktopBracket splits rounds into two groups:
- *
- *  mainRounds  — semi, final, and any non-third_place rounds rendered as
- *                sequential bracket columns with connector arrows between them.
- *                Trophy is placed at the right end of the "final" column.
- *
- *  thirdPlaceRound — "3·4위전" rendered as a separate section BELOW the main
- *                bracket row, with a pill-style divider label.
- *                NO connector is drawn between final and third_place.
- *
- * Structure:
- *   .tm-bracket-desktop-wrapper                 — outer flex column
- *     .tm-tournament-bracket-h                  — main bracket row (semi → final → trophy)
- *       .tm-bracket-col-wrapper (×n)
- *         .tm-bracket-column
- *           .tm-bracket-column-label
- *           .tm-bracket-column-fixtures
- *           .tm-bracket-trophy (final column only)
- *         .tm-bracket-connector (omitted on last wrapper)
- *     .tm-bracket-third-place-section (optional) — parallel consolation section
- *       divider label
- *       .tm-tournament-bracket-h (single column)
- */
-function DesktopBracket({ rounds }: { rounds: RoundGroup[] }) {
-  const mainRounds = rounds.filter((r) => r.key !== 'third_place');
-  const thirdPlaceRound = rounds.find((r) => r.key === 'third_place') ?? null;
-  const champion = getChampion(rounds);
-
-  return (
-    <div className="tm-show-desktop" role="region" aria-label="대진표">
-      {/* ── Main bracket: semi → final → trophy ── */}
-      <div className="tm-tournament-bracket-h">
-        {mainRounds.map((round, idx) => {
-          const isFinal = round.key === 'final';
-          const isLast = idx === mainRounds.length - 1;
-
-          return (
-            <div key={round.key} className="tm-bracket-col-wrapper">
-              {/* Column */}
-              <div className="tm-bracket-column">
-                {/* Column header */}
-                <div className="tm-bracket-column-label">
-                  <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                    {round.label}
-                  </span>
-                </div>
-
-                {/* Fixtures */}
-                <div className="tm-bracket-column-fixtures">
-                  {round.fixtures.map((fixture) => (
-                    <BracketFixtureCard key={fixture.id} fixture={fixture} />
-                  ))}
-                </div>
-
-                {/* Trophy at the right end of the final column — tournament endpoint */}
-                {isFinal ? (
-                  <div className="tm-bracket-trophy">
-                    <TrophyPlaceholder champion={champion} />
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Connector arrow between consecutive main-bracket columns.
-                  Omitted on the last main column — no arrow after the final.
-                  aria-hidden so screen readers see only fixture content. */}
-              {!isLast ? (
-                <div className="tm-bracket-connector" aria-hidden="true" />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── 3·4위전: parallel consolation section — 4강 패자 경기 ── */}
-      {thirdPlaceRound !== null ? (
-        <div
-          style={{ marginTop: 24 }}
-          aria-label="3·4위전"
-        >
-          {/* Pill divider label */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 16,
-            }}
-            aria-hidden="true"
-          >
-            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
-            <span
-              className="tm-text-micro"
-              style={{
-                color: 'var(--text-caption)',
-                whiteSpace: 'nowrap',
-                padding: '2px 10px',
-                border: '1px solid var(--grey200)',
-                borderRadius: 99,
-                background: 'var(--grey50)',
-              }}
-            >
-              3·4위전
-            </span>
-            <div style={{ flex: 1, height: 1, background: 'var(--grey200)' }} />
-          </div>
-
-          {/* Single column — no connectors, no trophy */}
-          <div className="tm-tournament-bracket-h" style={{ maxWidth: 300 }}>
-            <div className="tm-bracket-col-wrapper">
-              <div className="tm-bracket-column">
-                <div className="tm-bracket-column-label">
-                  <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                    {thirdPlaceRound.label}
-                  </span>
-                </div>
-                <div className="tm-bracket-column-fixtures">
-                  {thirdPlaceRound.fixtures.map((fixture) => (
-                    <BracketFixtureCard key={fixture.id} fixture={fixture} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+        <TrophyIcon size={13} strokeWidth={2} />
+      </span>
+      <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>우승</span>
+      <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+        {champion}
+      </span>
     </div>
   );
 }
@@ -638,22 +450,92 @@ export interface TournamentBracketProps {
 }
 
 export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) {
-  if (fixtures.length === 0) {
-    return <BracketEmpty />;
-  }
+  const mountRef = useRef<HTMLDivElement>(null);
+  // ≥768px → widen the bracket so a small 2-round tree fills the desktop bleed.
+  const [isWide, setIsWide] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+  );
 
-  const rounds = groupFixturesByRound(fixtures, groups);
+  const rounds = useMemo(() => groupFixturesByRound(fixtures, groups), [fixtures, groups]);
+  const data = useMemo(() => buildBracketData(fixtures, groups), [fixtures, groups]);
+  const champion = useMemo(() => getChampion(rounds), [rounds]);
 
-  if (rounds.length === 0) {
+  // Wrapper height — bracketry fills its container, so size it to the content.
+  const wrapperHeight = useMemo(() => {
+    const mainRounds = rounds.filter((r) => r.key !== 'third_place');
+    const hasBronze = rounds.some((r) => r.key === 'third_place');
+    const maxStack = Math.max(
+      1,
+      ...mainRounds.map((r) => r.fixtures.length),
+      hasBronze ? 2 : 1,
+    );
+    return Math.max(300, (isWide ? 88 : 64) + maxStack * (isWide ? 120 : 104));
+  }, [rounds, isWide]);
+
+  // Track the desktop breakpoint to re-theme the bracket responsively.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setIsWide(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (data.matches.length === 0) return;
+    const el = mountRef.current;
+    if (!el) return;
+
+    let instance: BracketInstance | null = null;
+    let cancelled = false;
+
+    // Lay out at full width first so bracketry shows every round with room to spare.
+    el.style.width = '100%';
+
+    void import('bracketry').then((mod) => {
+      if (cancelled || !mountRef.current) return;
+      const createBracket = mod.createBracket as unknown as CreateBracket;
+      instance = createBracket(data, mountRef.current, buildBracketOptions(isWide));
+
+      // Desktop: bracketry left-aligns its content inside the wrapper, so a compact
+      // tree drifts left in the wide bleed. Shrink the wrapper to the tree's natural
+      // width (only when it comfortably fits) so the flex parent centers it.
+      if (isWide) {
+        requestAnimationFrame(() => {
+          const node = mountRef.current;
+          if (cancelled || !node) return;
+          const root = node.querySelector('.bracket-root');
+          const contentWidth = root instanceof HTMLElement ? root.scrollWidth : 0;
+          if (contentWidth > 0 && contentWidth < node.clientWidth) {
+            node.style.width = `${Math.ceil(contentWidth)}px`;
+          }
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      instance?.uninstall();
+    };
+  }, [data, isWide]);
+
+  if (fixtures.length === 0 || data.matches.length === 0) {
     return <BracketEmpty />;
   }
 
   return (
     <div>
-      {/* Mobile: vertical */}
-      <MobileBracket rounds={rounds} />
-      {/* Desktop: horizontal columns — styled via desktop/tournaments.css */}
-      <DesktopBracket rounds={rounds} />
+      {champion ? <ChampionBanner champion={champion} /> : null}
+      {/* bracketry sizes to content; the flex parent centers the (width-fitted) tree. */}
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div
+          ref={mountRef}
+          role="group"
+          aria-label="대진표"
+          style={{ height: wrapperHeight }}
+        />
+      </div>
     </div>
   );
 }

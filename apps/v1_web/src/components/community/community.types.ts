@@ -61,6 +61,9 @@ export type NotificationModel = {
 export type NotificationsViewModel = {
   unreadCount: number;
   notifications: NotificationModel[];
+  /** API 로딩/에러 상태. 뷰에서 loading/error 분기에 사용 */
+  status?: 'loading' | 'error' | 'ready';
+  onRetry?: () => void;
   readAllPending?: boolean;
   readAllToastVisible?: boolean;
   onReadAll?: () => void;

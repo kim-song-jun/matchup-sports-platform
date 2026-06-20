@@ -5,7 +5,8 @@ import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { ChevronLeft, Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { EmptyState } from '@/components/v1-ui/primitives';
+import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BellIcon, ChatIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
@@ -143,21 +144,30 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
           </div>
         </div>
         <div className="tm-notification-list">
-          {model.notifications.length === 0 ? (
+          {/* 로딩 중에는 EmptyState 노출을 막는다 — ready 이후에만 빈 상태를 판정한다 */}
+          {model.status === 'loading' ? (
+            <PageSkeleton variant="list" />
+          ) : model.status === 'error' ? (
+            <ErrorState
+              message="알림을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+              onRetry={model.onRetry}
+            />
+          ) : model.notifications.length === 0 ? (
             <EmptyState title="알림이 없어요" sub="매치, 팀매치, 채팅 알림이 생기면 이곳에 모아 보여드릴게요." />
-          ) : null}
-          {groups.map((group) => {
-            const items = model.notifications.filter((notification) => notification.group === group);
-            if (items.length === 0) return null;
-            return (
-              <section key={group} className="tm-notification-section">
-                <div className="tm-text-label">{group}</div>
-                <div className="tm-notification-stack">
-                  {items.map((notification) => <NotificationCard key={notification.id} notification={notification} onOpen={model.onOpen} />)}
-                </div>
-              </section>
-            );
-          })}
+          ) : (
+            groups.map((group) => {
+              const items = model.notifications.filter((notification) => notification.group === group);
+              if (items.length === 0) return null;
+              return (
+                <section key={group} className="tm-notification-section">
+                  <div className="tm-text-label">{group}</div>
+                  <div className="tm-notification-stack">
+                    {items.map((notification) => <NotificationCard key={notification.id} notification={notification} onOpen={model.onOpen} />)}
+                  </div>
+                </section>
+              );
+            })
+          )}
         </div>
       </div>
       {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽었어요</div> : null}

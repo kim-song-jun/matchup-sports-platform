@@ -140,8 +140,22 @@ export function NotificationsPageClient() {
   const query = useV1Notifications({ limit: 50 });
   const read = useV1ReadNotification();
   const readAll = useV1ReadAllNotifications();
-  const notifications = Array.isArray(query.data?.items) ? query.data.items.map(toNotificationModel) : [];
+
+  const status: NotificationsViewModel['status'] = query.isPending
+    ? 'loading'
+    : query.isError
+      ? 'error'
+      : 'ready';
+
+  // 로딩·에러 중에는 빈 배열을 유지하되 EmptyState를 노출하지 않는다.
+  // ready 상태에서만 실제 알림이 없는지 판정한다.
+  const notifications = status === 'ready' && Array.isArray(query.data?.items)
+    ? query.data.items.map(toNotificationModel)
+    : [];
+
   const model: NotificationsViewModel = {
+    status,
+    onRetry: query.isError ? () => query.refetch() : undefined,
     unreadCount: typeof query.data?.unreadCount === 'number' ? query.data.unreadCount : 0,
     notifications,
     readAllPending: readAll.isPending,

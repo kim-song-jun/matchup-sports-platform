@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
 
 export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
@@ -34,7 +35,16 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
           ))}
         </div>
         <div className="tm-notice-stack">
-          {model.notices.length ? model.notices.map((notice) => <NoticeRow key={notice.id} notice={notice} />) : (
+          {model.status === 'loading' ? (
+            <PageSkeleton variant="list" />
+          ) : model.status === 'error' ? (
+            <ErrorState
+              message="공지사항을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+              onRetry={model.onRetry}
+            />
+          ) : model.notices.length ? (
+            model.notices.map((notice) => <NoticeRow key={notice.id} notice={notice} />)
+          ) : (
             <Card pad={18} className="tm-notice-summary-card">
               <div className="tm-text-label">공지 없음</div>
               <p className="tm-text-body">이 카테고리에 공지가 아직 없어요.</p>
@@ -59,20 +69,31 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
           {/* breadcrumb-style label, not a section heading — keep the notice title as the sole h1 */}
           <p className="tm-text-heading" aria-hidden="true">공지 상세</p>
         </div>
-        <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
-        <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
-        <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>
-        <Card pad={18} className="tm-notice-summary-card">
-          <div className="tm-text-label">요약</div>
-          <p className="tm-text-body">{notice.summary}</p>
-        </Card>
-        <div className="tm-notice-body">
-          {notice.body.map((paragraph) => <p key={paragraph} className="tm-text-body">{paragraph}</p>)}
-        </div>
-        <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
-          <div className="tm-text-label">관련 매치 확인</div>
-          <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에도 같은 안내가 표시돼요.</div>
-        </Link>
+        {model.status === 'loading' ? (
+          <PageSkeleton variant="detail" />
+        ) : model.status === 'error' ? (
+          <ErrorState
+            message="공지사항을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            onRetry={model.onRetry}
+          />
+        ) : (
+          <>
+            <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
+            <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
+            <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>
+            <Card pad={18} className="tm-notice-summary-card">
+              <div className="tm-text-label">요약</div>
+              <p className="tm-text-body">{notice.summary}</p>
+            </Card>
+            <div className="tm-notice-body">
+              {notice.body.map((paragraph) => <p key={paragraph} className="tm-text-body">{paragraph}</p>)}
+            </div>
+            <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
+              <div className="tm-text-label">관련 매치 확인</div>
+              <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에도 같은 안내가 표시돼요.</div>
+            </Link>
+          </>
+        )}
       </article>
     </AppChrome>
   );

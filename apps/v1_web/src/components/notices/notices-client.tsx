@@ -11,7 +11,6 @@ export function NoticeListPageClient() {
   const [selectedCategory, setSelectedCategory] = useState('전체');
   const query = useV1Notices(selectedCategory === '전체' ? undefined : { category: selectedCategory });
   const fallback = getNoticeListViewModel();
-  const notices = sortPinnedFirst(query.data ? getNoticeItems(query.data).map(toNotice) : fallback.notices);
   const categories = useMemo(() => {
     const labels = ['전체', '고정', '업데이트', '안내'];
     return labels.map((label) => ({
@@ -21,17 +20,29 @@ export function NoticeListPageClient() {
     }));
   }, [selectedCategory]);
 
-  const model: NoticeListViewModel = query.data
-    ? {
-        ...fallback,
-        filters: categories,
-        notices,
-      }
-    : {
-        ...fallback,
-        filters: categories,
-        notices: selectedCategory === '전체' ? notices : notices.filter((notice) => notice.tag === selectedCategory),
-      };
+  const status: NoticeListViewModel['status'] = query.isPending
+    ? 'loading'
+    : query.isError
+      ? 'error'
+      : 'ready';
+
+  // fallback 정적 목업은 ready 상태에서 실제 데이터가 없을 때만 사용한다.
+  // 로딩·에러 중에는 목업을 실데이터처럼 노출하지 않는다.
+  const noticesFromApi = query.data ? sortPinnedFirst(getNoticeItems(query.data).map(toNotice)) : [];
+  const noticesReady = status === 'ready'
+    ? (noticesFromApi.length ? noticesFromApi : fallback.notices)
+    : [];
+  const visibleNotices = selectedCategory === '전체'
+    ? noticesReady
+    : noticesReady.filter((notice) => notice.tag === selectedCategory);
+
+  const model: NoticeListViewModel = {
+    ...fallback,
+    filters: categories,
+    notices: visibleNotices,
+    status,
+    onRetry: query.isError ? () => query.refetch() : undefined,
+  };
 
   return <NoticeListPageView model={model} />;
 }
@@ -39,12 +50,24 @@ export function NoticeListPageClient() {
 export function NoticeDetailPageClient({ noticeId }: { noticeId: string }) {
   const query = useV1Notice(noticeId);
   const fallback = getNoticeDetailViewModel(noticeId);
-  const model: NoticeDetailViewModel = query.data
-    ? {
-        ...fallback,
-        notice: toNotice(query.data.notice ?? fallbackNotice(noticeId)),
-      }
-    : fallback;
+
+  const status: NoticeDetailViewModel['status'] = query.isPending
+    ? 'loading'
+    : query.isError
+      ? 'error'
+      : 'ready';
+
+  // fallback 정적 목업은 ready 상태에서 실제 데이터가 없을 때만 사용한다.
+  // 로딩·에러 중에는 목업을 실데이터처럼 노출하지 않는다.
+  const model: NoticeDetailViewModel = {
+    ...fallback,
+    notice:
+      status === 'ready' && query.data
+        ? toNotice(query.data.notice ?? fallbackNotice(noticeId))
+        : fallback.notice,
+    status,
+    onRetry: query.isError ? () => query.refetch() : undefined,
+  };
 
   return <NoticeDetailPageView model={model} />;
 }

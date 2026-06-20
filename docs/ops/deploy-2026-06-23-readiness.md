@@ -130,9 +130,11 @@
 
 | WS | 상태 | 커밋 | 검증(D1) |
 |----|------|------|----------|
-| 1 CSS 토큰 | ✅ 완료 | `423c9249` | grep 전수증명(undefined-w/o-fallback 0) + tsc green + 값 적대검토. 라이브 비주얼은 WS11 대진표 페이지에서 종합 확인 |
-| 2 데드코드 Web(삭제 승인) | 대기 | — | — |
-| 3 데드 API(verification) | 대기 | — | — |
-| 4 카피 31건 | 대기 | — | — |
+| 1 CSS 토큰 | ✅ 완료 | `423c9249` | grep 전수증명(undefined-w/o-fallback 0) + tsc green + 값 적대검토 |
+| 2 데드코드 Web | ✅ 완료 | `4999c33e` | **refute-panel(5 sonnet+opus judge)** 적대 검증 → 26개/9,294줄 삭제. grep 참조 0 + tsc clean(.next 캐시 제거 후) |
+| 3 데드 API(verification) | ❌ **거부** | — | refute가 **ALIVE 판정**: app.module.ts DI 등록 + spec 존재. discovery "dead" 오판 → 삭제 시 API 부팅 파손. **적대 검증이 사고 방지** |
+| 4 카피 | 🔄 진행 | `8ee6e7cf`(4-a) | 4-a: high-severity(영문 enum 5 + placeholder + admin 역할 + global-error) 완료. 4-b: 합니다체 ~32건 진행 중 |
+
+**적대 검증(D1) 성과 기록**: WS3에서 discovery의 dead 판단이 틀렸음을 refute-panel이 잡아냄(verification 모듈은 DI 등록된 live 모듈). "findings 맹신 금지(D3)"가 실제 파손을 막은 사례. WS1에서도 `--signup-steps` false-positive·`--red-alpha-08` 값 오류를 grep 재검증이 정정.
 
 > **검증 proportionality**: WS1 같은 additive 토큰 정의는 grep 결정증명+tsc로 충분(결과가 deterministic). WS2(데드코드 삭제·import 파손 위험), WS8/9(테스트 진위), WS10(admin 토큰 시각 회귀) 등 위험 workstream은 **opus refute-panel(Workflow)** 으로 적대 검증.

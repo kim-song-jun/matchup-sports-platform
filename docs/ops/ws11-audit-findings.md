@@ -31,4 +31,5 @@ matches 17(최다) · community 15 · auth-onboarding 13 · team-matches 12 · t
 - ✅ **Rank6 raw enum** 4곳(teams-client 563·my-api-clients 1008/1027·onboarding 388) → 신규 `lib/v1-status-labels.ts` 단일소스 라벨(미매핑도 안전 한글). `1a6944f5`. **Rank6 완료.**
 - ✅ **Rank5 a11y aria**(서브에이전트): useId(admin-filter-bar·SimpleModal 3인스턴스 id 중복), role=switch(알림토글), aria-pressed(칩 4종), aria-label(채팅입력·stepper), aria-busy. `553936dc`. **Rank5 완료.**
 - ✅ **테스트 정리**(서브에이전트): 전 기존 테스트 감사 → FAKE 0(제거 불필요), home thin-smoke 강화. `553936dc`.
-- ⏭ 다음: Rank2 필터시트 공유추출(DraggableFilterSheet 3중 중복)+모달 role/ESC/focus-trap → Rank3 dead-end CTA(완료화면 no-op·match-1 하드코딩) → Rank4 silent API(notices stale fallback)/window.confirm 5곳→모달 → 클러스터 medium → WS6 색·WS7 API·WS10 admin 토큰·deploy.yml.
+- ✅ **Rank4 silent API**(서브에이전트, D3 실버그 확인): notices 실패/로딩 중 정적 mock 노출 + notifications premature empty → loading/error/ready 분기(PageSkeleton/ErrorState 재사용). `16871608`, 라이브 검증. (window.confirm→modal은 잔여.)
+- ⏭ 다음: Rank2 필터시트 공유추출(DraggableFilterSheet 3중 중복)+모달 role/ESC/focus-trap → Rank3 dead-end CTA(완료화면 no-op·match-1 하드코딩) → window.confirm 5곳→modal → 클러스터 medium → WS6 색·WS7 API·WS10 admin 토큰·deploy.yml.

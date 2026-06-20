@@ -1070,6 +1070,15 @@ button:disabled {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
+/* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
+.v1-icon-button:focus-visible,
+.v1-tab:focus-visible,
+.v1-button:focus-visible,
+.v1-chip:focus-visible,
+.v1-card-link:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
 
 .tm-btn-disabled {
   color: var(--text-caption);
@@ -1245,6 +1254,7 @@ button:disabled {
   padding: 0;
   color: inherit;
   min-width: 0;
+  min-height: 44px; /* WS5 a11y — 명시적 터치 타깃(아이콘 자식에만 의존하지 않음) */
 }
 
 .tm-quick-action:disabled {
@@ -1290,7 +1300,8 @@ button:disabled {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
-  padding: 0;
+  padding: 0 4px;
+  min-height: 44px; /* WS5 a11y 터치 타깃 */
   display: flex;
   align-items: center;
   gap: 2px;
@@ -2122,9 +2133,9 @@ button:disabled {
 
 .tm-list-search-clear,
 .tm-list-search-submit {
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -3155,8 +3166,8 @@ button:disabled {
 }
 
 .v1-icon-button {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 999px;
   display: grid;

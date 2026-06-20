@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { PointerEvent, ReactNode } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
@@ -513,11 +513,23 @@ function DraggableFilterSheet({
     setOffsetY(0);
   };
 
+  // a11y: ESC 키로 필터 시트 닫기 (드래그 동작과 독립적으로 동작)
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      router.push(closeHref);
+    }
+  };
+
   return (
     <div className="tm-filter-layer">
+      {/* role="dialog" + aria-modal="true": 스크린리더가 시트를 대화상자로 인식하고
+          배경 콘텐츠를 읽지 않도록 함. focus-trap은 드래그 인터랙션 충돌 위험으로 생략. */}
       <section
         className="tm-filter-sheet"
+        role="dialog"
+        aria-modal="true"
         aria-label={ariaLabel}
+        onKeyDown={handleKeyDown}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}

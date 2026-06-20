@@ -828,7 +828,7 @@ export function NotificationSettingsPageClient() {
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
           {toggleError ? (
-            <div className="tm-card" style={{ padding: 14, background: 'rgba(254,152,0,.10)', marginBottom: 8 }}>
+            <div className="tm-card" style={{ padding: 14, background: 'var(--tint-orange)', marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </div>

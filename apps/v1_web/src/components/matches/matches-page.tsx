@@ -146,7 +146,7 @@ function MatchParticipantsPageView() {
         <h1 className="tm-text-heading" style={{ margin: 0 }}>참가자</h1>
       </div>
       <div className="tm-match-list">
-        <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
+        <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">주말 풋살 한판!</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>승인 완료 2명 · 승인중 1명 · 정원 10명</div>
         </Card>
@@ -242,8 +242,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
-              <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.76)', marginTop: 6 }}>{match.host} 호스트 · {match.deadline}</div>
-              {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'rgba(255,255,255,.86)', marginTop: 8 }}>{heroMessage}</div> : null}
+              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-76)', marginTop: 6 }}>{match.host} 호스트 · {match.deadline}</div>
+              {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
           </div>
         </div>
@@ -636,7 +636,7 @@ function InfoRow({ label, value, sub }: { label: string; value: string; sub?: st
 }
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
-  return <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'rgba(3,178,108,.08)' : 'rgba(254,152,0,.10)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange500)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;
+  return <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange500)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;
 }
 
 function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
@@ -844,7 +844,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
       </div>
       <div className="tm-create-shell tm-match-create-shell">
         <EmptyState title="매치가 만들어졌어요" sub="매치를 만들었어요! 팀원들에게 먼저 공유해 참여 의사를 확인해 보세요." />
-        <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'rgba(49,130,246,.24)' }}>
+        <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">FC 발빠른놈들 팀 채팅</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>24명에게 매치 링크와 일정을 공유해요</div>
         </Card>

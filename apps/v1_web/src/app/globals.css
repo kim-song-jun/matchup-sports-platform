@@ -60,6 +60,47 @@
   --sh-1: var(--shadow-1); /* box-shadow: .tm-auth-segment-active, .tm-chat-bubble 등 */
   --line: var(--border); /* hairline border: .tm-auth-profile-upload 등 */
   --red-alpha-08: rgba(240, 68, 82, 0.08); /* --red500(#f04452) 8% — 에러 카드 border */
+  /* ── WS6 토큰화 — 소비자 하드코딩 hex/rgba → 의미 토큰 ── */
+  /* OAuth 브랜드 */
+  --kakao-yellow: #FEE500;
+  --naver-green: #03C75A;
+  /* 톤 카드 틴트 배경 */
+  --tint-green: rgba(3, 178, 108, 0.08);   /* --green500(#03b26c) 8% — 녹색 안내 카드 */
+  --tint-orange: rgba(254, 152, 0, 0.10);  /* --orange500(#fe9800) 10% — 주황 안내 카드 */
+  --tint-blue-border: rgba(49, 130, 246, 0.24); /* --blue500(#3182f6) 24% — 파란 카드 테두리 */
+  /* 어두운 스크림 / 오버레이 (히어로 카드, 서랍, 토스트) */
+  --scrim-dark-32: rgba(25, 31, 40, 0.32);  /* 대화상자 스크림 */
+  --scrim-dark-72: rgba(25, 31, 40, 0.72);  /* 히어로 하단바 배경 */
+  --scrim-dark-94: rgba(25, 31, 40, 0.94);  /* 검색 에러 토스트 배경 */
+  --navy-scrim-32: rgba(15, 23, 42, 0.32);  /* 채팅 데스크톱 Leave 스크림 */
+  --navy-scrim-40: rgba(10, 30, 66, 0.40);  /* 대회 고스트 버튼 배경 */
+  --navy-scrim-55: rgba(10, 30, 66, 0.55);  /* 대회 고스트 버튼 배경 hover */
+  /* 흰 반투명 오버레이 — 컬러 히어로/다크 배경 위 텍스트·UI */
+  --overlay-white-08: rgba(255, 255, 255, 0.08);  /* 푸터 구분선 */
+  --overlay-white-18: rgba(255, 255, 255, 0.18);  /* 프로모 eyebrow 뱃지 배경 */
+  --overlay-white-35: rgba(255, 255, 255, 0.35);  /* 푸터 copy 텍스트 */
+  --overlay-white-55: rgba(255, 255, 255, 0.55);  /* 푸터 링크 기본 */
+  --overlay-white-66: rgba(255, 255, 255, 0.66);  /* 랜딩 CTA 서브 */
+  --overlay-white-68: rgba(255, 255, 255, 0.68);  /* 팀매치 히어로 팀 레이블 */
+  --overlay-white-70: rgba(255, 255, 255, 0.70);  /* 대회 고스트 버튼 테두리 */
+  --overlay-white-72: rgba(255, 255, 255, 0.72);  /* 팀매치·팀 페이지 서브텍스트 */
+  --overlay-white-75: rgba(255, 255, 255, 0.75);  /* 프로모 메타 */
+  --overlay-white-76: rgba(255, 255, 255, 0.76);  /* 매치 히어로 호스트/마감 */
+  --overlay-white-82: rgba(255, 255, 255, 0.82);  /* 프로모 tagline */
+  --overlay-white-85: rgba(255, 255, 255, 0.85);  /* 푸터 링크 hover */
+  --overlay-white-86: rgba(255, 255, 255, 0.86);  /* 히어로 메시지 */
+  --overlay-white-88: rgba(255, 255, 255, 0.88);  /* 프로모 prize 레이블 */
+  --overlay-white-90: rgba(255, 255, 255, 0.90);  /* 푸터 브랜드 */
+  --overlay-white-92: rgba(255, 255, 255, 0.92);  /* 프로모 eyebrow 텍스트, CTA hover */
+  --glass-white-96: rgba(255, 255, 255, 0.96);   /* 네비/헤더 유리 배경 */
+  /* 모달·사이드바 그림자 */
+  --shadow-modal: 0 8px 32px rgba(20, 28, 45, 0.14);
+  --shadow-sidebar: 4px 0 24px rgba(20, 28, 45, 0.12);
+  /* 검색 포커스 링 */
+  --blue-focus-ring: rgba(49, 130, 246, 0.12);
+  /* 대회 상금 / 보조 색 */
+  --prize-gold: #ffd84d;
+  --orange600: #f08a00;
   /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
   --font-size-micro: 11px;
   --font-size-caption: 12px;

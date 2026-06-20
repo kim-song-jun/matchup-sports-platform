@@ -30,7 +30,7 @@ describe('auth view models', () => {
     expect(model.providers).toHaveLength(3);
     expect(model.providers[0]).toMatchObject({
       label: '카카오',
-      background: '#FEE500',
+      background: 'var(--kakao-yellow)',
       color: 'var(--static-black)',
       disabled: false,
     });

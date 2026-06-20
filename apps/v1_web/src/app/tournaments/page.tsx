@@ -143,12 +143,12 @@ function TournamentsListContent() {
             textDecoration: 'none',
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
             <TrophyIcon size={12} strokeWidth={2} aria-hidden="true" />
             상금 걸린 대회
           </span>
           <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featured.title}</div>
-          <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
+          <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
             {featured.scheduledAt ? (formatTournamentDateShort(featured.scheduledAt) ?? '날짜 미정') : '날짜 미정'}
             {' · '}
             {featured.confirmedCount}/{featured.teamCount}팀 확정

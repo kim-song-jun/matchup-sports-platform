@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
@@ -300,6 +300,17 @@ function CancelModal({
 }) {
   const [reason, setReason] = useState('');
 
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !isSubmitting) {
+        onClose();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSubmitting, onClose]);
+
   return (
     <>
       {/* Scrim — v1 pattern */}
@@ -423,6 +434,9 @@ function RegistrationDetailView({
     maxPlayers: number;
     scheduledAt: string | null;
     venue: string | null;
+    bankName: string | null;
+    bankAccount: string | null;
+    bankHolder: string | null;
   };
   registration: V1TournamentRegistration;
 }) {
@@ -641,14 +655,28 @@ function RegistrationDetailView({
                       <InfoRow
                         label="참가비"
                         value={formatEntryFee(tournament.entryFee)}
-                        isLast={!registration.depositorName}
+                        isLast={!registration.depositorName && registration.status !== 'awaiting_payment'}
                       />
                       {registration.depositorName ? (
-                        <InfoRow label="입금자명" value={registration.depositorName} isLast />
+                        <InfoRow
+                          label="입금자명"
+                          value={registration.depositorName}
+                          isLast={registration.status !== 'awaiting_payment'}
+                        />
+                      ) : null}
+                      {/* awaiting_payment 상태이고 계좌 정보가 있으면 입금 안내 렌더 */}
+                      {registration.status === 'awaiting_payment' && tournament.bankName ? (
+                        <>
+                          <InfoRow label="은행" value={tournament.bankName} />
+                          <InfoRow label="계좌번호" value={tournament.bankAccount ?? ''} />
+                          <InfoRow label="예금주" value={tournament.bankHolder ?? ''} isLast />
+                        </>
                       ) : null}
                       <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
                         {registration.status === 'awaiting_payment'
-                          ? '입금 완료 후 자동으로 상태가 변경돼요.'
+                          ? tournament.bankName
+                            ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 자동으로 상태가 변경돼요.'
+                            : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 자동으로 상태가 변경돼요.'
                           : '아직 결제 정보가 없어요.'}
                       </div>
                     </div>
@@ -868,6 +896,9 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           maxPlayers: tournament.maxPlayers,
           scheduledAt: tournament.scheduledAt,
           venue: tournament.venue,
+          bankName: tournament.bankName,
+          bankAccount: tournament.bankAccount,
+          bankHolder: tournament.bankHolder,
         }}
         registration={registration}
       />

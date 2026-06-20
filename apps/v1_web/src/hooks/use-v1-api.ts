@@ -1340,6 +1340,10 @@ export function useV1SubmitRegistration(tournamentId: string, registrationId: st
         queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      // /my 페이지가 myTournamentRegistration 캐시를 사용하므로 함께 무효화
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
     },
   });
 }
@@ -1357,6 +1361,10 @@ export function useV1CancelRegistrationRequest(tournamentId: string, registratio
         queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      // /my 페이지가 myTournamentRegistration 캐시를 사용하므로 함께 무효화
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
     },
   });
 }

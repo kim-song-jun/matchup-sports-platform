@@ -872,7 +872,7 @@ function PaymentGuideStep({
             <div style={{ padding: '0 16px 14px' }}>
               <AlertBanner
                 tone="info"
-                message="입금 계좌는 신청 확인 후 알림으로 보내드려요. 먼저 신청만 완료해 주세요."
+                message="신청이 완료됐어요. 계좌 정보는 확인 후 알림으로 안내드릴게요."
               />
               <div style={{ marginTop: 10 }}>
                 <InfoRow

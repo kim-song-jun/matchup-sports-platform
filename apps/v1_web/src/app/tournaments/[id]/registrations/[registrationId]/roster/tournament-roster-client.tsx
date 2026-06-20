@@ -5,6 +5,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, ErrorState } from '@/components/v1-ui/primitives';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import {
   useV1TournamentPlayers,
   useV1Tournament,
@@ -492,11 +493,13 @@ export function TournamentRosterPageClient({
 
   const addPlayer = useV1AddPlayer(tournamentId, registrationId);
   const removePlayer = useV1RemovePlayer(tournamentId, registrationId);
+  const { confirm: confirmRemove, ConfirmModal: RemoveConfirmModal } = useConfirm();
 
   const [showAddForm, setShowAddForm] = useState(false);
   // Incremented on each successful add to remount the form (clears internal state).
   const [addFormKey, setAddFormKey] = useState(0);
   const [addError, setAddError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   const players = rosterData?.players ?? [];
@@ -548,6 +551,7 @@ export function TournamentRosterPageClient({
     eligibilityStatus: V1PlayerEligibilityStatus;
   }) {
     setAddError(null);
+    setAddSuccess(null);
     try {
       await addPlayer.mutateAsync({
         userId: formData.userId,
@@ -558,13 +562,24 @@ export function TournamentRosterPageClient({
       // #8: Keep form open so operator can add the next player immediately.
       // Remounting via key resets all internal form state cleanly.
       setAddFormKey((k) => k + 1);
+      setAddSuccess('선수를 추가했어요.');
     } catch (err) {
       setAddError(extractErrorMessage(err, '선수 추가에 실패했어요. 잠시 후 다시 시도해 주세요.'));
     }
   }
 
   async function handleRemovePlayer(playerId: string) {
+    const player = players.find((p) => p.id === playerId);
+    const nameLabel = player?.realName ? `"${player.realName}"` : '이 선수';
+    const ok = await confirmRemove({
+      title: '선수 삭제',
+      message: `${nameLabel}를 명단에서 삭제할까요?`,
+      confirmLabel: '삭제',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setRemoveError(null);
+    setAddSuccess(null);
     try {
       await removePlayer.mutateAsync(playerId);
     } catch (err) {
@@ -605,6 +620,13 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
+        {/* Add success feedback */}
+        {addSuccess ? (
+          <div style={{ marginBottom: 14 }}>
+            <AlertBanner tone="info" message={addSuccess} />
+          </div>
+        ) : null}
+
         {/* Roster header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div>
@@ -620,7 +642,7 @@ export function TournamentRosterPageClient({
               type="button"
               className="tm-btn tm-btn-sm tm-btn-primary"
               style={{ flexShrink: 0, minWidth: 64 }}
-              onClick={() => { setAddError(null); setShowAddForm(true); }}
+              onClick={() => { setAddError(null); setAddSuccess(null); setShowAddForm(true); }}
               aria-label="선수 추가하기"
             >
               + 추가
@@ -640,7 +662,7 @@ export function TournamentRosterPageClient({
               key={addFormKey}
               teamId={registration?.teamId ?? ''}
               onSubmit={handleAddPlayer}
-              onCancel={() => { setShowAddForm(false); setAddError(null); }}
+              onCancel={() => { setShowAddForm(false); setAddError(null); setAddSuccess(null); }}
               isSubmitting={addPlayer.isPending}
               error={addError}
             />
@@ -688,6 +710,9 @@ export function TournamentRosterPageClient({
           </Link>
         </div>
       </div>
+
+      {/* 선수 삭제 confirm modal */}
+      {RemoveConfirmModal}
     </AppChrome>
   );
 }

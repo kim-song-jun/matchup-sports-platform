@@ -421,6 +421,7 @@ function RegistrationsTab({
   const rosterUnlock = useV1RosterUnlock();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
+  const { confirm: confirmCancel, ConfirmModal: CancelConfirmModal } = useConfirm();
 
   const registrations = data?.items ?? [];
 
@@ -452,7 +453,15 @@ function RegistrationsTab({
     );
   };
 
-  const handleCancel = (reg: V1AdminTournamentRegistration) => {
+  const handleCancel = async (reg: V1AdminTournamentRegistration) => {
+    const teamLabel = reg.teamName ? `"${reg.teamName}"` : '이 팀';
+    const ok = await confirmCancel({
+      title: '신청 취소',
+      message: `${teamLabel}의 신청을 취소할까요? 이 작업은 되돌릴 수 없어요.`,
+      confirmLabel: '취소 처리',
+      tone: 'danger',
+    });
+    if (!ok) return;
     cancelRegistration.mutate(
       { registrationId: reg.id },
       {
@@ -623,6 +632,9 @@ function RegistrationsTab({
         registration={rosterRegistration}
         showToast={showToast}
       />
+
+      {/* 신청 취소 confirm modal */}
+      {CancelConfirmModal}
     </>
   );
 }
@@ -1809,6 +1821,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
   const { toasts, showToast } = useAdminToast();
   const updateTournament = useV1UpdateTournament(id);
+  const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
 
   const [activeTab, setActiveTab] = useState<TabId>('registrations');
 
@@ -1892,7 +1905,17 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const registrations = regData?.items ?? [];
 
   // ── Status change ────────────────────────────────────────────────────
-  const handleStatusChange = (nextStatus: V1TournamentStatus) => {
+  const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
+    // 취소는 비가역 → 반드시 확인 게이트
+    if (nextStatus === 'cancelled') {
+      const ok = await confirmStatusChange({
+        title: '대회 취소',
+        message: '대회를 취소하면 되돌릴 수 없어요. 정말 취소할까요?',
+        confirmLabel: '대회 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
     changeStatus.mutate(
       { status: nextStatus },
       {
@@ -2354,6 +2377,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
           </div>
         </form>
       </SimpleModal>
+
+      {/* 대회 상태 변경 confirm modal (취소 등 비가역 액션) */}
+      {StatusConfirmModal}
 
       <AdminToasts toasts={toasts} />
     </>

@@ -149,7 +149,7 @@
 | 10 Admin 토큰 정합 | 대기 | — | 265 raw Tailwind → 토큰 |
 | 11 페르소나 비주얼 감사 | 🔄 진행 | — | **파이프라인 확립**: v1 스택(pg:5432+api:8121 가동중, web:3013 preview_start) + dev-auth(icon.tester). 감사 완료: /landing(이슈0, 'N'은 Next devtools false-alarm)·/home(이슈: 매너 "− 점" 빈상태 카피 어색). 다음 배치에서 login/signup/matches/teams/tournaments/my 등 계속(컨텍스트당 ~5-8샷) |
 | 12 v1 e2e(Playwright) | ✅ 1차 완료 | `bd0a2c4a` | **서브에이전트 구축 + 직접 8/8 green 검증**. v1 전용(:3013) playwright.config + dev-auth fixture + landing(3)/home(2)/matches(3) 진짜 플로우 스펙. CI 통합은 deploy.yml 분리 시. 추가 플로우(signup/team/tournament apply)는 확장 여지 |
-| 4-d 카피 재스윕 | 🔄 진행 | — | 라이브 감사가 WS4-b의 '입니다' 체계적 누락 포착 → 명백 3건 즉시 수정(`b7b37bd5`) + 나머지 서브에이전트 재스윕 중 |
+| 4-d 카피 재스윕 | ✅ 완료 | `b7b37bd5`·`7f9764cc` | 라이브 감사가 WS4-b의 '입니다/됩니다/합니다' 체계적 누락 포착 → 3건 즉시 + 22건 서브에이전트 재스윕. **live UI 합니다체 잔여 0(grep 검증)** + tsc + 43 tests green. 카피 정리 완결 |
 | WS11 추가 감사 | 🔄 진행 | `e0c57c60`·`b7b37bd5` | /matches·/tournaments·/teams 감사(대체로 양호). 발견·수정: home "− 점", teams 생성 fallback·StateCard 합니다체 3건. 발견·기록: 매치카드 "신청 마감" 중복 |
 | deploy.yml 분리 | 대기 | — | 결정#1 — v1 전용 job |
 

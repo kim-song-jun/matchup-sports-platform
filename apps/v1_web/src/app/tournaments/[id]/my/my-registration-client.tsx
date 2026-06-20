@@ -57,7 +57,7 @@ function paymentStatusLabel(status: string): string {
     case 'paid': return '결제 완료';
     case 'cancelled': return '결제 취소';
     case 'refunded': return '환불';
-    default: return status;
+    default: return '알 수 없음';
   }
 }
 

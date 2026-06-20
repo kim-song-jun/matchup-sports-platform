@@ -372,7 +372,7 @@ function applicationStatusLabel(status: string): string {
     case 'withdrawn': return '취소됨';
     case 'cancelled_by_host': return '호스트 취소';
     case 'expired': return '마감됨';
-    default: return status;
+    default: return '알 수 없음';
   }
 }
 

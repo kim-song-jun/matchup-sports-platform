@@ -24,7 +24,7 @@ function eligibilityLabel(status: V1PlayerEligibilityStatus): string {
     case 'non_pro': return '아마추어';
     case 'pro': return '선출';
     case 'needs_review': return '확인 중';
-    default: return status;
+    default: return '알 수 없음';
   }
 }
 

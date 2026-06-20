@@ -521,7 +521,7 @@ export default function AdminAdminsPage() {
     return (
       <AdminEmpty
         title="최고운영자 전용이에요"
-        description="이 페이지는 최고운영자(owner)만 접근할 수 있어요. 권한을 확인해 주세요."
+        description="이 페이지는 최고운영자만 접근할 수 있어요. 권한을 확인해 주세요."
       />
     );
   }
@@ -626,8 +626,8 @@ export default function AdminAdminsPage() {
 
   // Role change status options (only ops / support are assignable, not owner)
   const roleChangeOptions = [
-    { value: 'ops', label: '운영 (ops)' },
-    { value: 'support', label: '지원 (support)' },
+    { value: 'ops', label: '운영' },
+    { value: 'support', label: '지원' },
   ];
 
   const errorMessage = isError

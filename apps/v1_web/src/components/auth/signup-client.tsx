@@ -285,7 +285,7 @@ export function SignupClient() {
                     setEmailCheck({ status: 'idle', value: '' });
                     setFieldError(null);
                   }}
-                  placeholder="you@example.com"
+                  placeholder="예: me@email.com"
                   type="email"
                   value={email}
                 />

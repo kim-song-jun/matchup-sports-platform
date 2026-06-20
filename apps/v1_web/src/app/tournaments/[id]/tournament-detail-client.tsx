@@ -856,7 +856,7 @@ function fixtureStatusLabel(status: string): string {
     case 'in_progress': return '진행 중';
     case 'completed': return '종료';
     case 'cancelled': return '취소';
-    default: return status;
+    default: return '알 수 없음';
   }
 }
 

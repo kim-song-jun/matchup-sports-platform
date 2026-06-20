@@ -44,7 +44,7 @@ export function EmailLoginClient() {
         <div className="tm-auth-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">이메일</span>
-            <input className="tm-input tm-auth-input" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} />
+            <input className="tm-input tm-auth-input" onChange={(event) => setEmail(event.target.value)} placeholder="예: me@email.com" required type="email" value={email} />
           </label>
           <label className="tm-auth-field">
             <span className="tm-text-label">비밀번호</span>

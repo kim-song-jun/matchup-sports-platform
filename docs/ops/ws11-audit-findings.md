@@ -27,4 +27,5 @@ matches 17(최다) · community 15 · auth-onboarding 13 · team-matches 12 · t
 
 ## 처리 현황
 - ✅ **Rank1 터치타깃 44px** 5클래스(.tm-chip/.tm-list-filter-button/.tm-btn-sm/.tm-auth-check-button/.tm-auth-agreement-arrow) — `2bc49f08`, 라이브 검증.
-- ⏭ 다음: Rank6 urgent 오표기+raw enum(copy 정확성 버그) → Rank2 필터시트 공유추출/모달 a11y → Rank3 dead-end CTA → Rank4 silent API/window.confirm → Rank5 정적 id/토글 ARIA. 도메인별 medium도 순차.
+- ✅ **Rank6 urgent 오표기** matches·team-matches summary "마감"→"모집중"(open count와 일치) — `243541d4`, 라이브 검증.
+- ⏭ 다음: Rank6 잔여(raw enum 6곳: teams-client 563·my-api-clients 1008/1027·onboarding 388 — status→한글 라벨맵) → Rank2 필터시트 공유추출/모달 a11y → Rank3 dead-end CTA → Rank4 silent API/window.confirm → Rank5 정적 id/토글 ARIA → 클러스터 medium → WS6 색·WS7 API·WS10 admin 토큰.

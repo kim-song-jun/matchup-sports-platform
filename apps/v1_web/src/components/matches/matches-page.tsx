@@ -498,7 +498,7 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
             ))}
           </div>
         </div>
-        {/* 보기 형식은 추후 추가 예정입니다.
+        {/* TODO: view format toggle (list / grid) — planned for later
         <div className="tm-filter-section">
           <div className="tm-text-label">보기 방식</div>
           <div className="tm-filter-view-grid">
@@ -660,7 +660,7 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
     <div>
       <h1 className="tm-text-heading">매치 정보</h1>
       <CreateField label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
-      <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치입니다." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
+      <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치예요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} onUpload={model.form?.uploadImage} />
       <CapacityField value={draft.capacity} onChange={(value) => model.form?.onFieldChange('capacity', value)} />
       <LevelRangeField levels={model.levels} minLevel={draft.minLevel} maxLevel={draft.maxLevel} onChange={(field, value) => model.form?.onFieldChange(field, value)} />
@@ -847,7 +847,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
           <div className="tm-text-body-lg">FC 발빠른놈들 팀 채팅</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>24명에게 매치 링크와 일정을 공유해요</div>
         </Card>
-        {['내 팀에 공유', '초대 링크 복사', '관심 멤버에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 일정 정보를 공유합니다.</div></Card>)}
+        {['내 팀에 공유', '초대 링크 복사', '관심 멤버에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 일정 정보를 공유해요.</div></Card>)}
       </div>
       <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches/match-1">상세 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">내 팀에 공유</button></div></div>
     </AppChrome>

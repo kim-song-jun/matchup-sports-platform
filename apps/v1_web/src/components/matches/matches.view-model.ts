@@ -118,7 +118,7 @@ const matchDetailByMode: Record<MatchDetailViewModel['mode'], (typeof matches)[n
 
 const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel['match'], 'description' | 'address' | 'rules' | 'participants'>> = {
   default: {
-    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치입니다. 경기 전 10분 일찍 모여 팀을 나누고 가볍게 몸을 풉니다.',
+    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치예요. 경기 전 10분 일찍 모여 팀을 나누고 가볍게 몸을 풀어요.',
     address: '서울 양천구 안양천로 939',
     rules: ['풋살화 착용', '개인 물 지참', '지각 시 호스트에게 미리 연락'],
     participants: [
@@ -128,7 +128,7 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
     ],
   },
   pending: {
-    description: '참가 신청이 접수된 러닝 매치입니다. 호스트가 프로필과 최근 참여 이력을 확인한 뒤 승인 여부를 결정합니다.',
+    description: '참가 신청이 접수된 러닝 매치예요. 호스트가 프로필과 최근 참여 이력을 확인한 뒤 승인 여부를 결정해요.',
     address: '서울 송파구 올림픽로 25',
     rules: ['러닝화 착용', '개인 물 지참', '승인 전까지 참가 확정 아님'],
     participants: [

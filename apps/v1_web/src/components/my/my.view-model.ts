@@ -83,8 +83,8 @@ export function getMyMatchesModel(mode: 'joined' | 'created'): MyMatchesViewMode
 
 export const myTeams: MyTeam[] = [
   { id: 'team-1', name: 'FC 발빠른놈들', logo: 'F', sport: '축구', region: '서울 마포', role: 'owner', roleLabel: '팀장', members: 18, manner: '4.9', next: '토요일 18:00 정기전', description: '주말 저녁마다 꾸준히 뛰는 축구 팀이에요. 빠른 전환과 즐거운 경기 분위기를 중요하게 봅니다.' },
-  { id: 'team-2', name: '강남 러너스', logo: 'R', sport: '러닝', region: '서울 강남', role: 'admin', roleLabel: '운영진', members: 42, manner: '4.8', next: '목요일 07:00 한강 러닝', description: '평일 아침 5km와 주말 LSD를 함께하는 러닝 크루입니다.' },
-  { id: 'team-3', name: '마포 스윔', logo: 'S', sport: '수영', region: '서울 마포', role: 'member', roleLabel: '멤버', members: 24, manner: '4.7', next: '수요일 20:00 정기 모임', description: '초보-중수 레인 위주로 매너 있는 운동을 만드는 수영 팀입니다.' },
+  { id: 'team-2', name: '강남 러너스', logo: 'R', sport: '러닝', region: '서울 강남', role: 'admin', roleLabel: '운영진', members: 42, manner: '4.8', next: '목요일 07:00 한강 러닝', description: '평일 아침 5km와 주말 LSD를 함께하는 러닝 크루예요.' },
+  { id: 'team-3', name: '마포 스윔', logo: 'S', sport: '수영', region: '서울 마포', role: 'member', roleLabel: '멤버', members: 24, manner: '4.7', next: '수요일 20:00 정기 모임', description: '초보-중수 레인 위주로 매너 있는 운동을 만드는 수영 팀이에요.' },
 ];
 
 export const myTeamsModel: MyTeamsViewModel = {

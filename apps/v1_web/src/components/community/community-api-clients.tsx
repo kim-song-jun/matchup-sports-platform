@@ -191,7 +191,7 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
     id: message.messageId,
     who: message.mine ? 'me' : 'other',
     label: message.mine ? '나' : message.sender.displayName,
-    body: message.content ?? '삭제된 메시지입니다.',
+    body: message.content ?? '삭제된 메시지예요.',
   };
 }
 

@@ -20,7 +20,7 @@ const teams = [
     statusLabel: '모집 중',
     tags: ['초보-중수', '주 1회', '친선'],
     genderRule: '성별 무관',
-    intro: '주 1회 정기적으로 풋살을 즐기는 동네 팀입니다. 초보-중수 멤버와 빠른 응답을 중요하게 봅니다.',
+    intro: '주 1회 정기적으로 풋살을 즐기는 동네 팀이에요. 초보-중수 멤버와 빠른 응답을 중요하게 봐요.',
     next: '오늘 21:00 정기전',
   },
   {
@@ -36,7 +36,7 @@ const teams = [
     statusLabel: '검토 중',
     tags: ['중수', '평일 저녁', '리그 준비'],
     genderRule: '여',
-    intro: '평일 저녁 풋살 위주로 운영하는 팀입니다. 가입 신청은 운영진 검토 후 확정합니다.',
+    intro: '평일 저녁 풋살 위주로 운영하는 팀이에요. 가입 신청은 운영진 검토 후 확정해요.',
     next: '가입 신청 검토 중',
   },
   {
@@ -82,7 +82,7 @@ const teamByMode: Record<TeamDetailViewModel['mode'], (typeof teams)[number]> = 
 
 const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel['team'], 'description' | 'activity' | 'condition' | 'schedule' | 'city' | 'county' | 'level' | 'membersList'>> = {
   default: {
-    description: '성수와 광진권에서 풋살 정기전을 운영하는 팀입니다. 신규 멤버는 2주 체험 후 정식 가입으로 전환합니다.',
+    description: '성수와 광진권에서 풋살 정기전을 운영하는 팀이에요. 신규 멤버는 2주 체험 후 정식 가입으로 전환해요.',
     activity: '주 1회 정기전 · 신규 멤버 3명 모집',
     condition: '풋살 초보-중수 · 성동/광진권 활동 가능',
     schedule: '매주 목 21:00 · 성수 풋살파크',

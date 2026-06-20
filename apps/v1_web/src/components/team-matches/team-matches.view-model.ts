@@ -22,7 +22,7 @@ const teamMatchDetailByMode: Record<TeamMatchDetailViewModel['mode'], (typeof te
 
 const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailViewModel['match'], 'description' | 'address' | 'applicantTeams'>> = {
   default: {
-    description: '우리 팀 홈구장에서 친선 팀매치를 진행합니다. 상대팀은 신청 후 팀 정보와 등급을 확인해 승인합니다.',
+    description: '우리 팀 홈구장에서 친선 팀매치를 진행해요. 상대팀은 신청 후 팀 정보와 등급을 확인해 승인해요.',
     address: '서울 마포구 월드컵로 240',
     applicantTeams: [
       { name: '성수 러너스 FC', meta: 'B등급 · 매너 4.9 · 18명', status: '신청 가능' },
@@ -30,7 +30,7 @@ const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailV
     ],
   },
   pending: {
-    description: '우리 팀 신청이 접수된 팀매치입니다. 홈팀이 팀 정보, 매너, 전적을 확인한 뒤 승인 여부를 결정합니다.',
+    description: '우리 팀 신청이 접수된 팀매치예요. 홈팀이 팀 정보, 매너, 전적을 확인한 뒤 승인 여부를 결정해요.',
     address: '서울 구로구 새말로 97',
     applicantTeams: [
       { name: '우리 팀', meta: '신청 완료 · 홈팀 검토 대기', status: '승인 대기' },
@@ -58,7 +58,7 @@ const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailV
 
 const draft = {
   title: '주말 풋살 초보 환영 팀매치',
-  description: '상대 팀과 즐겁게 경기하는 친선 팀매치입니다.',
+  description: '상대 팀과 즐겁게 경기하는 친선 팀매치예요.',
   grade: 'A+',
   format: '5:5',
   style: '친선 · 매너 중시',

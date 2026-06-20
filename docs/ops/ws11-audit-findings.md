@@ -34,4 +34,6 @@ matches 17(최다) · community 15 · auth-onboarding 13 · team-matches 12 · t
 - ✅ **Rank4 silent API**(서브에이전트, D3 실버그 확인): notices 실패/로딩 중 정적 mock 노출 + notifications premature empty → loading/error/ready 분기(PageSkeleton/ErrorState 재사용). `16871608`, 라이브 검증. (window.confirm→modal은 잔여.)
 - ✅ **패턴 enforcement 인프라**(pillar 1): docs/v1-coding-patterns.md + scripts/v1-pattern-check.mjs(합니다체·미정의토큰) + pnpm lint 연결. `639f68bb`. (WS6-a 에이전트 중간종료 작업의 일관성을 이 검사가 즉시 검증 — undefined 토큰 0.)
 - ✅ **WS6-a consumer 색 토큰화**(서브에이전트): tint/scrim/overlay/brand 토큰(동일값) → matches/applications/my/auth. `d83285de`, 시각 변화 0.
-- ⏭ 다음: WS6-b(tournaments.css 흰색 오버레이 11곳) → Rank2 필터시트 공유추출+모달 a11y → Rank3 dead-end CTA → window.confirm 5곳→modal → 클러스터 medium → WS7 API·WS10 admin 토큰·deploy.yml.
+- ✅ **Rank3 dead-end CTA**(서브에이전트, D3): match-1 하드코딩 3곳 동적화 + no-op 공유버튼 2곳(navigator.share) + disabled CTA 2곳(참가관리·비밀번호찾기 Link). `26bc6849`. **Rank3 완료 → top-6 중 5개(Rank1/3/4/5/6) 완료, Rank2만 잔여.**
+- ⏭ 다음: Rank2 필터시트 공유추출(DraggableFilterSheet 3중 중복)+모달 role/ESC/focus-trap → 데드코드(MatchParticipantsPageView + mock view-model match-1 href) → window.confirm 5곳→modal → 클러스터 medium → WS6-b(tournaments 11) → WS7 API·WS10 admin 토큰·deploy.yml.
+- 🔴 **OPEN DECISION(사용자)**: landing 11종목 광고 vs 실제 seed 4종목 — seed 추가 vs 카피 조정(v1-persona-flows.md 참조).

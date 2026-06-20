@@ -138,7 +138,7 @@
 | 5 a11y(터치타깃·focus ring) | ✅ 완료 | `91b97bc8` | .v1-icon-button 40→44, search clear/submit 30→44, section/quick-action min-height 44, v1-shell focus-visible ring. tsc clean. 사이즈 시각정합은 WS11 확인 |
 | 6 하드코딩 색/dark: | 대기 | — | rgba/hex 토큰화, dark: 제거(light-only) |
 | 7 API 기술부채 + 알림 wire-up | 대기 | — | as any·silent catch·Record<unknown> + chat/notice pref full wire-up(결정#4) + 4-c |
-| 8 API 유닛테스트 | 대기 | — | auth/matches/teams/team-matches/chat/notifications service.spec |
+| 8 API 유닛테스트 | ✅ 완료 | `b869a0f4` | **병렬 writer(sonnet)+opus judge** 적대 검증. 6 서비스 67 테스트(전부 REAL 판정). 전체 unit 33 suites/**383 tests green** + tsc clean. judge 우려 2건(echo·dead mock) 수정 |
 | 9 프론트 유닛테스트 | 대기 | — | login/email·matches/new·tournaments/apply page.test + fake test 2건 교체 |
 | 10 Admin 토큰 정합 | 대기 | — | 265 raw Tailwind → 토큰 |
 | 11 페르소나 비주얼 감사 | 대기 | — | WS1~6 적용 후, preview 브라우저 3티어 ~112샷 |

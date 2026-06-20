@@ -34,6 +34,9 @@
 - 라이브 감사 완료: landing·home·matches·tournaments·teams·my(6) + admin 표면(이전 세션).
 - 종합 코드 감사(8도메인 ~91 findings)로 **전 화면 빠짐없이** 커버 → 발견 이슈 순차 수정 중(`ws11-audit-findings.md`).
 - P04 매치생성 wizard 1단계(/matches/new/sport) 라이브 감사: 깔끔(1/4단계 진행바·종목카드·CTA 양호).
-  **발견(데이터/콘텐츠)**: 종목 4개(축구/풋살/러닝/수영)만 노출 — /matches 필터도 동일. 플랫폼 "11종목" 대비
-  master sports 응답/seed 데이터 한계로 추정. UI 버그는 아니나 콘텐츠 갭, 배포 전 seed/master 확인 필요.
+  **발견(콘텐츠 — 🔴 OPEN DECISION, 사용자 게이트)**: API 확인 결과 v1_api master sports = **4종목**(축구/풋살/러닝/수영,
+  각 4레벨)이 실제 seed. 그러나 `landing/page.tsx`는 **"11개 종목"** + 11개 이름(아이스하키🏒/클라이밍🧗 등, L43/167/174-182)을
+  **하드코딩** 광고. → 사용자가 landing의 11종목 보고 가입해도 매치생성/필터엔 4종목뿐 = 과장·오해.
+  **배포 전 제품 결정 필요**: (a) 11종목 DB seed 추가(백엔드) / (b) landing 카피를 실제 4종목 또는 'aspirational(준비중)'로 조정(프론트).
+  코드 단독 결정 불가 — 제품 의도 확인 후 처리.
 - ⏳ 라이브 페르소나 walk 잔여: 온보딩 wizard(P01)·매치 wizard 2~4단계·팀매치 wizard(P08)·대회 신청·로스터(P10/P11)·설정(P14)·채팅(P13) 등 — 화면별 진행. (종합 코드감사로 전 화면 이미 커버됨.)

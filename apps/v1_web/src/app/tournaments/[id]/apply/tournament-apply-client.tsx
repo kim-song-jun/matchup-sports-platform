@@ -11,6 +11,7 @@ import {
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatEntryFee } from '@/lib/date-utils';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod } from '@/types/api';
 
 /* ── Helpers ── */
@@ -18,11 +19,6 @@ import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod } from '@/
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] | undefined {
   if (!data) return undefined;
   return 'items' in data ? data.items : (data as V1MyTeam[]);
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
 }
 
 function formatPrizePool(prize: number): string {

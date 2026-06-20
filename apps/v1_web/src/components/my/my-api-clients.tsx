@@ -1011,6 +1011,7 @@ function toMyMember(
   }
 
   return {
+    id: member.membershipId,
     name: member.displayName,
     role: roleLabel(member.role),
     meta: new Date(member.joinedAt).toLocaleDateString('ko-KR'),
@@ -1030,6 +1031,7 @@ function toMyJoinRequest(
   },
 ): MyMember {
   return {
+    id: application.applicationId,
     name: application.applicant.displayName,
     role: '가입 요청',
     meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),

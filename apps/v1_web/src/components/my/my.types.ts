@@ -81,6 +81,8 @@ export type MyTeamDetailViewModel = {
 };
 
 export type MyMember = {
+  /** membershipId(멤버) 또는 applicationId(가입 요청) — React list key에 사용 */
+  id: string;
   name: string;
   role: string;
   meta: string;

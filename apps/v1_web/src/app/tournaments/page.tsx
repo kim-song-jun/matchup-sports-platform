@@ -8,6 +8,7 @@ import { TrophyIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
+import { formatTournamentDateShort, formatEntryFee } from '@/lib/date-utils';
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 /* ── Sport filter chip data ── (codes must match v1Sport.code in DB) */
@@ -66,21 +67,6 @@ function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
     default:
       return { badgeClass: 'tm-badge-grey', label: status };
   }
-}
-
-function formatTournamentDate(dateStr: string | null): string {
-  if (!dateStr) return '날짜 미정';
-  const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  const weekday = weekdays[d.getDay()];
-  return `${month}/${day} (${weekday})`;
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
 }
 
 /* ── Main content (client component for data fetching) ── */
@@ -163,7 +149,7 @@ function TournamentsListContent() {
           </span>
           <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featured.title}</div>
           <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
-            {featured.scheduledAt ? formatTournamentDate(featured.scheduledAt) : '날짜 미정'}
+            {featured.scheduledAt ? (formatTournamentDateShort(featured.scheduledAt) ?? '날짜 미정') : '날짜 미정'}
             {' · '}
             {featured.confirmedCount}/{featured.teamCount}팀 확정
             {featured.venue ? ` · ${featured.venue}` : ''}
@@ -463,7 +449,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           {/* Date + venue */}
           {item.scheduledAt ? (
             <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              {formatTournamentDate(item.scheduledAt)}
+              {formatTournamentDateShort(item.scheduledAt) ?? '날짜 미정'}
             </span>
           ) : null}
           {item.venue ? (

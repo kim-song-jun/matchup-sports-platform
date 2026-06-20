@@ -122,13 +122,13 @@ export const myTeamMembersModel: MyTeamMembersViewModel = {
     { label: '요청', value: 2, unit: '명' },
   ],
   members: [
-    { name: '김정민', role: '팀장', meta: '공격수 · 매너 4.9', status: '나' },
-    { name: '박서준', role: '운영진', meta: '미드필더 · 매너 4.8', status: '활동중' },
-    { name: '이하늘', role: '멤버', meta: '수비수 · 매너 4.7', status: '활동중' },
+    { id: 'ms-1', name: '김정민', role: '팀장', meta: '공격수 · 매너 4.9', status: '나' },
+    { id: 'ms-2', name: '박서준', role: '운영진', meta: '미드필더 · 매너 4.8', status: '활동중' },
+    { id: 'ms-3', name: '이하늘', role: '멤버', meta: '수비수 · 매너 4.7', status: '활동중' },
   ],
   requests: [
-    { name: '최민호', role: '가입 요청', meta: '축구 32회 · 매너 4.6', status: '검토' },
-    { name: '정유진', role: '가입 요청', meta: '풋살 18회 · 매너 4.9', status: '검토' },
+    { id: 'ap-1', name: '최민호', role: '가입 요청', meta: '축구 32회 · 매너 4.6', status: '검토' },
+    { id: 'ap-2', name: '정유진', role: '가입 요청', meta: '풋살 18회 · 매너 4.9', status: '검토' },
   ],
 };
 

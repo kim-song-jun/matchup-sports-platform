@@ -321,7 +321,7 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
     <section>
       <div className="tm-my-section-label">{title}</div>
       <div className="tm-my-list-stack">
-        {members.map((member) => <MyMemberCard key={member.name} member={member} />)}
+        {members.map((member) => <MyMemberCard key={member.id} member={member} />)}
       </div>
     </section>
   );

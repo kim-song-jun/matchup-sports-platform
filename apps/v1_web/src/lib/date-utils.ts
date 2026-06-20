@@ -1,12 +1,15 @@
 /**
- * 공유 날짜 포맷터 — v1_web 전역 단일 소스.
+ * 공유 날짜/금액 포맷터 — v1_web 전역 단일 소스.
  *
- * 로컬 포맷터 금지 규칙에 따라, 날짜 문자열을 다루는 모든 컴포넌트는
+ * 로컬 포맷터 금지 규칙에 따라, 날짜 문자열·금액을 다루는 모든 컴포넌트는
  * 이 파일의 함수를 import하여 사용해야 해요. 로컬에 동일 포맷터 정의 금지.
  *
  * 대회(Tournament) 날짜 표기 기준:
  *   - compact 슬롯 (홈 티저 · 목록 카드): formatTournamentDateShort  → 'M/D (요일)'
  *   - 상세 슬롯 (대회 상세 페이지):        formatTournamentDateLong   → 'YYYY년 M월 D일 (요일)'
+ *
+ * 금액 포맷터:
+ *   - formatEntryFee(fee)   → 0이면 '무료', 그 외 'N원' (ko-KR 천 단위 구분)
  */
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
@@ -33,4 +36,13 @@ export function formatTournamentDateLong(dateStr: string | null | undefined): st
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '날짜 미정';
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
+}
+
+/**
+ * 참가비 포맷터: 0이면 '무료', 그 외 ko-KR 천 단위 구분 + '원'.
+ * 예) 0 → '무료', 30000 → '30,000원'
+ */
+export function formatEntryFee(fee: number): string {
+  if (fee === 0) return '무료';
+  return `${fee.toLocaleString('ko-KR')}원`;
 }

@@ -8,6 +8,7 @@ import { useV1Tournament, useV1MyRegistration } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { formatTournamentDateShort, formatTournamentDateLong, formatEntryFee } from '@/lib/date-utils';
 import type {
   V1TournamentDetail,
   V1TournamentFormat,
@@ -48,32 +49,6 @@ function getFormatLabel(format: V1TournamentFormat): string {
     case 'knockout': return '토너먼트';
     case 'group_knockout': return '조별리그 후 토너먼트';
   }
-}
-
-function formatTournamentDate(dateStr: string | null): string {
-  if (!dateStr) return '날짜 미정';
-  const d = new Date(dateStr);
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  const weekday = weekdays[d.getDay()];
-  return `${year}년 ${month}월 ${day}일 (${weekday})`;
-}
-
-function formatShortDate(dateStr: string | null): string {
-  if (!dateStr) return '미정';
-  const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  const weekday = weekdays[d.getDay()];
-  return `${month}/${day} (${weekday})`;
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
 }
 
 function formatPrize(amount: number): string {
@@ -380,12 +355,12 @@ function TournamentDetailView({
           </div>
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
-            <InfoRow label="일정" value={formatShortDate(tournament.scheduledAt)} />
+            <InfoRow label="일정" value={formatTournamentDateShort(tournament.scheduledAt) ?? '미정'} />
             <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
           {/* 항상 표시 */}
           {tournament.registrationDeadlineAt ? (
-            <InfoRow label="신청 마감" value={formatTournamentDate(tournament.registrationDeadlineAt)} />
+            <InfoRow label="신청 마감" value={formatTournamentDateLong(tournament.registrationDeadlineAt)} />
           ) : null}
           {tournament.venue ? (
             <InfoRow label="장소" value={tournament.venue} />
@@ -492,7 +467,7 @@ function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {formatShortDate(tournament.scheduledAt)}
+            {formatTournamentDateShort(tournament.scheduledAt) ?? '미정'}
           </span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -900,8 +875,9 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const hasResult = fixture.result !== null;
   const homeScore = hasResult ? fixture.result!.homeScore : null;
   const awayScore = hasResult ? fixture.result!.awayScore : null;
+  // 라운드 라벨: tournament-bracket.tsx ROUND_LABELS 맵과 동일하게 '4강' 사용
   const roundLabel = fixture.round
-    ? fixture.round.replace('group', '조별').replace('semi', '준결승').replace('final', '결승').replace('third_place', '3·4위')
+    ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
     : `${fixture.fixtureNumber}경기`;
 
   return (
@@ -921,7 +897,7 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           </span>
           {fixture.scheduledAt ? (
             <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>
-              {formatShortDate(fixture.scheduledAt)}
+              {formatTournamentDateShort(fixture.scheduledAt) ?? ''}
             </span>
           ) : null}
         </div>

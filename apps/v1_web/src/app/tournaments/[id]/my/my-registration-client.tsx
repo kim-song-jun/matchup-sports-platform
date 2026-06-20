@@ -14,6 +14,7 @@ import {
   useV1Team,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatEntryFee } from '@/lib/date-utils';
 import type {
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
@@ -59,11 +60,6 @@ function paymentStatusLabel(status: string): string {
     case 'refunded': return '환불';
     default: return '알 수 없음';
   }
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
 }
 
 /** Returns the badge class + label for the roster shortage badge.

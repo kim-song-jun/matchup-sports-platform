@@ -38,5 +38,7 @@ matches 17(최다) · community 15 · auth-onboarding 13 · team-matches 12 · t
 - ✅ **데드코드 MatchParticipantsPageView + 'participants' state 제거**(서브에이전트, D3): match-1 하드코딩 2건 동반 제거. `d3a26ff8`.
 - ✅ **window.confirm/alert → ConfirmModal**(서브에이전트): 신규 v1-ui/confirm-modal(useConfirm 훅, role=dialog/ESC/focus-trap/danger tone) → 5곳(applications·my·teams·admin) 교체, dead 가드 제거. `077fe24b`. (모달 라이브 시각검증은 트리거 화면 도달 시.)
 - ✅ **Rank2 필터시트 a11y**(서브에이전트, in-place): matches/teams/team-matches 3시트 role=dialog/aria-modal/ESC(focus-trap 보수적 생략). `92dd3387`, 라이브 검증. **→ 종합 감사 top-6(Rank1~6) 전체 처리 완료.**
-- ⏭ 다음(클러스터 medium·기타): 필터시트 3중 중복 공유추출(배포 후) · mock view-model match-1 broken href(fallback-only) · tournaments '4강'vs'준결승' 라벨 일관 · date-utils 로컬 포맷터 중복 · WS6-b(tournaments 색) · WS7(API noti wire-up, Prisma migration 동반) · WS10(admin 토큰 265) · deploy.yml v1 split.
+- ✅ **클러스터 medium**(서브에이전트, D3+라이브): tournaments 라운드 라벨 '준결승'→'4강' 통일 + formatEntryFee/formatTournamentDate 4중 dedup→date-utils(happy-path byte-identical 검증) + my 멤버 key 안정화(membershipId/applicationId, 픽스처 동반). `003caa95`, 라이브 날짜/금액 정상.
+- ⏭ 다음(저위험): WS6-b(tournaments.css 하드코딩 white-overlay 색→토큰) · mock view-model match-1 broken href(fallback-only).
+- ⏸ 고위험/배포후 권고: 필터시트 3중 공유추출 · WS7(API noti wire-up, Prisma migration 동반) · WS10(admin 토큰 265) · deploy.yml v1 split.
 - 🔴 **OPEN DECISION(사용자)**: landing 11종목 광고 vs 실제 seed 4종목 — seed 추가 vs 카피 조정(v1-persona-flows.md 참조).

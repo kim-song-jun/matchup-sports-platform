@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -183,6 +183,7 @@ interface SimpleModalProps {
 }
 
 function SimpleModal({ open, title, onClose, pending = false, children }: SimpleModalProps) {
+  const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
 
@@ -245,11 +246,11 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="simple-modal-title"
+        aria-labelledby={titleId}
         className="bg-white rounded-2xl shadow-[var(--shadow-2)] w-full max-w-[480px] overflow-hidden"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 id="simple-modal-title" className="text-sm font-bold text-gray-900">
+          <h2 id={titleId} className="text-sm font-bold text-gray-900">
             {title}
           </h2>
           <button

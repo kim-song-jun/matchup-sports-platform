@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -33,7 +34,7 @@ export function AdminFilterBar({
   onStatusChange,
   rightSlot,
 }: AdminFilterBarProps) {
-  const inputId = 'admin-filter-search';
+  const inputId = useId();
 
   return (
     <div className="flex flex-col gap-2.5">

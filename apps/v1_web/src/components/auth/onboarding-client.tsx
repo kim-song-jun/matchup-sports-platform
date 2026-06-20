@@ -268,6 +268,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                 key={sport.id}
                 onClick={() => setDraft((current) => toggleSport(current, sport.id))}
                 type="button"
+                aria-pressed={selectedSportIds.has(sport.id)}
               >
                 <div className="tm-text-body-lg">{sport.name}</div>
                 <div className="tm-text-caption">{selectedSportIds.has(sport.id) ? '선택됨' : '탭해서 선택'}</div>

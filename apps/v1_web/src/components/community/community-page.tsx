@@ -24,7 +24,7 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
       {/* Desktop column wrapper — display:contents on mobile, block column on desktop */}
       <div className="tm-chat-desktop-wrap">
         <div className="tm-chat-list">
-          <div className="tm-sport-chip-row">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect}>{category.label} {category.count}</button>)}</div>
+          <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
           {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오고 있어요" body="잠시만 기다려 주세요." /> : null}
           {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
           {hasRooms ? (
@@ -85,7 +85,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
           {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>전송하지 못했어요. 다시 시도해 주세요.</div> : null}
-        <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 추가" disabled={model.status === 'error'}><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
+        <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 추가" disabled={model.status === 'error'}><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" aria-label="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" aria-busy={model.sending} disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
       </div>
     </AppChrome>
   );

@@ -90,7 +90,7 @@ export function TermsClient() {
             <div className="tm-text-caption">{error}</div>
           </div>
         ) : null}
-        <button className="tm-card tm-auth-agree-all tm-auth-agree-button tm-pressable" onClick={() => setRequired(!requiredChecked)} type="button">
+        <button className="tm-card tm-auth-agree-all tm-auth-agree-button tm-pressable" onClick={() => setRequired(!requiredChecked)} type="button" aria-pressed={requiredChecked}>
           <TermsCheck checked={requiredChecked} />
           <span className="tm-text-body-lg">필수 약관 전체 동의</span>
         </button>

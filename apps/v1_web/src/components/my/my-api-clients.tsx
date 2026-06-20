@@ -836,7 +836,7 @@ export function NotificationSettingsPageClient() {
           {items.map((setting) => {
             const enabled = Boolean(notifications?.[setting.key]);
             return (
-              <button key={setting.key} className="tm-card tm-my-toggle-button tm-pressable" onClick={() => toggle(setting.key)} type="button" disabled={!notifications || update.isPending}>
+              <button key={setting.key} className="tm-card tm-my-toggle-button tm-pressable" onClick={() => toggle(setting.key)} type="button" disabled={!notifications || update.isPending} role="switch" aria-checked={enabled} aria-label={setting.label}>
                 <div className="tm-my-toggle-row">
                   <div>
                     <div className="tm-text-body-lg">{setting.label}</div>

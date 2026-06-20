@@ -585,11 +585,11 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
         const content = <>{sport.label} <span className="tab-num">{sport.count}</span></>;
 
         return sport.href ? (
-          <Link key={sport.label} className={className} href={sport.href}>
+          <Link key={sport.label} className={className} href={sport.href} aria-current={sport.active ? 'page' : undefined}>
             {content}
           </Link>
         ) : (
-          <button key={sport.label} className={className} type="button">
+          <button key={sport.label} className={className} type="button" aria-pressed={sport.active}>
             {content}
           </button>
         );
@@ -730,11 +730,11 @@ function CapacityField({ value, onChange }: { value: number; onChange?: (value: 
     <div className="tm-create-field">
       <div className="tm-text-label">최대 인원</div>
       <div className="tm-create-stepper">
-        <button className="tm-create-stepper-button" type="button" onClick={() => onChange?.(Math.max(2, normalized - 1))}>-</button>
-        <select className="tm-create-input tm-create-select-control" value={normalized} onChange={(event) => onChange?.(Number(event.target.value))}>
+        <button className="tm-create-stepper-button" type="button" aria-label="인원 줄이기" onClick={() => onChange?.(Math.max(2, normalized - 1))}>-</button>
+        <select className="tm-create-input tm-create-select-control" value={normalized} aria-label="최대 인원 선택" onChange={(event) => onChange?.(Number(event.target.value))}>
           {options.map((item) => <option key={item} value={item}>{item}명</option>)}
         </select>
-        <button className="tm-create-stepper-button" type="button" onClick={() => onChange?.(Math.min(30, normalized + 1))}>+</button>
+        <button className="tm-create-stepper-button" type="button" aria-label="인원 늘리기" onClick={() => onChange?.(Math.min(30, normalized + 1))}>+</button>
       </div>
     </div>
   );

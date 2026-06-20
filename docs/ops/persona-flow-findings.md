@@ -10,7 +10,7 @@
 
 ## ⏭ 비차단 findings (22건) — batch 집행
 
-### Batch A — my 영역 (my-api-clients/my-page/reviews-page)
+### ✅ Batch A — my 영역 (완료 `ba25a146`, 라이브 검증 + dead code 정리)
 - **#3 [high] my 팀 isError silent mock** (P05/06/07) `my-api-clients.tsx:77-87,89-96` — query.data 부재 시 가짜 3팀 노출. → isError→ErrorState, isLoading→스켈레톤, mock 폴백 제거.
 - **#4 [high] 회원 탈퇴 no confirm** (P14) `my-api-clients.tsx:895-902` — 비가역 탈퇴가 즉시 mutate. → ConfirmModal(tone danger).
 - **#10 [medium] my/teams/[id] 운영메뉴 role 가드 없음** (P06/07) `my-api-clients.tsx:100-104` — member에게 팀설정 노출→403. → viewer.role 기반 노출.

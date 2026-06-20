@@ -133,7 +133,17 @@
 | 1 CSS 토큰 | ✅ 완료 | `423c9249` | grep 전수증명(undefined-w/o-fallback 0) + tsc green + 값 적대검토 |
 | 2 데드코드 Web | ✅ 완료 | `4999c33e` | **refute-panel(5 sonnet+opus judge)** 적대 검증 → 26개/9,294줄 삭제. grep 참조 0 + tsc clean(.next 캐시 제거 후) |
 | 3 데드 API(verification) | ❌ **거부** | — | refute가 **ALIVE 판정**: app.module.ts DI 등록 + spec 존재. discovery "dead" 오판 → 삭제 시 API 부팅 파손. **적대 검증이 사고 방지** |
-| 4 카피 | 🔄 진행 | `8ee6e7cf`(4-a) | 4-a: high-severity(영문 enum 5 + placeholder + admin 역할 + global-error) 완료. 4-b: 합니다체 ~32건 진행 중 |
+| 4 카피(프론트) | ✅ 완료 | `8ee6e7cf`·`9d4f552c` | 4-a: high-severity(영문 enum 5 + placeholder + admin 역할 + global-error). 4-b: 합니다체 31건 해요체(서브에이전트, grep 잔여 0 + tsc). |
+| 4-c 카피(API 응답) | 🆕 후속 | — | v1_api가 사용자 노출 메시지를 합니다체로 반환(예: `'신청할 수 있습니다.'`). v1_api/src 응답 문자열 해요체 정비 필요(WS7과 함께) |
+| 5 a11y(터치타깃·focus ring) | 다음 | — | globals.css: .v1-icon-button 40→44, .tm-list-search-* 30→44, v1-shell 클래스 focus-visible ring 추가 |
+| 6 하드코딩 색/dark: | 대기 | — | rgba/hex 토큰화, dark: 제거(light-only) |
+| 7 API 기술부채 + 알림 wire-up | 대기 | — | as any·silent catch·Record<unknown> + chat/notice pref full wire-up(결정#4) + 4-c |
+| 8 API 유닛테스트 | 대기 | — | auth/matches/teams/team-matches/chat/notifications service.spec |
+| 9 프론트 유닛테스트 | 대기 | — | login/email·matches/new·tournaments/apply page.test + fake test 2건 교체 |
+| 10 Admin 토큰 정합 | 대기 | — | 265 raw Tailwind → 토큰 |
+| 11 페르소나 비주얼 감사 | 대기 | — | WS1~6 적용 후, preview 브라우저 3티어 ~112샷 |
+| 12 v1 e2e(Playwright 풀+Supertest) | 대기 | — | 결정#4 — 풀 하네스 |
+| deploy.yml 분리 | 대기 | — | 결정#1 — v1 전용 job |
 
 **적대 검증(D1) 성과 기록**: WS3에서 discovery의 dead 판단이 틀렸음을 refute-panel이 잡아냄(verification 모듈은 DI 등록된 live 모듈). "findings 맹신 금지(D3)"가 실제 파손을 막은 사례. WS1에서도 `--signup-steps` false-positive·`--red-alpha-08` 값 오류를 grep 재검증이 정정.
 

@@ -913,15 +913,15 @@ function getEligibilityReason(
 
 function getEligibilityReasonMessage(reasonCode: string) {
   const messages: Record<string, string> = {
-    OK: '신청할 수 있습니다.',
-    HOST_TEAM_CANNOT_APPLY: '호스트 팀은 자기 팀매치에 신청할 수 없습니다.',
-    ALREADY_REQUESTED: '이미 신청했고 승인 대기 중입니다.',
-    ALREADY_APPROVED: '이미 승인된 신청입니다.',
-    MATCHED_ALREADY: '이미 매칭이 완료되었습니다.',
-    NOT_RECRUITING: '모집 중인 팀매치가 아닙니다.',
+    OK: '신청할 수 있어요.',
+    HOST_TEAM_CANNOT_APPLY: '호스트 팀은 자기 팀매치에 신청할 수 없어요.',
+    ALREADY_REQUESTED: '이미 신청해서 승인을 기다리고 있어요.',
+    ALREADY_APPROVED: '이미 승인된 신청이에요.',
+    MATCHED_ALREADY: '이미 매칭이 완료됐어요.',
+    NOT_RECRUITING: '지금은 모집 중인 팀매치가 아니에요.',
   };
 
-  return messages[reasonCode] ?? '신청할 수 없습니다.';
+  return messages[reasonCode] ?? '신청할 수 없어요.';
 }
 
 function validationError(message: string, field: string) {

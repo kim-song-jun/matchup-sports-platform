@@ -1429,15 +1429,15 @@ function getJoinReason(
 
 function getJoinReasonMessage(reasonCode: string) {
   const messages: Record<string, string> = {
-    OK: '가입 신청할 수 있습니다.',
-    ALREADY_MEMBER: '이미 팀 멤버입니다.',
-    ALREADY_REQUESTED: '이미 가입 신청했고 승인 대기 중입니다.',
-    JOIN_CLOSED: '가입 신청이 마감된 팀입니다.',
-    TEAM_NOT_ACTIVE: '현재 가입할 수 없는 팀입니다.',
-    BLOCKED_USER: '신청할 수 없는 계정 상태입니다.',
+    OK: '가입 신청할 수 있어요.',
+    ALREADY_MEMBER: '이미 팀 멤버예요.',
+    ALREADY_REQUESTED: '이미 가입 신청해서 승인을 기다리고 있어요.',
+    JOIN_CLOSED: '가입 신청이 마감된 팀이에요.',
+    TEAM_NOT_ACTIVE: '지금은 가입할 수 없는 팀이에요.',
+    BLOCKED_USER: '신청할 수 없는 계정 상태예요.',
   };
 
-  return messages[reasonCode] ?? '가입 신청할 수 없습니다.';
+  return messages[reasonCode] ?? '가입 신청할 수 없어요.';
 }
 
 function validationError(message: string, field: string) {

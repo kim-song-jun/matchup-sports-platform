@@ -36,5 +36,6 @@ matches 17(최다) · community 15 · auth-onboarding 13 · team-matches 12 · t
 - ✅ **WS6-a consumer 색 토큰화**(서브에이전트): tint/scrim/overlay/brand 토큰(동일값) → matches/applications/my/auth. `d83285de`, 시각 변화 0.
 - ✅ **Rank3 dead-end CTA**(서브에이전트, D3): match-1 하드코딩 3곳 동적화 + no-op 공유버튼 2곳(navigator.share) + disabled CTA 2곳(참가관리·비밀번호찾기 Link). `26bc6849`. **Rank3 완료 → top-6 중 5개(Rank1/3/4/5/6) 완료, Rank2만 잔여.**
 - ✅ **데드코드 MatchParticipantsPageView + 'participants' state 제거**(서브에이전트, D3): match-1 하드코딩 2건 동반 제거. `d3a26ff8`.
-- ⏭ 다음: Rank2 필터시트(고위험 refactor — 배포 임박이라 a11y만 in-place 검토) → window.confirm 5곳→modal → 클러스터 medium → mock view-model match-1 broken href(fallback-only) → WS6-b → WS7 API·WS10 admin 토큰·deploy.yml.
+- ✅ **window.confirm/alert → ConfirmModal**(서브에이전트): 신규 v1-ui/confirm-modal(useConfirm 훅, role=dialog/ESC/focus-trap/danger tone) → 5곳(applications·my·teams·admin) 교체, dead 가드 제거. `077fe24b`. (모달 라이브 시각검증은 트리거 화면 도달 시.)
+- ⏭ 다음: Rank2 필터시트(고위험 refactor — 배포 임박이라 a11y만 in-place 검토) → 클러스터 medium → mock view-model match-1 broken href(fallback-only) → WS6-b → WS7 API·WS10 admin 토큰·deploy.yml.
 - 🔴 **OPEN DECISION(사용자)**: landing 11종목 광고 vs 실제 seed 4종목 — seed 추가 vs 카피 조정(v1-persona-flows.md 참조).

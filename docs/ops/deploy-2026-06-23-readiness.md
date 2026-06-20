@@ -150,7 +150,7 @@
 | 11 페르소나 비주얼 감사 | 🔄 진행 | — | **파이프라인 확립**: v1 스택(pg:5432+api:8121 가동중, web:3013 preview_start) + dev-auth(icon.tester). 감사 완료: /landing(이슈0, 'N'은 Next devtools false-alarm)·/home(이슈: 매너 "− 점" 빈상태 카피 어색). 다음 배치에서 login/signup/matches/teams/tournaments/my 등 계속(컨텍스트당 ~5-8샷) |
 | 12 v1 e2e(Playwright) | ✅ 1차 완료 | `bd0a2c4a` | **서브에이전트 구축 + 직접 8/8 green 검증**. v1 전용(:3013) playwright.config + dev-auth fixture + landing(3)/home(2)/matches(3) 진짜 플로우 스펙. CI 통합은 deploy.yml 분리 시. 추가 플로우(signup/team/tournament apply)는 확장 여지 |
 | 4-d 카피 재스윕 | ✅ 완료 | `b7b37bd5`·`7f9764cc` | 라이브 감사가 WS4-b의 '입니다/됩니다/합니다' 체계적 누락 포착 → 3건 즉시 + 22건 서브에이전트 재스윕. **live UI 합니다체 잔여 0(grep 검증)** + tsc + 43 tests green. 카피 정리 완결 |
-| WS11 추가 감사 | 🔄 진행 | `e0c57c60`·`b7b37bd5` | /matches·/tournaments·/teams 감사(대체로 양호). 발견·수정: home "− 점", teams 생성 fallback·StateCard 합니다체 3건. 발견·기록: 매치카드 "신청 마감" 중복 |
+| WS11 추가 감사 | 🔄 진행 | `e0c57c60`·`b7b37bd5` | 감사 화면: /landing /home(수정) /matches /tournaments /teams /my — **6화면 대체로 토스급 양호**. 수정: home "− 점", 카피 25건(4-d). 발견·기록(디자인 판단 필요): ① 매치카드 "신청 마감" 상태 중복 노출 ② /my 리스트 아이콘 영문 레터배지(M/C/T/R) vs home SVG — 일관성. 미감사: matches[id]상세·signup·onboarding·chat·team-matches·admin·wizard들 — 다음 배치 |
 | deploy.yml 분리 | 대기 | — | 결정#1 — v1 전용 job |
 
 **적대 검증(D1) 성과 기록**: WS3에서 discovery의 dead 판단이 틀렸음을 refute-panel이 잡아냄(verification 모듈은 DI 등록된 live 모듈). "findings 맹신 금지(D3)"가 실제 파손을 막은 사례. WS1에서도 `--signup-steps` false-positive·`--red-alpha-08` 값 오류를 grep 재검증이 정정.

@@ -335,7 +335,7 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     statusLabel: team.joinPolicy === 'closed' ? '마감' : '모집 중',
     tags: [team.levelLabel ?? team.skillLevelText ?? fallback.tags[0] ?? '전체 레벨', fallback.tags[1] ?? '주 1회', team.genderRule ?? fallback.genderRule],
     genderRule: team.genderRule ?? fallback.genderRule,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀입니다. 가입은 운영진이 검토한 후 확정돼요.`,
+    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요. 가입은 운영진이 검토한 후 확정돼요.`,
   };
 }
 

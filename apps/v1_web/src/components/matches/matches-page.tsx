@@ -376,7 +376,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
       <div className="tm-create-shell tm-match-create-shell">
         <CreateProgress step={stepNo} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
-        {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치입니다" body={model.form.lockedReason} /> : null}
+        {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치예요" body={model.form.lockedReason} /> : null}
         {model.step === 'sport' ? <SportStep model={model} /> : null}
         {model.step === 'info' || model.step === 'edit' ? <InfoStep model={model} edit={edit} /> : null}
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}

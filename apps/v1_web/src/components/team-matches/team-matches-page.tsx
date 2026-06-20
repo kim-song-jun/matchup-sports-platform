@@ -346,7 +346,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
       <div className="tm-create-shell">
         <CreateProgress step={step} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
-        {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 팀매치입니다" body={model.form.lockedReason} /> : null}
+        {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 팀매치예요" body={model.form.lockedReason} /> : null}
         {model.step === 'team' ? <TeamStep model={model} /> : null}
         {model.step === 'sport' ? <SportStep model={model} /> : null}
         {model.step === 'info' || edit ? <InfoStep model={model} edit={edit} /> : null}

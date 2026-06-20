@@ -143,7 +143,9 @@
 
 ### 🔎 발견된 후속 (감사 중)
 - **리뷰 태그 UI 누락**: v1_api `REVIEW_TAGS`는 8개(punctual/manner/teamwork/communication/active/considerate/passionate/play_again)인데 UI(`REVIEW_TAG_OPTIONS`)는 6개만 노출 — `active`·`passionate` 제외. 의도적 큐레이션인지 누락인지 **사용자 확인 필요**(제품 결정).
-- **WS11 /home**: 매너 점수 빈상태 "− 점" 카피 어색 → 수정 대기.
+- **WS11 /home**: 매너 점수 빈상태 "− 점" → "−" 수정 완료(`e0c57c60`, 라이브 검증).
+- **WS11 /matches**: 매치 카드에서 "신청 마감" 상태가 태그行 + 우하단 2곳 중복 노출 — 공유 카드 컴포넌트라 디자인 판단 후 단일화 검토(즉시 수정 보류).
+- WS11 감사 완료 화면: /landing✓ /home✓(수정) /matches✓. 미감사: login/signup/onboarding/matches[id]/teams/tournaments/my/chat/admin 등 — 다음 배치.
 | 10 Admin 토큰 정합 | 대기 | — | 265 raw Tailwind → 토큰 |
 | 11 페르소나 비주얼 감사 | 🔄 진행 | — | **파이프라인 확립**: v1 스택(pg:5432+api:8121 가동중, web:3013 preview_start) + dev-auth(icon.tester). 감사 완료: /landing(이슈0, 'N'은 Next devtools false-alarm)·/home(이슈: 매너 "− 점" 빈상태 카피 어색). 다음 배치에서 login/signup/matches/teams/tournaments/my 등 계속(컨텍스트당 ~5-8샷) |
 | 12 v1 e2e(Playwright 풀+Supertest) | 대기 | — | 결정#4 — 풀 하네스 |

@@ -707,6 +707,8 @@ button:disabled {
 .tm-auth-check-button {
   display: grid;
   place-items: center;
+  min-width: 44px; /* WS11 a11y 터치 타깃 */
+  min-height: 44px;
 }
 
 .tm-auth-agreement-main {
@@ -718,8 +720,8 @@ button:disabled {
 }
 
 .tm-auth-agreement-arrow {
-  width: 28px;
-  height: 28px;
+  width: 44px; /* WS11 a11y 터치 타깃 (28→44) */
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 999px;
@@ -1003,7 +1005,7 @@ button:disabled {
 }
 
 .tm-btn-sm {
-  min-height: 40px;
+  min-height: 44px; /* WS11 a11y 터치 타깃 (40→44) */
   padding: 0 14px;
   font-size: 13px;
 }
@@ -1153,7 +1155,7 @@ button:disabled {
 }
 
 .tm-chip {
-  min-height: 34px;
+  min-height: 44px; /* WS11 a11y 터치 타깃 (34→44) — 라이브 검증으로 토스 균형 확인 */
   border: 1px solid var(--grey200);
   border-radius: 999px;
   background: var(--bg);
@@ -2205,9 +2207,9 @@ button:disabled {
 }
 
 .tm-list-filter-button {
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
+  width: 44px; /* WS11 a11y 터치 타깃 (40→44) */
+  min-width: 44px;
+  height: 44px;
   border-radius: 12px;
   display: grid;
   place-items: center;

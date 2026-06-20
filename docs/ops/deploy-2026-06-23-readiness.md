@@ -117,3 +117,22 @@
 5. **`PATCH /notification-preferences` 데드 엔드포인트** — wire / 제거 / as-is. **권고**: as-is + 주석. → 게이트: WS7 일부
 
 **비게이트(즉시 착수 가능, 명백·저위험)**: WS1(CSS 토큰), WS3(verification 모듈 — 단 grep 재확인), WS4(카피), WS5(a11y), WS6(색 정리), WS8·9(테스트 추가), WS10(admin 토큰). 각각 D1 적대 검증 후 커밋.
+
+### ✅ 결정 확정 (2026-06-21, 사용자 게이트 완료)
+1. **deploy.yml**: → **v1 전용 job 분리** (레거시 `needs: test` 결합 해제, flake 차단). deploy.yml 수정 workstream 추가.
+2. **noti pref 필드/엔드포인트**: → **전부 wire-up** (chatEnabled/noticeEnabled 매핑 + `PATCH /notification-preferences` 프론트 mutation hook + UI 연결). WS7 범위 확장 — Prisma 변경 시 migration 동반.
+3. **design-source/ + 프로토타입**: → **삭제**. WS2에 포함.
+4. **Playwright v1 e2e**: → **지금 풀 하네스 구축** (playwright config :3013, 헤더 dev-auth fixture, 페르소나 storageState, seed). WS12 범위 확장(Supertest + Playwright 둘 다).
+
+> **scope 확장 주의**: #2·#4가 권고보다 큰 범위(full wire-up, full Playwright). 6/23까지 시간 배분 시 WS1~6(blocker·데드코드·카피·a11y) 우선 → WS7~10(테스트·admin·wire-up) → WS11~12(비주얼·e2e) 순. Prisma migration·CI 변경은 배포 임박 리스크라 충분한 검증과 함께.
+
+## 8. 실행 진행 (Blitz Execution — workstream별 상태)
+
+| WS | 상태 | 커밋 | 검증(D1) |
+|----|------|------|----------|
+| 1 CSS 토큰 | ✅ 완료 | `423c9249` | grep 전수증명(undefined-w/o-fallback 0) + tsc green + 값 적대검토. 라이브 비주얼은 WS11 대진표 페이지에서 종합 확인 |
+| 2 데드코드 Web(삭제 승인) | 대기 | — | — |
+| 3 데드 API(verification) | 대기 | — | — |
+| 4 카피 31건 | 대기 | — | — |
+
+> **검증 proportionality**: WS1 같은 additive 토큰 정의는 grep 결정증명+tsc로 충분(결과가 deterministic). WS2(데드코드 삭제·import 파손 위험), WS8/9(테스트 진위), WS10(admin 토큰 시각 회귀) 등 위험 workstream은 **opus refute-panel(Workflow)** 으로 적대 검증.

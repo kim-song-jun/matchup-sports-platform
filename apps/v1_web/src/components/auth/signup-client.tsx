@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import {
@@ -363,6 +363,10 @@ export function SignupClient() {
           {step === 'sport' ? (
             sportsQuery.isLoading ? (
               <p className="tm-text-caption">종목을 불러오는 중이에요…</p>
+            ) : sportsQuery.isError ? (
+              // 종목 로드 실패 시 빈 그리드 대신 오류 안내 — 다음 CTA도 별도로 disable하지 않아도
+              // sports가 비어 있으면 선택 자체가 불가능하므로 건너뛰기를 유도함.
+              <ErrorState message="종목 목록을 불러오지 못했어요. 다시 시도해 주세요." onRetry={() => void sportsQuery.refetch()} />
             ) : (
               <div className="tm-auth-sport-grid">
                 {sports.map((sport) => (

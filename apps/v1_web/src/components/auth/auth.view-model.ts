@@ -1,12 +1,14 @@
 import type { AuthExceptionKind, AuthExceptionViewModel, EmailLoginViewModel, LoginViewModel, SignupCompleteViewModel, SignupFormViewModel, TermsViewModel } from './auth.types';
 
-export function getLoginViewModel(): LoginViewModel {
+export function getLoginViewModel(redirectPath?: string | null): LoginViewModel {
   const kakaoHref = buildKakaoAuthUrl();
+  // redirect 파라미터가 있으면 이메일 로그인 버튼도 해당 경로를 보존해야 세션 만료 후 복귀가 끊기지 않음.
+  const emailHref = redirectPath ? `/login/email?redirect=${encodeURIComponent(redirectPath)}` : '/login/email';
 
   return {
     heroTitle: '같이 뛸 사람을\n한 번에 찾아요',
     heroSub: 'Teameet에 오신 걸 환영해요',
-    emailHref: '/login/email',
+    emailHref,
     guestHref: '/home',
     signupHref: '/terms',
     providers: [

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import {
@@ -97,6 +97,14 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   useEffect(() => {
     if (hydrated) writeDraft(draft);
   }, [draft, hydrated]);
+
+  // 마스터 데이터 3쿼리 중 하나라도 실패하면 빈 draft 저장 위험이 있으므로 에러 상태 분리.
+  const masterError = onboarding.isError || sportsQuery.isError || regionsQuery.isError;
+  const retryMasterData = () => {
+    if (onboarding.isError) void onboarding.refetch();
+    if (sportsQuery.isError) void sportsQuery.refetch();
+    if (regionsQuery.isError) void regionsQuery.refetch();
+  };
 
   const sports = sportsQuery.data ?? [];
   const regions = toDistrictRegionOptions(regionsQuery.data ?? []);
@@ -219,6 +227,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
       complete={complete}
       defer={defer}
       disabled={
+        masterError ||
         pending ||
         (step === 'sport' && draft.sports.length === 0) ||
         (step === 'level' && (draft.sports.length === 0 || missingLevels))
@@ -258,6 +267,8 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
         {skipAction ? <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={skipAction} type="button">나중에 설정하기</button> : null}
         {onboarding.isLoading || sportsQuery.isLoading || regionsQuery.isLoading ? <Notice title="불러오는 중" body="저장된 정보를 불러오고 있어요." /> : null}
+        {/* 마스터 데이터 실패 시 빈 draft로 저장 방지 — 재시도 유도 후 저장 CTA도 disable됨 */}
+        {masterError ? <ErrorState message="운동 설정 정보를 불러오지 못했어요. 다시 시도해 주세요." onRetry={retryMasterData} /> : null}
         {error ? <Notice title="저장하지 못했어요" body={error} tone="orange" /> : null}
         {step === 'resume' ? <ResumePanel onboardingStep={onboarding.data?.currentStep} draft={draft} /> : null}
         {step === 'sport' ? (

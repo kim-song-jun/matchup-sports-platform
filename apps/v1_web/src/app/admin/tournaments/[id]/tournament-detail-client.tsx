@@ -62,6 +62,7 @@ import {
   useAdminToast,
 } from '@/components/admin';
 import type { AdminTableColumn } from '@/components/admin';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -702,6 +703,7 @@ function BracketTab({
   // auto-generate state
   const [autoGenGroupId, setAutoGenGroupId] = useState('');
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const { confirm: confirmModal, ConfirmModal } = useConfirm();
 
   // ── Record result state ─────────────────────────────────────────────
   const [resultFixture, setResultFixture] = useState<V1AdminBracketFixture | null>(null);
@@ -792,9 +794,11 @@ function BracketTab({
     // Check for existing fixtures in this group
     const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
     if (existingInGroup.length > 0) {
-      const ok = window.confirm(
-        `"${group.name}"에 이미 경기 일정 ${existingInGroup.length}개가 있어요. 추가로 만들까요?`,
-      );
+      const ok = await confirmModal({
+        title: '경기 일정 추가',
+        message: `"${group.name}"에 이미 경기 일정 ${existingInGroup.length}개가 있어요. 추가로 만들까요?`,
+        confirmLabel: '추가 생성',
+      });
       if (!ok) return;
     }
 
@@ -953,6 +957,9 @@ function BracketTab({
   const hasData = groups.length > 0 || fixtures.length > 0;
 
   return (
+    <>
+      {/* 확인 모달 — window.confirm 대체 */}
+      {ConfirmModal}
     <div className={[
       'flex flex-col gap-6',
       hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_1fr] lg:items-start lg:gap-6' : '',
@@ -1593,6 +1600,7 @@ function BracketTab({
         </form>
       </SimpleModal>
     </div>
+    </>
   );
 }
 

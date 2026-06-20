@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1ApproveTeamJoinApplication,
@@ -119,6 +120,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const removeMember = useV1RemoveTeamMembership(teamId);
   const approveApplication = useV1ApproveTeamJoinApplication(teamId);
   const rejectApplication = useV1RejectTeamJoinApplication(teamId);
+  const { confirm, ConfirmModal } = useConfirm();
   const items = members.data?.items ?? [];
   const requests = applications.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
@@ -142,22 +144,28 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
         actionPending,
         canManageMembers,
         canDelegateOwner,
-        promote: () => confirmAction(`${member.displayName}님을 운영진으로 지정할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
-        delegateOwner: () => confirmAction(`${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
-        demote: () => confirmAction(`${member.displayName}님을 멤버로 강등할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
-        remove: () => confirmAction(`${member.displayName}님을 팀에서 내보낼까요?`, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' })),
+        promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
+        delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
+        demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
+        remove: () => confirmAction(confirm, { title: '멤버 내보내기', message: `${member.displayName}님을 팀에서 내보낼까요?`, tone: 'danger' }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' })),
       }),
     ),
     requests: requests.map((application) =>
       toMyJoinRequest(application, {
         actionPending,
-        approve: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 승인할까요?`, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
-        reject: () => confirmAction(`${application.applicant.displayName}님의 가입 요청을 거절할까요?`, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
+        approve: () => confirmAction(confirm, { title: '가입 요청 승인', message: `${application.applicant.displayName}님의 가입 요청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
+        reject: () => confirmAction(confirm, { title: '가입 요청 거절', message: `${application.applicant.displayName}님의 가입 요청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
       }),
     ),
   };
 
-  return <MyTeamMembersPageView model={model} backHref={`/my/teams/${teamId}`} />;
+  return (
+    <>
+      {/* 확인 모달 — window.confirm 대체 */}
+      {ConfirmModal}
+      <MyTeamMembersPageView model={model} backHref={`/my/teams/${teamId}`} />
+    </>
+  );
 }
 
 export function ProfileEditPageClient() {
@@ -1034,9 +1042,18 @@ function toMyJoinRequest(
   };
 }
 
-function confirmAction(message: string, action: () => void) {
-  if (typeof window !== 'undefined' && !window.confirm(message)) return;
-  action();
+/**
+ * confirmAction — useConfirm()의 confirm 함수를 받아 모달 확인 후 action을 실행한다.
+ * window.confirm 대체 헬퍼.
+ */
+function confirmAction(
+  confirm: (opts: import('@/components/v1-ui/confirm-modal').ConfirmOptions) => Promise<boolean>,
+  opts: import('@/components/v1-ui/confirm-modal').ConfirmOptions,
+  action: () => void,
+): void {
+  confirm(opts).then((ok) => {
+    if (ok) action();
+  });
 }
 
 function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatches'][number] {

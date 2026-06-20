@@ -11,7 +11,8 @@ import {
   useV1RejectMatchApplication,
 } from '@/hooks/use-v1-api';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState } from '@/components/v1-ui/primitives';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { extractErrorMessage } from '@/lib/error-message';
 import { cssUrl } from '@/lib/assets';
@@ -33,6 +34,8 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   );
   const approveApplication = useV1ApproveMatchApplication(matchId);
   const rejectApplication = useV1RejectMatchApplication(matchId);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { confirm, ConfirmModal } = useConfirm();
 
   // Non-host redirect: once viewer state is resolved, push to detail
   useEffect(() => {
@@ -72,35 +75,38 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const actionPending = approveApplication.isPending || rejectApplication.isPending;
   const eligibilityData = eligibility.data;
 
-  function handleApprove(application: V1MatchApplication) {
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm(`${application.displayName}님의 신청을 승인할까요?`)
-    ) {
-      return;
-    }
+  async function handleApprove(application: V1MatchApplication) {
+    const ok = await confirm({
+      title: '신청 승인',
+      message: `${application.displayName}님의 신청을 승인할까요?`,
+      confirmLabel: '승인',
+    });
+    if (!ok) return;
+    setActionError(null);
     approveApplication.mutate(
       { applicationId: application.applicationId, note: null },
       {
         onError: (err) => {
-          window.alert(extractErrorMessage(err, '승인하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+          setActionError(extractErrorMessage(err, '승인하지 못했어요. 잠시 후 다시 시도해 주세요.'));
         },
       },
     );
   }
 
-  function handleReject(application: V1MatchApplication) {
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm(`${application.displayName}님의 신청을 거절할까요?`)
-    ) {
-      return;
-    }
+  async function handleReject(application: V1MatchApplication) {
+    const ok = await confirm({
+      title: '신청 거절',
+      message: `${application.displayName}님의 신청을 거절할까요?`,
+      confirmLabel: '거절',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setActionError(null);
     rejectApplication.mutate(
       { applicationId: application.applicationId, reason: 'rejected_by_host_from_applications_page' },
       {
         onError: (err) => {
-          window.alert(extractErrorMessage(err, '거절하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+          setActionError(extractErrorMessage(err, '거절하지 못했어요. 잠시 후 다시 시도해 주세요.'));
         },
       },
     );
@@ -108,8 +114,16 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 
   return (
     <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+      {/* 확인 모달 — window.confirm 대체 */}
+      {ConfirmModal}
       <DesktopPageHead matchId={matchId} />
       <div className="tm-match-list">
+        {/* 액션 에러 인라인 배너 — window.alert 대체 */}
+        {actionError ? (
+          <div style={{ marginBottom: 12 }}>
+            <AlertBanner message={actionError} tone="error" />
+          </div>
+        ) : null}
         {/* 매치 요약 카드 */}
         <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">{matchTitle}</div>

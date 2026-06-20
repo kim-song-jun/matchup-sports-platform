@@ -8,6 +8,7 @@
   --blue100: #d6e7ff;
   --blue500: #3182f6;
   --blue600: #2272eb;
+  --blue700: #1b64da; /* blue600보다 진한 강조색 — active 상태(.tm-review-tag-chip 등) */
   --green50: #e3f8ef;
   --green500: #03b26c;
   --orange50: #fff3e0;
@@ -55,6 +56,17 @@
   --accent: var(--blue);
   --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);
   --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);
+  /* ── 시맨틱 별칭 — 컴포넌트 CSS가 참조하지만 정의가 누락됐던 토큰(WS1 복구) ── */
+  --sh-1: var(--shadow-1); /* box-shadow: .tm-auth-segment-active, .tm-chat-bubble 등 */
+  --line: var(--border); /* hairline border: .tm-auth-profile-upload 등 */
+  --red-alpha-08: rgba(240, 68, 82, 0.08); /* --red500(#f04452) 8% — 에러 카드 border */
+  /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
+  --font-size-micro: 11px;
+  --font-size-caption: 12px;
+  --font-size-label: 13px;
+  --font-size-body-lg: 17px;
+  --font-size-subhead: 20px;
+  --font-size-heading: 24px;
   --font:
     -apple-system,
     BlinkMacSystemFont,

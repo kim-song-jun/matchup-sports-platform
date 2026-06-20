@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
@@ -120,7 +120,10 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
           {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
         </div>
         <div className="tm-my-list-stack">
-          {model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
+          {/* #14: 소속 팀이 없을 때 빈 상태 안내 */}
+          {model.teams.length === 0
+            ? <EmptyState title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
+            : model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
         </div>
       </div>
     </AppChrome>
@@ -320,9 +323,14 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
   return (
     <section>
       <div className="tm-my-section-label">{title}</div>
-      <div className="tm-my-list-stack">
-        {members.map((member) => <MyMemberCard key={member.id} member={member} />)}
-      </div>
+      {/* #14: 멤버/요청이 없을 때 빈 상태 안내 */}
+      {members.length === 0
+        ? <EmptyState title={`${title}이 없어요`} sub="아직 표시할 항목이 없어요." />
+        : (
+          <div className="tm-my-list-stack">
+            {members.map((member) => <MyMemberCard key={member.id} member={member} />)}
+          </div>
+        )}
     </section>
   );
 }

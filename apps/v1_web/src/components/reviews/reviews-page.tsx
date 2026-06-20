@@ -168,7 +168,8 @@ export function ReviewsReceivedPageView({
   model: ReviewsReceivedPageModel;
 }) {
   return (
-    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews">
+    // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
+    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received">
       <div className="tm-review-shell">
         <ReviewsReceivedContent
           errorMessage={errorMessage}

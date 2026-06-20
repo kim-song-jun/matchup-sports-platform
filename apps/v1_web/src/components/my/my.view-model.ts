@@ -5,7 +5,6 @@ import type {
   MyTeam,
   MyTeamDetailViewModel,
   MyTeamMembersViewModel,
-  MyTeamsViewModel,
   NotificationSettingsViewModel,
   ProfileEditViewModel,
   SettingsViewModel,
@@ -87,14 +86,6 @@ export const myTeams: MyTeam[] = [
   { id: 'team-3', name: '마포 스윔', logo: 'S', sport: '수영', region: '서울 마포', role: 'member', roleLabel: '멤버', members: 24, manner: '4.7', next: '수요일 20:00 정기 모임', description: '초보-중수 레인 위주로 매너 있는 운동을 만드는 수영 팀이에요.' },
 ];
 
-export const myTeamsModel: MyTeamsViewModel = {
-  teams: myTeams,
-  summary: [
-    { label: '소속 팀', value: myTeams.length, unit: '팀' },
-    { label: '운영 권한', value: 2, unit: '팀' },
-    { label: '평균 매너', value: '4.8' },
-  ],
-};
 
 export function getMyTeamDetailModel(teamId = 'team-1'): MyTeamDetailViewModel {
   const team = myTeams.find((item) => item.id === teamId) ?? myTeams[0];

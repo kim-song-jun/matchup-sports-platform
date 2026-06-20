@@ -44,8 +44,9 @@ import {
   MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import type { MyHomeViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
-import { myHomeModel, myTeamsModel, profileEditModel, settingsModel } from './my.view-model';
+import { myHomeModel, profileEditModel, settingsModel } from './my.view-model';
 
 type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -76,11 +77,17 @@ export function MyHomePageClient() {
 
 export function MyTeamsPageClient() {
   const query = useV1MyTeams();
+
+  // 에러 상태: mock 폴백 없이 에러를 명시적으로 표시한다.
+  if (query.isError) {
+    return <ErrorState message="팀 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} />;
+  }
+
   const items = query.data?.items ?? [];
   const teams = items.map(toMyTeam);
   const model: MyTeamsViewModel = {
-    teams: query.data ? teams : myTeamsModel.teams,
-    summary: buildTeamSummary(query.data ? teams : myTeamsModel.teams),
+    teams,
+    summary: buildTeamSummary(teams),
   };
 
   return <MyTeamsPageView model={model} />;
@@ -89,19 +96,34 @@ export function MyTeamsPageClient() {
 export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
   const query = useV1TeamDetail(teamId);
   const teamMatches = useV1MyTeamMatches({ limit: 20 });
-  const team = query.data;
 
-  if (!team) {
-    return <MyTeamDetailPageView model={fallbackTeamDetail(teamId)} />;
+  // 에러 상태: mock 폴백 없이 에러를 명시적으로 표시한다.
+  if (query.isError) {
+    return <ErrorState message="팀 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} />;
   }
+
+  // 로딩 중: data 부재 시 스켈레톤 대신 빈 모델을 사용 (MyTeamDetailPageView 내부 레이아웃 보존)
+  const team = query.data;
+  if (!team) {
+    return <MyTeamDetailPageView model={{ team: { id: teamId, name: '불러오는 중…', logo: '…', sport: '', region: '', role: 'member', roleLabel: '', members: 0, manner: '-', next: '', description: '' }, actions: [], recentMatches: [] }} />;
+  }
+
+  const viewerRole = team.viewer.role;
+  // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
+  const canManage = viewerRole === 'owner' || viewerRole === 'manager';
+  const actions: MyTeamDetailViewModel['actions'] = [
+    { label: '팀 매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'G' },
+    ...(canManage
+      ? [
+          { label: '멤버 관리', sub: '초대와 가입 요청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'M' },
+          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit`, icon: 'S' },
+        ]
+      : []),
+  ];
 
   const model: MyTeamDetailViewModel = {
     team: toTeamDetailModel(team),
-    actions: [
-      { label: '멤버 관리', sub: '초대와 가입 요청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'M' },
-      { label: '팀 매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'G' },
-      { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit`, icon: 'S' },
-    ],
+    actions,
     recentMatches: (teamMatches.data?.items ?? []).filter((match) => match.teamId === team.teamId).slice(0, 3).map(toMyTeamMatch),
     chatHref: '/chat',
   };
@@ -800,6 +822,18 @@ export function LocationSettingsPageClient() {
 export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
+
+  // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
+  if (settings.isError) {
+    return (
+      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
+        <div className="tm-my-shell">
+          <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
+        </div>
+      </AppChrome>
+    );
+  }
+
   const notifications = settings.data?.notifications;
   const [toggleError, setToggleError] = useState(false);
   const items = [
@@ -865,9 +899,25 @@ export function WithdrawalPageClient() {
   const router = useRouter();
   const withdrawal = useV1WithdrawalRequest();
   const [reason, setReason] = useState('');
+  // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
+  const { confirm, ConfirmModal } = useConfirm();
+
+  const handleWithdraw = () => {
+    confirm({
+      title: '탈퇴 요청',
+      message: '정말 탈퇴 요청할까요? 되돌릴 수 없어요.',
+      confirmLabel: '탈퇴 요청',
+      tone: 'danger',
+    }).then((ok) => {
+      if (ok) {
+        withdrawal.mutate({ reason: reason || null }, { onSuccess: () => router.replace('/login') });
+      }
+    });
+  };
 
   return (
     <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
+      {ConfirmModal}
       <div className="tm-my-shell">
         <div className="tm-my-withdrawal-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
@@ -896,7 +946,7 @@ export function WithdrawalPageClient() {
           className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
           type="button"
           disabled={withdrawal.isPending}
-          onClick={() => withdrawal.mutate({ reason: reason || null }, { onSuccess: () => router.replace('/login') })}
+          onClick={handleWithdraw}
         >
           {withdrawal.isPending ? '요청 중' : '탈퇴 요청'}
         </button>
@@ -1069,11 +1119,6 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
     note: match.teamName ? `${match.teamName} 관련 팀매치예요.` : '내 팀 관련 팀매치예요.',
     href: match.detailRoute,
   };
-}
-
-function fallbackTeamDetail(teamId: string): MyTeamDetailViewModel {
-  const team = myTeamsModel.teams.find((item) => item.id === teamId) ?? myTeamsModel.teams[0];
-  return { team, actions: [], recentMatches: [] };
 }
 
 function buildTeamSummary(teams: MyTeam[]) {

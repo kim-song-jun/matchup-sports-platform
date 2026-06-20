@@ -98,6 +98,8 @@ export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'com
 
 export type MatchCreateViewModel = {
   step: MatchCreateStep;
+  /** 생성 완료 또는 수정 중인 매치의 실제 ID. backHref·상세보기 링크에 사용. */
+  matchId?: string;
   selectedSport: string;
   sports: string[];
   levels: string[];

@@ -293,7 +293,7 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
       <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
-        {manage ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>관리할 수 없어요</button> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
+        {manage ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`${match.href}/applications`}>참가 관리</Link> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
       </div>
     </Card>
   );

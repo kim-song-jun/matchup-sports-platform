@@ -56,7 +56,7 @@ export function EmailLoginClient() {
         </button>
         {error ? <p className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">{error}</p> : null}
         <div className="tm-auth-link-row">
-          <button className="tm-btn tm-btn-sm tm-btn-ghost tm-btn-disabled" disabled type="button">비밀번호 찾기</button>
+          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/auth/password-reset">비밀번호 찾기</Link>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>
         </div>
         {!error && model.notice ? (

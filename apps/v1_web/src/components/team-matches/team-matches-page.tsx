@@ -620,7 +620,47 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
 }
 
 function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
-  return <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches"><div className="tm-create-shell"><EmptyState title="팀매치가 만들어졌어요" sub="팀원들에게 먼저 공유해서 참가 가능 여부와 경기 준비를 함께 확인해 보세요." /><Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)' }}><div className="tm-text-body-lg">{model.selectedTeam} 팀 채팅</div><div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 팀매치 링크와 경기조건을 공유해요</div></Card>{['팀 채팅에 공유', '초대 링크 복사', '상대팀 후보에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 경기조건을 공유해요.</div></Card>)}</div><div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/team-matches">목록으로</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">팀 채팅에 공유</button></div></div></AppChrome>;
+  const [shareMsg, setShareMsg] = useState('');
+
+  const handleShare = async () => {
+    const title = model.draft.title || '팀매치';
+    const url = typeof window !== 'undefined' ? new URL('/team-matches', window.location.origin).toString() : '/team-matches';
+    // navigator.share 지원 환경(모바일)에서는 네이티브 공유 시트 사용
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch {
+        // 취소(AbortError) 또는 미지원 → 클립보드 fallback
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareMsg('링크를 복사했어요');
+    } catch {
+      setShareMsg('링크 복사에 실패했어요');
+    }
+    window.setTimeout(() => setShareMsg(''), 1800);
+  };
+
+  return (
+    <AppChrome title="팀매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/team-matches">
+      <div className="tm-create-shell">
+        <EmptyState title="팀매치가 만들어졌어요" sub="팀원들에게 먼저 공유해서 참가 가능 여부와 경기 준비를 함께 확인해 보세요." />
+        <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)' }}>
+          <div className="tm-text-body-lg">{model.selectedTeam} 팀매치 공유</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 팀매치 링크와 경기조건을 공유해요</div>
+        </Card>
+        {shareMsg ? <div className="tm-text-caption" role="status" style={{ marginTop: 12, textAlign: 'center', color: 'var(--text-caption)' }}>{shareMsg}</div> : null}
+      </div>
+      <div className="tm-fixed-cta tm-create-fixed-cta">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/team-matches">목록으로</Link>
+          <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" onClick={() => { void handleShare(); }}>공유하기</button>
+        </div>
+      </div>
+    </AppChrome>
+  );
 }
 
 function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {

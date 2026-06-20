@@ -366,10 +366,10 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
   const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
   return (
-    <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? '/matches/match-1' : '/matches'}>
+    <AppChrome title={edit ? '매치 수정' : '매치 만들기'} activeTab="matches" bottomNav={false} backHref={edit ? (model.matchId ? `/matches/${model.matchId}` : '/matches') : '/matches'}>
       {/* Desktop page head */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={edit ? '/matches/match-1' : '/matches'} aria-label={edit ? '매치 상세로 돌아가기' : '매치 목록으로 돌아가기'}>
+        <Link className="tm-desktop-back" href={edit ? (model.matchId ? `/matches/${model.matchId}` : '/matches') : '/matches'} aria-label={edit ? '매치 상세로 돌아가기' : '매치 목록으로 돌아가기'}>
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{edit ? '매치 수정' : '매치 만들기'}</h1>
@@ -833,6 +833,33 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
 }
 
 function MatchComplete({ model }: { model: MatchCreateViewModel }) {
+  const [shareMsg, setShareMsg] = useState('');
+  // 생성된 매치 상세 URL. matchId가 없으면(정적 데모 경로) 목록으로 fallback.
+  const detailHref = model.matchId ? `/matches/${model.matchId}` : '/matches';
+
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? new URL(detailHref, window.location.origin).toString() : detailHref;
+    const title = model.draft.title || '새 매치';
+    // navigator.share 지원 환경(모바일)에서는 네이티브 공유 시트 사용
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        // null 반환: 네이티브 시트가 UX 직접 처리
+        return;
+      } catch {
+        // 취소(AbortError) 또는 미지원 → 클립보드 fallback
+      }
+    }
+    // 클립보드 복사 fallback
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareMsg('링크를 복사했어요');
+    } catch {
+      setShareMsg('링크 복사에 실패했어요');
+    }
+    window.setTimeout(() => setShareMsg(''), 1800);
+  };
+
   return (
     <AppChrome title="매치 만들기 완료" activeTab="matches" bottomNav={false} backHref="/matches">
       {/* Desktop page head */}
@@ -845,12 +872,17 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
       <div className="tm-create-shell tm-match-create-shell">
         <EmptyState title="매치가 만들어졌어요" sub="매치를 만들었어요! 팀원들에게 먼저 공유해 참여 의사를 확인해 보세요." />
         <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
-          <div className="tm-text-body-lg">FC 발빠른놈들 팀 채팅</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>24명에게 매치 링크와 일정을 공유해요</div>
+          <div className="tm-text-body-lg">매치 공유</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 매치 링크와 일정을 공유해요</div>
         </Card>
-        {['내 팀에 공유', '초대 링크 복사', '관심 멤버에게 보내기'].map((item, index) => <Card key={item} pad={14} className={index === 0 ? 'tm-create-selected' : ''} style={{ marginTop: 10 }}><div className="tm-text-label">{item}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{model.draft.title} 일정 정보를 공유해요.</div></Card>)}
+        {shareMsg ? <div className="tm-text-caption" role="status" style={{ marginTop: 12, textAlign: 'center', color: 'var(--text-caption)' }}>{shareMsg}</div> : null}
       </div>
-      <div className="tm-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches/match-1">상세 보기</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button">내 팀에 공유</button></div></div>
+      <div className="tm-fixed-cta">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={detailHref}>상세 보기</Link>
+          <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" onClick={() => { void handleShare(); }}>공유하기</button>
+        </div>
+      </div>
     </AppChrome>
   );
 }
@@ -902,5 +934,7 @@ function nextCreateHref(step: MatchCreateViewModel['step']) {
   if (step === 'info') return '/matches/new/place-time';
   if (step === 'place-time') return '/matches/new/confirm';
   if (step === 'confirm') return '/matches/new/complete';
-  return '/matches/match-1';
+  // 'complete'·'edit' 단계에선 이 함수가 호출되지 않음(onSubmit/onCancel 핸들러가 직접 라우팅).
+  // 만약 도달하면 안전하게 목록으로 복귀.
+  return '/matches';
 }

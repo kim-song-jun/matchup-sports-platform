@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
+import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1ApproveTeamJoinApplication,
   useV1CheckEmail,
@@ -1005,7 +1006,7 @@ function toMyMember(
     name: member.displayName,
     role: roleLabel(member.role),
     meta: new Date(member.joinedAt).toLocaleDateString('ko-KR'),
-    status: member.status === 'active' ? '활동 중' : member.status,
+    status: teamMemberStatusLabel(member.status),
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions?.actionPending,
@@ -1024,7 +1025,7 @@ function toMyJoinRequest(
     name: application.applicant.displayName,
     role: '가입 요청',
     meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),
-    status: application.status === 'requested' ? '대기' : application.status,
+    status: teamJoinApplicationStatusLabel(application.status),
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },

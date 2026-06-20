@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import {
   useV1CompleteOnboarding,
   useV1DeferOnboarding,
@@ -385,7 +386,7 @@ function OnboardingFixedAction({
 function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboardingStep?: V1OnboardingStep }) {
   return (
     <div className="tm-auth-stack">
-      <Card pad={15}><div className="tm-text-body-lg">현재 단계</div><div className="tm-text-caption">{onboardingStep ?? 'sport'}</div></Card>
+      <Card pad={15}><div className="tm-text-body-lg">현재 단계</div><div className="tm-text-caption">{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
       <Card pad={15}><div className="tm-text-body-lg">선택한 종목</div><div className="tm-text-caption">{draft.sports.length}개</div></Card>
       <Card pad={15}><div className="tm-text-body-lg">선택한 지역</div><div className="tm-text-caption">{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
       <Notice title="잠깐 나가도 괜찮아요" body="설정을 나가도 선택한 내용이 저장돼요. 돌아오면 멈춘 단계부터 이어서 할 수 있어요." />

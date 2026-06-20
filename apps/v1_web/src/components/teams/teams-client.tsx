@@ -21,6 +21,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
+import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
@@ -560,7 +561,7 @@ function toRequestModel(
   return {
     name: application.applicant.displayName,
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
-    status: application.status === 'requested' ? '검토 중' : application.status,
+    status: teamJoinApplicationStatusLabel(application.status),
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },

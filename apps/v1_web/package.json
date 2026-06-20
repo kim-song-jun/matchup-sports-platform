@@ -13,7 +13,8 @@
     "lint": "echo '[v1_web] lint delegated to tsc --noEmit'",
     "clean": "rm -rf .next out",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.17",

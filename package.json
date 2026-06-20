@@ -27,6 +27,7 @@
     "v1:db:studio": "pnpm --filter v1_api db:studio",
     "v1:db:seed": "pnpm --filter v1_api db:seed",
     "v1:test": "pnpm --filter v1_api test && pnpm --filter v1_web test",
+    "test:e2e:v1": "pnpm --filter v1_web test:e2e",
     "test:e2e": "pnpm exec playwright test --config=e2e/playwright.config.ts",
     "test:all": "pnpm --filter api test && pnpm --filter web test && pnpm exec playwright test --config=e2e/playwright.config.ts",
     "qa:manual:routes": "node scripts/qa/manual-route-smoke.mjs",

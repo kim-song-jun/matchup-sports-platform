@@ -59,7 +59,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                 <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
                 <NumberDisplay
                   value={dash ? '-' : model.stats.mannerScore}
-                  unit={dash ? '' : '점'}
+                  /* 점수 없을 때(빈 sentinel '-')는 '점' 단위 숨김 → "- 점" 어색함 방지 */
+                  unit={dash || model.stats.mannerScore === '-' ? '' : '점'}
                   size={36}
                   sub={
                     /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */

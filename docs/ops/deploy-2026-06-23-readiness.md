@@ -135,7 +135,7 @@
 | 3 데드 API(verification) | ❌ **거부** | — | refute가 **ALIVE 판정**: app.module.ts DI 등록 + spec 존재. discovery "dead" 오판 → 삭제 시 API 부팅 파손. **적대 검증이 사고 방지** |
 | 4 카피(프론트) | ✅ 완료 | `8ee6e7cf`·`9d4f552c` | 4-a: high-severity(영문 enum 5 + placeholder + admin 역할 + global-error). 4-b: 합니다체 31건 해요체(서브에이전트, grep 잔여 0 + tsc). |
 | 4-c 카피(API 응답) | 🆕 후속 | — | v1_api가 사용자 노출 메시지를 합니다체로 반환(예: `'신청할 수 있습니다.'`). v1_api/src 응답 문자열 해요체 정비 필요(WS7과 함께) |
-| 5 a11y(터치타깃·focus ring) | 다음 | — | globals.css: .v1-icon-button 40→44, .tm-list-search-* 30→44, v1-shell 클래스 focus-visible ring 추가 |
+| 5 a11y(터치타깃·focus ring) | ✅ 완료 | `91b97bc8` | .v1-icon-button 40→44, search clear/submit 30→44, section/quick-action min-height 44, v1-shell focus-visible ring. tsc clean. 사이즈 시각정합은 WS11 확인 |
 | 6 하드코딩 색/dark: | 대기 | — | rgba/hex 토큰화, dark: 제거(light-only) |
 | 7 API 기술부채 + 알림 wire-up | 대기 | — | as any·silent catch·Record<unknown> + chat/notice pref full wire-up(결정#4) + 4-c |
 | 8 API 유닛테스트 | 대기 | — | auth/matches/teams/team-matches/chat/notifications service.spec |

@@ -141,7 +141,7 @@
 | 8 API 유닛테스트 | ✅ 완료 | `b869a0f4` | **병렬 writer(sonnet)+opus judge** 적대 검증. 6 서비스 67 테스트(전부 REAL 판정). 전체 unit 33 suites/**383 tests green** + tsc clean. judge 우려 2건(echo·dead mock) 수정 |
 | 9 프론트 유닛테스트 | 대기 | — | login/email·matches/new·tournaments/apply page.test + fake test 2건 교체 |
 | 10 Admin 토큰 정합 | 대기 | — | 265 raw Tailwind → 토큰 |
-| 11 페르소나 비주얼 감사 | 대기 | — | WS1~6 적용 후, preview 브라우저 3티어 ~112샷 |
+| 11 페르소나 비주얼 감사 | 🔄 진행 | — | **파이프라인 확립**: v1 스택(pg:5432+api:8121 가동중, web:3013 preview_start) + dev-auth(icon.tester). 감사 완료: /landing(이슈0, 'N'은 Next devtools false-alarm)·/home(이슈: 매너 "− 점" 빈상태 카피 어색). 다음 배치에서 login/signup/matches/teams/tournaments/my 등 계속(컨텍스트당 ~5-8샷) |
 | 12 v1 e2e(Playwright 풀+Supertest) | 대기 | — | 결정#4 — 풀 하네스 |
 | deploy.yml 분리 | 대기 | — | 결정#1 — v1 전용 job |
 

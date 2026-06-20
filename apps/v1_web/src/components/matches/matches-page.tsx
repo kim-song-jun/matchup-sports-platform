@@ -57,7 +57,6 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
 
 export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
   if (model.state === 'filter') return <MatchFilterPageView model={model} />;
-  if (model.state === 'participants') return <MatchParticipantsPageView />;
 
   return (
     <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/matches">
@@ -124,39 +123,6 @@ function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches">초기화</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/matches">{model.matches.length}개 결과 보기</Link>
         </div>
-      </div>
-    </AppChrome>
-  );
-}
-
-function MatchParticipantsPageView() {
-  const participants = [
-    { name: '김정민', meta: '호스트 · 매너 4.9', status: '승인완료' },
-    { name: '박서준', meta: '초보 · 최근 3경기', status: '승인완료' },
-    { name: '이하나', meta: '중수 · 빠른 응답', status: '승인중' },
-  ];
-
-  return (
-    <AppChrome title="참가자" activeTab="matches" bottomNav={false} backHref="/matches/match-1">
-      {/* Desktop page head */}
-      <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/matches/match-1" aria-label="매치 상세로 돌아가기">
-          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
-        <h1 className="tm-text-heading" style={{ margin: 0 }}>참가자</h1>
-      </div>
-      <div className="tm-match-list">
-        <Card pad={16} style={{ background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
-          <div className="tm-text-body-lg">주말 풋살 한판!</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>승인 완료 2명 · 승인중 1명 · 정원 10명</div>
-        </Card>
-        <div className="tm-my-list-stack" style={{ marginTop: 14 }}>
-          {participants.map((person) => <ListItem key={person.name} title={person.name} sub={person.meta} trailing={person.status} />)}
-        </div>
-        <Card pad={14} style={{ marginTop: 16, background: 'var(--grey50)' }}>
-          <div className="tm-text-label">참가자 승인은 매치 상세 페이지에서 관리할 수 있어요</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>참가자 승인 상태와 모집 정원을 한곳에서 확인할 수 있어요.</div>
-        </Card>
       </div>
     </AppChrome>
   );

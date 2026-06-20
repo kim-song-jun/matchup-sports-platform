@@ -220,11 +220,6 @@ export function getMatchStateViewModel(state: MatchStateViewModel['state']): Mat
       description: '신청 대기와 승인 완료 상태의 개인 매치를 모아 보여줍니다.',
       matches: base.matches.filter((match) => match.status === 'pending' || match.status === 'approved'),
     },
-    participants: {
-      title: '참가자',
-      description: '참가 신청과 승인 상태를 확인할 수 있어요.',
-      matches: base.matches,
-    },
   }[state];
 
   return {

@@ -61,7 +61,7 @@ export type MatchListViewModel = {
 };
 
 export type MatchStateViewModel = MatchListViewModel & {
-  state: 'empty' | 'error' | 'filter' | 'joined' | 'participants';
+  state: 'empty' | 'error' | 'filter' | 'joined';
   title: string;
   description: string;
 };

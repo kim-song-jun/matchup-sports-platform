@@ -63,7 +63,7 @@ export function ChatListPageClient() {
     leaveConfirm: leaveTarget
       ? {
           title: '채팅방을 나갈까요?',
-          body: '나가면 목록에서 사라지고, 새 메시지는 다시 초대되기 전까지 받을 수 없습니다.',
+          body: '나가면 목록에서 사라지고, 새 메시지는 다시 초대되기 전까지 받을 수 없어요.',
           pending: leaveRoom.isPending,
           onCancel: () => setLeaveTarget(null),
           onConfirm: () =>

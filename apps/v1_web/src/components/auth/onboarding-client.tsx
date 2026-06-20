@@ -438,7 +438,7 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
   }
 
   if (status === 'unmatched' && location) {
-    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · 지원 지역과 거리가 멀어 자동 선택하지 않았습니다.`} tone="orange" />;
+    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · 지원 지역과 거리가 멀어 자동 선택하지 않았어요.`} tone="orange" />;
   }
 
   if (location) {

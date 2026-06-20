@@ -38,7 +38,7 @@ const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailV
     ],
   },
   approved: {
-    description: '상대팀 승인이 완료된 팀매치입니다. 경기 전 팀 채팅과 준비물 안내를 계속 확인할 수 있습니다.',
+    description: '상대팀 승인이 완료된 팀매치예요. 경기 전 팀 채팅과 준비물 안내를 계속 확인할 수 있어요.',
     address: '서울 송파구 올림픽로 25',
     applicantTeams: [
       { name: '우리 팀', meta: '승인된 상대팀 · 참가 확정', status: '승인 완료' },
@@ -46,7 +46,7 @@ const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailV
     ],
   },
   mine: {
-    description: '내 팀이 만든 팀매치입니다. 신청팀을 승인하거나 거절하고, 필요하면 경기 조건을 수정할 수 있습니다.',
+    description: '내 팀이 만든 팀매치예요. 신청팀을 승인하거나 거절하고, 필요하면 경기 조건을 수정할 수 있어요.',
     address: '서울 강남구 테헤란로 120',
     applicantTeams: [
       { name: '서초 풋살클럽', meta: 'B등급 · 매너 4.8 · 16명', status: '승인 대기' },
@@ -94,7 +94,7 @@ export function getTeamMatchStateViewModel(state: TeamMatchStateViewModel['state
   const copy = {
     empty: {
       title: '조건에 맞는 팀매치가 없어요',
-      description: '종목, 지역, 등급 조건을 줄이면 신청 가능한 팀매치를 다시 볼 수 있습니다.',
+      description: '종목, 지역, 등급 조건을 줄이면 신청 가능한 팀매치를 다시 볼 수 있어요.',
       matches: [],
     },
     error: {

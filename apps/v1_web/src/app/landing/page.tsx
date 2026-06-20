@@ -117,7 +117,7 @@ export default function LandingPage() {
                   <h3 className="tm-text-body-lg tm-landing-feature-title">팀·클럽 찾기</h3>
                   <p className="tm-text-caption tm-landing-feature-desc">
                     종목·지역·수준별 팀을 검색하고 가입 신청을 보내세요.
-                    팀 신뢰 점수로 믿을 수 있는 팀인지 미리 확인할 수 있습니다.
+                    팀 신뢰 점수로 믿을 수 있는 팀인지 미리 확인할 수 있어요.
                   </p>
                 </div>
               </li>

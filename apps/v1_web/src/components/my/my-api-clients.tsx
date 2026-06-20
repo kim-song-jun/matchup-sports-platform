@@ -142,7 +142,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
         canManageMembers,
         canDelegateOwner,
         promote: () => confirmAction(`${member.displayName}님을 운영진으로 지정할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
-        delegateOwner: () => confirmAction(`${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 됩니다.`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
+        delegateOwner: () => confirmAction(`${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
         demote: () => confirmAction(`${member.displayName}님을 멤버로 강등할까요?`, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
         remove: () => confirmAction(`${member.displayName}님을 팀에서 내보낼까요?`, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' })),
       }),
@@ -257,7 +257,7 @@ export function ProfileEditPageClient() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있습니다.' }));
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있어요.' }));
       event.target.value = '';
       return;
     }
@@ -276,7 +276,7 @@ export function ProfileEditPageClient() {
       }
     };
     reader.onerror = () => {
-      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했습니다. 다시 선택해 주세요.' }));
+      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했어요. 다시 선택해 주세요.' }));
     };
     reader.readAsDataURL(file);
   };
@@ -300,12 +300,12 @@ export function ProfileEditPageClient() {
     }
 
     if (!nicknameVerified) {
-      setFieldErrors({ nickname: '닉네임 중복 확인이 필요합니다.' });
+      setFieldErrors({ nickname: '닉네임 중복 확인이 필요해요.' });
       return;
     }
 
     if (!emailVerified) {
-      setFieldErrors({ email: '이메일 중복 확인이 필요합니다.' });
+      setFieldErrors({ email: '이메일 중복 확인이 필요해요.' });
       return;
     }
 
@@ -485,7 +485,7 @@ export function ProfileEditPageClient() {
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>
-        {isBlocked && (nicknameChanged || emailChanged) ? <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있습니다.</div> : null}
+        {isBlocked && (nicknameChanged || emailChanged) ? <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.</div> : null}
       </div>
     </AppChrome>
   );
@@ -538,7 +538,7 @@ export function SportsSettingsPageClient() {
       });
       router.replace('/my');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '운동 정보 저장에 실패했습니다.');
+      setMessage(error instanceof Error ? error.message : '운동 정보 저장에 실패했어요.');
     }
   };
 
@@ -588,7 +588,7 @@ export function SportsSettingsPageClient() {
 
         <Card pad={16}>
           <div className="tm-text-body-lg">기본 활동 지역</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치와 팀 추천에 사용할 기본 지역입니다.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치와 팀 추천에 사용할 기본 지역이에요.</div>
           <label className="tm-create-field" style={{ marginTop: 14 }}>
             <span className="tm-text-label">지역</span>
             <select className="tm-input" value={selectedRegionId} onChange={(event) => setSelectedRegionId(event.target.value)}>
@@ -675,7 +675,7 @@ export function LocationSettingsPageClient() {
     }
 
     setStatus('requesting');
-    setMessage('현재 위치를 확인하고 있습니다.');
+    setMessage('현재 위치를 확인하고 있어요.');
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolveLocation.mutate(
@@ -695,7 +695,7 @@ export function LocationSettingsPageClient() {
               setSelectedRegionId(result.region.id);
               setMatchedLabel(label);
               setStatus('matched');
-              setMessage(`${label} 지역으로 확인됐습니다. 저장하면 추천 기준 지역으로 사용됩니다.`);
+              setMessage(`${label} 지역으로 확인됐어요. 저장하면 추천 기준 지역으로 사용돼요.`);
             },
             onError: () => {
               setStatus('unmatched');
@@ -720,11 +720,11 @@ export function LocationSettingsPageClient() {
         onSuccess: (result) => {
           setStatus('saved');
           setMatchedLabel(result.region.name);
-          setMessage(`${result.region.name} 지역이 추천 기준으로 저장됐습니다.`);
+          setMessage(`${result.region.name} 지역이 추천 기준으로 저장됐어요.`);
         },
         onError: (error) => {
           setStatus('unmatched');
-          setMessage(error instanceof Error ? error.message : '활동 지역 저장에 실패했습니다.');
+          setMessage(error instanceof Error ? error.message : '활동 지역 저장에 실패했어요.');
         },
       },
     );
@@ -764,7 +764,7 @@ export function LocationSettingsPageClient() {
               setSelectedRegionId(event.target.value);
               setMatchedLabel(regions.find((region) => region.id === event.target.value)?.name ?? null);
               setStatus('idle');
-              setMessage('선택한 지역을 저장하면 추천 기준 지역으로 사용됩니다.');
+              setMessage('선택한 지역을 저장하면 추천 기준 지역으로 사용돼요.');
             }}>
               <option value="">시/군/구 선택</option>
               {regions.map((region) => (
@@ -957,7 +957,7 @@ function toMyTeam(item: V1MyTeam): MyTeam {
     members: item.memberCount,
     manner: item.trust?.score != null && hasTrustValue(item.trust.trustState) ? String(item.trust.score) : '-',
     next: item.canCreateTeamMatch ? '팀매치 만들 수 있어요' : '팀매치에 참여할 수 있어요',
-    description: `${item.sport.name} 팀입니다.`,
+    description: `${item.sport.name} 팀이에요.`,
   };
 }
 
@@ -1046,7 +1046,7 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
     meta: `${new Date(match.startsAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} · ${match.sportName}`,
     status,
     statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집 중',
-    note: match.teamName ? `${match.teamName} 관련 팀매치입니다.` : '내 팀 관련 팀매치입니다.',
+    note: match.teamName ? `${match.teamName} 관련 팀매치예요.` : '내 팀 관련 팀매치예요.',
     href: match.detailRoute,
   };
 }

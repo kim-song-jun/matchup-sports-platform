@@ -52,7 +52,7 @@ const teams = [
     statusLabel: '마감',
     tags: ['11:11', '주말', 'A등급'],
     genderRule: '남',
-    intro: '주말 11:11 경기를 꾸준히 하는 팀입니다. 현재 모집은 닫혀 있어 다음 모집 알림만 받을 수 있습니다.',
+    intro: '주말 11:11 경기를 꾸준히 하는 팀이에요. 현재 모집은 닫혀 있어 다음 모집 알림만 받을 수 있어요.',
     next: '다음 모집 알림 가능',
   },
   {
@@ -68,7 +68,7 @@ const teams = [
     statusLabel: '내 팀',
     tags: ['팀장', '팀매치 운영 중', '친선'],
     genderRule: '성별 무관',
-    intro: '내가 관리하는 풋살 팀입니다. 팀 소개, 멤버 권한, 모집 상태와 팀매치 생성을 관리할 수 있습니다.',
+    intro: '내가 관리하는 풋살 팀이에요. 팀 소개, 멤버 권한, 모집 상태와 팀매치 생성을 관리할 수 있어요.',
     next: '신청 3명 검토 필요',
   },
 ];
@@ -96,7 +96,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     ],
   },
   pending: {
-    description: '가입 신청이 접수된 팀입니다. 운영진이 프로필, 활동 지역, 최근 매치 이력을 검토하고 있습니다.',
+    description: '가입 신청이 접수된 팀이에요. 운영진이 프로필, 활동 지역, 최근 매치 이력을 검토하고 있어요.',
     activity: '평일 저녁 정기전 · 운영진 검토 후 가입',
     condition: '풋살 중수 · 평일 저녁 참여 가능',
     schedule: '매주 화 20:00 · 강동 풋살파크',
@@ -109,7 +109,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     ],
   },
   closed: {
-    description: '현재 모집이 마감된 축구 팀입니다. 다음 모집이 열리면 알림을 받을 수 있습니다.',
+    description: '현재 모집이 마감된 축구 팀이에요. 다음 모집이 열리면 알림을 받을 수 있어요.',
     activity: '주말 11:11 정기전 · 현재 모집 마감',
     condition: '축구 A등급 · 주말 고정 참여',
     schedule: '매주 일 09:00 · 상암 보조구장',
@@ -121,7 +121,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     ],
   },
   mine: {
-    description: '내가 관리하는 팀입니다. 팀 정보, 멤버 권한, 가입 신청, 팀매치 생성과 수정 흐름으로 이동할 수 있습니다.',
+    description: '내가 관리하는 팀이에요. 팀 정보, 멤버 권한, 가입 신청, 팀매치 생성과 수정 흐름으로 이동할 수 있어요.',
     activity: '팀매치 운영 중 · 가입 신청 3명 검토 필요',
     condition: '풋살 초보-중수 · 구로/영등포권',
     schedule: '매주 금 21:00 · 신도림 풋살파크',
@@ -158,7 +158,7 @@ export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamS
     },
     empty: {
       title: '조건에 맞는 팀이 없어요',
-      description: '지역, 종목, 모집 상태 조건을 줄이면 가입 가능한 팀을 다시 볼 수 있습니다.',
+      description: '지역, 종목, 모집 상태 조건을 줄이면 가입 가능한 팀을 다시 볼 수 있어요.',
       query: '없는 팀',
       teams: [],
     },
@@ -225,7 +225,7 @@ export function getTeamFormViewModel(mode: TeamFormViewModel['mode']): TeamFormV
       logoUrl: null,
       sport: '풋살',
       region: '서울 성동구',
-      description: mode === 'edit' ? '주 1회 꾸준히 함께 경기할 멤버를 찾습니다.' : '',
+      description: mode === 'edit' ? '주 1회 꾸준히 함께 경기할 멤버를 찾아요.' : '',
       sports: mode === 'edit' ? ['풋살', '축구'] : [],
       city: mode === 'edit' ? '서울' : '',
       county: mode === 'edit' ? '성동구' : '',

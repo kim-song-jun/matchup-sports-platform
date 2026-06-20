@@ -137,7 +137,7 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
     ],
   },
   approved: {
-    description: '승인이 완료된 수영 매치입니다. 참가가 확정되었으므로 경기 전 안내와 준비물을 계속 확인할 수 있습니다.',
+    description: '승인이 완료된 수영 매치예요. 참가가 확정되었으므로 경기 전 안내와 준비물을 계속 확인할 수 있어요.',
     address: '서울 마포구 월드컵로 25',
     rules: ['수모 착용', '입장 15분 전 도착', '승인 완료자는 채팅 안내 확인'],
     participants: [
@@ -146,7 +146,7 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
     ],
   },
   mine: {
-    description: '내가 만든 농구 픽업 매치입니다. 신청자를 승인하거나 거절하고, 필요하면 매치 정보를 수정할 수 있습니다.',
+    description: '내가 만든 농구 픽업 매치예요. 신청자를 승인하거나 거절하고, 필요하면 매치 정보를 수정할 수 있어요.',
     address: '서울 성동구 아차산로 17',
     rules: ['실내화 착용', '팀 조끼 제공', '신청자는 호스트 승인 후 확정'],
     participants: [
@@ -202,12 +202,12 @@ export function getMatchStateViewModel(state: MatchStateViewModel['state']): Mat
   const copy = {
     empty: {
       title: '조건에 맞는 매치가 없어요',
-      description: '지역, 시간, 종목 조건을 줄이면 참여 가능한 매치를 다시 볼 수 있습니다.',
+      description: '지역, 시간, 종목 조건을 줄이면 참여 가능한 매치를 다시 볼 수 있어요.',
       matches: [],
     },
     error: {
       title: '매치 목록을 불러오지 못했어요',
-      description: '일시적으로 목록을 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+      description: '일시적으로 목록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
       matches: [],
     },
     filter: {
@@ -222,7 +222,7 @@ export function getMatchStateViewModel(state: MatchStateViewModel['state']): Mat
     },
     participants: {
       title: '참가자',
-      description: '참가 신청과 승인 상태를 확인할 수 있습니다.',
+      description: '참가 신청과 승인 상태를 확인할 수 있어요.',
       matches: base.matches,
     },
   }[state];

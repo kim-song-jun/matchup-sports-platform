@@ -39,7 +39,8 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         <SportSelector sports={model.sports} />
         <div className="tm-match-summary-row">
           <div className="tm-text-label">{model.summary.label}</div>
-          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 마감 {model.summary.urgent}</div>
+          {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
+          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집중 {model.summary.urgent}</div>
         </div>
         <div className="tm-match-card-stack">
           {model.matches.length ? (

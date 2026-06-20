@@ -29,4 +29,6 @@ matches 17(최다) · community 15 · auth-onboarding 13 · team-matches 12 · t
 - ✅ **Rank1 터치타깃 44px** 5클래스(.tm-chip/.tm-list-filter-button/.tm-btn-sm/.tm-auth-check-button/.tm-auth-agreement-arrow) — `2bc49f08`, 라이브 검증.
 - ✅ **Rank6 urgent 오표기** matches·team-matches summary "마감"→"모집중"(open count와 일치) — `243541d4`, 라이브 검증.
 - ✅ **Rank6 raw enum** 4곳(teams-client 563·my-api-clients 1008/1027·onboarding 388) → 신규 `lib/v1-status-labels.ts` 단일소스 라벨(미매핑도 안전 한글). `1a6944f5`. **Rank6 완료.**
-- ⏭ 다음: Rank2 필터시트 공유추출(DraggableFilterSheet 3중 중복)+모달 role/ESC/focus-trap → Rank3 dead-end CTA(완료화면 no-op·match-1 하드코딩) → Rank4 silent API(notices stale fallback)/window.confirm 5곳→모달 → Rank5 정적 id(useId)/토글 role=switch → 클러스터 medium → WS6 색·WS7 API·WS10 admin 토큰.
+- ✅ **Rank5 a11y aria**(서브에이전트): useId(admin-filter-bar·SimpleModal 3인스턴스 id 중복), role=switch(알림토글), aria-pressed(칩 4종), aria-label(채팅입력·stepper), aria-busy. `553936dc`. **Rank5 완료.**
+- ✅ **테스트 정리**(서브에이전트): 전 기존 테스트 감사 → FAKE 0(제거 불필요), home thin-smoke 강화. `553936dc`.
+- ⏭ 다음: Rank2 필터시트 공유추출(DraggableFilterSheet 3중 중복)+모달 role/ESC/focus-trap → Rank3 dead-end CTA(완료화면 no-op·match-1 하드코딩) → Rank4 silent API(notices stale fallback)/window.confirm 5곳→모달 → 클러스터 medium → WS6 색·WS7 API·WS10 admin 토큰·deploy.yml.

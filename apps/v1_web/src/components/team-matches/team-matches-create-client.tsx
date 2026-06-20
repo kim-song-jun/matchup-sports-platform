@@ -19,6 +19,7 @@ import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-match
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
 const storageKey = 'teameet:v1:team-match-draft';
+const selectionKey = 'teameet:v1:team-match-selection';
 const defaultGenderRule = '성별 무관';
 
 type TeamMatchDraft = TeamMatchCreateViewModel['draft'];
@@ -30,29 +31,64 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const regions = useV1MasterRegions();
   const createTeamMatch = useV1CreateTeamMatch();
   const [draft, setDraft] = usePersistedDraft();
-  const [selectedTeamId, setSelectedTeamId] = useState('');
-  const [selectedSportId, setSelectedSportId] = useState('');
-  const [regionId, setRegionId] = useState('');
+  // 위저드 step이 각각 별도 라우트라 step 이동 시 재마운트된다. 팀/종목/지역 선택을 로컬
+  // useState에만 두면 매 step 첫 항목으로 리셋돼(팀 B·풋살 선택→첫 creatable팀·축구로 소실)
+  // 잘못된 팀/종목/지역으로 팀매치가 생성된다. draft와 동일하게 localStorage에 영속한다.
+  const [selection, setSelection] = useState<{ teamId: string; sportId: string; regionId: string }>({
+    teamId: '',
+    sportId: '',
+    regionId: '',
+  });
+  const [selectionHydrated, setSelectionHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const myTeams = normalizeMyTeams(teams.data);
   const allMyTeams = myTeams ?? [];
   const creatableTeams = allMyTeams.filter((team) => team.canCreateTeamMatch);
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
+  // 마스터 데이터 준비 후 1회 hydrate: 저장된 선택이 유효하면 우선, 없으면 첫 항목 기본값.
   useEffect(() => {
-    if (!selectedTeamId && creatableTeams[0]) setSelectedTeamId(creatableTeams[0].teamId);
-    if (selectedTeamId && !creatableTeams.some((team) => team.teamId === selectedTeamId)) {
-      setSelectedTeamId(creatableTeams[0]?.teamId ?? '');
+    if (selectionHydrated || teams.isLoading || !sports.data || regionOptions.length === 0) return;
+    let stored: { teamId?: string; sportId?: string; regionId?: string } = {};
+    try {
+      const raw = window.localStorage.getItem(selectionKey);
+      if (raw) stored = JSON.parse(raw) as { teamId?: string; sportId?: string; regionId?: string };
+    } catch {
+      window.localStorage.removeItem(selectionKey);
     }
-  }, [creatableTeams, selectedTeamId]);
+    const teamId =
+      stored.teamId && creatableTeams.some((team) => team.teamId === stored.teamId)
+        ? stored.teamId
+        : creatableTeams[0]?.teamId ?? '';
+    const sportId =
+      stored.sportId && sports.data.some((item) => item.id === stored.sportId)
+        ? stored.sportId
+        : sports.data[0]?.id ?? '';
+    const regionId =
+      stored.regionId && regionOptions.some((item) => item.id === stored.regionId)
+        ? stored.regionId
+        : regionOptions[0]?.id ?? '';
+    setSelection({ teamId, sportId, regionId });
+    setSelectionHydrated(true);
+  }, [teams.isLoading, creatableTeams, sports.data, regionOptions, selectionHydrated]);
 
+  // 선택한 팀이 더 이상 생성 가능 팀이 아니면 첫 creatable 팀으로 교정(원래 가드 보존).
   useEffect(() => {
-    if (!selectedSportId && sports.data?.[0]) setSelectedSportId(sports.data[0].id);
-  }, [selectedSportId, sports.data]);
+    if (!selectionHydrated) return;
+    if (selection.teamId && !creatableTeams.some((team) => team.teamId === selection.teamId)) {
+      setSelection((current) => ({ ...current, teamId: creatableTeams[0]?.teamId ?? '' }));
+    }
+  }, [selectionHydrated, creatableTeams, selection.teamId]);
 
+  // hydrate 이후 선택 변경을 영속(다음 step 재마운트에서 복원).
   useEffect(() => {
-    if (!regionId && regionOptions[0]) setRegionId(regionOptions[0].id);
-  }, [regionId, regionOptions]);
+    if (!selectionHydrated) return;
+    window.localStorage.setItem(selectionKey, JSON.stringify(selection));
+  }, [selection, selectionHydrated]);
+
+  const selectedTeamId = selection.teamId;
+  const selectedSportId = selection.sportId;
+  const regionId = selection.regionId;
 
   const model = buildCreateModel({
     step,
@@ -75,14 +111,14 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     submitting: createTeamMatch.isPending,
     onSelectTeam: (teamName) => {
       const team = myTeams?.find((item) => item.name === teamName);
-      if (team) setSelectedTeamId(team.teamId);
+      if (team) setSelection((current) => ({ ...current, teamId: team.teamId }));
     },
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
-      if (sport) setSelectedSportId(sport.id);
+      if (sport) setSelection((current) => ({ ...current, sportId: sport.id }));
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: setRegionId,
+    onRegionChange: (value) => setSelection((current) => ({ ...current, regionId: value })),
     onBack: () => router.push(previousHref(step)),
     onNext: () => router.push(nextHref(step)),
     onSubmit: () => {
@@ -95,6 +131,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       createTeamMatch.mutate(payload, {
         onSuccess: (result) => {
           window.localStorage.removeItem(storageKey);
+          window.localStorage.removeItem(selectionKey);
           router.push(result.detailRoute || `/team-matches/${result.teamMatchId}`);
         },
         onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 만들 수 없어요. 다시 시도해 주세요.'),

@@ -11,6 +11,7 @@ import {
   useV1TeamMatchEdit,
   useV1UpdateTeamMatch,
 } from '@/hooks/use-v1-api';
+import { extractErrorMessage } from '@/lib/error-message';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
@@ -135,7 +136,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
           window.localStorage.removeItem(selectionKey);
           router.push(result.detailRoute || `/team-matches/${result.teamMatchId}`);
         },
-        onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 만들 수 없어요. 다시 시도해 주세요.'),
+        onError: (err) => setError(extractErrorMessage(err, '팀매치를 만들 수 없어요. 다시 시도해 주세요.')),
       });
     },
   });
@@ -195,7 +196,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
         { ...payload, version },
         {
           onSuccess: (result) => router.push(result.detailRoute || `/team-matches/${teamMatchId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 수정할 수 없어요. 다시 시도해 주세요.'),
+          onError: (err) => setError(extractErrorMessage(err, '팀매치를 수정할 수 없어요. 다시 시도해 주세요.')),
         },
       );
     },
@@ -204,7 +205,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
         { reason: 'host_cancelled_from_v1_web' },
         {
           onSuccess: () => router.push(`/team-matches/${teamMatchId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '팀매치를 취소할 수 없어요. 다시 시도해 주세요.'),
+          onError: (err) => setError(extractErrorMessage(err, '팀매치를 취소할 수 없어요. 다시 시도해 주세요.')),
         },
       );
     },

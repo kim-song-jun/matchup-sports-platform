@@ -106,7 +106,7 @@ function matchStatusBadgeClass(mode: MatchDetailViewModel['mode'], status: Match
 
 function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: MatchDetailViewModel['match']['status']) {
   if (mode === 'pending') return '승인 대기';
-  if (mode === 'approved') return '승인완료';
+  if (mode === 'approved') return '승인 완료';
   if (mode === 'mine') return '내 매치';
   if (status === 'full') return '모집 완료';
   return '모집 중';
@@ -644,7 +644,7 @@ function SportStep({ model }: { model: MatchCreateViewModel }) {
             onClick={() => model.form?.onSelectSport(sport)}
           >
             <div className="tm-text-body-lg">{sport}</div>
-            <div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : ''}</div>
+            {sport === model.selectedSport ? <div className="tm-text-caption" style={{ marginTop: 5 }}>선택됨</div> : null}
           </button>
         ))}
       </div>

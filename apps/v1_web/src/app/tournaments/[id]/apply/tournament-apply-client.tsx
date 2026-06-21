@@ -325,13 +325,13 @@ function TeamSelectStep({
                           display: 'grid',
                           placeItems: 'center',
                           color: 'var(--text-caption)',
-                          fontSize: 17,
+                          fontSize: 'var(--font-size-body-lg)',
                         }}
                       >
                         {team.logoUrl ? (
                           <img src={team.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-caption)' }}>
+                          <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-caption)' }}>
                             {team.name?.charAt(0)}
                           </span>
                         )}
@@ -384,7 +384,7 @@ function TeamSelectStep({
                             display: 'grid',
                             placeItems: 'center',
                             color: 'var(--static-white)',
-                            fontSize: 11,
+                            fontSize: 'var(--font-size-micro)',
                             fontWeight: 800,
                           }}
                         >
@@ -1137,7 +1137,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(25,31,40,0.32)',
+              background: 'var(--scrim-dark-32)',
               display: 'grid',
               placeItems: 'center',
               zIndex: 9999,
@@ -1145,7 +1145,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           >
             <div
               className="tm-text-label"
-              style={{ color: 'var(--static-white)', background: 'rgba(25,31,40,0.72)', padding: '12px 20px', borderRadius: 14 }}
+              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 14 }}
             >
               잠깐만요…
             </div>

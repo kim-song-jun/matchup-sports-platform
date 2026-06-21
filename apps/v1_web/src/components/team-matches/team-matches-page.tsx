@@ -336,7 +336,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>
-      <div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>{secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={model.step === 'team' ? '/team-matches' : '/team-matches/new/team'}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}{primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.form?.submitting || Boolean(model.form?.lockedReason)} onClick={primaryAction}>{model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}</div>{edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}</div>
+      <div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>{secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}{primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.form?.submitting || Boolean(model.form?.lockedReason)} onClick={primaryAction}>{model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}</div>{edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}</div>
     </AppChrome>
   );
 }
@@ -527,7 +527,7 @@ function DraggableFilterSheet({
 function TeamMatchCard({ match, index }: { match: TeamMatchModel; index: number }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      매너·승 통계는 caption 유지 (맥락 정보). */
-  return <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}><div className="tm-team-match-vs"><div><div className="tm-text-caption">홈팀</div><div className="tm-text-subhead">{match.hostTeam}</div></div><span>vs</span><div style={{ textAlign: 'right' }}><div className="tm-text-caption">상대팀</div><div className="tm-text-subhead">모집 중</div></div></div><div style={{ padding: 14 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{match.sport}</span><span className="tm-badge tm-badge-grey">{match.grade}등급</span><span className="tm-badge tm-badge-grey">{match.format}</span><span className="tm-badge tm-badge-grey">{match.gender}</span>{match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div><div className="tm-match-list-footer"><span className="tm-text-caption">매너 {match.manner} · 승 {match.wins}</span><span className="tm-text-body-lg tab-num" style={{ fontWeight: 700, color: 'var(--blue500)' }}>{match.opponentCost.toLocaleString('ko-KR')}원</span></div></div></Link>;
+  return <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}><div className="tm-team-match-vs"><div><div className="tm-text-caption">홈팀</div><div className="tm-text-subhead">{match.hostTeam}</div></div><span>vs</span><div style={{ textAlign: 'right' }}><div className="tm-text-caption">상대팀</div><div className="tm-text-subhead">모집 중</div></div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{match.sport}</span><span className="tm-badge tm-badge-grey">{match.grade}등급</span><span className="tm-badge tm-badge-grey">{match.format}</span><span className="tm-badge tm-badge-grey">{match.gender}</span>{match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div><div className="tm-match-list-footer"><span className="tm-text-caption">매너 {match.manner} · 승 {match.wins}</span><span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue500)' }}>{match.opponentCost.toLocaleString('ko-KR')}원</span></div></div></Link>;
 }
 
 function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
@@ -722,6 +722,18 @@ function nextHref(step: TeamMatchCreateViewModel['step']) {
   if (step === 'condition') return '/team-matches/new/place-time';
   if (step === 'place-time') return '/team-matches/new/confirm';
   if (step === 'confirm') return '/team-matches/new/complete';
+  return '/team-matches';
+}
+
+/* prevHref: "이전" 버튼의 Link fallback — model.form?.onBack 이 없는 정적 렌더에서 사용.
+ * 단순히 team 아닌 경우를 모두 /new/team 으로 보내면 중간 단계에서 step 1 로 뛰어넘는
+ * 버그가 발생한다(form.onBack 이 항상 있는 client 코드에서도 이 fallback 이 노출될 수 있음). */
+function prevHref(step: TeamMatchCreateViewModel['step']) {
+  if (step === 'sport') return '/team-matches/new/team';
+  if (step === 'info') return '/team-matches/new/sport';
+  if (step === 'condition') return '/team-matches/new/info';
+  if (step === 'place-time') return '/team-matches/new/condition';
+  if (step === 'confirm') return '/team-matches/new/place-time';
   return '/team-matches';
 }
 

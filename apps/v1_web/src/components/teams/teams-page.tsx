@@ -147,7 +147,7 @@ function TeamOpenMatchesSection({
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: 10,
-                border: '1px solid var(--grey100)',
+                border: '1px solid var(--border)',
                 borderRadius: 14,
                 padding: '14px 16px',
                 background: 'var(--bg)',
@@ -247,7 +247,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               </div>
               {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비공개</button>}
             </div>
-            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
+            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
           </Card>
         </div>
 
@@ -324,7 +324,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
             {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비공개</button>}
           </div>
-          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
+          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
         </Card>
       </article>
       <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>{heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}<button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>{model.ctaPending ? '처리 중' : cta}</button></div>
@@ -384,7 +384,7 @@ export function TeamFormPageView({
             </Card>
           ) : null}
           <h2 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h2>
-          {form?.error ? <Card pad={14} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
+          {form?.error ? <Card pad={16} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
           <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
           <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           <div className="tm-create-field">
@@ -570,7 +570,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
           <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card>
         </div>
-        <Card pad={14} style={{ background: 'var(--grey50)', marginTop: 14 }}>
+        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 14 }}>
           <div className="tm-text-label">권한 규칙</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
         </Card>
@@ -583,11 +583,11 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         </div>
         {model.activeTab === 'members' ? (
           <MemberSection title="팀 멤버" sub="팀에 속한 멤버의 역할과 권한을 관리해요." desktopGrid>
-            {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
+            {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
           </MemberSection>
         ) : (
           <MemberSection title="가입 신청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
-            {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
+            {model.requests.map((request, index) => <MemberCard key={index} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
           </MemberSection>
         )}
       </div>
@@ -873,7 +873,7 @@ function MemberCard({
   const disabled = actionPending || actions.length === 0;
 
   return (
-    <Card pad={14}>
+    <Card pad={16}>
       <ListItem title={title} sub={sub} trailing={role} />
       <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
         관리

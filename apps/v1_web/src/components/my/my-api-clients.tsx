@@ -518,7 +518,7 @@ export function ProfileEditPageClient() {
         <label className="tm-create-field">
           <span className="tm-text-label">소개</span>
           {/* #25: rows=4 + min-height 100px — 프로필 소개는 좀 더 넓게 */}
-          <textarea className="tm-input tm-create-input-multiline" value={bio} onChange={(event) => setBio(event.target.value)} maxLength={500} rows={4} style={{ minHeight: 100 }} />
+          <textarea className="tm-input tm-create-input-multiline" value={bio} onChange={(event) => setBio(event.target.value)} maxLength={500} rows={4} />
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">공개 범위</span>
@@ -880,10 +880,10 @@ export function NotificationSettingsPageClient() {
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
           {toggleError ? (
-            <div className="tm-card" style={{ padding: 14, background: 'var(--tint-orange)', marginBottom: 8 }}>
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </div>
+            </Card>
           ) : null}
           {items.map((setting) => {
             const enabled = Boolean(notifications?.[setting.key]);

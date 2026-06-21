@@ -147,7 +147,7 @@ function TournamentsListContent() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
             {maxPrize > 0 ? (
-              <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>최대 {formatPrize(maxPrize)}</span>
+              <span style={{ fontWeight: 800, fontSize: 'var(--font-size-subhead)', letterSpacing: '-0.5px' }}>최대 {formatPrize(maxPrize)}</span>
             ) : (
               <span />
             )}

@@ -80,7 +80,7 @@ function SectionStepper({ sections }: { sections: ReadonlyArray<{ id: string; la
                 className="relative z-10 flex flex-col items-center gap-1.5 rounded focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[var(--font-size-caption)] font-bold ${
                     isActive
                       ? 'bg-[var(--blue500)] text-[var(--static-white)]'
                       : completed
@@ -95,7 +95,7 @@ function SectionStepper({ sections }: { sections: ReadonlyArray<{ id: string; la
                   )}
                 </span>
                 <span
-                  className={`text-[11px] leading-tight break-keep ${
+                  className={`text-[var(--font-size-micro)] leading-tight break-keep ${
                     isActive ? 'font-semibold text-[var(--text-strong)]' : 'text-[var(--text-caption)]'
                   }`}
                 >
@@ -127,7 +127,7 @@ function FormField({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[13px] font-semibold text-[var(--text-body)]">
+      <label htmlFor={id} className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
         {label}
         {required && (
           <>
@@ -137,7 +137,7 @@ function FormField({
         )}
       </label>
       {children}
-      {hint && <p className="text-[12px] text-[var(--text-caption)]">{hint}</p>}
+      {hint && <p className="text-[var(--font-size-caption)] text-[var(--text-caption)]">{hint}</p>}
     </div>
   );
 }
@@ -215,7 +215,7 @@ function DatetimeTextInput({
           .trim()}
       />
       {invalid && (
-        <p id={`${id}-err`} role="alert" className="text-[12px] text-[var(--red500)] mt-0.5">
+        <p id={`${id}-err`} role="alert" className="text-[var(--font-size-caption)] text-[var(--red500)] mt-0.5">
           날짜 형식이 맞지 않아요 (예: 2026-08-15 09:00)
         </p>
       )}
@@ -328,7 +328,7 @@ export default function AdminTournamentsNewPage() {
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 text-[13px] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -347,7 +347,7 @@ export default function AdminTournamentsNewPage() {
 
           {/* ── 기본 정보 ────────────────────────────────────────────── */}
           <section id="tsec-basic" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">기본 정보</h2>
+            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">기본 정보</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
               <FormField id="sport-id" label="종목" required>
@@ -446,7 +446,7 @@ export default function AdminTournamentsNewPage() {
 
           {/* ── 팀 / 선수 설정 ───────────────────────────────────────── */}
           <section id="tsec-team" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">팀 · 선수 설정</h2>
+            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">팀 · 선수 설정</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField id="team-count" label="참가 팀 수" hint="비우면 무제한">
                 <input
@@ -470,7 +470,7 @@ export default function AdminTournamentsNewPage() {
                     .trim()}
                 />
                 {teamCountError !== null && (
-                  <p id="team-count-err" role="alert" className="text-[12px] text-[var(--red500)] mt-0.5">
+                  <p id="team-count-err" role="alert" className="text-[var(--font-size-caption)] text-[var(--red500)] mt-0.5">
                     {teamCountError}
                   </p>
                 )}
@@ -521,7 +521,7 @@ export default function AdminTournamentsNewPage() {
                     .trim()}
                 />
                 {playersRangeError !== null && (
-                  <p id="players-range-err" role="alert" className="text-[12px] text-[var(--red500)] mt-0.5">
+                  <p id="players-range-err" role="alert" className="text-[var(--font-size-caption)] text-[var(--red500)] mt-0.5">
                     {playersRangeError}
                   </p>
                 )}
@@ -531,7 +531,7 @@ export default function AdminTournamentsNewPage() {
 
           {/* ── 참가비 / 계좌 ────────────────────────────────────────── */}
           <section id="tsec-fee" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">참가비 · 계좌</h2>
+            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">참가비 · 계좌</h2>
             <div className="flex flex-col gap-4">
               {/* 참가비 + 총 상금 — 2열 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -628,7 +628,7 @@ export default function AdminTournamentsNewPage() {
 
           {/* ── 규정 / 환불 ──────────────────────────────────────────── */}
           <section id="tsec-rules" className="px-5 py-6 scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">규정 · 환불 정책</h2>
+            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">규정 · 환불 정책</h2>
             <div className="flex flex-col gap-4">
               <FormField id="rules-text" label="대회 규정">
                 <textarea
@@ -661,7 +661,7 @@ export default function AdminTournamentsNewPage() {
         <div className="max-w-3xl mx-auto flex items-center gap-3 mt-5">
           <Link
             href="/admin/tournaments"
-            className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             취소
           </Link>
@@ -669,7 +669,7 @@ export default function AdminTournamentsNewPage() {
             type="submit"
             disabled={!canSubmit}
             className={[
-              'inline-flex items-center justify-center h-[48px] px-8 rounded-xl text-[15px] font-semibold transition-colors',
+              'inline-flex items-center justify-center h-[48px] px-8 rounded-xl text-[var(--font-size-body)] font-semibold transition-colors',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed',
             ].join(' ')}

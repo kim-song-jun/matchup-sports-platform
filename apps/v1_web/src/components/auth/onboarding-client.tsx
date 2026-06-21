@@ -409,9 +409,9 @@ function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboar
   return (
     <div className="tm-auth-stack">
       {/* #19: 핵심 상태값은 tm-text-body(15px)로 격상, 레이블은 caption 유지 */}
-      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>현재 단계</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
-      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>선택한 종목</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.sports.length}개</div></Card>
-      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>선택한 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
+      <Card pad={15}><div className="tm-text-caption">현재 단계</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
+      <Card pad={15}><div className="tm-text-caption">선택한 종목</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.sports.length}개</div></Card>
+      <Card pad={15}><div className="tm-text-caption">선택한 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
       <Notice title="잠깐 나가도 괜찮아요" body="설정을 나가도 선택한 내용이 저장돼요. 돌아오면 멈춘 단계부터 이어서 할 수 있어요." />
     </div>
   );
@@ -434,11 +434,11 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
   return (
     <div className="tm-auth-stack tm-onboarding-confirm-grid">
       {/* #19: 값(sportSummary, regionSummary)을 tm-text-body(15px/600)로 격상, 레이블은 caption 유지 */}
-      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{sportSummary || '선택하지 않음'}</div></Card>
-      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '선택하지 않음'}</div></Card>
+      <Card pad={15}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{sportSummary || '선택하지 않음'}</div></Card>
+      <Card pad={15}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '선택하지 않음'}</div></Card>
       {draft.currentLocation ? (
         <Card pad={15} className="tm-onboarding-confirm-full">
-          <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>현재 위치</div>
+          <div className="tm-text-caption">현재 위치</div>
           <div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>
             {formatLocation(draft.currentLocation)}
           </div>

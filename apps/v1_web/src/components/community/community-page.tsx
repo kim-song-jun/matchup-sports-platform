@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Pin, Send, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { BellIcon, ChatIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { BellIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
@@ -122,7 +122,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
        */}
       <div className="tm-chat-room-desktop-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/chat" aria-label="채팅 목록으로 돌아가기">
-          <ChevronLeft size={22} strokeWidth={2.2} aria-hidden="true" />
+          <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </Link>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
       </div>
@@ -180,7 +180,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
         {/* Desktop page head: only visible on desktop (tm-show-desktop) */}
         <div className="tm-notifications-desktop-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
-            <ChevronLeft size={22} strokeWidth={2.2} aria-hidden="true" />
+            <ChevronLeftIcon size={22} strokeWidth={2.2} />
           </Link>
           <div className="tm-notifications-desktop-head-title">
             <h1 className="tm-text-heading" style={{ margin: 0 }}>
@@ -235,7 +235,8 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
 }
 
 function ChatSection({ title, children }: { title: string; children: ReactNode }) {
-  const labelId = `chat-section-${title.replace(/\s+/g, '-')}`;
+  /* useId(): 다중 인스턴스 렌더 시 id 충돌 방지 (v1-coding-patterns §3) */
+  const labelId = useId();
   return (
     <section className="tm-chat-section" aria-labelledby={labelId}>
       <div id={labelId} className="tm-chat-section-label">{title}</div>

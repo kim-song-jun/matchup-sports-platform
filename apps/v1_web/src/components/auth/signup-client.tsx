@@ -2,8 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
+import { Card } from '@/components/v1-ui/primitives';
+import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import {
   useV1CheckEmail,
   useV1CheckNickname,
@@ -222,7 +222,7 @@ export function SignupClient() {
             {primary.label}
           </button>
           {disabledHint ? (
-            <p className="tm-text-caption" role="status" style={{ margin: '6px 0 0', textAlign: 'center', color: 'var(--text-caption)' }}>
+            <p className="tm-text-caption" role="status" style={{ margin: '6px 0 0', textAlign: 'center' }}>
               {disabledHint}
             </p>
           ) : null}
@@ -257,7 +257,7 @@ export function SignupClient() {
           ))}
         </div>
         {step !== 'birthdate' ? (
-          <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계">← 이전</button>
+          <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계"><ChevronLeftIcon size={18} strokeWidth={2.2} />이전</button>
         ) : null}
         <div className="tm-signup-hero">
           <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
@@ -304,7 +304,7 @@ export function SignupClient() {
                     setEmailCheck({ status: 'idle', value: '' });
                     setFieldError(null);
                   }}
-                  placeholder="예: me@email.com"
+                  placeholder="예: 이름@이메일.com"
                   type="email"
                   value={email}
                 />

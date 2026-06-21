@@ -1,8 +1,5 @@
 import type {
   MyHomeViewModel,
-  MyTeamMembersViewModel,
-  NotificationSettingsViewModel,
-  ProfileEditViewModel,
   SettingsViewModel,
 } from './my.types';
 
@@ -51,37 +48,6 @@ export const myHomeModel: MyHomeViewModel = {
   ],
 };
 
-export const myTeamMembersModel: MyTeamMembersViewModel = {
-  teamName: 'FC 발빠른놈들',
-  activeTab: 'members',
-  tabs: [
-    { key: 'members', label: '멤버', count: 3, onSelect: () => undefined },
-    { key: 'requests', label: '가입 신청', count: 2, onSelect: () => undefined },
-  ],
-  summary: [
-    { label: '전체', value: 18, unit: '명' },
-    { label: '운영진', value: 3, unit: '명' },
-    { label: '요청', value: 2, unit: '명' },
-  ],
-  members: [
-    { id: 'ms-1', name: '김정민', role: '팀장', meta: '공격수 · 매너 4.9', status: '나' },
-    { id: 'ms-2', name: '박서준', role: '운영진', meta: '미드필더 · 매너 4.8', status: '활동중' },
-    { id: 'ms-3', name: '이하늘', role: '멤버', meta: '수비수 · 매너 4.7', status: '활동중' },
-  ],
-  requests: [
-    { id: 'ap-1', name: '최민호', role: '가입 신청', meta: '축구 32회 · 매너 4.6', status: '검토' },
-    { id: 'ap-2', name: '정유진', role: '가입 신청', meta: '풋살 18회 · 매너 4.9', status: '검토' },
-  ],
-};
-
-export const profileEditModel: ProfileEditViewModel = {
-  user: myUser,
-  fields: [
-    { label: '닉네임', value: myUser.name },
-    { label: '소개', value: myUser.intro, multiline: true },
-  ],
-};
-
 export const settingsModel: SettingsViewModel = {
   title: '설정',
   groups: [
@@ -99,14 +65,5 @@ export const settingsModel: SettingsViewModel = {
         { label: '회원 탈퇴', sub: '탈퇴 전 꼭 확인해 주세요', href: '/my/settings/withdrawal', icon: 'W' },
       ],
     },
-  ],
-};
-
-export const notificationSettingsModel: NotificationSettingsViewModel = {
-  settings: [
-    { label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때', enabled: true },
-    { label: '팀 가입 신청', sub: '내가 운영하는 팀에 신청이 들어올 때', enabled: true },
-    { label: '채팅 메시지', sub: '참여 중인 매치와 팀 채팅 새 메시지', enabled: false },
-    { label: '마케팅 소식', sub: '새 기능과 이벤트 안내', enabled: false },
   ],
 };

@@ -47,7 +47,6 @@ export type TeamMatchListViewModel = {
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
     sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
-    viewOptions: Array<{ label: string; value: 'card' | 'compact'; description: string; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
   };

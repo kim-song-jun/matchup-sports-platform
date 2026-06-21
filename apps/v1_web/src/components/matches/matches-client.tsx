@@ -280,10 +280,6 @@ function buildMatchFilterSheet(
     { label: '마감임박', value: 'deadline', href: buildMatchHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
     { label: '최신순', value: 'latest', href: buildMatchHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
-  const viewOptions: NonNullable<MatchListViewModel['filterSheet']>['viewOptions'] = [
-    { label: '카드형', value: 'card', description: '이미지와 핵심 정보를 크게', href: buildMatchHref(params, { view: 'card', filter: '1' }), active: view === 'card' },
-    { label: '콤팩트형', value: 'compact', description: '더 많은 매치를 빠르게', href: buildMatchHref(params, { view: 'compact', filter: '1' }), active: view === 'compact' },
-  ];
   const genderOptions: NonNullable<MatchListViewModel['filterSheet']>['genderOptions'] = [
     { label: '성별 무관', value: '성별 무관', href: buildMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
     { label: '남', value: '남', href: buildMatchHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
@@ -306,7 +302,6 @@ function buildMatchFilterSheet(
     genderRule,
     levels,
     sortOptions,
-    viewOptions,
     genderOptions,
     levelOptions,
   };

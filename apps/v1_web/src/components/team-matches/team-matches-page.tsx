@@ -43,7 +43,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         {model.isLoading
           ? <PageSkeleton />
           : model.matches.length
-            ? <div className="tm-match-card-stack">{model.matches.map((match, index) => <TeamMatchCard key={match.id} match={match} index={index} />)}</div>
+            ? <div className="tm-match-card-stack">{model.matches.map((match) => <TeamMatchCard key={match.id} match={match} />)}</div>
             : <EmptyState title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
         }
       </div>
@@ -434,19 +434,6 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
             ))}
           </div>
         </div>
-        {/* TODO: view format toggle (list / grid) — planned for later
-        <div className="tm-filter-section">
-          <div className="tm-text-label">보기 방식</div>
-          <div className="tm-filter-view-grid">
-            {sheet.viewOptions.map((option) => (
-              <Link key={option.value} className={`tm-filter-view-option ${option.active ? 'tm-filter-view-option-active' : ''}`} href={option.href}>
-                <span className="tm-text-label">{option.label}</span>
-                <span className="tm-text-micro">{option.description}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-        */}
         <div className="tm-filter-actions">
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={sheet.closeHref}>닫기</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href={sheet.applyHref}>적용하기</Link>
@@ -524,7 +511,7 @@ function DraggableFilterSheet({
   );
 }
 
-function TeamMatchCard({ match, index }: { match: TeamMatchModel; index: number }) {
+function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      매너·승 통계는 caption 유지 (맥락 정보). */
   return <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}><div className="tm-team-match-vs"><div><div className="tm-text-caption">홈팀</div><div className="tm-text-subhead">{match.hostTeam}</div></div><span>vs</span><div style={{ textAlign: 'right' }}><div className="tm-text-caption">상대팀</div><div className="tm-text-subhead">모집 중</div></div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{match.sport}</span><span className="tm-badge tm-badge-grey">{match.grade}등급</span><span className="tm-badge tm-badge-grey">{match.format}</span><span className="tm-badge tm-badge-grey">{match.gender}</span>{match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div><div className="tm-match-list-footer"><span className="tm-text-caption">매너 {match.manner} · 승 {match.wins}</span><span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue500)' }}>{match.opponentCost.toLocaleString('ko-KR')}원</span></div></div></Link>;

@@ -330,10 +330,6 @@ function buildTeamMatchFilterSheet(
     { label: '마감임박', value: 'deadline', href: buildTeamMatchHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
     { label: '최신순', value: 'latest', href: buildTeamMatchHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
-  const viewOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['viewOptions'] = [
-    { label: '카드형', value: 'card', description: 'VS 히어로와 팀 정보', href: buildTeamMatchHref(params, { view: 'card', filter: '1' }), active: view === 'card' },
-    { label: '콤팩트형', value: 'compact', description: '더 많은 팀매치 비교', href: buildTeamMatchHref(params, { view: 'compact', filter: '1' }), active: view === 'compact' },
-  ];
   const genderOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['genderOptions'] = [
     { label: '성별 무관', value: '성별 무관', href: buildTeamMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
     { label: '남', value: '남', href: buildTeamMatchHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
@@ -356,7 +352,6 @@ function buildTeamMatchFilterSheet(
     genderRule,
     levels,
     sortOptions,
-    viewOptions,
     genderOptions,
     levelOptions,
   };

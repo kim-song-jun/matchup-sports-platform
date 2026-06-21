@@ -463,19 +463,6 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
             ))}
           </div>
         </div>
-        {/* TODO: view format toggle (list / grid) — planned for later
-        <div className="tm-filter-section">
-          <div className="tm-text-label">보기 방식</div>
-          <div className="tm-filter-view-grid">
-            {sheet.viewOptions.map((option) => (
-              <Link key={option.value} className={`tm-filter-view-option ${option.active ? 'tm-filter-view-option-active' : ''}`} href={option.href}>
-                <span className="tm-text-label">{option.label}</span>
-                <span className="tm-text-micro">{option.description}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-        */}
         <div className="tm-filter-actions">
           <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={sheet.closeHref}>닫기</Link>
           <Link className="tm-btn tm-btn-lg tm-btn-primary" href={sheet.applyHref}>적용하기</Link>

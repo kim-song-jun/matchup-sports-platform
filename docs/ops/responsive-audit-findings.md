@@ -11,7 +11,10 @@
 4. **unscoped 전역 셀렉터 타 도메인 침범** — .tm-floating-fab{display:none}가 team-matches FAB까지 숨김.
 5. **와이드(1920+) 우측 1fr 무제한** — admin DataTable/BracketTab.
 
-## prioritized 16 (수정 진행 중 — 단일 에이전트)
+## ✅ prioritized 16 — 전부 수정 완료 (`978dbb7f` + nav `bb266c8d`)
+라이브 검증(eval 측정): #1 team-matches 데스크톱 CTA 노출+FAB숨김(1440) · #2 신청폼 692px(←252) · #3 review shell 중앙정렬 200=200 · #4 태블릿 820서 2열 273×2 · #6 admin 테이블 900px(1920). 나머지(#5,7-11,13-16)는 비파괴 CSS + 에이전트 D3 + lint/vitest. (#12 auth 태블릿은 이미 600px 구현돼 skip.)
+
+## prioritized 16 (원본)
 **HIGH**: #1 team-matches 데스크톱 생성버튼 소실(team-matches-page.tsx:19-37) · #2 토너먼트 신청폼 600px 갇힘(tournament-apply-client.tsx:1055 인라인) · #3 my/review 3곳 left-pin(my.css:206-225,367-371).
 **MEDIUM**: #4 태블릿 그리드 미전환(systemic) · #5 홈 carousel override 부재 · #6 admin table 1320px 과폭 · #7 매치상세 패널 360px 고정 · #8 랜딩 히어로 380px · #9 채팅 태블릿 규칙 부재 · #10 토너먼트 steps 간격 · #11 admin bracket 우측 1fr.
 **LOW**: #12 auth 태블릿 프레임 · #13 홈 weather dead CSS · #14 search sticky top · #15 footer 정렬 · #16 admin KPI 그리드 단계.

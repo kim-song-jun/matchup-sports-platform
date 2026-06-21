@@ -14,8 +14,7 @@
     "lint:patterns": "node scripts/v1-pattern-check.mjs",
     "clean": "rm -rf .next out",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e": "playwright test --config e2e/playwright.config.ts"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.17",

@@ -18,12 +18,19 @@ export async function loginAs(page: Page, email: string): Promise<void> {
   }, email);
 }
 
-/** 로그아웃 상태(신규 방문자 플로우용) — v1 인증 키 제거. */
+/**
+ * 로그아웃 상태(신규 방문자 플로우용) — v1 인증 키 제거.
+ * addInitScript는 매 navigation 직전 실행되므로 가드 없이 제거하면
+ * 가입 성공 후 앱이 저장한 세션을 다음 라우트에서 다시 지워 버린다(Copilot #1).
+ * sessionStorage sentinel로 최초 1회만 제거 → 이후 앱이 세션을 저장하면 보존된다.
+ */
 export async function logout(page: Page): Promise<void> {
   await page.addInitScript(() => {
     try {
+      if (window.sessionStorage.getItem('__e2e_logged_out__')) return;
       window.localStorage.removeItem('teameet.v1.userEmail');
       window.localStorage.removeItem('teameet.v1.userId');
+      window.sessionStorage.setItem('__e2e_logged_out__', '1');
     } catch {
       /* noop */
     }

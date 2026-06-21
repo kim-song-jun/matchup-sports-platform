@@ -38,9 +38,17 @@
 - **#22a [low] 채팅 이미지버튼 no-op** (P13) `community-page.tsx:89` — → disabled 또는 '준비 중'.
 - **#13 [medium] 신청 후 도달 동선 약함 + 비인증 CTA dead-end** (P03/09) `matches-page.tsx:264,318`,`team-matches-client.tsx:447-449` — → 신청현황 CTA + 미인증/무팀 분기 CTA.
 
-### Batch E — a11y 터치타깃 (globals.css)
+### ✅ Batch E — a11y 터치 + edit 복귀 (완료 `59ab5e0a`, 라이브 #18 44px + dead code cascade 정리)
 - **#18 [medium] 리뷰 별점/태그/탭 터치 미달** (P12) `globals.css:3827-3836(별점 28px),3855-3865(태그 32px),3741-3750(탭 38px)` — → 44px hit area(시각크기 유지).
 - **#16 [medium] my edit 복귀 경로 공개로 이탈** (P05/06/07) `teams-page.tsx:361,407,410`,`teams-form-client.tsx:144` — → my 경유 시 /my/teams/[id] 복귀.
+
+## ✅ 집행 완료 요약 (페르소나 findings)
+- **critical 3**(`93873e97`): 매치/팀매치 위저드 종목·팀·지역 소실 + edit 무한로딩 — 라이브 증명.
+- **Batch A**(`ba25a146`): my 6 + dead code. **B**(`9d6b5bef`): tournament 5. **C**(`d6ff2916`): auth 3.
+  **D**(`54c129f8`): team-matches 6 + matches lockedReason 갭. **백엔드 #21**(`af632b58`): 매치/팀매치/팀가입
+  신청불가 사유 전수 해요체(v1_api 33 tests). **E**(`59ab5e0a`): 리뷰 터치 44px + edit 복귀 + cascade dead code.
+- 총 **22 비차단 findings 중 19 처리**(#9·10·11·12·13·14·16·17·18·19·20·21·22·23·24 + critical 3 + #6·7·12b). 전부 D3 + lint/tsc/vitest + (해당시)라이브.
+- **미처리 = 제품 결정/백엔드 의존만 잔여**(아래).
 
 ## 🔴 제품 결정 필요 (자동수정 금지 — 사용자 게이트)
 - **#8 onboarding status 'signup_done' 잔류** (P01) — 이메일 가입이 /onboarding/complete 미호출. 간소화(현 동작 유지+status 'completed' 명시) vs 위저드 경유. 제품 의도 확인.

@@ -18,10 +18,10 @@ test.describe('[applicant] 팀 탐색 및 가입 플로우', () => {
     // AppChrome title="팀" — 팀 목록 헤딩
     await expect(main).toContainText('팀');
     // seed 팀이 있으므로 팀 카드가 최소 1개 렌더되어야
-    const teamCards = page.locator('.tm-team-card-stack a, a[href*="/teams/"]').filter({
-      hasNot: page.locator('[href="/teams/new"]'),
-    });
-    expect(await teamCards.count()).toBeGreaterThanOrEqual(1);
+    // 실제 카드 스택 내 팀 링크만 타깃(광범위 a[href*="/teams/"]는 모바일서 숨겨진 데스크톱 링크를 first로 잡아 flaky).
+    // count() 즉시 평가 대신 first().toBeVisible()로 auto-wait (Copilot).
+    const teamCards = page.locator('.tm-team-card-stack a[href*="/teams/"]');
+    await expect(teamCards.first()).toBeVisible();
   });
 
   test('/teams → 팀 상세 — 가입 관련 CTA가 렌더된다', async ({ page }) => {

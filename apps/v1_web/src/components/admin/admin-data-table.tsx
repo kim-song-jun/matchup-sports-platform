@@ -168,17 +168,19 @@ export function AdminDataTable<T>({
                 return (
                 <tr
                   key={keyExtractor(row)}
-                  className={['transition-colors hover:bg-gray-50/60', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
+                  className={['transition-colors hover:bg-gray-50/60', tone ? ROW_TONE_TR[tone] : ''].filter(Boolean).join(' ')}
                 >
-                  {columns.map((col) => (
+                  {columns.map((col, colIdx) => (
                     <td
                       key={col.key}
                       className={[
                         'px-4 py-3 tabular-nums align-middle',
+                        // rowTone 좌측 accent: 테이블에서 <tr> border-l은 border model상 미렌더될 수 있어 첫 셀(td)에 적용 (Copilot)
+                        colIdx === 0 && tone ? ROW_TONE_ACCENT[tone] : '',
                         alignClass(col.align),
                         col.width ?? '',
                         col.className ?? '',
-                      ].join(' ')}
+                      ].filter(Boolean).join(' ')}
                     >
                       {col.render(row)}
                     </td>

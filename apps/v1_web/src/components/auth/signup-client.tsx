@@ -198,6 +198,17 @@ export function SignupClient() {
       ? { label: '건너뛰기', onClick: () => { setBirthDate(''); void goToOnboarding(); } }
       : null;
 
+  /* #18: disabled 이유 힌트 — tm-text-caption(12px)으로 CTA 하단에 표시 */
+  const disabledHint: string | null = primary.disabled
+    ? step === 'nickname'
+      ? '닉네임 중복 확인 후 다음으로 넘어갈 수 있어요.'
+      : step === 'email'
+        ? '이메일 중복 확인 후 다음으로 넘어갈 수 있어요.'
+        : step === 'password'
+          ? !passwordLongEnough ? '비밀번호는 8자 이상이어야 해요.' : '비밀번호 확인이 일치해야 해요.'
+          : null
+    : null;
+
   return (
     <AuthFrame
       fixedAction={
@@ -210,6 +221,11 @@ export function SignupClient() {
           >
             {primary.label}
           </button>
+          {disabledHint ? (
+            <p className="tm-text-caption" role="status" style={{ margin: '6px 0 0', textAlign: 'center', color: 'var(--text-caption)' }}>
+              {disabledHint}
+            </p>
+          ) : null}
           {skip ? (
             <button className="tm-btn tm-btn-md tm-btn-ghost tm-signup-skip" type="button" onClick={skip.onClick} disabled={saving}>
               {skip.label}

@@ -82,7 +82,8 @@ export function NumberDisplay({ value, unit = '원', size = 32, sub }: NumberDis
         }}
       >
         {typeof value === 'number' ? value.toLocaleString('ko-KR') : value}
-        <span style={{ fontSize: size * 0.5, fontWeight: 600, color: 'var(--text-muted)' }}>{unit}</span>
+        {/* #20: unit은 토큰 고정 15px(--font-size-body) — size 비율 대신 고정값으로 일관성 확보 */}
+        <span className="tm-text-body" style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{unit}</span>
       </div>
       {sub ? <div className="tm-text-caption" style={{ marginTop: 4 }}>{sub}</div> : null}
     </div>
@@ -102,7 +103,8 @@ export function KPIStat({ label, value, unit }: KPIStatProps) {
       <div className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>{label}</div>
       <div className="tab-num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-strong)', marginTop: 4 }}>
         {typeof value === 'number' ? value.toLocaleString('ko-KR') : value}
-        {unit ? <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 2 }}>{unit}</span> : null}
+        {/* #16: unit을 tm-text-micro(11px)로 낮춰 값 숫자 단독 prominence 확보 */}
+        {unit ? <span className="tm-text-micro" style={{ fontWeight: 500, color: 'var(--text-muted)', marginLeft: 2 }}>{unit}</span> : null}
       </div>
     </div>
   );

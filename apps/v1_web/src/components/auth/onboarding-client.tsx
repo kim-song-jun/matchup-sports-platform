@@ -351,12 +351,12 @@ function OnboardingFixedAction({
   step: OnboardingRouteStep;
 }) {
   if (step === 'resume') {
+    /* #22: 픽셀 스페이서 div → gap으로 교체 */
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" onClick={() => saveAndGo('sport', '/onboarding/sport')} type="button">처음부터 다시 선택</button>
-        <div style={{ height: 8 }} />
         <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" onClick={() => saveAndGo('confirm', '/onboarding/confirm')} type="button">저장된 선택 확인</button>
-      </>
+      </div>
     );
   }
 
@@ -383,12 +383,12 @@ function OnboardingFixedAction({
   }
 
   if (step === 'region') {
+    /* #22: 픽셀 스페이서 div → gap으로 교체 */
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '지역 선택 완료'}</button>
-        <div style={{ height: 8 }} />
         <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
-      </>
+      </div>
     );
   }
 
@@ -398,9 +398,10 @@ function OnboardingFixedAction({
 function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboardingStep?: V1OnboardingStep }) {
   return (
     <div className="tm-auth-stack">
-      <Card pad={15}><div className="tm-text-body-lg">현재 단계</div><div className="tm-text-caption">{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
-      <Card pad={15}><div className="tm-text-body-lg">선택한 종목</div><div className="tm-text-caption">{draft.sports.length}개</div></Card>
-      <Card pad={15}><div className="tm-text-body-lg">선택한 지역</div><div className="tm-text-caption">{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
+      {/* #19: 핵심 상태값은 tm-text-body(15px)로 격상, 레이블은 caption 유지 */}
+      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>현재 단계</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
+      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>선택한 종목</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.sports.length}개</div></Card>
+      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>선택한 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
       <Notice title="잠깐 나가도 괜찮아요" body="설정을 나가도 선택한 내용이 저장돼요. 돌아오면 멈춘 단계부터 이어서 할 수 있어요." />
     </div>
   );
@@ -422,12 +423,13 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
 
   return (
     <div className="tm-auth-stack tm-onboarding-confirm-grid">
-      <Card pad={15}><div className="tm-text-label">관심 종목과 실력</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{sportSummary || '선택하지 않음'}</div></Card>
-      <Card pad={15}><div className="tm-text-label">활동 지역</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{regionSummary || '선택하지 않음'}</div></Card>
+      {/* #19: 값(sportSummary, regionSummary)을 tm-text-body(15px/600)로 격상, 레이블은 caption 유지 */}
+      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{sportSummary || '선택하지 않음'}</div></Card>
+      <Card pad={15}><div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '선택하지 않음'}</div></Card>
       {draft.currentLocation ? (
         <Card pad={15} className="tm-onboarding-confirm-full">
-          <div className="tm-text-label">현재 위치</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>현재 위치</div>
+          <div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>
             {formatLocation(draft.currentLocation)}
           </div>
         </Card>

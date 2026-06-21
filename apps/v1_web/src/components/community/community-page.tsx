@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -10,6 +10,64 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BellIcon, ChatIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
+
+/* #23: 나가기 확인 시트 — a11y 보강 (ESC 핸들러 + 첫 버튼 autoFocus + role=dialog/aria-modal) */
+function LeaveConfirmSheet({
+  title,
+  body,
+  pending,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  body: string;
+  pending: boolean | undefined;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !pending) onCancel();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [pending, onCancel]);
+
+  return (
+    <div className="tm-chat-leave-scrim" role="presentation" onClick={pending ? undefined : onCancel}>
+      <div
+        className="tm-chat-leave-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="tm-text-body-lg">{title}</div>
+        <div className="tm-text-caption" style={{ marginTop: 6 }}>{body}</div>
+        <button
+          className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
+          style={{ marginTop: 16 }}
+          type="button"
+          disabled={pending}
+          onClick={onConfirm}
+          /* autoFocus: 모달 열릴 때 첫 번째 액션 버튼으로 포커스 이동 */
+          autoFocus
+        >
+          {pending ? '나가는 중' : '나가기'}
+        </button>
+        <button
+          className="tm-btn tm-btn-lg tm-btn-ghost tm-btn-block"
+          style={{ marginTop: 8 }}
+          type="button"
+          disabled={pending}
+          onClick={onCancel}
+        >
+          취소
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
   const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
@@ -41,14 +99,13 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
         </div>
       </div>
       {model.leaveConfirm ? (
-        <div className="tm-chat-leave-scrim" role="presentation">
-          <div className="tm-chat-leave-sheet" role="dialog" aria-modal="true" aria-label={model.leaveConfirm.title}>
-            <div className="tm-text-body-lg">{model.leaveConfirm.title}</div>
-            <div className="tm-text-caption" style={{ marginTop: 6 }}>{model.leaveConfirm.body}</div>
-            <button className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block" style={{ marginTop: 16 }} type="button" disabled={model.leaveConfirm.pending} onClick={model.leaveConfirm.onConfirm}>{model.leaveConfirm.pending ? '나가는 중' : '나가기'}</button>
-            <button className="tm-btn tm-btn-lg tm-btn-ghost tm-btn-block" style={{ marginTop: 8 }} type="button" disabled={model.leaveConfirm.pending} onClick={model.leaveConfirm.onCancel}>취소</button>
-          </div>
-        </div>
+        <LeaveConfirmSheet
+          title={model.leaveConfirm.title}
+          body={model.leaveConfirm.body}
+          pending={model.leaveConfirm.pending}
+          onConfirm={model.leaveConfirm.onConfirm}
+          onCancel={model.leaveConfirm.onCancel}
+        />
       ) : null}
     </AppChrome>
   );

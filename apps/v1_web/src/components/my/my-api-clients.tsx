@@ -497,7 +497,8 @@ export function ProfileEditPageClient() {
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">소개</span>
-          <textarea className="tm-input tm-create-input-multiline" value={bio} onChange={(event) => setBio(event.target.value)} maxLength={500} />
+          {/* #25: rows=4 + min-height 100px — 프로필 소개는 좀 더 넓게 */}
+          <textarea className="tm-input tm-create-input-multiline" value={bio} onChange={(event) => setBio(event.target.value)} maxLength={500} rows={4} style={{ minHeight: 100 }} />
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">공개 범위</span>

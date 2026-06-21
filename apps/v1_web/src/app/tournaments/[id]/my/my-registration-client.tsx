@@ -177,6 +177,54 @@ function RegistrationPass({
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
+  /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
+  if (status === 'awaiting_payment') {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderTop: '3px solid var(--orange500)',
+          borderRadius: 16,
+          overflow: 'hidden',
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ padding: '16px 18px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
+            <span className="tm-badge tm-badge-orange">입금 대기</span>
+          </div>
+          <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.35 }}>
+            {title}
+          </div>
+          {teamName ? (
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+              {teamName}
+            </div>
+          ) : null}
+        </div>
+        <div
+          style={{
+            borderTop: '1px dashed var(--border)',
+            padding: '13px 18px',
+            display: 'flex', flexDirection: 'column', gap: 9,
+          }}
+        >
+          <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDay(scheduledAt) || '일정 미정'} />
+          <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
+          {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
+        </div>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
+          <p className="tm-text-caption" style={{ color: 'var(--orange500)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
+            신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (status !== 'confirmed' && status !== 'waitlisted' && status !== 'paid') return null;
 
   const accent = getSportAccent(sportCode);

@@ -40,7 +40,8 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         <div className="tm-match-summary-row">
           <div className="tm-text-label">{model.summary.label}</div>
           {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
-          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 {model.summary.urgent}</div>
+          {/* #21: '모집 중 N' 숫자만 weight 700로 분리 — 나머지 caption 유지 */}
+          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700 }}>{model.summary.urgent}</strong></div>
         </div>
         <div className="tm-match-card-stack">
           {model.matches.length ? (

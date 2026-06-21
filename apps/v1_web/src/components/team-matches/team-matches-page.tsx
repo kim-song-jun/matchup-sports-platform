@@ -37,7 +37,8 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
       <MatchTypeSegment active="team" />
       <div className="tm-match-list">
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button">{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
-        <div className="tm-match-summary-row"><div className="tm-text-label">서울 전체 · 팀매치</div><div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 {model.summary.urgent}</div></div>
+        {/* #21: '모집 중 N' 숫자만 weight 700 — 나머지 caption 유지 */}
+        <div className="tm-match-summary-row"><div className="tm-text-label">서울 전체 · 팀매치</div><div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700 }}>{model.summary.urgent}</strong></div></div>
         {/* #5: 로딩 중엔 PageSkeleton, 완료 후 비어 있으면 EmptyState — 빈/로딩 구분 */}
         {model.isLoading
           ? <PageSkeleton />
@@ -559,7 +560,9 @@ function DraggableFilterSheet({
 }
 
 function TeamMatchCard({ match, index }: { match: TeamMatchModel; index: number }) {
-  return <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}><div className="tm-team-match-vs"><div><div className="tm-text-caption">홈팀</div><div className="tm-text-subhead">{match.hostTeam}</div></div><span>vs</span><div style={{ textAlign: 'right' }}><div className="tm-text-caption">상대팀</div><div className="tm-text-subhead">모집 중</div></div></div><div style={{ padding: 14 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{match.sport}</span><span className="tm-badge tm-badge-grey">{match.grade}등급</span><span className="tm-badge tm-badge-grey">{match.format}</span><span className="tm-badge tm-badge-grey">{match.gender}</span>{match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div><div className="tm-match-list-footer"><span className="tm-text-caption">매너 {match.manner} · 승 {match.wins}</span><span className="tm-text-label tab-num">{match.opponentCost.toLocaleString('ko-KR')}원</span></div></div></Link>;
+  /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
+   *      매너·승 통계는 caption 유지 (맥락 정보). */
+  return <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}><div className="tm-team-match-vs"><div><div className="tm-text-caption">홈팀</div><div className="tm-text-subhead">{match.hostTeam}</div></div><span>vs</span><div style={{ textAlign: 'right' }}><div className="tm-text-caption">상대팀</div><div className="tm-text-subhead">모집 중</div></div></div><div style={{ padding: 14 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{match.sport}</span><span className="tm-badge tm-badge-grey">{match.grade}등급</span><span className="tm-badge tm-badge-grey">{match.format}</span><span className="tm-badge tm-badge-grey">{match.gender}</span>{match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div><div className="tm-match-list-footer"><span className="tm-text-caption">매너 {match.manner} · 승 {match.wins}</span><span className="tm-text-body-lg tab-num" style={{ fontWeight: 700, color: 'var(--blue500)' }}>{match.opponentCost.toLocaleString('ko-KR')}원</span></div></div></Link>;
 }
 
 function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {

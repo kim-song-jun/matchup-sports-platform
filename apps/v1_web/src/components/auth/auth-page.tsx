@@ -165,21 +165,22 @@ function ProviderButton({ provider }: { provider: LoginProvider }) {
 }
 
 function ExceptionActions({ model }: { model: AuthExceptionViewModel }) {
+  /* #22: 픽셀 스페이서 div → gap으로 교체 */
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <AuthActionButton action={model.primary} />
-      {model.secondary ? <><div style={{ height: 8 }} /><AuthActionButton action={model.secondary} /></> : null}
-    </>
+      {model.secondary ? <AuthActionButton action={model.secondary} /> : null}
+    </div>
   );
 }
 
 function SignupActions({ primary, secondary }: { primary: AuthAction; secondary: AuthAction }) {
+  /* #22: 픽셀 스페이서 div → gap으로 교체 */
   return (
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <AuthActionButton action={primary} />
-      <div style={{ height: 8 }} />
       <AuthActionButton action={secondary} />
-    </>
+    </div>
   );
 }
 

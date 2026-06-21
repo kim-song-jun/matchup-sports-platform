@@ -1345,9 +1345,10 @@ button:disabled {
 .tm-section-action {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  /* #15: blue500으로 격상해 '더보기' 진입점 링크로 인식되도록 */
+  color: var(--blue500);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 0 4px;
   min-height: 44px; /* WS5 a11y 터치 타깃 */
   display: flex;
@@ -1952,7 +1953,8 @@ button:disabled {
 }
 
 .tm-create-input-multiline {
-  min-height: 104px;
+  /* #25: 104px → 72px — 과대한 빈 여백 제거, textarea는 내용에 따라 자동 성장 */
+  min-height: 72px;
   align-items: flex-start;
   padding-top: 12px;
 }

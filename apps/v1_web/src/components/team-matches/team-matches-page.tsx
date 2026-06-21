@@ -24,6 +24,14 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
       topBar={false}
       floatingSlot={<TeamMatchCreateFloatingButton />}
     >
+      {/* 데스크톱 전용 인라인 헤더 — FAB가 데스크톱에서 숨겨지므로 대체 CTA 제공 */}
+      <div className="tm-team-match-desktop-header tm-show-desktop">
+        <h1 className="tm-team-match-desktop-header-title">팀매치</h1>
+        <Link className="tm-team-match-desktop-create-btn" href="/team-matches/new/team" aria-label="팀매치 만들기">
+          <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
+          팀매치 만들기
+        </Link>
+      </div>
       <TeamMatchSearchBar filterCount={model.filterCount} search={model.search} query={model.query} filterHref={model.filterHref} />
       <MatchTypeSegment active="team" />
       <div className="tm-match-list">

@@ -732,7 +732,8 @@
 
   /* Prize cards: stay 3-col on desktop (already set) */
 
-  /* Desktop: revert to single-row flex so all 6 steps sit on one horizontal line */
+  /* Desktop: revert to single-row flex so all 6 steps sit on one horizontal line.
+     max-width + margin-inline: auto — 초광폭에서 스텝 열이 지나치게 넓어지지 않도록 제한 */
   .tm-tournament-promo-steps {
     display: flex;
     grid-template-columns: unset;
@@ -742,6 +743,8 @@
     align-items: center;
     padding-bottom: 0;
     margin-bottom: 20px;
+    max-width: 700px;
+    margin-inline: auto;
   }
 
   .tm-tournament-promo-step {

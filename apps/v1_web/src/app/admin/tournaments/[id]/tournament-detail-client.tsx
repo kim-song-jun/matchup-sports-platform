@@ -974,7 +974,8 @@ function BracketTab({
       {ConfirmModal}
     <div className={[
       'flex flex-col gap-6',
-      hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_1fr] lg:items-start lg:gap-6' : '',
+      /* 우측 컬럼(브래킷)에 minmax(0,640px) 상한 추가 — 1920+에서 과폭 방지 */
+      hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_minmax(0,640px)] lg:items-start lg:gap-6' : '',
     ].join(' ')}>
 
       {/* ── 좌측 컬럼: 관리 폼 (조 만들기 · 팀 배정 · 픽스처 만들기) ── */}

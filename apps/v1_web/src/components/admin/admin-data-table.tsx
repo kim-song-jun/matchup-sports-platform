@@ -115,7 +115,8 @@ export function AdminDataTable<T>({
   return (
     <>
       {/* ── Desktop table (lg+) ─────────────────────────────────────────── */}
-      <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      {/* max-w-[900px]: tableMaxWidth 미전달 시 과폭 방지 기본 캡 (1920+ 대응) */}
+      <div className={['hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden', tableMaxWidth ?? 'max-w-[900px]'].join(' ')}>
         <div className="overflow-x-auto">
           <table className={['w-full text-sm text-gray-700', tableMaxWidth ?? ''].join(' ').trim()}>
             <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">

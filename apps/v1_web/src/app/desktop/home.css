@@ -218,16 +218,22 @@
 }
 
 /* ─── Sidebar: weather strip ──────────────────────────────────────────────── */
+/* .tm-home-weather-head 인라인 style 대체 — 모바일 기본값(모든 폭)에서 CSS로 관리 */
+.tm-home-weather-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 @media (min-width: 1024px) {
   .tm-home-sidebar .tm-weather-strip {
     border-radius: 14px;
   }
 
-  /* Weather section: label + refresh button row */
+  /* 데스크톱: margin-bottom은 그대로 유지 */
   .tm-home-weather-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     margin-bottom: 8px;
   }
 }
@@ -279,6 +285,24 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+}
+
+/* ─── Featured carousel → 데스크톱 wrapped grid ──────────────────────────────
+ * 모바일: 가로 스와이프 캐러셀 (overflow-x:auto, flex).
+ * 데스크톱: 가로 스크롤 해제 → 2-up 래핑 그리드, 카드가 컬럼을 균등 분할.
+ */
+@media (min-width: 1024px) {
+  .tm-home-featured-carousel {
+    overflow-x: visible;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .tm-home-featured-carousel > * {
+    /* 캐러셀 고정폭(min(88%, 400px)) 해제 — 그리드 셀 채움 */
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

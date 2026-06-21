@@ -85,7 +85,8 @@ export default function AdminOverviewPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        /* lg:grid-cols-4: 어드민 사이드바가 1024+에서만 나타나므로 4열은 lg부터 (fix #16) */
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <AdminKpiCard
             label="활성 회원"
             value={overview?.users.active ?? 0}

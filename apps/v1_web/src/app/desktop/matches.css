@@ -110,6 +110,18 @@
   }
 }
 
+/* ─── 태블릿 (768–1023): 2-up 그리드 전환 ───────────────────────────────────
+ * 600px 프레임 폭에서 모바일 단일 컬럼 → 2-up 으로 전환해 공간 활용 개선.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-match-card-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+}
+
 @media (min-width: 1440px) {
   /* 3-up grid at ≥1440. */
   .tm-match-card-stack {
@@ -161,10 +173,12 @@
     padding: 28px 0 12px;
   }
 
-  /* Two-column layout for the detail body + sticky right card. */
+  /* Two-column layout for the detail body + sticky right card.
+     minmax(0,1fr): 좌측이 내용에 따라 수축 가능 (overflow 방지).
+     min(360px,34%): 우측 패널이 초광폭 뷰포트에서 무한 확장되지 않도록 상한 */
   .tm-match-detail-desktop-layout {
     display: grid;
-    grid-template-columns: 1fr 360px;
+    grid-template-columns: minmax(0, 1fr) min(360px, 34%);
     gap: 32px;
     align-items: start;
     padding-top: 0;

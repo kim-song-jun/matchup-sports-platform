@@ -125,6 +125,16 @@
   }
 }
 
+/* ─── 태블릿 (768–1023): 스와이프 액션 숨김 ──────────────────────────────────
+ * 태블릿(포인터 디바이스)에서 터치 전용 스와이프 액션이 노출되지 않도록 한다.
+ * ≥1024 블록에서도 display:none이지만, 768-1023 구간을 명시적으로 처리.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-chat-row-actions {
+    display: none;
+  }
+}
+
 /* ─── /chat/[id] room: centered conversation column ──────────────────────
  * Message bubbles + input bar re-scoped to a ~760px centered column.
  * The mobile .tm-topbar is hidden on desktop — the JSX renders a

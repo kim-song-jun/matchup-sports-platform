@@ -113,7 +113,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Weather strip */}
           <div className="tm-home-sidebar-weather-wrap">
-            <div className="tm-home-weather-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
+            {/* 인라인 style 제거 → home.css .tm-home-weather-head 규칙으로 이전 */}
+            <div className="tm-home-weather-head">
               <div className="tm-text-label">현재 위치 날씨</div>
               <button
                 className="tm-btn tm-btn-icon tm-btn-neutral"

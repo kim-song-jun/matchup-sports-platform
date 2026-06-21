@@ -8,6 +8,51 @@
 /* ─── List page (/team-matches) ──────────────────────────────────────────── */
 
 @media (min-width: 1024px) {
+  /* 인라인 "팀매치 만들기" CTA 헤더 — FAB는 데스크톱에서 display:none이므로 대체 CTA */
+  .tm-team-match-desktop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 28px 0 4px;
+  }
+
+  .tm-team-match-desktop-header-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--grey900);
+    letter-spacing: -0.5px;
+    margin: 0;
+  }
+
+  /* matches.css / teams.css의 desktop-create-btn 패턴과 동일 */
+  .tm-team-match-desktop-create-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: var(--blue500);
+    color: var(--static-white);
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.12s;
+    flex-shrink: 0;
+  }
+
+  .tm-team-match-desktop-create-btn:hover {
+    background: var(--blue600);
+  }
+
+  .tm-team-match-desktop-create-btn:focus-visible {
+    outline: 2px solid var(--blue500);
+    outline-offset: 2px;
+    border-radius: 10px;
+  }
+
   /* Search bar: un-stick from mobile top, widen padding to match content column */
   .tm-list-searchbar {
     position: static;

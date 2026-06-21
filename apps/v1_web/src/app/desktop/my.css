@@ -206,6 +206,9 @@
   .tm-review-shell {
     padding: 0 0 48px;
     max-width: 720px;
+    /* 가운데 정렬 — .tm-my-settings-desktop 패턴 일치 */
+    margin-left: auto;
+    margin-right: auto;
   }
 
   /* Review schedule cards: hover lift. */
@@ -222,6 +225,9 @@
   .tm-review-compose-shell {
     max-width: 720px;
     padding-bottom: 120px;
+    /* 가운데 정렬 — .tm-review-shell 패턴 일치 */
+    margin-left: auto;
+    margin-right: auto;
   }
 
   /* Stats grid: 4-up on desktop. */
@@ -368,6 +374,9 @@
     display: grid;
     gap: 14px;
     max-width: 800px;
+    /* .tm-my-settings-desktop(184-186) 패턴과 동일하게 가운데 정렬 */
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .tm-my-members-desktop .tm-my-list-stack {

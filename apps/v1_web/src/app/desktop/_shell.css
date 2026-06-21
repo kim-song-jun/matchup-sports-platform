@@ -156,6 +156,11 @@
     padding-left: 40px;
     padding-right: 40px;
   }
+
+  /* 푸터 내부 콘텐츠를 1120px 컬럼에 맞춰 40px 패딩으로 정렬 (1024에서 24px) */
+  .tm-desktop-footer-inner {
+    padding: 24px 40px;
+  }
 }
 
 /* ─── Desktop top navigation bar ──────────────────────────────────────────── */

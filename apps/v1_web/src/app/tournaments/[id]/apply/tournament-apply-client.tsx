@@ -1050,10 +1050,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   return (
     <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
-      <div
-        className="tm-tournament-apply-body"
-        style={{ maxWidth: 'var(--v1-app-chrome-frame-width)', marginInline: 'auto', width: '100%' }}
-      >
+      {/* maxWidth/marginInline 인라인 스타일 제거:
+          모바일은 globals.css 기본값이 처리, 데스크톱은 tournaments.css의
+          .tm-tournament-apply-body { max-width:unset } + .tm-tournament-form-grid 가 담당 */}
+      <div className="tm-tournament-apply-body">
         <StepIndicator current={step} />
 
         {/* Desktop 2-column layout via .tm-tournament-form-grid */}

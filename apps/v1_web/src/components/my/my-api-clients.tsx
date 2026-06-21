@@ -46,7 +46,7 @@ import {
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import type { MyHomeViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
-import { myHomeModel, profileEditModel, settingsModel } from './my.view-model';
+import { myHomeModel, settingsModel } from './my.view-model';
 
 type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -62,7 +62,23 @@ export function MyHomePageClient() {
   const pendingReviews = useV1Reviews({ tab: 'pending', limit: 1 }, { enabled: Boolean(profile.data) });
 
   const model = useMemo(() => {
-    if (!profile.data) return myHomeModel;
+    if (!profile.data) {
+      // profile.data 부재(로딩 중) 시 mock 사용자 정보를 노출하지 않는다.
+      return {
+        ...myHomeModel,
+        user: {
+          ...myHomeModel.user,
+          name: '—',
+          handle: '—',
+          region: '—',
+          initials: '—',
+          intro: '',
+          sports: [],
+          stats: myHomeModel.user.stats.map((stat) => ({ ...stat, value: '—' })),
+          monthly: myHomeModel.user.monthly.map((stat) => ({ ...stat, value: '—' })),
+        },
+      };
+    }
     return toMyHomeModel(
       profile.data,
       teams.data?.items ?? [],
@@ -197,14 +213,14 @@ export function ProfileEditPageClient() {
   const update = useV1UpdateProfile();
   const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
-  const [displayName, setDisplayName] = useState(profileEditModel.user.name);
-  const [nickname, setNickname] = useState(profileEditModel.user.name);
+  const [displayName, setDisplayName] = useState('');
+  const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageName, setProfileImageName] = useState('');
-  const [bio, setBio] = useState(profileEditModel.user.intro);
+  const [bio, setBio] = useState('');
   const [visibilityStatus, setVisibilityStatus] = useState<'public' | 'members_only' | 'private'>('public');
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
@@ -671,20 +687,7 @@ function SportLevelPicker({
 }
 
 export function SettingsPageClient() {
-  const settings = useV1Settings();
-  const model = {
-    ...settingsModel,
-    groups: settingsModel.groups.map((group) => ({
-      ...group,
-      items: group.items.map((item) =>
-        item.label === '프로필 수정' && settings.data
-          ? { ...item, sub: `${settings.data.profile.displayName} · ${visibilityLabel(settings.data.profile.visibilityStatus)}` }
-          : item,
-      ),
-    })),
-  };
-
-  return <SettingsPageView model={model} />;
+  return <SettingsPageView model={settingsModel} />;
 }
 
 type LocationStatus = 'idle' | 'requesting' | 'matched' | 'denied' | 'unsupported' | 'unmatched' | 'saved';
@@ -1154,11 +1157,6 @@ function roleLabel(role: string) {
   return '비회원';
 }
 
-function visibilityLabel(value: string) {
-  if (value === 'private') return '비공개';
-  if (value === 'members_only') return '멤버 공개';
-  return '전체 공개';
-}
 
 function hasTrustValue(value: string) {
   return value === 'verified' || value === 'estimated';

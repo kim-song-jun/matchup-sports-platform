@@ -89,7 +89,7 @@ export function getTeamMatchListViewModel(): TeamMatchListViewModel {
   };
 }
 
-export function getTeamMatchStateViewModel(state: TeamMatchStateViewModel['state']): TeamMatchStateViewModel {
+export function getTeamMatchStateViewModel(state: 'empty' | 'error'): TeamMatchStateViewModel {
   const base = getTeamMatchListViewModel();
   const copy = {
     empty: {
@@ -101,11 +101,6 @@ export function getTeamMatchStateViewModel(state: TeamMatchStateViewModel['state
       title: '팀매치 목록을 불러오지 못했어요',
       description: '일시적으로 목록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
       matches: [],
-    },
-    filter: {
-      title: '팀매치 필터',
-      description: '상대 팀 조건과 경기 방식을 선택해 신청 가능한 팀매치를 찾아보세요.',
-      matches: base.matches,
     },
   }[state];
 

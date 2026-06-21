@@ -238,7 +238,10 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
 }
 
 
-export function LegalPageView({ model }: { model: SettingsViewModel }) {
+// model prop is intentionally unused — LegalPageView renders static legal content only.
+// The prop is kept for backward compatibility with the existing page.tsx caller.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
   return (
     <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
@@ -254,7 +257,6 @@ export function LegalPageView({ model }: { model: SettingsViewModel }) {
             <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" chev />
             <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" chev />
           </Card>
-          <MenuSection section={model.groups[0]} />
         </div>
       </div>
     </AppChrome>

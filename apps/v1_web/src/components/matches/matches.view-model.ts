@@ -229,11 +229,6 @@ export function getMatchStateViewModel(state: MatchStateViewModel['state']): Mat
       description: '일시적으로 목록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
       matches: [],
     },
-    filter: {
-      title: '필터',
-      description: '원하는 종목, 지역, 모집 상태를 선택해 참여 가능한 매치를 찾아보세요.',
-      matches: base.matches,
-    },
     joined: {
       title: '참여한 매치',
       description: '신청 대기와 승인 완료 상태의 개인 매치를 모아 보여줍니다.',

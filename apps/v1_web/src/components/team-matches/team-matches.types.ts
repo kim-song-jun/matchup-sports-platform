@@ -59,7 +59,7 @@ export type TeamMatchListViewModel = {
 };
 
 export type TeamMatchStateViewModel = TeamMatchListViewModel & {
-  state: 'empty' | 'error' | 'filter';
+  state: 'empty' | 'error';
   title: string;
   description: string;
 };

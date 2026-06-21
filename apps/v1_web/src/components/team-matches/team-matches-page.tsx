@@ -5,7 +5,7 @@ import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
@@ -53,8 +53,6 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
 }
 
 export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewModel }) {
-  if (model.state === 'filter') return <TeamMatchFilterPageView model={model} />;
-
   return (
     <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/team-matches">
       <div className="tm-match-list">
@@ -68,39 +66,6 @@ export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewMod
             <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/team-matches" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
           </Card>
         ) : null}
-      </div>
-    </AppChrome>
-  );
-}
-
-function TeamMatchFilterPageView({ model }: { model: TeamMatchStateViewModel }) {
-  return (
-    <AppChrome title="필터" activeTab="matches" bottomNav={false} backHref="/team-matches">
-      <div className="tm-create-shell">
-        <section>
-          <h1 className="tm-text-heading">팀매치 조건</h1>
-          <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
-        </section>
-        <Card pad={16}>
-          <div className="tm-text-body-lg">종목</div>
-          <div className="tm-sport-chip-row" style={{ marginTop: 12 }}>
-            {model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href}>{sport.label}</Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button">{sport.label}</button>)}
-          </div>
-        </Card>
-        <Card pad={16}>
-          <div className="tm-text-body-lg">상대팀 조건</div>
-          <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
-            <ListItem title="등급" sub="A-C 등급" trailing="변경 가능" />
-            <ListItem title="경기 방식" sub="5:5, 6:6, 11:11" trailing="3개" />
-            <ListItem title="비용" sub="무료초청 우선" trailing="1개" />
-          </div>
-        </Card>
-      </div>
-      <div className="tm-fixed-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/team-matches">초기화</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/team-matches">{model.matches.length}개 결과 보기</Link>
-        </div>
       </div>
     </AppChrome>
   );

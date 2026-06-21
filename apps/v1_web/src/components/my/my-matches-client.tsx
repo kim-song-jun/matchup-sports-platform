@@ -4,18 +4,17 @@ import { useV1MyMatches } from '@/hooks/use-v1-api';
 import type { V1Match } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
-import { getMyMatchesModel } from './my.view-model';
 
 export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
   const query = useV1MyMatches({ mode, limit: 50 });
-  const fallback = getMyMatchesModel(mode);
-  const items = query.data?.items ?? [];
-  const matches = items.map(toMyMatch);
+  // Only show real data. Mock fallback matches must never appear in place of real data.
+  const matches = query.data ? query.data.items.map(toMyMatch) : [];
 
   const model: MyMatchesViewModel = {
-    ...fallback,
-    matches: query.data ? matches : fallback.matches,
-    summary: buildSummary(mode, query.data ? matches : fallback.matches),
+    mode,
+    title: mode === 'joined' ? '참여한 매치' : '내가 만든 매치',
+    matches,
+    summary: buildSummary(mode, matches),
     apiNotice: getApiNotice(query.isLoading, query.isError),
   };
 

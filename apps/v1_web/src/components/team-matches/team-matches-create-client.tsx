@@ -373,7 +373,6 @@ function buildPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string
     regionId,
     title: draft.title.trim(),
     description: draft.description.trim() || null,
-    imageUrl: '/mock/generated/team-huddle.webp',
     startsAt: startsAt.toISOString(),
     endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
     deadlineAt: null,

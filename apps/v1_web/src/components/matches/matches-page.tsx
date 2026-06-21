@@ -57,8 +57,6 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
 }
 
 export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
-  if (model.state === 'filter') return <MatchFilterPageView model={model} />;
-
   return (
     <AppChrome title={model.title} activeTab="matches" bottomNav={false} backHref="/matches">
       {/* Desktop back + title header (mobile topbar is hidden on desktop) */}
@@ -89,45 +87,6 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
   );
 }
 
-function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
-  return (
-    <AppChrome title="필터" activeTab="matches" bottomNav={false} backHref="/matches">
-      {/* Desktop page head */}
-      <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
-          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
-        <h1 className="tm-text-heading" style={{ margin: 0 }}>필터</h1>
-      </div>
-      <div className="tm-create-shell tm-match-create-shell">
-        <section>
-          <h2 className="tm-text-heading">매치 조건</h2>
-          <p className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55 }}>{model.description}</p>
-        </section>
-        <Card pad={16}>
-          <div className="tm-text-body-lg">종목</div>
-          <div className="tm-sport-chip-row" style={{ marginTop: 12 }}>
-            {model.sports.map((sport) => <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button">{sport.label}</button>)}
-          </div>
-        </Card>
-        <Card pad={16}>
-          <div className="tm-text-body-lg">현재 적용된 조건</div>
-          <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
-            <ListItem title="지역" sub="서울 전체" trailing="변경 가능" />
-            <ListItem title="날짜" sub="이번 주" trailing="변경 가능" />
-            <ListItem title="모집 상태" sub="모집 중 우선" trailing="2개" />
-          </div>
-        </Card>
-      </div>
-      <div className="tm-fixed-cta">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches">초기화</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/matches">{model.matches.length}개 결과 보기</Link>
-        </div>
-      </div>
-    </AppChrome>
-  );
-}
 
 function MatchCreateFloatingButton() {
   return (

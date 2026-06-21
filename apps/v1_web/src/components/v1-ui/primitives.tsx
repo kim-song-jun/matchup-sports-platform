@@ -33,8 +33,10 @@ export function AlertBanner({
         background: s.bg,
         color: s.color,
         lineHeight: 1.55,
+        /* #6: error tone은 weight 700으로 시각 강도 격상 */
+        fontWeight: isError ? 700 : undefined,
       }}
-      className="tm-text-caption"
+      className="tm-text-label"
     >
       {message}
     </div>
@@ -96,7 +98,8 @@ type KPIStatProps = {
 export function KPIStat({ label, value, unit }: KPIStatProps) {
   return (
     <div>
-      <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{label}</div>
+      {/* #1: 라벨은 micro/muted로 recede — 값이 상대적으로 pop */}
+      <div className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>{label}</div>
       <div className="tab-num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-strong)', marginTop: 4 }}>
         {typeof value === 'number' ? value.toLocaleString('ko-KR') : value}
         {unit ? <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 2 }}>{unit}</span> : null}
@@ -156,7 +159,8 @@ export function ListItem({ title, sub, trailing, chev, href }: ListItemProps) {
         </div>
         {sub ? <div className="tm-text-caption" style={{ marginTop: 2 }}>{sub}</div> : null}
       </div>
-      {trailing ? <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>{trailing}</div> : null}
+      {/* #1: trailing(상태/수치)은 text-strong으로 — 라벨 muted와 대비 */}
+      {trailing ? <div className="tm-text-label" style={{ color: 'var(--text-strong)', flexShrink: 0 }}>{trailing}</div> : null}
       {chev ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}
     </>
   );
@@ -255,19 +259,34 @@ type InfoRowProps = {
   valueColor?: string;
   /** Pass true on the final row of a card to remove the redundant bottom hairline. */
   isLast?: boolean;
+  /** Optional sub-text rendered below the value in micro/caption style. (#13: matches-page InfoRow 통합) */
+  sub?: string;
+  /** Optional inline badge node rendered after the value. (#2: 희소성 배지) */
+  badge?: React.ReactNode;
 };
 
-export function InfoRow({ label, value, valueColor, isLast }: InfoRowProps) {
+export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRowProps) {
   return (
     <div
       className="tm-info-row"
       style={{ ...(isLast ? { borderBottom: 'none' } : {}) }}
     >
-      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+      {/* #1: 라벨은 caption/muted로 recede */}
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
         {label}
       </div>
-      <div className="tm-text-label" style={{ textAlign: 'right', color: valueColor ?? 'var(--text-strong)' }}>
-        {value}
+      {/* #1: 값 슬롯 — body(15px)+weight600+strong으로 라벨 대비 명확한 위계 */}
+      <div style={{ textAlign: 'right', minWidth: 0 }}>
+        <div
+          className="tm-text-body"
+          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
+        >
+          {value}
+          {/* #2: 희소성/마감 인라인 배지 */}
+          {badge}
+        </div>
+        {/* #13: sub-text 지원 — matches-page 로컬 InfoRow 통합 */}
+        {sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}
       </div>
     </div>
   );

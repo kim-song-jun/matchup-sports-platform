@@ -492,7 +492,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           </div>
         ) : null}
 
-        {/* Bottom row: entry fee + team count */}
+        {/* #7: Bottom row: entry fee(강조) + team fill rate(마감 임박 배지) */}
         <div
           style={{
             display: 'flex',
@@ -503,10 +503,15 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             borderTop: '1px solid var(--grey100)',
           }}
         >
-          <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+          {/* #7: 참가비 — text-strong + weight700로 시각 강도 격상 */}
+          <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
             참가비 {formatEntryFee(item.entryFee)}
           </span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* #7: 확정 팀 ≥80% 이상이면 '거의 마감' orange 배지 */}
+            {item.teamCount > 0 && item.confirmedCount / item.teamCount >= 0.8
+              ? <span className="tm-badge tm-badge-orange">거의 마감</span>
+              : null}
             <span className="tab-num">{item.confirmedCount}</span>
             <span>/</span>
             <span className="tab-num">{item.teamCount}</span>

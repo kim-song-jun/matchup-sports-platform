@@ -54,6 +54,8 @@ export type TeamMatchListViewModel = {
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
   summary: { count: number; today: number; urgent: number };
   matches: TeamMatchModel[];
+  /** #5: 로딩 중 여부 — true일 때 EmptyState 대신 PageSkeleton 렌더 */
+  isLoading?: boolean;
 };
 
 export type TeamMatchStateViewModel = TeamMatchListViewModel & {

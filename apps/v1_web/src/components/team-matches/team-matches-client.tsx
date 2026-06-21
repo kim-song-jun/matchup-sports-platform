@@ -100,8 +100,7 @@ export function TeamMatchListPageClient() {
   };
   // 로딩 중(items === undefined)에는 mock matches를 렌더하지 않는다.
   // base.matches는 존재하지 않는 ID(team-match-1~4)를 가리켜, 로딩 중에 클릭하면 404로 이어진다.
-  // items가 확정된 후에만 실제 데이터로 카드를 렌더하고, 로딩 중에는 빈 배열을 넘겨
-  // TeamMatchListPageView가 스켈레톤(EmptyState)을 표시하게 한다.
+  // #5: isLoading=true를 넘겨 TeamMatchListPageView가 EmptyState 대신 PageSkeleton을 렌더하게 한다.
   const model: TeamMatchListViewModel = items
     ? {
         ...base,
@@ -134,8 +133,9 @@ export function TeamMatchListPageClient() {
           matches: countItems,
           selectedSportId,
         }),
-        // 로딩 중 mock 카드가 클릭되지 않도록 빈 배열로 override
         matches: [],
+        // #5: 로딩 중임을 명시 — 빈/로딩 구분
+        isLoading: query.isLoading,
       };
 
   return <TeamMatchListPageView model={model} />;

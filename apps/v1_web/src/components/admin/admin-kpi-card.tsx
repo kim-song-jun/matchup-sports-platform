@@ -26,6 +26,14 @@ const TONE_ICON: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
   danger: 'text-red-400',
 };
 
+/* #10: danger/warning tone일 때 카드 배경·테두리로 시각 강도 격상 */
+const TONE_WRAPPER: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
+  neutral: 'bg-white border-gray-100',
+  positive: 'bg-white border-gray-100',
+  warning: 'bg-amber-50 border-amber-100',
+  danger: 'bg-red-50 border-red-100',
+};
+
 function KpiCardInner({
   label,
   value,
@@ -34,7 +42,7 @@ function KpiCardInner({
   icon,
 }: Omit<AdminKpiCardProps, 'href' | 'ariaLabel'>) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-4 md:p-5 min-h-[80px] flex flex-col justify-between">
+    <div className={`${TONE_WRAPPER[tone]} rounded-2xl border p-4 md:p-5 min-h-[80px] flex flex-col justify-between`}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-[12px] md:text-[13px] text-gray-500 leading-tight">{label}</p>
         {icon && (

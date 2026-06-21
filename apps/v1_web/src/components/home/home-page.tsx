@@ -259,8 +259,12 @@ function FeaturedMatchCard({
         ) : (
           <>
             <div className="tm-text-body-lg">{match.venue}</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+            <div className="tm-text-caption" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {match.date} {match.time} · {match.currentParticipants}/{match.maxParticipants}명
+              {/* #8: 잔여 자리 ≤3일 때 orange 배지로 희소성 강조 */}
+              {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants
+                ? <span className="tm-badge tm-badge-orange">마감 임박</span>
+                : null}
             </div>
           </>
         )}
@@ -388,9 +392,16 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
               {match.title}
             </div>
             <div className="tm-match-card-footer">
-              <span className="tm-text-micro tab-num" style={{ color: 'var(--text-muted)' }}>
-                {match.currentParticipants}/{match.maxParticipants}명
-              </span>
+              {/* #8: 잔여 자리 ≤3일 때 인원 수치를 orange로 + 텍스트 강조 */}
+              {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants ? (
+                <span className="tm-text-micro tab-num" style={{ color: 'var(--orange500)', fontWeight: 700 }}>
+                  {match.currentParticipants}/{match.maxParticipants}명 · 마감 임박
+                </span>
+              ) : (
+                <span className="tm-text-micro tab-num" style={{ color: 'var(--text-muted)' }}>
+                  {match.currentParticipants}/{match.maxParticipants}명
+                </span>
+              )}
               <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
                 {match.actionLabel}
               </span>

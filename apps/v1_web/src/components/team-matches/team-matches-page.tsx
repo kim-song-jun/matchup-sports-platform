@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import type {
@@ -37,7 +38,13 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
       <div className="tm-match-list">
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button">{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
         <div className="tm-match-summary-row"><div className="tm-text-label">서울 전체 · 팀매치</div><div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 {model.summary.urgent}</div></div>
-        {model.matches.length ? <div className="tm-match-card-stack">{model.matches.map((match, index) => <TeamMatchCard key={match.id} match={match} index={index} />)}</div> : <EmptyState title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />}
+        {/* #5: 로딩 중엔 PageSkeleton, 완료 후 비어 있으면 EmptyState — 빈/로딩 구분 */}
+        {model.isLoading
+          ? <PageSkeleton />
+          : model.matches.length
+            ? <div className="tm-match-card-stack">{model.matches.map((match, index) => <TeamMatchCard key={match.id} match={match} index={index} />)}</div>
+            : <EmptyState title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
+        }
       </div>
       {model.filterSheet?.open ? <TeamMatchFilterSheet model={model} /> : null}
     </AppChrome>
@@ -280,7 +287,19 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                           <span className={`tm-badge ${team.status === '승인 완료' ? 'tm-badge-green' : team.status === '미승인' ? 'tm-badge-red' : 'tm-badge-orange'}`}>{team.status}</span>
                         </div>
                         {(team.onApprove ?? team.onReject) ? (
+                          // #4: 순서 [거절(좌/danger)] [승인(우/primary)] — 위험 행동을 왼쪽 ghost red, 확정 행동을 오른쪽 primary로
                           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+                            {team.onReject ? (
+                              <button
+                                className="tm-btn tm-btn-sm tm-btn-danger"
+                                type="button"
+                                disabled={team.actionPending}
+                                onClick={() => { void team.onReject?.(); }}
+                                aria-label={`${team.name} 거절`}
+                              >
+                                거절
+                              </button>
+                            ) : null}
                             {team.onApprove ? (
                               <button
                                 className="tm-btn tm-btn-sm tm-btn-primary"
@@ -290,17 +309,6 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                                 aria-label={`${team.name} 승인`}
                               >
                                 {team.actionPending ? '처리 중' : '승인'}
-                              </button>
-                            ) : null}
-                            {team.onReject ? (
-                              <button
-                                className="tm-btn tm-btn-sm tm-btn-neutral"
-                                type="button"
-                                disabled={team.actionPending}
-                                onClick={() => { void team.onReject?.(); }}
-                                aria-label={`${team.name} 거절`}
-                              >
-                                거절
                               </button>
                             ) : null}
                           </div>

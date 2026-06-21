@@ -105,6 +105,9 @@
   --font-size-micro: 11px;
   --font-size-caption: 12px;
   --font-size-label: 13px;
+  /* #14: body/body-sm 토큰 추가 — 하드코딩 14/15px 대체용 */
+  --font-size-body-sm: 14px;
+  --font-size-body: 15px;
   --font-size-body-lg: 17px;
   --font-size-subhead: 20px;
   --font-size-heading: 24px;
@@ -1123,7 +1126,9 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* #3: .tm-btn-disabled와 .tm-btn:disabled 불일치 해소 — opacity 통일 + cursor 명시 */
 .tm-btn-disabled {
+  opacity: 0.78;
   color: var(--text-caption);
   cursor: not-allowed;
 }
@@ -2669,21 +2674,23 @@ button:disabled {
   color: var(--text-caption);
 }
 
+/* #11: 미읽음 본문 미리보기 — blue 강조 완화해 카운트 배지가 단일 focal point */
 .tm-chat-last-message-unread {
-  color: var(--blue500);
-  font-weight: 700;
+  color: var(--text-strong);
+  font-weight: 600;
 }
 
+/* #11: 미읽음 카운트 배지 — 24px/12px로 격상(단일 focal point) */
 .tm-chat-inline-unread {
-  min-width: 20px;
-  height: 20px;
+  min-width: 24px;
+  height: 24px;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--blue500);
   color: var(--static-white);
   display: inline-grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   flex: 0 0 auto;
 }
@@ -2901,6 +2908,11 @@ button:disabled {
 .tm-notification-card-unread .tm-notification-icon {
   background: var(--blue500);
   color: var(--static-white);
+}
+
+/* #12: 미읽음 알림 카드 제목 — blue600으로 아이콘 강조와 짝 맞춤 */
+.tm-notification-card-unread .tm-text-body-lg {
+  color: var(--blue600);
 }
 
 .tm-notification-meta {

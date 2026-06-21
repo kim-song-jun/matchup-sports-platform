@@ -5,7 +5,7 @@ import type { ChangeEvent, KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
@@ -222,7 +222,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
             <InfoRow label="장소" value={match.venue} sub={match.address} />
-            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`} />
+            {/* #2: 잔여 자리 N≤3일 때 orange 배지로 희소성 강조 */}
+            <InfoRow
+              label="인원"
+              value={`${match.current}/${match.capacity}명`}
+              sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`}
+              badge={Math.max(match.capacity - match.current, 0) <= 3 && match.current < match.capacity
+                ? <span className="tm-badge tm-badge-orange">마감 임박</span>
+                : undefined}
+            />
             <InfoRow label="레벨" value={match.level} />
             <InfoRow label="성별 조건" value={match.gender} />
             {mode === 'pending' ? (
@@ -617,17 +625,7 @@ function MatchCardItem({ match, index }: { match: MatchCardModel; index: number 
   );
 }
 
-function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="tm-info-row">
-      <div className="tm-text-caption">{label}</div>
-      <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
-        <div className="tm-text-label">{value}</div>
-        {sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}
-      </div>
-    </div>
-  );
-}
+/* #13: 로컬 InfoRow 제거 — 공유 primitives.tsx의 InfoRow로 통합 (sub/badge prop 지원 포함) */
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
   return <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange500)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;

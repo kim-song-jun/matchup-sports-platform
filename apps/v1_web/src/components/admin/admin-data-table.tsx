@@ -50,6 +50,12 @@ interface AdminDataTableProps<T> {
    * behaviour unchanged — additive prop).
    */
   tableMaxWidth?: string;
+  /**
+   * #9: Per-row visual tone for dangerous/warning states (suspended, blocked, cancelled…).
+   * danger → bg-red-50/40 + left red accent bar.
+   * warning → bg-amber-50/40 + left amber accent bar.
+   */
+  rowTone?: (row: T) => 'danger' | 'warning' | undefined;
 }
 
 // ── Alignment utility ─────────────────────────────────────────────────────
@@ -60,6 +66,16 @@ function alignClass(align: AdminTableColumn<unknown>['align']): string {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
+// #9: row tone → Tailwind class maps
+const ROW_TONE_TR: Record<'danger' | 'warning', string> = {
+  danger: 'bg-red-50/40',
+  warning: 'bg-amber-50/40',
+};
+const ROW_TONE_ACCENT: Record<'danger' | 'warning', string> = {
+  danger: 'border-l-2 border-l-red-400',
+  warning: 'border-l-2 border-l-amber-400',
+};
+
 export function AdminDataTable<T>({
   columns,
   rows,
@@ -73,6 +89,7 @@ export function AdminDataTable<T>({
   skeletonRows = 5,
   scrollOnMobile = false,
   tableMaxWidth,
+  rowTone,
 }: AdminDataTableProps<T>) {
   // Error state
   if (error) {
@@ -146,10 +163,12 @@ export function AdminDataTable<T>({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {rows.map((row) => (
+              {rows.map((row) => {
+                const tone = rowTone?.(row);
+                return (
                 <tr
                   key={keyExtractor(row)}
-                  className="transition-colors hover:bg-gray-50/60"
+                  className={['transition-colors hover:bg-gray-50/60', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
                 >
                   {columns.map((col) => (
                     <td
@@ -172,7 +191,8 @@ export function AdminDataTable<T>({
                     </td>
                   )}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -182,10 +202,12 @@ export function AdminDataTable<T>({
       {scrollOnMobile ? (
         <div className="lg:hidden overflow-x-auto -mx-4 px-4">
           <ul className="flex flex-col gap-2 min-w-[480px]" role="list">
-            {rows.map((row) => (
+            {rows.map((row) => {
+              const tone = rowTone?.(row);
+              return (
               <li
                 key={keyExtractor(row)}
-                className="bg-white rounded-xl border border-gray-100 px-4 py-3"
+                className={['bg-white rounded-xl border border-gray-100 px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
               >
                 <dl className="flex flex-col gap-1.5">
                   {columns.map((col) => (
@@ -201,15 +223,18 @@ export function AdminDataTable<T>({
                   </div>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       ) : (
         <ul className="lg:hidden flex flex-col gap-2" role="list">
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const tone = rowTone?.(row);
+            return (
             <li
               key={keyExtractor(row)}
-              className="bg-white rounded-xl border border-gray-100 px-4 py-3"
+              className={['bg-white rounded-xl border border-gray-100 px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
             >
               <dl className="flex flex-col gap-1.5">
                 {columns.map((col) => (
@@ -225,7 +250,8 @@ export function AdminDataTable<T>({
                 </div>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </>

@@ -92,7 +92,8 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           </Card>
         ) : null}
         <div className="tm-my-list-stack">
-          {model.matches.length === 0 ? (
+          {/* 로딩/에러 중(apiNotice 노출)에는 '매치 없어요' 빈상태를 띄우지 않는다 — 알림 카드와 모순 방지 (Copilot) */}
+          {!model.apiNotice && model.matches.length === 0 ? (
             <p className="tm-text-caption" style={{ margin: 0, padding: '72px 0', textAlign: 'center' }}>
               표시할 매치가 없어요
             </p>

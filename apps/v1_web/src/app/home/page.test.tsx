@@ -50,13 +50,10 @@ describe('HomePage', () => {
     expect(screen.getAllByText('공지사항').length).toBeGreaterThan(0);
   });
 
-  it('shows the plain greeting when signedOut fallback viewerName is absent', () => {
-    // When the model has no viewerName (or signedOut=true), the greeting
-    // must fall back to '안녕하세요' (without a name). We verify this by
-    // checking that the greeting text without "님" suffix also exists — the
-    // element rendered by 'dash ? "안녕하세요" : `안녕하세요, ${viewerName}님`'.
-    // In the default fallback, signedOut=false so viewerName IS shown.
-    // This test only asserts the greeting element exists at all (regression guard).
+  it('홈 진입 시 인사 문구 요소가 렌더된다 (greeting wired-up 회귀 가드)', () => {
+    // 기본 렌더(signedOut=false)에서는 '안녕하세요, {이름}님' 형태가 노출된다.
+    // signedOut/이름 부재 분기를 단독으로 셋업해 검증하는 테스트가 아니라,
+    // 인사 요소('안녕하세요' 또는 '안녕하세요, …')가 항상 wired-up임을 보장하는 회귀 가드다.
     render(
       <Providers>
         <HomePage />

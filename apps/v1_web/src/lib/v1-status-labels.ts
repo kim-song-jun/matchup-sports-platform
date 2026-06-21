@@ -33,6 +33,23 @@ export function teamMemberStatusLabel(status: string): string {
   return TEAM_MEMBER_STATUS[status] ?? '—';
 }
 
+/**
+ * 매치·팀매치 수정 잠금 사유 (lockedReason enum → 한국어). 두 도메인 공용 단일 소스.
+ *
+ * 백엔드 가능 값:
+ *   - team-matches.service.ts: 'terminal_or_matched_status'
+ *   - matches.service.ts:      'terminal_status'
+ * 미매핑 값은 안전한 한글 폴백으로 대체한다.
+ */
+const LOCKED_REASON_LABEL: Record<string, string> = {
+  terminal_or_matched_status: '이미 매칭이 완료됐거나 종료된 팀매치는 수정할 수 없어요.',
+  terminal_status: '완료·취소·종료된 매치는 수정할 수 없어요.',
+};
+
+export function lockedReasonLabel(reason: string): string {
+  return LOCKED_REASON_LABEL[reason] ?? '지금은 수정할 수 없어요.';
+}
+
 /** 온보딩 단계 (V1OnboardingStep). */
 const ONBOARDING_STEP_LABEL: Record<string, string> = {
   terms: '약관 동의',

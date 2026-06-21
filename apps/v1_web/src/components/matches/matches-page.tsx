@@ -225,7 +225,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 1명 포함)`} />
             <InfoRow label="레벨" value={match.level} />
             <InfoRow label="성별 조건" value={match.gender} />
-            {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." /> : null}
+            {mode === 'pending' ? (
+              <>
+                <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
+                {/* 신청 후 현황 확인 CTA — '내 신청 현황 보기' (#13) */}
+                <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/my/matches/joined" style={{ marginTop: 10 }}>
+                  내 신청 현황 보기
+                </Link>
+              </>
+            ) : null}
             {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 방문해 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 10 }}>
@@ -278,7 +286,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 1명 포함)`} />
           <InfoRow label="레벨" value={match.level} />
           <InfoRow label="성별 조건" value={match.gender} />
-          {mode === 'pending' ? <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." /> : null}
+          {mode === 'pending' ? (
+            <>
+              <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
+              {/* 신청 후 현황 확인 CTA — '내 신청 현황 보기' (#13) */}
+              <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/my/matches/joined" style={{ marginTop: 10 }}>
+                내 신청 현황 보기
+              </Link>
+            </>
+          ) : null}
           {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 방문해 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 10 }}>

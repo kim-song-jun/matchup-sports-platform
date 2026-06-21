@@ -13,6 +13,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
+import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MatchEdit, V1MatchMutationPayload } from '@/types/api';
 import { MatchCreatePageView } from './matches-page';
 import type { MatchCreateStep, MatchCreateViewModel } from './matches.types';
@@ -146,7 +147,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
     regions: editQuery.data?.form.regionId ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
     error: editQuery.isError ? '수정 권한이 없거나 매치를 불러오지 못했어요.' : error,
-    lockedReason: editQuery.data?.editable === false ? editQuery.data.lockedReason ?? '지금은 수정할 수 없어요.' : null,
+    lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
     onSelectSport: () => undefined,
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),

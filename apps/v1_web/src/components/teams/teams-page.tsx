@@ -37,7 +37,7 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
         <div className="tm-sport-chip-row">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button">{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
         <div className="tm-team-summary-bar">
           <div className="tm-text-label">{model.summary.scope}</div>
-          <div className="tm-text-caption tab-num">{model.summary.total}팀 · 모집중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
+          <div className="tm-text-caption tab-num">{model.summary.total}팀 · 모집 중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
         </div>
         {model.teams.length ? <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div> : <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />}
       </div>
@@ -100,7 +100,7 @@ function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
           <div className="tm-text-body-lg">가입 조건</div>
           <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
             <ListItem title="지역" sub="서울 전체" trailing="변경 가능" />
-            <ListItem title="모집 상태" sub="모집중 우선" trailing="1개" />
+            <ListItem title="모집 상태" sub="모집 중 우선" trailing="1개" />
             <ListItem title="활동 빈도" sub="주 1회 이상" trailing="1개" />
           </div>
         </Card>
@@ -159,14 +159,14 @@ function TeamOpenMatchesSection({
                 <div className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.title}</div>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>{[match.dateLabel, match.venue].filter(Boolean).join(' · ')}</div>
               </div>
-              <span className="tm-badge tm-badge-blue" style={{ flexShrink: 0 }}>모집중</span>
+              <span className="tm-badge tm-badge-blue" style={{ flexShrink: 0 }}>모집 중</span>
             </Link>
           ))}
         </div>
       ) : (
         <Card pad={16} style={{ background: 'var(--grey50)' }}>
           <div className="tm-text-label">아직 열어둔 매치가 없어요</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>이 팀이 새 경기를 모집하면 여기에서 보여드릴게요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>이 팀이 새 경기를 모집하면 여기서 확인할 수 있어요.</div>
         </Card>
       )}
     </>
@@ -245,7 +245,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
                 <div className="tm-text-body-lg">주요 멤버</div>
                 <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
               </div>
-              {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>보기 불가</button>}
+              {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비공개</button>}
             </div>
             {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
           </Card>
@@ -322,12 +322,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <div className="tm-text-body-lg">주요 멤버</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
             </div>
-            {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>보기 불가</button>}
+            {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비공개</button>}
           </div>
           {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member) => <ListItem key={member.name} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
         </Card>
       </article>
-      <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해요.'}</div>{heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}<button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>{model.ctaPending ? '처리 중' : cta}</button></div>
+      <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>{heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}<button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>{model.ctaPending ? '처리 중' : cta}</button></div>
     </AppChrome>
   );
 }
@@ -584,7 +584,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
             {model.members.map((member) => <MemberCard key={member.name} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
           </MemberSection>
         ) : (
-          <MemberSection title="가입 요청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
+          <MemberSection title="가입 신청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
             {model.requests.map((request) => <MemberCard key={request.name} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
           </MemberSection>
         )}

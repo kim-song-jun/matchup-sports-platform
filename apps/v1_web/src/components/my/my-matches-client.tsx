@@ -95,7 +95,7 @@ function buildNote(match: V1Match, status: MyMatchStatus) {
   if (status === 'pending') return '호스트가 신청을 검토 중이에요.';
   if (status === 'approved') return '참가가 확정됐어요. 장소와 시간을 확인해 보세요.';
   if (status === 'ended' && isReviewableMatch(match)) return '상대 평가와 리뷰를 남길 수 있어요.';
-  if (status === 'ended') return '종료됐거나 모집이 마감된 매치예요.';
+  if (status === 'ended') return '경기가 종료됐거나 모집이 마감된 상태예요.';
   return `${match.participantCount ?? 0}/${match.capacity ?? 0}명이 참가 확정했어요.`;
 }
 

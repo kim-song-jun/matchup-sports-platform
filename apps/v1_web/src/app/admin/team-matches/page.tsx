@@ -40,15 +40,15 @@ function formatDateTime(dateStr: string): string {
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
-  { value: 'recruiting', label: '모집중' },
+  { value: 'recruiting', label: '모집 중' },
   { value: 'matched', label: '매칭됨' },
-  { value: 'cancelled', label: '취소' },
+  { value: 'cancelled', label: '취소됨' },
   { value: 'completed', label: '완료' },
   { value: 'archived', label: '보관' },
 ];
 
 const REASON_MODAL_STATUS_OPTIONS = [
-  { value: 'recruiting', label: STATUS_META['recruiting']?.label ?? '모집중' },
+  { value: 'recruiting', label: STATUS_META['recruiting']?.label ?? '모집 중' },
   { value: 'matched', label: STATUS_META['matched']?.label ?? '매칭됨' },
   { value: 'cancelled', label: STATUS_META['cancelled']?.label ?? '취소됨' },
   { value: 'completed', label: STATUS_META['completed']?.label ?? '완료' },
@@ -128,7 +128,7 @@ export default function AdminTeamMatchesPage() {
       {
         onSuccess: () => {
           setModalRow(null);
-          showToast('처리했어요.', 'success');
+          showToast('팀매치 상태를 변경했어요.', 'success');
           setAccumulatedRows([]);
           setCursor(null);
           setNextCursor(null);

@@ -575,7 +575,7 @@ function RegistrationDetailView({
           onClick={() => { setCancelError(null); setShowCancelModal(true); }}
           style={{ marginTop: 4 }}
         >
-          참가 취소 신청
+          참가 취소 요청
         </button>
       ) : null}
     </>
@@ -757,7 +757,7 @@ function RegistrationDetailView({
                   className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
                   onClick={() => { setCancelError(null); setShowCancelModal(true); }}
                 >
-                  참가 취소 신청
+                  참가 취소 요청
                 </button>
               ) : null}
             </div>

@@ -33,7 +33,7 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
       ...item,
       href: `/my/reviews/${item.sourceType}/${item.sourceId}`,
       badgeLabel: item.state === 'done' ? '완료' : item.sourceType === 'team_match' ? '상대팀' : '작성 전',
-      kindLabel: item.sourceType === 'team_match' ? '팀매치' : '개인매치',
+      kindLabel: item.sourceType === 'team_match' ? '팀매치' : '개인 매치',
       meta: buildListMeta(item.completedAt, item.reviewedCount, item.targetCount, item.remainingCount),
       ctaLabel: item.state === 'done' ? '보기' : item.reviewedCount > 0 ? '이어서 작성' : '리뷰',
     })),
@@ -85,7 +85,7 @@ export function toReviewsReceivedPageModel(data: V1ReviewReceivedResponse | unde
 }
 
 export function sourceTypeLabel(sourceType: V1ReviewSourceType) {
-  return sourceType === 'team_match' ? '팀매치' : '개인매치';
+  return sourceType === 'team_match' ? '팀매치' : '개인 매치';
 }
 
 export function formatDateTime(value: string | null) {

@@ -50,9 +50,9 @@ const MATCH_STATUS_OPTIONS = (
 // ── Status filter chips ───────────────────────────────────────────────────────
 const MATCH_STATUS_FILTER_OPTIONS = [
   { value: '', label: '전체' },
-  { value: 'recruiting', label: '모집중' },
+  { value: 'recruiting', label: '모집 중' },
   { value: 'closed', label: '마감' },
-  { value: 'cancelled', label: '취소' },
+  { value: 'cancelled', label: '취소됨' },
   { value: 'completed', label: '완료' },
   { value: 'archived', label: '보관' },
 ];
@@ -158,7 +158,7 @@ export default function AdminMatchesPage() {
           // re-fetched fresh instead of left stale in extraRows.
           setExtraRows([]);
           setNextCursor(null);
-          showToast('처리했어요.', 'success');
+          showToast('매치 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '상태 변경에 실패했어요.'), 'error');

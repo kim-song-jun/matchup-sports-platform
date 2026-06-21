@@ -81,7 +81,7 @@ function ReviewsReceivedContent({
       <ReviewStats stats={model.stats} />
       {loading ? <ReviewSkeleton count={2} /> : null}
       {!loading && errorMessage ? <ReviewNotice title="받은 리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
-      {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대방이 리뷰를 보내면 경기별로 정리돼서 보여요." /> : null}
+      {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대방이 보낸 리뷰가 경기별로 모여서 보여요." /> : null}
       {!loading && !errorMessage && model.userGroups.length > 0 ? <ReceivedGroupSection title="내가 받은 리뷰" groups={model.userGroups} /> : null}
       {!loading && !errorMessage && model.teamGroups.length > 0 ? <ReceivedGroupSection title="내 팀이 받은 리뷰" groups={model.teamGroups} /> : null}
     </>
@@ -195,8 +195,8 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
           <div className="tm-text-label">{model.source.title}</div>
           <div className="tm-review-chip-row">
             <span className="tm-badge tm-badge-blue">{reviewed}명 전송</span>
-            <span className="tm-badge tm-badge-blue">별점 완료</span>
-            <span className="tm-badge tm-badge-blue">태그 완료</span>
+            <span className="tm-badge tm-badge-blue">별점 선택됨</span>
+            <span className="tm-badge tm-badge-blue">태그 선택됨</span>
             <span className="tm-badge tm-badge-grey">{remaining}명 남음</span>
           </div>
         </Card>

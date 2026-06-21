@@ -36,7 +36,7 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
       <MatchTypeSegment active="team" />
       <div className="tm-match-list">
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button">{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
-        <div className="tm-match-summary-row"><div className="tm-text-label">서울 전체 · 팀매치</div><div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집중 {model.summary.urgent}</div></div>
+        <div className="tm-match-summary-row"><div className="tm-text-label">서울 전체 · 팀매치</div><div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 {model.summary.urgent}</div></div>
         {model.matches.length ? <div className="tm-match-card-stack">{model.matches.map((match, index) => <TeamMatchCard key={match.id} match={match} index={index} />)}</div> : <EmptyState title="조건에 맞는 팀매치가 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />}
       </div>
       {model.filterSheet?.open ? <TeamMatchFilterSheet model={model} /> : null}
@@ -114,7 +114,7 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode']) {
 }
 
 function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode']) {
-  if (mode === 'pending') return '홈팀 검토 대기';
+  if (mode === 'pending') return '홈팀 검토 중';
   if (mode === 'approved') return '참가 확정';
   if (mode === 'mine') return '승인 후 확정';
   return '신청 후 승인';
@@ -231,7 +231,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               <InfoRow label="성별 조건" value={match.gender} />
               <InfoRow label="총비용" value={`${match.cost.toLocaleString('ko-KR')}원`} />
               <InfoRow label="상대팀 부담금" value={`${match.opponentCost.toLocaleString('ko-KR')}원`} sub={match.opponentCost === 0 ? '무료초청 · 실제 청구 없음' : undefined} />
-              {mode === 'pending' ? <StateCard tone="orange" title="신청 확인을 완료했어요" body="홈팀 검토가 끝나면 알림으로 알려드릴게요." /> : null}
+              {mode === 'pending' ? <StateCard tone="orange" title="신청이 접수됐어요" body="홈팀 검토가 끝나면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
               {match.description ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
@@ -583,7 +583,7 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <div className="tm-text-body-lg">{team.name}</div>
                 {team.disabled ? (
-                  <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>권한 필요</span>
+                  <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>매치 생성 권한 없음</span>
                 ) : null}
               </div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.members}명 · {team.role}</div>

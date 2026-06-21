@@ -168,7 +168,7 @@ function TournamentsListContent() {
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" style={{ marginTop: 28, padding: '0 20px' }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle title="진행 중인 대회" />
+          <SectionTitle title="대회 목록" />
         </div>
         <div id="tournament-list-heading" className="sr-only">진행 중인 대회 목록</div>
 

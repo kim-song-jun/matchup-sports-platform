@@ -560,7 +560,7 @@ function RegistrationsTab({
                   onClick={() => handleConfirmPayment(reg)}
                   disabled={confirmPayment.isPending}
                   icon={<Check size={13} />}
-                  label="입금확인"
+                  label="입금 확인"
                   tone="blue"
                 />
               )}

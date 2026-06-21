@@ -100,7 +100,7 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       backHref: '/login/email',
       badge: '비밀번호 찾기',
       title: '이메일 로그인으로 다시 시도해 주세요',
-      body: '비밀번호를 잊었다면 이메일 가입 정보를 확인한 뒤 다시 로그인해 주세요. 계정에 접근하기 어려우면 새 이메일로 가입할 수 있어요.',
+      body: '현재는 비밀번호 재설정 이메일 발송 기능을 준비 중이에요. 가입했던 이메일과 비밀번호로 로그인해 주세요.',
       tone: 'orange',
       primary: { label: '이메일 로그인으로 돌아가기', href: '/login/email' },
       secondary: { label: '간편 로그인으로 이동', href: '/login', tone: 'neutral' },

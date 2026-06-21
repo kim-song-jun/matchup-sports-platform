@@ -160,7 +160,7 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
             </Card>
             {model.recentMatches.length > 0 ? (
               <>
-                <div className="tm-my-section-label">최근 팀 매치</div>
+                <div className="tm-my-section-label">최근 팀매치</div>
                 <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
               </>
             ) : null}
@@ -198,7 +198,7 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
           <Link className="tm-desktop-back" href={backHref} aria-label="팀 정보로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
-          <h1 className="tm-text-heading">{model.teamName} — 멤버 관리</h1>
+          <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
         </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
           {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
@@ -210,7 +210,7 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
             </button>
           ))}
         </div>
-        {model.activeTab === 'members' ? <MemberGroup title="멤버" members={model.members} /> : <MemberGroup title="가입 요청" members={model.requests} />}
+        {model.activeTab === 'members' ? <MemberGroup title="멤버" members={model.members} /> : <MemberGroup title="가입 신청" members={model.requests} />}
       </div>
     </AppChrome>
   );

@@ -27,7 +27,7 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
         <div className="tm-chat-list">
           <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
           {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오고 있어요" body="잠시만 기다려 주세요." /> : null}
-          {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
+          {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
           {hasRooms ? (
             <>
               <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
@@ -85,10 +85,9 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
           {model.status !== 'loading' && model.messages.length === 0 ? <ChatEmptyState title={model.emptyTitle ?? '아직 메시지가 없어요'} body={model.emptyBody ?? '첫 메시지를 보내 대화를 시작할 수 있어요.'} onRetry={model.onRetry} /> : null}
           {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
         </div>
-        {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>전송하지 못했어요. 다시 시도해 주세요.</div> : null}
-        {/* 이미지 첨부는 미구현 상태 — 클릭 시 '준비 중이에요' 안내 토스트 표시.
-            disabled 처리만 하면 사용자가 버튼 고장으로 오해할 수 있어 title로 상태 안내. */}
-        <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" title="이미지 첨부는 준비 중이에요" disabled><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" aria-label="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" aria-busy={model.sending} disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
+        {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
+        {/* 이미지 첨부는 미구현 상태 — aria-label로 준비 중 안내, title 중복 제거 */}
+        <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" disabled><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" aria-label="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" aria-busy={model.sending} disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
       </div>
     </AppChrome>
   );
@@ -155,7 +154,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
               onRetry={model.onRetry}
             />
           ) : model.notifications.length === 0 ? (
-            <EmptyState title="알림이 없어요" sub="매치, 팀매치, 채팅 알림이 생기면 이곳에 모아 보여드릴게요." />
+            <EmptyState title="알림이 없어요" sub="매치, 팀매치, 채팅 알림이 오면 여기서 확인할 수 있어요." />
           ) : (
             groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);

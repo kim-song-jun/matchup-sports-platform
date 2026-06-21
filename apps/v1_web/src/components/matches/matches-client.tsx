@@ -230,7 +230,7 @@ function toParticipants(
   if (!match.participantsPreview?.length) {
     return [{
       name: match.host?.displayName ?? fallback[0]?.name ?? '호스트',
-      meta: '매치 만든 사람',
+      meta: '호스트',
       status: '승인완료',
       href: manageHref,
     }];

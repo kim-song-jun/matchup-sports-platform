@@ -564,10 +564,15 @@ export default function AdminAdminsPage() {
       vars = { userId: row.userId, adminRole: status as 'ops' | 'support', reason };
     }
 
+    const successMessage =
+      action === 'revoke' ? '권한을 회수했어요.' :
+      action === 'reactivate' ? '권한을 재부여했어요.' :
+      '역할을 변경했어요.';
+
     updateAdminRole.mutate(vars, {
       onSuccess: () => {
         setActionModal(null);
-        showToast('처리했어요.', 'success');
+        showToast(successMessage, 'success');
       },
       onError: (err) => {
         showToast(resolveAdminErrorMessage(err, '처리에 실패했어요.'), 'error');

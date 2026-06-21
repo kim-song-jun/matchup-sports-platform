@@ -259,7 +259,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     activeTab,
     tabs: [
       { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => setActiveTab('members') },
-      { key: 'requests', label: '가입 요청', count: requestItems.length, onSelect: () => setActiveTab('requests') },
+      { key: 'requests', label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') },
     ],
     teamName: team.data?.name ?? fallback.teamName,
     summary: {
@@ -283,8 +283,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     requests: requestItems.map((application) =>
       toRequestModel(application, {
         actionPending,
-        approve: () => confirmAction(confirm, { title: '가입 요청 승인', message: `${application.applicant.displayName}님의 가입 요청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
-        reject: () => confirmAction(confirm, { title: '가입 요청 거절', message: `${application.applicant.displayName}님의 가입 요청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' })),
+        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
+        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' })),
       }),
     ),
   };

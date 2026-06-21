@@ -109,11 +109,11 @@ export default function AdminOverviewPage() {
             ariaLabel={`활성 팀: ${overview?.teams.active ?? 0}개`}
           />
           <AdminKpiCard
-            label="모집중 팀매치"
+            label="모집 중 팀매치"
             value={overview?.teamMatches.recruiting ?? 0}
             tone="neutral"
             href="/admin/team-matches?status=recruiting"
-            ariaLabel={`모집중 팀매치: ${overview?.teamMatches.recruiting ?? 0}건`}
+            ariaLabel={`모집 중 팀매치: ${overview?.teamMatches.recruiting ?? 0}건`}
           />
         </div>
       )}

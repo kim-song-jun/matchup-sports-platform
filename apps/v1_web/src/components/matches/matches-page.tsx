@@ -40,7 +40,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         <div className="tm-match-summary-row">
           <div className="tm-text-label">{model.summary.label}</div>
           {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
-          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집중 {model.summary.urgent}</div>
+          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 {model.summary.urgent}</div>
         </div>
         <div className="tm-match-card-stack">
           {model.matches.length ? (
@@ -114,7 +114,7 @@ function MatchFilterPageView({ model }: { model: MatchStateViewModel }) {
           <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
             <ListItem title="지역" sub="서울 전체" trailing="변경 가능" />
             <ListItem title="날짜" sub="이번 주" trailing="변경 가능" />
-            <ListItem title="모집 상태" sub="모집중 우선" trailing="2개" />
+            <ListItem title="모집 상태" sub="모집 중 우선" trailing="2개" />
           </div>
         </Card>
       </div>
@@ -145,7 +145,7 @@ function matchStatusBadgeClass(mode: MatchDetailViewModel['mode'], status: Match
 }
 
 function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: MatchDetailViewModel['match']['status']) {
-  if (mode === 'pending') return '승인중';
+  if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') return '승인완료';
   if (mode === 'mine') return '내 매치';
   if (status === 'full') return '모집 완료';
@@ -172,7 +172,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         window.setTimeout(() => setHeroMessage(''), 1800);
       })
       .catch(() => {
-        setHeroMessage('일시적인 오류가 생겼어요. 잠시 후 다시 시도해 주세요.');
+        setHeroMessage('잠깐 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 1800);
       });
   };
@@ -222,7 +222,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
             <InfoRow label="장소" value={match.venue} sub={match.address} />
-            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 1명 포함)`} />
+            <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`} />
             <InfoRow label="레벨" value={match.level} />
             <InfoRow label="성별 조건" value={match.gender} />
             {mode === 'pending' ? (
@@ -234,7 +234,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Link>
               </>
             ) : null}
-            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 방문해 주세요." /> : null}
+            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 10 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -283,7 +283,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
-          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남음 (호스트 1명 포함)`} />
+          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`} />
           <InfoRow label="레벨" value={match.level} />
           <InfoRow label="성별 조건" value={match.gender} />
           {mode === 'pending' ? (
@@ -295,7 +295,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
             </>
           ) : null}
-          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 방문해 주세요." /> : null}
+          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 10 }}>
             <div className="tm-text-body-lg">참가자</div>
@@ -646,7 +646,7 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
 }
 
 function SportStep({ model }: { model: MatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">어떤 종목인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>함께 할 종목을 선택해 주세요.</p><div className="tm-create-sport-grid">{model.sports.map((sport) => <button key={sport} className={`tm-card tm-pressable ${sport === model.selectedSport ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" onClick={() => model.form?.onSelectSport(sport)}><div className="tm-text-body-lg">{sport}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : '선택 가능'}</div></button>)}</div></div>;
+  return <div><h1 className="tm-text-heading">어떤 종목인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>함께 할 종목을 선택해 주세요.</p><div className="tm-create-sport-grid">{model.sports.map((sport) => <button key={sport} className={`tm-card tm-pressable ${sport === model.selectedSport ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" onClick={() => model.form?.onSelectSport(sport)}><div className="tm-text-body-lg">{sport}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : ''}</div></button>)}</div></div>;
 }
 
 function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean }) {
@@ -801,7 +801,7 @@ function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
         <CreateField label="신청 마감일" value={draft.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField label="신청 마감시간" value={draft.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>비워두면 경기 시작 전까지 신청을 받아요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>둘 다 비워두면 경기 시작 전까지 신청을 받아요.</div>
     </div>
   );
 }
@@ -867,7 +867,7 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         <EmptyState title="매치가 만들어졌어요" sub="매치를 만들었어요! 팀원들에게 먼저 공유해 참여 의사를 확인해 보세요." />
         <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">매치 공유</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 매치 링크와 일정을 공유해요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 링크와 일정을 알려보세요</div>
         </Card>
         {shareMsg ? <div className="tm-text-caption" role="status" style={{ marginTop: 12, textAlign: 'center', color: 'var(--text-caption)' }}>{shareMsg}</div> : null}
       </div>

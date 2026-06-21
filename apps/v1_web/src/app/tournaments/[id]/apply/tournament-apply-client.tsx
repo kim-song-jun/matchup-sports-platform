@@ -684,7 +684,7 @@ function AgreementsStep({
                 계좌이체
               </div>
               <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-                신청하면 안내해 드리는 계좌로 입금하면 돼요.
+                신청이 완료되면 안내해 드리는 계좌로 참가비를 입금해 주세요.
               </div>
             </div>
           </div>

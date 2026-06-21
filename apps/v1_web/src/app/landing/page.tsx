@@ -199,7 +199,7 @@ export default function LandingPage() {
                 >
                   <span aria-hidden="true">{emoji}</span>
                   <span>{name}</span>
-                  <span className="tm-landing-sport-soon" aria-hidden="true">준비중</span>
+                  <span className="tm-landing-sport-soon" aria-hidden="true">준비 중</span>
                 </li>
               ))}
             </ul>

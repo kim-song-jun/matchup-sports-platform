@@ -716,7 +716,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
             ) : (
               <Card pad={16} style={{ background: 'var(--grey50)' }}>
                 <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                  결선 대진 준비 중
+                  결선 대진표
                 </div>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>
                   조별 리그가 끝나면 결선 대진표가 공개돼요.

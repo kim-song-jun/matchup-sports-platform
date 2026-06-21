@@ -112,10 +112,10 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
   // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
   const canManage = viewerRole === 'owner' || viewerRole === 'manager';
   const actions: MyTeamDetailViewModel['actions'] = [
-    { label: '팀 매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'G' },
+    { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'G' },
     ...(canManage
       ? [
-          { label: '멤버 관리', sub: '초대와 가입 요청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'M' },
+          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'M' },
           // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /my/teams/[id] 복귀 유도
           { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'S' },
         ]
@@ -155,7 +155,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
     activeTab,
     tabs: [
       { key: 'members' as const, label: '멤버', count: members.data?.summary.memberCount ?? items.length, onSelect: () => setActiveTab('members') },
-      { key: 'requests' as const, label: '가입 요청', count: requests.length, onSelect: () => setActiveTab('requests') },
+      { key: 'requests' as const, label: '가입 신청', count: requests.length, onSelect: () => setActiveTab('requests') },
     ],
     summary: [
       { label: '전체', value: members.data?.summary.memberCount ?? items.length, unit: '명' },
@@ -176,8 +176,8 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
     requests: requests.map((application) =>
       toMyJoinRequest(application, {
         actionPending,
-        approve: () => confirmAction(confirm, { title: '가입 요청 승인', message: `${application.applicant.displayName}님의 가입 요청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
-        reject: () => confirmAction(confirm, { title: '가입 요청 거절', message: `${application.applicant.displayName}님의 가입 요청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
+        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
+        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
       }),
     ),
   };
@@ -597,7 +597,7 @@ export function SportsSettingsPageClient() {
                   type="button"
                 >
                   <div className="tm-text-body-lg">{sport.name}</div>
-                  <div className="tm-text-caption">{selected ? '선택됨' : '선택 가능'}</div>
+                  <div className="tm-text-caption">{selected ? '선택됨' : ''}</div>
                 </button>
               );
             })}
@@ -839,7 +839,7 @@ export function NotificationSettingsPageClient() {
   const [toggleError, setToggleError] = useState(false);
   const items = [
     { key: 'matchEnabled', label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때' },
-    { key: 'teamEnabled', label: '팀 가입 요청', sub: '내가 운영하는 팀에 요청이 들어올 때' },
+    { key: 'teamEnabled', label: '팀 가입 신청', sub: '내가 운영하는 팀에 신청이 들어올 때' },
     { key: 'teamMatchEnabled', label: '팀매치 알림', sub: '팀매치 신청, 승인, 매칭 상태가 바뀔 때' },
     { key: 'chatEnabled', label: '채팅 메시지', sub: '참여 중인 매치와 팀 채팅 새 메시지' },
     { key: 'noticeEnabled', label: '공지 알림', sub: '서비스 운영 공지와 필수 안내' },
@@ -1084,7 +1084,7 @@ function toMyJoinRequest(
   return {
     id: application.applicationId,
     name: application.applicant.displayName,
-    role: '가입 요청',
+    role: '가입 신청',
     meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),
     status: teamJoinApplicationStatusLabel(application.status),
     actions: [

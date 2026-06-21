@@ -141,7 +141,7 @@ export function getTeamListViewModel(): TeamListViewModel {
     query: '',
     placeholder: '팀명, 지역, 종목 검색',
     filterCount: 0,
-    chips: ['전체 42', '모집중 18', '내 주변', '초보-중수', '주 1회'].map((label, index) => ({ label, active: index === 0 })),
+    chips: ['전체 42', '모집 중 18', '내 주변', '초보-중수', '주 1회'].map((label, index) => ({ label, active: index === 0 })),
     summary: { scope: '서울 전체 · 팀 둘러보기', total: 42, recruiting: 18, nearby: 7 },
     teams,
   };
@@ -237,7 +237,7 @@ export function getTeamMembersViewModel(): TeamMembersViewModel {
     activeTab: 'members',
     tabs: [
       { key: 'members', label: '멤버', count: 3, onSelect: () => undefined },
-      { key: 'requests', label: '가입 요청', count: 2, onSelect: () => undefined },
+      { key: 'requests', label: '가입 신청', count: 2, onSelect: () => undefined },
     ],
     summary: { total: 18, managers: 2, pending: 3 },
     members: [

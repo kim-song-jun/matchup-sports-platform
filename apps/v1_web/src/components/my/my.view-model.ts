@@ -60,7 +60,7 @@ const joinedMatches: MyMatch[] = [
 ];
 
 const createdMatches: MyMatch[] = [
-  { id: 'match-4', title: '잠실 러닝 크루 매치', meta: '5월 28일 목 · 07:00 · 잠실한강공원', status: 'recruiting', statusLabel: '모집중', note: '6명 중 4명이 참가 확정했어요.', href: '/matches/match-4' },
+  { id: 'match-4', title: '잠실 러닝 크루 매치', meta: '5월 28일 목 · 07:00 · 잠실한강공원', status: 'recruiting', statusLabel: '모집 중', note: '6명 중 4명이 참가 확정했어요.', href: '/matches/match-4' },
   { id: 'match-5', title: '목동 풋살 친선전', meta: '6월 1일 월 · 21:00 · 목동풋살장', status: 'approved', statusLabel: '확정', note: '상대 팀과 장소 예약이 확정됐어요.', href: '/matches/match-5' },
 ];
 
@@ -71,7 +71,7 @@ export function getMyMatchesModel(mode: 'joined' | 'created'): MyMatchesViewMode
     title: mode === 'joined' ? '참여한 매치' : '내가 만든 매치',
     summary: [
       { label: '전체', value: matches.length, unit: '건' },
-      { label: mode === 'joined' ? '승인 대기' : '모집중', value: matches.filter((item) => item.status === 'pending' || item.status === 'recruiting').length, unit: '건' },
+      { label: mode === 'joined' ? '승인 대기' : '모집 중', value: matches.filter((item) => item.status === 'pending' || item.status === 'recruiting').length, unit: '건' },
       { label: '확정', value: matches.filter((item) => item.status === 'approved').length, unit: '건' },
     ],
     matches,
@@ -84,7 +84,7 @@ export const myTeamMembersModel: MyTeamMembersViewModel = {
   activeTab: 'members',
   tabs: [
     { key: 'members', label: '멤버', count: 3, onSelect: () => undefined },
-    { key: 'requests', label: '가입 요청', count: 2, onSelect: () => undefined },
+    { key: 'requests', label: '가입 신청', count: 2, onSelect: () => undefined },
   ],
   summary: [
     { label: '전체', value: 18, unit: '명' },
@@ -97,8 +97,8 @@ export const myTeamMembersModel: MyTeamMembersViewModel = {
     { id: 'ms-3', name: '이하늘', role: '멤버', meta: '수비수 · 매너 4.7', status: '활동중' },
   ],
   requests: [
-    { id: 'ap-1', name: '최민호', role: '가입 요청', meta: '축구 32회 · 매너 4.6', status: '검토' },
-    { id: 'ap-2', name: '정유진', role: '가입 요청', meta: '풋살 18회 · 매너 4.9', status: '검토' },
+    { id: 'ap-1', name: '최민호', role: '가입 신청', meta: '축구 32회 · 매너 4.6', status: '검토' },
+    { id: 'ap-2', name: '정유진', role: '가입 신청', meta: '풋살 18회 · 매너 4.9', status: '검토' },
   ],
 };
 
@@ -133,7 +133,7 @@ export const settingsModel: SettingsViewModel = {
 export const notificationSettingsModel: NotificationSettingsViewModel = {
   settings: [
     { label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때', enabled: true },
-    { label: '팀 가입 요청', sub: '내가 운영하는 팀에 요청이 들어올 때', enabled: true },
+    { label: '팀 가입 신청', sub: '내가 운영하는 팀에 신청이 들어올 때', enabled: true },
     { label: '채팅 메시지', sub: '참여 중인 매치와 팀 채팅 새 메시지', enabled: false },
     { label: '마케팅 소식', sub: '새 기능과 이벤트 안내', enabled: false },
   ],

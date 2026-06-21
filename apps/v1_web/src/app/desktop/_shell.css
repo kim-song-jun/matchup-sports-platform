@@ -181,7 +181,15 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--grey150);
-    padding: 0 24px;
+    /*
+     * Cap the nav's inner content to the 1120px content column and center it,
+     * so the brand/tabs/actions align with .tm-scroll-area content at every
+     * width (1024 → 2560+). Without this the full-bleed bar pins the brand to
+     * the far-left and actions to the far-right on wide screens, leaving the
+     * header visually disconnected from the centered body column.
+     * 24px = .tm-scroll-area's inner horizontal padding (keeps brand flush with content).
+     */
+    padding: 0 max(24px, calc((100% - 1120px) / 2 + 24px));
     gap: 0;
   }
 

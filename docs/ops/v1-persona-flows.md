@@ -30,6 +30,13 @@
 - **디자인**: 토스급 미니멀·깔끔·직관? 토큰 일관·a11y 44px/focus/aria?
 - **상태**: loading/error/empty 적절? (Rank4로 notices/notifications 처리됨)
 
+## ✅ 자동화 E2E (페르소나별 flow 테스트 — `pnpm test:e2e:v1`)
+페르소나 flow를 **실행 가능한 E2E 테스트로 codify**(e2e/v1.config.ts + e2e/v1-tests/, 52 tests mobile+desktop 전부 통과):
+- visitor: 신규 가입→온보딩 sport 도달 E2E(visitor-onboarding) · applicant: 매치 탐색·상세(match-discovery)·팀 가입(team-join)·대회 신청(tournament)
+- host: 매치 생성 위저드 **종목 영속 회귀**(match-create, critical 버그 93873e97)·팀매치(team-match, 데스크톱 CTA) · owner: 팀 관리·멤버(team-management)
+- member: 채팅·알림(chat-notifications)·설정(settings) · admin: 운영 개요·users 테이블(admin) · responsive: nav 정렬·하단 nav smoke
+- 인증: e2e/v1-tests/helpers/auth.ts loginAs(seed 페르소나 email). 패턴: seed id 셀렉터·toContainText(반응형 중복 회피).
+
 ## 진행
 - 라이브 감사 완료: landing·home·matches·tournaments·teams·my(6) + admin 표면(이전 세션).
 - 종합 코드 감사(8도메인 ~91 findings)로 **전 화면 빠짐없이** 커버 → 발견 이슈 순차 수정 중(`ws11-audit-findings.md`).

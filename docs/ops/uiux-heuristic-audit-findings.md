@@ -14,5 +14,10 @@
 HIGH: #1 InfoRow/KPIStat/ListItem 값 위계 평탄(primitives.tsx) · #2 매치상세 희소성/마감 11px(matches-page:225,620) · #3 disabled 분열(globals:1106,1126) · #4 팀매치 거절 회색(team-matches-page:297) · #5 로딩=Empty(community/team-matches) · #6 AlertBanner 12px(primitives:37) · #7 대회 참가비 muted(tournaments/page:506) · #8 매치카드 희소성 평탄(home/matches) · #9 admin 위험행 강조없음(admin-data-table:152) · #10 admin 위험 KPI 약함(admin-kpi-card:19,37) · #11 채팅 미읽음 분산(globals:2672) · #12 알림 미읽음 제목 컬러(globals:2885).
 MEDIUM: #13 InfoRow 3종 통합 · #14 타입스케일 토큰화 · #15 SectionTitle action 약함 · #16 KPIStat unit · #17 affordance · #18 disabled 이유 · #19 온보딩 요약값 · #20 NumberDisplay unit/팀매치 비용 · #21 요약바 모집중 · #22 인라인 px · #23 채팅 나가기 시트 modal화 · #24 입금대기 카드 · #25 textarea 높이.
 
+## ✅ 25 findings 전부 수정 완료
+- **HIGH 14**(`887bda1e`): InfoRow 값 위계·AlertBanner·희소성 orange 배지·참가비·disabled 통일·거절 danger·로딩 skeleton·admin 위험 강조·미읽음 focal point·InfoRow 통합·토큰. 라이브: 매치상세 값 prominent(15px/600)·/my 무회귀.
+- **MEDIUM 11**(`90373112`, #15-25): SectionTitle blue·KPIStat/NumberDisplay unit·팀매치 비용·온보딩 요약값·요약바 모집중 N strong(라이브)·affordance·disabled 힌트·채팅 시트 a11y·입금 카드·textarea·픽셀 스페이서. (#22 Card pad 광범위 리팩터는 이연.)
+- 전부 refined minimalism(weight/시맨틱컬러/orange 배지, 장식 0) + lint/vitest + eval/스크린샷 검증.
+
 ## 검증 방침
 공유 primitive 변경은 **broad 영향** → eval 측정 + 다화면 스크린샷(settled 상태)으로 회귀 확인. 강조는 refined minimalism(weight/시맨틱컬러/orange 배지), 장식 추가 금지.

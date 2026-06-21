@@ -5,26 +5,11 @@ import { useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
-import { useV1Tournaments } from '@/hooks/use-v1-api';
+import { useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateShort, formatEntryFee } from '@/lib/date-utils';
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
-
-/* ── Sport filter chip data ── (codes must match v1Sport.code in DB) */
-const FILTER_SPORTS: Array<{ code: string; label: string }> = [
-  { code: 'soccer',     label: '축구' },
-  { code: 'futsal',     label: '풋살' },
-  { code: 'basketball', label: '농구' },
-  { code: 'baseball',   label: '야구' },
-  { code: 'volleyball', label: '배구' },
-  { code: 'badminton',  label: '배드민턴' },
-  { code: 'tennis',     label: '테니스' },
-  { code: 'running',    label: '러닝' },
-  { code: 'swimming',   label: '수영' },
-  { code: 'cycling',    label: '사이클' },
-  { code: 'golf',       label: '골프' },
-];
 
 export default function TournamentsPage() {
   return (
@@ -76,6 +61,12 @@ function TournamentsListContent() {
   const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
   // D3: 종목 필터 — null = '전체'
   const [activeSportCode, setActiveSportCode] = useState<string | null>(null);
+
+  /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
+  const { data: sportsData } = useV1MasterSports();
+  const filterSports: Array<{ code: string; label: string }> = (sportsData ?? [])
+    .filter((s) => s.code)
+    .map((s) => ({ code: s.code as string, label: s.name }));
 
   const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({
     cursor,
@@ -208,7 +199,7 @@ function TournamentsListContent() {
             전체
           </button>
 
-          {FILTER_SPORTS.map(({ code, label }) => {
+          {filterSports.map(({ code, label }) => {
             const accent = getSportAccent(code);
             const isActive = activeSportCode === code;
             return (
@@ -309,6 +300,7 @@ function TournamentsListContent() {
               </div>
               <span className="tm-tournament-promo-step-num" aria-hidden="true">{i + 1}</span>
               <span className="tm-tournament-promo-step-label">{step.label}</span>
+              <span className="tm-tournament-promo-step-sub" aria-hidden="true">{step.sub}</span>
               {i < PROCESS_STEPS.length - 1 ? (
                 <span className="tm-tournament-promo-step-connector" aria-hidden="true" />
               ) : null}
@@ -322,66 +314,77 @@ function TournamentsListContent() {
 
 /* ── Inline icon components (stroke=currentColor, 24 viewBox, 1.8 strokeWidth) ── */
 
-function IconClipboard({ size = 24 }: { size?: number }) {
+/** 신청: 연필로 양식 작성 — 팀 정보 입력 단계 */
+function IconPencilForm({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
   );
 }
 
-function IconCreditCard({ size = 24 }: { size?: number }) {
+/** 결제: 체크 표시가 있는 지갑 — 참가비 결제 완료 */
+function IconWalletCheck({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-      <line x1="1" y1="10" x2="23" y2="10" />
+      <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+      <path d="M16 2H8L4 7h16l-4-5z" />
+      <polyline points="9 12 11 14 15 10" />
     </svg>
   );
 }
 
-function IconUsers({ size = 24 }: { size?: number }) {
+/** 선수 명단: 체크리스트 — 선수 등록 확인 */
+function IconCheckList({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
     </svg>
   );
 }
 
-function IconSoccerBall({ size = 24 }: { size?: number }) {
+/** 조별 리그: 격자 표 — 조 편성·리그 경기 */
+function IconGrid({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-      <path d="M2 12h20" />
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
     </svg>
   );
 }
 
-function IconBracket({ size = 24 }: { size?: number }) {
+/** 결선 토너먼트: 토너먼트 브라켓 — 단판 승부 */
+function IconTournamentBracket({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6h4v12H3" />
-      <path d="M7 12h5" />
-      <path d="M12 8h2v8h-2" />
-      <path d="M14 12h3" />
-      <path d="M17 10h3v4h-3" />
+      {/* 왼쪽 두 씨드 */}
+      <rect x="2" y="4" width="5" height="3" rx="1" />
+      <rect x="2" y="10" width="5" height="3" rx="1" />
+      {/* 왼쪽 브라켓 connector */}
+      <path d="M7 5.5h3v6H7" />
+      {/* 가운데 */}
+      <rect x="10" y="7" width="5" height="3" rx="1" />
+      {/* 오른쪽 connector */}
+      <path d="M15 8.5h3" />
+      {/* 결승 */}
+      <rect x="18" y="7" width="4" height="3" rx="1" />
     </svg>
   );
 }
 
 /* ── Static data ── */
 
-const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string }> = [
-  { icon: <IconClipboard size={20} />, label: '신청' },
-  { icon: <IconCreditCard size={20} />, label: '결제' },
-  { icon: <IconUsers size={20} />, label: '선수 명단' },
-  { icon: <IconSoccerBall size={20} />, label: '조별 리그' },
-  { icon: <IconBracket size={20} />, label: '결선 토너먼트' },
-  { icon: <TrophyIcon size={20} strokeWidth={1.8} />, label: '우승' },
+const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string; sub: string }> = [
+  { icon: <IconPencilForm size={20} />,        label: '신청',      sub: '팀 정보 입력' },
+  { icon: <IconWalletCheck size={20} />,       label: '결제',      sub: '참가비 납부' },
+  { icon: <IconCheckList size={20} />,         label: '선수 명단', sub: '로스터 확정' },
+  { icon: <IconGrid size={20} />,              label: '조별 리그', sub: '라운드 로빈' },
+  { icon: <IconTournamentBracket size={20} />, label: '결선',      sub: '단판 토너먼트' },
+  { icon: <TrophyIcon size={20} strokeWidth={1.8} />, label: '우승', sub: '시상 및 정산' },
 ];
 
 /* ── Tournament card ── */

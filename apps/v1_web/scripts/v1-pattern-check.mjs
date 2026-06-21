@@ -29,8 +29,10 @@ const HAPNIDA_ALLOW = [
 function checkHapnida() {
   let out = '';
   try {
+    // *.test.* 제외: 테스트 단언 문자열은 사용자 노출 UI 카피가 아니라 검증 데이터
+    // (예: 백엔드 메시지 변경 회귀 가드는 구·신 문자열을 모두 비교해야 함).
     out = execSync(
-      `grep -rnE "입니다|습니다|됩니다|랍니다|십니다" src --include="*.tsx" --include="*.ts" || true`,
+      `grep -rnE "입니다|습니다|됩니다|랍니다|십니다" src --include="*.tsx" --include="*.ts" --exclude="*.test.ts" --exclude="*.test.tsx" || true`,
       { encoding: 'utf8' },
     );
   } catch { /* grep no-match exits 1 */ }

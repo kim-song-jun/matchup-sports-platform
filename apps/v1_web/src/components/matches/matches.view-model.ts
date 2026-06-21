@@ -5,6 +5,25 @@ import type {
   MatchListViewModel,
   MatchStateViewModel,
 } from './matches.types';
+import type { V1MatchApiStatus, V1ViewerState } from '@/types/api';
+
+/**
+ * 매치 상세 '참가' CTA 라벨.
+ * eligible(불리언)이 단일 진실원천 — eligible이면 항상 '참가 신청', 아니면 백엔드 차단 사유 메시지.
+ * OK 메시지를 문자열 비교로 거르던 방식은 카피 변경(합니다체→해요체)에 취약했음 (Copilot).
+ */
+export function applyLabel(
+  viewerState: V1ViewerState,
+  status: V1MatchApiStatus,
+  eligible?: boolean,
+  message?: string,
+) {
+  if (viewerState === 'host') return '매치 관리';
+  if (viewerState === 'requested') return '신청 취소';
+  if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
+  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
+  return !eligible && message ? message : '참가 신청';
+}
 
 const matches = [
   {

@@ -17,7 +17,7 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
-import { getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
+import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
 
 const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
 
@@ -169,7 +169,7 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
-        applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.message),
+        applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
         applyPending: applyMatch.isPending || withdrawMatch.isPending,
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
         chatLabel: chatLabel(viewerState),
@@ -401,14 +401,6 @@ function toDetailMode(viewerState: V1ViewerState, status: V1MatchApiStatus): Mat
   if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
   if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'approved';
   return 'default';
-}
-
-function applyLabel(viewerState: V1ViewerState, status: V1MatchApiStatus, message?: string) {
-  if (viewerState === 'host') return '매치 관리';
-  if (viewerState === 'requested') return '신청 취소';
-  if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
-  return message && message !== '신청할 수 있습니다.' ? message : '참가 신청';
 }
 
 function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {

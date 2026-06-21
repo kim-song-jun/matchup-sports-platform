@@ -19,6 +19,7 @@ import {
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
 import { TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -526,8 +527,8 @@ function getApplyAction({
 }): (() => Promise<unknown>) | undefined {
   if ((viewerState === 'requested' || applicationId) && applicationId) return withdraw;
   if (eligible && selectedTeamId) return () => apply(selectedTeamId);
-  // 비인증: 로그인 페이지로 이동 (#13)
-  if (isGuest) return async () => { redirectTo('/login'); };
+  // 비인증: 로그인 페이지로 이동하되, 보던 팀매치 상세로 복귀하도록 redirect 전파 (Copilot)
+  if (isGuest) return async () => { redirectTo(getLoginPathForRedirect(getCurrentRedirectPath())); };
   // 팀 없음: 팀 만들기 페이지로 이동 (#13)
   if (hasNoTeam) return async () => { redirectTo('/teams/new'); };
   return undefined;

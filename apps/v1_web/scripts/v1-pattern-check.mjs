@@ -21,7 +21,7 @@ const violations = [];
 // 의도적 예외(코드 로직·비-UI): 변경 시 분기 깨지거나 사용자 콘텐츠/주석.
 const HAPNIDA_ALLOW = [
   'matches-client.tsx:411', // API 응답 비교 로직 (값 변경 시 분기 깨짐)
-  'matches-create-client.tsx', // oldDefaults: localStorage 저장 draft 비교값
+  'matches-create-client.tsx:299', // oldDefaults 비교 baseline(line 299, 비-UI) — 파일 전체 아닌 해당 라인만 면제
   'community.view-model.ts', // mock 채팅 사용자 콘텐츠
   'team-matches.view-model.ts:1', // 공고 제목(유저 작성형 mock)
   'src/test/', // 테스트 fixture

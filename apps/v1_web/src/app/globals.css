@@ -3739,7 +3739,8 @@ button:disabled {
 }
 
 .tm-review-tab {
-  min-height: 38px;
+  /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items로 내용 중앙 정렬) */
+  min-height: 44px;
   border-radius: 12px;
   display: grid;
   place-items: center;
@@ -3825,6 +3826,8 @@ button:disabled {
 }
 
 .tm-review-star {
+  /* a11y: 시각 크기 28px 유지 + ::before 투명 히트영역으로 터치 타깃 44px 확보 */
+  position: relative;
   width: 28px;
   height: 28px;
   border: 0;
@@ -3834,6 +3837,12 @@ button:disabled {
   font-size: 24px;
   line-height: 28px;
   padding: 0;
+}
+
+.tm-review-star::before {
+  content: '';
+  position: absolute;
+  inset: -8px; /* (44 - 28) / 2 = 8px 확장 → 터치 타깃 44×44 */
 }
 
 .tm-review-star[data-active="true"] {
@@ -3853,7 +3862,8 @@ button:disabled {
 }
 
 .tm-review-tag-chip {
-  min-height: 32px;
+  /* a11y: 터치 타깃 44px 확보 (패딩 증가로 시각적 변화 최소화, 시각 무게 유지) */
+  min-height: 44px;
   border: 1px solid var(--grey200);
   border-radius: 999px;
   background: var(--surface);
@@ -3861,7 +3871,7 @@ button:disabled {
   font-size: 12px;
   font-weight: 700;
   line-height: 16px;
-  padding: 7px 10px;
+  padding: 13px 10px;
 }
 
 .tm-review-tag-chip[data-active="true"] {

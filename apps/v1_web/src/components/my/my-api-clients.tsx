@@ -116,7 +116,8 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
     ...(canManage
       ? [
           { label: '멤버 관리', sub: '초대와 가입 요청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'M' },
-          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit`, icon: 'S' },
+          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /my/teams/[id] 복귀 유도
+          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'S' },
         ]
       : []),
   ];

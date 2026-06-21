@@ -351,17 +351,24 @@ function teamDetailStatusBadgeClass(mode: TeamDetailViewModel['mode']) {
   return 'tm-badge-blue';
 }
 
-export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
+export function TeamFormPageView({
+  model,
+  /** #16: my 컨텍스트에서 진입한 경우 취소·저장 후 돌아갈 경로. 기본값 '/teams' */
+  cancelHref = '/teams',
+}: {
+  model: TeamFormViewModel;
+  cancelHref?: string;
+}) {
   const edit = model.mode === 'edit';
   const team = model.team;
   const form = model.form;
   const previewSport = form?.sports.find((sport) => sport.id === form.sportId)?.name ?? team.sports[0] ?? '';
   const previewRegion = form?.regions.find((region) => region.id === form.regionId)?.name ?? team.region ?? '';
   return (
-    <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false} backHref="/teams">
+    <AppChrome title={edit ? '팀 수정' : '팀 만들기'} activeTab="teams" bottomNav={false} backHref={cancelHref}>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+        <Link className="tm-desktop-back" href={cancelHref} aria-label={edit ? '팀으로 돌아가기' : '팀 목록으로'}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
         </Link>
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
@@ -404,10 +411,10 @@ export function TeamFormPageView({ model }: { model: TeamFormViewModel }) {
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
           <TeamFormPreview team={team} sportName={previewSport} regionName={previewRegion} />
           <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
-          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams">{edit ? '취소' : '이전'}</Link>
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={cancelHref}>{edit ? '취소' : '이전'}</Link>
         </aside>
       </div>
-      <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={edit ? '/teams' : '/teams'}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
+      <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </AppChrome>
   );
 }

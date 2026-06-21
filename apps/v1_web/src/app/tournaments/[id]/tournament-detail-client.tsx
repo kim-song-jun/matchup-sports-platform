@@ -879,6 +879,8 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const roundLabel = fixture.round
     ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
     : `${fixture.fixtureNumber}경기`;
+  // 날짜 라벨: invalid/누락이면 null → 빈 span(스타일된 공백) 대신 날짜 영역 자체를 숨긴다 (Copilot)
+  const scheduledLabel = formatTournamentDateShort(fixture.scheduledAt);
 
   return (
     <Card pad={14}>
@@ -895,9 +897,9 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             {roundLabel}
           </span>
-          {fixture.scheduledAt ? (
+          {scheduledLabel ? (
             <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>
-              {formatTournamentDateShort(fixture.scheduledAt) ?? ''}
+              {scheduledLabel}
             </span>
           ) : null}
         </div>

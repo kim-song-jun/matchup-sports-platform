@@ -4,13 +4,10 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
-import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import {
   useV1CheckEmail,
   useV1CheckNickname,
-  useV1MasterSports,
   useV1Register,
-  useV1SaveOnboardingPreferences,
   useV1UpdateProfile,
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
@@ -18,15 +15,16 @@ import { saveStoredV1Session } from '@/lib/session-storage';
 import { readSignupTermsAccepted } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
 
-type WizardStep = 'nickname' | 'email' | 'password' | 'birthdate' | 'sport';
-const STEP_ORDER: WizardStep[] = ['nickname', 'email', 'password', 'birthdate', 'sport'];
+// sport step은 onboarding 위저드(/onboarding/sport)가 담당.
+// 인라인 wizard는 계정 생성(nickname→email→password) + 생년월일(birthdate)까지만.
+type WizardStep = 'nickname' | 'email' | 'password' | 'birthdate';
+const STEP_ORDER: WizardStep[] = ['nickname', 'email', 'password', 'birthdate'];
 
 const STEP_COPY: Record<WizardStep, { title: string; sub: string }> = {
   nickname: { title: '어떤 이름으로\n활동할까요?', sub: '경기와 팀에서 보일 이름이에요. 나중에 바꿀 수 있어요.' },
   email: { title: '이메일을\n알려주세요', sub: '로그인과 알림에 사용해요.' },
   password: { title: '비밀번호를\n설정해 주세요', sub: '8자 이상으로 안전하게 만들어 주세요.' },
   birthdate: { title: '생년월일을\n알려주세요', sub: '연령대에 맞는 매칭에 쓰여요. 건너뛰어도 괜찮아요.' },
-  sport: { title: '어떤 운동에\n관심 있으세요?', sub: '관심 종목을 골라 주세요. 실력·지역은 나중에 설정에서 채울 수 있어요.' },
 };
 
 type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
@@ -35,10 +33,8 @@ export function SignupClient() {
   const router = useRouter();
   const register = useV1Register();
   const updateProfile = useV1UpdateProfile();
-  const savePreferences = useV1SaveOnboardingPreferences();
   const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
-  const sportsQuery = useV1MasterSports();
 
   const [step, setStep] = useState<WizardStep>('nickname');
   const [nickname, setNickname] = useState('');
@@ -48,7 +44,6 @@ export function SignupClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [birthDate, setBirthDate] = useState(''); // ISO YYYY-MM-DD from the native date picker
-  const [sportIds, setSportIds] = useState<string[]>([]);
   const [requiredTermsAccepted, setRequiredTermsAccepted] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +56,6 @@ export function SignupClient() {
 
   const stepIndex = STEP_ORDER.indexOf(step);
   const copy = STEP_COPY[step];
-  const sports = sportsQuery.data ?? [];
   const today = new Date().toISOString().slice(0, 10);
 
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
@@ -70,7 +64,8 @@ export function SignupClient() {
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
-  const saving = updateProfile.isPending || savePreferences.isPending;
+  // saving은 생년월일 저장 진행 중 표시에 사용
+  const saving = updateProfile.isPending;
 
   const runNicknameCheck = () => {
     const next = nickname.trim();
@@ -112,9 +107,6 @@ export function SignupClient() {
     });
   };
 
-  const toggleSport = (id: string) =>
-    setSportIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
-
   const goBack = () => {
     setFieldError(null);
     setError(null);
@@ -124,7 +116,6 @@ export function SignupClient() {
     }
     if (step === 'email') return setStep('nickname');
     if (step === 'password') return setStep('email');
-    if (step === 'sport') return setStep('birthdate');
     // birthdate: 계정이 이미 생성된 이후라 계정 단계로 돌아가지 않는다.
   };
 
@@ -164,8 +155,9 @@ export function SignupClient() {
     );
   };
 
-  // 생년월일(선택) + 관심 운동(선택)을 저장하고 홈으로. 나머지(실력·지역 등)는 내 설정에서.
-  const completeFlow = async (includeSport: boolean) => {
+  // 생년월일(선택)을 저장한 뒤 onboarding 위저드로 이동.
+  // 종목·실력·지역 수집과 onboardingStatus 'completed' 확정은 위저드(/onboarding/sport)가 담당한다.
+  const goToOnboarding = async () => {
     setError(null);
     try {
       if (birthDate) {
@@ -177,13 +169,7 @@ export function SignupClient() {
           birthDate: birthDate.replace(/-/g, ''),
         });
       }
-      if (includeSport && sportIds.length > 0) {
-        await savePreferences.mutateAsync({
-          sports: sportIds.map((id) => ({ sportId: id, levelId: null })),
-          currentStep: 'sport',
-        });
-      }
-      router.replace('/home');
+      router.replace('/onboarding/sport');
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : '저장에 실패했어요. 다시 시도해 주세요.');
     }
@@ -200,16 +186,17 @@ export function SignupClient() {
               disabled: register.isPending || !passwordLongEnough || !passwordMatch,
               onClick: submitAccount,
             }
-          : step === 'birthdate'
-            ? { label: '다음', disabled: false, onClick: () => setStep('sport') }
-            : { label: saving ? '저장 중…' : '시작하기', disabled: saving, onClick: () => completeFlow(true) };
+          : {
+              // birthdate
+              label: saving ? '저장 중…' : '다음',
+              disabled: saving,
+              onClick: goToOnboarding,
+            };
 
   const skip =
     step === 'birthdate'
-      ? { label: '건너뛰기', onClick: () => { setBirthDate(''); setStep('sport'); } }
-      : step === 'sport'
-        ? { label: '건너뛰고 시작하기', onClick: () => completeFlow(false) }
-        : null;
+      ? { label: '건너뛰기', onClick: () => { setBirthDate(''); void goToOnboarding(); } }
+      : null;
 
   return (
     <AuthFrame
@@ -358,32 +345,6 @@ export function SignupClient() {
                 onChange={(event) => setBirthDate(event.target.value)}
               />
             </label>
-          ) : null}
-
-          {step === 'sport' ? (
-            sportsQuery.isLoading ? (
-              <p className="tm-text-caption">종목을 불러오는 중이에요…</p>
-            ) : sportsQuery.isError ? (
-              // 종목 로드 실패 시 빈 그리드 대신 오류 안내 — 다음 CTA도 별도로 disable하지 않아도
-              // sports가 비어 있으면 선택 자체가 불가능하므로 건너뛰기를 유도함.
-              <ErrorState message="종목 목록을 불러오지 못했어요. 다시 시도해 주세요." onRetry={() => void sportsQuery.refetch()} />
-            ) : (
-              <div className="tm-auth-sport-grid">
-                {sports.map((sport) => (
-                  <button
-                    key={sport.id}
-                    type="button"
-                    className={`tm-card tm-auth-option-card ${sportIds.includes(sport.id) ? 'tm-auth-option-selected' : ''}`}
-                    onClick={() => toggleSport(sport.id)}
-                    aria-pressed={sportIds.includes(sport.id)}
-                  >
-                    <SportGlyph code={sport.code} size={30} className="tm-signup-sport-icon" />
-                    <div className="tm-text-body-lg">{sport.name}</div>
-                    <div className="tm-text-caption">{sportIds.includes(sport.id) ? '선택됨' : '탭해서 선택'}</div>
-                  </button>
-                ))}
-              </div>
-            )
           ) : null}
         </form>
 

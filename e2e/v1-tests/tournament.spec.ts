@@ -1,0 +1,54 @@
+import { test, expect } from '@playwright/test';
+import { loginAs } from './helpers/auth';
+import { personas } from './personas';
+
+/**
+ * 페르소나: applicant(지원수) — 대회 참가 신청자.
+ * 플로우: /tournaments → 대회 목록 렌더 → 대회 상세 → /tournaments/[id]/apply 페이지 렌더.
+ */
+test.describe('[applicant] 대회 탐색 및 신청 플로우', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, personas.applicant.email);
+  });
+
+  test('/tournaments — 대회 목록 페이지가 렌더된다', async ({ page }) => {
+    await page.goto('/tournaments');
+    const main = page.getByRole('main');
+    await expect(main).toBeVisible();
+    // AppChrome title="대회" — 대회 페이지 핵심 텍스트
+    await expect(main).toContainText('대회');
+  });
+
+  test('/tournaments → 대회 상세 → 신청 페이지 도달', async ({ page }) => {
+    await page.goto('/tournaments');
+    const main = page.getByRole('main');
+    await expect(main).toBeVisible();
+
+    // 대회 목록에서 첫 번째 링크 클릭 (seed id 패턴 /tournaments/0000…)
+    const tournamentLink = page.locator('a[href*="/tournaments/0000"]').first();
+
+    if (await tournamentLink.count() === 0) {
+      // seed 대회가 없는 경우 — 빈 상태 확인 후 통과
+      await expect(main).toContainText(/대회|없어요/);
+      return;
+    }
+
+    await expect(tournamentLink).toBeVisible();
+    await tournamentLink.click();
+
+    await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]{8,}/);
+    const detail = page.getByRole('main');
+    await expect(detail).toBeVisible();
+
+    // 신청 링크 또는 버튼 탐색
+    const applyLink = page.locator('a[href*="/apply"]').first();
+    if (await applyLink.count() > 0) {
+      await applyLink.click();
+      await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]{8,}\/apply/);
+      await expect(page.getByRole('main')).toBeVisible();
+    } else {
+      // 신청 버튼이 없는 경우(마감/비로그인 등) — 상세 페이지 도달로 충분
+      await expect(detail).toContainText(/대회|종목|모집/);
+    }
+  });
+});

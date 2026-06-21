@@ -60,28 +60,16 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
       </div>
       {model.state === 'restricted' ? null : <TeamSearchBar model={model} />}
       <div className="tm-team-list">
-        {model.state === 'search' ? (
-          <>
-            <div className="tm-team-summary-bar">
-              <div className="tm-text-label">검색어 `{model.query}`</div>
-              <div className="tm-text-caption tab-num">{model.summary.total}팀 · 모집중 {model.summary.recruiting}</div>
+        <EmptyState title={model.title} sub={model.description} />
+        {model.state === 'error' ? (
+          <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18, background: 'var(--grey50)' }}>
+            <div className="tm-text-label">팀 목록으로 돌아가 다시 확인해 주세요</div>
+            <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
+              새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
             </div>
-            <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
-          </>
-        ) : (
-          <>
-            <EmptyState title={model.title} sub={model.description} />
-            {model.state === 'error' ? (
-              <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18, background: 'var(--grey50)' }}>
-                <div className="tm-text-label">팀 목록으로 돌아가 다시 확인해 주세요</div>
-                <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
-                  새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
-                </div>
-                <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
-              </Card>
-            ) : null}
-          </>
-        )}
+            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
+          </Card>
+        ) : null}
       </div>
     </AppChrome>
   );

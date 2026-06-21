@@ -150,12 +150,6 @@ export function getTeamListViewModel(): TeamListViewModel {
 export function getTeamStateViewModel(state: TeamStateViewModel['state']): TeamStateViewModel {
   const base = getTeamListViewModel();
   const copy = {
-    search: {
-      title: '팀 검색',
-      description: '팀명, 지역, 종목으로 가입 가능한 팀을 찾아보세요.',
-      query: '풋살',
-      teams,
-    },
     empty: {
       title: '조건에 맞는 팀이 없어요',
       description: '지역, 종목, 모집 상태 조건을 줄이면 가입 가능한 팀을 다시 볼 수 있어요.',

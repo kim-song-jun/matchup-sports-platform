@@ -140,29 +140,6 @@ export function TeamListPageClient() {
   }
 }
 
-export function TeamSearchPageClient({ queryText = '' }: { queryText?: string }) {
-  const query = useV1Teams(queryText ? { query: queryText, limit: 20 } : { limit: 20 });
-  const base = getTeamStateViewModel('search');
-
-  if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
-
-  const items = query.data?.items;
-  const model = items
-    ? {
-        ...base,
-        query: queryText || base.query,
-        teams: items.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0])),
-        summary: {
-          ...base.summary,
-          total: items.length,
-          recruiting: items.filter((item) => item.joinPolicy === 'approval_required').length,
-        },
-      }
-    : base;
-
-  return <TeamStatePageView model={model} />;
-}
-
 export function TeamFilterPageClient() {
   const query = useV1Teams({ joinPolicy: 'approval_required', sort: 'recommended', limit: 20 });
   const base = getTeamStateViewModel('filter');

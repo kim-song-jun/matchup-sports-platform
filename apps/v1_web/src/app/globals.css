@@ -3024,6 +3024,12 @@ button:disabled {
     text-align: left !important;
   }
 
+  /* #1(Copilot): 값 슬롯 inner flex(justify-content:flex-end)가 column 레이아웃에서도
+     좌측 정렬되도록 — text-align:left와 일치(값이 우측에 잔류하지 않게). */
+  .tm-info-row > div:last-child > div {
+    justify-content: flex-start;
+  }
+
   .tm-team-info-row {
     grid-template-columns: 1fr;
     gap: 4px;

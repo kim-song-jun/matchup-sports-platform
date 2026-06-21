@@ -25,14 +25,12 @@ test.describe('[applicant] 대회 탐색 및 신청 플로우', () => {
     await expect(main).toBeVisible();
 
     // 대회 목록에서 첫 번째 링크 클릭 (seed id 패턴 /tournaments/0000…)
-    const tournamentLink = page.locator('a[href*="/tournaments/0000"]').first();
-
-    if (await tournamentLink.count() === 0) {
-      // seed 대회가 없는 경우 — 빈 상태 확인 후 통과
-      await expect(main).toContainText(/대회|없어요/);
-      return;
-    }
-
+    // 대회 id는 UUID이므로 기존 0000 패턴 셀렉터는 항상 0건→silent-pass였음(Copilot #3 수정).
+    // 상세 링크(목록 카드 → /tournaments/<uuid>)만 선택. seed 대회는 항상 존재하므로
+    // 못 찾으면 회귀로 실패해야 한다(빈 상태로 조용히 통과 금지).
+    const tournamentLink = page
+      .locator('a[href*="/tournaments/"]:not([href$="/tournaments"]):not([href*="/apply"]):not([href*="/my"]):not([href*="/roster"])')
+      .first();
     await expect(tournamentLink).toBeVisible();
     await tournamentLink.click();
 

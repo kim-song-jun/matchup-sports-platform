@@ -44,10 +44,10 @@ interface AdminDataTableProps<T> {
    */
   scrollOnMobile?: boolean;
   /**
-   * Tailwind max-width class applied to the desktop <table> element so
-   * stat-heavy tables don't stretch across the full 1440 px viewport.
-   * Example: 'max-w-3xl'. When omitted the table stays w-full (existing
-   * behaviour unchanged — additive prop).
+   * Tailwind max-width class for the desktop table wrapper so stat-heavy
+   * tables don't stretch across wide (1920+) viewports.
+   * 기본값(미전달): 'max-w-[900px]' 캡 적용(#6). 캡 해제는 'max-w-none',
+   * 다른 폭은 예: 'max-w-3xl' 전달.
    */
   tableMaxWidth?: string;
   /**

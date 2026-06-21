@@ -4195,3 +4195,30 @@ button:disabled {
   height: 0;
   display: none;
 }
+
+/* ── 랜딩 종목 칩 — 준비중 상태 ────────────────────────────────────────────
+ * .tm-landing-sport-chip (활성) 스타일과 시각 일관성 유지.
+ * 컬러만으로 구분하지 않음 — '준비중' 텍스트 배지가 비색상 지표(a11y).
+ * 하드코딩 색 없음 — 전부 토큰 참조. ─────────────────────────────────────*/
+
+/* 준비중 칩 컨테이너 — 활성 칩 대비 opacity로 muted 처리 */
+.tm-landing-sport-chip-soon {
+  opacity: 0.55;
+  cursor: default;
+  position: relative;
+}
+
+/* '준비중' 텍스트 배지 — 칩 우상단 인라인 뱃지 */
+.tm-landing-sport-soon {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+  background: var(--grey150);
+  color: var(--grey600);
+  /* 비색상 지표: 텍스트 '준비중'이 상태를 전달 */
+}

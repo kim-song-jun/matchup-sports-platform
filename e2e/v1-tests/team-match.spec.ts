@@ -26,7 +26,7 @@ test.describe('[host] 팀매치 목록 플로우', () => {
     await expect(fab).toHaveCount(1);
   });
 
-  test('데스크톱: /team-matches 헤더에 "팀매치 만들기" CTA가 노출된다', async ({ page }) => {
+  test('데스크톱: /team-matches 헤더에 "팀매치 만들기" CTA가 노출된다', async ({ page }, testInfo) => {
     // 이 테스트는 --project=desktop(1440px)으로 실행될 때 의미 있음
     // mobile viewport에서도 DOM에는 존재(CSS 표시만 다름) → DOM 존재 확인
     await page.goto('/team-matches');
@@ -39,5 +39,10 @@ test.describe('[host] 팀매치 목록 플로우', () => {
     await expect(desktopCta).toHaveAttribute('href', '/team-matches/new/team');
     // aria-label도 존재
     await expect(desktopCta).toHaveAttribute('aria-label', '팀매치 만들기');
+    // 데스크톱(1440) 프로젝트에선 실제로 보여야 한다 — CSS로 숨겨지는 회귀를 toBeVisible로 포착(Copilot).
+    // 모바일 프로젝트에선 이 데스크톱 CTA가 반응형 CSS로 숨겨지므로 DOM 존재(toHaveCount)까지만 의미.
+    if (testInfo.project.name === 'desktop') {
+      await expect(desktopCta).toBeVisible();
+    }
   });
 });

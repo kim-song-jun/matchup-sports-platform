@@ -94,14 +94,13 @@
     margin-top: 20px;
   }
 
-  /* Each card gets a hover lift. */
+  /* Hover: background tint only — lift(translateY) and shadow-2 violate toss-clean R-K2. */
   .tm-match-list-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: background-color 0.12s;
   }
 
   .tm-match-list-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+    background: var(--grey50);
   }
 
   /* Taller card media on desktop for visual weight. */

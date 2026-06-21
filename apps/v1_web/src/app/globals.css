@@ -1211,9 +1211,15 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* a11y R-A2: 키보드 포커스 링 — .tm-btn/:focus-visible 패턴과 통일 */
+.tm-chip:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
 }
 
 .tm-chip-active {
@@ -1952,6 +1958,13 @@ button:disabled {
   gap: 8px;
 }
 
+/* a11y R-A2: 키보드 포커스 시 내부 input이 focus를 받으면 컨테이너에 링 표시 */
+.tm-create-input:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-color: var(--blue500);
+}
+
 .tm-create-input-multiline {
   /* #25: 104px → 72px — 과대한 빈 여백 제거, textarea는 내용에 따라 자동 성장 */
   min-height: 72px;
@@ -2440,7 +2453,7 @@ button:disabled {
 }
 
 .tm-team-form-chip-row .tm-chip {
-  min-height: 30px;
+  /* a11y: min-height 44px 유지 (base .tm-chip 상속) — padding만 축소해 밀도 조정 */
   padding: 0 10px;
 }
 
@@ -2536,7 +2549,7 @@ button:disabled {
 .tm-chat-section-label {
   padding: 8px 20px 6px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 700;
 }
 
@@ -2612,7 +2625,7 @@ button:disabled {
   padding: 0 8px;
   background: var(--grey200);
   color: var(--text-strong);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   display: grid;
   place-items: center;
@@ -2657,7 +2670,7 @@ button:disabled {
   gap: 6px;
   min-width: 0;
   color: var(--text-caption);
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   line-height: 1.35;
 }
 
@@ -2692,7 +2705,7 @@ button:disabled {
   color: var(--static-white);
   display: inline-grid;
   place-items: center;
-  font-size: 12px;
+  font-size: var(--font-size-caption); /* 12px — R-T2 토큰 */
   font-weight: 800;
   flex: 0 0 auto;
 }
@@ -2832,7 +2845,7 @@ button:disabled {
   display: flex;
   align-items: center;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: var(--font-size-body-sm); /* 14px — R-T2 토큰 */
   font-weight: 600;
 }
 
@@ -2862,7 +2875,7 @@ button:disabled {
   place-items: center;
   padding: 0 14px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 800;
 }
 
@@ -2920,7 +2933,7 @@ button:disabled {
 .tm-notification-meta {
   margin-top: 6px;
   color: var(--text-caption);
-  font-size: 12px;
+  font-size: var(--font-size-caption); /* 12px — R-T2 토큰 */
   font-weight: 700;
 }
 
@@ -3644,7 +3657,8 @@ button:disabled {
 
 .tm-my-profile-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* KPI 3개 — 4열에서 3열로 수정해 빈 4번째 열 제거 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: -14px -20px 2px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);

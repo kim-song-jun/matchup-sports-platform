@@ -35,9 +35,13 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
       <TeamSearchBar model={model} />
       <div className="tm-team-list">
         <div className="tm-sport-chip-row" role="group" aria-label="종목 필터">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href} aria-current={chip.active ? 'page' : undefined}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={chip.active}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
+        {/* 모바일 진입점 위계: summary-bar 텍스트를 tm-text-heading으로 승격해 페이지 진입점을 명확히 함.
+            desktop에는 이미 .tm-team-desktop-header가 제목을 담당하므로 모바일에서만 노출. */}
+        <h2 className="tm-text-heading tm-hide-desktop tm-team-mobile-heading">{model.summary.scope}</h2>
         <div className="tm-team-summary-bar">
-          <div className="tm-text-label">{model.summary.scope}</div>
-          <div className="tm-text-caption tab-num">{model.summary.total}팀 · 모집 중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
+          <div className="tm-text-caption tab-num tm-hide-desktop">{model.summary.total}팀 · 모집 중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
+          <div className="tm-text-label tm-show-desktop">{model.summary.scope}</div>
+          <div className="tm-text-caption tab-num tm-show-desktop">{model.summary.total}팀 · 모집 중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
         </div>
         {model.teams.length ? <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div> : <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />}
       </div>
@@ -757,17 +761,24 @@ function DraggableFilterSheet({
 }
 
 function TeamCard({ team }: { team: TeamModel }) {
+  // intro가 10자 미만이면 "내용 없음"으로 간주해 intro-box 자체를 숨긴다.
+  // 빈 박스가 카드 공간을 차지하면서 시각적 밀도를 낮추는 것을 방지하기 위함.
+  const hasIntro = team.intro.trim().length >= 10;
+
   return (
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <TeamLogo team={team} />
         <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><span className={`tm-badge ${team.status === 'closed' ? 'tm-badge-grey' : team.status === 'reviewing' ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{team.statusLabel}</span></div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · {team.members}명</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
       </div>
-      <div className="tm-team-intro-box">
-        <div className="tm-text-label">팀 소개</div>
-        <div className="tm-text-body" style={{ marginTop: 6, color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
-      </div>
-      <div className="tm-team-card-footer"><span className="tm-text-caption">{team.next}</span><span className={`tm-btn tm-btn-sm ${team.status === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary'}`}>{team.status === 'closed' ? '알림받기' : '팀 보기'}</span></div>
+      {/* intro가 충분히 있을 때만 intro-box를 렌더한다. '팀 소개' 라벨은 시각 노이즈이므로 제거하고 본문만 표시. */}
+      {hasIntro ? (
+        <div className="tm-team-intro-box">
+          <div className="tm-text-body line-clamp-2" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
+        </div>
+      ) : null}
+      {/* '팀 보기' CTA: 반복 파란 solid 버튼 대신 ghost 텍스트 링크로 절제. closed 팀의 '알림받기'는 neutral 유지. */}
+      <div className="tm-team-card-footer"><span className="tm-text-caption">{team.next}</span><span className={`tm-btn tm-btn-sm ${team.status === 'closed' ? 'tm-btn-neutral' : 'tm-btn-ghost tm-team-card-view-link'}`}>{team.status === 'closed' ? '알림받기' : '팀 보기 ›'}</span></div>
     </Link>
   );
 }

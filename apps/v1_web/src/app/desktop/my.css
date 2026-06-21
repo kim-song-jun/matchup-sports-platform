@@ -66,10 +66,12 @@
   }
 
   /* Desktop 2-column wrapper for the my home page.
+   * LEFT sidebar: 360px 고정 — 프로필/통계 콘텐츠에 충분한 폭.
+   * RIGHT main: 1fr 확장 — 우하단 대형 공백 해소 (이전: 340px 고정이라 main이 남은 폭에 늘어나지 않았음).
    * On mobile this wrapper had display:contents — override to real grid here. */
   .tm-my-desktop-layout {
     display: grid;
-    grid-template-columns: 340px 1fr;
+    grid-template-columns: 360px 1fr;
     gap: 32px;
     align-items: start;
   }
@@ -112,13 +114,10 @@
     border-radius: 24px;
   }
 
-  /* Stats strip: reset the negative margin bleed, keep the grid. */
+  /* Stats strip: 이제 Card(border/radius/padding 내장) 안에 있으므로 독립 스타일 불필요.
+   * KPIStat 간격만 조정해 Card 내부 리듬을 유지함. */
   .tm-my-desktop-sidebar .tm-my-profile-stats {
-    margin: 0;
-    border: 1px solid var(--grey100);
-    border-radius: 16px;
-    padding: 14px 16px;
-    background: var(--surface);
+    margin: 8px 0 0;
   }
 
   .tm-my-desktop-sidebar .tm-my-profile-stats > div {
@@ -458,8 +457,9 @@
  */
 
 @media (min-width: 1440px) {
+  /* 1440 이상: sidebar를 380px로 소폭 확장해 main 컬럼에 공간 양보 */
   .tm-my-desktop-layout {
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 380px 1fr;
     gap: 40px;
   }
 
@@ -469,12 +469,20 @@
   }
 }
 
-/* 마이페이지 하단 로그아웃 버튼 여백 (데스크탑은 좌측 정렬 폭 제한) */
+/* 마이페이지 하단 로그아웃 버튼 여백.
+ * ghost variant이므로 좌측 정렬·폭 제한 대신 텍스트 링크처럼 자연스럽게 표시. */
 .tm-my-logout-row {
   margin-top: 20px;
 }
-@media (min-width: 1024px) {
-  .tm-my-logout-row {
-    max-width: 320px;
-  }
+
+/* ghost 로그아웃 버튼: 색=캡션, hover=text-strong. 파괴 액션이 primary CTA보다 낮은 시각 위계 유지 */
+.tm-logout-ghost {
+  color: var(--text-caption);
+  padding-left: 0;
+  padding-right: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tm-logout-ghost:hover:not(:disabled) {
+  color: var(--text-strong);
 }

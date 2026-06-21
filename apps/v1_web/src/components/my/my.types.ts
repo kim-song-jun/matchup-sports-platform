@@ -9,6 +9,7 @@ export type MyUser = {
   monthly: Array<{ label: string; value: number | string; unit?: string }>;
 };
 
+/** icon 값은 Lucide コンポーネント명 문자열 — MenuSection에서 매핑 후 렌더됨 */
 export type MyMenuItem = {
   label: string;
   sub: string;

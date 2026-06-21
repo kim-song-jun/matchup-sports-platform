@@ -120,19 +120,22 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * 5. Sport selection grid — 3 columns inside the 560px card.
- *    Each card ≈ (560 - 32*2 - 12*2) / 3 ≈ 154px — comfortable tap target.
+ * 5. Sport selection grid — 2×2 square layout inside the 560px card.
+ *    [taste-A] 4종목이 정확히 2×2 정사각 배치로 채워져 데스크톱 하단·우측
+ *    대형 공백을 해소한다. 3열이면 2행에 카드 1개 + 빈 칸 2개로 공백이 생김.
+ *    Each card ≈ (560 - 32*2 - 10) / 2 ≈ 243px — 넓은 카드로 시각 안정감.
  *    auth.css already sets gap:12px, margin-top:28px — keep those.
  * ───────────────────────────────────────────────────────────────────────────── */
 @media (min-width: 1024px) {
   .tm-onboarding-frame .tm-auth-sport-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
     margin-top: 24px;
   }
 
+  /* 2열로 넓어진 카드는 모바일 기본(88px)보다 더 세로로 채워 정사각 비율에 가깝게. */
   .tm-onboarding-frame .tm-auth-option-card {
-    min-height: 76px;
+    min-height: 96px;
   }
 }
 

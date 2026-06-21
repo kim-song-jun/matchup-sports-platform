@@ -1,4 +1,17 @@
 import Link from 'next/link';
+import {
+  Bell,
+  ClipboardList,
+  Dumbbell,
+  FileText,
+  LucideProps,
+  LogOut,
+  MapPin,
+  Plus,
+  Settings,
+  Star,
+  Users,
+} from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
@@ -18,6 +31,20 @@ import type {
   ProfileEditViewModel,
   SettingsViewModel,
 } from './my.types';
+
+/** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
+const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  ClipboardList,
+  Plus,
+  Users,
+  Star,
+  Dumbbell,
+  Settings,
+  MapPin,
+  Bell,
+  FileText,
+  LogOut,
+};
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   return (
@@ -47,7 +74,11 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               </div>
               <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">수정</Link>
             </section>
-            <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
+            {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
+            <Card pad={16}>
+              <div className="tm-text-body-lg">활동 요약</div>
+              <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
+            </Card>
             <Card pad={16}>
               <div className="tm-text-body-lg">이번 달 활동</div>
               <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
@@ -58,9 +89,9 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>
-            {/* Logout surfaced directly on 마이페이지 (also in 계정 설정) for discoverability. */}
+            {/* 로그아웃: 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 (계정 설정 페이지에도 동일하게 있어 발견성 유지) */}
             <div className="tm-my-logout-row">
-              <LogoutButton />
+              <LogoutButton variant="ghost" />
             </div>
           </div>
         </div>
@@ -270,16 +301,24 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
     <section>
       <div className="tm-my-section-label">{section.title}</div>
       <Card pad={0}>
-        {section.items.map((item) => (
-          <Link key={item.label} className="tm-my-menu-row" href={item.href}>
-            <span className="tm-my-menu-icon">{item.icon}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'block' }}>{item.label}</span>
-              <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>
-            </span>
-            <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
-          </Link>
-        ))}
+        {section.items.map((item) => {
+          const IconComponent = MENU_ICON_MAP[item.icon];
+          return (
+            <Link key={item.label} className="tm-my-menu-row" href={item.href}>
+              {/* Lucide 아이콘: 단일 글자 모노그램 대체. 의미 있는 시각 단서 제공 */}
+              <span className="tm-my-menu-icon" aria-hidden="true">
+                {IconComponent ? (
+                  <IconComponent size={18} strokeWidth={1.75} color="var(--blue500)" />
+                ) : item.icon}
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'block' }}>{item.label}</span>
+                <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>
+              </span>
+              <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
+            </Link>
+          );
+        })}
       </Card>
     </section>
   );

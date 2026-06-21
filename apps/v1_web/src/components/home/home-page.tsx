@@ -45,23 +45,30 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
               {dash ? '안녕하세요' : `안녕하세요, ${model.viewerName}님`}
             </div>
+            {/*
+             * [taste-A] 통계 위계 후퇴: NumberDisplay 36→24 + 한 줄 컴팩트 스트립.
+             * 통계가 인사말보다 시각 무게를 과점하던 위계 역전을 교정한다.
+             * 두 항목을 gap 24px 수평 스트립으로 압축하고, 숫자 크기를 heading 레벨
+             * (24px, --font-size-heading)로 낮춰 제목 레벨 아이덴티티를 유지하면서도
+             * 히어로 카드·섹션 타이틀이 시각 우선순위를 되찾게 한다.
+             */}
             <div className="tm-home-stats">
               <div>
-                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
+                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
                 <NumberDisplay
                   value={dash ? '-' : model.stats.monthlyActivity}
                   unit={dash ? '' : '경기'}
-                  size={36}
+                  size={24}
                   sub={dash ? undefined : model.stats.monthlyActivitySub}
                 />
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
+                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
                 <NumberDisplay
                   value={dash ? '-' : model.stats.mannerScore}
                   /* 점수 없을 때(빈 sentinel '-')는 '점' 단위 숨김 → "- 점" 어색함 방지 */
                   unit={dash || model.stats.mannerScore === '-' ? '' : '점'}
-                  size={36}
+                  size={24}
                   sub={
                     /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
                     dash || model.stats.mannerScoreSub === '-'
@@ -189,7 +196,13 @@ function QuickActionIcon({ item }: { item: HomeQuickAction }) {
 function QuickAction({ item }: { item: HomeQuickAction }) {
   const content = (
     <>
-      <div className="tm-quick-icon" style={{ background: item.background, color: item.color }}>
+      {/*
+       * [taste-A] 퀵액션 아이콘 색 강조 낮춤 — 아이콘만 컬러, 배경은 중립 grey50.
+       * 기존: orange·green·blue 배경이 동시에 노출 → 다중 강조색 충돌(R-C1 위반 경계).
+       * 변경: 배경은 통일 var(--grey50), 아이콘 컬러만 item.color로 종목/기능 식별.
+       * 아이콘+라벨 텍스트 병행으로 컬러만으로 정보 전달하지 않는다(R-C3 준수).
+       */}
+      <div className="tm-quick-icon" style={{ background: 'var(--grey50)', color: item.color }}>
         <QuickActionIcon item={item} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -266,6 +279,22 @@ function FeaturedMatchCard({
                 ? <span className="tm-badge tm-badge-orange">마감 임박</span>
                 : null}
             </div>
+            {/*
+             * [taste-A] 히어로 카드 주요 CTA — solid blue primary 버튼 1개.
+             * 기존에는 카드 자체(Link)가 CTA 역할을 암묵적으로 맡고 있었으나,
+             * 시각적 종착점(explicit CTA)이 없어 행동 유도력이 약했다.
+             * 카드 전체 Link를 유지하되, 카드 내부 CTA 버튼을 추가해
+             * 명시적 행동 신호를 제공한다. (R-K5: CTA 화면당 최대 1개)
+             */}
+            <button
+              className="tm-btn tm-btn-primary tm-btn-sm"
+              type="button"
+              style={{ marginTop: 12, width: '100%', pointerEvents: 'none' }}
+              aria-hidden="true"
+              tabIndex={-1}
+            >
+              {match.actionLabel ?? '신청하기'}
+            </button>
           </>
         )}
       </div>

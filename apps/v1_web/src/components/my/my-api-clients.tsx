@@ -128,12 +128,12 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
   // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
   const canManage = viewerRole === 'owner' || viewerRole === 'manager';
   const actions: MyTeamDetailViewModel['actions'] = [
-    { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'G' },
+    { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'ClipboardList' },
     ...(canManage
       ? [
-          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'M' },
+          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'Users' },
           // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /my/teams/[id] 복귀 유도
-          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'S' },
+          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'Settings' },
         ]
       : []),
   ];
@@ -974,7 +974,6 @@ function toMyHomeModel(
 ): MyHomeViewModel {
   const displayName = profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
-  const monthlyMannerScore = activitySummary?.monthly.mannerScore ?? totalMannerScore;
   const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
   const communitySection = sections.find((section) => section.title === '커뮤니티');
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
@@ -982,7 +981,7 @@ function toMyHomeModel(
       label: '리뷰',
       sub: hasPendingReviews ? '작성할 리뷰가 있어요' : '작성한 리뷰와 받은 리뷰를 확인해요',
       href: '/my/reviews',
-      icon: 'R',
+      icon: 'Star',
     });
   }
 
@@ -1005,9 +1004,9 @@ function toMyHomeModel(
         { label: '소속 팀', value: activitySummary?.totals.teamCount ?? teams.length, unit: '팀' },
         { label: '매너 점수', value: formatScore(totalMannerScore) },
       ],
+      // '매너 점수'는 상단 활동 요약(stats)에만 표시. monthly는 경기 수·승률만 — 이중 표기 해소.
       monthly: [
         { label: '이번 달 경기', value: activitySummary?.monthly.matchCount ?? 0, unit: '경기' },
-        { label: '매너 점수', value: formatScore(monthlyMannerScore) },
         { label: '승률', value: formatWinRate(activitySummary?.monthly.winRate) },
       ],
     },

@@ -569,14 +569,16 @@ function MatchCardItem({ match, index }: { match: MatchCardModel; index: number 
         <span className="tm-match-count-badge tab-num">{match.current}/{match.capacity}</span>
       </div>
       <div className="tm-match-list-card-body">
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <span className="tm-badge tm-badge-grey">{match.sport}</span>
-          <span className="tm-badge tm-badge-grey">{match.level}</span>
-          <span className="tm-badge tm-badge-grey">{match.gender}</span>
-          <span className="tm-badge tm-badge-orange">{match.deadline}</span>
+        {/* [격상1] 종목 배지 제거 — 미디어 상단 badge에 이미 표시됨(중복).
+            [격상2] 마감 orange 배지 제거 — footer actionLabel로 통합.
+            레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{match.level} · {match.gender}</div>
+        <div className="tm-text-body-lg" style={{ marginTop: 8 }}>{match.title}</div>
+        {/* [격상3] 시간만 weight 600으로 강조 — 행동 결정 핵심 정보 분리. 날짜·장소는 caption 유지. */}
+        <div className="tm-text-caption" style={{ marginTop: 5 }}>
+          <strong style={{ fontWeight: 600 }}>{match.date} {match.time}</strong>
+          {' · '}{match.venue}
         </div>
-        <div className="tm-text-body-lg" style={{ marginTop: 10 }}>{match.title}</div>
-        <div className="tm-text-caption" style={{ marginTop: 5 }}>{match.date} {match.time} · {match.venue}</div>
         <div className="tm-match-list-footer">
           <span className="tm-text-caption">{match.region} · {match.host}</span>
           <span className="tm-text-label">{match.actionLabel}</span>

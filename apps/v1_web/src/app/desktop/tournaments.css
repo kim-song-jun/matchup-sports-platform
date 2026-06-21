@@ -135,12 +135,17 @@
   .tm-tournament-list-grid {
     display: grid;
     flex-direction: unset;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    /* auto-fit: 아이템이 적을 때 빈 열이 생기지 않고 자연스럽게 collapse됨 */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 16px;
+    /* 카드 하단 라인을 맞추기 위해 stretch 적용 */
+    align-items: stretch;
   }
 
   .tm-tournament-list-grid .tm-card {
     transition: box-shadow 0.15s, transform 0.15s;
+    /* 카드가 그리드 셀 전체 높이를 채우도록 */
+    height: 100%;
   }
 
   .tm-tournament-list-grid .tm-card:hover {
@@ -745,18 +750,18 @@
   /* Prize cards: stay 3-col on desktop (already set) */
 
   /* Desktop: revert to single-row flex so all 6 steps sit on one horizontal line.
-     max-width + margin-inline: auto — 초광폭에서 스텝 열이 지나치게 넓어지지 않도록 제한 */
+     max-width 유지, margin-inline: 0 으로 좌측 정렬 (중앙 centering 제거). */
   .tm-tournament-promo-steps {
     display: flex;
     grid-template-columns: unset;
     flex-wrap: nowrap;
     gap: 4px;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     padding-bottom: 0;
     margin-bottom: 20px;
     max-width: 700px;
-    margin-inline: auto;
+    margin-inline: 0;
   }
 
   .tm-tournament-promo-step {

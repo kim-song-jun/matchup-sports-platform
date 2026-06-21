@@ -5,6 +5,26 @@
  * Mobile (<768) is NEVER modified here.
  * ============================================================ */
 
+/* ─── 모바일 진입점 위계 — summary-bar를 heading으로 승격 ─────────────────────
+ * .tm-team-mobile-heading: tm-hide-desktop을 통해 모바일(<1024)에서만 렌더.
+ * desktop에서는 .tm-team-desktop-header-title이 동일 역할을 담당.
+ */
+.tm-team-mobile-heading {
+  margin: 0 0 4px;
+  padding: 12px 0 0;
+}
+
+/* ─── 카드 footer '팀 보기' ghost 링크 스타일 보강 ──────────────────────────
+ * tm-btn-ghost는 globals.css에서 배경 없는 텍스트 링크로 정의됨.
+ * 카드 컨텍스트에서 파란 텍스트 + 기본 색상 구분으로 충분.
+ * solid blue CTA를 카드마다 반복하지 않아 시각 노이즈 절제.
+ */
+.tm-team-card-view-link {
+  color: var(--blue500);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 /* ─── List /teams ─────────────────────────────────────────────────────────────
  * Sport-chip row wraps instead of scrolling horizontally.
  * Summary bar becomes a single line.
@@ -105,14 +125,15 @@
     margin-top: 20px;
   }
 
-  /* Hover lift for each card */
+  /* hover lift(translateY) 금지(rubric R-K2 / .impeccable anti-pattern).
+     배경 tint + border-color 변화만으로 hover 상태를 표현한다. */
   .tm-team-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: background-color 0.12s, border-color 0.12s;
   }
 
   .tm-team-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+    background: var(--blue50);
+    border-color: var(--blue100);
   }
 
   /* Hide floating FAB — inline button provides the same action */

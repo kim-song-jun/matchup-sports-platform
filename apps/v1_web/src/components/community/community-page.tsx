@@ -11,7 +11,7 @@ import { BellIcon, ChatIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/com
 import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
-/* #23: 나가기 확인 시트 — a11y 보강 (ESC 핸들러 + 첫 버튼 autoFocus + role=dialog/aria-modal) */
+/* #23: 나가기 확인 시트 — a11y 보강 (ESC 핸들러 + 취소 버튼 autoFocus + role=dialog/aria-modal) */
 function LeaveConfirmSheet({
   title,
   body,
@@ -50,17 +50,17 @@ function LeaveConfirmSheet({
           type="button"
           disabled={pending}
           onClick={onConfirm}
-          /* autoFocus: 모달 열릴 때 첫 번째 액션 버튼으로 포커스 이동 */
-          autoFocus
         >
           {pending ? '나가는 중' : '나가기'}
         </button>
+        {/* autoFocus: 파괴적 액션이 기본 포커스를 받지 않도록 안전 버튼(취소)으로 초기 포커스 이동 */}
         <button
           className="tm-btn tm-btn-lg tm-btn-ghost tm-btn-block"
           style={{ marginTop: 8 }}
           type="button"
           disabled={pending}
           onClick={onCancel}
+          autoFocus
         >
           취소
         </button>
@@ -216,9 +216,10 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);
               if (items.length === 0) return null;
+              const headingId = `notif-group-${group.replace(/\s+/g, '-')}`;
               return (
-                <section key={group} className="tm-notification-section">
-                  <div className="tm-text-label">{group}</div>
+                <section key={group} className="tm-notification-section" aria-labelledby={headingId}>
+                  <div id={headingId} className="tm-text-label">{group}</div>
                   <div className="tm-notification-stack">
                     {items.map((notification) => <NotificationCard key={notification.id} notification={notification} onOpen={model.onOpen} />)}
                   </div>
@@ -234,7 +235,13 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
 }
 
 function ChatSection({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="tm-chat-section"><div className="tm-chat-section-label">{title}</div><div className="tm-chat-card-stack">{children}</div></section>;
+  const labelId = `chat-section-${title.replace(/\s+/g, '-')}`;
+  return (
+    <section className="tm-chat-section" aria-labelledby={labelId}>
+      <div id={labelId} className="tm-chat-section-label">{title}</div>
+      <div className="tm-chat-card-stack">{children}</div>
+    </section>
+  );
 }
 
 function ChatEmptyState({ title, body, href, onRetry }: { title: string; body: string; href?: string; onRetry?: () => void }) {
@@ -337,13 +344,19 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
 
 function NotificationCard({ notification, onOpen }: { notification: NotificationModel; onOpen?: (notification: NotificationModel) => void }) {
   return (
-    <Link className={`tm-notification-card ${notification.unread ? 'tm-notification-card-unread' : ''}`} href={notification.href} onClick={(event) => {
-      if (!onOpen) return;
-      event.preventDefault();
-      onOpen(notification);
-    }}>
-      <div className="tm-notification-icon"><BellIcon size={18} /></div>
+    <Link
+      className={`tm-notification-card ${notification.unread ? 'tm-notification-card-unread' : ''}`}
+      href={notification.href}
+      onClick={(event) => {
+        if (!onOpen) return;
+        event.preventDefault();
+        onOpen(notification);
+      }}
+    >
+      <div className="tm-notification-icon" aria-hidden="true"><BellIcon size={18} /></div>
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* 읽지 않음 상태를 컬러 외에 텍스트로도 전달 — 컬러만 의존 금지 */}
+        {notification.unread ? <span className="sr-only">읽지 않음</span> : null}
         <div className="tm-text-body-lg">{notification.title}</div>
         <div className="tm-text-caption line-clamp-2" style={{ marginTop: 3 }}>{notification.body}</div>
         <div className="tm-notification-meta">{notification.time}</div>

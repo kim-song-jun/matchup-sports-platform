@@ -433,10 +433,11 @@ export function ProfileEditPageClient() {
           <input className={`tm-input ${fieldErrors.displayName ? 'tm-auth-input-error' : ''}`} value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={40} required />
           {fieldErrors.displayName ? <span className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.displayName}</span> : null}
         </label>
-        <label className="tm-create-field">
-          <span className="tm-text-label">닉네임</span>
+        <div className="tm-create-field">
+          <label className="tm-text-label" htmlFor="v1-profile-nickname">닉네임</label>
           <span className="tm-auth-field-with-action">
             <input
+              id="v1-profile-nickname"
               className={`tm-input ${fieldErrors.nickname ? 'tm-auth-input-error' : nicknameVerified && nicknameChanged ? 'tm-auth-input-success' : ''}`}
               value={nickname}
               onChange={(event) => {
@@ -446,21 +447,23 @@ export function ProfileEditPageClient() {
               }}
               maxLength={40}
               required
+              aria-describedby={fieldErrors.nickname ? 'v1-profile-nickname-helper' : undefined}
             />
-            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || !nicknameChanged || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button">
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || !nicknameChanged || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button" aria-label="닉네임 중복 확인">
               {checkNickname.isPending ? '확인 중' : nicknameChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
           {fieldErrors.nickname || (nicknameVerified && nicknameChanged) ? (
-            <span className={`tm-text-caption ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+            <span id="v1-profile-nickname-helper" className={`tm-text-caption ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
               {fieldErrors.nickname ?? '사용 가능한 닉네임이에요.'}
             </span>
           ) : null}
-        </label>
-        <label className="tm-create-field">
-          <span className="tm-text-label">이메일</span>
+        </div>
+        <div className="tm-create-field">
+          <label className="tm-text-label" htmlFor="v1-profile-email">이메일</label>
           <span className="tm-auth-field-with-action">
             <input
+              id="v1-profile-email"
               className={`tm-input ${fieldErrors.email ? 'tm-auth-input-error' : emailVerified && emailChanged ? 'tm-auth-input-success' : ''}`}
               value={email}
               onChange={(event) => {
@@ -470,17 +473,18 @@ export function ProfileEditPageClient() {
               }}
               type="email"
               required
+              aria-describedby={fieldErrors.email ? 'v1-profile-email-helper' : undefined}
             />
-            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button">
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
               {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
           {fieldErrors.email || (emailVerified && emailChanged) ? (
-            <span className={`tm-text-caption ${fieldErrors.email ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+            <span id="v1-profile-email-helper" className={`tm-text-caption ${fieldErrors.email ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
               {fieldErrors.email ?? '사용 가능한 이메일이에요.'}
             </span>
           ) : null}
-        </label>
+        </div>
         <label className="tm-create-field">
           <span className="tm-text-label">휴대폰 번호</span>
           <input
@@ -612,9 +616,10 @@ export function SportsSettingsPageClient() {
                   key={sport.id}
                   onClick={() => toggleSport(sport.id)}
                   type="button"
+                  aria-pressed={selected}
                 >
                   <div className="tm-text-body-lg">{sport.name}</div>
-                  <div className="tm-text-caption">{selected ? '선택됨' : ''}</div>
+                  <div className="tm-text-caption" aria-hidden="true">{selected ? '선택됨' : ''}</div>
                 </button>
               );
             })}
@@ -677,7 +682,7 @@ function SportLevelPicker({
       <div className="tm-text-label">{sport.name}</div>
       <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
         {sport.levels.map((level) => (
-          <button className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`} key={level.id} onClick={() => onSelect(level.id)} type="button">
+          <button className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`} key={level.id} onClick={() => onSelect(level.id)} type="button" aria-pressed={levelId === level.id}>
             {level.name}
           </button>
         ))}

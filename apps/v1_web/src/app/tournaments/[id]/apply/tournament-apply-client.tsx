@@ -37,12 +37,22 @@ const STEPS: Array<{ id: ApplyStep; label: string }> = [
 
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
+  const currentLabel = STEPS[currentIndex]?.label ?? '';
   const nextStep = STEPS[currentIndex + 1];
   return (
     <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
+      {/* a11y: 단계 전환 시 스크린리더에 현재 단계 공지 (aria-live polite) */}
+      <span
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {`${currentIndex + 1}단계 중 ${STEPS.length}단계: ${currentLabel}`}
+      </span>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span className="tm-badge tm-badge-blue">{`${currentIndex + 1}/${STEPS.length} 단계`}</span>
-        <span className="tm-text-caption" style={{ marginLeft: 8 }}>{STEPS[currentIndex]?.label}</span>
+        <span className="tm-text-caption" style={{ marginLeft: 8 }}>{currentLabel}</span>
       </div>
       <div className="tm-create-bars" style={{ gridTemplateColumns: `repeat(${STEPS.length}, 1fr)` }}>
         {STEPS.map((step, index) => (

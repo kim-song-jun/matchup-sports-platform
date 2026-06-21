@@ -235,9 +235,25 @@ export function SignupClient() {
       }
     >
       <div className="tm-auth-body">
-        <div className="tm-signup-progress" aria-hidden="true">
+        {/* sr-only aria-live: 단계 전환 시 스크린리더에 공지 */}
+        <p
+          className="sr-only"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {`${STEP_ORDER.length}단계 중 ${stepIndex + 1}단계: ${copy.title.replace(/\n/g, ' ')}`}
+        </p>
+        <div
+          className="tm-signup-progress"
+          role="progressbar"
+          aria-label={`회원가입 진행 단계 ${stepIndex + 1} / ${STEP_ORDER.length}`}
+          aria-valuenow={stepIndex + 1}
+          aria-valuemin={1}
+          aria-valuemax={STEP_ORDER.length}
+          style={{ ['--signup-steps' as string]: STEP_ORDER.length }}
+        >
           {STEP_ORDER.map((value, index) => (
-            <span key={value} data-on={index <= stepIndex} />
+            <span key={value} data-on={index <= stepIndex} aria-hidden="true" />
           ))}
         </div>
         {step !== 'birthdate' ? (

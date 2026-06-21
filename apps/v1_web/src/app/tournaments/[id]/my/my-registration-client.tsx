@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
@@ -347,6 +347,26 @@ function CancelModal({
   error: string | null;
 }) {
   const [reason, setReason] = useState('');
+  const sheetRef = useRef<HTMLElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+
+  // 열릴 때 이전 포커스 저장, 닫힐 때 복원 (WCAG 2.4.3)
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+    return () => {
+      const el = previousFocusRef.current;
+      if (el && typeof (el as HTMLElement).focus === 'function') {
+        (el as HTMLElement).focus();
+      }
+    };
+  }, []);
+
+  // 열릴 때 닫기 버튼에 초기 포커스 — 실수로 취소 요청 누르는 것을 방지
+  useEffect(() => {
+    const id = setTimeout(() => closeBtnRef.current?.focus(), 60);
+    return () => clearTimeout(id);
+  }, []);
 
   // ESC 키로 모달 닫기
   useEffect(() => {
@@ -359,6 +379,44 @@ function CancelModal({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isSubmitting, onClose]);
 
+  // focus-trap: Tab / Shift-Tab을 대화 상자 안에서만 순환
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+    function trap(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(sheet!.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
+  }, []);
+
+  // body 스크롤 잠금 — 모달 뒤 콘텐츠 스크롤 방지
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
     <>
       {/* Scrim — v1 pattern */}
@@ -370,6 +428,7 @@ function CancelModal({
       {/* Sheet layer */}
       <div className="tm-filter-layer">
         <section
+          ref={sheetRef}
           className="tm-filter-sheet"
           role="dialog"
           aria-modal="true"
@@ -413,6 +472,7 @@ function CancelModal({
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button
+              ref={closeBtnRef}
               type="button"
               className="tm-btn tm-btn-lg tm-btn-neutral"
               style={{ flex: 1 }}

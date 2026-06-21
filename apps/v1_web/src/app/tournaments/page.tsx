@@ -183,7 +183,7 @@ function TournamentsListContent() {
             aria-label="전체 종목"
             className="tm-btn"
             style={{
-              padding: '4px 12px',
+              padding: '0 12px',
               borderRadius: 999,
               fontSize: 'var(--font-size-caption)',
               fontWeight: activeSportCode === null ? 700 : 500,
@@ -191,7 +191,10 @@ function TournamentsListContent() {
               color: activeSportCode === null ? 'var(--static-white)' : 'var(--text-body)',
               border: 'none',
               cursor: 'pointer',
-              minHeight: 32,
+              /* a11y: 터치 타깃 최소 44px (WCAG 2.5.5) */
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
               lineHeight: 1,
               transition: 'background 0.15s, color 0.15s',
             }}
@@ -214,7 +217,7 @@ function TournamentsListContent() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 5,
-                  padding: '4px 10px',
+                  padding: '0 10px',
                   borderRadius: 999,
                   fontSize: 'var(--font-size-caption)',
                   fontWeight: isActive ? 700 : 500,
@@ -222,7 +225,8 @@ function TournamentsListContent() {
                   color: isActive ? accent.badgeText : 'var(--text-body)',
                   border: isActive ? `1.5px solid ${accent.dot}` : '1.5px solid transparent',
                   cursor: 'pointer',
-                  minHeight: 32,
+                  /* a11y: 터치 타깃 최소 44px (WCAG 2.5.5) */
+                  minHeight: 44,
                   lineHeight: 1,
                   transition: 'background 0.15s, color 0.15s, border-color 0.15s',
                 }}

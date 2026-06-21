@@ -251,7 +251,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
-          <InfoRow label="인원" value={`${match.current}/${match.capacity}명`} sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`} />
+          {/* #2 (모바일): 잔여 자리 N≤3 시 orange 배지로 희소성 강조 — 데스크톱과 일치 */}
+          <InfoRow
+            label="인원"
+            value={`${match.current}/${match.capacity}명`}
+            sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`}
+            badge={Math.max(match.capacity - match.current, 0) <= 3 && match.current < match.capacity
+              ? <span className="tm-badge tm-badge-orange">마감 임박</span>
+              : undefined}
+          />
           <InfoRow label="레벨" value={match.level} />
           <InfoRow label="성별 조건" value={match.gender} />
           {mode === 'pending' ? (
@@ -325,6 +333,12 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{edit ? '매치 수정' : '매치 만들기'}</h1>
       </div>
       <div className="tm-create-shell tm-match-create-shell">
+        {/* 단계 전환 시 스크린리더에 현재 단계 공지 */}
+        {!edit ? (
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][stepNo - 1]} — {stepNo}단계 / 4단계
+          </div>
+        ) : null}
         <CreateProgress step={stepNo} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치예요" body={model.form.lockedReason} /> : null}
@@ -429,7 +443,7 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
           <div className="tm-text-label">정렬</div>
           <div className="tm-filter-chip-wrap">
             {sheet.sortOptions.map((option) => (
-              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href}>{option.label}</Link>
+              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? true : undefined}>{option.label}</Link>
             ))}
           </div>
         </div>
@@ -437,7 +451,7 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
           <div className="tm-text-label">성별 조건</div>
           <div className="tm-filter-chip-wrap">
             {sheet.genderOptions.map((option) => (
-              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href}>{option.label}</Link>
+              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? true : undefined}>{option.label}</Link>
             ))}
           </div>
         </div>
@@ -445,7 +459,7 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
           <div className="tm-text-label">레벨</div>
           <div className="tm-filter-chip-wrap">
             {sheet.levelOptions.map((option) => (
-              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href}>{option.label}</Link>
+              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? true : undefined}>{option.label}</Link>
             ))}
           </div>
         </div>
@@ -595,16 +609,47 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
   return (
     <div className="tm-create-progress">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-        <span className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{edit ? '수정' : `${step}/4단계`}</span>
+        <span
+          className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}
+          {...(!edit && {
+            role: 'progressbar',
+            'aria-valuenow': step,
+            'aria-valuemin': 1,
+            'aria-valuemax': 4,
+            'aria-label': `매치 만들기 ${step}단계/4단계`,
+          })}
+        >
+          {edit ? '수정' : `${step}/4단계`}
+        </span>
         <span className="tm-text-caption">{edit ? '기존 값 유지 · 변경사항만 저장' : ['종목 선택', '매치 정보', '장소와 시간', '작성 내용 확인'][step - 1]}</span>
       </div>
-      {!edit ? <div className="tm-create-bars">{[1, 2, 3, 4].map((item) => <span key={item} data-active={item <= step} />)}</div> : null}
+      {!edit ? <div className="tm-create-bars" aria-hidden="true">{[1, 2, 3, 4].map((item) => <span key={item} data-active={item <= step} />)}</div> : null}
     </div>
   );
 }
 
 function SportStep({ model }: { model: MatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">어떤 종목인가요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>함께 할 종목을 선택해 주세요.</p><div className="tm-create-sport-grid">{model.sports.map((sport) => <button key={sport} className={`tm-card tm-pressable ${sport === model.selectedSport ? 'tm-create-selected' : ''}`} style={{ padding: 16, textAlign: 'left' }} type="button" onClick={() => model.form?.onSelectSport(sport)}><div className="tm-text-body-lg">{sport}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : ''}</div></button>)}</div></div>;
+  return (
+    <div>
+      <h1 className="tm-text-heading">어떤 종목인가요?</h1>
+      <p className="tm-text-body" style={{ marginTop: 8 }}>함께 할 종목을 선택해 주세요.</p>
+      <div className="tm-create-sport-grid">
+        {model.sports.map((sport) => (
+          <button
+            key={sport}
+            className={`tm-card tm-pressable ${sport === model.selectedSport ? 'tm-create-selected' : ''}`}
+            style={{ padding: 16, textAlign: 'left' }}
+            type="button"
+            aria-pressed={sport === model.selectedSport}
+            onClick={() => model.form?.onSelectSport(sport)}
+          >
+            <div className="tm-text-body-lg">{sport}</div>
+            <div className="tm-text-caption" style={{ marginTop: 5 }}>{sport === model.selectedSport ? '선택됨' : ''}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean }) {
@@ -865,7 +910,7 @@ function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (va
       <div className="tm-text-label">성별 조건</div>
       <div className="tm-team-form-chip-row">
         {['성별 무관', '남', '여'].map((option) => (
-          <button key={option} className={`tm-chip ${value === option ? 'tm-chip-active' : ''}`} type="button" onClick={() => onChange?.(option)}>
+          <button key={option} className={`tm-chip ${value === option ? 'tm-chip-active' : ''}`} type="button" aria-pressed={value === option} onClick={() => onChange?.(option)}>
             {option}
           </button>
         ))}

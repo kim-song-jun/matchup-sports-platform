@@ -78,7 +78,7 @@ export function AdminFilterBar({
                     onClick={() => onStatusChange(opt.value)}
                     aria-pressed={active}
                     className={[
-                      'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
+                      'inline-flex items-center px-3 min-h-[44px] rounded-full text-[13px] font-medium transition-colors',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       active
                         ? 'bg-blue-500 text-white'

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Check } from 'lucide-react';
 import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TournamentFormat } from '@/types/api';
@@ -53,32 +53,46 @@ function SectionStepper({ sections }: { sections: ReadonlyArray<{ id: string; la
   return (
     <nav
       aria-label="작성 단계"
-      className="max-w-3xl mx-auto sticky top-0 z-20 mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-3"
+      className="max-w-3xl mx-auto sticky top-[52px] lg:top-0 z-20 mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-3"
     >
       <ol className="flex items-start">
         {sections.map((section, index) => {
-          const reached = index <= activeIndex;
+          const completed = index < activeIndex;
           const isActive = index === activeIndex;
+          const stepLabel = completed
+            ? `${section.label} (완료)`
+            : isActive
+              ? `${section.label} (현재 단계)`
+              : section.label;
           return (
             <li key={section.id} className="relative flex flex-1 flex-col items-center">
               {index < sections.length - 1 ? (
                 <span
                   aria-hidden="true"
-                  className={`absolute left-1/2 top-[13px] h-[2px] w-full ${index < activeIndex ? 'bg-[var(--blue500)]' : 'bg-[var(--border)]'}`}
+                  className={`absolute left-1/2 top-[13px] h-[2px] w-full ${completed ? 'bg-[var(--blue500)]' : 'bg-[var(--border)]'}`}
                 />
               ) : null}
               <button
                 type="button"
                 onClick={() => jumpTo(section.id)}
                 aria-current={isActive ? 'step' : undefined}
+                aria-label={stepLabel}
                 className="relative z-10 flex flex-col items-center gap-1.5 rounded focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <span
                   className={`flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold ${
-                    reached ? 'bg-[var(--blue500)] text-[var(--static-white)]' : 'bg-[var(--grey100)] text-[var(--text-caption)]'
+                    isActive
+                      ? 'bg-[var(--blue500)] text-[var(--static-white)]'
+                      : completed
+                        ? 'bg-[var(--blue100)] text-[var(--blue500)]'
+                        : 'bg-[var(--grey100)] text-[var(--text-caption)]'
                   }`}
                 >
-                  {index + 1}
+                  {completed ? (
+                    <Check size={13} aria-hidden="true" strokeWidth={2.5} />
+                  ) : (
+                    index + 1
+                  )}
                 </span>
                 <span
                   className={`text-[11px] leading-tight break-keep ${
@@ -332,7 +346,7 @@ export default function AdminTournamentsNewPage() {
         <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
 
           {/* ── 기본 정보 ────────────────────────────────────────────── */}
-          <section id="tsec-basic" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-24">
+          <section id="tsec-basic" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">기본 정보</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -431,7 +445,7 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 팀 / 선수 설정 ───────────────────────────────────────── */}
-          <section id="tsec-team" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-24">
+          <section id="tsec-team" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">팀 · 선수 설정</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField id="team-count" label="참가 팀 수" hint="비우면 무제한">
@@ -516,7 +530,7 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 참가비 / 계좌 ────────────────────────────────────────── */}
-          <section id="tsec-fee" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-24">
+          <section id="tsec-fee" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">참가비 · 계좌</h2>
             <div className="flex flex-col gap-4">
               {/* 참가비 + 총 상금 — 2열 */}
@@ -613,7 +627,7 @@ export default function AdminTournamentsNewPage() {
           </section>
 
           {/* ── 규정 / 환불 ──────────────────────────────────────────── */}
-          <section id="tsec-rules" className="px-5 py-6 scroll-mt-24">
+          <section id="tsec-rules" className="px-5 py-6 scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">규정 · 환불 정책</h2>
             <div className="flex flex-col gap-4">
               <FormField id="rules-text" label="대회 규정">

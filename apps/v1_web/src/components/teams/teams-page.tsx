@@ -34,7 +34,7 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
       </div>
       <TeamSearchBar model={model} />
       <div className="tm-team-list">
-        <div className="tm-sport-chip-row">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button">{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
+        <div className="tm-sport-chip-row" role="group" aria-label="종목 필터">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href} aria-current={chip.active ? 'page' : undefined}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={chip.active}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
         <div className="tm-team-summary-bar">
           <div className="tm-text-label">{model.summary.scope}</div>
           <div className="tm-text-caption tab-num">{model.summary.total}팀 · 모집 중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
@@ -92,8 +92,8 @@ function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
         </section>
         <Card pad={16}>
           <div className="tm-text-body-lg">빠른 조건</div>
-          <div className="tm-sport-chip-row" style={{ marginTop: 12 }}>
-            {model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button">{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}
+          <div className="tm-sport-chip-row" role="group" aria-label="빠른 조건 선택" style={{ marginTop: 12 }}>
+            {model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href} aria-current={chip.active ? 'page' : undefined}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={chip.active}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}
           </div>
         </Card>
         <Card pad={16}>
@@ -219,7 +219,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </button>
             <TeamLogo team={team} large />
             <h2 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h2>
-            <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
+            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
               <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
               <span className="tm-badge tm-badge-grey">{team.members}명</span>
@@ -296,7 +296,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           </button>
           <TeamLogo team={team} large />
           <h1 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h1>
-          <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,.72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
+          <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
             <span className="tm-badge tm-badge-grey">{team.members}명</span>
@@ -373,7 +373,9 @@ export function TeamFormPageView({
                   </div>
                 </div>
                 <button
-                  aria-pressed={Boolean(form?.membersVisibilityEnabled)}
+                  role="switch"
+                  aria-checked={Boolean(form?.membersVisibilityEnabled)}
+                  aria-label="멤버 목록 공개"
                   className={`tm-toggle ${form?.membersVisibilityEnabled ? 'tm-toggle-on' : ''}`}
                   onClick={() => form?.onMembersVisibilityChange?.(!form.membersVisibilityEnabled)}
                   type="button"
@@ -387,7 +389,7 @@ export function TeamFormPageView({
           <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           <div className="tm-create-field">
             <div className="tm-text-label">종목</div>
-            <div className="tm-team-form-chip-row">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '러닝', '수영']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
+            <div className="tm-team-form-chip-row" role="group" aria-label="종목 선택">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '러닝', '수영']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" aria-pressed={team.sports.includes(sport)} onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
           </div>
           <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
           <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline onChange={(value) => form?.onFieldChange('description', value)} />
@@ -572,9 +574,9 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           <div className="tm-text-label">권한 규칙</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
         </Card>
-        <div className="tm-team-form-chip-row" style={{ marginTop: 14 }}>
+        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 탭 선택" style={{ marginTop: 14 }}>
           {model.tabs.map((tab) => (
-            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect}>
+            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" aria-pressed={model.activeTab === tab.key} onClick={tab.onSelect}>
               {tab.label} <span className="tab-num">{tab.count}</span>
             </button>
           ))}
@@ -672,7 +674,7 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
             <div className="tm-text-label">{title as string}</div>
             <div className="tm-filter-chip-wrap">
               {(options as Array<{ label: string; value: string; href: string; active?: boolean }>).map((option) => (
-                <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href}>{option.label}</Link>
+                <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? 'page' : undefined}>{option.label}</Link>
               ))}
             </div>
           </div>
@@ -799,9 +801,9 @@ function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (va
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">성별 조건</div>
-      <div className="tm-team-form-chip-row">
+      <div className="tm-team-form-chip-row" role="group" aria-label="성별 조건 선택">
         {['성별 무관', '남', '여'].map((option) => (
-          <button key={option} className={`tm-chip ${value === option ? 'tm-chip-active' : ''}`} type="button" onClick={() => onChange?.(option)}>
+          <button key={option} className={`tm-chip ${value === option ? 'tm-chip-active' : ''}`} type="button" aria-pressed={value === option} onClick={() => onChange?.(option)}>
             {option}
           </button>
         ))}

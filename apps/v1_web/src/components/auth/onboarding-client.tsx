@@ -62,7 +62,7 @@ const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub
     sub: '위치 권한 없어도 괜찮아요. 아래에서 지역을 직접 고르거나 건너뛸 수 있어요.',
   },
   confirm: {
-    stepNo: 3,
+    stepNo: 4,
     title: '준비가 끝났어요',
     sub: '선택한 종목, 실력, 지역을 기준으로 홈 추천과 필터가 시작돼요.',
   },
@@ -262,7 +262,15 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         <span className="tm-onboarding-desktop-nav-title">{topTitle}</span>
       </div>
       <div className="tm-auth-body">
-        <ProgressHeader stepNo={meta.stepNo} total={3} />
+        {/* 단계 전환 시 스크린리더에 현재 단계를 공지 */}
+        <span
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {meta.stepNo > 0 ? `4단계 중 ${meta.stepNo}단계, ${meta.title}` : meta.title}
+        </span>
+        <ProgressHeader stepNo={meta.stepNo} total={4} />
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
         {skipAction ? <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={skipAction} type="button">나중에 설정하기</button> : null}
@@ -300,6 +308,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                       key={level.id}
                       onClick={() => setDraft((current) => setSportLevel(current, sportId, level.id))}
                       type="button"
+                      aria-pressed={levelId === level.id}
                     >
                       {level.name}
                     </button>
@@ -322,10 +331,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                   key={region.id}
                   onClick={() => setDraft((current) => toggleRegion(current, region.id))}
                   type="button"
+                  aria-pressed={selectedRegionIds.has(region.id)}
                 >
-              {region.name}
-            </button>
-          ))}
+                  {region.name}
+                </button>
+              ))}
         </div>
           </>
         ) : null}
@@ -470,8 +480,17 @@ function Notice({ body, title, tone = 'blue' }: { body: string; title: string; t
 function ProgressHeader({ stepNo, total }: { stepNo: number; total: number }) {
   return (
     <div className="tm-auth-progress">
-      <span className="tm-text-micro">{stepNo > 0 ? `${stepNo} / ${total}단계` : null}</span>
-      <div className="tm-auth-progress-bars">{Array.from({ length: total }).map((_, index) => <span key={index} data-active={stepNo > 0 && index < stepNo} />)}</div>
+      <span className="tm-text-micro" aria-hidden="true">{stepNo > 0 ? `${stepNo} / ${total}단계` : null}</span>
+      <div
+        className="tm-auth-progress-bars"
+        role="progressbar"
+        aria-valuenow={stepNo > 0 ? stepNo : 0}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={stepNo > 0 ? `${total}단계 중 ${stepNo}단계` : '시작 전'}
+      >
+        {Array.from({ length: total }).map((_, index) => <span key={index} data-active={stepNo > 0 && index < stepNo} />)}
+      </div>
     </div>
   );
 }

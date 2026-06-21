@@ -256,7 +256,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                       setDebouncedSearch('');
                     }}
                     aria-label="선택 해제"
-                    className="flex items-center justify-center w-[32px] h-[32px] rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     <X size={14} aria-hidden="true" />
                   </button>

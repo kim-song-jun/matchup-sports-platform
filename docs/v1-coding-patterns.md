@@ -50,7 +50,7 @@
 ## 8. 테스트 — 진짜 테스트만
 - "이 테스트가 깨지면 실제 버그를 잡는가"를 만족. mock-verifying-mock·정적 문자열 통과용 금지.
 - v1_web=Vitest+TL+MSW, v1_api=Jest(PrismaService mock). 서비스 계약·상태전이·가드·멱등·계산 검증.
-- e2e: `apps/v1_web/e2e/`(Playwright, :3013, 헤더 dev-auth fixture) — 실제 사용자 플로우.
+- e2e: `e2e/v1-tests/` + `e2e/v1.config.ts` (`pnpm test:e2e:v1`, Playwright, :3013, 헤더 dev-auth fixture) — 실제 사용자 플로우. (구앱 `:3003` 스위트와 별도)
 
 ---
 > 이 문서는 이번 배포 준비(2026-06-23) 세션에서 확립·적용한 패턴을 codify한 것이다.

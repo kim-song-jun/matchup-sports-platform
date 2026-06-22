@@ -381,7 +381,7 @@
 .tm-tournament-promo-prize-amount {
   font-size: 40px;
   font-weight: 800;
-  color: #ffd84d;
+  color: var(--prize-gold);
   line-height: 1.1;
   letter-spacing: -0.5px;
 }

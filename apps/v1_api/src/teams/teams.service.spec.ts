@@ -96,6 +96,8 @@ describe('TeamsService', () => {
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
+    v1ChatRoom: { findUnique: jest.Mock };
+    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock };
     $transaction: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
@@ -119,6 +121,8 @@ describe('TeamsService', () => {
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
+      v1ChatRoom: { findUnique: jest.fn() },
+      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn() },
       $transaction: jest.fn(),
     };
 
@@ -150,10 +154,10 @@ describe('TeamsService', () => {
   it('removeMembership: owner 멤버십은 제거할 수 없다 → 409 STATE_CONFLICT', async () => {
     // owner가 본인을 제거하려 해도, 또는 다른 owner 역할도 동일
     const ownerMembership = membershipRow({ role: 'owner', userId: member.id });
-    // getMembershipWithTeam(target) → owner 역할 멤버십, assertOwner(caller) → owner 본인
+    // getMembershipWithTeam(target) → owner 역할 멤버십, getManagementActor(caller) → owner 본인
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(ownerMembership) // getMembershipWithTeam (the target)
-      .mockResolvedValueOnce({ id: 'mem-owner' }); // assertOwner (caller IS owner)
+      .mockResolvedValueOnce({ role: 'owner' }); // getManagementActor (caller IS owner)
 
     // owner 멤버십 제거는 ConflictException(409, code=STATE_CONFLICT) — ForbiddenException 아님
     await expect(
@@ -163,13 +167,13 @@ describe('TeamsService', () => {
     });
   });
 
-  // ─── removeMembership: 비-owner는 제거 불가 (assertOwner) ──────────────────
+  // ─── removeMembership: 비-owner는 제거 불가 (getManagementActor) ──────────────────
 
   it('removeMembership: owner가 아닌 사용자는 멤버 제거를 시도해도 403', async () => {
     const targetMembership = membershipRow({ role: 'member', userId: member.id, userId2: 'target' });
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(targetMembership) // getMembershipWithTeam
-      .mockResolvedValueOnce(null);            // assertOwner → not owner → throws
+      .mockResolvedValueOnce(null);            // getManagementActor → not owner → throws
 
     await expect(
       service.removeMembership(manager, 'mem-1', {}),
@@ -182,7 +186,7 @@ describe('TeamsService', () => {
     const ownerTarget = membershipRow({ role: 'owner', userId: 'target-user', status: 'active' });
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(ownerTarget) // getMembershipWithTeam
-      .mockResolvedValueOnce({ id: 'assertOwner' }); // assertOwner (caller is owner)
+      .mockResolvedValueOnce({ role: 'owner' }); // getManagementActor (caller is owner)
 
     await expect(
       service.changeMembershipRole(owner, 'mem-target', { role: 'manager' }),
@@ -203,7 +207,7 @@ describe('TeamsService', () => {
 
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(memberTarget) // getMembershipWithTeam
-      .mockResolvedValueOnce({ id: 'assertOwner' }); // assertOwner
+      .mockResolvedValueOnce({ role: 'owner' }); // getManagementActor
 
     await expect(
       service.changeMembershipRole(owner, 'mem-target', { role: 'manager' }),
@@ -224,7 +228,7 @@ describe('TeamsService', () => {
 
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(managerTarget) // getMembershipWithTeam
-      .mockResolvedValueOnce({ id: 'assertOwner' }); // assertOwner
+      .mockResolvedValueOnce({ role: 'owner' }); // getManagementActor
 
     const result = await service.changeMembershipRole(owner, 'mem-1', { role: 'manager' });
 
@@ -412,12 +416,101 @@ describe('TeamsService', () => {
 
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(inactiveMembership) // getMembershipWithTeam
-      .mockResolvedValueOnce({ id: 'assertOwner' }); // assertOwner
+      .mockResolvedValueOnce({ role: 'owner' }); // getManagementActor
 
     await expect(
       service.removeMembership(owner, 'mem-1', {}),
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'ALREADY_PROCESSED' }),
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // ─── manager 권한 확장: member 대상은 관리 가능, 다른 manager/owner 는 불가 ────
+
+  it('changeMembershipRole: manager가 member를 manager로 승격할 수 있다 (member 대상 관리 허용)', async () => {
+    const memberTarget = membershipRow({
+      role: 'member',
+      userId: 'target-user',
+      status: 'active',
+      team: teamRow({ managerCount: 1 }),
+    });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(memberTarget) // getMembershipWithTeam (target)
+      .mockResolvedValueOnce({ role: 'manager' }); // getManagementActor (caller is manager)
+    prisma.v1TeamMembership.update.mockResolvedValue({
+      id: 'mem-1',
+      teamId: 'team-1',
+      role: 'manager',
+    });
+    prisma.v1Team.update.mockResolvedValue({ managerCount: 2 });
+
+    const result = await service.changeMembershipRole(manager, 'mem-1', { role: 'manager' });
+
+    expect(prisma.v1TeamMembership.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { role: 'manager' } }),
+    );
+    expect(result).toMatchObject({ role: 'manager', managerCount: 2 });
+  });
+
+  it('changeMembershipRole: manager는 다른 manager의 역할을 변경할 수 없다 → 403 PERMISSION_DENIED', async () => {
+    const managerTarget = membershipRow({
+      role: 'manager',
+      userId: 'other-manager',
+      status: 'active',
+      team: teamRow({ managerCount: 2 }),
+    });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(managerTarget) // getMembershipWithTeam (target)
+      .mockResolvedValueOnce({ role: 'manager' }); // getManagementActor (caller is manager)
+
+    await expect(
+      service.changeMembershipRole(manager, 'mem-1', { role: 'member' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('removeMembership: manager가 member를 추방할 수 있다 (member 대상 관리 허용)', async () => {
+    const memberTarget = membershipRow({
+      role: 'member',
+      userId: 'target-user',
+      status: 'active',
+    });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(memberTarget) // getMembershipWithTeam (target)
+      .mockResolvedValueOnce({ role: 'manager' }); // getManagementActor (caller is manager)
+    prisma.v1TeamMembership.update.mockResolvedValue({
+      id: 'mem-1',
+      teamId: 'team-1',
+      status: 'removed',
+    });
+    prisma.v1Team.update.mockResolvedValue({ memberCount: 4 });
+    prisma.v1ChatRoom.findUnique.mockResolvedValue(null); // 채팅방 없음 → 참가자 정리 early-return
+
+    const result = await service.removeMembership(manager, 'mem-1', {});
+
+    expect(prisma.v1TeamMembership.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'removed' }) }),
+    );
+    expect(result).toMatchObject({ status: 'removed', memberCount: 4 });
+  });
+
+  it('removeMembership: manager는 다른 manager를 추방할 수 없다 → 403 PERMISSION_DENIED', async () => {
+    const managerTarget = membershipRow({
+      role: 'manager',
+      userId: 'other-manager',
+      status: 'active',
+    });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(managerTarget) // getMembershipWithTeam (target)
+      .mockResolvedValueOnce({ role: 'manager' }); // getManagementActor (caller is manager)
+
+    await expect(
+      service.removeMembership(manager, 'mem-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

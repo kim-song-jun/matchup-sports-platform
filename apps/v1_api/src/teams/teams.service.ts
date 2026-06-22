@@ -372,20 +372,28 @@ export class TeamsService {
 
     const pageItems = memberships.slice(0, limit);
     const hasNext = memberships.length > limit;
-    const canManage = viewerMembership.role === 'owner';
+    const viewerIsOwner = viewerMembership.role === 'owner';
+    const viewerIsManager = viewerMembership.role === 'manager';
 
     return {
-      items: pageItems.map((membership) => ({
-        membershipId: membership.id,
-        userId: membership.userId,
-        displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
-        profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
-        role: membership.role,
-        status: membership.status,
-        joinedAt: membership.joinedAt,
-        canChangeRole: canManage && membership.role !== 'owner' && membership.status === 'active',
-        canRemove: canManage && membership.role !== 'owner' && membership.status === 'active',
-      })),
+      items: pageItems.map((membership) => {
+        // owner: 모든 비-owner 멤버 관리 / manager: member 만 관리 (CLAUDE.md 역할 계층)
+        const isManageableTarget =
+          membership.status === 'active' &&
+          membership.role !== 'owner' &&
+          (viewerIsOwner || (viewerIsManager && membership.role === 'member'));
+        return {
+          membershipId: membership.id,
+          userId: membership.userId,
+          displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
+          profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
+          role: membership.role,
+          status: membership.status,
+          joinedAt: membership.joinedAt,
+          canChangeRole: isManageableTarget,
+          canRemove: isManageableTarget,
+        };
+      }),
       summary: {
         ownerCount: 1,
         managerCount: team.managerCount,
@@ -468,7 +476,7 @@ export class TeamsService {
   ) {
     this.assertActiveAccount(user);
     const target = await this.getMembershipWithTeam(membershipId);
-    await this.assertOwner(user, target.teamId);
+    const actorRole = await this.getManagementActor(user, target.teamId);
 
     if (target.status !== 'active') {
       throw stateConflict('Only active memberships can change role');
@@ -554,6 +562,13 @@ export class TeamsService {
     if (target.role === 'owner') {
       throw stateConflict('Owner role cannot be changed by this API');
     }
+    // manager 는 member 대상만 역할 변경 가능 (다른 manager·owner 변경은 owner 전용)
+    if (actorRole === 'manager' && target.role !== 'member') {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Managers can only change member roles',
+      });
+    }
     if (dto.role === 'manager' && target.team.managerCount >= 5) {
       throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
     }
@@ -599,10 +614,17 @@ export class TeamsService {
   ) {
     this.assertActiveAccount(user);
     const target = await this.getMembershipWithTeam(membershipId);
-    await this.assertOwner(user, target.teamId);
+    const actorRole = await this.getManagementActor(user, target.teamId);
 
     if (target.role === 'owner') {
       throw stateConflict('Owner cannot be removed by this API');
+    }
+    // manager 는 member 대상만 추방 가능 (다른 manager·owner 추방은 owner 전용)
+    if (actorRole === 'manager' && target.role !== 'member') {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Managers can only remove members',
+      });
     }
     if (target.status !== 'active') {
       throw new ConflictException({
@@ -1154,20 +1176,6 @@ export class TeamsService {
     return { team, membership };
   }
 
-  private async assertOwner(user: V1AuthUser, teamId: string) {
-    const membership = await this.prisma.v1TeamMembership.findFirst({
-      where: { teamId, userId: user.id, role: 'owner', status: 'active' },
-      select: { id: true },
-    });
-
-    if (!membership) {
-      throw new ForbiddenException({
-        code: 'PERMISSION_DENIED',
-        message: 'Only the team owner can perform this action',
-      });
-    }
-  }
-
   private async getMembershipWithTeam(membershipId: string) {
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: {
@@ -1207,9 +1215,17 @@ export class TeamsService {
   }
 
   private async assertManagerOrOwner(user: V1AuthUser, teamId: string) {
+    await this.getManagementActor(user, teamId);
+  }
+
+  // owner/manager 멤버십 단일 조회 소스 — 권한 검증 + 행위자 role 반환
+  private async getManagementActor(
+    user: V1AuthUser,
+    teamId: string,
+  ): Promise<'owner' | 'manager'> {
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: { teamId, userId: user.id, role: { in: ['owner', 'manager'] }, status: 'active' },
-      select: { id: true },
+      select: { role: true },
     });
 
     if (!membership) {
@@ -1218,6 +1234,7 @@ export class TeamsService {
         message: 'Only team owners or managers can perform this action',
       });
     }
+    return membership.role as 'owner' | 'manager';
   }
 
   private assertActiveAccount(user: V1AuthUser) {

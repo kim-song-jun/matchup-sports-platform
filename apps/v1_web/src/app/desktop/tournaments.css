@@ -953,7 +953,7 @@
 }
 
 .tm-bk-champ-decided .tm-bk-champ-icon {
-  background: linear-gradient(135deg, var(--orange500), #f08a00);
+  background: linear-gradient(135deg, var(--orange500), var(--orange600));
   color: var(--static-white);
 }
 

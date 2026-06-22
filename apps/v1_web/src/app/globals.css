@@ -1,6 +1,8 @@
-@import "tailwindcss";
-/* [P1 Pretendard] DESIGN.md 브랜드 폰트 — CDN variable font (하위 호환 정적 폴백 포함) */
+/* [P1 Pretendard] DESIGN.md 브랜드 폰트 — CDN variable font.
+ * ★ @import 는 tailwindcss 확장보다 먼저여야 함: Tailwind v4 의 @import "tailwindcss" 가
+ *   인라인 확장되면 그 뒤 @import 가 모든 규칙 뒤로 밀려 "@import must precede all rules" 빌드 에러. */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
+@import "tailwindcss";
 
 :root {
   color-scheme: light;

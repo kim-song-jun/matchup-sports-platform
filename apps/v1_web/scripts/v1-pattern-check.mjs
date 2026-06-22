@@ -22,7 +22,6 @@ const violations = [];
 const HAPNIDA_ALLOW = [
   'matches-create-client.tsx:299', // oldDefaults 비교 baseline(line 299, 비-UI) — 파일 전체 아닌 해당 라인만 면제
   'community.view-model.ts', // mock 채팅 사용자 콘텐츠
-  'team-matches.view-model.ts:1', // 공고 제목(유저 작성형 mock)
   'src/test/', // 테스트 fixture
 ];
 function checkHapnida() {
@@ -37,7 +36,12 @@ function checkHapnida() {
   } catch { /* grep no-match exits 1 */ }
   for (const line of out.split('\n').filter(Boolean)) {
     const loc = line.split(':').slice(0, 2).join(':');
-    if (HAPNIDA_ALLOW.some((a) => line.includes(a) || loc.includes(a))) continue;
+    if (HAPNIDA_ALLOW.some((a) => {
+      // :N 라인 핀은 loc 끝과 정확 일치만 — ':1'이 ':11'·':100' 등에 부분매칭되는 것 방지 (Copilot)
+      if (/:\d+$/.test(a)) return loc === a || loc.endsWith('/' + a);
+      // 파일/디렉토리 엔트리(community.view-model.ts, src/test/ 등)는 부분 매칭
+      return line.includes(a) || loc.includes(a);
+    })) continue;
     // 주석 줄 제외(// 또는 * 로 시작)
     const body = line.slice(line.indexOf(':', line.indexOf(':') + 1) + 1).trim();
     if (body.startsWith('//') || body.startsWith('*') || body.startsWith('/*')) continue;

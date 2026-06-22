@@ -8,7 +8,7 @@ import type {
 
 const teamMatches = [
   { id: 'team-match-1', title: 'FC 발빠른놈들 vs 상대팀 구합니다', sport: '축구', hostTeam: 'FC 발빠른놈들', venue: '상암 월드컵 A구장', region: '서울 마포', date: '5월 11일 일', time: '09:00', endTime: '11:00', format: '11:11', grade: 'A', style: '친선', cost: 280000, opponentCost: 140000, uniform: '빨강', gender: '성별 무관', manner: 4.8, wins: 23, status: 'open' as const },
-  { id: 'team-match-2', title: '주말 친선 풋살 상대 찾습니다', sport: '풋살', hostTeam: '다이나믹 FS', venue: '신도림 풋살파크', region: '서울 구로', date: '5월 12일 월', time: '20:00', endTime: '22:00', format: '5:5', grade: 'B', style: '매너 중시', cost: 80000, opponentCost: 0, uniform: '파랑', gender: '남', manner: 4.6, wins: 15, status: 'pending' as const },
+  { id: 'team-match-2', title: '주말 친선 풋살 상대 구해요', sport: '풋살', hostTeam: '다이나믹 FS', venue: '신도림 풋살파크', region: '서울 구로', date: '5월 12일 월', time: '20:00', endTime: '22:00', format: '5:5', grade: 'B', style: '매너 중시', cost: 80000, opponentCost: 0, uniform: '파랑', gender: '남', manner: 4.6, wins: 15, status: 'pending' as const },
   { id: 'team-match-3', title: '평일 저녁 6:6 풋살 교환매치', sport: '풋살', hostTeam: '퇴근후풋살', venue: '잠실종합운동장 풋살장', region: '서울 송파', date: '5월 14일 수', time: '19:30', endTime: '21:30', format: '6:6', grade: 'C', style: '교환매치', cost: 60000, opponentCost: 30000, uniform: '검정', gender: '여', manner: 4.7, wins: 11, status: 'approved' as const },
   { id: 'team-match-4', title: '내 팀이 만든 강남 풋살 매치', sport: '풋살', hostTeam: '강남 러너스 FS', venue: '강남 실내풋살장', region: '서울 강남', date: '5월 15일 목', time: '21:00', endTime: '23:00', format: '5:5', grade: 'B', style: '친선', cost: 100000, opponentCost: 50000, uniform: '흰색', gender: '성별 무관', manner: 4.9, wins: 19, status: 'mine' as const },
 ];

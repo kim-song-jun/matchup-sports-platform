@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useV1Logout } from '@/hooks/use-v1-api';
 import { clearStoredV1Session } from '@/lib/session-storage';
 import { v1Keys } from '@/lib/query-keys';
+import { Button } from '@/components/v1-ui/button';
 
 type LogoutButtonProps = {
   /**
@@ -25,19 +26,19 @@ export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
     router.replace('/login');
   };
 
-  const className =
-    variant === 'ghost'
-      ? 'tm-btn tm-btn-md tm-btn-ghost tm-logout-ghost'
-      : 'tm-btn tm-btn-lg tm-btn-neutral tm-btn-block';
+  const isGhost = variant === 'ghost';
 
   return (
-    <button
-      className={className}
-      disabled={logout.isPending}
+    <Button
+      block={!isGhost}
+      className={isGhost ? 'tm-logout-ghost' : undefined}
+      loading={logout.isPending}
       onClick={() => logout.mutate(undefined, { onSettled: clearAndRedirect })}
+      size={isGhost ? 'md' : 'lg'}
       type="button"
+      variant={isGhost ? 'ghost' : 'neutral'}
     >
-      {logout.isPending ? '로그아웃 중' : '로그아웃'}
-    </button>
+      로그아웃
+    </Button>
   );
 }

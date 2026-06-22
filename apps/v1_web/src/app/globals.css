@@ -162,6 +162,12 @@
   --input-text:                 var(--text-strong);
   --input-placeholder:          var(--text-caption);
 
+  /* ── [P1 State-layer] 공통 상호작용 투명도 토큰 (M3 state-layer 모델) ───────
+   * hover 4% / pressed 8% — 컴포넌트마다 제각각이던 hover/active 피드백을 일괄 통일.
+   * 실제 사용처: .tm-card.tm-interactive, .tm-list-row.tm-interactive ───────── */
+  --state-hover-opacity: 0.04;
+  --state-pressed-opacity: 0.08;
+
   --v1-shell-frame-width: 375px;
   --v1-app-chrome-frame-width: 480px;
   --v1-shell-wide-frame-width: 480px;
@@ -1026,6 +1032,7 @@ button:disabled {
   line-height: 28px; /* [P1 4pt snap] 26→28 (4의 배수, ×1.65 — 한국어 +0.1 여유 포함) */
   font-weight: 700;
   color: var(--text-strong);
+  word-break: keep-all; /* [P2 한글] 카드 제목 음절 단위 줄바꿈 방지 — TDS 패턴 */
 }
 
 .tm-text-body {
@@ -1077,6 +1084,7 @@ button:disabled {
   justify-content: center;
   gap: 6px;
   font-weight: 700;
+  word-break: keep-all; /* [P2 한글] TDS 패턴 — 음절 단위 줄바꿈 방지 */
 }
 
 .tm-btn-icon {
@@ -1144,6 +1152,37 @@ button:disabled {
   color: var(--static-white);
 }
 
+/* ── [P1 Interaction states] 버튼 hover / active / transition ─────────────────
+ * - transition-all 금지 → 필요한 속성만 명시 (성능 규칙)
+ * - @media(hover:hover) 가드로 터치기기에서 hover 억제 (ghost hover 방지)
+ * - active scale은 :not(:disabled) 가드로 비활성 버튼 눌림 피드백 차단
+ * ─────────────────────────────────────────────────────────────────────────── */
+.tm-btn {
+  transition: background-color 0.12s ease, transform 0.08s ease;
+}
+
+@media (hover: hover) {
+  .tm-btn-primary:hover:not(:disabled) {
+    background: var(--button-fill-primary-hover); /* --blue600 — 정의된 토큰 활성화 */
+  }
+
+  .tm-btn-neutral:hover:not(:disabled) {
+    background: var(--grey150); /* grey100 → grey150 한 단계 진하게 */
+  }
+
+  .tm-btn-outline:hover:not(:disabled) {
+    background: var(--grey50);
+  }
+
+  .tm-btn-danger:hover:not(:disabled) {
+    background: #d93040; /* red500(#f04452) 보다 한 단계 진함 */
+  }
+}
+
+.tm-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 /* disabled CTA — opacity만으로는 파란 배경이 유지돼 '가짜 활성' 인상을 준다.
    배경·글자를 명시적 비활성 토큰으로 덮어써서 누르면 안 됨을 형태로 전달한다. */
 .tm-btn:disabled {
@@ -1169,6 +1208,33 @@ button:disabled {
   outline-offset: 2px;
 }
 
+/* ── [P1 Card / List-row interactive states] ──────────────────────────────────
+ * 실제 컴포넌트 클래스: .tm-card-interactive (예: search-result-card), .tm-list-row-interactive.
+ * 복합 .tm-card.tm-interactive 도 병행 지원(향후 사용 대비).
+ * state-layer 토큰(--state-hover-opacity:0.04) 기반 hover 피드백.
+ * @media(hover:hover) 가드로 터치기기 ghost hover 억제.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: hover) {
+  .tm-card-interactive:hover,
+  .tm-card.tm-interactive:hover {
+    box-shadow: var(--shadow-1); /* elevation-1 lift */
+    cursor: pointer;
+  }
+
+  .tm-list-row-interactive:hover,
+  .tm-list-row.tm-interactive:hover {
+    background: var(--grey100); /* list-row-bg(grey50) → grey100 한 단계 진하게 */
+    cursor: pointer;
+  }
+}
+
+/* [P1 focus-visible] 카드 키보드 포커스 링 — base 승격 (기존 1회성 패치 통합) */
+.tm-card-interactive:focus-visible,
+.tm-card.tm-interactive:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
 /* #3: .tm-btn-disabled와 .tm-btn:disabled 불일치 해소 — opacity 통일 + cursor 명시 */
 .tm-btn-disabled {
   opacity: 0.78;
@@ -1187,6 +1253,7 @@ button:disabled {
   line-height: 1;
   font-weight: 700;
   white-space: nowrap;
+  word-break: keep-all; /* [P2 한글] TDS 패턴 */
 }
 
 .tm-badge-blue {
@@ -1214,6 +1281,25 @@ button:disabled {
   color: var(--red500);
 }
 
+/* ── [P2 Badge size variants] M3 dot(6px) + Carbon SM(18px) ─────────────────
+ * .tm-badge-dot  — 라벨 없는 상태 점 (미읽음·온라인·모집중 등)
+ * .tm-badge-sm   — 밀도 높은 컨텍스트용 소형 뱃지 (font-size-2xs 토큰 참조)
+ * 색 variant(.tm-badge-blue 등)과 조합해 사용
+ * ─────────────────────────────────────────────────────────────────────────── */
+.tm-badge-dot {
+  width: 6px;
+  height: 6px;
+  min-height: unset;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.tm-badge-sm {
+  min-height: 18px;
+  font-size: 11px; /* --font-size-micro(11px) 참조 */
+  padding: 0 6px;
+}
+
 .tm-input {
   width: 100%;
   min-height: 50px;
@@ -1232,7 +1318,23 @@ button:disabled {
 }
 
 .tm-input:focus {
-  border-color: var(--input-border-focus);
+  border-color: var(--input-border-focus); /* --blue500 */
+  box-shadow: 0 0 0 3px var(--blue50); /* [P1] focus ring — WCAG 1.4.11 3:1 확보 */
+}
+
+/* [P1 focus-visible] 키보드 포커스에만 outline 표시, 마우스 클릭 시 숨김 */
+.tm-input:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+/* [P1 disabled] 브라우저 기본 스타일 대신 명시적 비활성 토큰 적용 */
+.tm-input:disabled,
+.tm-input[disabled] {
+  background: var(--grey100);
+  color: var(--text-caption);
+  cursor: not-allowed;
+  opacity: 1; /* 브라우저 기본 opacity 오버라이드 */
 }
 
 /*

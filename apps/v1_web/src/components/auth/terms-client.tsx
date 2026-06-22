@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { Button } from '@/components/v1-ui/button';
 import { useV1CompleteSocialTerms } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { saveSignupTermsAccepted } from '@/lib/signup-terms-storage';
@@ -76,9 +77,17 @@ export function TermsClient() {
       topTitle="약관 동의"
       backHref={isSocialMode ? undefined : model.backHref}
       fixedAction={
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!requiredAccepted || socialTerms.isPending} onClick={continueToSignup} type="button">
-          {socialTerms.isPending ? '저장 중' : requiredAccepted ? model.primary.label : '필수 약관에 동의해 주세요'}
-        </button>
+        <Button
+          block
+          disabled={!requiredAccepted}
+          loading={socialTerms.isPending}
+          onClick={continueToSignup}
+          size="lg"
+          type="button"
+          variant="primary"
+        >
+          {requiredAccepted ? model.primary.label : '필수 약관에 동의해 주세요'}
+        </Button>
       }
     >
       <div className="tm-auth-body">

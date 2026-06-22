@@ -487,8 +487,16 @@ export function ProfileEditPageClient() {
         </section>
         <label className="tm-create-field">
           <span className="tm-text-label">이름</span>
-          <input className={`tm-input ${fieldErrors.displayName ? 'tm-auth-input-error' : ''}`} value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={40} required />
-          {fieldErrors.displayName ? <span className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.displayName}</span> : null}
+          <input
+            className={`tm-input ${fieldErrors.displayName ? 'tm-auth-input-error' : ''}`}
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            maxLength={40}
+            required
+            aria-invalid={fieldErrors.displayName ? true : undefined}
+            aria-describedby={fieldErrors.displayName ? 'profile-displayName-error' : undefined}
+          />
+          {fieldErrors.displayName ? <span id="profile-displayName-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.displayName}</span> : null}
         </label>
         <div className="tm-create-field">
           <label className="tm-text-label" htmlFor="v1-profile-nickname">닉네임</label>
@@ -504,14 +512,19 @@ export function ProfileEditPageClient() {
               }}
               maxLength={40}
               required
-              aria-describedby={fieldErrors.nickname ? 'v1-profile-nickname-helper' : undefined}
+              aria-invalid={fieldErrors.nickname ? true : undefined}
+              aria-describedby={fieldErrors.nickname || (nicknameVerified && nicknameChanged) ? 'v1-profile-nickname-helper' : undefined}
             />
             <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || !nicknameChanged || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button" aria-label="닉네임 중복 확인">
               {checkNickname.isPending ? '확인 중' : nicknameChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
           {fieldErrors.nickname || (nicknameVerified && nicknameChanged) ? (
-            <span id="v1-profile-nickname-helper" className={`tm-text-caption ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+            <span
+              id="v1-profile-nickname-helper"
+              role={fieldErrors.nickname ? 'alert' : undefined}
+              className={`tm-text-caption ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
+            >
               {fieldErrors.nickname ?? '사용 가능한 닉네임이에요.'}
             </span>
           ) : null}
@@ -530,14 +543,19 @@ export function ProfileEditPageClient() {
               }}
               type="email"
               required
-              aria-describedby={fieldErrors.email ? 'v1-profile-email-helper' : undefined}
+              aria-invalid={fieldErrors.email ? true : undefined}
+              aria-describedby={fieldErrors.email || (emailVerified && emailChanged) ? 'v1-profile-email-helper' : undefined}
             />
             <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
               {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
           {fieldErrors.email || (emailVerified && emailChanged) ? (
-            <span id="v1-profile-email-helper" className={`tm-text-caption ${fieldErrors.email ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+            <span
+              id="v1-profile-email-helper"
+              role={fieldErrors.email ? 'alert' : undefined}
+              className={`tm-text-caption ${fieldErrors.email ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
+            >
               {fieldErrors.email ?? '사용 가능한 이메일이에요.'}
             </span>
           ) : null}
@@ -554,8 +572,10 @@ export function ProfileEditPageClient() {
               setPhoneDigits(toDigits(event.target.value, 11));
               setFieldErrors((current) => ({ ...current, phone: undefined }));
             }}
+            aria-invalid={fieldErrors.phone ? true : undefined}
+            aria-describedby={fieldErrors.phone ? 'profile-phone-error' : undefined}
           />
-          {fieldErrors.phone ? <span className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.phone}</span> : null}
+          {fieldErrors.phone ? <span id="profile-phone-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.phone}</span> : null}
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">생년월일</span>
@@ -569,8 +589,10 @@ export function ProfileEditPageClient() {
               setBirthDateDigits(toDigits(event.target.value, 8));
               setFieldErrors((current) => ({ ...current, birthDate: undefined }));
             }}
+            aria-invalid={fieldErrors.birthDate ? true : undefined}
+            aria-describedby={fieldErrors.birthDate ? 'profile-birthDate-error' : undefined}
           />
-          {fieldErrors.birthDate ? <span className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.birthDate}</span> : null}
+          {fieldErrors.birthDate ? <span id="profile-birthDate-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.birthDate}</span> : null}
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">소개</span>

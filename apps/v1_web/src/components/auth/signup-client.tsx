@@ -281,11 +281,17 @@ export function SignupClient() {
                   placeholder="사용할 닉네임"
                   type="text"
                   value={nickname}
+                  aria-invalid={fieldError ? true : undefined}
+                  aria-describedby={fieldError ? 'signup-nickname-helper' : nicknameVerified ? 'signup-nickname-helper' : undefined}
                 />
                 <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || nickname.trim().length < 2} onClick={runNicknameCheck} type="button">{checkNickname.isPending ? '확인 중' : '중복 확인'}</button>
               </span>
               {fieldError || nicknameVerified ? (
-                <span className={`tm-text-caption tm-auth-field-helper ${fieldError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+                <span
+                  id="signup-nickname-helper"
+                  role={fieldError ? 'alert' : undefined}
+                  className={`tm-text-caption tm-auth-field-helper ${fieldError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
+                >
                   {fieldError ?? '사용 가능한 닉네임이에요.'}
                 </span>
               ) : null}
@@ -307,11 +313,17 @@ export function SignupClient() {
                   placeholder="예: 이름@이메일.com"
                   type="email"
                   value={email}
+                  aria-invalid={fieldError ? true : undefined}
+                  aria-describedby={fieldError || emailVerified ? 'signup-email-helper' : undefined}
                 />
                 <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !email.includes('@')} onClick={runEmailCheck} type="button">{checkEmail.isPending ? '확인 중' : '중복 확인'}</button>
               </span>
               {fieldError || emailVerified ? (
-                <span className={`tm-text-caption tm-auth-field-helper ${fieldError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+                <span
+                  id="signup-email-helper"
+                  role={fieldError ? 'alert' : undefined}
+                  className={`tm-text-caption tm-auth-field-helper ${fieldError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
+                >
                   {fieldError ?? '사용 가능한 이메일이에요.'}
                 </span>
               ) : null}
@@ -331,15 +343,17 @@ export function SignupClient() {
                     placeholder="8자 이상"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
+                    aria-invalid={passwordTooShort ? true : undefined}
+                    aria-describedby={passwordTooShort || passwordLongEnough ? 'signup-password-helper' : undefined}
                   />
                   <button className="tm-auth-password-toggle" type="button" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPassword} onClick={() => setShowPassword((v) => !v)}>
                     {showPassword ? <EyeOffIcon size={20} strokeWidth={1.8} /> : <EyeIcon size={20} strokeWidth={1.8} />}
                   </button>
                 </span>
                 {passwordTooShort ? (
-                  <span className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">8자 이상 입력해 주세요.</span>
+                  <span id="signup-password-helper" role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">8자 이상 입력해 주세요.</span>
                 ) : passwordLongEnough ? (
-                  <span className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">사용할 수 있는 비밀번호예요.</span>
+                  <span id="signup-password-helper" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">사용할 수 있는 비밀번호예요.</span>
                 ) : null}
               </label>
               <label className="tm-auth-field">
@@ -352,15 +366,17 @@ export function SignupClient() {
                     placeholder="비밀번호 다시 입력"
                     type={showPasswordConfirm ? 'text' : 'password'}
                     value={passwordConfirm}
+                    aria-invalid={passwordMismatch ? true : undefined}
+                    aria-describedby={passwordMismatch || passwordMatch ? 'signup-password-confirm-helper' : undefined}
                   />
                   <button className="tm-auth-password-toggle" type="button" aria-label={showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPasswordConfirm} onClick={() => setShowPasswordConfirm((v) => !v)}>
                     {showPasswordConfirm ? <EyeOffIcon size={20} strokeWidth={1.8} /> : <EyeIcon size={20} strokeWidth={1.8} />}
                   </button>
                 </span>
                 {passwordMismatch ? (
-                  <span className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">비밀번호가 일치하지 않아요.</span>
+                  <span id="signup-password-confirm-helper" role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">비밀번호가 일치하지 않아요.</span>
                 ) : passwordMatch ? (
-                  <span className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">비밀번호가 일치해요.</span>
+                  <span id="signup-password-confirm-helper" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">비밀번호가 일치해요.</span>
                 ) : null}
               </label>
             </>

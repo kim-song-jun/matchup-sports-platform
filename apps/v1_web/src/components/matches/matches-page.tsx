@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
+import { Button } from '@/components/v1-ui/button';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
@@ -302,16 +303,23 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </div>
             <div className="tm-match-detail-desktop-cta-actions">
               {showChat ? (
-                <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!model.onChat || model.chatPending} onClick={model.onChat}>
-                  {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
-                </button>
+                <Button loading={model.chatPending} disabled={!model.onChat} onClick={model.onChat} size="lg" type="button" variant="neutral">
+                  {model.chatLabel ?? '채팅'}
+                </Button>
               ) : null}
               {mode === 'mine' ? (
                 <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
               ) : (
-                <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}>
-                  {model.applyPending ? '처리 중' : cta}
-                </button>
+                <Button
+                  disabled={!canRunAction}
+                  loading={model.applyPending}
+                  onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}
+                  size="lg"
+                  type="button"
+                  variant={ctaTone === 'tm-btn-primary' ? 'primary' : ctaTone === 'tm-btn-warning' ? 'warning' : ctaTone === 'tm-btn-success' ? 'success' : 'neutral'}
+                >
+                  {cta}
+                </Button>
               )}
             </div>
           </div>
@@ -365,16 +373,23 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: showChat ? '104px 1fr' : '1fr', gap: 8 }}>
           {showChat ? (
-            <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!model.onChat || model.chatPending} onClick={model.onChat}>
-              {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
-            </button>
+            <Button loading={model.chatPending} disabled={!model.onChat} onClick={model.onChat} size="lg" type="button" variant="neutral">
+              {model.chatLabel ?? '채팅'}
+            </Button>
           ) : null}
           {mode === 'mine' ? (
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
           ) : (
-            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}>
-              {model.applyPending ? '처리 중' : cta}
-            </button>
+            <Button
+              disabled={!canRunAction}
+              loading={model.applyPending}
+              onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}
+              size="lg"
+              type="button"
+              variant={ctaTone === 'tm-btn-primary' ? 'primary' : ctaTone === 'tm-btn-warning' ? 'warning' : ctaTone === 'tm-btn-success' ? 'success' : 'neutral'}
+            >
+              {cta}
+            </Button>
           )}
         </div>
       </div>

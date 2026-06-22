@@ -1,7 +1,106 @@
 import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { ChevronRightIcon } from './icons';
 import { InboxIcon } from 'lucide-react';
+
+/* ── TextField ── */
+/* Carbon/Ant 표준 error a11y 패턴:
+ *   (a) aria-invalid="true"       — input이 잘못된 상태임을 AT에 전달
+ *   (b) aria-describedby={errorId} — error 메시지 노드 id를 input에 연결
+ *   (c) id={errorId} role="alert"  — error 메시지가 자동으로 읽힘
+ */
+
+type TextFieldBaseProps = {
+  /** 레이블 텍스트 */
+  label: string;
+  /** 선택 항목임을 표시할 때 true */
+  optional?: boolean;
+  /** 에러 메시지. 있으면 aria-invalid + role="alert" 자동 적용 */
+  error?: string | null;
+  /** 성공 메시지. error가 없을 때만 표시됨 */
+  success?: string | null;
+  /** 외부에서 고정 id를 주입할 때 사용 (기본값: label 기반 자동 생성) */
+  fieldId?: string;
+  /** label + input + helper를 묶는 컨테이너 className */
+  className?: string;
+};
+
+type TextFieldInputProps = TextFieldBaseProps & InputHTMLAttributes<HTMLInputElement> & {
+  multiline?: false;
+  /** label 옆에 렌더할 추가 노드 (중복 확인 버튼 등) */
+  action?: ReactNode;
+};
+
+type TextFieldTextareaProps = TextFieldBaseProps & TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  multiline: true;
+  action?: never;
+};
+
+export type TextFieldProps = TextFieldInputProps | TextFieldTextareaProps;
+
+/**
+ * TextField — 레이블 + 입력 + 에러/성공 헬퍼를 하나로 묶은 a11y 표준 필드 컴포넌트.
+ *
+ * 에러가 있을 때:
+ *  - input/textarea에 aria-invalid="true" 자동 적용
+ *  - input/textarea에 aria-describedby="{fieldId}-error" 자동 적용
+ *  - 에러 메시지 span에 id="{fieldId}-error" role="alert" 자동 적용
+ */
+export function TextField(props: TextFieldProps) {
+  const { label, optional, error, success, fieldId: externalId, className, multiline, ...rest } = props;
+  // id 생성: 외부 주입 > label 기반 slug
+  const fieldId = externalId ?? `tf-${label.replace(/[^a-zA-Z0-9가-힣]/g, '-')}`;
+  const errorId = `${fieldId}-error`;
+  const successId = `${fieldId}-success`;
+  const hasError = Boolean(error);
+  const hasSuccess = !hasError && Boolean(success);
+
+  const sharedAriaProps = {
+    id: fieldId,
+    'aria-invalid': hasError ? (true as const) : undefined,
+    'aria-describedby': hasError ? errorId : hasSuccess ? successId : undefined,
+  };
+
+  return (
+    <div className={`tm-create-field ${className ?? ''}`.trim()}>
+      <label className="tm-text-label" htmlFor={fieldId}>
+        {label}
+        {optional ? <em className="tm-auth-optional" style={{ marginLeft: 4 }}>선택</em> : null}
+      </label>
+      {!multiline && 'action' in props && props.action ? (
+        <span className="tm-auth-field-with-action">
+          <input
+            className={`tm-input ${hasError ? 'tm-auth-input-error' : hasSuccess ? 'tm-auth-input-success' : ''}`}
+            {...sharedAriaProps}
+            {...(rest as InputHTMLAttributes<HTMLInputElement>)}
+          />
+          {props.action}
+        </span>
+      ) : multiline ? (
+        <textarea
+          className={`tm-input tm-create-input-multiline ${hasError ? 'tm-auth-input-error' : ''}`}
+          {...sharedAriaProps}
+          {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
+        />
+      ) : (
+        <input
+          className={`tm-input ${hasError ? 'tm-auth-input-error' : hasSuccess ? 'tm-auth-input-success' : ''}`}
+          {...sharedAriaProps}
+          {...(rest as InputHTMLAttributes<HTMLInputElement>)}
+        />
+      )}
+      {hasError ? (
+        <span id={errorId} role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">
+          {error}
+        </span>
+      ) : hasSuccess ? (
+        <span id={successId} className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">
+          {success}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 /* ── AlertBanner ── */
 

@@ -17,6 +17,28 @@ import type {
   MatchStateViewModel,
 } from './matches.types';
 
+/**
+ * 종목 한국어 레이블 → 인디케이터 dot CSS 색상.
+ * getSportAccent(code)는 영문 코드 기준이라 여기서 인라인 매핑.
+ * 미매핑 종목은 grey400 fallback으로 안전하게 처리한다.
+ */
+function sportDotColor(sportLabel: string): string {
+  const map: Record<string, string> = {
+    풋살: 'var(--blue500)',
+    축구: 'var(--blue500)',
+    수영: 'var(--blue500)',
+    배구: 'var(--blue500)',
+    농구: 'var(--orange500)',
+    야구: 'var(--orange500)',
+    러닝: 'var(--green500)',
+    배드민턴: 'var(--green500)',
+    테니스: 'var(--green500)',
+    사이클: 'var(--green500)',
+    골프: 'var(--green500)',
+  };
+  return map[sportLabel] ?? 'var(--grey400)';
+}
+
 export function MatchListPageView({ model }: { model: MatchListViewModel }) {
   return (
     <AppChrome
@@ -162,7 +184,16 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </div>
             <div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                <span className="tm-badge tm-badge-blue">{match.sport}</span>
+                {/* 종목 배지: blue solid → sport dot + 텍스트(중립 배지).
+                    R-C1 준수: 단일 블루 액센트는 상태 배지에만 예약. */}
+                <span className="tm-badge tm-match-detail-sport-badge">
+                  <span
+                    className="tm-match-detail-sport-dot"
+                    style={{ background: sportDotColor(match.sport) }}
+                    aria-hidden="true"
+                  />
+                  {match.sport}
+                </span>
                 <span className="tm-badge tm-badge-grey">{match.level}</span>
                 <span className="tm-badge tm-badge-grey">{match.gender}</span>
                 <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
@@ -874,6 +905,11 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
 }
 
 function CreateField({ label, value, placeholder, suffix, multiline, type = 'text', onChange }: { label: string; value?: string; placeholder?: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
+  // date/time 인풋은 lang="ko"를 부여해 OS locale에 상관없이
+  // 가능한 경우 한국어 포맷(yyyy.mm.dd 또는 HH:MM)으로 표시를 유도한다.
+  // CSS(.tm-create-native-input[type="date" i] 등)에서 appearance:none +
+  // ::-webkit-calendar-picker-indicator 처리로 OS 스피너/아이콘을 제거한다.
+  const isDateLike = type === 'date' || type === 'time';
   return (
     <label className="tm-create-field">
       <div className="tm-text-label">{label}</div>
@@ -882,7 +918,14 @@ function CreateField({ label, value, placeholder, suffix, multiline, type = 'tex
           multiline ? (
             <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
           ) : (
-            <input className="tm-create-native-input" type={type} value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+            <input
+              className="tm-create-native-input"
+              type={type}
+              lang={isDateLike ? 'ko' : undefined}
+              value={value ?? ''}
+              placeholder={placeholder}
+              onChange={(event) => onChange(event.target.value)}
+            />
           )
         ) : (
           <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder}</span>

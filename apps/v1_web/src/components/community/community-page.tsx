@@ -88,9 +88,13 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
           {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
           {hasRooms ? (
             <>
-              <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
-                {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
-              </ChatSection>
+              {/* (1) pinnedRooms가 있을 때만 '고정' 섹션 헤더를 노출한다.
+                  pinnedRooms.length === 0이면 빈 "고정 0" 헤더가 불필요하게 렌더되므로 가드. */}
+              {model.pinnedRooms.length > 0 ? (
+                <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
+                  {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
+                </ChatSection>
+              ) : null}
               <ChatSection title={`채팅방 ${model.rooms.length}`}>
                 {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
               </ChatSection>
@@ -329,10 +333,15 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>
               <span className="tm-chat-room-type">{room.type}</span>
               <span className={`tm-chat-last-message ${room.unread > 0 ? 'tm-chat-last-message-unread' : ''}`}>{room.last}</span>
-              {room.unread > 0 ? <span className="tm-chat-inline-unread">{room.unread}</span> : null}
+              {/* (2) 모바일: last-line 안에서 배지 노출. 데스크톱에서는 meta 열로 이동하므로 숨긴다. */}
+              {room.unread > 0 ? <span className="tm-chat-inline-unread tm-hide-desktop" aria-label={`읽지 않은 메시지 ${room.unread}개`}>{room.unread}</span> : null}
             </div>
           </div>
-          <div className="tm-chat-row-meta"><div className="tm-text-micro">{room.time}</div></div>
+          {/* (2) 데스크톱: 타임스탬프 아래에 배지를 배치. meta 열이 column flex이므로 자연스럽게 적층된다. */}
+          <div className="tm-chat-row-meta">
+            <div className="tm-text-micro">{room.time}</div>
+            {room.unread > 0 ? <span className="tm-chat-inline-unread tm-show-desktop" aria-label={`읽지 않은 메시지 ${room.unread}개`}>{room.unread}</span> : null}
+          </div>
         </Link>
         <div className="tm-chat-row-actions" aria-label={`${room.title} 채팅방 작업`}>
           <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onTogglePin}><Pin size={18} strokeWidth={2.1} /><span>{room.pinned ? '고정 해제' : '고정'}</span></button>

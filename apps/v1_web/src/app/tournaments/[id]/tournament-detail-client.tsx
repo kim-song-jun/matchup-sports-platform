@@ -95,11 +95,12 @@ function ApplyCTAButtons({
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8 }}>
       <Link
         href={`/tournaments/${tournament.id}/my`}
         className="tm-btn tm-btn-lg tm-btn-neutral"
         aria-label="내 신청 상태 확인"
+        style={{ whiteSpace: 'nowrap' }}
       >
         내 신청 보기
       </Link>
@@ -1075,11 +1076,23 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table
-          /* maxWidth keeps columns tight on the wide desktop column (팀 칸이 늘어나
-             승점/전적/득실이 멀리 밀리는 현상 방지). 모바일은 카드가 더 좁아 100%로 채움. */
-          style={{ width: '100%', maxWidth: 460, borderCollapse: 'collapse', minWidth: 280 }}
+          /* colgroup으로 열 너비를 명시해 카드 끝선까지 순위표가 확장되도록 함.
+             maxWidth 캡 제거 — 카드 너비에 맞게 테이블이 늘어남. */
+          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}
           aria-label={`${group.name} 순위표`}
         >
+          <colgroup>
+            {/* 순위 */}
+            <col style={{ width: 32 }} />
+            {/* 팀명 — 남은 공간을 모두 차지 */}
+            <col />
+            {/* 승점 */}
+            <col style={{ width: 48 }} />
+            {/* 전적 */}
+            <col style={{ width: 88 }} />
+            {/* 득실 */}
+            <col style={{ width: 48 }} />
+          </colgroup>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--grey100)' }}>
               <th

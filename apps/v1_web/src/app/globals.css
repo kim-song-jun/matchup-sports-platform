@@ -1192,6 +1192,23 @@ button:disabled {
   border-color: var(--blue500);
 }
 
+/*
+ * (3) tm-input-select — OS 기본 select 화살표(▾) 제거 후 커스텀 SVG chevron 적용.
+ * appearance:none으로 UA 기본 스타일을 제거하고, url-encoded SVG를 background-image로
+ * 삽입합니다. 색은 --text-caption 토큰(#6B7684)에 맞춘 하드코딩 없는 회색(%236B7684).
+ * padding-right은 chevron 영역 확보(40px).
+ */
+.tm-input-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7684' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px 16px;
+  cursor: pointer;
+}
+
 .tm-auth-input-error {
   border-color: var(--red500);
 }
@@ -2905,8 +2922,11 @@ button:disabled {
 }
 
 .tm-notification-card-unread {
-  background: var(--blue50);
-  border-color: rgba(49,130,246,.24);
+  /* 단일 액센트 규약: 카드 면은 중립 --bg, 미읽음 신호는 좌측 6px 마커로만 표현 */
+  background: var(--bg);
+  border-color: var(--grey100);
+  border-left: 6px solid var(--blue500);
+  padding-left: 10px; /* 좌측 border 6px 보정 — 전체 패딩 14px 유지 */
 }
 
 .tm-notification-icon {
@@ -2925,9 +2945,9 @@ button:disabled {
   color: var(--static-white);
 }
 
-/* #12: 미읽음 알림 카드 제목 — blue600으로 아이콘 강조와 짝 맞춤 */
+/* 미읽음 카드 제목 — blue500으로 마커 컬러와 일관성 */
 .tm-notification-card-unread .tm-text-body-lg {
-  color: var(--blue600);
+  color: var(--blue500);
 }
 
 .tm-notification-meta {
@@ -3647,6 +3667,13 @@ button:disabled {
   display: grid;
   gap: 14px;
   padding-top: 18px;
+  /*
+   * (1) 모바일 fixed CTA가 생년월일 등 하단 필드를 가리는 버그 수정.
+   * 버튼 높이 56px + CTA 상단 패딩 14px + 여백 16px = 86px + safe-area.
+   * tm-create-shell의 하드코딩 124px보다 이 값이 적용 순서상 뒤에 오므로
+   * specificity로 덮어씌우기 위해 별도 속성으로 선언합니다.
+   */
+  padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px) + 16px);
 }
 
 .tm-profile-edit-shell .tm-my-profile-head {

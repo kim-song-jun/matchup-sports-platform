@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
@@ -243,32 +244,41 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <InfoRow label="모집 여부" value={`${team.statusLabel} · ${team.activity}`} />
             <InfoRow label="정기 일정" value={team.schedule} />
           </Card>
-          <Card pad={16} style={{ marginTop: 14, opacity: team.memberAccess.canView ? 1 : 0.72 }}>
+          {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
+          <Card pad={16} style={{ marginTop: 14 }}>
             <div className="tm-section-row" style={{ marginTop: 0 }}>
               <div>
                 <div className="tm-text-body-lg">주요 멤버</div>
                 <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
               </div>
-              {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비공개</button>}
+              {team.memberAccess.canView ? (
+                <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
+              ) : (
+                <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Lock size={11} aria-hidden="true" />
+                  비공개
+                </span>
+              )}
             </div>
             {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
           </Card>
         </div>
 
-        {/* RIGHT: sticky sidebar (replaces mobile fixed CTA on desktop) */}
+        {/* RIGHT: sticky sidebar
+            (4) identity(팀 로고+팀명/지역) 중복 제거 — 히어로 카드에 이미 표시됨.
+            구분선도 함께 제거. CTA + 핵심 결정단서(정원·모집상태·정기일정 1줄)만 남김. */}
         <aside className="tm-team-detail-desktop-sidebar">
-          <div className="tm-team-detail-sidebar-identity">
-            <TeamLogo team={team} />
-            <div>
-              <div className="tm-text-body-lg">{team.name}</div>
-              <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.sport} · {team.region}</div>
-            </div>
-          </div>
-          <div className="tm-team-detail-sidebar-divider" />
+          {/* 핵심 결정단서: 정원·모집상태·정기일정 — 가입 전 즉시 판단에 필요한 3가지 */}
           <div className="tm-team-detail-sidebar-meta">
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-            <span className="tm-badge tm-badge-grey">{team.members}명</span>
+            <span className="tm-badge tm-badge-grey">{team.members}/{team.capacity}명</span>
           </div>
+          {team.schedule ? (
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              정기 일정 · {team.schedule}
+            </div>
+          ) : null}
+          <div className="tm-team-detail-sidebar-divider" />
           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
             {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
           </div>
@@ -320,13 +330,21 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <InfoRow label="모집 여부" value={`${team.statusLabel} · ${team.activity}`} />
           <InfoRow label="정기 일정" value={team.schedule} />
         </Card>
-        <Card pad={16} style={{ marginTop: 14, opacity: team.memberAccess.canView ? 1 : 0.72 }}>
+        {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
+        <Card pad={16} style={{ marginTop: 14 }}>
           <div className="tm-section-row" style={{ marginTop: 0 }}>
             <div>
               <div className="tm-text-body-lg">주요 멤버</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
             </div>
-            {team.memberAccess.canView ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>비공개</button>}
+            {team.memberAccess.canView ? (
+              <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
+            ) : (
+              <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Lock size={11} aria-hidden="true" />
+                비공개
+              </span>
+            )}
           </div>
           {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
         </Card>
@@ -803,7 +821,31 @@ function InfoChips({ label, items }: { label: string; items: string[] }) {
   return (
     <div className="tm-team-info-block">
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 600, marginBottom: 8 }}>{label}</div>
-      <div className="tm-team-form-chip-row">{items.map((item) => <span key={item} className="tm-chip tm-chip-active">{item}</span>)}</div>
+      {/* (1) 파란 solid chip(tm-chip-active)은 테이블 톤을 파괴.
+          단일 종목 → sport dot + 텍스트로 충분히 식별 가능.
+          복수 종목 → tm-badge tm-badge-grey 로 중립 처리. */}
+      {items.length === 1 ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: 'var(--blue500)',
+              flexShrink: 0,
+            }}
+            aria-hidden="true"
+          />
+          <span className="tm-text-body">{items[0]}</span>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {items.map((item) => (
+            <span key={item} className="tm-badge tm-badge-grey">{item}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

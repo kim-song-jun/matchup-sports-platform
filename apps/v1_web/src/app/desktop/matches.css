@@ -1,6 +1,63 @@
 /* Desktop overrides for matches — owned by the matches wave. */
 /* Mobile (<768) is byte-identical — only @media (min-width:1024px|1440px) blocks here. */
 
+/* ─── Match detail: sport indicator badge (taste-T2) ─────────────────────────
+ * 히어로의 종목 배지를 blue solid → 중립(grey100 배경) + sport dot으로 변경.
+ * R-C1 준수: blue는 상태 배지(모집중/내 매치)에만 예약.
+ */
+
+.tm-match-detail-sport-badge {
+  /* 히어로(dark overlay) 위 중립 배지.
+     --overlay-white-18: 프로모 eyebrow 뱃지 배경 전용 토큰(globals.css L80).
+     --overlay-white-92: 프로모 eyebrow 뱃지 텍스트 토큰(globals.css L93).
+     상태 배지(모집중/내 매치)는 tm-badge-blue로 별도 적용 — 블루는 상태 전용. */
+  background: var(--overlay-white-18);
+  color: var(--overlay-white-92);
+  gap: 5px;
+}
+
+/* dot: 8×8 원형 인디케이터 */
+.tm-match-detail-sport-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── 생성폼 date / time 네이티브 인풋 (1) ───────────────────────────────────
+ * appearance:none 은 globals.css .tm-create-native-input 에 없어 OS 스타일이 노출됨.
+ * - ::-webkit-calendar-picker-indicator  → 달력/시계 아이콘 제거
+ * - ::-webkit-inner-spin-button          → AM/PM·숫자 스피너 제거
+ * - ::-webkit-clear-button               → ×(지우기) 버튼 제거
+ * - appearance:none / -webkit-appearance:none → OS 테마 인풋 모양 제거
+ * 결과: 토큰 기반 .tm-create-input 컨테이너 스타일만 보임(Toss 인풋 동일 외관).
+ */
+
+.tm-create-native-input[type="date"],
+.tm-create-native-input[type="time"] {
+  appearance: none;
+  -webkit-appearance: none;
+  /* 한국 포맷(yyyy-mm-dd / HH:MM)은 lang="ko" + value 포맷이 우선.
+     width:100%는 부모 .tm-create-input flex 기준으로 꽉 채운다. */
+  width: 100%;
+  cursor: text;
+}
+
+.tm-create-native-input[type="date"]::-webkit-calendar-picker-indicator,
+.tm-create-native-input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.tm-create-native-input[type="date"]::-webkit-inner-spin-button,
+.tm-create-native-input[type="time"]::-webkit-inner-spin-button,
+.tm-create-native-input[type="date"]::-webkit-clear-button,
+.tm-create-native-input[type="time"]::-webkit-clear-button {
+  display: none;
+  -webkit-appearance: none;
+}
+
 /* ─── List /matches ──────────────────────────────────────────────────────────
  * Kill the stretched single-column. Convert .tm-match-card-stack to a 2-up
  * card grid at ≥1024 and 3-up at ≥1440. Sport-chip row stays full width.

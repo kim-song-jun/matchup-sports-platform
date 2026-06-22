@@ -152,7 +152,11 @@
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
-    padding-bottom: 120px;
+    /*
+     * (1) 데스크톱에서는 fixed CTA가 static 인라인으로 전환되므로
+     *     모바일의 CTA 높이 보상 padding-bottom이 불필요하다. 폼 흐름 리듬만 확보.
+     */
+    padding-bottom: 40px;
   }
 
   /* Profile head inside edit form: horizontal layout (same as mobile) but
@@ -163,11 +167,22 @@
     border-radius: 16px;
   }
 
-  /* Fixed CTA pinned to the centered 600px column. */
+  /*
+   * (2) 데스크톱 '프로필 저장' CTA: fixed 해제 → 폼 흐름 맨 끝에 인라인으로 배치.
+   * 모바일에서는 .tm-fixed-cta(position:fixed, z-index:31)가 유지되지만,
+   * 데스크톱(≥1024px)에서는 position:static으로 override해 폼 흐름에 자연스럽게
+   * 따라오도록 합니다. border/background는 폼 카드와 시각적으로 구분하기 위해 유지.
+   */
   .tm-my-profile-edit-cta {
+    position: static;
+    transform: none;
+    width: 100%;
     max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+    z-index: auto;
   }
 }
 

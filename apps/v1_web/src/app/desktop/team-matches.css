@@ -96,12 +96,59 @@
    Already defined in matches.css — no override needed here. */
 
 
+/* ─── Info group cards (all viewports) ───────────────────────────────────── */
+
+/* 의미 그룹 카드 — 11개 flat InfoRow를 3개 시맨틱 섹션으로 분할(T4) */
+.tm-info-group {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.tm-info-group-label {
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--text-caption);
+  padding: 12px 16px 4px;
+  letter-spacing: -0.1px;
+}
+
+/* 그룹 내 InfoRow: 테두리는 그룹 카드가 담당하므로 개별 하단 선 유지(구분), 좌우 패딩 적용 */
+.tm-info-group .tm-info-row {
+  padding: 0 16px;
+}
+
+/* 그룹 내 마지막 InfoRow의 하단 보더 제거 — 그룹 카드 자체가 경계 역할 */
+.tm-info-group .tm-info-row:last-child {
+  border-bottom: none;
+}
+
+/* 비용 그룹 — 상대팀 부담금 수치 승격 영역(R-D1 primary) */
+.tm-info-cost-hero {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tm-info-cost-amount {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.tm-info-cost-value {
+  font-size: var(--font-size-subhead);
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.5px;
+}
+
 /* ─── Detail page (/team-matches/[id]) ───────────────────────────────────── */
 
 @media (min-width: 1024px) {
   /* The whole detail article uses a 2-column layout:
-   * LEFT (~60%) : VS hero + info rows + description + host team link + applicant teams
-   * RIGHT (~40%): sticky apply/CTA card
+   * LEFT (~60%) : VS hero + info group cards + description + host team card (mobile only)
+   * RIGHT (~40%): host-team compact card + sticky apply/CTA card
    * The desktop layout wrapper is .tm-team-match-detail-desktop */
   .tm-team-match-detail-desktop {
     display: grid;
@@ -130,11 +177,19 @@
     padding: 0;
   }
 
-  /* Right column: sticky CTA card */
+  /* Right column: sticky — host-team card + CTA card */
   .tm-team-match-detail-right {
     position: sticky;
     top: 88px; /* 64px nav + 24px breathing */
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* 홈팀 카드: 우측 컬럼 상단, marginTop 리셋(gap이 간격 담당) */
+  .tm-team-match-right-host .tm-host-team-card {
+    margin-top: 0;
   }
 
   /* Desktop-only hero actions row (share + notify) */
@@ -180,6 +235,12 @@
     align-items: center;
     gap: 14px;
     padding: 0;
+  }
+
+  /* info-group 카드 내부 행은 16px 좌우 패딩 유지 — 위 padding:0가 그룹 카드 행까지 덮어
+   * 라벨/값이 radius 16px 카드 테두리에 밀착되는 데스크톱 회귀 방지(특이도 0-3-0으로 보존). */
+  .tm-team-match-detail-left .tm-info-group .tm-info-row {
+    padding: 0 16px;
   }
 
   .tm-team-match-detail-left .tm-info-row > div:last-child {

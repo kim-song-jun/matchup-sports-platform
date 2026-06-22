@@ -260,13 +260,6 @@
     gap: 16px;
   }
 
-  /* Sidebar logo + team name area */
-  .tm-team-detail-sidebar-identity {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
   /* Status + member count row in sidebar */
   .tm-team-detail-sidebar-meta {
     display: flex;
@@ -326,6 +319,20 @@
 @media (min-width: 1440px) {
   .tm-team-members-desktop-layout {
     gap: 18px;
+  }
+}
+
+/* ─── 팀 목록/상태 페이지: desktop 빈상태 중앙 안착 ──────────────────────────
+ * (2) 1440 wide에서 EmptyState가 정중앙으로 흩어지는 문제 해결.
+ * 실제 EmptyState는 .tm-team-list 안(TeamListPageView/TeamStatePageView)에 렌더되므로
+ * 해당 스코프로 max-width 480 컬럼 + 상단 offset 적용(채워진 카드 스택엔 미적용 — 빈 상태에만 렌더).
+ */
+@media (min-width: 1024px) {
+  .tm-team-list .tm-empty-state {
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-top: 120px;
   }
 }
 

@@ -522,7 +522,8 @@ export function ProfileEditPageClient() {
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">공개 범위</span>
-          <select className="tm-input" value={visibilityStatus} onChange={(event) => setVisibilityStatus(event.target.value as typeof visibilityStatus)}>
+          {/* (3) OS 기본 ▾ 대신 커스텀 SVG chevron — appearance:none + background-image */}
+          <select className="tm-input tm-input-select" value={visibilityStatus} onChange={(event) => setVisibilityStatus(event.target.value as typeof visibilityStatus)}>
             <option value="public">전체 공개</option>
             <option value="members_only">멤버 공개</option>
             <option value="private">비공개</option>
@@ -534,6 +535,12 @@ export function ProfileEditPageClient() {
           <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
         </Card>
       </form>
+      {/*
+        (1) 모바일: tm-fixed-cta가 생년월일 필드를 가리지 않도록 form shell에
+            padding-bottom을 safe-area 포함 계산값으로 덮어씁니다. (globals.css 참조)
+        (2) 데스크톱: position:static 으로 전환해 폼 흐름 맨 끝에 위치시킵니다.
+            tm-my-profile-edit-cta 데스크톱 override는 desktop/my.css에서 처리합니다.
+      */}
       <div className="tm-fixed-cta tm-my-profile-edit-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}

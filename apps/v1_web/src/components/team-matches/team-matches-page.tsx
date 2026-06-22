@@ -97,8 +97,10 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const { match, mode } = model;
   const locked = mode === 'pending' || mode === 'approved';
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
-  const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const canRunAction = Boolean(model.onApply);
+  /* ctaTone: 행동 불가(신청 불가 등 onApply=undefined + 리다이렉트도 없는 상태)는
+   * neutral+disabled 조합으로 표시 — primary 파란 버튼처럼 보여 클릭 오인 방지(T1). */
+  const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : canRunAction ? 'tm-btn-primary' : 'tm-btn-neutral tm-btn-disabled';
   // 채팅 버튼: approved/host(mine)는 활성, pending(승인 대기)은 disabled + '승인 완료 후 이용' 안내.
   // default(비참여자)에는 미노출.
   const chatEnabled = Boolean(model.onChat);
@@ -130,6 +132,36 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
         <div className="tm-text-micro" style={{ textAlign: 'center', color: 'var(--text-caption)' }}>승인 완료 후 이용할 수 있어요</div>
       ) : null}
     </div>
+  );
+
+  /* Host-team card — rendered in left column (mobile) and right column (desktop).
+   * Desktop 우측 컬럼에 이동해 40% 보이드를 채움(T1). 모바일은 기존 위치 유지. */
+  const hostTeamCard = (
+    <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
+      {/* 팀 로고 아바타 */}
+      <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, overflow: 'hidden', background: 'var(--grey100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {match.hostTeamLogoUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={match.hostTeamLogoUrl} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <span className="tm-text-subhead" style={{ color: 'var(--text-caption)' }}>{match.hostTeam.slice(0, 1)}</span>
+        )}
+      </div>
+      {/* 팀 정보 */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>홈팀 정보</div>
+        <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
+          <span className="tm-badge tm-badge-blue">{match.sport}</span>
+          <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
+          {match.hostTeamTrustState && match.hostTeamTrustState !== 'none' ? (
+            <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
+          ) : null}
+        </div>
+      </div>
+      {/* 팀 보기는 보조 CTA — apply가 단일 primary; 파란 fill 중복 방지(R-K5) */}
+      <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
+    </Link>
   );
 
   /* Shared CTA buttons — rendered in both mobile fixed bar and desktop sticky card */
@@ -193,17 +225,45 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
             <div className="tm-match-detail-body">
-              <InfoRow label="지역" value={match.region} />
-              <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
-              <InfoRow label="장소" value={match.venue} sub={match.address} />
-              <InfoRow label="종목" value={match.sport} />
-              <InfoRow label="실력등급" value={`${match.grade}등급`} />
-              <InfoRow label="경기방식" value={match.format} />
-              <InfoRow label="경기 스타일" value={match.style} />
-              <InfoRow label="유니폼 색상" value={match.uniform} />
-              <InfoRow label="성별 조건" value={match.gender} />
-              <InfoRow label="총비용" value={`${match.cost.toLocaleString('ko-KR')}원`} />
-              <InfoRow label="상대팀 부담금" value={`${match.opponentCost.toLocaleString('ko-KR')}원`} sub={match.opponentCost === 0 ? '무료초청 · 실제 청구 없음' : undefined} />
+              {/* ── 그룹 1: 일정 · 장소 ── */}
+              <div className="tm-info-group">
+                <div className="tm-info-group-label">일정 · 장소</div>
+                <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
+                <InfoRow label="장소" value={match.venue} sub={match.address} />
+                <InfoRow label="지역" value={match.region} />
+              </div>
+              {/* ── 그룹 2: 경기 조건 ── */}
+              <div className="tm-info-group">
+                <div className="tm-info-group-label">경기 조건</div>
+                <InfoRow label="종목" value={match.sport} />
+                <InfoRow label="실력등급" value={`${match.grade}등급`} />
+                <InfoRow label="경기방식" value={match.format} />
+                <InfoRow label="경기 스타일" value={match.style} />
+                <InfoRow label="유니폼 색상" value={match.uniform} />
+                <InfoRow label="성별 조건" value={match.gender} />
+              </div>
+              {/* ── 그룹 3: 비용 — 상대팀 부담금 수치 승격 ── */}
+              <div className="tm-info-group">
+                <div className="tm-info-group-label">비용</div>
+                {/* 상대팀 부담금은 신청 결정의 핵심 — primary 위치로 승격(R-D1) */}
+                <div className="tm-info-cost-hero">
+                  <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>상대팀 부담금</div>
+                  <div className="tm-info-cost-amount">
+                    {match.opponentCost === 0 ? (
+                      <>
+                        <span className="tm-info-cost-value">무료</span>
+                        <span className="tm-badge tm-badge-blue" style={{ marginLeft: 8 }}>무료초청</span>
+                      </>
+                    ) : (
+                      <span className="tm-info-cost-value">{match.opponentCost.toLocaleString('ko-KR')}원</span>
+                    )}
+                  </div>
+                  {match.opponentCost === 0 ? (
+                    <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>실제 청구 없음</div>
+                  ) : null}
+                </div>
+                <InfoRow label="총비용" value={`${match.cost.toLocaleString('ko-KR')}원`} />
+              </div>
               {mode === 'pending' ? <StateCard tone="orange" title="신청이 접수됐어요" body="홈팀 검토가 끝나면 알림으로 알려드릴게요." /> : null}
               {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="팀매치 참가가 확정됐어요. 경기 전 안내는 채팅에서 확인할 수 있어요." /> : null}
               {match.description ? (
@@ -212,30 +272,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div className="tm-text-body" style={{ marginTop: 8, lineHeight: 1.55, color: 'var(--text-muted)' }}>{match.description}</div>
                 </Card>
               ) : null}
-              <Link className="tm-card tm-pressable" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginTop: 14 }}>
-                {/* 팀 로고 아바타 */}
-                <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, overflow: 'hidden', background: 'var(--grey100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {match.hostTeamLogoUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={match.hostTeamLogoUrl} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <span className="tm-text-subhead" style={{ color: 'var(--text-caption)' }}>{match.hostTeam.slice(0, 1)}</span>
-                  )}
-                </div>
-                {/* 팀 정보 */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>홈팀 정보</div>
-                  <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
-                    <span className="tm-badge tm-badge-blue">{match.sport}</span>
-                    <span className="tm-badge tm-badge-grey">{match.grade}등급</span>
-                    {match.hostTeamTrustState && match.hostTeamTrustState !== 'none' ? (
-                      <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
-                    ) : null}
-                  </div>
-                </div>
-                <span className="tm-btn tm-btn-sm tm-btn-primary" style={{ flexShrink: 0 }}>팀 보기</span>
-              </Link>
+              {/* 홈팀 카드: 모바일은 왼쪽 컬럼 하단, 데스크톱은 우측 컬럼(tm-hide-desktop)으로 이동 */}
+              <div className="tm-hide-desktop" style={{ marginTop: 14 }}>{hostTeamCard}</div>
               {mode === 'mine' ? (
                 <Card pad={16} style={{ marginTop: 10 }}>
                   <div className="tm-text-body-lg">신청팀</div>
@@ -288,8 +326,10 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           </article>
         </div>
 
-        {/* RIGHT: desktop sticky CTA card (shown on desktop only) */}
+        {/* RIGHT: desktop sticky column — host-team compact + CTA card */}
         <div className="tm-team-match-detail-right tm-show-desktop">
+          {/* 홈팀 카드: 데스크톱 우측 컬럼 상단 — 40% 보이드 채움(T1) */}
+          <div className="tm-team-match-right-host">{hostTeamCard}</div>
           <div className="tm-team-match-cta-card">
             <div className="tm-team-match-cta-meta">
               <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>

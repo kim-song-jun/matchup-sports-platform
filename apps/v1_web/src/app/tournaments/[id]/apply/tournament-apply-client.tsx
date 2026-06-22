@@ -503,6 +503,7 @@ function ExpandableCheckRow({
             aria-expanded={expanded}
             aria-controls={bodyId}
             aria-label={expanded ? '내용 접기' : '내용 보기'}
+            className="tm-pressable"
             style={{
               flexShrink: 0,
               background: 'none',
@@ -516,10 +517,7 @@ function ExpandableCheckRow({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 8,
-              outline: 'none',
             }}
-            onFocus={(e) => (e.currentTarget.style.outline = '2px solid var(--blue500)')}
-            onBlur={(e) => (e.currentTarget.style.outline = 'none')}
           >
             <svg
               aria-hidden="true"

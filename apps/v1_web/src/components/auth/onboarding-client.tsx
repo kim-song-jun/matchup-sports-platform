@@ -416,9 +416,9 @@ function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboar
   return (
     <div className="tm-auth-stack">
       {/* #19: 핵심 상태값은 tm-text-body(15px)로 격상, 레이블은 caption 유지 */}
-      <Card pad={15}><div className="tm-text-caption">현재 단계</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
-      <Card pad={15}><div className="tm-text-caption">선택한 종목</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.sports.length}개</div></Card>
-      <Card pad={15}><div className="tm-text-caption">선택한 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
+      <Card pad={16}><div className="tm-text-caption">현재 단계</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
+      <Card pad={16}><div className="tm-text-caption">선택한 종목</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.sports.length}개</div></Card>
+      <Card pad={16}><div className="tm-text-caption">선택한 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
       <Notice title="잠깐 나가도 괜찮아요" body="설정을 나가도 선택한 내용이 저장돼요. 돌아오면 멈춘 단계부터 이어서 할 수 있어요." />
     </div>
   );
@@ -449,10 +449,10 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
         />
       ) : null}
       {/* #19: 값(sportSummary, regionSummary)을 tm-text-body(15px/600)로 격상, 레이블은 caption 유지 */}
-      <Card pad={15}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{sportSummary || '미설정'}</div></Card>
-      <Card pad={15}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '미설정'}</div></Card>
+      <Card pad={16}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{sportSummary || '미설정'}</div></Card>
+      <Card pad={16}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '미설정'}</div></Card>
       {draft.currentLocation ? (
-        <Card pad={15} className="tm-onboarding-confirm-full">
+        <Card pad={16} className="tm-onboarding-confirm-full">
           <div className="tm-text-caption">현재 위치</div>
           <div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>
             {formatLocation(draft.currentLocation)}
@@ -490,7 +490,7 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {
-  return <Card pad={14} className={`tm-auth-notice tm-auth-notice-${tone}`}><div className="tm-text-label">{title}</div><div className="tm-text-caption">{body}</div></Card>;
+  return <Card pad={16} className={`tm-auth-notice tm-auth-notice-${tone}`}><div className="tm-text-label">{title}</div><div className="tm-text-caption">{body}</div></Card>;
 }
 
 function ProgressHeader({ stepNo, total }: { stepNo: number; total: number }) {

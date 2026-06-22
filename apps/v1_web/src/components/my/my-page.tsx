@@ -129,9 +129,10 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
         <div className="tm-my-list-stack">
           {/* 로딩/에러 중(apiNotice 노출)에는 '매치 없어요' 빈상태를 띄우지 않는다 — 알림 카드와 모순 방지 (Copilot) */}
           {!model.apiNotice && model.matches.length === 0 ? (
-            <p className="tm-text-caption" style={{ margin: 0, padding: '72px 0', textAlign: 'center' }}>
-              표시할 매치가 없어요
-            </p>
+            <EmptyState
+              title="표시할 매치가 없어요"
+              sub={model.mode === 'joined' ? '매치에 참여하면 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
+            />
           ) : (
             model.matches.map((match) => <MyMatchCard key={match.id} match={match} manage={model.mode === 'created'} />)
           )}
@@ -153,7 +154,7 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
           <h1 className="tm-text-heading">내 팀</h1>
         </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
+          {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
         </div>
         <div className="tm-my-list-stack">
           {/* #14: 소속 팀이 없을 때 빈 상태 안내 */}
@@ -301,7 +302,7 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
           <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
         </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
+          {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
         </div>
         <div className="tm-team-form-chip-row" role="group" aria-label="멤버 목록 탭" style={{ marginTop: 14 }}>
           {model.tabs.map((tab) => (

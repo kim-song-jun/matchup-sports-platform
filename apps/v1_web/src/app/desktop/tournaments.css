@@ -143,14 +143,13 @@
   }
 
   .tm-tournament-list-grid .tm-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: background 0.15s;
     /* 카드가 그리드 셀 전체 높이를 채우도록 */
     height: 100%;
   }
 
   .tm-tournament-list-grid .tm-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+    background: var(--grey50);
   }
 }
 
@@ -840,7 +839,7 @@
 }
 
 .tm-bracket-col-head {
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 700;
   color: var(--text-muted);
   padding: 4px 0 8px;
@@ -891,7 +890,7 @@
 }
 
 .tm-bk-team {
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   font-weight: 600;
   color: var(--text-strong);
   overflow: hidden;
@@ -905,7 +904,7 @@
 }
 
 .tm-bk-score {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: 700;
   color: var(--text-strong);
   flex-shrink: 0;
@@ -917,7 +916,7 @@
 }
 
 .tm-bk-status {
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   color: var(--text-caption);
   text-align: center;
   padding: 5px 0;
@@ -958,7 +957,7 @@
 }
 
 .tm-bk-champ-name {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: 700;
   color: var(--text-strong);
 }
@@ -981,7 +980,7 @@
 }
 
 .tm-bracket-third-pill {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   color: var(--text-muted);
   padding: 3px 10px;
@@ -1058,7 +1057,7 @@
 
 /* ── 대회 진행 방식 — numbered step timeline ─────────────────────────────── */
 .tm-tourn-flow-format {
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 700;
   color: var(--blue500);
   margin-bottom: 16px;
@@ -1096,7 +1095,7 @@
   border-radius: 50%;
   background: var(--blue50);
   color: var(--blue500);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 700;
   display: grid;
   place-items: center;

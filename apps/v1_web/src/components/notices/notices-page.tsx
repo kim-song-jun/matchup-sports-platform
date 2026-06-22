@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
 
@@ -45,10 +45,10 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
           ) : model.notices.length ? (
             model.notices.map((notice) => <NoticeRow key={notice.id} notice={notice} />)
           ) : (
-            <Card pad={18} className="tm-notice-summary-card">
-              <div className="tm-text-label">공지 없음</div>
-              <p className="tm-text-body">이 카테고리에 공지가 아직 없어요.</p>
-            </Card>
+            <EmptyState
+              title="공지 없음"
+              sub="이 카테고리에 공지가 아직 없어요."
+            />
           )}
         </div>
       </div>
@@ -81,7 +81,7 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
             <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
             <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
             <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>
-            <Card pad={18} className="tm-notice-summary-card">
+            <Card pad={16} className="tm-notice-summary-card">
               <div className="tm-text-label">요약</div>
               <p className="tm-text-body">{notice.summary}</p>
             </Card>

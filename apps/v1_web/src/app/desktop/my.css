@@ -110,7 +110,7 @@
   .tm-my-desktop-sidebar .tm-my-avatar {
     width: 72px;
     height: 72px;
-    font-size: 28px;
+    font-size: var(--font-size-heading); /* 24px — R-T2 토큰, 구 28px */
     border-radius: 24px;
   }
 
@@ -217,14 +217,13 @@
     margin-right: auto;
   }
 
-  /* Review schedule cards: hover lift. */
+  /* Review schedule cards: background highlight on hover (no lift — R-K2). */
   .tm-review-schedule-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: box-shadow 0.15s;
   }
 
   .tm-review-schedule-card:hover {
     box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
   }
 
   /* Review compose shell: same max-width. */
@@ -262,14 +261,13 @@
     gap: 16px;
   }
 
-  /* Hover lift on match cards */
+  /* Hover depth on match cards — background/shadow only, no lift (R-K2). */
   .tm-my-matches-desktop .tm-my-list-stack .tm-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: box-shadow 0.15s;
   }
 
   .tm-my-matches-desktop .tm-my-list-stack .tm-card:hover {
     box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
   }
 
   /* Segment row (joined/created toggle): constrain to ~360px, don't stretch */
@@ -297,13 +295,13 @@
     gap: 16px;
   }
 
+  /* Hover depth on team cards — background/shadow only, no lift (R-K2). */
   .tm-my-teams-desktop .tm-my-team-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: box-shadow 0.15s;
   }
 
   .tm-my-teams-desktop .tm-my-team-card:hover {
     box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
   }
 
   /* Stat grid: already 3-col on mobile — fine on desktop, no override needed. */

@@ -137,9 +137,11 @@ function TeamOpenMatchesSection({
     <>
       <SectionTitle title="이 팀의 열린 매치" sub="이 팀이 지금 모집 중인 경기예요." />
       {loading ? (
-        <Card pad={16}>
-          <div className="tm-text-caption">열린 매치를 불러오고 있어요.</div>
-        </Card>
+        <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-label="열린 매치 불러오는 중">
+          {[0, 1].map((i) => (
+            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
+          ))}
+        </div>
       ) : items.length ? (
         <div style={{ display: 'grid', gap: 8 }}>
           {items.map((match) => (
@@ -728,9 +730,11 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
       <div className="tm-text-label" style={{ marginTop: 20 }}>보낸 초대</div>
       <div className="tm-text-caption" style={{ marginTop: 3, marginBottom: 10 }}>아직 수락되지 않은 초대예요.</div>
       {listLoading ? (
-        <Card pad={16}>
-          <div className="tm-text-caption">초대 목록을 불러오고 있어요.</div>
-        </Card>
+        <div style={{ display: 'grid', gap: 10 }} aria-busy="true" aria-label="초대 목록 불러오는 중">
+          {[0, 1].map((i) => (
+            <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
+          ))}
+        </div>
       ) : items.length === 0 ? (
         <EmptyState title="보낸 초대가 없어요" sub="이메일로 팀원을 초대하면 여기에 표시돼요." />
       ) : (

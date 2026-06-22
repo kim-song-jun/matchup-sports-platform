@@ -144,7 +144,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             <div className="tm-home-sidebar-notices">
               <div className="tm-notice-head">
                 <div className="tm-text-body-lg">공지사항</div>
-                <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>
+                <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', padding: '0 4px' }}>
                   전체보기
                 </Link>
               </div>
@@ -324,7 +324,7 @@ function SidebarTournamentsWidget() {
         <Link
           className="tm-btn tm-btn-sm tm-btn-ghost"
           href="/tournaments"
-          style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}
+          style={{ alignSelf: 'flex-end', padding: '0 4px' }}
         >
           전체보기
         </Link>
@@ -415,7 +415,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
       {matches.map((match) => (
         <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
           <div className="tm-match-card-media" style={{ background: `${cssUrl(match.imageUrl)} center/cover` }} />
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 16 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue500)' }}>{match.sportLabel}</div>
             <div className="tm-text-label line-clamp-2" style={{ color: 'var(--text-strong)', marginTop: 4, minHeight: 36 }}>
               {match.title}

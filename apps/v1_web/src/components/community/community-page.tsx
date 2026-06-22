@@ -7,7 +7,7 @@ import { Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { BellIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon, MatchIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { BellIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
@@ -84,8 +84,20 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
       <div className="tm-chat-desktop-wrap">
         <div className="tm-chat-list">
           <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
-          {model.status === 'loading' ? <ChatEmptyState title="채팅방을 불러오고 있어요" body="잠시만 기다려 주세요." /> : null}
-          {model.status !== 'loading' && !hasRooms ? <ChatEmptyState title={model.emptyTitle ?? '아직 채팅방이 없어요'} body={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.'} href={model.emptyHref} onRetry={model.onRetry} /> : null}
+          {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
+          {model.status === 'error' && !hasRooms ? (
+            <ErrorState
+              message={model.emptyTitle ?? '채팅방을 불러오지 못했어요.'}
+              onRetry={model.onRetry}
+            />
+          ) : model.status !== 'loading' && model.status !== 'error' && !hasRooms ? (
+            <EmptyState
+              title={model.emptyTitle ?? '아직 채팅방이 없어요'}
+              sub={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.'}
+              cta={model.emptyHref ? '추천 매치 보기' : undefined}
+              onCta={model.emptyHref ? () => { window.location.href = model.emptyHref!; } : undefined}
+            />
+          ) : null}
           {hasRooms ? (
             <>
               {/* (1) pinnedRooms가 있을 때만 '고정' 섹션 헤더를 노출한다.
@@ -142,8 +154,18 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
           </Link>
         </div>
         <div className="tm-chat-thread">
-          {model.status === 'loading' ? <ChatEmptyState title="메시지를 불러오고 있어요" body="잠시만 기다려 주세요." /> : null}
-          {model.status !== 'loading' && model.messages.length === 0 ? <ChatEmptyState title={model.emptyTitle ?? '아직 메시지가 없어요'} body={model.emptyBody ?? '첫 메시지를 보내 대화를 시작할 수 있어요.'} onRetry={model.onRetry} /> : null}
+          {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
+          {model.status === 'error' && model.messages.length === 0 ? (
+            <ErrorState
+              message={model.emptyTitle ?? '메시지를 불러오지 못했어요.'}
+              onRetry={model.onRetry}
+            />
+          ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
+            <EmptyState
+              title={model.emptyTitle ?? '아직 메시지가 없어요'}
+              sub={model.emptyBody ?? '첫 메시지를 보내 대화를 시작할 수 있어요.'}
+            />
+          ) : null}
           {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
@@ -249,17 +271,6 @@ function ChatSection({ title, children }: { title: string; children: ReactNode }
   );
 }
 
-function ChatEmptyState({ title, body, href, onRetry }: { title: string; body: string; href?: string; onRetry?: () => void }) {
-  return (
-    <div className="tm-chat-empty">
-      <div className="tm-chat-empty-icon"><ChatIcon size={28} strokeWidth={1.9} /></div>
-      <div className="tm-text-heading">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>{body}</div>
-      {onRetry ? <button className="tm-btn tm-btn-md tm-btn-primary" type="button" onClick={onRetry}>다시 시도</button> : null}
-      {!onRetry && href ? <Link className="tm-btn tm-btn-md tm-btn-primary" href={href}><MatchIcon size={16} strokeWidth={2} />추천 매치 보기</Link> : null}
-    </div>
-  );
-}
 
 function ChatRoomRow({ room }: { room: ChatRoomModel }) {
   const [isOpen, setIsOpen] = useState(false);

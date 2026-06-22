@@ -969,6 +969,13 @@ export function NotificationSettingsPageClient() {
                     <div className="tm-text-body">{setting.label}</div>
                     <div className="tm-text-caption" style={{ marginTop: 3 }}>{setting.sub}</div>
                   </div>
+                  <span
+                    className="tm-text-caption"
+                    style={{ minWidth: 24, textAlign: 'right', color: enabled ? 'var(--blue500)' : 'var(--text-caption)' }}
+                    aria-hidden="true"
+                  >
+                    {enabled ? 'ON' : 'OFF'}
+                  </span>
                   <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
                 </button>
               );

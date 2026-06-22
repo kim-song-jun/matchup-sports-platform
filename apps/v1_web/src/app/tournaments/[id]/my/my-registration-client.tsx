@@ -186,7 +186,6 @@ function RegistrationPass({
         style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderTop: '3px solid var(--orange500)',
           borderRadius: 16,
           overflow: 'hidden',
           marginBottom: 16,
@@ -229,8 +228,6 @@ function RegistrationPass({
 
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);
-  const topAccent =
-    status === 'waitlisted' ? 'var(--orange500)' : status === 'paid' ? 'var(--blue500)' : 'var(--green500)';
   const dateStr = formatMonthDay(scheduledAt);
   /* Roster next-step applies to active registrations; waitlisted shows a status note instead. */
   const showRosterFooter = status === 'confirmed' || status === 'paid';
@@ -242,7 +239,6 @@ function RegistrationPass({
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
-        borderTop: `3px solid ${topAccent}`,
         borderRadius: 16,
         overflow: 'hidden',
         marginBottom: 16,

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, ErrorState } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import {
   useV1TournamentPlayers,
@@ -200,7 +200,7 @@ function AddPlayerForm({
                 <button
                   type="button"
                   className="tm-btn tm-btn-sm tm-btn-neutral"
-                  style={{ marginTop: 6, width: '100%', minHeight: 36 }}
+                  style={{ marginTop: 6, width: '100%', minHeight: 44 }}
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
                 >
@@ -435,7 +435,7 @@ function PlayerRow({
           color: 'var(--text-strong)',
           display: 'grid',
           placeItems: 'center',
-          fontSize: 14,
+          fontSize: 'var(--font-size-body-sm)',
           fontWeight: 700,
         }}
       >
@@ -671,15 +671,13 @@ export function TournamentRosterPageClient({
 
         {/* Player list */}
         {players.length === 0 ? (
-          <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
-            <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-              등록된 선수가 없어요
-            </div>
-            <p className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              {isRosterLocked
-                ? '명단이 잠겨 있어요.'
-                : `최소 ${minPlayers}명 이상 등록해 주세요.`}
-            </p>
+          <Card pad={20}>
+            <EmptyState
+              title="등록된 선수가 없어요"
+              sub={isRosterLocked ? '명단이 잠겨 있어요.' : `최소 ${minPlayers}명 이상 등록해 주세요.`}
+              cta={!isRosterLocked ? '선수 추가하기' : undefined}
+              onCta={!isRosterLocked ? () => { setAddError(null); setAddSuccess(null); setShowAddForm(true); } : undefined}
+            />
           </Card>
         ) : (
           <Card pad={0}>

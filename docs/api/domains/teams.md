@@ -18,10 +18,12 @@
 | POST | `/teams/:id/apply` | Yes | 가입 신청 |
 | POST | `/teams/:id/leave` | Yes | 자진 탈퇴 |
 | POST | `/teams/:id/transfer-ownership` | Yes | 소유권 이전 |
-| POST | `/teams/:id/invitations` | Yes | 초대 발송 (manager+) |
-| GET | `/teams/:id/invitations` | Yes | 초대 목록 (manager+) |
-| PATCH | `/teams/:id/invitations/:invitationId/accept` | Yes | 초대 수락 |
-| PATCH | `/teams/:id/invitations/:invitationId/decline` | Yes | 초대 거절 |
+| POST | `/teams/:id/invitations` | Yes | 초대 발송 (manager+, body `{ invitedEmail, message? }`) |
+| GET | `/teams/:id/invitations` | Yes | 보낸 초대 목록 (manager+, pending) |
+| POST | `/teams/:id/invitations/:invitationId/cancel` | Yes | 초대 취소 (manager+) |
+| GET | `/me/invitations` | Yes | 받은 초대 목록 (pending) |
+| POST | `/team-invitations/:invitationId/accept` | Yes | 초대 수락 (피초대자 본인) |
+| POST | `/team-invitations/:invitationId/decline` | Yes | 초대 거절 (피초대자 본인) |
 
 ## GET /teams
 
@@ -98,9 +100,11 @@ CAUTION:
 
 ## 초대
 
-- invitation 만료 기간: 7일
-- 중복 pending 초대 차단
-- 수락 시 `teamMembership` 생성 + `memberCount` 증가
+- 이메일 기반: `invitedEmail` 로 V1User 조회(미존재 시 `USER_NOT_FOUND`), 이미 active 멤버면 `ALREADY_MEMBER`
+- 중복 pending 초대 차단: `(teamId, invitedUserId)` unique upsert — declined/cancelled 후 재초대 시 pending 으로 reset
+- 상태: `pending | accepted | declined | cancelled` (만료 없음)
+- 수락은 피초대자 본인만(`POST /team-invitations/:id/accept`) — `teamMembership` upsert(active) + `memberCount` 증가(이미 active 멤버면 미증가, approveJoinApplication 미러링)
+- 모든 mutation 멱등: `alreadyInvited` / `alreadyProcessed` / `alreadyCancelled` 플래그
 
 ## Frontend Mapping Notes
 

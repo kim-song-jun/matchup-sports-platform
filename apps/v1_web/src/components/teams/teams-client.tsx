@@ -51,7 +51,6 @@ export function TeamListPageClient() {
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
   const sports = useV1MasterSports();
-  const allTeams = useV1Teams();
   const teamFilters = useMemo(() => {
     const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
@@ -63,13 +62,15 @@ export function TeamListPageClient() {
     if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedSort, selectedSportId, submittedQuery]);
-  const filteredTeams = useV1Teams(
-    teamFilters,
-    { enabled: Boolean(teamFilters) },
-  );
+  const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 50 }), [teamFilters]);
+  const sportCountFilters = useMemo(() => {
+    const { sportId: _sportId, ...filtersWithoutSport } = teamFilters ?? {};
+    return { ...filtersWithoutSport, limit: 50 };
+  }, [teamFilters]);
+  const query = useV1Teams(listFilters);
+  const sportCounts = useV1Teams(sportCountFilters, { enabled: Boolean(selectedSportId) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
-  const query = teamFilters ? filteredTeams : allTeams;
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
@@ -77,7 +78,8 @@ export function TeamListPageClient() {
   const items = query.data?.items;
   const visibleItems = filterTeamsByLevels(items, selectedLevels);
   const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
-  const countItems = allTeams.data?.items ?? items ?? [];
+  const countItems = selectedSportId ? (sportCounts.data?.items ?? visibleItems) : visibleItems;
+  const isListLoading = query.isLoading && !items;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
     value: searchValue,
     placeholder: base.placeholder,
@@ -94,31 +96,23 @@ export function TeamListPageClient() {
       submitSearch(value, { source: 'recent' });
     },
   };
-  const model: TeamListViewModel = items
-    ? {
-        ...base,
-        query: submittedQuery,
-        filterCount: activeFilterCount,
-        search: searchModel,
-        filterHref: buildTeamHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
-        chips: buildTeamSportChips(countItems, base, searchParams, selectedSportId, sports.data),
-        teams: visibleTeams,
-        summary: {
-          ...base.summary,
-          total: visibleTeams.length,
-          recruiting: visibleTeams.filter((item) => item.status === 'open').length,
-        },
-      }
-    : {
-        ...base,
-        query: submittedQuery,
-        filterCount: activeFilterCount,
-        search: searchModel,
-        filterHref: buildTeamHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
-        chips: buildTeamSportChips(countItems, base, searchParams, selectedSportId, sports.data),
-      };
+  const model: TeamListViewModel = {
+    ...base,
+    query: submittedQuery,
+    filterCount: activeFilterCount,
+    search: searchModel,
+    filterHref: buildTeamHref(searchParams, { filter: '1' }),
+    filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
+    chips: buildTeamSportChips(countItems, base, searchParams, selectedSportId, sports.data),
+    teams: visibleTeams,
+    listLoading: isListLoading,
+    summary: {
+      ...base.summary,
+      total: visibleTeams.length,
+      recruiting: visibleTeams.filter((item) => item.status === 'open').length,
+      nearby: undefined,
+    },
+  };
 
   return <TeamListPageView model={model} />;
 

@@ -40,19 +40,40 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
             desktop에는 이미 .tm-team-desktop-header가 제목을 담당하므로 모바일에서만 노출. */}
         <h2 className="tm-text-heading tm-hide-desktop tm-team-mobile-heading">{model.summary.scope}</h2>
         <div className="tm-team-summary-bar">
-          {/* P1: 통계 숫자에 tabular-nums 적용. 전체 줄은 이미 tab-num 클래스 보유 — 인라인 강조만 추가 */}
-          <div className="tm-text-caption tab-num tm-hide-desktop">
-            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.total}</span>팀 · 모집 중 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.recruiting}</span> · 내 주변 {model.summary.nearby}
-          </div>
+          <div className="tm-text-caption tab-num tm-hide-desktop"><TeamSummaryText summary={model.summary} /></div>
           <div className="tm-text-label tm-show-desktop">{model.summary.scope}</div>
-          <div className="tm-text-caption tab-num tm-show-desktop">
-            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.total}</span>팀 · 모집 중 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.recruiting}</span> · 내 주변 {model.summary.nearby}
-          </div>
+          <div className="tm-text-caption tab-num tm-show-desktop"><TeamSummaryText summary={model.summary} /></div>
         </div>
-        {model.teams.length ? <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div> : <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />}
+        {model.listLoading ? (
+          <TeamListSkeleton />
+        ) : model.teams.length ? (
+          <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
+        ) : (
+          <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
+        )}
       </div>
       {model.filterSheet?.open ? <TeamFilterSheet model={model} /> : null}
     </AppChrome>
+  );
+}
+
+function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] }) {
+  return (
+    <>
+      <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.total}</span>
+      팀 · 모집 중 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.recruiting}</span>
+      {typeof summary.nearby === 'number' ? <> · 내 주변 {summary.nearby}</> : null}
+    </>
+  );
+}
+
+function TeamListSkeleton() {
+  return (
+    <div className="tm-team-card-stack" aria-busy="true" aria-label="팀 목록 불러오는 중">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="tm-review-skeleton" style={{ height: 164, borderRadius: 16 }} aria-hidden="true" />
+      ))}
+    </div>
   );
 }
 

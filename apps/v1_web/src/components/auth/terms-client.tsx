@@ -16,6 +16,7 @@ export function TermsClient() {
   const searchParams = useSearchParams();
   const socialTerms = useV1CompleteSocialTerms();
   const mode = searchParams.get('mode');
+  const document = searchParams.get('document');
   const isSocialMode = mode === 'social';
   const [checkedByTitle, setCheckedByTitle] = useState(() =>
     Object.fromEntries(model.agreements.map((agreement) => [agreement.title, false])),
@@ -71,6 +72,21 @@ export function TermsClient() {
     saveSignupTermsAccepted(true);
     router.push('/signup');
   };
+
+  if (document === 'privacy' || document === 'terms') {
+    const item = model.agreements.find((agreement) =>
+      document === 'privacy' ? agreement.title.includes('개인정보') : agreement.title.includes('이용약관'),
+    );
+
+    return (
+      <AuthFrame topTitle={item?.title ?? '약관'} backHref="/login">
+        <div className="tm-auth-body">
+          <h1 className="tm-text-heading tm-auth-heading">{item?.title ?? '약관'}</h1>
+          <p className="tm-text-body tm-auth-sub">{item?.detail ?? '약관 내용을 불러오지 못했어요.'}</p>
+        </div>
+      </AuthFrame>
+    );
+  }
 
   return (
     <AuthFrame

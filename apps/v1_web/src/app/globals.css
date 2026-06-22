@@ -782,7 +782,7 @@ button:disabled {
   min-height: 64px;
   padding: 15px;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  grid-template-columns: 26px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 12px;
 }
@@ -801,7 +801,8 @@ button:disabled {
 .tm-auth-check-button {
   display: grid;
   place-items: center;
-  min-width: 44px; /* WS11 a11y 터치 타깃 */
+  width: 26px;
+  min-width: 26px;
   min-height: 44px;
 }
 

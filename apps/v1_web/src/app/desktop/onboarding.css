@@ -15,9 +15,28 @@
  *  - Confirm panel: two-column summary cards.
  *  - Resume panel: summary cards side-by-side.
  *  - Consistent 44px touch targets and focus rings throughout.
+ *  - Sport option card: flex-column layout + SportGlyph icon (all viewports).
  *
- * Mobile (<768) is NEVER touched here — only @media (min-width:1024px) blocks.
+ * Mobile (<768): only the sport option card base layout rules below are
+ * viewport-agnostic (no media query) because globals.css does not own them
+ * and the icon layout must work on mobile too. Everything else is ≥1024 only.
  */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 0. Sport option card base layout — all viewports.
+ *    globals.css sets tm-auth-option-card { min-height: 88px } with no flex or
+ *    padding. The <button> element needs an explicit column layout so the
+ *    SportGlyph icon stacks above the sport name and selection hint.
+ *    Padding 16px keeps content clear of the card border.
+ *    align-items: flex-start + text-align: left give left-aligned Toss rhythm.
+ * ───────────────────────────────────────────────────────────────────────────── */
+.tm-auth-option-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  text-align: left;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * 1. Widen the auth frame for the onboarding wizard.
@@ -133,9 +152,10 @@
     margin-top: 24px;
   }
 
-  /* 2열로 넓어진 카드는 모바일 기본(88px)보다 더 세로로 채워 정사각 비율에 가깝게. */
+  /* 아이콘(28px) + margin(6px) + body-lg(22px) + caption(16px) + padding(32px) ≈ 104px.
+     2열 넓은 카드에서 정사각 비율에 가깝게 더 여유 있는 높이로 조정. */
   .tm-onboarding-frame .tm-auth-option-card {
-    min-height: 96px;
+    min-height: 110px;
   }
 }
 

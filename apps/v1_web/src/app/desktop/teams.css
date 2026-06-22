@@ -355,16 +355,20 @@
 }
 
 @media (min-width: 1024px) {
+  /* Fix (2): 좌측 폼 컬럼 과확장 방지.
+     minmax(0, 560px)으로 상한을 두어 넓은 뷰포트에서 입력칸이 ~690px 이상 늘어나지 않게 함.
+     320px 우측 rail은 유지. */
   .tm-team-form-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 560px) 320px;
     gap: 28px;
     align-items: start;
   }
 
-  /* Left form column: fill the 1fr track. Reset the GLOBAL .tm-create-shell
-     desktop cap (team-matches.css sets max-width:560 + margin:auto, which would
-     otherwise leak in and re-strand the form) and drop mobile padding/clearance. */
+  /* Left form column: 1fr 트랙 안에서 max-width 없이 track 폭만큼 채움.
+     Reset the GLOBAL .tm-create-shell desktop cap (team-matches.css sets
+     max-width:560 + margin:auto, which would otherwise leak in and re-strand
+     the form) and drop mobile padding/clearance. */
   .tm-team-form-grid .tm-create-shell {
     max-width: none;
     margin-left: 0;
@@ -396,4 +400,15 @@
   .tm-team-form-cta.tm-hide-desktop {
     display: none !important;
   }
+}
+
+/* ─── Fix (4): team-new 모바일 스크롤 하단 여백 ─────────────────────────────────
+ * 고정 CTA(~72px 버튼 + 8px gap + 16px 상하 padding ≈ 96px) +
+ * safe-area-inset-bottom(홈 바가 있는 기기 ~34px) 합산 ≈ 124px 이상.
+ * 매치 위저드(.tm-create-shell padding-bottom) 동일 패턴 적용.
+ * desktop에서는 .tm-team-form-grid .tm-create-shell이 padding:0 0 48px으로 재정의하므로
+ * 이 규칙은 사실상 모바일(<1024)에서만 유효하다.
+ */
+.tm-team-form-main {
+  padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px));
 }

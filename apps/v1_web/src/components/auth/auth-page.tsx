@@ -134,31 +134,39 @@ function AuthActionButton({ action }: { action: AuthAction }) {
 }
 
 function ProviderButton({ provider }: { provider: LoginProvider }) {
-  // 준비 중(disabled)에도 provider 브랜드색을 그대로 노출 — 회색 비활성 대신
-  // 브랜드 배경/텍스트를 인라인으로 적용(tm-auth-provider-disabled 의 grey100 을 덮음).
-  // disabled 의미는 cursor:not-allowed + 하단 "준비 중" 안내 + aria-label 로 전달.
-  const style = { background: provider.background, color: provider.color, border: 0 };
+  // Fill 패턴: 브랜드 배경(background) + 대비 충족 전경 텍스트(foreground).
+  // 이전 outline 리팩터(border/color에 브랜드색 재사용)는 카카오 1.28:1 / 네이버 2.25:1로
+  // WCAG 2.1 AA(4.5:1) FAIL — 격상 전 fill 패턴으로 복원.
+  // disabled(준비 중)은 tm-auth-provider-disabled(grey100 배경, caption 텍스트)로 처리.
+  const activeStyle = { background: provider.background, color: provider.foreground, borderColor: 'transparent' };
 
-  if (provider.href?.startsWith('http') && !provider.disabled) {
+  if (provider.disabled) {
     return (
-      <a className="tm-btn tm-btn-md tm-pressable" href={provider.href} style={style}>
+      <button
+        className="tm-btn tm-btn-md tm-auth-provider-disabled"
+        disabled
+        aria-label={`${provider.label} 로그인 (준비 중)`}
+        type="button"
+      >
+        {provider.label}
+      </button>
+    );
+  }
+
+  if (provider.href?.startsWith('http')) {
+    return (
+      <a className="tm-btn tm-btn-md tm-btn-outline tm-pressable" href={provider.href} style={activeStyle}>
         {provider.label}
       </a>
     );
   }
 
-  return provider.href && !provider.disabled ? (
-    <Link className="tm-btn tm-btn-md tm-pressable" href={provider.href} prefetch={false} style={style}>
+  return provider.href ? (
+    <Link className="tm-btn tm-btn-md tm-btn-outline tm-pressable" href={provider.href} prefetch={false} style={activeStyle}>
       {provider.label}
     </Link>
   ) : (
-    <button
-      className={`tm-btn tm-btn-md ${provider.disabled ? 'tm-auth-provider-disabled' : 'tm-pressable'}`}
-      disabled={provider.disabled}
-      aria-label={provider.disabled ? `${provider.label} 로그인 (준비 중)` : undefined}
-      style={style}
-      type="button"
-    >
+    <button className="tm-btn tm-btn-md tm-btn-outline tm-pressable" style={activeStyle} type="button">
       {provider.label}
     </button>
   );

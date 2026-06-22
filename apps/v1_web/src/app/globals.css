@@ -454,15 +454,17 @@ button:disabled {
   margin-top: 14px;
 }
 
-/* Email login — short form vertically centred in the card so the submit button
-   isn't stranded at the bottom of a tall frame (no big empty gap). */
+/* Email login — 짧은 폼이 화면 중앙에 떠서 아래쪽에 빈 보이드를 만들지 않도록
+   상단 정렬로 전환한다. margin-block:auto는 데스크톱 넓은 화면에서 폼을 뷰포트
+   정중앙에 띄워 위아래 공백이 과하게 생기는 원인이었다. */
 .tm-auth-email-frame .tm-auth-scroll {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
 }
 
 .tm-auth-email-frame .tm-auth-body {
-  margin-block: auto;
+  padding-top: 64px;
 }
 
 .tm-auth-email-submit {
@@ -890,12 +892,6 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.tm-my-toggle-button {
-  width: 100%;
-  padding: 16px;
-  text-align: left;
-}
-
 .tm-auth-progress {
   display: grid;
   gap: 10px;
@@ -1106,8 +1102,13 @@ button:disabled {
   color: var(--static-white);
 }
 
+/* disabled CTA — opacity만으로는 파란 배경이 유지돼 '가짜 활성' 인상을 준다.
+   배경·글자를 명시적 비활성 토큰으로 덮어써서 누르면 안 됨을 형태로 전달한다. */
 .tm-btn:disabled {
-  opacity: 0.78;
+  background: var(--grey100);
+  color: var(--text-caption);
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 /* ── Keyboard focus ring (WCAG 2.1 AA) ── */
@@ -4012,11 +4013,15 @@ button:disabled {
   gap: 14px;
 }
 
+/* WCAG 1.4.1 — off 상태는 배경색(grey200)만으로 형태를 나타내고 있어
+   색만으로 정보를 전달하는 위반이다. 1px 테두리를 추가해 색각 이상
+   사용자도 트랙 경계를 구분할 수 있도록 형태 단서를 제공한다. */
 .tm-toggle {
   width: 46px;
   height: 28px;
   border-radius: 999px;
   background: var(--grey200);
+  border: 1px solid var(--grey300);
   position: relative;
   flex: 0 0 auto;
 }
@@ -4033,8 +4038,10 @@ button:disabled {
   transition: transform .18s ease;
 }
 
+/* on 상태: 파란 배경이 이미 충분한 형태 단서 — off 상태 보조 테두리 제거 */
 .tm-toggle-on {
   background: var(--blue500);
+  border-color: transparent;
 }
 
 .tm-toggle-on::after {

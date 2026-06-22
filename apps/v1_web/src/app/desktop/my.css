@@ -200,14 +200,6 @@
     margin-right: auto;
   }
 
-  /* Notification toggle cards: slightly wider tap zone on desktop. */
-  .tm-my-settings-desktop .tm-my-toggle-button {
-    transition: background-color 0.12s;
-  }
-
-  .tm-my-settings-desktop .tm-my-toggle-button:hover {
-    background: var(--grey50);
-  }
 }
 
 /* ─── /my/reviews & /my/reviews/received: constrained column + page head ────
@@ -430,11 +422,16 @@
  */
 
 @media (min-width: 1024px) {
+  /*
+   * 모바일에서는 position:fixed인 CTA가 폼 말단 blue50 카드를 가리므로
+   * globals.css에서 padding-bottom:120px가 적용된다. 데스크톱에서는 CTA가
+   * position:static 폼 흐름으로 전환되므로 40px로 충분하다.
+   */
   .tm-my-sports-desktop {
     max-width: 640px;
     margin-left: auto;
     margin-right: auto;
-    padding-bottom: 120px;
+    padding-bottom: 40px;
   }
 
   .tm-my-sports-desktop .tm-auth-sport-grid {
@@ -442,10 +439,17 @@
     gap: 10px;
   }
 
+  /* 스포츠 설정 CTA: 프로필 편집과 동일하게 static 인라인으로 전환 */
   .tm-my-sports-cta {
+    position: static;
+    transform: none;
+    width: 100%;
     max-width: 640px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+    z-index: auto;
   }
 }
 
@@ -500,4 +504,32 @@
 }
 .tm-logout-ghost:hover:not(:disabled) {
   color: var(--text-strong);
+}
+
+/* ─── /my/settings/notifications: grouped toggle list ───────────────────────
+ * (2) 알림 설정 6개 개별 카드 → 단일 Card(pad=0) 내 .tm-my-menu-row 행.
+ * tm-noti-toggle-row는 .tm-my-menu-row 위에 얹는 modifier — toggle 우측 정렬.
+ * max-width는 settings 컨테이너(640px)가 이미 잡으므로 별도 불필요.
+ * 모바일에서도 동일하게 적용.
+ */
+.tm-noti-toggle-row {
+  min-height: 64px;
+}
+
+/* 토글 행 hover: settings 목록 패턴 일치 */
+.tm-noti-toggle-row:hover:not(:disabled) {
+  background: var(--grey50);
+}
+
+/* ─── /my/teams: KPI stat-grid 폭 제한 ──────────────────────────────────────
+ * (4) my-teams KPI 3-grid가 데스크톱에서 1120px 풀폭으로 늘어나는 문제.
+ * ≥1024px에서 max-width:360 + 좌측 정렬 — 콘텐츠 크기에 맞게 고정.
+ * teams·members 두 페이지 모두 .tm-my-stat-grid를 공유하므로 공통 적용.
+ */
+@media (min-width: 1024px) {
+  .tm-my-teams-desktop .tm-my-stat-grid,
+  .tm-my-members-desktop .tm-my-stat-grid {
+    max-width: 360px;
+    margin-left: 0;
+  }
 }

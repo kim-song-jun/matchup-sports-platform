@@ -301,16 +301,31 @@
     margin-right: auto;
     padding-left: 0;
     padding-right: 0;
-    padding-bottom: 120px;
+    /* Fix (1): 폼 끝 정적 CTA가 내용을 덮지 않도록 하단 padding 제거.
+       고정 CTA → 정적 배치로 전환했으므로 큰 하단 여백 불필요. */
+    padding-bottom: 32px;
   }
 
-  /* Desktop CTA for the wizard: stay inside the centered 600px column.
-     .tm-create-fixed-cta is only used on match creation/edit pages so
-     this global override is safe within the matches domain. */
-  .tm-create-fixed-cta {
+  /* Fix (1): 데스크톱에서 match wizard CTA를 fixed → static으로 전환.
+     .tm-create-fixed-cta는 globals.css에서 position:fixed / bottom:0 으로 정의됨.
+     데스크톱에서는 폼 아래에 정적으로 붙어 레벨 셀렉트 등 하단 입력칸을 가리지 않도록 함.
+     .tm-match-create-shell 바로 다음 형제 요소에만 스코프하여 team-matches 페이지 누수 방지.
+     bare .tm-create-fixed-cta 셀렉터 제거 — team-matches-page의 fixed CTA가 영향받지 않도록. */
+  .tm-match-create-shell + .tm-create-fixed-cta {
+    position: static;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    width: auto;
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
+    margin-top: 16px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-top: none;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   /* Sport grid: 3-up on desktop so all sports fit in fewer rows. */

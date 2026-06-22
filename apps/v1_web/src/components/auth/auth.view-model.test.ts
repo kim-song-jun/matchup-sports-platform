@@ -31,7 +31,7 @@ describe('auth view models', () => {
     expect(model.providers[0]).toMatchObject({
       label: '카카오',
       background: 'var(--kakao-yellow)',
-      color: 'var(--static-black)',
+      foreground: 'var(--static-black)',
       disabled: false,
     });
     expect(model.providers[0].href).toBe(

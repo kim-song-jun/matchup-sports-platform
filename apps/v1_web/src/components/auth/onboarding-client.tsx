@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import {
   useV1CompleteOnboarding,
@@ -111,6 +112,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const selectedSportIds = new Set(draft.sports.map((sport) => sport.sportId));
   const selectedRegionIds = new Set(draft.regions.map((region) => region.regionId));
   const missingLevels = draft.sports.some((sport) => !sport.levelId);
+  // confirm 게이트: 종목 없이 완료하면 홈 추천·필터가 동작하지 않으므로 CTA 비활성 처리.
+  // 지역은 '나중에 설정하기'로 건너뛸 수 있어 빈 상태가 유효하지만, 종목은 매칭의 핵심이라 필수.
+  const emptySports = draft.sports.length === 0;
   const selectedSports = useMemo(
     () => draft.sports.map((item) => ({ ...item, sport: sports.find((sport) => sport.id === item.sportId) })).filter((item) => item.sport),
     [draft.sports, sports],
@@ -229,8 +233,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
       disabled={
         masterError ||
         pending ||
-        (step === 'sport' && draft.sports.length === 0) ||
-        (step === 'level' && (draft.sports.length === 0 || missingLevels))
+        (step === 'sport' && emptySports) ||
+        (step === 'level' && (emptySports || missingLevels)) ||
+        (step === 'confirm' && emptySports)
       }
       pending={pending}
       saveAndGo={saveAndGo}
@@ -289,6 +294,8 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                 type="button"
                 aria-pressed={selectedSportIds.has(sport.id)}
               >
+                {/* SportGlyph: 선택 시 blue500, 미선택 시 text-muted — tm-signup-sport-icon 토큰 재사용 */}
+                <SportGlyph code={sport.code} size={28} className="tm-signup-sport-icon" />
                 <div className="tm-text-body-lg">{sport.name}</div>
                 <div className="tm-text-caption">{selectedSportIds.has(sport.id) ? '선택됨' : '탭해서 선택'}</div>
               </button>
@@ -339,7 +346,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         </div>
           </>
         ) : null}
-        {step === 'confirm' ? <ConfirmPanel draft={draft} regions={regions} sports={sports} /> : null}
+        {step === 'confirm' ? <ConfirmPanel draft={draft} emptySports={emptySports} regions={regions} sports={sports} /> : null}
       </div>
     </AuthFrame>
   );
@@ -417,7 +424,7 @@ function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboar
   );
 }
 
-function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regions: Array<{ id: string; name: string }>; sports: Array<{ id: string; name: string; levels: Array<{ id: string; name: string }> }> }) {
+function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: OnboardingDraft; emptySports: boolean; regions: Array<{ id: string; name: string }>; sports: Array<{ id: string; name: string; levels: Array<{ id: string; name: string }> }> }) {
   const sportSummary = draft.sports
     .map((item) => {
       const sport = sports.find((candidate) => candidate.id === item.sportId);
@@ -433,9 +440,17 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
 
   return (
     <div className="tm-auth-stack tm-onboarding-confirm-grid">
+      {/* 종목 미설정 경고: 홈 추천·필터가 동작하지 않음을 명시하고 뒤로가기를 안내 */}
+      {emptySports ? (
+        <Notice
+          title="종목을 선택하지 않았어요"
+          body="종목을 선택하지 않으면 홈 추천과 매칭 필터가 동작하지 않아요. 뒤로 돌아가 종목을 선택해 주세요."
+          tone="orange"
+        />
+      ) : null}
       {/* #19: 값(sportSummary, regionSummary)을 tm-text-body(15px/600)로 격상, 레이블은 caption 유지 */}
-      <Card pad={15}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{sportSummary || '선택하지 않음'}</div></Card>
-      <Card pad={15}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '선택하지 않음'}</div></Card>
+      <Card pad={15}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{sportSummary || '미설정'}</div></Card>
+      <Card pad={15}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '미설정'}</div></Card>
       {draft.currentLocation ? (
         <Card pad={15} className="tm-onboarding-confirm-full">
           <div className="tm-text-caption">현재 위치</div>
@@ -444,7 +459,8 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
           </div>
         </Card>
       ) : null}
-      <Notice title="설정 완료" body="홈에 들어간 뒤에도 설정에서 종목, 실력, 지역을 바꿀 수 있어요." tone="green" />
+      {/* 종목이 설정된 경우에만 완료 안내 노출 */}
+      {!emptySports ? <Notice title="설정 완료" body="홈에 들어간 뒤에도 설정에서 종목, 실력, 지역을 바꿀 수 있어요." tone="green" /> : null}
     </div>
   );
 }

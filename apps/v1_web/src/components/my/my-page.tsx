@@ -2,6 +2,7 @@ import Link from 'next/link';
 import {
   Bell,
   ClipboardList,
+  Crown,
   Dumbbell,
   FileText,
   LucideProps,
@@ -262,7 +263,10 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
             <h1 className="tm-text-heading">{model.title}</h1>
           </div>
           {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
-          <LogoutButton />
+          {/* 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 — 마이홈과 동일 패턴 */}
+          <div className="tm-my-logout-row">
+            <LogoutButton variant="ghost" />
+          </div>
         </div>
       </div>
     </AppChrome>
@@ -345,13 +349,19 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
 }
 
 function MyTeamCard({ team }: { team: MyTeam }) {
+  const isOwner = team.role === 'owner';
+  const isManager = team.role === 'manager' || team.role === 'admin';
+  const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
     <Link className="tm-my-team-card tm-pressable" href={`/my/teams/${team.id}`}>
       <div className="tm-team-logo">{team.logo}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">
           <div className="tm-text-body-lg">{team.name}</div>
-          <span className="tm-badge tm-badge-blue">{team.roleLabel}</span>
+          <span className={badgeClass}>
+            {isOwner && <Crown size={11} strokeWidth={2} style={{ marginRight: 3 }} aria-hidden="true" />}
+            {team.roleLabel}
+          </span>
         </div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · {team.members}명</div>
         <div className="tm-text-caption" style={{ marginTop: 8 }}>{team.next}</div>

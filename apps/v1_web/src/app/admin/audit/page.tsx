@@ -68,7 +68,7 @@ const ACTION_LOG_COLUMNS: AdminTableColumn<V1AdminLog>[] = [
     key: 'createdAt',
     header: '시각',
     render: (row) => (
-      <time dateTime={row.createdAt} className="text-[13px] text-gray-600 tabular-nums">
+      <time dateTime={row.createdAt} className="text-[var(--font-size-label)] text-gray-600 tabular-nums">
         {formatDateTime(row.createdAt)}
       </time>
     ),
@@ -77,14 +77,14 @@ const ACTION_LOG_COLUMNS: AdminTableColumn<V1AdminLog>[] = [
     key: 'adminUserId',
     header: '관리자',
     render: (row) => (
-      <span className="text-[13px] text-gray-700 font-mono">{shortId(row.adminUserId)}</span>
+      <span className="text-[var(--font-size-label)] text-gray-700 font-mono">{shortId(row.adminUserId)}</span>
     ),
   },
   {
     key: 'actionType',
     header: '액션',
     render: (row) => (
-      <span className="text-[13px] text-gray-800 font-medium">{adminActionLabel(row.actionType)}</span>
+      <span className="text-[var(--font-size-label)] text-gray-800 font-medium">{adminActionLabel(row.actionType)}</span>
     ),
   },
   {
@@ -93,7 +93,7 @@ const ACTION_LOG_COLUMNS: AdminTableColumn<V1AdminLog>[] = [
     render: (row) => (
       <span className="flex items-center gap-1.5">
         <AdminStatusPill status={row.targetType} label={adminTargetTypeLabel(row.targetType)} />
-        <span className="font-mono text-[12px] text-gray-400">{shortId(row.targetId)}</span>
+        <span className="font-mono text-[var(--font-size-caption)] text-gray-400">{shortId(row.targetId)}</span>
       </span>
     ),
   },
@@ -101,7 +101,7 @@ const ACTION_LOG_COLUMNS: AdminTableColumn<V1AdminLog>[] = [
     key: 'reason',
     header: '사유',
     render: (row) => (
-      <span className="text-[13px] text-gray-500 max-w-[200px] truncate block">
+      <span className="text-[var(--font-size-label)] text-gray-500 max-w-[200px] truncate block">
         {row.reason ?? '—'}
       </span>
     ),
@@ -114,7 +114,7 @@ const STATUS_LOG_COLUMNS: AdminTableColumn<V1AdminStatusChangeLog>[] = [
     key: 'createdAt',
     header: '시각',
     render: (row) => (
-      <time dateTime={row.createdAt} className="text-[13px] text-gray-600 tabular-nums">
+      <time dateTime={row.createdAt} className="text-[var(--font-size-label)] text-gray-600 tabular-nums">
         {formatDateTime(row.createdAt)}
       </time>
     ),
@@ -130,7 +130,7 @@ const STATUS_LOG_COLUMNS: AdminTableColumn<V1AdminStatusChangeLog>[] = [
     render: (row) => (
       <span className="flex items-center gap-1.5 flex-wrap">
         <AdminStatusPill status={row.fromStatus} />
-        <span className="text-gray-400 text-[11px]" aria-hidden="true">→</span>
+        <span className="text-gray-400 text-[var(--font-size-micro)]" aria-hidden="true">→</span>
         <AdminStatusPill status={row.toStatus} />
       </span>
     ),
@@ -139,7 +139,7 @@ const STATUS_LOG_COLUMNS: AdminTableColumn<V1AdminStatusChangeLog>[] = [
     key: 'actor',
     header: '처리자',
     render: (row) => (
-      <span className="text-[13px] text-gray-700 font-mono">
+      <span className="text-[var(--font-size-label)] text-gray-700 font-mono">
         {shortId(row.adminUserId ?? row.actorUserId)}
       </span>
     ),
@@ -148,7 +148,7 @@ const STATUS_LOG_COLUMNS: AdminTableColumn<V1AdminStatusChangeLog>[] = [
     key: 'reason',
     header: '사유',
     render: (row) => (
-      <span className="text-[13px] text-gray-500 max-w-[200px] truncate block">
+      <span className="text-[var(--font-size-label)] text-gray-500 max-w-[200px] truncate block">
         {row.reason ?? '—'}
       </span>
     ),
@@ -178,7 +178,7 @@ function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: bo
         type="button"
         onClick={onClick}
         disabled={loading}
-        className="inline-flex items-center justify-center h-[44px] px-6 bg-white border border-gray-200 rounded-xl text-[14px] text-gray-700 font-medium hover:border-blue-300 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="inline-flex items-center justify-center h-[44px] px-6 bg-white border border-gray-200 rounded-xl text-[var(--font-size-body-sm)] text-gray-700 font-medium hover:border-blue-300 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? '불러오는 중…' : '더 보기'}
       </button>
@@ -347,7 +347,7 @@ export default function AdminAuditPage() {
               type="button"
               onClick={() => handleTabChange(tab.key)}
               className={[
-                'px-4 min-h-[44px] rounded-lg text-[13px] font-medium transition-colors',
+                'px-4 min-h-[44px] rounded-lg text-[var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
                   ? 'bg-white text-gray-900 shadow-sm'
@@ -375,7 +375,7 @@ export default function AdminAuditPage() {
               onClick={() => setTargetType(opt.value)}
               aria-pressed={isActive}
               className={[
-                'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
+                'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
                   ? 'bg-blue-500 text-white'

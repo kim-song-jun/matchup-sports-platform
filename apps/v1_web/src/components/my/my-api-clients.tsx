@@ -892,20 +892,31 @@ export function NotificationSettingsPageClient() {
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
           ) : null}
-          {items.map((setting) => {
-            const enabled = Boolean(notifications?.[setting.key]);
-            return (
-              <button key={setting.key} className="tm-card tm-my-toggle-button tm-pressable" onClick={() => toggle(setting.key)} type="button" disabled={!notifications || update.isPending} role="switch" aria-checked={enabled} aria-label={setting.label}>
-                <div className="tm-my-toggle-row">
-                  <div>
-                    <div className="tm-text-body-lg">{setting.label}</div>
-                    <div className="tm-text-caption" style={{ marginTop: 4 }}>{setting.sub}</div>
+          {/* 6개 개별 카드 → 단일 Card 내 .tm-my-menu-row 행 — 시각 단위 절감, 마이홈 메뉴 패턴 일치 */}
+          <div className="tm-card" style={{ padding: 0 }}>
+            {items.map((setting) => {
+              const enabled = Boolean(notifications?.[setting.key]);
+              return (
+                <button
+                  key={setting.key}
+                  className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                  onClick={() => toggle(setting.key)}
+                  type="button"
+                  disabled={!notifications || update.isPending}
+                  role="switch"
+                  aria-checked={enabled}
+                  aria-label={setting.label}
+                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="tm-text-body">{setting.label}</div>
+                    <div className="tm-text-caption" style={{ marginTop: 3 }}>{setting.sub}</div>
                   </div>
                   <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </AppChrome>

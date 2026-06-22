@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import type {
   TeamDetailViewModel,
@@ -411,7 +411,38 @@ export function TeamFormPageView({
           <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           <div className="tm-create-field">
             <div className="tm-text-label">종목</div>
-            <div className="tm-team-form-chip-row" role="group" aria-label="종목 선택">{(form?.sports.map((sport) => sport.name) ?? ['축구', '풋살', '러닝', '수영']).map((sport) => <button key={sport} className={`tm-chip ${team.sports.includes(sport) ? 'tm-chip-active' : ''}`} type="button" aria-pressed={team.sports.includes(sport)} onClick={() => form?.onSportChange(form.sports.find((item) => item.name === sport)?.id ?? '')}>{sport}</button>)}</div>
+            {/* Fix (3): 하드코딩 fallback 제거.
+                form 미정의(로딩 중) → 스켈레톤 칩 4개(animate-pulse).
+                form 정의 + sports 빈 배열(fetch 실패) → ErrorState.
+                정상 데이터 → 실제 종목 칩. */}
+            {!form ? (
+              <div className="tm-team-form-chip-row" role="status" aria-label="종목 목록 불러오는 중">
+                {[80, 56, 72, 64].map((w) => (
+                  <span
+                    key={w}
+                    className="tm-chip"
+                    aria-hidden="true"
+                    style={{ width: w, background: 'var(--grey100)', color: 'transparent', animationName: 'pulse', animationDuration: '1.5s', animationTimingFunction: 'ease-in-out', animationIterationCount: 'infinite' }}
+                  />
+                ))}
+              </div>
+            ) : form.sports.length === 0 ? (
+              <ErrorState title="종목을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => window.location.reload()} />
+            ) : (
+              <div className="tm-team-form-chip-row" role="group" aria-label="종목 선택">
+                {form.sports.map((sport) => (
+                  <button
+                    key={sport.id}
+                    className={`tm-chip ${team.sports.includes(sport.name) ? 'tm-chip-active' : ''}`}
+                    type="button"
+                    aria-pressed={team.sports.includes(sport.name)}
+                    onClick={() => form.onSportChange(sport.id)}
+                  >
+                    {sport.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
           <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline onChange={(value) => form?.onFieldChange('description', value)} />

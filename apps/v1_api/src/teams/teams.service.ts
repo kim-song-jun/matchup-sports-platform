@@ -23,6 +23,7 @@ import {
   TeamMembersQueryDto,
   UpdateTeamDto,
 } from './dto/mutate-team.dto';
+import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
 import {
   ApproveTeamJoinApplicationDto,
   CreateTeamJoinApplicationDto,
@@ -1032,6 +1033,359 @@ export class TeamsService {
       joinState: 'rejected',
     };
   }
+
+  // ── 팀 초대 (이메일 기반) ────────────────────────────────────────────
+
+  async createInvitation(user: V1AuthUser, teamId: string, dto: CreateTeamInvitationDto) {
+    this.assertActiveAccount(user);
+    await this.assertManagerOrOwner(user, teamId);
+
+    const team = await this.prisma.v1Team.findFirst({
+      where: { id: teamId, deletedAt: null },
+      select: { id: true, name: true, status: true },
+    });
+    if (!team) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
+    }
+    if (team.status !== 'active') {
+      throw stateConflict('Team is not active', 'STATE_CONFLICT');
+    }
+
+    const invitedUser = await this.prisma.v1User.findUnique({
+      where: { email: dto.invitedEmail },
+      select: { id: true },
+    });
+    if (!invitedUser) {
+      throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User with this email was not found' });
+    }
+
+    const existingMembership = await this.prisma.v1TeamMembership.findUnique({
+      where: { teamId_userId: { teamId, userId: invitedUser.id } },
+      select: { status: true },
+    });
+    if (existingMembership?.status === 'active') {
+      throw new ConflictException({ code: 'ALREADY_MEMBER', message: 'User is already an active team member' });
+    }
+
+    const existing = await this.prisma.v1TeamInvitation.findUnique({
+      where: { teamId_invitedUserId: { teamId, invitedUserId: invitedUser.id } },
+      select: { id: true, status: true },
+    });
+
+    if (existing?.status === 'pending') {
+      return {
+        invitationId: existing.id,
+        teamId,
+        invitedUserId: invitedUser.id,
+        status: 'pending' as const,
+        alreadyInvited: true,
+      };
+    }
+
+    const invitation = existing
+      ? await this.prisma.v1TeamInvitation.update({
+          where: { id: existing.id },
+          data: {
+            status: 'pending',
+            invitedByUserId: user.id,
+            message: dto.message ?? null,
+            respondedAt: null,
+          },
+          select: { id: true, status: true },
+        })
+      : await this.prisma.v1TeamInvitation.create({
+          data: {
+            teamId,
+            invitedUserId: invitedUser.id,
+            invitedByUserId: user.id,
+            status: 'pending',
+            message: dto.message ?? null,
+          },
+          select: { id: true, status: true },
+        });
+
+    // 알림: 초대받은 사용자에게 안내 (fire-and-forget)
+    void this.notifications.emitNotification(invitedUser.id, 'team_invitation_received', teamId);
+
+    return {
+      invitationId: invitation.id,
+      teamId,
+      invitedUserId: invitedUser.id,
+      status: invitation.status,
+      alreadyInvited: false,
+    };
+  }
+
+  async listInvitations(user: V1AuthUser, teamId: string) {
+    await this.assertManagerOrOwner(user, teamId);
+
+    const invitations = await this.prisma.v1TeamInvitation.findMany({
+      where: { teamId, status: 'pending' },
+      orderBy: [{ createdAt: 'desc' }],
+      include: {
+        invitedUser: {
+          select: {
+            id: true,
+            profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      teamId,
+      items: invitations.map((inv) => ({
+        invitationId: inv.id,
+        teamId: inv.teamId,
+        invitedUserId: inv.invitedUserId,
+        status: inv.status,
+        message: inv.message,
+        createdAt: inv.createdAt,
+        invitedUser: {
+          userId: inv.invitedUser.id,
+          displayName:
+            inv.invitedUser.profile?.displayName ??
+            inv.invitedUser.profile?.nickname ??
+            '초대된 사용자',
+          profileImageUrl: inv.invitedUser.profile?.profileImageUrl ?? null,
+        },
+      })),
+    };
+  }
+
+  async cancelInvitation(user: V1AuthUser, teamId: string, invitationId: string) {
+    await this.assertManagerOrOwner(user, teamId);
+
+    const invitation = await this.prisma.v1TeamInvitation.findUnique({
+      where: { id: invitationId },
+      select: { id: true, teamId: true, status: true },
+    });
+    if (!invitation) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
+    }
+    if (invitation.teamId !== teamId) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation does not belong to this team' });
+    }
+
+    if (invitation.status === 'cancelled') {
+      return { invitationId: invitation.id, status: 'cancelled' as const, alreadyCancelled: true };
+    }
+    if (invitation.status !== 'pending') {
+      throw stateConflict(
+        `Invitation in status '${invitation.status}' cannot be cancelled`,
+        'STATE_CONFLICT',
+      );
+    }
+
+    const updated = await this.prisma.v1TeamInvitation.update({
+      where: { id: invitationId },
+      data: { status: 'cancelled' },
+      select: { id: true, status: true },
+    });
+
+    return { invitationId: updated.id, status: updated.status, alreadyCancelled: false };
+  }
+
+  async myInvitations(user: V1AuthUser) {
+    const invitations = await this.prisma.v1TeamInvitation.findMany({
+      where: { invitedUserId: user.id, status: 'pending' },
+      orderBy: [{ createdAt: 'desc' }],
+      include: {
+        team: {
+          select: {
+            id: true,
+            name: true,
+            sportId: true,
+            status: true,
+            profile: { select: { logoUrl: true, description: true } },
+          },
+        },
+        invitedByUser: {
+          select: {
+            id: true,
+            profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      items: invitations.map((inv) => ({
+        invitationId: inv.id,
+        teamId: inv.teamId,
+        status: inv.status,
+        message: inv.message,
+        createdAt: inv.createdAt,
+        team: {
+          teamId: inv.team.id,
+          name: inv.team.name,
+          sportId: inv.team.sportId,
+          logoUrl: inv.team.profile?.logoUrl ?? null,
+          introductionPreview: inv.team.profile?.description
+            ? inv.team.profile.description.slice(0, 120)
+            : null,
+        },
+        invitedBy: {
+          userId: inv.invitedByUser.id,
+          displayName:
+            inv.invitedByUser.profile?.displayName ??
+            inv.invitedByUser.profile?.nickname ??
+            '팀 관계자',
+          profileImageUrl: inv.invitedByUser.profile?.profileImageUrl ?? null,
+        },
+      })),
+    };
+  }
+
+  async acceptInvitation(user: V1AuthUser, invitationId: string) {
+    this.assertActiveAccount(user);
+    const invitation = await this.prisma.v1TeamInvitation.findUnique({
+      where: { id: invitationId },
+      select: {
+        id: true,
+        teamId: true,
+        invitedUserId: true,
+        invitedByUserId: true,
+        status: true,
+        team: { select: { id: true, name: true, status: true, memberCount: true } },
+      },
+    });
+    if (!invitation) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
+    }
+    if (invitation.invitedUserId !== user.id) {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only the invited user can accept this invitation' });
+    }
+
+    if (invitation.status === 'accepted') {
+      const existingMembership = await this.prisma.v1TeamMembership.findUnique({
+        where: { teamId_userId: { teamId: invitation.teamId, userId: user.id } },
+        select: { id: true },
+      });
+      return {
+        invitationId: invitation.id,
+        teamId: invitation.teamId,
+        membershipId: existingMembership?.id ?? null,
+        status: 'accepted' as const,
+        alreadyProcessed: true,
+      };
+    }
+    if (invitation.status !== 'pending') {
+      throw stateConflict(
+        `Invitation in status '${invitation.status}' cannot be accepted`,
+        'STATE_CONFLICT',
+      );
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedInvitation = await tx.v1TeamInvitation.update({
+        where: { id: invitation.id },
+        data: { status: 'accepted', respondedAt: new Date() },
+      });
+
+      const existingMembership = await tx.v1TeamMembership.findUnique({
+        where: { teamId_userId: { teamId: invitation.teamId, userId: user.id } },
+      });
+      const wasActive = existingMembership?.status === 'active';
+
+      const membership = await tx.v1TeamMembership.upsert({
+        where: { teamId_userId: { teamId: invitation.teamId, userId: user.id } },
+        update: {
+          role: 'member',
+          status: 'active',
+          joinedAt: existingMembership?.joinedAt ?? new Date(),
+          leftAt: null,
+          removedByUserId: null,
+        },
+        create: {
+          teamId: invitation.teamId,
+          userId: user.id,
+          role: 'member',
+          status: 'active',
+          joinedAt: new Date(),
+        },
+      });
+
+      const team = wasActive
+        ? invitation.team
+        : await tx.v1Team.update({
+            where: { id: invitation.teamId },
+            data: { memberCount: { increment: 1 } },
+          });
+
+      await tx.v1StatusChangeLog.createMany({
+        data: [
+          {
+            targetType: 'team_membership',
+            targetId: membership.id,
+            fromStatus: existingMembership?.status ?? null,
+            toStatus: 'active',
+            actorType: 'user',
+            actorUserId: user.id,
+            reason: 'team_invitation_accepted',
+          },
+        ],
+      });
+      await this.ensureTeamChatParticipant(
+        tx,
+        invitation.teamId,
+        user.id,
+        user.id,
+        'team_invitation_accepted',
+      );
+
+      return { updatedInvitation, membership, team };
+    });
+
+    // 알림: 초대한 사람에게 수락 안내 (fire-and-forget)
+    void this.notifications.emitNotification(
+      invitation.invitedByUserId,
+      'team_invitation_accepted',
+      invitation.teamId,
+    );
+
+    return {
+      invitationId: result.updatedInvitation.id,
+      teamId: invitation.teamId,
+      membershipId: result.membership.id,
+      status: result.updatedInvitation.status,
+      alreadyProcessed: false,
+    };
+  }
+
+  async declineInvitation(user: V1AuthUser, invitationId: string) {
+    this.assertActiveAccount(user);
+    const invitation = await this.prisma.v1TeamInvitation.findUnique({
+      where: { id: invitationId },
+      select: { id: true, teamId: true, invitedUserId: true, status: true },
+    });
+    if (!invitation) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Invitation was not found' });
+    }
+    if (invitation.invitedUserId !== user.id) {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only the invited user can decline this invitation' });
+    }
+
+    if (invitation.status === 'declined') {
+      return { invitationId: invitation.id, status: 'declined' as const, alreadyProcessed: true };
+    }
+    if (invitation.status !== 'pending') {
+      throw stateConflict(
+        `Invitation in status '${invitation.status}' cannot be declined`,
+        'STATE_CONFLICT',
+      );
+    }
+
+    const updated = await this.prisma.v1TeamInvitation.update({
+      where: { id: invitationId },
+      data: { status: 'declined', respondedAt: new Date() },
+      select: { id: true, status: true },
+    });
+
+    return { invitationId: updated.id, status: updated.status, alreadyProcessed: false };
+  }
+
+  // ── 팀 초대 끝 ──────────────────────────────────────────────────────
 
   private async getPublicTeam(teamId: string, user: V1AuthUser | null) {
     const team = await this.prisma.v1Team.findFirst({

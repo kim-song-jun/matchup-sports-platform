@@ -85,6 +85,30 @@ function applicationRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// ─── Invitation fixtures ──────────────────────────────────────────────────────
+
+const invitee = {
+  id: 'invitee-user',
+  email: 'invitee@teameet.v1',
+  accountStatus: 'active' as const,
+  onboardingStatus: 'completed' as const,
+};
+
+function invitationRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'inv-1',
+    teamId: 'team-1',
+    invitedUserId: invitee.id,
+    invitedByUserId: manager.id,
+    status: 'pending' as const,
+    message: null,
+    createdAt: new Date('2026-06-01'),
+    respondedAt: null,
+    team: { id: 'team-1', name: '테스트팀', status: 'active', memberCount: 5 },
+    ...overrides,
+  };
+}
+
 // ─── Test suite ───────────────────────────────────────────────────────────────
 
 describe('TeamsService', () => {
@@ -93,11 +117,13 @@ describe('TeamsService', () => {
     v1Team: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock };
     v1TeamJoinApplication: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1User: { findUnique: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
-    v1ChatRoom: { findUnique: jest.Mock };
-    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock };
+    v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
     $transaction: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
@@ -118,11 +144,19 @@ describe('TeamsService', () => {
         update: jest.fn(),
         create: jest.fn(),
       },
+      v1TeamInvitation: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      v1User: { findUnique: jest.fn() },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
-      v1ChatRoom: { findUnique: jest.fn() },
-      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn() },
+      v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
+      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
       $transaction: jest.fn(),
     };
 
@@ -513,5 +547,483 @@ describe('TeamsService', () => {
       response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 팀 멤버 초대 (createInvitation / acceptInvitation / declineInvitation / cancelInvitation)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // ─── createInvitation ───────────────────────────────────────────────────────
+
+  describe('createInvitation', () => {
+    /** 공통 성공 셋업: manager 권한 + 활성 팀 + 등록된 이메일 + 기존 초대 없음 */
+    function setupCreateInvitationSuccess(callerRole: 'owner' | 'manager' = 'manager') {
+      // assertManagerOrOwner → getManagementActor
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: callerRole });
+      // v1Team.findFirst (팀 조회)
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        id: 'team-1',
+        name: '테스트팀',
+        status: 'active',
+      });
+      // v1User.findUnique (초대할 이메일 → 유저 조회)
+      prisma.v1User.findUnique.mockResolvedValueOnce({ id: invitee.id });
+      // v1TeamMembership.findUnique (기존 멤버 여부)
+      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
+      // v1TeamInvitation.findUnique (기존 초대 여부)
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(null);
+    }
+
+    it('비멤버 이메일 초대 성공 → invitationId 반환 + alreadyInvited=false', async () => {
+      setupCreateInvitationSuccess();
+      prisma.v1TeamInvitation.create.mockResolvedValueOnce({
+        id: 'inv-new',
+        status: 'pending',
+      });
+
+      const result = await service.createInvitation(
+        manager,
+        'team-1',
+        { invitedEmail: invitee.email },
+      );
+
+      expect(result.invitationId).toBe('inv-new');
+      expect(result.status).toBe('pending');
+      expect(result.alreadyInvited).toBe(false);
+      expect(prisma.v1TeamInvitation.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('존재하지 않는 이메일 초대 → 404 USER_NOT_FOUND', async () => {
+      // assertManagerOrOwner → getManagementActor
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        id: 'team-1', name: '팀', status: 'active',
+      });
+      // 이메일에 해당하는 유저 없음
+      prisma.v1User.findUnique.mockResolvedValueOnce(null);
+
+      await expect(
+        service.createInvitation(owner, 'team-1', { invitedEmail: 'nobody@unknown.com' }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'USER_NOT_FOUND' }),
+      });
+      // 초대 레코드는 생성되지 않아야 함
+      expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
+    });
+
+    it('이미 active 멤버 초대 → 409 ALREADY_MEMBER', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        id: 'team-1', name: '팀', status: 'active',
+      });
+      prisma.v1User.findUnique.mockResolvedValueOnce({ id: invitee.id });
+      // 기존 active 멤버십 존재
+      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce({ status: 'active' });
+
+      await expect(
+        service.createInvitation(owner, 'team-1', { invitedEmail: invitee.email }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'ALREADY_MEMBER' }),
+      });
+      expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
+    });
+
+    it('manager 권한으로 초대 가능 (owner 가 아니어도 성공)', async () => {
+      setupCreateInvitationSuccess('manager');
+      prisma.v1TeamInvitation.create.mockResolvedValueOnce({
+        id: 'inv-mgr',
+        status: 'pending',
+      });
+
+      const result = await service.createInvitation(
+        manager,
+        'team-1',
+        { invitedEmail: invitee.email },
+      );
+
+      expect(result.alreadyInvited).toBe(false);
+      expect(result.invitationId).toBe('inv-mgr');
+    });
+
+    it('일반 멤버(member)는 초대할 수 없다 → 403 PERMISSION_DENIED', async () => {
+      // getManagementActor → null (member 는 owner/manager 가 아님)
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.createInvitation(
+          { ...member, accountStatus: 'active', onboardingStatus: 'completed' },
+          'team-1',
+          { invitedEmail: invitee.email },
+        ),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+      });
+      expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
+    });
+
+    it('declined 였던 초대 재초대 시 pending 으로 reset (upsert 경로)', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        id: 'team-1', name: '팀', status: 'active',
+      });
+      prisma.v1User.findUnique.mockResolvedValueOnce({ id: invitee.id });
+      // 기존 멤버 없음
+      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
+      // 기존 초대: declined 상태
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
+        id: 'inv-old',
+        status: 'declined',
+      });
+      // update(reset) 경로
+      prisma.v1TeamInvitation.update.mockResolvedValueOnce({
+        id: 'inv-old',
+        status: 'pending',
+      });
+
+      const result = await service.createInvitation(
+        owner,
+        'team-1',
+        { invitedEmail: invitee.email },
+      );
+
+      // create 가 아니라 update 경로로 reset 됐어야 함
+      expect(prisma.v1TeamInvitation.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'pending' }) }),
+      );
+      expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
+      expect(result.status).toBe('pending');
+      expect(result.alreadyInvited).toBe(false);
+    });
+
+    it('이미 pending 인 초대 재시도 → alreadyInvited=true (트랜잭션·생성 skip)', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        id: 'team-1', name: '팀', status: 'active',
+      });
+      prisma.v1User.findUnique.mockResolvedValueOnce({ id: invitee.id });
+      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
+      // 기존 초대: pending 상태
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
+        id: 'inv-existing',
+        status: 'pending',
+      });
+
+      const result = await service.createInvitation(
+        owner,
+        'team-1',
+        { invitedEmail: invitee.email },
+      );
+
+      expect(result.alreadyInvited).toBe(true);
+      expect(result.invitationId).toBe('inv-existing');
+      // DB 변경 없어야 함
+      expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
+      expect(prisma.v1TeamInvitation.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── acceptInvitation ───────────────────────────────────────────────────────
+
+  describe('acceptInvitation', () => {
+    /** 채팅방 관련 mock — ensureTeamChatParticipant early-path (채팅방 없음) */
+    function mockChatEarlyReturn() {
+      // v1ChatRoom.findUnique → null → create 경로
+      prisma.v1ChatRoom.findUnique.mockResolvedValue(null);
+      prisma.v1ChatRoom.create.mockResolvedValue({ id: 'room-1' });
+      // participant 없음 → create 경로
+      prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue(null);
+      prisma.v1ChatRoomParticipant.create.mockResolvedValue({ id: 'part-1' });
+    }
+
+    it('초대받은 본인이 수락 → membership active + memberCount increment', async () => {
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+
+      // 트랜잭션 내부
+      // v1TeamInvitation.update (accepted)
+      prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'accepted' });
+      // v1TeamMembership.findUnique (wasActive 체크) → 기존 멤버십 없음
+      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
+      // upsert → 새 멤버십 생성
+      prisma.v1TeamMembership.upsert.mockResolvedValueOnce({
+        id: 'mem-new',
+        teamId: 'team-1',
+        userId: invitee.id,
+        role: 'member',
+        status: 'active',
+        joinedAt: new Date(),
+      });
+      // memberCount increment
+      prisma.v1Team.update.mockResolvedValueOnce({ id: 'team-1', memberCount: 6 });
+      prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 1 });
+      mockChatEarlyReturn();
+
+      const result = await service.acceptInvitation(invitee, 'inv-1');
+
+      expect(result.status).toBe('accepted');
+      expect(result.alreadyProcessed).toBe(false);
+      expect(result.membershipId).toBe('mem-new');
+      // memberCount increment 가 호출됐어야 함
+      expect(prisma.v1Team.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ memberCount: { increment: 1 } }),
+        }),
+      );
+    });
+
+    it('본인 아닌 유저가 수락 시도 → 403 PERMISSION_DENIED', async () => {
+      // 초대: invitedUserId = invitee, 하지만 호출자 = member (다른 유저)
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+
+      await expect(
+        service.acceptInvitation(member, 'inv-1'), // member.id ≠ invitee.id
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('이미 accepted → alreadyProcessed=true (트랜잭션 skip)', async () => {
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'accepted' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+      // idempotency: 기존 멤버십 조회
+      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce({ id: 'mem-existing' });
+
+      const result = await service.acceptInvitation(invitee, 'inv-1');
+
+      expect(result.alreadyProcessed).toBe(true);
+      expect(result.status).toBe('accepted');
+      expect(result.membershipId).toBe('mem-existing');
+      // 트랜잭션이 실행되지 않아야 함
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('이미 active 멤버였으면 memberCount increment 안 함 (wasActive 분기)', async () => {
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+
+      prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'accepted' });
+      // wasActive = true: 기존 active 멤버십 존재
+      prisma.v1TeamMembership.findUnique.mockResolvedValueOnce({
+        id: 'mem-already',
+        status: 'active',
+        joinedAt: new Date('2026-01-01'),
+      });
+      prisma.v1TeamMembership.upsert.mockResolvedValueOnce({
+        id: 'mem-already',
+        teamId: 'team-1',
+        userId: invitee.id,
+        role: 'member',
+        status: 'active',
+        joinedAt: new Date('2026-01-01'),
+      });
+      prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 1 });
+      mockChatEarlyReturn();
+
+      const result = await service.acceptInvitation(invitee, 'inv-1');
+
+      expect(result.alreadyProcessed).toBe(false);
+      // wasActive=true → v1Team.update(memberCount increment) 가 호출되지 않아야 함
+      expect(prisma.v1Team.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── declineInvitation ──────────────────────────────────────────────────────
+
+  describe('declineInvitation', () => {
+    it('본인이 거절 → status=declined + alreadyProcessed=false', async () => {
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+      prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'declined' });
+
+      const result = await service.declineInvitation(invitee, 'inv-1');
+
+      expect(result.status).toBe('declined');
+      expect(result.alreadyProcessed).toBe(false);
+      expect(prisma.v1TeamInvitation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'declined' }),
+        }),
+      );
+    });
+
+    it('본인 아닌 유저가 거절 시도 → 403 PERMISSION_DENIED', async () => {
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+
+      await expect(
+        service.declineInvitation(member, 'inv-1'), // member.id ≠ invitee.id
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+      });
+      expect(prisma.v1TeamInvitation.update).not.toHaveBeenCalled();
+    });
+
+    it('이미 declined → alreadyProcessed=true (update skip)', async () => {
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'declined' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+
+      const result = await service.declineInvitation(invitee, 'inv-1');
+
+      expect(result.alreadyProcessed).toBe(true);
+      expect(result.status).toBe('declined');
+      expect(prisma.v1TeamInvitation.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── cancelInvitation ───────────────────────────────────────────────────────
+
+  describe('cancelInvitation', () => {
+    it('manager/owner 가 pending 초대 취소 → status=cancelled + alreadyCancelled=false', async () => {
+      // assertManagerOrOwner
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'manager' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
+        id: 'inv-1',
+        teamId: 'team-1',
+        status: 'pending',
+      });
+      prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'cancelled' });
+
+      const result = await service.cancelInvitation(manager, 'team-1', 'inv-1');
+
+      expect(result.status).toBe('cancelled');
+      expect(result.alreadyCancelled).toBe(false);
+      expect(prisma.v1TeamInvitation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { status: 'cancelled' },
+        }),
+      );
+    });
+
+    it('이미 cancelled 인 초대 취소 → alreadyCancelled=true (update skip)', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
+        id: 'inv-1',
+        teamId: 'team-1',
+        status: 'cancelled',
+      });
+
+      const result = await service.cancelInvitation(owner, 'team-1', 'inv-1');
+
+      expect(result.alreadyCancelled).toBe(true);
+      expect(result.status).toBe('cancelled');
+      expect(prisma.v1TeamInvitation.update).not.toHaveBeenCalled();
+    });
+
+    it('일반 멤버는 초대 취소 불가 → 403 PERMISSION_DENIED', async () => {
+      // getManagementActor → null (member 권한 없음)
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        service.cancelInvitation(member, 'team-1', 'inv-1'),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+      });
+      expect(prisma.v1TeamInvitation.update).not.toHaveBeenCalled();
+    });
+
+    it('accepted 된 초대는 취소 불가 → 409 STATE_CONFLICT', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce({
+        id: 'inv-1',
+        teamId: 'team-1',
+        status: 'accepted',
+      });
+
+      await expect(
+        service.cancelInvitation(owner, 'team-1', 'inv-1'),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'STATE_CONFLICT' }),
+      });
+      expect(prisma.v1TeamInvitation.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listInvitations', () => {
+    it('manager/owner 가 pending 초대 목록 조회 → invitedUser displayName fallback 포함', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'manager' }); // assertManagerOrOwner
+      prisma.v1TeamInvitation.findMany.mockResolvedValueOnce([
+        {
+          id: 'inv-1',
+          teamId: 'team-1',
+          invitedUserId: invitee.id,
+          status: 'pending',
+          message: '같이 해요',
+          createdAt: new Date('2026-06-01'),
+          invitedUser: { id: invitee.id, profile: { nickname: 'nick', displayName: null, profileImageUrl: null } },
+        },
+      ]);
+
+      const result = await service.listInvitations(manager, 'team-1');
+
+      expect(result.teamId).toBe('team-1');
+      expect(result.items).toHaveLength(1);
+      // displayName null → nickname fallback
+      expect(result.items[0]).toMatchObject({
+        invitationId: 'inv-1',
+        invitedUserId: invitee.id,
+        status: 'pending',
+        invitedUser: { userId: invitee.id, displayName: 'nick' },
+      });
+    });
+
+    it('일반 멤버는 초대 목록 조회 불가 → 403 PERMISSION_DENIED', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce(null); // getManagementActor → null
+      await expect(
+        service.listInvitations(member, 'team-1'),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+      });
+      expect(prisma.v1TeamInvitation.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('myInvitations', () => {
+    it('받은 pending 초대 목록 → team/invitedBy 투영 + introductionPreview 120자 컷', async () => {
+      const longIntro = 'a'.repeat(200);
+      prisma.v1TeamInvitation.findMany.mockResolvedValueOnce([
+        {
+          id: 'inv-1',
+          teamId: 'team-1',
+          status: 'pending',
+          message: null,
+          createdAt: new Date('2026-06-01'),
+          team: { id: 'team-1', name: '테스트팀', sportId: 'sport-1', status: 'active', profile: { logoUrl: null, description: longIntro } },
+          invitedByUser: { id: manager.id, profile: { nickname: '매니저', displayName: null, profileImageUrl: null } },
+        },
+      ]);
+
+      const result = await service.myInvitations(invitee);
+
+      // 본인이 받은 pending 초대만 조회
+      expect(prisma.v1TeamInvitation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { invitedUserId: invitee.id, status: 'pending' } }),
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].team).toMatchObject({ teamId: 'team-1', name: '테스트팀', sportId: 'sport-1' });
+      expect(result.items[0].team.introductionPreview).toHaveLength(120); // 200자 → 120 컷
+      expect(result.items[0].invitedBy.displayName).toBe('매니저'); // displayName null → nickname fallback
+    });
+  });
+
+  describe('invitation account guard', () => {
+    it('acceptInvitation: 비활성(suspended) 계정은 초대 수락 불가 → 403 (조회 전 차단)', async () => {
+      await expect(
+        service.acceptInvitation(suspended, 'inv-1'),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+      });
+      expect(prisma.v1TeamInvitation.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('declineInvitation: 비활성(suspended) 계정은 초대 거절 불가 → 403 (조회 전 차단)', async () => {
+      await expect(
+        service.declineInvitation(suspended, 'inv-1'),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+      });
+      expect(prisma.v1TeamInvitation.findUnique).not.toHaveBeenCalled();
+    });
   });
 });

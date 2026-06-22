@@ -132,6 +132,13 @@ enum V1TeamJoinApplicationStatus {
   expired
 }
 
+enum V1TeamInvitationStatus {
+  pending
+  accepted
+  declined
+  cancelled
+}
+
 enum V1TeamMatchStatus {
   recruiting
   matched
@@ -247,6 +254,8 @@ model V1User {
   removedTeamMemberships         V1TeamMembership[]         @relation("V1TeamMembershipRemover")
   teamJoinApplications           V1TeamJoinApplication[]    @relation("V1TeamJoinApplicant")
   reviewedTeamJoins              V1TeamJoinApplication[]    @relation("V1TeamJoinReviewer")
+  teamInvitesReceived            V1TeamInvitation[]         @relation("V1TeamInvitee")
+  teamInvitesSent                V1TeamInvitation[]         @relation("V1TeamInviter")
   createdTeamMatches             V1TeamMatch[]              @relation("V1TeamMatchCreator")
   teamMatchApplications          V1TeamMatchApplication[]   @relation("V1TeamMatchApplicantUser")
   reviewedTeamMatches            V1TeamMatchApplication[]   @relation("V1TeamMatchReviewer")
@@ -640,6 +649,7 @@ model V1Team {
   profile                      V1TeamProfile?
   memberships                  V1TeamMembership[]
   joinApplications             V1TeamJoinApplication[]
+  invitations                  V1TeamInvitation[]
   trustScore                   V1TeamTrustScore?
   hostedTeamMatches            V1TeamMatch[]              @relation("V1HostTeamMatches")
   approvedTeamMatches          V1TeamMatch[]              @relation("V1ApprovedApplicantTeam")
@@ -723,6 +733,27 @@ model V1TeamJoinApplication {
   @@index([status])
   @@index([createdAt])
   @@map("v1_team_join_applications")
+}
+
+model V1TeamInvitation {
+  id              String                 @id @default(uuid())
+  teamId          String                 @map("team_id")
+  invitedUserId   String                 @map("invited_user_id")
+  invitedByUserId String                 @map("invited_by_user_id")
+  status          V1TeamInvitationStatus @default(pending)
+  message         String?
+  respondedAt     DateTime?              @map("responded_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  team          V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedUser   V1User @relation("V1TeamInvitee", fields: [invitedUserId], references: [id], onDelete: Cascade)
+  invitedByUser V1User @relation("V1TeamInviter", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, invitedUserId])
+  @@index([invitedUserId, status])
+  @@index([teamId, status])
+  @@map("v1_team_invitations")
 }
 
 model V1TeamTrustScore {

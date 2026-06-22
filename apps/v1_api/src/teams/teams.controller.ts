@@ -3,6 +3,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
 import {
   ChangeTeamMembershipRoleDto,
   MutateTeamDto,
@@ -142,5 +143,60 @@ export class TeamsController {
     @Body() dto: RejectTeamJoinApplicationDto,
   ) {
     return this.teamsService.rejectJoinApplication(user, applicationId, dto);
+  }
+
+  // ── 팀 초대 (이메일 기반) ────────────────────────────────────────────
+
+  @Post('teams/:teamId/invitations')
+  @UseGuards(V1AuthGuard)
+  createInvitation(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: CreateTeamInvitationDto,
+  ) {
+    return this.teamsService.createInvitation(user, teamId, dto);
+  }
+
+  @Get('teams/:teamId/invitations')
+  @UseGuards(V1AuthGuard)
+  listInvitations(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+  ) {
+    return this.teamsService.listInvitations(user, teamId);
+  }
+
+  @Post('teams/:teamId/invitations/:invitationId/cancel')
+  @UseGuards(V1AuthGuard)
+  cancelInvitation(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.teamsService.cancelInvitation(user, teamId, invitationId);
+  }
+
+  @Get('me/invitations')
+  @UseGuards(V1AuthGuard)
+  myInvitations(@CurrentUser() user: V1AuthUser) {
+    return this.teamsService.myInvitations(user);
+  }
+
+  @Post('team-invitations/:invitationId/accept')
+  @UseGuards(V1AuthGuard)
+  acceptInvitation(
+    @CurrentUser() user: V1AuthUser,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.teamsService.acceptInvitation(user, invitationId);
+  }
+
+  @Post('team-invitations/:invitationId/decline')
+  @UseGuards(V1AuthGuard)
+  declineInvitation(
+    @CurrentUser() user: V1AuthUser,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.teamsService.declineInvitation(user, invitationId);
   }
 }

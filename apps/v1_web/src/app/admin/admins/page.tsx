@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, ShieldMinus, Shield, X, Search, RotateCcw } from 'lucide-react';
+import { ShieldCheck, ShieldMinus, Shield, X, Search, RotateCcw, Calendar, Clock, Activity } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminAdmins,
@@ -13,16 +13,13 @@ import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
-  AdminDataTable,
-  AdminStatusPill,
+  AdminCardList,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
-  STATUS_META,
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 import type { V1AdminRow, V1AdminUserRow, CursorPage } from '@/types/api';
 
 // ── Date formatter ─────────────────────────────────────────────────────────
@@ -580,55 +577,6 @@ export default function AdminAdminsPage() {
     });
   }
 
-  // ── Table columns ─────────────────────────────────────────────────────────
-  const columns: AdminTableColumn<V1AdminRow>[] = [
-    {
-      key: 'member',
-      header: '운영자',
-      render: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-semibold text-gray-900 text-[var(--font-size-body-sm)]">
-            {row.nickname ?? row.displayName ?? '(이름 없음)'}
-          </span>
-          {row.email && <span className="text-[var(--font-size-caption)] text-gray-400">{row.email}</span>}
-        </div>
-      ),
-    },
-    {
-      key: 'adminRole',
-      header: '역할',
-      render: (row) => <AdminRoleBadge role={row.adminRole} />,
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (row) => {
-        const statusKey = row.status === 'revoked' ? 'cancelled' : row.status;
-        const label =
-          row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지';
-        return <AdminStatusPill status={statusKey} label={label} />;
-      },
-    },
-    {
-      key: 'grantedAt',
-      header: '부여일',
-      render: (row) => (
-        <span className="text-[var(--font-size-label)] text-gray-500 tabular-nums whitespace-nowrap">
-          {formatDateCompact(row.grantedAt)}
-        </span>
-      ),
-    },
-    {
-      key: 'revokedAt',
-      header: '회수일',
-      render: (row) => (
-        <span className="text-[var(--font-size-label)] text-gray-500 tabular-nums whitespace-nowrap">
-          {row.revokedAt ? formatDateCompact(row.revokedAt) : '—'}
-        </span>
-      ),
-    },
-  ];
-
   // Role change status options (only ops / support are assignable, not owner)
   const roleChangeOptions = [
     { value: 'ops', label: '운영' },
@@ -689,23 +637,45 @@ export default function AdminAdminsPage() {
       />
 
       <div className="flex flex-col gap-4">
-        {/* Data table */}
-        <AdminDataTable<V1AdminRow>
-          columns={columns}
+        {/* Card list */}
+        <AdminCardList<V1AdminRow>
           rows={rows}
           keyExtractor={(row) => row.adminUserId}
-          actionsHeader="작업"
+          card={(row) => ({
+            title: row.nickname ?? row.displayName ?? '(이름 없음)',
+            subtitle: row.email ?? undefined,
+            statusNode: <AdminRoleBadge role={row.adminRole} />,
+            meta: [
+              {
+                icon: <Activity size={14} aria-hidden="true" />,
+                label: row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지',
+              },
+              {
+                icon: <Calendar size={14} aria-hidden="true" />,
+                label: `부여 ${formatDateCompact(row.grantedAt)}`,
+              },
+              {
+                icon: <Clock size={14} aria-hidden="true" />,
+                label: row.revokedAt ? `회수 ${formatDateCompact(row.revokedAt)}` : '회수일 없음',
+              },
+            ],
+            tone:
+              row.status === 'revoked'
+                ? 'danger'
+                : row.status === 'suspended'
+                  ? 'warning'
+                  : undefined,
+          })}
           renderActions={(row) => {
-            // Hide actions for owner rows (including self) — owner role cannot be changed via UI
+            // Hide actions for owner rows — owner role cannot be changed via UI
             if (row.adminRole === 'owner') return null;
             // Hide actions for own row (self-modification guard)
             if (row.adminUserId === myAdminUserId) return null;
 
             return (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 w-full">
                 {row.status === 'active' && (
                   <>
-                    {/* Role change: only for ops/support (not owner) */}
                     <button
                       type="button"
                       onClick={() => setActionModal({ row, action: 'changeRole' })}
@@ -718,7 +688,6 @@ export default function AdminAdminsPage() {
                     >
                       역할 변경
                     </button>
-                    {/* Revoke */}
                     <button
                       type="button"
                       onClick={() => setActionModal({ row, action: 'revoke' })}
@@ -760,7 +729,7 @@ export default function AdminAdminsPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonRows={5}
+          skeletonCards={5}
         />
 
         {/* Load more */}

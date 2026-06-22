@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, Calendar, Clock, Users, Coins } from 'lucide-react';
 import {
   useV1AdminTournaments,
   useV1AdminMe,
@@ -11,14 +11,13 @@ import type { V1Tournament, V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
-  AdminDataTable,
-  AdminStatusPill,
+  AdminCardList,
+  AdminFilterBar,
   AdminEmpty,
   AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -110,62 +109,12 @@ export default function AdminTournamentsPage() {
     if (nextCursor) setCursor(nextCursor);
   };
 
-  // ── Table columns ────────────────────────────────────────────────────
-  const columns: AdminTableColumn<V1Tournament>[] = [
-    {
-      key: 'title',
-      header: '대회명',
-      render: (row) => (
-        <Link
-          href={`/admin/tournaments/${row.id}`}
-          className="font-medium text-gray-900 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-        >
-          {row.title}
-        </Link>
-      ),
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (row) => (
-        <AdminStatusPill status={row.status} />
-      ),
-    },
-    {
-      key: 'scheduledAt',
-      header: '대회 일정',
-      render: (row) => (
-        <span className="text-gray-600 tabular-nums">{formatDate(row.scheduledAt)}</span>
-      ),
-    },
-    {
-      key: 'registrationDeadlineAt',
-      header: '신청 마감',
-      render: (row) => (
-        <span className="text-gray-600 tabular-nums">
-          {formatDate(row.registrationDeadlineAt)}
-        </span>
-      ),
-    },
-    {
-      key: 'entryFee',
-      header: '참가비',
-      align: 'right',
-      render: (row) => (
-        <span className="text-gray-600 tabular-nums">{formatCurrency(row.entryFee)}</span>
-      ),
-    },
-    {
-      key: 'registrationCount',
-      header: '신청 수',
-      align: 'right',
-      render: (row) => (
-        <span className="text-gray-600 tabular-nums">{row.registrationCount}팀</span>
-      ),
-    },
-  ];
-
   const isInitialLoad = isPending && accumulatedRows.length === 0;
+
+  const errorMessage =
+    isError && accumulatedRows.length === 0
+      ? extractErrorMessage(error, '대회 목록을 불러오지 못했어요.')
+      : undefined;
 
   return (
     <>
@@ -187,85 +136,107 @@ export default function AdminTournamentsPage() {
         }
       />
 
-      {/* Status chip filter — no search box (backend has no q for tournaments) */}
-      <div className="mb-4">
-        <div role="group" aria-label="상태 필터" className="flex items-center gap-1.5 flex-wrap">
-          {STATUS_OPTIONS.map((opt) => {
-            const active = activeStatus === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleStatusChange(opt.value)}
-                aria-pressed={active}
+      <div className="flex flex-col gap-4">
+        {/* Filter bar — no text search (backend has no q for tournaments) */}
+        <AdminFilterBar
+          hideSearch
+          searchValue=""
+          onSearchChange={() => undefined}
+          statusOptions={STATUS_OPTIONS}
+          activeStatus={activeStatus}
+          onStatusChange={handleStatusChange}
+        />
+
+        {/* Card list */}
+        {isInitialLoad ? (
+          <AdminTableSkeleton rows={8} />
+        ) : (
+          <AdminCardList<V1Tournament>
+            rows={accumulatedRows}
+            keyExtractor={(r) => r.id}
+            card={(row) => ({
+              title: row.title,
+              subtitle: row.venue ?? undefined,
+              status: row.status,
+              meta: [
+                {
+                  icon: <Calendar size={14} aria-hidden="true" />,
+                  label: formatDate(row.scheduledAt),
+                },
+                {
+                  icon: <Clock size={14} aria-hidden="true" />,
+                  label: `마감 ${formatDate(row.registrationDeadlineAt)}`,
+                },
+                {
+                  icon: <Users size={14} aria-hidden="true" />,
+                  label: `${row.registrationCount}팀`,
+                },
+                {
+                  icon: <Coins size={14} aria-hidden="true" />,
+                  label: formatCurrency(row.entryFee),
+                },
+              ],
+              tone:
+                row.status === 'cancelled'
+                  ? 'danger'
+                  : row.status === 'closed'
+                    ? 'warning'
+                    : undefined,
+            })}
+            renderActions={(row) => (
+              <Link
+                href={`/admin/tournaments/${row.id}`}
+                aria-label={`${row.title} 상세 보기`}
                 className={[
-                  'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
+                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg',
+                  'text-[var(--font-size-label)] font-medium text-gray-600 bg-gray-100',
+                  'hover:bg-gray-200 transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                  active
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
                 ].join(' ')}
               >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                상세 보기
+              </Link>
+            )}
+            loading={isInitialLoad}
+            empty={
+              <AdminEmpty
+                title="검색 결과가 없어요"
+                description="필터를 변경해 보세요."
+              />
+            }
+            error={errorMessage}
+            onRetry={() => void refetch()}
+            skeletonCards={8}
+          />
+        )}
 
-      {/* Data table */}
-      {isInitialLoad ? (
-        <AdminTableSkeleton cols={6} />
-      ) : isError && accumulatedRows.length === 0 ? (
-        <AdminDataTable<V1Tournament>
-          columns={columns}
-          rows={[]}
-          keyExtractor={(r) => r.id}
-          error={extractErrorMessage(error, '대회 목록을 불러오지 못했어요.')}
-          onRetry={() => void refetch()}
-        />
-      ) : (
-        <AdminDataTable<V1Tournament>
-          columns={columns}
-          rows={accumulatedRows}
-          keyExtractor={(r) => r.id}
-          actionsHeader="상세"
-          renderActions={(row) => (
-            <Link
-              href={`/admin/tournaments/${row.id}`}
-              aria-label={`${row.title} 상세 보기`}
-              className="inline-flex items-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+        {/* Load more */}
+        {hasMore && !isInitialLoad && (
+          <div className="flex flex-col items-center gap-1.5">
+            {loadMoreFailed && (
+              <p className="text-[var(--font-size-label)] text-red-500" role="alert">
+                {extractErrorMessage(error, '다음 목록을 불러오지 못했어요.')}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
+              disabled={isFetching}
+              className={[
+                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
+                'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
+                'disabled:opacity-50',
+                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+              ].join(' ')}
             >
-              상세 보기
-            </Link>
-          )}
-          empty={
-            <AdminEmpty
-              title="검색 결과가 없어요"
-              description="필터를 변경해 보세요."
-            />
-          }
-        />
-      )}
+              {isFetching ? '불러오는 중…' : loadMoreFailed ? '다시 시도' : '더 보기'}
+            </button>
+          </div>
+        )}
 
-      {/* Load more */}
-      {hasMore && !isInitialLoad && (
-        <div className="mt-4 flex flex-col items-center gap-1.5">
-          {loadMoreFailed && (
-            <p className="text-[13px] text-red-500" role="alert">
-              {extractErrorMessage(error, '다음 목록을 불러오지 못했어요.')}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
-            disabled={isFetching}
-            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[14px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            {isFetching ? '불러오는 중…' : loadMoreFailed ? '다시 시도' : '더 보기'}
-          </button>
-        </div>
-      )}
+        {/* Loading more skeleton */}
+        {isFetching && !isInitialLoad && <AdminTableSkeleton rows={4} />}
+      </div>
 
       <AdminToasts toasts={toasts} />
     </>

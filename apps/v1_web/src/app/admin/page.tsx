@@ -121,11 +121,11 @@ export default function AdminOverviewPage() {
       {/* ── Warning section ───────────────────────────────────────────── */}
       {!isPending && !isError && (
         <section aria-label="주의 필요 항목" className="mb-6">
-          <h2 className="text-[14px] font-semibold text-gray-700 mb-3">주의 필요</h2>
+          <h2 className="text-[var(--font-size-body-sm)] font-semibold text-gray-700 mb-3">주의 필요</h2>
           {totalWarnings === 0 ? (
             <div className="flex items-center gap-2.5 p-4 bg-green-50 border border-green-100 rounded-xl">
               <CheckCircle2 size={18} className="text-green-500 shrink-0" aria-hidden="true" />
-              <p className="text-[14px] text-green-700">지금은 조치가 필요한 항목이 없어요.</p>
+              <p className="text-[var(--font-size-body-sm)] text-green-700">지금은 조치가 필요한 항목이 없어요.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -165,10 +165,10 @@ export default function AdminOverviewPage() {
       {!isPending && !isError && (
         <section aria-label="최근 운영 활동" className="bg-white rounded-2xl border border-gray-100">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
-            <h2 className="text-[15px] font-bold text-gray-900">최근 운영 활동</h2>
+            <h2 className="text-[var(--font-size-body)] font-bold text-gray-900">최근 운영 활동</h2>
             <Link
               href="/admin/audit"
-              className="flex items-center gap-0.5 text-[13px] text-blue-500 font-medium hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
+              className="flex items-center gap-0.5 text-[var(--font-size-label)] text-blue-500 font-medium hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
             >
               전체 보기
               <ArrowRight size={13} aria-hidden="true" />
@@ -177,7 +177,7 @@ export default function AdminOverviewPage() {
 
           {!overview?.recentActions?.length ? (
             <div className="py-10 text-center">
-              <p className="text-[14px] text-gray-400">최근 운영 활동이 없어요.</p>
+              <p className="text-[var(--font-size-body-sm)] text-gray-400">최근 운영 활동이 없어요.</p>
             </div>
           ) : (
             <ul role="list">
@@ -190,14 +190,14 @@ export default function AdminOverviewPage() {
                   <AdminStatusPill status={action.targetType} label={adminTargetTypeLabel(action.targetType)} />
 
                   {/* Action description */}
-                  <span className="flex-1 text-[13px] text-gray-700 truncate">
+                  <span className="flex-1 text-[var(--font-size-label)] text-gray-700 truncate">
                     {adminActionLabel(action.actionType)}
                   </span>
 
                   {/* Relative time */}
                   <time
                     dateTime={action.createdAt}
-                    className="text-[12px] text-gray-400 shrink-0 tabular-nums"
+                    className="text-[var(--font-size-caption)] text-gray-400 shrink-0 tabular-nums"
                   >
                     {formatRelativeTime(action.createdAt)}
                   </time>

@@ -8,11 +8,11 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamRow } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { User, Users, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
-  AdminDataTable,
+  AdminCardList,
   AdminFilterBar,
-  AdminStatusPill,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -20,7 +20,6 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -74,15 +73,13 @@ export default function AdminTeamsPage() {
     if (s) setActiveStatus(s);
   }, []);
 
-  // Debounce search input ~300ms. The effect cleanup clears the pending timer on
-  // every keystroke and on unmount, so a queued callback can never fire after the
-  // status filter changes (mirrors the users/matches admin pages' debounce).
+  // Debounce search input ~300ms
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(searchInput), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset pagination whenever an applied filter (debounced query or status) changes.
+  // Reset pagination whenever an applied filter changes
   useEffect(() => {
     setAccumulatedRows([]);
     setCursor(null);
@@ -104,10 +101,8 @@ export default function AdminTeamsPage() {
   useEffect(() => {
     if (!data?.items) return;
     if (!cursor) {
-      // First page (filters changed) — replace
       setAccumulatedRows(data.items);
     } else {
-      // Subsequent pages — append
       setAccumulatedRows((prev) => [...prev, ...data.items]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,7 +130,6 @@ export default function AdminTeamsPage() {
         onSuccess: () => {
           setModalRow(null);
           showToast('팀 상태를 변경했어요.', 'success');
-          // Reset to first page so updated row is re-fetched
           setAccumulatedRows([]);
           setCursor(null);
         },
@@ -146,54 +140,12 @@ export default function AdminTeamsPage() {
     );
   };
 
-  // ── Table columns ──────────────────────────────────────────────────
-  const columns: AdminTableColumn<V1AdminTeamRow>[] = [
-    {
-      key: 'name',
-      header: '팀',
-      render: (row) => (
-        <span className="font-medium text-gray-900">{row.name}</span>
-      ),
-    },
-    {
-      key: 'sportName',
-      header: '종목',
-      render: (row) => <span className="text-gray-600">{row.sportName}</span>,
-    },
-    {
-      key: 'ownerName',
-      header: '소유자',
-      render: (row) => (
-        <span className="text-gray-600">{row.ownerName ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'members',
-      header: '인원',
-      align: 'right',
-      className: 'tabular-nums',
-      render: (row) => (
-        <span className="text-gray-600">
-          멤버 {row.memberCount} · 매니저 {row.managerCount}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (row) => <AdminStatusPill status={row.status} />,
-    },
-    {
-      key: 'createdAt',
-      header: '생성일',
-      render: (row) => (
-        <span className="text-gray-500 text-[13px]">{formatDate(row.createdAt)}</span>
-      ),
-    },
-  ];
-
   // ── Loading / error for initial load ───────────────────────────────
   const isInitialLoad = isPending && accumulatedRows.length === 0;
+  const errorMessage =
+    isError && accumulatedRows.length === 0
+      ? extractErrorMessage(error, '팀 목록을 불러오지 못했어요.')
+      : undefined;
 
   return (
     <>
@@ -203,8 +155,8 @@ export default function AdminTeamsPage() {
         description="플랫폼 내 모든 팀의 상태를 검색하고 관리해요."
       />
 
-      {/* Filter bar */}
-      <div className="mb-4">
+      <div className="flex flex-col gap-4">
+        {/* Filter bar */}
         <AdminFilterBar
           searchLabel="팀명 검색"
           searchPlaceholder="팀명 검색"
@@ -214,25 +166,34 @@ export default function AdminTeamsPage() {
           activeStatus={activeStatus}
           onStatusChange={handleStatusChange}
         />
-      </div>
 
-      {/* Data table */}
-      {isInitialLoad ? (
-        <AdminTableSkeleton />
-      ) : isError && accumulatedRows.length === 0 ? (
-        <AdminDataTable<V1AdminTeamRow>
-          columns={columns}
-          rows={[]}
-          keyExtractor={(r) => r.teamId}
-          error={extractErrorMessage(error, '팀 목록을 불러오지 못했어요.')}
-          onRetry={() => void refetch()}
-        />
-      ) : (
-        <AdminDataTable<V1AdminTeamRow>
-          columns={columns}
+        {/* Card list */}
+        <AdminCardList<V1AdminTeamRow>
           rows={accumulatedRows}
           keyExtractor={(r) => r.teamId}
-          actionsHeader="작업"
+          card={(row) => ({
+            title: row.name,
+            subtitle: row.sportName,
+            status: row.status,
+            meta: [
+              {
+                icon: <User size={14} aria-hidden="true" />,
+                label: row.ownerName ?? '—',
+              },
+              {
+                icon: <Users size={14} aria-hidden="true" />,
+                label: `멤버 ${row.memberCount} · 매니저 ${row.managerCount}`,
+              },
+              {
+                icon: <Calendar size={14} aria-hidden="true" />,
+                label: formatDate(row.createdAt),
+              },
+            ],
+            tone:
+              row.status === 'suspended' || row.status === 'archived'
+                ? 'warning'
+                : undefined,
+          })}
           renderActions={
             canWrite
               ? (row) => (
@@ -240,35 +201,49 @@ export default function AdminTeamsPage() {
                     type="button"
                     onClick={() => setModalRow(row)}
                     aria-label={`${row.name} 상태 변경`}
-                    className="inline-flex items-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap min-w-[80px] justify-center"
+                    className={[
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                      'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
+                      'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                    ].join(' ')}
                   >
                     상태 변경
                   </button>
                 )
               : undefined
           }
+          loading={isInitialLoad}
           empty={
             <AdminEmpty
               title="검색 결과가 없어요"
               description="검색어나 필터를 변경해 보세요."
             />
           }
+          error={errorMessage}
+          onRetry={() => void refetch()}
+          skeletonCards={8}
         />
-      )}
 
-      {/* Load more */}
-      {hasMore && !isInitialLoad && (
-        <div className="mt-4 flex justify-center">
-          <button
-            type="button"
-            onClick={handleLoadMore}
-            disabled={isPending}
-            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[14px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            {isPending ? '불러오는 중…' : '더 보기'}
-          </button>
-        </div>
-      )}
+        {/* Load more */}
+        {hasMore && !isInitialLoad && !isPending && (
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              onClick={handleLoadMore}
+              className={[
+                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
+                'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
+                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+              ].join(' ')}
+            >
+              더 보기
+            </button>
+          </div>
+        )}
+
+        {/* Loading more skeleton */}
+        {isPending && accumulatedRows.length > 0 && <AdminTableSkeleton rows={4} />}
+      </div>
 
       {/* Moderation modal */}
       <AdminReasonModal

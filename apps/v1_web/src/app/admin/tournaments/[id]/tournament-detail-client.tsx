@@ -15,6 +15,8 @@ import {
   Megaphone,
   Send,
   Pencil,
+  Users,
+  User,
 } from 'lucide-react';
 import {
   useV1AdminTournament,
@@ -52,10 +54,11 @@ import type {
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
+
 import {
   AdminPageHeader,
+  AdminCardList,
   AdminDataTable,
-  AdminStatusPill,
   AdminTableSkeleton,
   AdminEmpty,
   AdminToasts,
@@ -495,62 +498,40 @@ function RegistrationsTab({
   };
 
 
-  // ── AdminDataTable column definitions (f8) ───────────────────────────────
-  // loading/error/empty are delegated to AdminDataTable via props
-  const regColumns: AdminTableColumn<V1AdminTournamentRegistration>[] = [
-    {
-      key: 'teamName',
-      header: '팀명',
-      render: (r) => (
-        <span className="font-medium text-gray-900">{r.teamName ?? r.teamId}</span>
-      ),
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (r) => (
-        <AdminStatusPill status={r.status} />
-      ),
-    },
-    {
-      key: 'payment',
-      header: '결제',
-      render: (r) =>
-        r.payment ? (
-          <span className="text-[13px] text-gray-600">
-            {PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · {PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status}
-          </span>
-        ) : (
-          <span className="text-[13px] text-gray-500">—</span>
-        ),
-    },
-    {
-      key: 'depositorName',
-      header: '입금자',
-      render: (r) => (
-        <span className="text-[13px] text-gray-600">{r.depositorName ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'playerCount',
-      header: '선수 수',
-      render: (r) => (
-        <span className="tabular-nums text-gray-600">{r.playerCount}명</span>
-      ),
-    },
-  ];
-
   return (
     <>
-      {/* f8: AdminDataTable replaces custom desktop table + mobile card list */}
-      <AdminDataTable<V1AdminTournamentRegistration>
-        columns={regColumns}
+      {/* f8: AdminCardList — registrations as card grid */}
+      <AdminCardList<V1AdminTournamentRegistration>
         rows={registrations}
         keyExtractor={(r) => r.id}
+        card={(r) => ({
+          title: r.teamName ?? r.teamId,
+          subtitle: r.payment
+            ? `${PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · ${PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status}`
+            : undefined,
+          status: r.status,
+          meta: [
+            {
+              icon: <Users size={14} aria-hidden="true" />,
+              label: `${r.playerCount}명`,
+            },
+            {
+              icon: <User size={14} aria-hidden="true" />,
+              label: r.depositorName ?? '—',
+            },
+          ],
+          tone:
+            r.status === 'cancelled' || r.status === 'cancel_requested'
+              ? 'danger'
+              : r.status === 'awaiting_payment' || r.status === 'payment_checking'
+              ? 'warning'
+              : undefined,
+        })}
         loading={isPending}
         error={isError ? extractErrorMessage(error, '신청 목록을 불러오지 못했어요.') : undefined}
         onRetry={() => void refetch()}
         empty={<AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />}
+        skeletonCards={8}
         renderActions={(reg) => {
           const isLocked = !!reg.rosterLockedAt;
           return (

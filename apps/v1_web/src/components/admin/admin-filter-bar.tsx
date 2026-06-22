@@ -16,6 +16,8 @@ interface AdminFilterBarProps {
   searchPlaceholder?: string;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  /** 검색 입력란을 숨긴다. 백엔드가 q 파라미터를 지원하지 않는 페이지에서 사용 */
+  hideSearch?: boolean;
   statusOptions?: StatusOption[];
   activeStatus?: string;
   onStatusChange?: (value: string) => void;
@@ -29,6 +31,7 @@ export function AdminFilterBar({
   searchPlaceholder = '검색어 입력',
   searchValue,
   onSearchChange,
+  hideSearch = false,
   statusOptions,
   activeStatus,
   onStatusChange,
@@ -38,31 +41,33 @@ export function AdminFilterBar({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {/* Search row */}
-      <div className="relative">
-        {/* Visually-hidden label (linked via htmlFor) */}
-        <label htmlFor={inputId} className="sr-only">
-          {searchLabel}
-        </label>
-        <span
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-          aria-hidden="true"
-        >
-          <Search size={16} />
-        </span>
-        <input
-          id={inputId}
-          type="search"
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          className={[
-            'w-full h-[44px] pl-9 pr-4 text-sm bg-white border border-gray-200 rounded-xl',
-            'placeholder:text-gray-400 text-gray-900',
-            'transition-colors focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
-          ].join(' ')}
-        />
-      </div>
+      {/* Search row — hideSearch=true인 경우(백엔드 q 미지원) 렌더 생략 */}
+      {!hideSearch && (
+        <div className="relative">
+          {/* Visually-hidden label (linked via htmlFor) */}
+          <label htmlFor={inputId} className="sr-only">
+            {searchLabel}
+          </label>
+          <span
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            aria-hidden="true"
+          >
+            <Search size={16} />
+          </span>
+          <input
+            id={inputId}
+            type="search"
+            value={searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder}
+            className={[
+              'w-full h-[44px] pl-9 pr-4 text-sm bg-white border border-gray-200 rounded-xl',
+              'placeholder:text-gray-400 text-gray-900',
+              'transition-colors focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
+            ].join(' ')}
+          />
+        </div>
+      )}
 
       {/* Status chip row */}
       {(statusOptions && statusOptions.length > 0) || rightSlot ? (

@@ -9,11 +9,11 @@ import {
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { Activity, User, Clock, Users } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminDataTable,
-  AdminStatusPill,
+  AdminCardList,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -21,7 +21,6 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 import type { V1AdminMatchRow, CursorPage } from '@/types/api';
 
 // ── Date formatter ────────────────────────────────────────────────────────────
@@ -167,58 +166,6 @@ export default function AdminMatchesPage() {
     );
   }
 
-  // Table column definitions
-  const columns: AdminTableColumn<V1AdminMatchRow>[] = [
-    {
-      key: 'match',
-      header: '매치',
-      render: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-semibold text-gray-900 text-[14px]">{row.title}</span>
-          <span className="text-[12px] text-gray-400">{row.placeName}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'sport',
-      header: '종목',
-      render: (row) => (
-        <span className="text-[13px] text-gray-700">{row.sportName}</span>
-      ),
-    },
-    {
-      key: 'host',
-      header: '호스트',
-      render: (row) => (
-        <span className="text-[13px] text-gray-600">{row.hostName ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'startAt',
-      header: '일시',
-      render: (row) => (
-        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
-          {formatDateTime(row.startAt)}
-        </span>
-      ),
-    },
-    {
-      key: 'participants',
-      header: '인원',
-      align: 'right',
-      render: (row) => (
-        <span className="text-[13px] text-gray-600 tabular-nums">
-          {row.participantCount}/{row.maxParticipants}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (row) => <AdminStatusPill status={row.status} />,
-    },
-  ];
-
   const errorMessage = isError
     ? extractErrorMessage(error, '매치 목록을 불러오지 못했어요.')
     : undefined;
@@ -242,12 +189,30 @@ export default function AdminMatchesPage() {
           onStatusChange={(v) => setActiveStatus(v)}
         />
 
-        {/* Data table */}
-        <AdminDataTable<V1AdminMatchRow>
-          columns={columns}
+        {/* Card list */}
+        <AdminCardList<V1AdminMatchRow>
           rows={rows}
           keyExtractor={(row) => row.matchId}
-          actionsHeader="작업"
+          card={(row) => ({
+            title: row.title,
+            subtitle: row.placeName,
+            status: row.status,
+            meta: [
+              { icon: <Activity size={14} aria-hidden="true" />, label: row.sportName },
+              { icon: <User size={14} aria-hidden="true" />, label: row.hostName ?? '—' },
+              { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.startAt) },
+              {
+                icon: <Users size={14} aria-hidden="true" />,
+                label: `${row.participantCount}/${row.maxParticipants}`,
+              },
+            ],
+            tone:
+              row.status === 'cancelled'
+                ? 'danger'
+                : row.status === 'closed'
+                  ? 'warning'
+                  : undefined,
+          })}
           renderActions={
             canWrite
               ? (row) => (
@@ -258,7 +223,7 @@ export default function AdminMatchesPage() {
                       setModalOpen(true);
                     }}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
                       'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
@@ -278,7 +243,7 @@ export default function AdminMatchesPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonRows={8}
+          skeletonCards={8}
         />
 
         {/* Load more trigger */}
@@ -288,7 +253,7 @@ export default function AdminMatchesPage() {
               type="button"
               onClick={() => void loadMore()}
               className={[
-                'h-[44px] px-6 rounded-xl text-[14px] font-semibold transition-colors',
+                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
                 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               ].join(' ')}

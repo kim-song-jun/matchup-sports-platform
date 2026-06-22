@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
+  useV1CancelTeamInvitation,
   useV1ChangeTeamMembershipRole,
   useV1CreateTeamJoinApplication,
   useV1MasterSports,
@@ -11,7 +12,9 @@ import {
   useV1RecordSearch,
   useV1RejectTeamJoinApplication,
   useV1RemoveTeamMembership,
+  useV1SendTeamInvitation,
   useV1TeamDetail,
+  useV1TeamInvitations,
   useV1TeamJoinEligibility,
   useV1TeamJoinApplications,
   useV1TeamMatches,
@@ -19,6 +22,8 @@ import {
   useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
+import { extractErrorMessage } from '@/lib/error-message';
+import { V1ApiError } from '@/lib/api-client';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
@@ -238,29 +243,81 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
-  const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
+  const viewerRole = team.data?.viewer.role;
+  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
+  const canDelegateOwner = viewerRole === 'owner';
+  const canManageInvitations = canManageMembers;
+  const canReviewApplications = canManageMembers;
   const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
   const changeRole = useV1ChangeTeamMembershipRole(teamId);
   const removeMember = useV1RemoveTeamMembership(teamId);
   const approveApplication = useV1ApproveTeamJoinApplication(teamId);
   const rejectApplication = useV1RejectTeamJoinApplication(teamId);
+  const sendInvitation = useV1SendTeamInvitation(teamId);
+  const cancelInvitation = useV1CancelTeamInvitation(teamId);
+  const invitationsQuery = useV1TeamInvitations(teamId, { enabled: canManageInvitations });
   const { confirm, ConfirmModal } = useConfirm();
   const fallback = getTeamMembersViewModel();
 
+  // 초대 폼 로컬 상태
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
+  const invitationItems = invitationsQuery.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
-  const viewerRole = team.data?.viewer.role;
-  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
-  const canDelegateOwner = viewerRole === 'owner';
+
+  function handleSendInvitation() {
+    const email = inviteEmail.trim();
+    // 클라이언트 이메일 형식 검증
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setInviteError('올바른 이메일 형식을 입력해 주세요.');
+      return;
+    }
+    setInviteError(null);
+    setInviteSuccess(null);
+    sendInvitation.mutate(
+      { invitedEmail: email, message: inviteMessage.trim() || undefined },
+      {
+        onSuccess: (result) => {
+          if (result.alreadyInvited) {
+            setInviteSuccess('이미 초대한 사용자예요.');
+          } else {
+            setInviteSuccess('초대를 보냈어요.');
+            setInviteEmail('');
+            setInviteMessage('');
+          }
+        },
+        onError: (err) => {
+          const responseCode = err instanceof V1ApiError ? err.code : undefined;
+          if (responseCode === 'USER_NOT_FOUND') {
+            setInviteError('가입된 이메일을 찾을 수 없어요.');
+          } else if (responseCode === 'ALREADY_MEMBER') {
+            setInviteError('이미 팀 멤버예요.');
+          } else {
+            const raw = extractErrorMessage(err, '');
+            setInviteError(raw || '초대를 보내지 못했어요. 다시 시도해 주세요.');
+          }
+        },
+      },
+    );
+  }
+
+  const tabs: TeamMembersViewModel['tabs'] = [
+    { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => setActiveTab('members') },
+    { key: 'requests', label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') },
+    ...(canManageInvitations
+      ? [{ key: 'invitations' as const, label: '초대', count: invitationItems.length, onSelect: () => setActiveTab('invitations') }]
+      : []),
+  ];
 
   const model: TeamMembersViewModel = {
     ...fallback,
     activeTab,
-    tabs: [
-      { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => setActiveTab('members') },
-      { key: 'requests', label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') },
-    ],
+    tabs,
     teamName: team.data?.name ?? fallback.teamName,
     summary: {
       total: members.data?.summary.memberCount ?? memberItems.length,
@@ -287,6 +344,38 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' })),
       }),
     ),
+    invitations: canManageInvitations
+      ? {
+          form: {
+            email: inviteEmail,
+            message: inviteMessage,
+            onEmailChange: (value) => {
+              setInviteEmail(value);
+              setInviteError(null);
+              setInviteSuccess(null);
+            },
+            onMessageChange: setInviteMessage,
+            onSubmit: handleSendInvitation,
+            submitting: sendInvitation.isPending,
+            error: inviteError,
+            successMessage: inviteSuccess,
+          },
+          items: invitationItems.map((inv) => ({
+            invitationId: inv.invitationId,
+            displayName: inv.invitedUser.displayName,
+            createdAt: inv.createdAt,
+            message: inv.message,
+            cancelPending: cancelInvitation.isPending,
+            onCancel: () =>
+              confirmAction(
+                confirm,
+                { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '취소', tone: 'danger' },
+                () => cancelInvitation.mutate({ invitationId: inv.invitationId }),
+              ),
+          })),
+          listLoading: invitationsQuery.isLoading,
+        }
+      : undefined,
   };
 
   if (team.isError || members.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;

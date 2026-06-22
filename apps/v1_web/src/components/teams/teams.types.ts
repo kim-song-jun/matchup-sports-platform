@@ -124,8 +124,8 @@ export type TeamFormViewModel = {
 
 export type TeamMembersViewModel = {
   teamName: string;
-  activeTab: 'members' | 'requests';
-  tabs: Array<{ key: 'members' | 'requests'; label: string; count: number; onSelect: () => void }>;
+  activeTab: 'members' | 'requests' | 'invitations';
+  tabs: Array<{ key: 'members' | 'requests' | 'invitations'; label: string; count: number; onSelect: () => void }>;
   summary: { total: number; managers: number; pending: number };
   members: Array<{
     name: string;
@@ -143,4 +143,28 @@ export type TeamMembersViewModel = {
     actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
     actionPending?: boolean;
   }>;
+  /** owner/manager 전용 — 보낸 초대 목록 + 초대 폼 */
+  invitations?: {
+    /** 이메일 입력 폼 */
+    form: {
+      email: string;
+      message: string;
+      onEmailChange: (value: string) => void;
+      onMessageChange: (value: string) => void;
+      onSubmit: () => void;
+      submitting: boolean;
+      error: string | null;
+      successMessage: string | null;
+    };
+    /** 보낸 pending 초대 목록 */
+    items: Array<{
+      invitationId: string;
+      displayName: string;
+      createdAt: string;
+      message: string | null;
+      cancelPending: boolean;
+      onCancel: () => void;
+    }>;
+    listLoading: boolean;
+  };
 };

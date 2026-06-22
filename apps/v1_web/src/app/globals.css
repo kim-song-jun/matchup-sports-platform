@@ -4290,3 +4290,140 @@ button:disabled {
   color: var(--grey600);
   /* 비색상 지표: 텍스트 '준비중'이 상태를 전달 */
 }
+
+/* ── Team Invitation UI ───────────────────────────────────────────────────────
+ * light-only. dark: variant 절대 사용 금지.
+ * 모든 색은 CSS 변수(--grey*, --blue*, --text-*, --bg, --border) 참조.
+ * .tm-card / .tm-input / .tm-btn 과 동일한 radius/padding 리듬 사용.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* 이메일 초대 폼 컨테이너 — 입력과 버튼을 한 줄 row로 배치 */
+.tm-invitation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tm-invitation-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* 폼 내부의 input은 .tm-input 확장 — flex 1로 버튼 옆 채움 */
+.tm-invitation-form .tm-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 초대 카드 — 보낸 초대/받은 초대 공용 */
+.tm-invitation-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;           /* .tm-card 와 동일 radius */
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 카드 상단: 아바타 + 이름/이메일 + 상태 뱃지를 가로 배치 */
+.tm-invitation-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 카드 상단 텍스트 블록 — 이름·이메일·팀명 등 */
+.tm-invitation-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-invitation-meta-name {
+  font-size: var(--font-size-body-sm);  /* 14px */
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-invitation-meta-sub {
+  font-size: var(--font-size-label);    /* 13px */
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-invitation-meta-date {
+  font-size: var(--font-size-caption);  /* 12px */
+  color: var(--text-caption);
+}
+
+/* 카드 메시지 미리보기 */
+.tm-invitation-message {
+  font-size: var(--font-size-label);    /* 13px */
+  color: var(--text-body);
+  background: var(--grey50);
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+/* 카드 하단 CTA 버튼 그룹 */
+.tm-invitation-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+/* 상태 뱃지 — .tm-badge 기반에 invitation 전용 시맨틱 */
+.tm-invitation-status {
+  /* .tm-badge 와 동일 구조, 추가 override만 선언 */
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-caption);  /* 12px */
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* pending: 파란 tint — 비색상 지표: 텍스트 '초대중' 병기 필수 */
+.tm-invitation-status-pending {
+  background: var(--blue50);
+  color: var(--blue500);
+}
+
+/* accepted: 초록 tint — 비색상 지표: 텍스트 '수락됨' 병기 */
+.tm-invitation-status-accepted {
+  background: var(--green50);
+  color: var(--green500);
+}
+
+/* declined: 회색 tint — 비색상 지표: 텍스트 '거절됨' 병기 */
+.tm-invitation-status-declined {
+  background: var(--grey100);
+  color: var(--text-muted);
+}
+
+/* cancelled: 회색 tint — 비색상 지표: 텍스트 '취소됨' 병기 */
+.tm-invitation-status-cancelled {
+  background: var(--grey100);
+  color: var(--text-caption);
+}
+
+/* focus ring — .tm-btn:focus-visible 패턴과 통일 */
+.tm-invitation-card:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}

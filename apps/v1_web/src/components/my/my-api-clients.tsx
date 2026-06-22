@@ -9,10 +9,12 @@ import { Card, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
+  useV1AcceptTeamInvitation,
   useV1ApproveTeamJoinApplication,
   useV1CheckEmail,
   useV1CheckNickname,
   useV1ChangeTeamMembershipRole,
+  useV1DeclineTeamInvitation,
   useV1MyActivitySummary,
   useV1MyTeams,
   useV1MyTeamMatches,
@@ -20,6 +22,7 @@ import {
   useV1MasterSports,
   useV1Notifications,
   useV1Profile,
+  useV1ReceivedInvitations,
   useV1RejectTeamJoinApplication,
   useV1RemoveTeamMembership,
   useV1ResolveLocation,
@@ -36,16 +39,17 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
+  MyInvitationsPageView,
   SettingsPageView,
   MyTeamDetailPageView,
   MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
-import type { MyHomeViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyInvitationItem, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 
 type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'profileImage' | 'form', string>>;
@@ -107,6 +111,59 @@ export function MyTeamsPageClient() {
   };
 
   return <MyTeamsPageView model={model} />;
+}
+
+export function MyInvitationsPageClient() {
+  const query = useV1ReceivedInvitations();
+  const accept = useV1AcceptTeamInvitation();
+  const decline = useV1DeclineTeamInvitation();
+  const { confirm, ConfirmModal } = useConfirm();
+  const router = useRouter();
+
+  const actionPending = accept.isPending || decline.isPending;
+
+  const onAccept = (invitationId: string) => {
+    accept.mutate({ invitationId }, {
+      onSuccess: (result) => {
+        if (result.teamId) {
+          router.push(`/my/teams/${result.teamId}`);
+        } else {
+          void query.refetch();
+        }
+      },
+    });
+  };
+
+  const onDecline = (invitationId: string) => {
+    const invitation = (query.data?.items ?? []).find((item) => item.invitationId === invitationId);
+    const teamName = invitation?.team.name ?? '팀';
+    confirm({
+      title: '초대 거절',
+      message: `${teamName}의 초대를 거절할까요?`,
+      confirmLabel: '거절',
+      tone: 'danger',
+    }).then((ok) => {
+      if (ok) {
+        decline.mutate({ invitationId });
+      }
+    });
+  };
+
+  const model = {
+    invitations: (query.data?.items ?? []).map(toMyInvitationItem),
+    error: query.isError,
+    actionPending,
+    onAccept,
+    onDecline,
+    onRetry: () => void query.refetch(),
+  };
+
+  return (
+    <>
+      {ConfirmModal}
+      <MyInvitationsPageView model={model} />
+    </>
+  );
 }
 
 export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
@@ -1145,6 +1202,17 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
     statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집 중',
     note: match.teamName ? `${match.teamName} 관련 팀매치예요.` : '내 팀 관련 팀매치예요.',
     href: match.detailRoute,
+  };
+}
+
+function toMyInvitationItem(invitation: V1ReceivedInvitation): MyInvitationItem {
+  return {
+    invitationId: invitation.invitationId,
+    teamName: invitation.team.name,
+    teamLogo: invitation.team.name.slice(0, 1),
+    invitedByName: invitation.invitedBy.displayName,
+    message: invitation.message,
+    dateLabel: new Date(invitation.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
   };
 }
 

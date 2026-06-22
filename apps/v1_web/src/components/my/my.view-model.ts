@@ -37,6 +37,7 @@ export const myHomeModel: MyHomeViewModel = {
       title: '커뮤니티',
       items: [
         { label: '내 팀', sub: '소속 팀과 운영 권한을 확인해요', href: '/my/teams', icon: 'Users' },
+        { label: '받은 초대', sub: '팀에서 보낸 초대를 확인하고 수락해요', href: '/my/invitations', icon: 'Mail' },
         // 리뷰 항목은 my-api-clients.tsx의 toMyHomeModel에서 동적으로 추가됨
       ],
     },

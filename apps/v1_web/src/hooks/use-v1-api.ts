@@ -125,6 +125,12 @@ import type {
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
   V1AdminAnnouncementListResult,
+  V1TeamInvitationSummary,
+  V1TeamInvitationsPage,
+  V1ReceivedInvitation,
+  V1ReceivedInvitationsPage,
+  V1SendInvitationResult,
+  V1InvitationActionResult,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -1763,6 +1769,75 @@ export function useV1PublishAnnouncement(tournamentId?: string) {
       }
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'tournaments'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'tournaments'] });
+    },
+  });
+}
+
+// ── Team Invitations ──────────────────────────────────────────────────────────
+
+/** POST /teams/:teamId/invitations — 이메일로 팀원 초대 발송 */
+export function useV1SendTeamInvitation(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { invitedEmail: string; message?: string }) =>
+      v1Post<V1SendInvitationResult>(`/teams/${teamId}/invitations`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamInvitations(teamId) });
+    },
+  });
+}
+
+/** GET /teams/:teamId/invitations — 팀이 보낸 pending 초대 목록 */
+export function useV1TeamInvitations(teamId: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.teamInvitations(teamId),
+    queryFn: () => v1Get<V1TeamInvitationsPage>(`/teams/${teamId}/invitations`),
+    enabled: Boolean(teamId) && (options?.enabled ?? true),
+  });
+}
+
+/** POST /teams/:teamId/invitations/:invitationId/cancel — 보낸 초대 취소 */
+export function useV1CancelTeamInvitation(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invitationId }: { invitationId: string }) =>
+      v1Post<V1InvitationActionResult>(`/teams/${teamId}/invitations/${invitationId}/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamInvitations(teamId) });
+    },
+  });
+}
+
+/** GET /me/invitations — 내가 받은 pending 초대 목록 */
+export function useV1ReceivedInvitations() {
+  return useQuery({
+    queryKey: v1Keys.receivedInvitations(),
+    queryFn: () => v1Get<V1ReceivedInvitationsPage>('/me/invitations'),
+  });
+}
+
+/** POST /team-invitations/:invitationId/accept — 받은 초대 수락 */
+export function useV1AcceptTeamInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invitationId }: { invitationId: string }) =>
+      v1Post<V1InvitationActionResult>(`/team-invitations/${invitationId}/accept`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+    },
+  });
+}
+
+/** POST /team-invitations/:invitationId/decline — 받은 초대 거절 */
+export function useV1DeclineTeamInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invitationId }: { invitationId: string }) =>
+      v1Post<V1InvitationActionResult>(`/team-invitations/${invitationId}/decline`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
     },
   });
 }

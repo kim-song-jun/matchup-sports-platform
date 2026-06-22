@@ -7,6 +7,7 @@ import {
   FileText,
   LucideProps,
   LogOut,
+  Mail,
   MapPin,
   Plus,
   Settings,
@@ -20,6 +21,7 @@ import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitiv
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
+  MyInvitationsViewModel,
   MyMatch,
   MyMatchesViewModel,
   MyMember,
@@ -45,6 +47,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Bell,
   FileText,
   LogOut,
+  Mail,
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
@@ -158,6 +161,70 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
             ? <EmptyState title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
             : model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
         </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel }) {
+  return (
+    <AppChrome title="받은 초대" activeTab="my" bottomNav={false} backHref="/my">
+      <div className="tm-my-shell">
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">받은 초대</h1>
+        </div>
+        {model.error ? (
+          <EmptyState
+            title="초대 목록을 불러오지 못했어요"
+            sub="잠시 후 다시 시도해 주세요."
+            cta="다시 시도"
+            onCta={model.onRetry}
+          />
+        ) : model.invitations.length === 0 ? (
+          <EmptyState title="받은 초대가 없어요" sub="팀에서 초대를 받으면 여기에 표시돼요." />
+        ) : (
+          <div className="tm-my-list-stack">
+            {model.invitations.map((invitation) => (
+              <div key={invitation.invitationId} className="tm-invitation-card">
+                <div className="tm-invitation-card-head">
+                  <div className="tm-team-logo">{invitation.teamLogo}</div>
+                  <div className="tm-invitation-meta">
+                    <div className="tm-invitation-meta-name">{invitation.teamName}</div>
+                    <div className="tm-invitation-meta-sub">{invitation.invitedByName}님이 초대했어요</div>
+                    <div className="tm-invitation-meta-date">{invitation.dateLabel}</div>
+                  </div>
+                </div>
+                {invitation.message ? (
+                  <div className="tm-invitation-message">{invitation.message}</div>
+                ) : null}
+                <div className="tm-invitation-actions">
+                  <button
+                    className="tm-btn tm-btn-sm tm-btn-primary"
+                    type="button"
+                    disabled={model.actionPending}
+                    onClick={() => model.onAccept(invitation.invitationId)}
+                    aria-label={`${invitation.teamName} 초대 수락`}
+                  >
+                    수락
+                  </button>
+                  <button
+                    className="tm-btn tm-btn-sm tm-btn-ghost"
+                    type="button"
+                    disabled={model.actionPending}
+                    onClick={() => model.onDecline(invitation.invitationId)}
+                    aria-label={`${invitation.teamName} 초대 거절`}
+                  >
+                    거절
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </AppChrome>
   );

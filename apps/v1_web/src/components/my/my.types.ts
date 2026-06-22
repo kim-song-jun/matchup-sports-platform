@@ -112,6 +112,24 @@ export type SettingsViewModel = {
   groups: MyMenuSection[];
 };
 
+export type MyInvitationItem = {
+  invitationId: string;
+  teamName: string;
+  teamLogo: string;
+  invitedByName: string;
+  message: string | null;
+  dateLabel: string;
+};
+
+export type MyInvitationsViewModel = {
+  invitations: MyInvitationItem[];
+  error: boolean;
+  actionPending: boolean;
+  onAccept: (invitationId: string) => void;
+  onDecline: (invitationId: string) => void;
+  onRetry: () => void;
+};
+
 export type NotificationSetting = {
   label: string;
   sub: string;

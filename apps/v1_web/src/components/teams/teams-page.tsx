@@ -638,13 +638,154 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
           <MemberSection title="팀 멤버" sub="팀에 속한 멤버의 역할과 권한을 관리해요." desktopGrid>
             {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
           </MemberSection>
-        ) : (
+        ) : model.activeTab === 'requests' ? (
           <MemberSection title="가입 신청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
             {model.requests.map((request, index) => <MemberCard key={index} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
           </MemberSection>
-        )}
+        ) : model.invitations ? (
+          <InvitationSection invitations={model.invitations} />
+        ) : null}
       </div>
     </AppChrome>
+  );
+}
+
+function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembersViewModel['invitations']> }) {
+  const { form, items, listLoading } = invitations;
+
+  return (
+    <section className="tm-member-section">
+      <div className="tm-text-label">이메일로 초대</div>
+      <div className="tm-text-caption" style={{ marginTop: 3 }}>이메일 주소로 팀원을 직접 초대할 수 있어요.</div>
+
+      {/* 초대 폼 */}
+      <Card pad={16} style={{ marginTop: 12 }}>
+        <form
+          className="tm-invitation-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            form.onSubmit();
+          }}
+        >
+          <div className="tm-invitation-form-row">
+            <label htmlFor="invite-email" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 10 }}>
+              이메일
+            </label>
+            <input
+              id="invite-email"
+              className="tm-input"
+              type="email"
+              value={form.email}
+              placeholder="example@email.com"
+              autoComplete="email"
+              onChange={(event) => form.onEmailChange(event.target.value)}
+              disabled={form.submitting}
+              aria-describedby={form.error ? 'invite-email-error' : undefined}
+              aria-invalid={form.error ? true : undefined}
+              style={{ minHeight: 44 }}
+            />
+          </div>
+          <div className="tm-invitation-form-row">
+            <label htmlFor="invite-message" className="tm-text-label" style={{ flexShrink: 0, paddingTop: 10 }}>
+              메시지
+              <span className="tm-text-caption" style={{ fontWeight: 400, marginLeft: 4 }}>(선택)</span>
+            </label>
+            <textarea
+              id="invite-message"
+              className="tm-input"
+              value={form.message}
+              placeholder="함께 하고 싶은 이유를 적어 보세요."
+              rows={2}
+              onChange={(event) => form.onMessageChange(event.target.value)}
+              disabled={form.submitting}
+              style={{ resize: 'none', lineHeight: 1.5 }}
+            />
+          </div>
+          {form.error ? (
+            <div id="invite-email-error" className="tm-text-caption" role="alert" style={{ color: 'var(--red500)' }}>
+              {form.error}
+            </div>
+          ) : null}
+          {form.successMessage ? (
+            <div className="tm-text-caption" role="status" style={{ color: 'var(--green500)' }}>
+              {form.successMessage}
+            </div>
+          ) : null}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              className="tm-btn tm-btn-md tm-btn-primary"
+              type="submit"
+              disabled={form.submitting}
+              style={{ minHeight: 44, minWidth: 100 }}
+            >
+              {form.submitting ? '보내는 중…' : '초대 보내기'}
+            </button>
+          </div>
+        </form>
+      </Card>
+
+      {/* 보낸 초대 목록 */}
+      <div className="tm-text-label" style={{ marginTop: 20 }}>보낸 초대</div>
+      <div className="tm-text-caption" style={{ marginTop: 3, marginBottom: 10 }}>아직 수락되지 않은 초대예요.</div>
+      {listLoading ? (
+        <Card pad={16}>
+          <div className="tm-text-caption">초대 목록을 불러오고 있어요.</div>
+        </Card>
+      ) : items.length === 0 ? (
+        <EmptyState title="보낸 초대가 없어요" sub="이메일로 팀원을 초대하면 여기에 표시돼요." />
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {items.map((item) => (
+            <div key={item.invitationId} className="tm-invitation-card">
+              <div className="tm-invitation-card-head">
+                {/* 아바타 대체 — 이니셜 */}
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: 'var(--grey100)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    fontSize: 'var(--font-size-body-sm)',
+                    fontWeight: 700,
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {Array.from(item.displayName)[0] ?? '?'}
+                </div>
+                <div className="tm-invitation-meta">
+                  <span className="tm-invitation-meta-name">{item.displayName}</span>
+                  <span className="tm-invitation-meta-date">{formatInvitationDate(item.createdAt)} 초대</span>
+                </div>
+                {/* 비색상 지표: 텍스트 '초대중' 병기 */}
+                <span className="tm-invitation-status tm-invitation-status-pending" aria-label="초대 상태: 초대중">
+                  초대중
+                </span>
+              </div>
+              {item.message ? (
+                <div className="tm-invitation-message">{item.message}</div>
+              ) : null}
+              <div className="tm-invitation-actions">
+                <button
+                  className="tm-btn tm-btn-sm tm-btn-danger"
+                  type="button"
+                  disabled={item.cancelPending}
+                  onClick={item.onCancel}
+                  aria-label={`${item.displayName}님 초대 취소`}
+                  style={{ minHeight: 44 }}
+                >
+                  {item.cancelPending ? '취소 중…' : '초대 취소'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -807,6 +948,12 @@ function DraggableFilterSheet({
       </section>
     </div>
   );
+}
+
+function formatInvitationDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '날짜 미정';
+  return new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit' }).format(date);
 }
 
 function TeamCard({ team }: { team: TeamModel }) {

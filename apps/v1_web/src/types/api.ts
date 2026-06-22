@@ -1741,3 +1741,75 @@ export type V1CreateAnnouncementPayload = {
 export type V1AdminAnnouncementListResult = {
   items: V1AdminTournamentAnnouncement[];
 };
+
+// ── Team Invitations ──────────────────────────────────────────────────────────
+
+export type V1InvitationStatus = 'pending' | 'accepted' | 'declined' | 'cancelled';
+
+/** 보낸 초대 1건 (GET /teams/:teamId/invitations items 요소) */
+export type V1TeamInvitationSummary = {
+  invitationId: string;
+  teamId: string;
+  invitedUserId: string;
+  status: V1InvitationStatus;
+  message: string | null;
+  createdAt: string;
+  invitedUser: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+};
+
+/** GET /teams/:teamId/invitations 응답 */
+export type V1TeamInvitationsPage = {
+  teamId: string;
+  items: V1TeamInvitationSummary[];
+};
+
+/** 받은 초대 1건 (GET /me/invitations items 요소) */
+export type V1ReceivedInvitation = {
+  invitationId: string;
+  teamId: string;
+  status: V1InvitationStatus;
+  message: string | null;
+  createdAt: string;
+  team: {
+    teamId: string;
+    name: string;
+    sportId: string;
+    logoUrl: string | null;
+    introductionPreview: string | null;
+  };
+  invitedBy: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+};
+
+/** GET /me/invitations 응답 */
+export type V1ReceivedInvitationsPage = {
+  items: V1ReceivedInvitation[];
+};
+
+/** POST /teams/:teamId/invitations 응답 */
+export type V1SendInvitationResult = {
+  invitationId: string;
+  teamId: string;
+  invitedUserId: string;
+  status: V1InvitationStatus;
+  alreadyInvited: boolean;
+};
+
+/** POST /teams/:teamId/invitations/:invitationId/cancel
+ *  POST /team-invitations/:invitationId/accept
+ *  POST /team-invitations/:invitationId/decline 공통 응답 형태 */
+export type V1InvitationActionResult = {
+  invitationId: string;
+  teamId?: string;
+  membershipId?: string;
+  status: V1InvitationStatus;
+  alreadyCancelled?: boolean;
+  alreadyProcessed?: boolean;
+};

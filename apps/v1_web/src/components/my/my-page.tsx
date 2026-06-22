@@ -431,7 +431,11 @@ function MyTeamCard({ team }: { team: MyTeam }) {
             {team.roleLabel}
           </span>
         </div>
-        <div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · {team.members}명</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          {team.sport} · {team.region} ·{' '}
+          {/* P1 숫자:단위 2:1 tabular-nums — 멤버 수 */}
+          <span className="tab-num" style={{ fontVariantNumeric: 'tabular-nums' }}>{team.members}</span>명
+        </div>
         <div className="tm-text-caption" style={{ marginTop: 8 }}>{team.next}</div>
       </div>
       <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />

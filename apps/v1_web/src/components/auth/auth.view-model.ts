@@ -55,6 +55,7 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       backHref: '/login',
       badge: '소셜 권한 거부',
       title: '로그인을 완료하지 못했어요',
+      /* P2 UX 라이팅: 불안 상황(권한 거부) — 능동형보다 안심 유도 수동형 유지 */
       body: '필수 정보 제공 동의가 취소됐어요. 계정은 만들어지지 않았으니 같은 방법 또는 다른 로그인으로 다시 시도해 보세요.',
       tone: 'orange',
       primary: { label: '다시 로그인하기', href: '/login' },
@@ -164,11 +165,12 @@ export function getSignupFormViewModel(): SignupFormViewModel {
 
 export function getSignupCompleteViewModel(): SignupCompleteViewModel {
   return {
-    title: '회원가입이 완료됐어요',
-    sub: '이제 운동 설정을 하면 더 정확한 매치 추천을 받을 수 있어요.',
+    /* P2 UX 라이팅: 수동형("완료됐어요") → 능동형("완료했어요") */
+    title: '회원가입을 완료했어요',
+    sub: '운동 설정을 하면 더 정확한 매치를 추천받을 수 있어요.',
     steps: [
-      { title: '약관 동의 완료', body: '필수 약관 동의가 저장됐어요.', done: true },
-      { title: '회원가입 완료', body: '계정 만들기가 완료됐어요. 뒤로 가도 계정은 유지돼요.', done: true },
+      { title: '약관 동의 완료', body: '필수 약관에 동의했어요.', done: true },
+      { title: '회원가입 완료', body: '계정을 만들었어요. 뒤로 가도 계정은 유지돼요.', done: true },
     ],
     primary: { label: '운동 설정 시작하기', href: '/onboarding/sport' },
     secondary: { label: '나중에 설정하기', href: '/home', tone: 'neutral' },

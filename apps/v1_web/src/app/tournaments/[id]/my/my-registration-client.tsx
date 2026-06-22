@@ -798,8 +798,16 @@ function RegistrationDetailView({
               <Card pad={16} style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
-                      {players.length}명 등록됨
+                    {/* P1 숫자:단위 2:1 + tabular-nums */}
+                  <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                      <span
+                        className="tab-num"
+                        style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}
+                      >
+                        {players.length}
+                      </span>
+                      <span style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-strong)', fontWeight: 500, lineHeight: 1.2 }}>명</span>
+                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>등록됨</span>
                     </div>
                     <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
                       {`최소 ${tournament.minPlayers}명 · 최대 ${tournament.maxPlayers}명`}

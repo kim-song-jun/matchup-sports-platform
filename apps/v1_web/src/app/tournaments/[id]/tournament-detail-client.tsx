@@ -227,8 +227,20 @@ function TournamentDetailView({
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상금</div>
-            <div className="tm-text-subhead" style={{ color: 'var(--text-strong)', fontWeight: 800, lineHeight: 1.2 }}>
-              총 {formatPrize(tournament.prizePool!)}
+            {/* P1 숫자:단위 2:1 + tabular-nums — 상금 금액 */}
+            <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, lineHeight: 1.2 }}>
+              <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center', marginRight: 2 }}>총</span>
+              <span
+                className="tab-num"
+                style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 800, color: 'var(--text-strong)' }}
+              >
+                {tournament.prizePool!.toLocaleString('ko-KR')}
+              </span>
+              <span
+                style={{ fontSize: 'var(--font-size-body)', fontWeight: 600, color: 'var(--text-strong)' }}
+              >
+                원
+              </span>
             </div>
           </div>
         </div>
@@ -318,8 +330,12 @@ function TournamentDetailView({
           <div className="tm-hide-desktop" style={{ padding: '14px 16px', borderBottom: '1px solid var(--grey100)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
               <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
-              <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-                {tournament.confirmedCount}/{tournament.teamCount}팀
+              {/* P1 숫자:단위 2:1 + tabular-nums */}
+              <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                <span className="tab-num" style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-strong)' }}>
+                  {tournament.confirmedCount}
+                </span>
+                <span style={{ fontSize: 'var(--font-size-body-sm)', color: 'var(--text-muted)', fontWeight: 500 }}>/{tournament.teamCount}팀</span>
               </span>
             </div>
             <div

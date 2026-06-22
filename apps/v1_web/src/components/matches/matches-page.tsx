@@ -39,6 +39,54 @@ function sportDotColor(sportLabel: string): string {
   return map[sportLabel] ?? 'var(--grey400)';
 }
 
+/**
+ * [P2 마이크로인터랙션] 매치 만들기 완료 체크 아이콘 — globals.css .tm-complete-check 키프레임 활용.
+ * reduced-motion 환경: 0.18s fade-in만 적용 (globals.css에서 자동 처리).
+ */
+function CompletionCheckIcon() {
+  return (
+    <svg
+      className="tm-complete-check"
+      width="56"
+      height="56"
+      viewBox="0 0 56 56"
+      fill="none"
+      aria-hidden="true"
+      style={{ display: 'block', margin: '0 auto 4px' }}
+    >
+      <circle cx="28" cy="28" r="28" fill="var(--blue50)" />
+      <path
+        d="M16 28.5L23.5 36L40 20"
+        stroke="var(--blue500)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * [P0/P1 아이콘+컬러] 상태 아이콘 — 색상만으로 상태를 구분하지 않도록 아이콘+텍스트 병행 (WCAG 1.4.1).
+ */
+function StatusIcon({ tone }: { tone: 'orange' | 'green' }) {
+  if (tone === 'green') {
+    return (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+        <circle cx="7.5" cy="7.5" r="7.5" fill="var(--tint-green)" />
+        <path d="M4 7.5L6.5 10L11 5" stroke="var(--green500)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <circle cx="7.5" cy="7.5" r="7.5" fill="var(--tint-orange)" />
+      <path d="M7.5 4.5V8" stroke="var(--orange600)" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="7.5" cy="10.5" r="0.75" fill="var(--orange600)" />
+    </svg>
+  );
+}
+
 export function MatchListPageView({ model }: { model: MatchListViewModel }) {
   return (
     <AppChrome
@@ -62,8 +110,8 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         <div className="tm-match-summary-row">
           <div className="tm-text-label">{model.summary.label}</div>
           {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
-          {/* #21: '모집 중 N' 숫자만 weight 700로 분리 — 나머지 caption 유지 */}
-          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700 }}>{model.summary.urgent}</strong></div>
+          {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
+          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>
         </div>
         <div className="tm-match-card-stack">
           {model.matches.length ? (
@@ -213,15 +261,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
             <InfoRow label="장소" value={match.venue} sub={match.address} />
-            {/* #2: 잔여 자리 N≤3일 때 orange 배지로 희소성 강조 */}
-            <InfoRow
-              label="인원"
-              value={`${match.current}/${match.capacity}명`}
-              sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`}
-              badge={Math.max(match.capacity - match.current, 0) <= 3 && match.current < match.capacity
-                ? <span className="tm-badge tm-badge-orange">마감 임박</span>
-                : undefined}
-            />
+            {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 — 숫자(subhead/heading 크기) + 단위(body) 2:1 비율 */}
+            <CapacityRow current={match.current} capacity={match.capacity} />
             <InfoRow label="레벨" value={match.level} />
             <InfoRow label="성별 조건" value={match.gender} />
             {mode === 'pending' ? (
@@ -233,7 +274,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Link>
               </>
             ) : null}
-            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 10 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -268,7 +309,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               {mode === 'mine' ? (
                 <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
               ) : (
-                <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>
+                <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}>
                   {model.applyPending ? '처리 중' : cta}
                 </button>
               )}
@@ -282,15 +323,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
           <InfoRow label="장소" value={match.venue} sub={match.address} />
-          {/* #2 (모바일): 잔여 자리 N≤3 시 orange 배지로 희소성 강조 — 데스크톱과 일치 */}
-          <InfoRow
-            label="인원"
-            value={`${match.current}/${match.capacity}명`}
-            sub={`${Math.max(match.capacity - match.current, 0)}자리 남았어요`}
-            badge={Math.max(match.capacity - match.current, 0) <= 3 && match.current < match.capacity
-              ? <span className="tm-badge tm-badge-orange">마감 임박</span>
-              : undefined}
-          />
+          {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 (모바일) */}
+          <CapacityRow current={match.current} capacity={match.capacity} />
           <InfoRow label="레벨" value={match.level} />
           <InfoRow label="성별 조건" value={match.gender} />
           {mode === 'pending' ? (
@@ -302,7 +336,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
             </>
           ) : null}
-          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="매치 참가가 확정되었어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 10 }}>
             <div className="tm-text-body-lg">참가자</div>
@@ -338,7 +372,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           {mode === 'mine' ? (
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.manageHref ?? `/matches/${match.id}/edit`}>{cta}</Link>
           ) : (
-            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>
+            <button className={`tm-btn tm-btn-lg ${ctaTone}`} type="button" disabled={!canRunAction || model.applyPending} onClick={() => runHeroAction(model.onApply, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}>
               {model.applyPending ? '처리 중' : cta}
             </button>
           )}
@@ -597,7 +631,11 @@ function MatchCardItem({ match, index }: { match: MatchCardModel; index: number 
     <Link className="tm-match-list-card tm-pressable" href={`/matches/${match.id}`}>
       <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
         <span className="tm-badge tm-badge-blue">{index === 0 ? '추천' : match.sport}</span>
-        <span className="tm-match-count-badge tab-num">{match.current}/{match.capacity}</span>
+        {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
+        <span className="tm-match-count-badge" style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+          <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-lg)' }}>{match.current}</span>
+          <span style={{ fontSize: 'var(--font-size-body-sm)', color: 'inherit', opacity: 0.8 }}>/{match.capacity}명</span>
+        </span>
       </div>
       <div className="tm-match-list-card-body">
         {/* [격상1] 종목 배지 제거 — 미디어 상단 badge에 이미 표시됨(중복).
@@ -621,8 +659,53 @@ function MatchCardItem({ match, index }: { match: MatchCardModel; index: number 
 
 /* #13: 로컬 InfoRow 제거 — 공유 primitives.tsx의 InfoRow로 통합 (sub/badge prop 지원 포함) */
 
+/**
+ * [P1 숫자:단위 2:1 + tabular-nums] 인원 행 — 숫자(subhead size, weight700)와 단위(body size)를 2:1로 조판.
+ * 잔여 자리 ≤3 시 orange "마감 임박" 배지 병행 (색상 + 텍스트, WCAG 1.4.1).
+ */
+function CapacityRow({ current, capacity }: { current: number; capacity: number }) {
+  const remaining = Math.max(capacity - current, 0);
+  const isNearFull = remaining <= 3 && current < capacity;
+  return (
+    <div className="tm-info-row">
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>인원</div>
+      <div style={{ textAlign: 'right', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'flex-end', gap: 4 }}>
+          {/* 숫자: subhead 크기 + weight700 + tabular-nums */}
+          <span style={{
+            fontVariantNumeric: 'tabular-nums',
+            fontWeight: 700,
+            fontSize: 'var(--font-size-subhead)',
+            color: 'var(--text-strong)',
+            lineHeight: 1,
+          }}>
+            {current}
+          </span>
+          {/* 단위: body 크기 (약 절반) */}
+          <span style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-muted)', fontWeight: 500 }}>
+            /{capacity}명
+          </span>
+          {isNearFull ? <span className="tm-badge tm-badge-orange">마감 임박</span> : null}
+        </div>
+        <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>
+          {remaining}자리 남았어요
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
-  return <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange500)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;
+  return (
+    <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}>
+      {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <StatusIcon tone={tone} />
+        <div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange600)' }}>{title}</div>
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div>
+    </Card>
+  );
 }
 
 function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
@@ -887,7 +970,9 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         <h1 className="tm-text-heading" style={{ margin: 0 }}>매치 만들기 완료</h1>
       </div>
       <div className="tm-create-shell tm-match-create-shell">
-        <EmptyState title="매치가 만들어졌어요" sub="매치를 만들었어요! 팀원들에게 먼저 공유해 참여 의사를 확인해 보세요." />
+        {/* [P2 마이크로인터랙션] 완료 체크 애니메이션 — globals.css .tm-complete-check (reduced-motion 자동 처리) */}
+        <CompletionCheckIcon />
+        <EmptyState title="매치를 만들었어요" sub="팀원들에게 링크를 공유해 참여 의사를 확인해 보세요." />
         <Card pad={16} style={{ marginTop: 22, background: 'var(--blue50)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">매치 공유</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>팀원들에게 링크와 일정을 알려보세요</div>

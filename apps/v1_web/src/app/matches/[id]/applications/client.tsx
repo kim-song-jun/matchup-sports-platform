@@ -270,10 +270,17 @@ function ApplicationRow({
             style={{ marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap' }}
           >
             {mannerScore !== null ? (
-              <span>매너 {mannerScore}</span>
+              /* [P1 숫자:단위 2:1 + tabular-nums] 매너점수 숫자(body-sm weight600) : 단위(caption) */
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-strong)' }}>{mannerScore}</span>
+                <span>점</span>
+              </span>
             ) : null}
             {application.reviewCount > 0 ? (
-              <span>리뷰 {application.reviewCount}개</span>
+              <span style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                리뷰{' '}
+                <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-strong)' }}>{application.reviewCount}</span>개
+              </span>
             ) : null}
             {application.message ? (
               <span

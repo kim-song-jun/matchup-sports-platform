@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* [P1 Pretendard] DESIGN.md 브랜드 폰트 — CDN variable font (하위 호환 정적 폴백 포함) */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 
 :root {
   color-scheme: light;
@@ -36,7 +38,8 @@
   --text: var(--grey700);
   --text-body: var(--grey700);
   --text-muted: var(--grey600);
-  --text-caption: var(--grey500);
+  /* [P0 a11y] grey500(#8b95a1, 3.04:1)→grey600(#6b7684, 4.62:1) — WCAG AA 통과 */
+  --text-caption: var(--grey600);
   --muted: var(--text-muted);
   --border: var(--grey200);
   --border-strong: var(--grey300);
@@ -54,8 +57,16 @@
   --grey-300: var(--grey300);
   --grey-100: var(--grey100);
   --accent: var(--blue);
-  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);
+  /* ── [P2 Elevation] named shadow — 역할 매핑 (값 변경 없음, 의미 명문화) ──────
+   * elevation-0: flat surface (배경과 동일, shadow 없음)
+   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성
+   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림
+   * elevation-3: dialog — 모달·alert dialog (--shadow-modal)
+   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-sidebar)
+   * elevation-5: toast / FAB — 화면 최상단 플로팅 (별도 box-shadow 인라인)
+   * ──────────────────────────────────────────────────────────────────────────── */
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);       /* elevation-1: card */
+  --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);      /* elevation-2: dropdown/overlay */
   /* ── 시맨틱 별칭 — 컴포넌트 CSS가 참조하지만 정의가 누락됐던 토큰(WS1 복구) ── */
   --sh-1: var(--shadow-1); /* box-shadow: .tm-auth-segment-active, .tm-chat-bubble 등 */
   --line: var(--border); /* hairline border: .tm-auth-profile-upload 등 */
@@ -94,8 +105,8 @@
   --overlay-white-92: rgba(255, 255, 255, 0.92);  /* 프로모 eyebrow 텍스트, CTA hover */
   --glass-white-96: rgba(255, 255, 255, 0.96);   /* 네비/헤더 유리 배경 */
   /* 모달·사이드바 그림자 */
-  --shadow-modal: 0 8px 32px rgba(20, 28, 45, 0.14);
-  --shadow-sidebar: 4px 0 24px rgba(20, 28, 45, 0.12);
+  --shadow-modal: 0 8px 32px rgba(20, 28, 45, 0.14);  /* elevation-3: dialog */
+  --shadow-sidebar: 4px 0 24px rgba(20, 28, 45, 0.12); /* elevation-4: sidebar/drawer */
   /* 검색 포커스 링 */
   --blue-focus-ring: rgba(49, 130, 246, 0.12);
   /* 대회 상금 / 보조 색 */
@@ -111,7 +122,11 @@
   --font-size-body-lg: 17px;
   --font-size-subhead: 20px;
   --font-size-heading: 24px;
+  /* [P1 Pretendard] 브랜드 폰트 스택 — Variable→정적 폴백→시스템 폰트 순서 */
+  --font-pretendard: "Pretendard Variable", Pretendard, sans-serif;
   --font:
+    "Pretendard Variable",
+    Pretendard,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
@@ -120,6 +135,31 @@
     Arial,
     Helvetica,
     sans-serif;
+  /* ── [P1 Component 토큰] Base→Semantic→Component 3계층 완성 ──────────────────
+   * 컴포넌트는 이 계층을 참조 — Base(--blue500) 직접 참조 금지(R-X4).
+   * 테마/다크모드 파생 시 이 계층만 오버라이드하면 전파됨(System-of-System).
+   * ──────────────────────────────────────────────────────────────────────────── */
+  /* Button */
+  --button-fill-primary:        var(--blue500);
+  --button-fill-primary-hover:  var(--blue600);
+  --button-fill-neutral:        var(--grey100);
+  --button-fill-danger:         var(--red500);
+  --button-text-primary:        var(--static-white);
+  --button-text-neutral:        var(--text-strong);
+  /* Card */
+  --card-border:                var(--border);
+  --card-surface:               var(--bg);
+  --card-radius:                16px;
+  /* List row — 원래 시각(grey50 bg / grey100 border) 유지 (component 토큰 계층만 정리) */
+  --list-row-bg:                var(--grey50);
+  --list-row-border:            var(--grey100);
+  /* Input */
+  --input-border:               var(--border);
+  --input-surface:              var(--bg);
+  --input-border-focus:         var(--blue500);
+  --input-text:                 var(--text-strong);
+  --input-placeholder:          var(--text-caption);
+
   --v1-shell-frame-width: 375px;
   --v1-app-chrome-frame-width: 480px;
   --v1-shell-wide-frame-width: 480px;
@@ -981,42 +1021,42 @@ button:disabled {
 
 .tm-text-body-lg {
   font-size: 17px;
-  line-height: 26px;
+  line-height: 28px; /* [P1 4pt snap] 26→28 (4의 배수, ×1.65 — 한국어 +0.1 여유 포함) */
   font-weight: 700;
   color: var(--text-strong);
 }
 
 .tm-text-body {
   font-size: 15px;
-  line-height: 22px;
+  line-height: 24px; /* [P1 4pt snap] 22→24 (×1.6 — 한국어 권장 1.5~1.6) */
   font-weight: 500;
   color: var(--text);
 }
 
 .tm-text-label {
   font-size: 13px;
-  line-height: 19px;
+  line-height: 20px; /* [P1 4pt snap] 19→20 (4의 배수, ×1.54) */
   font-weight: 600;
   color: var(--text);
 }
 
 .tm-text-caption {
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px; /* [P1 4pt snap] 18→16 (4의 배수, ×1.33 — caption은 짧은 보조 텍스트라 압축해도 가독 OK) */
   font-weight: 400;
   color: var(--text-caption);
 }
 
 .tm-text-micro {
   font-size: 11px;
-  line-height: 15px;
+  line-height: 16px; /* [P1 4pt snap] 15→16 (4의 배수, ×1.45) */
   font-weight: 500;
 }
 
 .tm-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  background: var(--card-surface); /* [P1 component token] */
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
 }
 
 .tm-pressable {
@@ -1072,13 +1112,13 @@ button:disabled {
 }
 
 .tm-btn-primary {
-  background: var(--blue500);
-  color: var(--static-white);
+  background: var(--button-fill-primary); /* [P1 component token] --blue500 직접 참조 → component 계층 */
+  color: var(--button-text-primary);
 }
 
 .tm-btn-neutral {
-  background: var(--grey100);
-  color: var(--text-strong);
+  background: var(--button-fill-neutral); /* [P1 component token] */
+  color: var(--button-text-neutral);
 }
 
 .tm-btn-outline {
@@ -1088,8 +1128,8 @@ button:disabled {
 }
 
 .tm-btn-danger {
-  background: var(--red500);
-  color: var(--static-white);
+  background: var(--button-fill-danger); /* [P1 component token] */
+  color: var(--button-text-primary);
 }
 
 .tm-btn-warning {
@@ -1175,10 +1215,10 @@ button:disabled {
 .tm-input {
   width: 100%;
   min-height: 50px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border); /* [P1 component token] */
   border-radius: 14px;
-  background: var(--bg);
-  color: var(--text-strong);
+  background: var(--input-surface);
+  color: var(--input-text);
   padding: 0 14px;
   font: inherit;
   font-size: 15px;
@@ -1186,11 +1226,11 @@ button:disabled {
 }
 
 .tm-input::placeholder {
-  color: var(--text-caption);
+  color: var(--input-placeholder);
 }
 
 .tm-input:focus {
-  border-color: var(--blue500);
+  border-color: var(--input-border-focus);
 }
 
 /*
@@ -1562,8 +1602,8 @@ button:disabled {
   min-height: 58px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: var(--grey50);
-  border: 1px solid var(--grey100);
+  background: var(--list-row-bg); /* [P1 component token] */
+  border: 1px solid var(--list-row-border);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -4131,6 +4171,41 @@ button:disabled {
   }
   .tm-skeleton {
     animation: none;
+  }
+}
+
+/* ── [P2 마이크로인터랙션] 완료 체크 애니메이션 ────────────────────────────────
+ * 결제 완료·매칭 확정·팀 배정 등 비동기 완료 지점에서 사용.
+ * 컴포넌트가 이 클래스를 붙이면 체크 아이콘이 scale+opacity로 등장.
+ * prefers-reduced-motion 미충족 시: opacity만으로 부드럽게 페이드 (motion 없음).
+ * ──────────────────────────────────────────────────────────────────────────── */
+@keyframes tm-complete-check {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tm-complete-check-reduced {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.tm-complete-check {
+  animation: tm-complete-check 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-complete-check {
+    animation: tm-complete-check-reduced 0.18s ease both;
   }
 }
 

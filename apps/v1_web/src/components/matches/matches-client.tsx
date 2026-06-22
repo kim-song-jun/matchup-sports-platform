@@ -470,7 +470,7 @@ async function shareMatch(match: V1Match): Promise<string | null> {
   if (navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(url);
-      return '링크가 복사되었어요';
+      return '링크를 복사했어요';
     } catch {
       // clipboard 실패 — prompt 폴백
     }

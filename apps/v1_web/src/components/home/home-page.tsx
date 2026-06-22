@@ -97,7 +97,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '내 실력에 맞는 매치 추천'} action="전체보기" actionHref="/matches" />
             {model.network ? (
               <div style={{ padding: '0 20px 8px' }}>
-                <EmptyState title="목록을 불러오지 못했어요" sub="추천 목록과 대표 매치를 다시 불러와야 해요." cta="다시 불러오기" onCta={model.retry} />
+                {/* [P2 UX 라이팅] 능동형 + 해요체 */}
+                <EmptyState title="목록을 불러오지 못했어요" sub="아래 버튼으로 다시 불러올 수 있어요." cta="다시 불러오기" onCta={model.retry} />
               </div>
             ) : (
               <RecommendedMatchRail matches={model.recommendedMatches} />
@@ -168,9 +169,16 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
 function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   return (
-    <Link className="tm-floating-fab tm-home-chat-fab" href={model.chatHref} aria-label={`읽지 않은 채팅 ${model.chatUnreadCount}개`}>
+    <Link
+      className="tm-floating-fab tm-home-chat-fab"
+      href={model.chatHref}
+      aria-label={model.chatUnreadCount > 0 ? `채팅 — 읽지 않은 메시지 ${model.chatUnreadCount}개` : '채팅'}
+    >
       <ChatIcon size={22} strokeWidth={2.2} />
-      {model.chatUnreadCount > 0 ? <span className="tm-floating-count tab-num">{model.chatUnreadCount}</span> : null}
+      {/* [P0/P1 아이콘+컬러] 미읽음: 색상(뱃지) + 숫자 텍스트 병행 — 컬러만 의존 금지 */}
+      {model.chatUnreadCount > 0 ? (
+        <span className="tm-floating-count tab-num" aria-hidden="true">{model.chatUnreadCount}</span>
+      ) : null}
     </Link>
   );
 }
@@ -264,6 +272,7 @@ function FeaturedMatchCard({
       <div style={{ padding: 16 }}>
         {network ? (
           <>
+            {/* [P2 UX 라이팅] 에러 상황: 수동형 유지(실패 사실 전달) + CTA 능동형 */}
             <div className="tm-text-body-lg">목록을 불러오지 못했어요</div>
             <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 10 }} onClick={onRetry}>
               다시 불러오기
@@ -273,7 +282,12 @@ function FeaturedMatchCard({
           <>
             <div className="tm-text-body-lg">{match.venue}</div>
             <div className="tm-text-caption" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {match.date} {match.time} · {match.currentParticipants}/{match.maxParticipants}명
+              {match.date} {match.time} ·{' '}
+              {/* [P1 숫자:단위 2:1 + tabular-nums] 참가 인원 조판 */}
+              <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{match.currentParticipants}/{match.maxParticipants}</span>
+                <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>명</span>
+              </span>
               {/* #8: 잔여 자리 ≤3일 때 orange 배지로 희소성 강조 */}
               {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants
                 ? <span className="tm-badge tm-badge-orange">마감 임박</span>
@@ -331,12 +345,14 @@ function SidebarTournamentsWidget() {
       </div>
 
       {isLoading ? (
+        /* [P2 UX 라이팅] 능동형 로딩 안내 */
         <div
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', paddingTop: 8 }}
           aria-busy="true"
+          role="status"
         >
-          대회 목록을 불러오는 중이에요…
+          대회 목록을 가져오고 있어요…
         </div>
       ) : items.length === 0 ? (
         <div
@@ -390,13 +406,17 @@ function SidebarTournamentsWidget() {
                     {t.title}
                   </div>
                   <div
-                    className="tm-text-micro tab-num"
-                    style={{ color: 'var(--text-muted)', marginTop: 2 }}
+                    className="tm-text-micro"
+                    style={{ color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' }}
                   >
                     {t.sport.name}
                     {dateLabel ? ` · ${dateLabel}` : ''}
                     {' · '}
-                    <span>{t.confirmedCount}/{t.teamCount}팀</span>
+                    {/* [P1 숫자:단위 2:1 + tabular-nums] 팀 수 */}
+                    <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                      <span style={{ fontWeight: 600 }}>{t.confirmedCount}/{t.teamCount}</span>
+                      <span style={{ fontSize: 9 }}>팀</span>
+                    </span>
                   </div>
                 </div>
                 <ChevronRightIcon size={14} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--text-muted)' }} aria-hidden="true" />
@@ -422,13 +442,21 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
             </div>
             <div className="tm-match-card-footer">
               {/* #8: 잔여 자리 ≤3일 때 인원 수치를 orange로 + 텍스트 강조 */}
+              {/* [P1 숫자:단위 2:1 + tabular-nums] 인원수 조판: 숫자 font-weight 700, 단위 절반 크기 */}
               {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants ? (
-                <span className="tm-text-micro tab-num" style={{ color: 'var(--orange500)', fontWeight: 700 }}>
-                  {match.currentParticipants}/{match.maxParticipants}명 · 마감 임박
+                <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, fontVariantNumeric: 'tabular-nums' }}>
+                  <span className="tm-text-micro" style={{ color: 'var(--orange600)', fontWeight: 700 }}>
+                    {match.currentParticipants}/{match.maxParticipants}
+                  </span>
+                  <span style={{ fontSize: 9, color: 'var(--orange600)', fontWeight: 600 }}>명</span>
+                  <span className="tm-badge tm-badge-orange" style={{ marginLeft: 2 }}>마감 임박</span>
                 </span>
               ) : (
-                <span className="tm-text-micro tab-num" style={{ color: 'var(--text-muted)' }}>
-                  {match.currentParticipants}/{match.maxParticipants}명
+                <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1, fontVariantNumeric: 'tabular-nums' }}>
+                  <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {match.currentParticipants}/{match.maxParticipants}
+                  </span>
+                  <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>명</span>
                 </span>
               )}
               <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>

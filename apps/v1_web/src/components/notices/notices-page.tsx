@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Pin } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -45,9 +46,10 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
           ) : model.notices.length ? (
             model.notices.map((notice) => <NoticeRow key={notice.id} notice={notice} />)
           ) : (
+            /* [P2 UX 라이팅] 능동형 + 해요체 */
             <EmptyState
-              title="공지 없음"
-              sub="이 카테고리에 공지가 아직 없어요."
+              title="아직 공지가 없어요"
+              sub="새 공지가 올라오면 여기서 바로 확인할 수 있어요."
             />
           )}
         </div>
@@ -90,7 +92,8 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
             </div>
             <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
               <div className="tm-text-label">관련 매치 확인</div>
-              <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에도 같은 안내가 표시돼요.</div>
+              {/* [P2 UX 라이팅] 능동형 — 시스템이 표시하는 게 아니라 사용자가 확인하는 맥락으로 전환 */}
+            <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에서도 확인할 수 있어요.</div>
             </Link>
           </>
         )}
@@ -102,11 +105,20 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
 function NoticeRow({ notice }: { notice: NoticeModel }) {
   return (
     <Link className={`tm-card tm-pressable tm-notice-row ${notice.pinned ? 'tm-notice-row-active' : ''}`} href={`/notices/${notice.id}`}>
-      <span className="tm-notice-row-icon" aria-hidden="true">
+      {/* [P0/P1 아이콘+컬러] pinned 여부를 아이콘 + 배지 텍스트로 병행 전달 (컬러만 의존 금지) */}
+      <span className="tm-notice-row-icon" aria-hidden="true" style={{ color: notice.pinned ? 'var(--blue500)' : undefined }}>
         <BellIcon size={18} />
       </span>
       <span>
-        <span className="tm-text-micro tm-notice-row-meta">{notice.tag} · {notice.date}</span>
+        <span className="tm-text-micro tm-notice-row-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          {notice.pinned ? (
+                    <span className="tm-badge tm-badge-blue" style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                      <Pin size={10} strokeWidth={2.2} aria-hidden="true" />
+                      고정
+                    </span>
+                  ) : null}
+          {notice.tag} · {notice.date}
+        </span>
         <span className="tm-text-label tm-notice-row-title">{notice.title}</span>
         <span className="tm-text-caption line-clamp-2">{notice.summary}</span>
       </span>

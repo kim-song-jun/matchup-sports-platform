@@ -825,7 +825,7 @@ export function LocationSettingsPageClient() {
         onSuccess: (result) => {
           setStatus('saved');
           setMatchedLabel(result.region.name);
-          setMessage(`${result.region.name} 지역이 추천 기준으로 저장됐어요.`);
+          setMessage(`${result.region.name} 지역을 추천 기준으로 저장했어요.`);
         },
         onError: (error) => {
           setStatus('unmatched');

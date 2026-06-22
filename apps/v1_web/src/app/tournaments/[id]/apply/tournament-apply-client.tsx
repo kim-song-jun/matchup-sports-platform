@@ -827,7 +827,35 @@ function PaymentGuideStep({
         className="sr-only"
       />
 
-      <section aria-labelledby="bank-guide-heading" style={{ marginTop: 20 }}>
+      {/* P2 마이크로인터랙션 — 신청 완료 체크 피드백 (globals.css .tm-complete-check, reduced-motion 안전) */}
+      {/* P2 능동형: "신청이 완료됐어요" → "신청했어요" */}
+      <div
+        role="status"
+        aria-label="신청했어요"
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '24px 0 8px' }}
+      >
+        <div
+          className="tm-complete-check"
+          aria-hidden="true"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: 'var(--blue500)',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'var(--static-white)',
+          }}
+        >
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>신청했어요</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>아래 계좌로 참가비를 입금해 주세요</div>
+      </div>
+
+      <section aria-labelledby="bank-guide-heading" style={{ marginTop: 12 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle title="입금 안내" />
         </div>
@@ -880,7 +908,7 @@ function PaymentGuideStep({
             <div style={{ padding: '0 16px 14px' }}>
               <AlertBanner
                 tone="info"
-                message="신청이 완료됐어요. 계좌 정보는 확인 후 알림으로 안내드릴게요."
+                message="신청했어요. 계좌 정보는 확인 후 알림으로 안내드릴게요."
               />
               <div style={{ marginTop: 10 }}>
                 <InfoRow

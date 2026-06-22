@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Pin, Send, X } from 'lucide-react';
+import { Check, Pin, Send, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -91,10 +91,11 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
               onRetry={model.onRetry}
             />
           ) : model.status !== 'loading' && model.status !== 'error' && !hasRooms ? (
+            /* [P2 UX 라이팅] cta 능동형 표현 */
             <EmptyState
               title={model.emptyTitle ?? '아직 채팅방이 없어요'}
-              sub={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.'}
-              cta={model.emptyHref ? '추천 매치 보기' : undefined}
+              sub={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 열려요.'}
+              cta={model.emptyHref ? '매치 찾아보기' : undefined}
               onCta={model.emptyHref ? () => { window.location.href = model.emptyHref!; } : undefined}
             />
           ) : null}
@@ -128,6 +129,19 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
 }
 
 export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
+  /* [P2 마이크로인터랙션] 전송 완료 순간 체크 애니메이션 — sending true→false 전환 감지 */
+  const prevSendingRef = useRef(model.sending);
+  const [justSent, setJustSent] = useState(false);
+  useEffect(() => {
+    if (prevSendingRef.current && !model.sending && !model.sendError) {
+      setJustSent(true);
+      const t = window.setTimeout(() => setJustSent(false), 400);
+      return () => window.clearTimeout(t);
+    }
+    prevSendingRef.current = model.sending;
+    return undefined;
+  }, [model.sending, model.sendError]);
+
   return (
     <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/chat" showNotifications={false}>
       {/*
@@ -161,16 +175,35 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
               onRetry={model.onRetry}
             />
           ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
+            /* [P2 UX 라이팅] 능동형 */
             <EmptyState
               title={model.emptyTitle ?? '아직 메시지가 없어요'}
-              sub={model.emptyBody ?? '첫 메시지를 보내 대화를 시작할 수 있어요.'}
+              sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
           ) : null}
           {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
         {/* 이미지 첨부는 미구현 상태 — aria-label로 준비 중 안내, title 중복 제거 */}
-        <div className="tm-chat-inputbar"><button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" disabled><PlusIcon size={20} strokeWidth={2.2} /></button><input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" aria-label="메시지 입력" disabled={model.status === 'error'} /><button className="tm-btn tm-btn-icon tm-btn-primary" type="button" aria-label="전송" aria-busy={model.sending} disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()} onClick={model.onSend}>{model.sending ? '...' : <Send size={20} strokeWidth={2.2} />}</button></div>
+        {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
+        <div className="tm-chat-inputbar">
+          <button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" disabled><PlusIcon size={20} strokeWidth={2.2} /></button>
+          <input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" aria-label="메시지 입력" disabled={model.status === 'error'} />
+          <button
+            className="tm-btn tm-btn-icon tm-btn-primary"
+            type="button"
+            aria-label={justSent ? '전송 완료' : '전송'}
+            aria-busy={model.sending}
+            disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()}
+            onClick={model.onSend}
+          >
+            {model.sending ? '...' : justSent ? (
+              <span className="tm-complete-check" aria-hidden="true"><Check size={20} strokeWidth={2.5} /></span>
+            ) : (
+              <Send size={20} strokeWidth={2.2} />
+            )}
+          </button>
+        </div>
       </div>
     </AppChrome>
   );
@@ -237,7 +270,8 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
               onRetry={model.onRetry}
             />
           ) : model.notifications.length === 0 ? (
-            <EmptyState title="알림이 없어요" sub="매치, 팀매치, 채팅 알림이 오면 여기서 확인할 수 있어요." />
+            /* [P2 UX 라이팅] 능동형 */
+            <EmptyState title="아직 알림이 없어요" sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요." />
           ) : (
             groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);

@@ -40,9 +40,14 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
             desktop에는 이미 .tm-team-desktop-header가 제목을 담당하므로 모바일에서만 노출. */}
         <h2 className="tm-text-heading tm-hide-desktop tm-team-mobile-heading">{model.summary.scope}</h2>
         <div className="tm-team-summary-bar">
-          <div className="tm-text-caption tab-num tm-hide-desktop">{model.summary.total}팀 · 모집 중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
+          {/* P1: 통계 숫자에 tabular-nums 적용. 전체 줄은 이미 tab-num 클래스 보유 — 인라인 강조만 추가 */}
+          <div className="tm-text-caption tab-num tm-hide-desktop">
+            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.total}</span>팀 · 모집 중 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.recruiting}</span> · 내 주변 {model.summary.nearby}
+          </div>
           <div className="tm-text-label tm-show-desktop">{model.summary.scope}</div>
-          <div className="tm-text-caption tab-num tm-show-desktop">{model.summary.total}팀 · 모집 중 {model.summary.recruiting} · 내 주변 {model.summary.nearby}</div>
+          <div className="tm-text-caption tab-num tm-show-desktop">
+            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.total}</span>팀 · 모집 중 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.recruiting}</span> · 내 주변 {model.summary.nearby}
+          </div>
         </div>
         {model.teams.length ? <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div> : <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />}
       </div>
@@ -68,9 +73,9 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
           <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 18, background: 'var(--grey50)' }}>
-            <div className="tm-text-label">팀 목록으로 돌아가 다시 확인해 주세요</div>
+            <div className="tm-text-label">목록에서 다시 확인해 주세요</div>
             <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
-              새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
+              새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 보세요.
             </div>
             <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/teams" style={{ marginTop: 14 }}>목록으로 돌아가기</Link>
           </Card>
@@ -166,7 +171,11 @@ function TeamOpenMatchesSection({
                 <div className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.title}</div>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>{[match.dateLabel, match.venue].filter(Boolean).join(' · ')}</div>
               </div>
-              <span className="tm-badge tm-badge-blue" style={{ flexShrink: 0 }}>모집 중</span>
+              {/* P0/P1: 색상+아이콘+텍스트 병행 (WCAG 1.4.1) */}
+              <span className="tm-badge tm-badge-blue" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+                모집 중
+              </span>
             </Link>
           ))}
         </div>
@@ -192,11 +201,11 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
     void Promise.resolve(action())
       .then(() => {
         setHeroMessage(successMessage);
-        window.setTimeout(() => setHeroMessage(''), 1800);
+        window.setTimeout(() => setHeroMessage(''), 2000);
       })
       .catch(() => {
         setHeroMessage('잠시 후 다시 시도해 주세요.');
-        window.setTimeout(() => setHeroMessage(''), 1800);
+        window.setTimeout(() => setHeroMessage(''), 2000);
       });
   };
 
@@ -219,7 +228,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
               type="button"
               aria-label="공유"
-              onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}
+              onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}
               style={{ position: 'absolute', top: 14, right: 14 }}
             >
               <ShareIcon size={20} />
@@ -284,13 +293,14 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
             {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
           </div>
-          {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
+          {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
+          {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
             <button
               className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
               type="button"
               disabled={!model.onCta || model.ctaPending}
-              onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}
+              onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}
             >
               {model.ctaPending ? '처리 중' : cta}
             </button>
@@ -305,7 +315,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
             type="button"
             aria-label="공유"
-            onClick={() => runHeroAction(model.onShare, '공유 링크를 준비했어요')}
+            onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}
             style={{ position: 'absolute', top: 14, right: 14 }}
           >
             <ShareIcon size={20} />
@@ -351,7 +361,14 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
         </Card>
       </article>
-      <div className="tm-fixed-cta tm-hide-desktop"><div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>{heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}<button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청이 취소되었어요.' : '신청이 완료되었어요.')}>{model.ctaPending ? '처리 중' : cta}</button></div>
+      <div className="tm-fixed-cta tm-hide-desktop">
+        <div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>
+        {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
+        {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}
+        <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}>
+          {model.ctaPending ? '처리 중' : cta}
+        </button>
+      </div>
     </AppChrome>
   );
 }
@@ -969,7 +986,20 @@ function TeamCard({ team }: { team: TeamModel }) {
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <TeamLogo team={team} />
-        <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><span className={`tm-badge ${team.status === 'closed' ? 'tm-badge-grey' : team.status === 'reviewing' ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{team.statusLabel}</span></div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · {team.members}명</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
+        <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div>
+              {/* P0/P1: 상태를 색상+아이콘+텍스트로 병행 표시 (WCAG 1.4.1) */}
+              <span className={`tm-badge ${team.status === 'closed' ? 'tm-badge-grey' : team.status === 'reviewing' ? 'tm-badge-orange' : 'tm-badge-blue'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                {/* 색상 구분에 아이콘 병행 */}
+                {team.status === 'closed' ? (
+                  <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" opacity={0.55} /></svg>
+                ) : team.status === 'reviewing' ? (
+                  <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+                ) : (
+                  <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+                )}
+                {team.statusLabel}
+              </span>
+            </div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{team.members}</span>명</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
       </div>
       {/* intro가 충분히 있을 때만 intro-box를 렌더한다. '팀 소개' 라벨은 시각 노이즈이므로 제거하고 본문만 표시. */}
       {hasIntro ? (

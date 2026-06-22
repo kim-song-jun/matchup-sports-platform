@@ -56,6 +56,7 @@ export default function LandingPage() {
               </p>
             </div>
             {/* Hero stat strip */}
+            {/* P1 숫자:단위 2:1 + tabular-nums — stat-num(24px mobile/28px desktop) : label(11px/13px) ≈ 2.2:1. tabular-nums는 .tm-landing-stat-num CSS에 적용됨 */}
             <div className="tm-landing-hero-stats" role="list">
               <div className="tm-landing-stat" role="listitem">
                 <span className="tm-landing-stat-num">124</span>

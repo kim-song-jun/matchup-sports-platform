@@ -52,8 +52,9 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
             </>
           ) : null}
           <p className="tm-text-caption tm-auth-policy">
-            로그인 또는 가입을 진행하면 <Link href="/terms" style={{ color: 'var(--blue500)' }}>서비스 이용약관</Link>과{' '}
-            <Link href="/my/settings/legal" style={{ color: 'var(--blue500)' }}>개인정보 처리방침</Link>에 동의하는 것으로 간주돼요.
+            {/* P0 R-X2: 링크 텍스트 blue500(3.71:1 불통과) → blue700(#1b64da, 5.41:1 AA 통과). blue600은 4.49:1로 0.01 미달. */}
+            로그인 또는 가입을 진행하면 <Link href="/terms" style={{ color: 'var(--blue700)' }}>서비스 이용약관</Link>과{' '}
+            <Link href="/my/settings/legal" style={{ color: 'var(--blue700)' }}>개인정보 처리방침</Link>에 동의하는 것으로 간주돼요.
           </p>
         </div>
       </div>
@@ -85,7 +86,8 @@ export function SignupCompletePageView({ model }: { model: SignupCompleteViewMod
   return (
     <AuthFrame fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />}>
       <div className="tm-auth-complete">
-        <div className="tm-auth-complete-icon"><CheckMark checked /></div>
+        {/* P2 마이크로인터랙션: .tm-complete-check 키프레임으로 완료 피드백 (globals.css 제공) */}
+        <div className="tm-auth-complete-icon tm-complete-check"><CheckMark checked /></div>
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
         <div className="tm-auth-stack">

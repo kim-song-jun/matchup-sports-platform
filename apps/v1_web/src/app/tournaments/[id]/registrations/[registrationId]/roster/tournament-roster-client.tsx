@@ -243,7 +243,7 @@ function AddPlayerForm({
             className="tm-input"
             aria-describedby={birthDateError ? 'player-birthdate-error' : undefined}
             aria-invalid={birthDateError ? true : undefined}
-            style={{ fontFamily: 'var(--font-pretendard, inherit)' }}
+            style={{ fontFamily: 'var(--font-pretendard)' }}
           />
         </FormField>
 
@@ -630,8 +630,25 @@ export function TournamentRosterPageClient({
         {/* Roster header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div>
-            <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)' }}>
-              {`선수 명단 (${players.length}명)`}
+            {/* P1 숫자:단위 2:1 — 선수 수 숫자(subhead)+단위(body) */}
+            <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+              <span
+                className="tab-num"
+                style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}
+              >
+                {players.length}
+              </span>
+              <span
+                style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-strong)', fontWeight: 500, lineHeight: 1.2 }}
+              >
+                명
+              </span>
+              <span
+                className="tm-text-caption"
+                style={{ color: 'var(--text-muted)', marginLeft: 4 }}
+              >
+                선수 명단
+              </span>
             </div>
             <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
               {`최소 ${minPlayers}명 · 최대 ${maxPlayers}명`}
@@ -682,7 +699,7 @@ export function TournamentRosterPageClient({
         ) : (
           <Card pad={0}>
             <div style={{ padding: '8px 14px' }}>
-              <div className="tm-text-micro" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
+              <div className="tm-text-micro tab-num" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
                 총 {players.length}명 · {isRosterLocked ? '잠김' : '수정 가능'}
               </div>
             </div>

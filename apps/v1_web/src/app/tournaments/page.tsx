@@ -151,7 +151,7 @@ function TournamentsListContent() {
             ) : (
               <span />
             )}
-            <span style={{ background: 'var(--static-white)', color: 'var(--blue600)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block' }}>자세히 보기 →</span>
+            <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block' }}>자세히 보기 →</span>
           </div>
         </Link>
       ) : null}

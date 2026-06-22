@@ -296,7 +296,7 @@ function buildDefaultDraft(): MatchDraft {
 function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> {
   const oldDefaults = {
     title: '주말 풋살 초보 환영 매치',
-    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치입니다.',
+    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치예요.',
     rules: '풋살화 착용, 지각 시 미리 연락',
     venue: '안양천 풋살장',
     address: '서울 양천구 안양천로 939',

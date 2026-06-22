@@ -41,7 +41,13 @@ test.describe('[applicant] 대회 탐색 및 신청 플로우', () => {
     // 신청 링크 또는 버튼 탐색
     const applyLink = page.locator('a[href*="/apply"]').first();
     if (await applyLink.count() > 0) {
-      await applyLink.click();
+      // a[href*="/apply"]는 데스크톱에서 .tm-hide-desktop으로 숨겨진 모바일 fixed-CTA
+      // 까지 매칭돼 click이 영구 대기할 수 있다(Copilot). 상세 URL에서 tournamentId를
+      // 추출해 /apply로 직접 이동하여 '신청 페이지 도달' 검증이 항상 실행되게 한다.
+      const detailUrl = page.url();
+      const idMatch = detailUrl.match(/\/tournaments\/([a-f0-9-]{8,})/);
+      if (!idMatch) throw new Error(`대회 상세 URL에서 id를 찾지 못했어요: ${detailUrl}`);
+      await page.goto(`/tournaments/${idMatch[1]}/apply`);
       await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]{8,}\/apply/);
       await expect(page.getByRole('main')).toBeVisible();
     } else {

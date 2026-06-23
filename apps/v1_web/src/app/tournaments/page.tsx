@@ -5,25 +5,11 @@ import { useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
-import { useV1Tournaments } from '@/hooks/use-v1-api';
+import { useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
+import { formatTournamentDateShort, formatEntryFee } from '@/lib/date-utils';
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
-
-/* ── Sport filter chip data ── (codes must match v1Sport.code in DB) */
-const FILTER_SPORTS: Array<{ code: string; label: string }> = [
-  { code: 'soccer',     label: '축구' },
-  { code: 'futsal',     label: '풋살' },
-  { code: 'basketball', label: '농구' },
-  { code: 'baseball',   label: '야구' },
-  { code: 'volleyball', label: '배구' },
-  { code: 'badminton',  label: '배드민턴' },
-  { code: 'tennis',     label: '테니스' },
-  { code: 'running',    label: '러닝' },
-  { code: 'swimming',   label: '수영' },
-  { code: 'cycling',    label: '사이클' },
-  { code: 'golf',       label: '골프' },
-];
 
 export default function TournamentsPage() {
   return (
@@ -68,33 +54,24 @@ function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
   }
 }
 
-function formatTournamentDate(dateStr: string | null): string {
-  if (!dateStr) return '날짜 미정';
-  const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  const weekday = weekdays[d.getDay()];
-  return `${month}/${day} (${weekday})`;
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
-}
-
 /* ── Main content (client component for data fetching) ── */
 
 function TournamentsListContent() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
   // D3: 종목 필터 — null = '전체'
-  const [activeSportCode, setActiveSportCode] = useState<string | null>(null);
+  const [activeSportId, setActiveSportId] = useState<string | null>(null);
+
+  /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
+  const { data: sportsData } = useV1MasterSports();
+  const filterSports: Array<{ id: string; code: string; label: string }> = (sportsData ?? [])
+    .filter((s) => s.id)
+    .map((s) => ({ id: s.id, code: s.code ?? s.id, label: s.name }));
 
   const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({
     cursor,
     limit: 20,
-    sportId: activeSportCode ?? undefined,
+    sportId: activeSportId ?? undefined,
   });
 
   // Accumulate pages when cursor is set
@@ -134,10 +111,14 @@ function TournamentsListContent() {
 
   /** D3: 종목 칩 선택 — 페이지/누적 목록 리셋 후 필터 적용 */
   const handleSportFilter = (code: string | null) => {
-    setActiveSportCode(code);
+    setActiveSportId(code);
     setCursor(undefined);
     setAllItems([]);
   };
+
+  const activeSportLabel = activeSportId
+    ? filterSports.find((sport) => sport.id === activeSportId)?.label
+    : null;
 
   return (
     <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
@@ -157,24 +138,24 @@ function TournamentsListContent() {
             textDecoration: 'none',
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
             <TrophyIcon size={12} strokeWidth={2} aria-hidden="true" />
             상금 걸린 대회
           </span>
           <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featured.title}</div>
-          <div className="tm-text-caption" style={{ color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
-            {featured.scheduledAt ? formatTournamentDate(featured.scheduledAt) : '날짜 미정'}
+          <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
+            {featured.scheduledAt ? (formatTournamentDateShort(featured.scheduledAt) ?? '날짜 미정') : '날짜 미정'}
             {' · '}
             {featured.confirmedCount}/{featured.teamCount}팀 확정
             {featured.venue ? ` · ${featured.venue}` : ''}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
             {maxPrize > 0 ? (
-              <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>최대 {formatPrize(maxPrize)}</span>
+              <span style={{ fontWeight: 800, fontSize: 'var(--font-size-subhead)', letterSpacing: '-0.5px' }}>최대 {formatPrize(maxPrize)}</span>
             ) : (
               <span />
             )}
-            <span className="tm-text-label" style={{ color: 'var(--static-white)', fontWeight: 700 }}>자세히 보기 →</span>
+            <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block' }}>자세히 보기 →</span>
           </div>
         </Link>
       ) : null}
@@ -182,7 +163,7 @@ function TournamentsListContent() {
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" style={{ marginTop: 28, padding: '0 20px' }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle title="진행 중인 대회" />
+          <SectionTitle title="대회 목록" />
         </div>
         <div id="tournament-list-heading" className="sr-only">진행 중인 대회 목록</div>
 
@@ -202,19 +183,22 @@ function TournamentsListContent() {
           <button
             type="button"
             onClick={() => handleSportFilter(null)}
-            aria-pressed={activeSportCode === null}
+            aria-pressed={activeSportId === null}
             aria-label="전체 종목"
             className="tm-btn"
             style={{
-              padding: '4px 12px',
+              padding: '0 12px',
               borderRadius: 999,
               fontSize: 'var(--font-size-caption)',
-              fontWeight: activeSportCode === null ? 700 : 500,
-              background: activeSportCode === null ? 'var(--blue500)' : 'var(--grey100)',
-              color: activeSportCode === null ? 'var(--static-white)' : 'var(--text-body)',
+              fontWeight: activeSportId === null ? 700 : 500,
+              background: activeSportId === null ? 'var(--blue500)' : 'var(--grey100)',
+              color: activeSportId === null ? 'var(--static-white)' : 'var(--text-body)',
               border: 'none',
               cursor: 'pointer',
-              minHeight: 32,
+              /* a11y: 터치 타깃 최소 44px (WCAG 2.5.5) */
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
               lineHeight: 1,
               transition: 'background 0.15s, color 0.15s',
             }}
@@ -222,14 +206,14 @@ function TournamentsListContent() {
             전체
           </button>
 
-          {FILTER_SPORTS.map(({ code, label }) => {
+          {filterSports.map(({ id, code, label }) => {
             const accent = getSportAccent(code);
-            const isActive = activeSportCode === code;
+            const isActive = activeSportId === id;
             return (
               <button
-                key={code}
+                key={id}
                 type="button"
-                onClick={() => handleSportFilter(code)}
+                onClick={() => handleSportFilter(id)}
                 aria-pressed={isActive}
                 aria-label={`${label} 종목만 보기`}
                 className="tm-btn"
@@ -237,15 +221,16 @@ function TournamentsListContent() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: 5,
-                  padding: '4px 10px',
+                  padding: '0 10px',
                   borderRadius: 999,
                   fontSize: 'var(--font-size-caption)',
                   fontWeight: isActive ? 700 : 500,
-                  background: isActive ? accent.badgeBg : 'var(--grey100)',
-                  color: isActive ? accent.badgeText : 'var(--text-body)',
-                  border: isActive ? `1.5px solid ${accent.dot}` : '1.5px solid transparent',
+                  background: isActive ? 'var(--blue500)' : 'var(--grey100)',
+                  color: isActive ? 'var(--static-white)' : 'var(--text-body)',
+                  border: isActive ? '1.5px solid var(--blue500)' : '1.5px solid transparent',
                   cursor: 'pointer',
-                  minHeight: 32,
+                  /* a11y: 터치 타깃 최소 44px (WCAG 2.5.5) */
+                  minHeight: 44,
                   lineHeight: 1,
                   transition: 'background 0.15s, color 0.15s, border-color 0.15s',
                 }}
@@ -257,7 +242,7 @@ function TournamentsListContent() {
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: isActive ? accent.dot : 'var(--grey400)',
+                    background: isActive ? 'var(--static-white)' : 'var(--grey400)',
                     flexShrink: 0,
                   }}
                 />
@@ -276,8 +261,8 @@ function TournamentsListContent() {
           />
         ) : displayItems.length === 0 ? (
           <EmptyState
-            title="현재 모집 중인 대회가 없어요"
-            sub="새로운 대회가 열리면 앱 알림으로 안내드릴게요."
+            title={activeSportLabel ? `${activeSportLabel} 모집 중인 대회가 없어요` : '현재 모집 중인 대회가 없어요'}
+            sub={activeSportLabel ? '다른 종목을 선택하거나 새로운 대회 알림을 기다려 주세요.' : '새로운 대회가 열리면 앱 알림으로 안내드릴게요.'}
             icon={<TrophyIcon size={36} strokeWidth={1.5} />}
           />
         ) : (
@@ -323,6 +308,7 @@ function TournamentsListContent() {
               </div>
               <span className="tm-tournament-promo-step-num" aria-hidden="true">{i + 1}</span>
               <span className="tm-tournament-promo-step-label">{step.label}</span>
+              <span className="tm-tournament-promo-step-sub" aria-hidden="true">{step.sub}</span>
               {i < PROCESS_STEPS.length - 1 ? (
                 <span className="tm-tournament-promo-step-connector" aria-hidden="true" />
               ) : null}
@@ -336,66 +322,77 @@ function TournamentsListContent() {
 
 /* ── Inline icon components (stroke=currentColor, 24 viewBox, 1.8 strokeWidth) ── */
 
-function IconClipboard({ size = 24 }: { size?: number }) {
+/** 신청: 연필로 양식 작성 — 팀 정보 입력 단계 */
+function IconPencilForm({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </svg>
   );
 }
 
-function IconCreditCard({ size = 24 }: { size?: number }) {
+/** 결제: 체크 표시가 있는 지갑 — 참가비 결제 완료 */
+function IconWalletCheck({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-      <line x1="1" y1="10" x2="23" y2="10" />
+      <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+      <path d="M16 2H8L4 7h16l-4-5z" />
+      <polyline points="9 12 11 14 15 10" />
     </svg>
   );
 }
 
-function IconUsers({ size = 24 }: { size?: number }) {
+/** 선수 명단: 체크리스트 — 선수 등록 확인 */
+function IconCheckList({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
     </svg>
   );
 }
 
-function IconSoccerBall({ size = 24 }: { size?: number }) {
+/** 조별 리그: 격자 표 — 조 편성·리그 경기 */
+function IconGrid({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-      <path d="M2 12h20" />
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
     </svg>
   );
 }
 
-function IconBracket({ size = 24 }: { size?: number }) {
+/** 결선 토너먼트: 토너먼트 브라켓 — 단판 승부 */
+function IconTournamentBracket({ size = 24 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 6h4v12H3" />
-      <path d="M7 12h5" />
-      <path d="M12 8h2v8h-2" />
-      <path d="M14 12h3" />
-      <path d="M17 10h3v4h-3" />
+      {/* 왼쪽 두 씨드 */}
+      <rect x="2" y="4" width="5" height="3" rx="1" />
+      <rect x="2" y="10" width="5" height="3" rx="1" />
+      {/* 왼쪽 브라켓 connector */}
+      <path d="M7 5.5h3v6H7" />
+      {/* 가운데 */}
+      <rect x="10" y="7" width="5" height="3" rx="1" />
+      {/* 오른쪽 connector */}
+      <path d="M15 8.5h3" />
+      {/* 결승 */}
+      <rect x="18" y="7" width="4" height="3" rx="1" />
     </svg>
   );
 }
 
 /* ── Static data ── */
 
-const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string }> = [
-  { icon: <IconClipboard size={20} />, label: '신청' },
-  { icon: <IconCreditCard size={20} />, label: '결제' },
-  { icon: <IconUsers size={20} />, label: '선수 명단' },
-  { icon: <IconSoccerBall size={20} />, label: '조별 리그' },
-  { icon: <IconBracket size={20} />, label: '결선 토너먼트' },
-  { icon: <TrophyIcon size={20} strokeWidth={1.8} />, label: '우승' },
+const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string; sub: string }> = [
+  { icon: <IconPencilForm size={20} />,        label: '신청',      sub: '팀 정보 입력' },
+  { icon: <IconWalletCheck size={20} />,       label: '결제',      sub: '참가비 납부' },
+  { icon: <IconCheckList size={20} />,         label: '선수 명단', sub: '로스터 확정' },
+  { icon: <IconGrid size={20} />,              label: '조별 리그', sub: '라운드 로빈' },
+  { icon: <IconTournamentBracket size={20} />, label: '결선',      sub: '단판 토너먼트' },
+  { icon: <TrophyIcon size={20} strokeWidth={1.8} />, label: '우승', sub: '시상 및 정산' },
 ];
 
 /* ── Tournament card ── */
@@ -463,7 +460,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           {/* Date + venue */}
           {item.scheduledAt ? (
             <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              {formatTournamentDate(item.scheduledAt)}
+              {formatTournamentDateShort(item.scheduledAt) ?? '날짜 미정'}
             </span>
           ) : null}
           {item.venue ? (
@@ -506,7 +503,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           </div>
         ) : null}
 
-        {/* Bottom row: entry fee + team count */}
+        {/* #7: Bottom row: entry fee(강조) + team fill rate(마감 임박 배지) */}
         <div
           style={{
             display: 'flex',
@@ -517,10 +514,15 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
             borderTop: '1px solid var(--grey100)',
           }}
         >
-          <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
+          {/* #7: 참가비 — text-strong + weight700로 시각 강도 격상 */}
+          <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
             참가비 {formatEntryFee(item.entryFee)}
           </span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* #7: 확정 팀 ≥80% 이상이면 '거의 마감' orange 배지 */}
+            {item.teamCount > 0 && item.confirmedCount / item.teamCount >= 0.8
+              ? <span className="tm-badge tm-badge-orange">거의 마감</span>
+              : null}
             <span className="tab-num">{item.confirmedCount}</span>
             <span>/</span>
             <span className="tab-num">{item.teamCount}</span>

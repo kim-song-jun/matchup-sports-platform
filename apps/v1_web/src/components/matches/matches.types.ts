@@ -46,7 +46,6 @@ export type MatchListViewModel = {
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
     sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
-    viewOptions: Array<{ label: string; value: 'card' | 'compact'; description: string; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
   };
@@ -61,7 +60,7 @@ export type MatchListViewModel = {
 };
 
 export type MatchStateViewModel = MatchListViewModel & {
-  state: 'empty' | 'error' | 'filter' | 'joined' | 'participants';
+  state: 'empty' | 'error' | 'joined';
   title: string;
   description: string;
 };
@@ -98,6 +97,8 @@ export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'com
 
 export type MatchCreateViewModel = {
   step: MatchCreateStep;
+  /** 생성 완료 또는 수정 중인 매치의 실제 ID. backHref·상세보기 링크에 사용. */
+  matchId?: string;
   selectedSport: string;
   sports: string[];
   levels: string[];

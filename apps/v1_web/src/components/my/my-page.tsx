@@ -1,11 +1,27 @@
 import Link from 'next/link';
+import {
+  Bell,
+  ClipboardList,
+  Crown,
+  Dumbbell,
+  FileText,
+  LucideProps,
+  LogOut,
+  Mail,
+  MapPin,
+  Plus,
+  Settings,
+  Star,
+  Users,
+} from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
+  MyInvitationsViewModel,
   MyMatch,
   MyMatchesViewModel,
   MyMember,
@@ -18,6 +34,21 @@ import type {
   ProfileEditViewModel,
   SettingsViewModel,
 } from './my.types';
+
+/** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
+const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  ClipboardList,
+  Plus,
+  Users,
+  Star,
+  Dumbbell,
+  Settings,
+  MapPin,
+  Bell,
+  FileText,
+  LogOut,
+  Mail,
+};
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   return (
@@ -47,7 +78,11 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               </div>
               <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">수정</Link>
             </section>
-            <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
+            {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
+            <Card pad={16}>
+              <div className="tm-text-body-lg">활동 요약</div>
+              <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
+            </Card>
             <Card pad={16}>
               <div className="tm-text-body-lg">이번 달 활동</div>
               <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
@@ -58,9 +93,9 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>
-            {/* Logout surfaced directly on 마이페이지 (also in 계정 설정) for discoverability. */}
+            {/* 로그아웃: 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 (계정 설정 페이지에도 동일하게 있어 발견성 유지) */}
             <div className="tm-my-logout-row">
-              <LogoutButton />
+              <LogoutButton variant="ghost" />
             </div>
           </div>
         </div>
@@ -82,8 +117,8 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           <h1 className="tm-text-heading">내 매치</h1>
         </div>
         <div className="tm-segment-row">
-          <Link className={`tm-btn tm-btn-md ${joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/joined">참여한 매치</Link>
-          <Link className={`tm-btn tm-btn-md ${!joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/created">생성한 매치</Link>
+          <Link className={`tm-btn tm-btn-md ${joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/joined" aria-current={joined ? 'page' : undefined}>참여한 매치</Link>
+          <Link className={`tm-btn tm-btn-md ${!joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/created" aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
         </div>
         {model.apiNotice ? (
           <Card pad={14} className={model.apiNotice.tone === 'warning' ? 'tm-auth-soft-card-warning' : undefined}>
@@ -92,10 +127,12 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
           </Card>
         ) : null}
         <div className="tm-my-list-stack">
-          {model.matches.length === 0 ? (
-            <p className="tm-text-caption" style={{ margin: 0, padding: '72px 0', textAlign: 'center' }}>
-              표시할 매치가 없어요
-            </p>
+          {/* 로딩/에러 중(apiNotice 노출)에는 '매치 없어요' 빈상태를 띄우지 않는다 — 알림 카드와 모순 방지 (Copilot) */}
+          {!model.apiNotice && model.matches.length === 0 ? (
+            <EmptyState
+              title="표시할 매치가 없어요"
+              sub={model.mode === 'joined' ? '매치에 참여하면 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
+            />
           ) : (
             model.matches.map((match) => <MyMatchCard key={match.id} match={match} manage={model.mode === 'created'} />)
           )}
@@ -117,11 +154,78 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
           <h1 className="tm-text-heading">내 팀</h1>
         </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
+          {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
         </div>
         <div className="tm-my-list-stack">
-          {model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
+          {/* #14: 소속 팀이 없을 때 빈 상태 안내 */}
+          {model.teams.length === 0
+            ? <EmptyState title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
+            : model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
         </div>
+      </div>
+    </AppChrome>
+  );
+}
+
+export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel }) {
+  return (
+    <AppChrome title="받은 초대" activeTab="my" bottomNav={false} backHref="/my">
+      <div className="tm-my-shell">
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">받은 초대</h1>
+        </div>
+        {model.error ? (
+          <EmptyState
+            title="초대 목록을 불러오지 못했어요"
+            sub="잠시 후 다시 시도해 주세요."
+            cta="다시 시도"
+            onCta={model.onRetry}
+          />
+        ) : model.invitations.length === 0 ? (
+          <EmptyState title="받은 초대가 없어요" sub="팀에서 초대를 받으면 여기에 표시돼요." />
+        ) : (
+          <div className="tm-my-list-stack">
+            {model.invitations.map((invitation) => (
+              <div key={invitation.invitationId} className="tm-invitation-card">
+                <div className="tm-invitation-card-head">
+                  <div className="tm-team-logo">{invitation.teamLogo}</div>
+                  <div className="tm-invitation-meta">
+                    <div className="tm-invitation-meta-name">{invitation.teamName}</div>
+                    <div className="tm-invitation-meta-sub">{invitation.invitedByName}님이 초대했어요</div>
+                    <div className="tm-invitation-meta-date">{invitation.dateLabel}</div>
+                  </div>
+                </div>
+                {invitation.message ? (
+                  <div className="tm-invitation-message">{invitation.message}</div>
+                ) : null}
+                <div className="tm-invitation-actions">
+                  <button
+                    className="tm-btn tm-btn-sm tm-btn-primary"
+                    type="button"
+                    disabled={model.actionPending}
+                    onClick={() => model.onAccept(invitation.invitationId)}
+                    aria-label={`${invitation.teamName} 초대 수락`}
+                  >
+                    수락
+                  </button>
+                  <button
+                    className="tm-btn tm-btn-sm tm-btn-ghost"
+                    type="button"
+                    disabled={model.actionPending}
+                    onClick={() => model.onDecline(invitation.invitationId)}
+                    aria-label={`${invitation.teamName} 초대 거절`}
+                  >
+                    거절
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </AppChrome>
   );
@@ -157,7 +261,7 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
             </Card>
             {model.recentMatches.length > 0 ? (
               <>
-                <div className="tm-my-section-label">최근 팀 매치</div>
+                <div className="tm-my-section-label">최근 팀매치</div>
                 <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
               </>
             ) : null}
@@ -195,19 +299,19 @@ export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: 
           <Link className="tm-desktop-back" href={backHref} aria-label="팀 정보로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
           </Link>
-          <h1 className="tm-text-heading">{model.teamName} — 멤버 관리</h1>
+          <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
         </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          {model.summary.map((stat) => <Card key={stat.label} pad={12}><KPIStat {...stat} /></Card>)}
+          {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
         </div>
-        <div className="tm-team-form-chip-row" style={{ marginTop: 14 }}>
+        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 목록 탭" style={{ marginTop: 14 }}>
           {model.tabs.map((tab) => (
-            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect}>
+            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect} aria-pressed={model.activeTab === tab.key}>
               {tab.label} <span className="tab-num">{tab.count}</span>
             </button>
           ))}
         </div>
-        {model.activeTab === 'members' ? <MemberGroup title="멤버" members={model.members} /> : <MemberGroup title="가입 요청" members={model.requests} />}
+        {model.activeTab === 'members' ? <MemberGroup title="멤버" members={model.members} /> : <MemberGroup title="가입 신청" members={model.requests} />}
       </div>
     </AppChrome>
   );
@@ -227,7 +331,10 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
             <h1 className="tm-text-heading">{model.title}</h1>
           </div>
           {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
-          <LogoutButton />
+          {/* 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 — 마이홈과 동일 패턴 */}
+          <div className="tm-my-logout-row">
+            <LogoutButton variant="ghost" />
+          </div>
         </div>
       </div>
     </AppChrome>
@@ -235,7 +342,10 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
 }
 
 
-export function LegalPageView({ model }: { model: SettingsViewModel }) {
+// model prop is intentionally unused — LegalPageView renders static legal content only.
+// The prop is kept for backward compatibility with the existing page.tsx caller.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
   return (
     <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false} backHref="/my/settings">
       <div className="tm-my-shell">
@@ -251,7 +361,6 @@ export function LegalPageView({ model }: { model: SettingsViewModel }) {
             <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" chev />
             <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" chev />
           </Card>
-          <MenuSection section={model.groups[0]} />
         </div>
       </div>
     </AppChrome>
@@ -264,16 +373,24 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
     <section>
       <div className="tm-my-section-label">{section.title}</div>
       <Card pad={0}>
-        {section.items.map((item) => (
-          <Link key={item.label} className="tm-my-menu-row" href={item.href}>
-            <span className="tm-my-menu-icon">{item.icon}</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'block' }}>{item.label}</span>
-              <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>
-            </span>
-            <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
-          </Link>
-        ))}
+        {section.items.map((item) => {
+          const IconComponent = MENU_ICON_MAP[item.icon];
+          return (
+            <Link key={item.label} className="tm-my-menu-row" href={item.href}>
+              {/* Lucide 아이콘: 단일 글자 모노그램 대체. 의미 있는 시각 단서 제공 */}
+              <span className="tm-my-menu-icon" aria-hidden="true">
+                {IconComponent ? (
+                  <IconComponent size={18} strokeWidth={1.75} color="var(--blue500)" />
+                ) : item.icon}
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'block' }}>{item.label}</span>
+                <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>
+              </span>
+              <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
+            </Link>
+          );
+        })}
       </Card>
     </section>
   );
@@ -293,22 +410,32 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
       <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
-        {manage ? <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>관리할 수 없어요</button> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
+        {manage ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`${match.href}/applications`}>참가 관리</Link> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
       </div>
     </Card>
   );
 }
 
 function MyTeamCard({ team }: { team: MyTeam }) {
+  const isOwner = team.role === 'owner';
+  const isManager = team.role === 'manager' || team.role === 'admin';
+  const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
     <Link className="tm-my-team-card tm-pressable" href={`/my/teams/${team.id}`}>
       <div className="tm-team-logo">{team.logo}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">
           <div className="tm-text-body-lg">{team.name}</div>
-          <span className="tm-badge tm-badge-blue">{team.roleLabel}</span>
+          <span className={badgeClass}>
+            {isOwner && <Crown size={11} strokeWidth={2} style={{ marginRight: 3 }} aria-hidden="true" />}
+            {team.roleLabel}
+          </span>
         </div>
-        <div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · {team.members}명</div>
+        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          {team.sport} · {team.region} ·{' '}
+          {/* P1 숫자:단위 2:1 tabular-nums — 멤버 수 */}
+          <span className="tab-num" style={{ fontVariantNumeric: 'tabular-nums' }}>{team.members}</span>명
+        </div>
         <div className="tm-text-caption" style={{ marginTop: 8 }}>{team.next}</div>
       </div>
       <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
@@ -320,9 +447,14 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
   return (
     <section>
       <div className="tm-my-section-label">{title}</div>
-      <div className="tm-my-list-stack">
-        {members.map((member) => <MyMemberCard key={member.name} member={member} />)}
-      </div>
+      {/* #14: 멤버/요청이 없을 때 빈 상태 안내 */}
+      {members.length === 0
+        ? <EmptyState title={`${title}이 없어요`} sub="아직 표시할 항목이 없어요." />
+        : (
+          <div className="tm-my-list-stack">
+            {members.map((member) => <MyMemberCard key={member.id} member={member} />)}
+          </div>
+        )}
     </section>
   );
 }

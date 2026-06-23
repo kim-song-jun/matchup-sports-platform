@@ -48,14 +48,18 @@
     gap: 10px;
   }
 
-  /* Notification card: hover lift + focus ring. */
+  /* Notification card: hover tint (그림자·lift 대신 content-first solid 규약) */
   .tm-notification-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: background 0.12s;
   }
 
   .tm-notification-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+    background: var(--grey50);
+  }
+
+  /* 미읽음 hover: 마커 유지 + 동일 tint */
+  .tm-notification-card-unread:hover {
+    background: var(--grey50);
   }
 
   .tm-notification-card:focus-visible {

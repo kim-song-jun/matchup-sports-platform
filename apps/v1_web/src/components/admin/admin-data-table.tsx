@@ -44,12 +44,18 @@ interface AdminDataTableProps<T> {
    */
   scrollOnMobile?: boolean;
   /**
-   * Tailwind max-width class applied to the desktop <table> element so
-   * stat-heavy tables don't stretch across the full 1440 px viewport.
-   * Example: 'max-w-3xl'. When omitted the table stays w-full (existing
-   * behaviour unchanged — additive prop).
+   * Tailwind max-width class for the desktop table wrapper so stat-heavy
+   * tables don't stretch across wide (1920+) viewports.
+   * 기본값(미전달): 'max-w-[900px]' 캡 적용(#6). 캡 해제는 'max-w-none',
+   * 다른 폭은 예: 'max-w-3xl' 전달.
    */
   tableMaxWidth?: string;
+  /**
+   * #9: Per-row visual tone for dangerous/warning states (suspended, blocked, cancelled…).
+   * danger → bg-red-50/40 + left red accent bar.
+   * warning → bg-amber-50/40 + left amber accent bar.
+   */
+  rowTone?: (row: T) => 'danger' | 'warning' | undefined;
 }
 
 // ── Alignment utility ─────────────────────────────────────────────────────
@@ -60,6 +66,16 @@ function alignClass(align: AdminTableColumn<unknown>['align']): string {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
+// #9: row tone → Tailwind class maps
+const ROW_TONE_TR: Record<'danger' | 'warning', string> = {
+  danger: 'bg-red-50/40',
+  warning: 'bg-amber-50/40',
+};
+const ROW_TONE_ACCENT: Record<'danger' | 'warning', string> = {
+  danger: 'border-l-2 border-l-red-400',
+  warning: 'border-l-2 border-l-amber-400',
+};
+
 export function AdminDataTable<T>({
   columns,
   rows,
@@ -73,6 +89,7 @@ export function AdminDataTable<T>({
   skeletonRows = 5,
   scrollOnMobile = false,
   tableMaxWidth,
+  rowTone,
 }: AdminDataTableProps<T>) {
   // Error state
   if (error) {
@@ -115,7 +132,8 @@ export function AdminDataTable<T>({
   return (
     <>
       {/* ── Desktop table (lg+) ─────────────────────────────────────────── */}
-      <div className="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      {/* max-w-[900px]: tableMaxWidth 미전달 시 과폭 방지 기본 캡 (1920+ 대응) */}
+      <div className={['hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden', tableMaxWidth ?? 'max-w-[900px]'].join(' ')}>
         <div className="overflow-x-auto">
           <table className={['w-full text-sm text-gray-700', tableMaxWidth ?? ''].join(' ').trim()}>
             <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
@@ -145,20 +163,24 @@ export function AdminDataTable<T>({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {rows.map((row) => (
+              {rows.map((row) => {
+                const tone = rowTone?.(row);
+                return (
                 <tr
                   key={keyExtractor(row)}
-                  className="transition-colors hover:bg-gray-50/60"
+                  className={['transition-colors hover:bg-gray-50/60', tone ? ROW_TONE_TR[tone] : ''].filter(Boolean).join(' ')}
                 >
-                  {columns.map((col) => (
+                  {columns.map((col, colIdx) => (
                     <td
                       key={col.key}
                       className={[
                         'px-4 py-3 tabular-nums align-middle',
+                        // rowTone 좌측 accent: 테이블에서 <tr> border-l은 border model상 미렌더될 수 있어 첫 셀(td)에 적용 (Copilot)
+                        colIdx === 0 && tone ? ROW_TONE_ACCENT[tone] : '',
                         alignClass(col.align),
                         col.width ?? '',
                         col.className ?? '',
-                      ].join(' ')}
+                      ].filter(Boolean).join(' ')}
                     >
                       {col.render(row)}
                     </td>
@@ -171,7 +193,8 @@ export function AdminDataTable<T>({
                     </td>
                   )}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -181,10 +204,12 @@ export function AdminDataTable<T>({
       {scrollOnMobile ? (
         <div className="lg:hidden overflow-x-auto -mx-4 px-4">
           <ul className="flex flex-col gap-2 min-w-[480px]" role="list">
-            {rows.map((row) => (
+            {rows.map((row) => {
+              const tone = rowTone?.(row);
+              return (
               <li
                 key={keyExtractor(row)}
-                className="bg-white rounded-xl border border-gray-100 px-4 py-3"
+                className={['bg-white rounded-xl border border-gray-100 px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
               >
                 <dl className="flex flex-col gap-1.5">
                   {columns.map((col) => (
@@ -200,15 +225,18 @@ export function AdminDataTable<T>({
                   </div>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       ) : (
         <ul className="lg:hidden flex flex-col gap-2" role="list">
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const tone = rowTone?.(row);
+            return (
             <li
               key={keyExtractor(row)}
-              className="bg-white rounded-xl border border-gray-100 px-4 py-3"
+              className={['bg-white rounded-xl border border-gray-100 px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
             >
               <dl className="flex flex-col gap-1.5">
                 {columns.map((col) => (
@@ -224,7 +252,8 @@ export function AdminDataTable<T>({
                 </div>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </>

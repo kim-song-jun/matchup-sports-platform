@@ -13,7 +13,7 @@ export default function GlobalError({
           <div className="v1-frame">
             <section className="v1-main" style={{ display: 'grid', alignContent: 'center' }}>
               <div className="v1-card v1-card-pad">
-                <p className="v1-item-title">화면을 다시 불러올 수 없습니다</p>
+                <p className="v1-item-title">화면을 다시 불러올 수 없어요</p>
                 <p className="v1-caption" style={{ marginTop: 8 }}>
                   잠시 후 다시 시도해 주세요.
                 </p>

@@ -1,6 +1,63 @@
 /* Desktop overrides for matches — owned by the matches wave. */
 /* Mobile (<768) is byte-identical — only @media (min-width:1024px|1440px) blocks here. */
 
+/* ─── Match detail: sport indicator badge (taste-T2) ─────────────────────────
+ * 히어로의 종목 배지를 blue solid → 중립(grey100 배경) + sport dot으로 변경.
+ * R-C1 준수: blue는 상태 배지(모집중/내 매치)에만 예약.
+ */
+
+.tm-match-detail-sport-badge {
+  /* 히어로(dark overlay) 위 중립 배지.
+     --overlay-white-18: 프로모 eyebrow 뱃지 배경 전용 토큰(globals.css L80).
+     --overlay-white-92: 프로모 eyebrow 뱃지 텍스트 토큰(globals.css L93).
+     상태 배지(모집중/내 매치)는 tm-badge-blue로 별도 적용 — 블루는 상태 전용. */
+  background: var(--overlay-white-18);
+  color: var(--overlay-white-92);
+  gap: 5px;
+}
+
+/* dot: 8×8 원형 인디케이터 */
+.tm-match-detail-sport-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── 생성폼 date / time 네이티브 인풋 (1) ───────────────────────────────────
+ * appearance:none 은 globals.css .tm-create-native-input 에 없어 OS 스타일이 노출됨.
+ * - ::-webkit-calendar-picker-indicator  → 달력/시계 아이콘 제거
+ * - ::-webkit-inner-spin-button          → AM/PM·숫자 스피너 제거
+ * - ::-webkit-clear-button               → ×(지우기) 버튼 제거
+ * - appearance:none / -webkit-appearance:none → OS 테마 인풋 모양 제거
+ * 결과: 토큰 기반 .tm-create-input 컨테이너 스타일만 보임(Toss 인풋 동일 외관).
+ */
+
+.tm-create-native-input[type="date"],
+.tm-create-native-input[type="time"] {
+  appearance: none;
+  -webkit-appearance: none;
+  /* 한국 포맷(yyyy-mm-dd / HH:MM)은 lang="ko" + value 포맷이 우선.
+     width:100%는 부모 .tm-create-input flex 기준으로 꽉 채운다. */
+  width: 100%;
+  cursor: text;
+}
+
+.tm-create-native-input[type="date"]::-webkit-calendar-picker-indicator,
+.tm-create-native-input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.tm-create-native-input[type="date"]::-webkit-inner-spin-button,
+.tm-create-native-input[type="time"]::-webkit-inner-spin-button,
+.tm-create-native-input[type="date"]::-webkit-clear-button,
+.tm-create-native-input[type="time"]::-webkit-clear-button {
+  display: none;
+  -webkit-appearance: none;
+}
+
 /* ─── List /matches ──────────────────────────────────────────────────────────
  * Kill the stretched single-column. Convert .tm-match-card-stack to a 2-up
  * card grid at ≥1024 and 3-up at ≥1440. Sport-chip row stays full width.
@@ -94,19 +151,30 @@
     margin-top: 20px;
   }
 
-  /* Each card gets a hover lift. */
+  /* Hover: background tint only — lift(translateY) and shadow-2 violate toss-clean R-K2. */
   .tm-match-list-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: background-color 0.12s;
   }
 
   .tm-match-list-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+    background: var(--grey50);
   }
 
   /* Taller card media on desktop for visual weight. */
   .tm-match-list-media {
     height: 172px;
+  }
+}
+
+/* ─── 태블릿 (768–1023): 2-up 그리드 전환 ───────────────────────────────────
+ * 600px 프레임 폭에서 모바일 단일 컬럼 → 2-up 으로 전환해 공간 활용 개선.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-match-card-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 16px;
   }
 }
 
@@ -161,10 +229,12 @@
     padding: 28px 0 12px;
   }
 
-  /* Two-column layout for the detail body + sticky right card. */
+  /* Two-column layout for the detail body + sticky right card.
+     minmax(0,1fr): 좌측이 내용에 따라 수축 가능 (overflow 방지).
+     min(360px,34%): 우측 패널이 초광폭 뷰포트에서 무한 확장되지 않도록 상한 */
   .tm-match-detail-desktop-layout {
     display: grid;
-    grid-template-columns: 1fr 360px;
+    grid-template-columns: minmax(0, 1fr) min(360px, 34%);
     gap: 32px;
     align-items: start;
     padding-top: 0;
@@ -231,16 +301,31 @@
     margin-right: auto;
     padding-left: 0;
     padding-right: 0;
-    padding-bottom: 120px;
+    /* Fix (1): 폼 끝 정적 CTA가 내용을 덮지 않도록 하단 padding 제거.
+       고정 CTA → 정적 배치로 전환했으므로 큰 하단 여백 불필요. */
+    padding-bottom: 32px;
   }
 
-  /* Desktop CTA for the wizard: stay inside the centered 600px column.
-     .tm-create-fixed-cta is only used on match creation/edit pages so
-     this global override is safe within the matches domain. */
-  .tm-create-fixed-cta {
+  /* Fix (1): 데스크톱에서 match wizard CTA를 fixed → static으로 전환.
+     .tm-create-fixed-cta는 globals.css에서 position:fixed / bottom:0 으로 정의됨.
+     데스크톱에서는 폼 아래에 정적으로 붙어 레벨 셀렉트 등 하단 입력칸을 가리지 않도록 함.
+     .tm-match-create-shell 바로 다음 형제 요소에만 스코프하여 team-matches 페이지 누수 방지.
+     bare .tm-create-fixed-cta 셀렉터 제거 — team-matches-page의 fixed CTA가 영향받지 않도록. */
+  .tm-match-create-shell + .tm-create-fixed-cta {
+    position: static;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    width: auto;
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
+    margin-top: 16px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-top: none;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   /* Sport grid: 3-up on desktop so all sports fit in fewer rows. */

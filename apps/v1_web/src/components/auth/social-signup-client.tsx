@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/v1-ui/primitives';
+import { Button } from '@/components/v1-ui/button';
 import { useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { saveStoredV1Session } from '@/lib/session-storage';
@@ -98,9 +99,17 @@ export function SocialSignupClient() {
       topTitle="카카오 가입"
       fixedAction={
         <>
-          <button className={`tm-btn tm-btn-lg ${isBlocked ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`} disabled={isBlocked} form="v1-social-signup-form" type="submit">
-            {completeProfile.isPending ? '저장 중' : isBlocked ? '입력 확인 후 계속' : '운동 설정으로 계속'}
-          </button>
+          <Button
+            block
+            disabled={isBlocked && !completeProfile.isPending}
+            form="v1-social-signup-form"
+            loading={completeProfile.isPending}
+            size="lg"
+            type="submit"
+            variant={isBlocked ? 'neutral' : 'primary'}
+          >
+            {isBlocked ? '입력 확인 후 계속' : '운동 설정으로 계속'}
+          </Button>
           {disabledReason ? <div className="tm-text-micro tm-auth-fixed-reason">{disabledReason}</div> : null}
         </>
       }
@@ -124,11 +133,17 @@ export function SocialSignupClient() {
                 required
                 type="text"
                 value={nickname}
+                aria-invalid={fieldErrors.nickname ? true : undefined}
+                aria-describedby={fieldErrors.nickname || nicknameVerified ? 'social-signup-nickname-helper' : undefined}
               />
-              <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || nickname.trim().length < 2} onClick={runNicknameCheck} type="button">{checkNickname.isPending ? '확인 중' : '중복 확인'}</button>
+              <Button disabled={nickname.trim().length < 2} loading={checkNickname.isPending} onClick={runNicknameCheck} size="md" type="button" variant="neutral">중복 확인</Button>
             </span>
             {fieldErrors.nickname || nicknameVerified ? (
-              <span className={`tm-text-caption tm-auth-field-helper ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}>
+              <span
+                id="social-signup-nickname-helper"
+                role={fieldErrors.nickname ? 'alert' : undefined}
+                className={`tm-text-caption tm-auth-field-helper ${fieldErrors.nickname ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
+              >
                 {fieldErrors.nickname ?? '사용 가능한 닉네임이에요.'}
               </span>
             ) : null}

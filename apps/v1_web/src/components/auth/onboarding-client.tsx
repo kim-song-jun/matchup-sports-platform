@@ -3,8 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { SportGlyph } from '@/components/v1-ui/sport-glyph';
+import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import {
   useV1CompleteOnboarding,
   useV1DeferOnboarding,
@@ -61,7 +63,7 @@ const stepMeta: Record<OnboardingRouteStep, { stepNo: number; title: string; sub
     sub: '위치 권한 없어도 괜찮아요. 아래에서 지역을 직접 고르거나 건너뛸 수 있어요.',
   },
   confirm: {
-    stepNo: 3,
+    stepNo: 4,
     title: '준비가 끝났어요',
     sub: '선택한 종목, 실력, 지역을 기준으로 홈 추천과 필터가 시작돼요.',
   },
@@ -97,11 +99,22 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     if (hydrated) writeDraft(draft);
   }, [draft, hydrated]);
 
+  // 마스터 데이터 3쿼리 중 하나라도 실패하면 빈 draft 저장 위험이 있으므로 에러 상태 분리.
+  const masterError = onboarding.isError || sportsQuery.isError || regionsQuery.isError;
+  const retryMasterData = () => {
+    if (onboarding.isError) void onboarding.refetch();
+    if (sportsQuery.isError) void sportsQuery.refetch();
+    if (regionsQuery.isError) void regionsQuery.refetch();
+  };
+
   const sports = sportsQuery.data ?? [];
   const regions = toDistrictRegionOptions(regionsQuery.data ?? []);
   const selectedSportIds = new Set(draft.sports.map((sport) => sport.sportId));
   const selectedRegionIds = new Set(draft.regions.map((region) => region.regionId));
   const missingLevels = draft.sports.some((sport) => !sport.levelId);
+  // confirm 게이트: 종목 없이 완료하면 홈 추천·필터가 동작하지 않으므로 CTA 비활성 처리.
+  // 지역은 '나중에 설정하기'로 건너뛸 수 있어 빈 상태가 유효하지만, 종목은 매칭의 핵심이라 필수.
+  const emptySports = draft.sports.length === 0;
   const selectedSports = useMemo(
     () => draft.sports.map((item) => ({ ...item, sport: sports.find((sport) => sport.id === item.sportId) })).filter((item) => item.sport),
     [draft.sports, sports],
@@ -218,9 +231,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
       complete={complete}
       defer={defer}
       disabled={
+        masterError ||
         pending ||
-        (step === 'sport' && draft.sports.length === 0) ||
-        (step === 'level' && (draft.sports.length === 0 || missingLevels))
+        (step === 'sport' && emptySports) ||
+        (step === 'level' && (emptySports || missingLevels)) ||
+        (step === 'confirm' && emptySports)
       }
       pending={pending}
       saveAndGo={saveAndGo}
@@ -252,11 +267,21 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         <span className="tm-onboarding-desktop-nav-title">{topTitle}</span>
       </div>
       <div className="tm-auth-body">
-        <ProgressHeader stepNo={meta.stepNo} total={3} />
+        {/* 단계 전환 시 스크린리더에 현재 단계를 공지 */}
+        <span
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        >
+          {meta.stepNo > 0 ? `4단계 중 ${meta.stepNo}단계, ${meta.title}` : meta.title}
+        </span>
+        <ProgressHeader stepNo={meta.stepNo} total={4} />
         <h1 className="tm-text-heading tm-auth-heading">{meta.title}</h1>
         <p className="tm-text-body tm-auth-sub">{meta.sub}</p>
         {skipAction ? <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={skipAction} type="button">나중에 설정하기</button> : null}
         {onboarding.isLoading || sportsQuery.isLoading || regionsQuery.isLoading ? <Notice title="불러오는 중" body="저장된 정보를 불러오고 있어요." /> : null}
+        {/* 마스터 데이터 실패 시 빈 draft로 저장 방지 — 재시도 유도 후 저장 CTA도 disable됨 */}
+        {masterError ? <ErrorState message="운동 설정 정보를 불러오지 못했어요. 다시 시도해 주세요." onRetry={retryMasterData} /> : null}
         {error ? <Notice title="저장하지 못했어요" body={error} tone="orange" /> : null}
         {step === 'resume' ? <ResumePanel onboardingStep={onboarding.data?.currentStep} draft={draft} /> : null}
         {step === 'sport' ? (
@@ -267,7 +292,10 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                 key={sport.id}
                 onClick={() => setDraft((current) => toggleSport(current, sport.id))}
                 type="button"
+                aria-pressed={selectedSportIds.has(sport.id)}
               >
+                {/* SportGlyph: 선택 시 blue500, 미선택 시 text-muted — tm-signup-sport-icon 토큰 재사용 */}
+                <SportGlyph code={sport.code} size={28} className="tm-signup-sport-icon" />
                 <div className="tm-text-body-lg">{sport.name}</div>
                 <div className="tm-text-caption">{selectedSportIds.has(sport.id) ? '선택됨' : '탭해서 선택'}</div>
               </button>
@@ -287,6 +315,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                       key={level.id}
                       onClick={() => setDraft((current) => setSportLevel(current, sportId, level.id))}
                       type="button"
+                      aria-pressed={levelId === level.id}
                     >
                       {level.name}
                     </button>
@@ -309,14 +338,15 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                   key={region.id}
                   onClick={() => setDraft((current) => toggleRegion(current, region.id))}
                   type="button"
+                  aria-pressed={selectedRegionIds.has(region.id)}
                 >
-              {region.name}
-            </button>
-          ))}
+                  {region.name}
+                </button>
+              ))}
         </div>
           </>
         ) : null}
-        {step === 'confirm' ? <ConfirmPanel draft={draft} regions={regions} sports={sports} /> : null}
+        {step === 'confirm' ? <ConfirmPanel draft={draft} emptySports={emptySports} regions={regions} sports={sports} /> : null}
       </div>
     </AuthFrame>
   );
@@ -338,12 +368,12 @@ function OnboardingFixedAction({
   step: OnboardingRouteStep;
 }) {
   if (step === 'resume') {
+    /* #22: 픽셀 스페이서 div → gap으로 교체 */
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" onClick={() => saveAndGo('sport', '/onboarding/sport')} type="button">처음부터 다시 선택</button>
-        <div style={{ height: 8 }} />
         <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" onClick={() => saveAndGo('confirm', '/onboarding/confirm')} type="button">저장된 선택 확인</button>
-      </>
+      </div>
     );
   }
 
@@ -370,12 +400,12 @@ function OnboardingFixedAction({
   }
 
   if (step === 'region') {
+    /* #22: 픽셀 스페이서 div → gap으로 교체 */
     return (
-      <>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '다음으로'}</button>
-        <div style={{ height: 8 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={pending} onClick={() => saveAndGo('region', '/onboarding/confirm')} type="button">{pending ? '저장 중' : '지역 선택 완료'}</button>
         <button className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
-      </>
+      </div>
     );
   }
 
@@ -385,15 +415,17 @@ function OnboardingFixedAction({
 function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboardingStep?: V1OnboardingStep }) {
   return (
     <div className="tm-auth-stack">
-      <Card pad={15}><div className="tm-text-body-lg">현재 단계</div><div className="tm-text-caption">{onboardingStep ?? 'sport'}</div></Card>
-      <Card pad={15}><div className="tm-text-body-lg">선택한 종목</div><div className="tm-text-caption">{draft.sports.length}개</div></Card>
-      <Card pad={15}><div className="tm-text-body-lg">선택한 지역</div><div className="tm-text-caption">{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
+      {/* #19: 핵심 상태값은 tm-text-body(15px)로 격상, 레이블은 caption 유지 */}
+      <Card pad={16}><div className="tm-text-caption">현재 단계</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{onboardingStepLabel(onboardingStep ?? 'sport')}</div></Card>
+      {/* P1 tabular-nums: 숫자 카운트에 폰트 수치 흔들림 방지 */}
+      <Card pad={16}><div className="tm-text-caption">선택한 종목</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{draft.sports.length}개</div></Card>
+      <Card pad={16}><div className="tm-text-caption">선택한 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{draft.regions.length ? `${draft.regions.length}개` : '선택한 지역 없음'}</div></Card>
       <Notice title="잠깐 나가도 괜찮아요" body="설정을 나가도 선택한 내용이 저장돼요. 돌아오면 멈춘 단계부터 이어서 할 수 있어요." />
     </div>
   );
 }
 
-function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regions: Array<{ id: string; name: string }>; sports: Array<{ id: string; name: string; levels: Array<{ id: string; name: string }> }> }) {
+function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: OnboardingDraft; emptySports: boolean; regions: Array<{ id: string; name: string }>; sports: Array<{ id: string; name: string; levels: Array<{ id: string; name: string }> }> }) {
   const sportSummary = draft.sports
     .map((item) => {
       const sport = sports.find((candidate) => candidate.id === item.sportId);
@@ -409,17 +441,28 @@ function ConfirmPanel({ draft, regions, sports }: { draft: OnboardingDraft; regi
 
   return (
     <div className="tm-auth-stack tm-onboarding-confirm-grid">
-      <Card pad={15}><div className="tm-text-label">관심 종목과 실력</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{sportSummary || '선택하지 않음'}</div></Card>
-      <Card pad={15}><div className="tm-text-label">활동 지역</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{regionSummary || '선택 안 함'}</div></Card>
+      {/* 종목 미설정 경고: 홈 추천·필터가 동작하지 않음을 명시하고 뒤로가기를 안내 */}
+      {emptySports ? (
+        <Notice
+          title="종목을 선택하지 않았어요"
+          body="종목을 선택하지 않으면 홈 추천과 매칭 필터가 동작하지 않아요. 뒤로 돌아가 종목을 선택해 주세요."
+          tone="orange"
+        />
+      ) : null}
+      {/* #19: 값(sportSummary, regionSummary)을 tm-text-body(15px/600)로 격상, 레이블은 caption 유지 */}
+      {/* P1 tabular-nums: 숫자가 포함될 수 있는 요약 텍스트 */}
+      <Card pad={16}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{sportSummary || '미설정'}</div></Card>
+      <Card pad={16}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '미설정'}</div></Card>
       {draft.currentLocation ? (
-        <Card pad={15} className="tm-onboarding-confirm-full">
-          <div className="tm-text-label">현재 위치</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>
+        <Card pad={16} className="tm-onboarding-confirm-full">
+          <div className="tm-text-caption">현재 위치</div>
+          <div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>
             {formatLocation(draft.currentLocation)}
           </div>
         </Card>
       ) : null}
-      <Notice title="설정 완료" body="홈에 들어간 뒤에도 설정에서 종목, 실력, 지역을 바꿀 수 있어요." tone="green" />
+      {/* 종목이 설정된 경우에만 완료 안내 노출 */}
+      {!emptySports ? <Notice title="설정 완료" body="홈에 들어간 뒤에도 설정에서 종목, 실력, 지역을 바꿀 수 있어요." tone="green" /> : null}
     </div>
   );
 }
@@ -438,7 +481,7 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
   }
 
   if (status === 'unmatched' && location) {
-    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · 지원 지역과 거리가 멀어 자동 선택하지 않았습니다.`} tone="orange" />;
+    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · 지원 지역과 거리가 멀어 자동 선택하지 않았어요.`} tone="orange" />;
   }
 
   if (location) {
@@ -449,14 +492,23 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {
-  return <Card pad={14} className={`tm-auth-notice tm-auth-notice-${tone}`}><div className="tm-text-label">{title}</div><div className="tm-text-caption">{body}</div></Card>;
+  return <Card pad={16} className={`tm-auth-notice tm-auth-notice-${tone}`}><div className="tm-text-label">{title}</div><div className="tm-text-caption">{body}</div></Card>;
 }
 
 function ProgressHeader({ stepNo, total }: { stepNo: number; total: number }) {
   return (
     <div className="tm-auth-progress">
-      <span className="tm-text-micro">{stepNo > 0 ? `${stepNo} / ${total}단계` : null}</span>
-      <div className="tm-auth-progress-bars">{Array.from({ length: total }).map((_, index) => <span key={index} data-active={stepNo > 0 && index < stepNo} />)}</div>
+      <span className="tm-text-micro" aria-hidden="true">{stepNo > 0 ? `${stepNo} / ${total}단계` : null}</span>
+      <div
+        className="tm-auth-progress-bars"
+        role="progressbar"
+        aria-valuenow={stepNo > 0 ? stepNo : 0}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={stepNo > 0 ? `${total}단계 중 ${stepNo}단계` : '시작 전'}
+      >
+        {Array.from({ length: total }).map((_, index) => <span key={index} data-active={stepNo > 0 && index < stepNo} />)}
+      </div>
     </div>
   );
 }

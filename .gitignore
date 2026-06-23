@@ -8,7 +8,9 @@ dist/
 .playwright-mcp/
 .pnpm-store/
 playwright-report/
+playwright-report-v1/
 test-results/
+test-results-v1/
 tmp/
 output/
 e2e/.auth/

@@ -108,7 +108,8 @@
 @media (min-width: 1024px) {
   .tm-search-panel {
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
+    /* 280→304px: 빠른 조건 부제('팀매치 결과 함께 보기') 한 줄 확보 */
+    grid-template-columns: 304px minmax(0, 1fr);
     gap: 0 32px;
     align-items: start;
     padding-top: 8px;
@@ -120,7 +121,7 @@
     gap: 0;
     /* Stick to viewport when results scroll long */
     position: sticky;
-    top: 148px; /* 64px nav + 52px search bar + 32px spacing */
+    top: 152px; /* 64px nav + 52px search bar + 36px spacing — 148→152 보정 */
     max-height: calc(100dvh - 160px);
     overflow-y: auto;
     scrollbar-width: none;
@@ -141,14 +142,14 @@
   }
 }
 
-/* ─── 5. Quick filters grid — 4-up on desktop ─────────────────────────────────
+/* ─── 5. Quick filters grid — 1-col on desktop panel ──────────────────────────
  * On mobile: 2-column grid (from .tm-search-quick-grid inline style).
- * On desktop: 2-column to keep each card readable within the 280px panel.
- * The tablet breakpoint in globals.css forces 1-col; override it back to 2-col.
+ * On desktop: 1-column so 부제 텍스트('팀매치 결과 함께 보기' 등)가 한 줄로 표시됨.
+ * 304px 패널 폭 기준 각 카드 full-width → 부제 mid-word 줄바꿈 해소.
  */
 @media (min-width: 1024px) {
   .tm-search-quick-grid {
-    grid-template-columns: 1fr 1fr !important;
+    grid-template-columns: 1fr !important;
     gap: 8px !important;
   }
 }

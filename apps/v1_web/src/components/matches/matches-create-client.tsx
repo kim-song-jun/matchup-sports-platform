@@ -13,12 +13,14 @@ import {
 } from '@/hooks/use-v1-api';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
+import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MatchEdit, V1MatchMutationPayload } from '@/types/api';
 import { MatchCreatePageView } from './matches-page';
 import type { MatchCreateStep, MatchCreateViewModel } from './matches.types';
 import { getMatchCreateViewModel } from './matches.view-model';
 
 const storageKey = 'teameet:v1:match-draft';
+const selectionKey = 'teameet:v1:match-selection';
 const defaultGenderRule = '성별 무관';
 
 type MatchDraft = MatchCreateViewModel['draft'];
@@ -30,19 +32,45 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   const createMatch = useV1CreateMatch();
   const uploadImages = useV1UploadImages();
   const [draft, setDraft] = usePersistedDraft();
-  const [selectedSportId, setSelectedSportId] = useState('');
-  const [regionId, setRegionId] = useState('');
+  // 위저드 step이 각각 별도 라우트라 step 이동 시 이 컴포넌트가 재마운트된다. 종목/지역 선택을
+  // 로컬 useState에만 두면 매 step 첫 항목으로 리셋돼(풋살 선택→다음 step에서 축구로 소실)
+  // 잘못된 종목/지역으로 매치가 생성된다. draft와 동일하게 localStorage에 영속한다.
+  const [selection, setSelection] = useState<{ sportId: string; regionId: string }>({ sportId: '', regionId: '' });
+  const [selectionHydrated, setSelectionHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedSportId && sports.data?.[0]) setSelectedSportId(sports.data[0].id);
-  }, [selectedSportId, sports.data]);
 
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
+  // 마스터 데이터 준비 후 1회 hydrate: 저장된 선택이 유효하면 우선, 없으면 첫 항목 기본값.
   useEffect(() => {
-    if (!regionId && regionOptions[0]) setRegionId(regionOptions[0].id);
-  }, [regionId, regionOptions]);
+    if (selectionHydrated || !sports.data || regionOptions.length === 0) return;
+    let stored: { sportId?: string; regionId?: string } = {};
+    try {
+      const raw = window.localStorage.getItem(selectionKey);
+      if (raw) stored = JSON.parse(raw) as { sportId?: string; regionId?: string };
+    } catch {
+      window.localStorage.removeItem(selectionKey);
+    }
+    const sportId =
+      stored.sportId && sports.data.some((item) => item.id === stored.sportId)
+        ? stored.sportId
+        : sports.data[0]?.id ?? '';
+    const regionId =
+      stored.regionId && regionOptions.some((item) => item.id === stored.regionId)
+        ? stored.regionId
+        : regionOptions[0]?.id ?? '';
+    setSelection({ sportId, regionId });
+    setSelectionHydrated(true);
+  }, [sports.data, regionOptions, selectionHydrated]);
+
+  // hydrate 이후 선택 변경을 영속(다음 step 재마운트에서 복원).
+  useEffect(() => {
+    if (!selectionHydrated) return;
+    window.localStorage.setItem(selectionKey, JSON.stringify(selection));
+  }, [selection, selectionHydrated]);
+
+  const selectedSportId = selection.sportId;
+  const regionId = selection.regionId;
 
   const model = buildCreateModel({
     step,
@@ -55,10 +83,10 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     submitting: createMatch.isPending,
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
-      if (sport) setSelectedSportId(sport.id);
+      if (sport) setSelection((current) => ({ ...current, sportId: sport.id }));
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: setRegionId,
+    onRegionChange: (value) => setSelection((current) => ({ ...current, regionId: value })),
     onBack: () => router.push(previousCreateHref(step)),
     onNext: () => router.push(nextCreateHref(step)),
     uploadImage: async (file: File) => {
@@ -78,6 +106,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
         onSuccess: (result) => {
           window.localStorage.setItem('teameet:v1:last-match-id', result.matchId);
           window.localStorage.removeItem(storageKey);
+          window.localStorage.removeItem(selectionKey);
           router.push(result.detailRoute || `/matches/${result.matchId}`);
         },
         onError: (err) => setError(err instanceof Error ? err.message : '매치를 만들지 못했어요. 다시 시도해 주세요.'),
@@ -111,13 +140,14 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
 
   const model = buildCreateModel({
     step: 'edit',
+    matchId,
     draft,
     selectedSportId,
     regionId,
     sports: editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : [],
     regions: editQuery.data?.form.regionId ? [{ id: editQuery.data.form.regionId, name: '현재 지역' }] : [],
     error: editQuery.isError ? '수정 권한이 없거나 매치를 불러오지 못했어요.' : error,
-    lockedReason: editQuery.data?.editable === false ? editQuery.data.lockedReason ?? '지금은 수정할 수 없어요.' : null,
+    lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
     onSelectSport: () => undefined,
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
@@ -163,6 +193,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
 
 function buildCreateModel({
   step,
+  matchId,
   draft,
   selectedSportId,
   regionId,
@@ -182,6 +213,7 @@ function buildCreateModel({
   submitLabel,
 }: {
   step: MatchCreateStep;
+  matchId?: string;
   draft: MatchDraft;
   selectedSportId: string;
   regionId: string;
@@ -206,6 +238,7 @@ function buildCreateModel({
 
   return {
     ...fallback,
+    matchId,
     selectedSport,
     sports: sportNames,
     draft,
@@ -263,7 +296,7 @@ function buildDefaultDraft(): MatchDraft {
 function normalizeStoredDraft(stored: Partial<MatchDraft>): Partial<MatchDraft> {
   const oldDefaults = {
     title: '주말 풋살 초보 환영 매치',
-    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치입니다.',
+    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치예요.',
     rules: '풋살화 착용, 지각 시 미리 연락',
     venue: '안양천 풋살장',
     address: '서울 양천구 안양천로 939',

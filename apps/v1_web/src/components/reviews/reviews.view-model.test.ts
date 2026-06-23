@@ -1,19 +1,42 @@
 import { describe, expect, it } from 'vitest';
 import { REVIEW_TAG_OPTIONS } from './reviews.view-model';
 
-describe('reviews view model', () => {
-  it('uses review tag codes accepted by the v1 API DTO', () => {
-    const acceptedCodes = new Set([
-      'punctual',
-      'manner',
-      'teamwork',
-      'communication',
-      'active',
-      'considerate',
-      'passionate',
-      'play_again',
-    ]);
+/**
+ * v1 API(reviews.service.ts의 REVIEW_TAGS)가 수용하는 리뷰 태그 코드의 정본.
+ * 서버는 `uniqueTagCodes`에서 `tagCode in REVIEW_TAGS`로 필터링하므로, 이 집합에 없는
+ * 코드를 UI가 보내면 **조용히 누락**된다(400도 아니고 그냥 사라짐). 따라서 UI 옵션 코드는
+ * 반드시 이 집합의 부분집합이어야 한다. (UI가 8개를 모두 제공할 의무는 없음 — 현재 UI는
+ * 6개만 큐레이션해 노출하며, active/passionate는 의도적으로 제외된 것으로 본다.)
+ * v1_api에서 REVIEW_TAGS를 변경하면 이 목록도 함께 갱신해야 한다.
+ */
+const API_ACCEPTED_CODES = new Set([
+  'punctual',
+  'manner',
+  'teamwork',
+  'communication',
+  'active',
+  'considerate',
+  'passionate',
+  'play_again',
+]);
 
-    expect(REVIEW_TAG_OPTIONS.map((option) => option.code).every((code) => acceptedCodes.has(code))).toBe(true);
+describe('reviews view model — 태그 옵션 계약', () => {
+  it('모든 옵션 코드가 API 수용 집합에 속한다 (제출 시 조용히 누락되지 않음)', () => {
+    const offending = REVIEW_TAG_OPTIONS.map((option) => option.code).filter(
+      (code) => !API_ACCEPTED_CODES.has(code),
+    );
+    // 실패 시 어떤 코드가 API에 없는지 메시지에 드러나도록 빈 배열과 비교한다.
+    expect(offending).toEqual([]);
+  });
+
+  it('코드 중복이 없다 (같은 태그가 두 번 노출되지 않음)', () => {
+    const codes = REVIEW_TAG_OPTIONS.map((option) => option.code);
+    expect(new Set(codes).size).toBe(codes.length);
+  });
+
+  it('모든 옵션이 비어있지 않은 한국어 라벨을 가진다', () => {
+    for (const option of REVIEW_TAG_OPTIONS) {
+      expect(option.label.trim().length).toBeGreaterThan(0);
+    }
   });
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ShieldCheck } from 'lucide-react';
+import { Activity, Calendar, Clock, Shield } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminUsers,
@@ -13,8 +13,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminDataTable,
-  AdminStatusPill,
+  AdminCardList,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -22,7 +21,6 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 import type { V1AdminUserRow, CursorPage } from '@/types/api';
 
 // ── Date formatter ────────────────────────────────────────────────────────────
@@ -167,64 +165,6 @@ export default function AdminUsersPage() {
     );
   }
 
-  // Table column definitions
-  const columns: AdminTableColumn<V1AdminUserRow>[] = [
-    {
-      key: 'member',
-      header: '회원',
-      render: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-gray-900 text-[14px]">
-              {row.nickname ?? row.displayName ?? '(이름 없음)'}
-            </span>
-            {row.adminRole && (
-              <span className="inline-flex items-center gap-0.5 bg-blue-50 text-blue-700 text-[11px] font-semibold px-1.5 py-0.5 rounded-full">
-                <ShieldCheck size={10} aria-hidden="true" />
-                운영자
-              </span>
-            )}
-          </div>
-          {row.email && (
-            <span className="text-[12px] text-gray-400">{row.email}</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (row) => <AdminStatusPill status={row.accountStatus} />,
-    },
-    {
-      key: 'activity',
-      header: '활동',
-      render: (row) => (
-        <span className="text-[13px] text-gray-600 tabular-nums">
-          매치 {row.hostedMatchCount} · 팀 {row.ownedTeamCount}
-        </span>
-      ),
-    },
-    {
-      key: 'createdAt',
-      header: '가입일',
-      render: (row) => (
-        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
-          {formatDateCompact(row.createdAt)}
-        </span>
-      ),
-    },
-    {
-      key: 'lastLoginAt',
-      header: '최근 접속',
-      render: (row) => (
-        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
-          {formatDateCompact(row.lastLoginAt)}
-        </span>
-      ),
-    },
-  ];
-
   const errorMessage = isError
     ? extractErrorMessage(error, '회원 목록을 불러오지 못했어요.')
     : undefined;
@@ -248,12 +188,38 @@ export default function AdminUsersPage() {
           onStatusChange={(v) => setActiveStatus(v)}
         />
 
-        {/* Data table */}
-        <AdminDataTable<V1AdminUserRow>
-          columns={columns}
+        {/* Card list */}
+        <AdminCardList<V1AdminUserRow>
           rows={rows}
           keyExtractor={(row) => row.userId}
-          actionsHeader="작업"
+          card={(row) => ({
+            title: row.nickname ?? row.displayName ?? '(이름 없음)',
+            subtitle: row.email ?? undefined,
+            status: row.accountStatus,
+            meta: [
+              ...(row.adminRole
+                ? [{ icon: <Shield size={14} aria-hidden="true" />, label: '운영자' }]
+                : []),
+              {
+                icon: <Activity size={14} aria-hidden="true" />,
+                label: `매치 ${row.hostedMatchCount} · 팀 ${row.ownedTeamCount}`,
+              },
+              {
+                icon: <Calendar size={14} aria-hidden="true" />,
+                label: formatDateCompact(row.createdAt),
+              },
+              {
+                icon: <Clock size={14} aria-hidden="true" />,
+                label: formatDateCompact(row.lastLoginAt),
+              },
+            ],
+            tone:
+              row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
+                ? 'danger'
+                : row.accountStatus === 'suspended' || row.accountStatus === 'withdrawal_pending'
+                  ? 'warning'
+                  : undefined,
+          })}
           renderActions={
             canWrite
               ? (row) => (
@@ -264,7 +230,7 @@ export default function AdminUsersPage() {
                       setModalOpen(true);
                     }}
                     className={[
-                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium',
+                      'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
                       'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
@@ -284,7 +250,7 @@ export default function AdminUsersPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonRows={8}
+          skeletonCards={8}
         />
 
         {/* Load more trigger */}
@@ -294,7 +260,7 @@ export default function AdminUsersPage() {
               type="button"
               onClick={() => void loadMore()}
               className={[
-                'h-[44px] px-6 rounded-xl text-[14px] font-semibold transition-colors',
+                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
                 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               ].join(' ')}

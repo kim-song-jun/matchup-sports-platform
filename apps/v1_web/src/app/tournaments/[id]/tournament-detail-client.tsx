@@ -8,6 +8,7 @@ import { useV1Tournament, useV1MyRegistration } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { formatTournamentDateShort, formatTournamentDateLong, formatEntryFee } from '@/lib/date-utils';
 import type {
   V1TournamentDetail,
   V1TournamentFormat,
@@ -48,32 +49,6 @@ function getFormatLabel(format: V1TournamentFormat): string {
     case 'knockout': return '토너먼트';
     case 'group_knockout': return '조별리그 후 토너먼트';
   }
-}
-
-function formatTournamentDate(dateStr: string | null): string {
-  if (!dateStr) return '날짜 미정';
-  const d = new Date(dateStr);
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  const weekday = weekdays[d.getDay()];
-  return `${year}년 ${month}월 ${day}일 (${weekday})`;
-}
-
-function formatShortDate(dateStr: string | null): string {
-  if (!dateStr) return '미정';
-  const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  const weekday = weekdays[d.getDay()];
-  return `${month}/${day} (${weekday})`;
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
 }
 
 function formatPrize(amount: number): string {
@@ -120,11 +95,12 @@ function ApplyCTAButtons({
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8 }}>
       <Link
         href={`/tournaments/${tournament.id}/my`}
         className="tm-btn tm-btn-lg tm-btn-neutral"
         aria-label="내 신청 상태 확인"
+        style={{ whiteSpace: 'nowrap' }}
       >
         내 신청 보기
       </Link>
@@ -251,8 +227,20 @@ function TournamentDetailView({
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상금</div>
-            <div className="tm-text-subhead" style={{ color: 'var(--text-strong)', fontWeight: 800, lineHeight: 1.2 }}>
-              총 {formatPrize(tournament.prizePool!)}
+            {/* P1 숫자:단위 2:1 + tabular-nums — 상금 금액 */}
+            <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, lineHeight: 1.2 }}>
+              <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center', marginRight: 2 }}>총</span>
+              <span
+                className="tab-num"
+                style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 800, color: 'var(--text-strong)' }}
+              >
+                {tournament.prizePool!.toLocaleString('ko-KR')}
+              </span>
+              <span
+                style={{ fontSize: 'var(--font-size-body)', fontWeight: 600, color: 'var(--text-strong)' }}
+              >
+                원
+              </span>
             </div>
           </div>
         </div>
@@ -342,8 +330,12 @@ function TournamentDetailView({
           <div className="tm-hide-desktop" style={{ padding: '14px 16px', borderBottom: '1px solid var(--grey100)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
               <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
-              <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-                {tournament.confirmedCount}/{tournament.teamCount}팀
+              {/* P1 숫자:단위 2:1 + tabular-nums */}
+              <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                <span className="tab-num" style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-strong)' }}>
+                  {tournament.confirmedCount}
+                </span>
+                <span style={{ fontSize: 'var(--font-size-body-sm)', color: 'var(--text-muted)', fontWeight: 500 }}>/{tournament.teamCount}팀</span>
               </span>
             </div>
             <div
@@ -380,12 +372,12 @@ function TournamentDetailView({
           </div>
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
-            <InfoRow label="일정" value={formatShortDate(tournament.scheduledAt)} />
+            <InfoRow label="일정" value={formatTournamentDateShort(tournament.scheduledAt) ?? '미정'} />
             <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
           {/* 항상 표시 */}
           {tournament.registrationDeadlineAt ? (
-            <InfoRow label="신청 마감" value={formatTournamentDate(tournament.registrationDeadlineAt)} />
+            <InfoRow label="신청 마감" value={formatTournamentDateLong(tournament.registrationDeadlineAt)} />
           ) : null}
           {tournament.venue ? (
             <InfoRow label="장소" value={tournament.venue} />
@@ -492,7 +484,7 @@ function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {formatShortDate(tournament.scheduledAt)}
+            {formatTournamentDateShort(tournament.scheduledAt) ?? '미정'}
           </span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -741,7 +733,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
             ) : (
               <Card pad={16} style={{ background: 'var(--grey50)' }}>
                 <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                  결선 대진 준비 중
+                  결선 대진표
                 </div>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>
                   조별 리그가 끝나면 결선 대진표가 공개돼요.
@@ -856,7 +848,7 @@ function fixtureStatusLabel(status: string): string {
     case 'in_progress': return '진행 중';
     case 'completed': return '종료';
     case 'cancelled': return '취소';
-    default: return status;
+    default: return '알 수 없음';
   }
 }
 
@@ -900,9 +892,12 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const hasResult = fixture.result !== null;
   const homeScore = hasResult ? fixture.result!.homeScore : null;
   const awayScore = hasResult ? fixture.result!.awayScore : null;
+  // 라운드 라벨: tournament-bracket.tsx ROUND_LABELS 맵과 동일하게 '4강' 사용
   const roundLabel = fixture.round
-    ? fixture.round.replace('group', '조별').replace('semi', '준결승').replace('final', '결승').replace('third_place', '3·4위')
+    ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
     : `${fixture.fixtureNumber}경기`;
+  // 날짜 라벨: invalid/누락이면 null → 빈 span(스타일된 공백) 대신 날짜 영역 자체를 숨긴다 (Copilot)
+  const scheduledLabel = formatTournamentDateShort(fixture.scheduledAt);
 
   return (
     <Card pad={14}>
@@ -919,9 +914,9 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           <span className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             {roundLabel}
           </span>
-          {fixture.scheduledAt ? (
+          {scheduledLabel ? (
             <span className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>
-              {formatShortDate(fixture.scheduledAt)}
+              {scheduledLabel}
             </span>
           ) : null}
         </div>
@@ -1097,11 +1092,23 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table
-          /* maxWidth keeps columns tight on the wide desktop column (팀 칸이 늘어나
-             승점/전적/득실이 멀리 밀리는 현상 방지). 모바일은 카드가 더 좁아 100%로 채움. */
-          style={{ width: '100%', maxWidth: 460, borderCollapse: 'collapse', minWidth: 280 }}
+          /* colgroup으로 열 너비를 명시해 카드 끝선까지 순위표가 확장되도록 함.
+             maxWidth 캡 제거 — 카드 너비에 맞게 테이블이 늘어남. */
+          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}
           aria-label={`${group.name} 순위표`}
         >
+          <colgroup>
+            {/* 순위 */}
+            <col style={{ width: 32 }} />
+            {/* 팀명 — 남은 공간을 모두 차지 */}
+            <col />
+            {/* 승점 */}
+            <col style={{ width: 48 }} />
+            {/* 전적 */}
+            <col style={{ width: 88 }} />
+            {/* 득실 */}
+            <col style={{ width: 48 }} />
+          </colgroup>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--grey100)' }}>
               <th

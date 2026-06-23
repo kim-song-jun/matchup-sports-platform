@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
@@ -73,6 +73,12 @@ export function TeamCreatePageClient() {
 
 export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
+  // #16: my 컨텍스트(/my/teams/[id]) 경유 진입 여부 판별
+  // from=my 파라미터가 있으면 취소·저장 후 /my/teams/[id]로 복귀
+  const searchParams = useSearchParams();
+  const fromMy = searchParams.get('from') === 'my';
+  const cancelHref = fromMy ? `/my/teams/${teamId}` : '/teams';
+  const successHref = fromMy ? `/my/teams/${teamId}` : undefined; // undefined이면 API 응답 detailRoute 사용
   const query = useV1TeamDetail(teamId);
   const updateTeam = useV1UpdateTeam(teamId);
   const uploadImages = useV1UploadImages();
@@ -141,14 +147,15 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       updateTeam.mutate(
         { ...payload, version, membersVisibilityEnabled },
         {
-          onSuccess: (result) => router.push(result.detailRoute || `/teams/${teamId}`),
+          // #16: from=my이면 저장 후 /my/teams/[id]로 복귀, 아니면 API 응답 경로 사용
+          onSuccess: (result) => router.push(successHref ?? result.detailRoute ?? `/teams/${teamId}`),
           onError: (err) => setError(err instanceof Error ? err.message : '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'),
         },
       );
     },
   });
 
-  return <TeamFormPageView model={model} />;
+  return <TeamFormPageView model={model} cancelHref={cancelHref} />;
 }
 
 function buildModel({
@@ -178,7 +185,7 @@ function buildModel({
   joinPolicy: 'approval_required' | 'closed';
   membersVisibilityEnabled?: boolean;
   sports: Array<{ id: string; name: string }>;
-  regions: Array<{ id: string; name: string }>;
+  regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   error: string | null;
   submitting: boolean;
   setDraft: (updater: (current: TeamDraft) => TeamDraft) => void;

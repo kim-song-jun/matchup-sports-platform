@@ -8,18 +8,17 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1AdminTeamMatchRow } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { Activity, Clock, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
-  AdminDataTable,
-  AdminStatusPill,
+  AdminFilterBar,
+  AdminCardList,
   AdminReasonModal,
   AdminEmpty,
-  AdminTableSkeleton,
   STATUS_META,
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -40,15 +39,15 @@ function formatDateTime(dateStr: string): string {
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
-  { value: 'recruiting', label: '모집중' },
+  { value: 'recruiting', label: '모집 중' },
   { value: 'matched', label: '매칭됨' },
-  { value: 'cancelled', label: '취소' },
+  { value: 'cancelled', label: '취소됨' },
   { value: 'completed', label: '완료' },
   { value: 'archived', label: '보관' },
 ];
 
 const REASON_MODAL_STATUS_OPTIONS = [
-  { value: 'recruiting', label: STATUS_META['recruiting']?.label ?? '모집중' },
+  { value: 'recruiting', label: STATUS_META['recruiting']?.label ?? '모집 중' },
   { value: 'matched', label: STATUS_META['matched']?.label ?? '매칭됨' },
   { value: 'cancelled', label: STATUS_META['cancelled']?.label ?? '취소됨' },
   { value: 'completed', label: STATUS_META['completed']?.label ?? '완료' },
@@ -128,7 +127,7 @@ export default function AdminTeamMatchesPage() {
       {
         onSuccess: () => {
           setModalRow(null);
-          showToast('처리했어요.', 'success');
+          showToast('팀매치 상태를 변경했어요.', 'success');
           setAccumulatedRows([]);
           setCursor(null);
           setNextCursor(null);
@@ -139,41 +138,6 @@ export default function AdminTeamMatchesPage() {
       },
     );
   };
-
-  // ── Table columns ──────────────────────────────────────────────────
-  const columns: AdminTableColumn<V1AdminTeamMatchRow>[] = [
-    {
-      key: 'title',
-      header: '팀매치',
-      render: (row) => (
-        <span className="font-medium text-gray-900">{row.title}</span>
-      ),
-    },
-    {
-      key: 'hostTeamName',
-      header: '호스트팀',
-      render: (row) => (
-        <span className="text-gray-600">{row.hostTeamName}</span>
-      ),
-    },
-    {
-      key: 'sportName',
-      header: '종목',
-      render: (row) => <span className="text-gray-600">{row.sportName}</span>,
-    },
-    {
-      key: 'startAt',
-      header: '일시',
-      render: (row) => (
-        <span className="text-gray-600 tabular-nums">{formatDateTime(row.startAt)}</span>
-      ),
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (row) => <AdminStatusPill status={row.status} />,
-    },
-  ];
 
   // ── Loading / error for initial load ───────────────────────────────
   const isInitialLoad = isPending && accumulatedRows.length === 0;
@@ -186,77 +150,78 @@ export default function AdminTeamMatchesPage() {
         description="플랫폼 내 모든 팀매치의 상태를 필터링하고 관리해요."
       />
 
-      {/* Status chip filter — no search box (backend has no q for team-matches) */}
+      {/* Status chip filter — AdminFilterBar 재사용으로 chip 높이 min-h-[44px] + 페이지 간 리듬 통일.
+          백엔드가 q 파라미터를 미지원하므로 hideSearch=true로 검색 입력란만 생략한다. */}
       <div className="mb-4">
-        <div role="group" aria-label="상태 필터" className="flex items-center gap-1.5 flex-wrap">
-          {STATUS_OPTIONS.map((opt) => {
-            const active = activeStatus === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleStatusChange(opt.value)}
-                aria-pressed={active}
-                className={[
-                  'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
-                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                  active
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
-                ].join(' ')}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <AdminFilterBar
+          hideSearch
+          searchValue=""
+          onSearchChange={() => undefined}
+          statusOptions={STATUS_OPTIONS}
+          activeStatus={activeStatus}
+          onStatusChange={handleStatusChange}
+        />
       </div>
 
-      {/* Data table */}
-      {isInitialLoad ? (
-        <AdminTableSkeleton />
-      ) : isError && accumulatedRows.length === 0 ? (
-        <AdminDataTable<V1AdminTeamMatchRow>
-          columns={columns}
-          rows={[]}
-          keyExtractor={(r) => r.teamMatchId}
-          error={extractErrorMessage(error, '팀매치 목록을 불러오지 못했어요.')}
-          onRetry={() => void refetch()}
-        />
-      ) : (
-        <AdminDataTable<V1AdminTeamMatchRow>
-          columns={columns}
-          rows={accumulatedRows}
-          keyExtractor={(r) => r.teamMatchId}
-          actionsHeader="작업"
-          renderActions={
-            canWrite
-              ? (row) => (
-                  <button
-                    type="button"
-                    onClick={() => setModalRow(row)}
-                    aria-label={`${row.title} 상태 변경`}
-                    className="inline-flex items-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap min-w-[80px] justify-center"
-                  >
-                    상태 변경
-                  </button>
-                )
-              : undefined
-          }
-          empty={
-            <AdminEmpty
-              title="검색 결과가 없어요"
-              description="필터를 변경해 보세요."
-            />
-          }
-        />
-      )}
+      {/* Card list */}
+      <AdminCardList<V1AdminTeamMatchRow>
+        rows={accumulatedRows}
+        keyExtractor={(r) => r.teamMatchId}
+        card={(row) => ({
+          title: row.title,
+          subtitle: row.hostTeamName,
+          status: row.status,
+          meta: [
+            { icon: <Activity size={14} aria-hidden="true" />, label: row.sportName },
+            { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.startAt) },
+            { icon: <Calendar size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
+          ],
+          tone:
+            row.status === 'cancelled'
+              ? 'danger'
+              : row.status === 'archived'
+                ? 'warning'
+                : undefined,
+        })}
+        renderActions={
+          canWrite
+            ? (row) => (
+                <button
+                  type="button"
+                  onClick={() => setModalRow(row)}
+                  aria-label={`${row.title} 상태 변경`}
+                  className={[
+                    'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                    'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
+                    'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                  ].join(' ')}
+                >
+                  상태 변경
+                </button>
+              )
+            : undefined
+        }
+        loading={isInitialLoad}
+        empty={
+          <AdminEmpty
+            title="검색 결과가 없어요"
+            description="필터를 변경해 보세요."
+          />
+        }
+        error={
+          isError && accumulatedRows.length === 0
+            ? extractErrorMessage(error, '팀매치 목록을 불러오지 못했어요.')
+            : undefined
+        }
+        onRetry={() => void refetch()}
+        skeletonCards={8}
+      />
 
       {/* Load more */}
       {hasMore && !isInitialLoad && (
         <div className="mt-4 flex flex-col items-center gap-1.5">
           {loadMoreFailed && (
-            <p className="text-[13px] text-red-500" role="alert">
+            <p className="text-[var(--font-size-label)] text-red-500" role="alert">
               {extractErrorMessage(error, '다음 목록을 불러오지 못했어요.')}
             </p>
           )}
@@ -264,7 +229,7 @@ export default function AdminTeamMatchesPage() {
             type="button"
             onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
             disabled={isFetching}
-            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[14px] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             {isFetching ? '불러오는 중…' : loadMoreFailed ? '다시 시도' : '더 보기'}
           </button>

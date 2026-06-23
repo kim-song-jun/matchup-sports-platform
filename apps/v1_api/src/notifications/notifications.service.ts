@@ -24,7 +24,9 @@ export type NotificationEventType =
   | 'team_match_cancelled'
   | 'tournament_registration_confirmed'
   | 'tournament_registration_waitlisted'
-  | 'tournament_registration_cancelled';
+  | 'tournament_registration_cancelled'
+  | 'team_invitation_received'
+  | 'team_invitation_accepted';
 
 /** Preference field in V1NotificationPreference that gates the event type. */
 function preferenceFieldForEvent(
@@ -54,7 +56,9 @@ function preferenceFieldForEvent(
   if (
     type === 'team_join_application_received' ||
     type === 'team_join_application_accepted' ||
-    type === 'team_join_application_rejected'
+    type === 'team_join_application_rejected' ||
+    type === 'team_invitation_received' ||
+    type === 'team_invitation_accepted'
   ) {
     return 'teamEnabled';
   }
@@ -89,7 +93,9 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   if (
     type === 'team_join_application_received' ||
     type === 'team_join_application_accepted' ||
-    type === 'team_join_application_rejected'
+    type === 'team_join_application_rejected' ||
+    type === 'team_invitation_received' ||
+    type === 'team_invitation_accepted'
   ) {
     return 'team';
   }
@@ -140,6 +146,8 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_registration_confirmed: '대회 참가가 확정됐어요',
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요',
   tournament_registration_cancelled: '대회 참가가 취소됐어요',
+  team_invitation_received: '팀 초대가 도착했어요',
+  team_invitation_accepted: '팀 초대를 수락했어요',
 };
 
 @Injectable()

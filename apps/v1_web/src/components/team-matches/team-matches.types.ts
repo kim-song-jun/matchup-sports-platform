@@ -47,17 +47,18 @@ export type TeamMatchListViewModel = {
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
     sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
-    viewOptions: Array<{ label: string; value: 'card' | 'compact'; description: string; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
   };
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
   summary: { count: number; today: number; urgent: number };
   matches: TeamMatchModel[];
+  /** #5: 로딩 중 여부 — true일 때 EmptyState 대신 PageSkeleton 렌더 */
+  isLoading?: boolean;
 };
 
 export type TeamMatchStateViewModel = TeamMatchListViewModel & {
-  state: 'empty' | 'error' | 'filter';
+  state: 'empty' | 'error';
   title: string;
   description: string;
 };

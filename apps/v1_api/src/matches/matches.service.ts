@@ -1035,18 +1035,18 @@ function getGenderRuleWhere(genderRule: NonNullable<MatchesQueryDto['genderRule'
 
 function getReasonMessage(reasonCode: string) {
   const messages: Record<string, string> = {
-    OK: '신청할 수 있습니다.',
-    LOGIN_REQUIRED: '로그인이 필요합니다.',
-    HOST_CANNOT_APPLY: '호스트는 자기 매치에 신청할 수 없습니다.',
-    ALREADY_REQUESTED: '이미 신청했고 승인 대기 중입니다.',
-    ALREADY_PARTICIPANT: '이미 참여 확정된 매치입니다.',
-    FULL: '정원이 마감되었습니다.',
-    DEADLINE_PASSED: '신청 가능 시간이 지났습니다.',
-    NOT_RECRUITING: '모집 중인 매치가 아닙니다.',
-    BLOCKED_USER: '신청할 수 없는 계정 상태입니다.',
+    OK: '신청할 수 있어요.',
+    LOGIN_REQUIRED: '로그인이 필요해요.',
+    HOST_CANNOT_APPLY: '내가 만든 매치에는 신청할 수 없어요.',
+    ALREADY_REQUESTED: '이미 신청해서 승인을 기다리고 있어요.',
+    ALREADY_PARTICIPANT: '이미 참여가 확정된 매치예요.',
+    FULL: '정원이 모두 찼어요.',
+    DEADLINE_PASSED: '신청 가능 시간이 지났어요.',
+    NOT_RECRUITING: '지금은 모집 중인 매치가 아니에요.',
+    BLOCKED_USER: '신청할 수 없는 계정 상태예요.',
   };
 
-  return messages[reasonCode] ?? '신청할 수 없습니다.';
+  return messages[reasonCode] ?? '신청할 수 없어요.';
 }
 
 function validationError(message: string, field: string) {

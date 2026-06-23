@@ -57,13 +57,13 @@ export function ChatListPageClient() {
     rooms: visibleRooms.filter((room) => !room.pinned),
     status: query.isPending ? 'loading' : query.isError ? 'error' : 'ready',
     emptyTitle: query.isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
-    emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생깁니다.' : undefined,
+    emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
     emptyHref: query.isError ? undefined : '/matches',
     onRetry: query.isError ? () => query.refetch() : undefined,
     leaveConfirm: leaveTarget
       ? {
           title: '채팅방을 나갈까요?',
-          body: '나가면 목록에서 사라지고, 새 메시지는 다시 초대되기 전까지 받을 수 없습니다.',
+          body: '나가면 목록에서 사라지고, 호스트가 다시 초대할 때까지 메시지를 받을 수 없어요.',
           pending: leaveRoom.isPending,
           onCancel: () => setLeaveTarget(null),
           onConfirm: () =>
@@ -140,8 +140,22 @@ export function NotificationsPageClient() {
   const query = useV1Notifications({ limit: 50 });
   const read = useV1ReadNotification();
   const readAll = useV1ReadAllNotifications();
-  const notifications = Array.isArray(query.data?.items) ? query.data.items.map(toNotificationModel) : [];
+
+  const status: NotificationsViewModel['status'] = query.isPending
+    ? 'loading'
+    : query.isError
+      ? 'error'
+      : 'ready';
+
+  // 로딩·에러 중에는 빈 배열을 유지하되 EmptyState를 노출하지 않는다.
+  // ready 상태에서만 실제 알림이 없는지 판정한다.
+  const notifications = status === 'ready' && Array.isArray(query.data?.items)
+    ? query.data.items.map(toNotificationModel)
+    : [];
+
   const model: NotificationsViewModel = {
+    status,
+    onRetry: query.isError ? () => query.refetch() : undefined,
     unreadCount: typeof query.data?.unreadCount === 'number' ? query.data.unreadCount : 0,
     notifications,
     readAllPending: readAll.isPending,
@@ -191,7 +205,7 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
     id: message.messageId,
     who: message.mine ? 'me' : 'other',
     label: message.mine ? '나' : message.sender.displayName,
-    body: message.content ?? '삭제된 메시지입니다.',
+    body: message.content ?? '삭제된 메시지예요.',
   };
 }
 
@@ -210,12 +224,20 @@ function toNotificationModel(notification: V1Notification): NotificationModel {
 }
 
 function normalizeNotificationHref(route?: string | null, type?: string | null) {
-  if (!route) return type?.includes('review') ? '/my/reviews' : '/notifications';
-  if (route.startsWith('/chat/rooms/')) return route.replace('/chat/rooms/', '/chat/');
-  if (route === '/reviews' || route.startsWith('/reviews?')) return route.replace('/reviews', '/my/reviews');
-  if (route.startsWith('/reviews/')) return `/my${route}`;
-  if (type?.includes('review') && route === '/my') return '/my/reviews';
-  return route;
+  const normalized = (() => {
+    if (!route) return type?.includes('review') ? '/my/reviews' : '/notifications';
+    if (route.startsWith('/chat/rooms/')) return route.replace('/chat/rooms/', '/chat/');
+    if (route === '/reviews' || route.startsWith('/reviews?')) return route.replace('/reviews', '/my/reviews');
+    if (route.startsWith('/reviews/')) return `/my${route}`;
+    if (type?.includes('review') && route === '/my') return '/my/reviews';
+    return route;
+  })();
+
+  if (normalized === '/notifications' || normalized.includes('from=notifications')) {
+    return normalized;
+  }
+
+  return `${normalized}${normalized.includes('?') ? '&' : '?'}from=notifications`;
 }
 
 function formatNotificationGroup(value: string) {

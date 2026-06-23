@@ -5,6 +5,26 @@
  * Mobile (<768) is NEVER modified here.
  * ============================================================ */
 
+/* ─── 모바일 진입점 위계 — summary-bar를 heading으로 승격 ─────────────────────
+ * .tm-team-mobile-heading: tm-hide-desktop을 통해 모바일(<1024)에서만 렌더.
+ * desktop에서는 .tm-team-desktop-header-title이 동일 역할을 담당.
+ */
+.tm-team-mobile-heading {
+  margin: 0 0 4px;
+  padding: 12px 0 0;
+}
+
+/* ─── 카드 footer '팀 보기' ghost 링크 스타일 보강 ──────────────────────────
+ * tm-btn-ghost는 globals.css에서 배경 없는 텍스트 링크로 정의됨.
+ * 카드 컨텍스트에서 파란 텍스트 + 기본 색상 구분으로 충분.
+ * solid blue CTA를 카드마다 반복하지 않아 시각 노이즈 절제.
+ */
+.tm-team-card-view-link {
+  color: var(--blue500);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 /* ─── List /teams ─────────────────────────────────────────────────────────────
  * Sport-chip row wraps instead of scrolling horizontally.
  * Summary bar becomes a single line.
@@ -105,19 +125,30 @@
     margin-top: 20px;
   }
 
-  /* Hover lift for each card */
+  /* hover lift(translateY) 금지(rubric R-K2 / .impeccable anti-pattern).
+     배경 tint + border-color 변화만으로 hover 상태를 표현한다. */
   .tm-team-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: background-color 0.12s, border-color 0.12s;
   }
 
   .tm-team-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+    background: var(--blue50);
+    border-color: var(--blue100);
   }
 
   /* Hide floating FAB — inline button provides the same action */
   .tm-floating-fab {
     display: none;
+  }
+}
+
+/* ─── 태블릿 (768–1023): 2-up 그리드 전환 ─────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-team-card-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 16px;
   }
 }
 
@@ -229,13 +260,6 @@
     gap: 16px;
   }
 
-  /* Sidebar logo + team name area */
-  .tm-team-detail-sidebar-identity {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
   /* Status + member count row in sidebar */
   .tm-team-detail-sidebar-meta {
     display: flex;
@@ -298,6 +322,20 @@
   }
 }
 
+/* ─── 팀 목록/상태 페이지: desktop 빈상태 중앙 안착 ──────────────────────────
+ * (2) 1440 wide에서 EmptyState가 정중앙으로 흩어지는 문제 해결.
+ * 실제 EmptyState는 .tm-team-list 안(TeamListPageView/TeamStatePageView)에 렌더되므로
+ * 해당 스코프로 max-width 480 컬럼 + 상단 offset 적용(채워진 카드 스택엔 미적용 — 빈 상태에만 렌더).
+ */
+@media (min-width: 1024px) {
+  .tm-team-list .tm-empty-state {
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-top: 120px;
+  }
+}
+
 /* ─── new/edit forms /teams/new  /teams/[id]/edit ─────────────────────────────
  * Desktop: 2-column grid — left form column + right sticky live-preview rail
  * (mirrors the tournament apply .tm-tournament-form-grid pattern so 팀 만들기 fills
@@ -316,17 +354,37 @@
   width: 100%;
 }
 
+.tm-team-form-main .tm-create-field {
+  display: block;
+}
+
+.tm-region-select-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tm-region-select-grid .tm-create-input {
+  width: 100%;
+  margin-top: 0;
+}
+
 @media (min-width: 1024px) {
+  /* Fix (2): 좌측 폼 컬럼 과확장 방지.
+     minmax(0, 560px)으로 상한을 두어 넓은 뷰포트에서 입력칸이 ~690px 이상 늘어나지 않게 함.
+     320px 우측 rail은 유지. */
   .tm-team-form-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 560px) 320px;
     gap: 28px;
     align-items: start;
   }
 
-  /* Left form column: fill the 1fr track. Reset the GLOBAL .tm-create-shell
-     desktop cap (team-matches.css sets max-width:560 + margin:auto, which would
-     otherwise leak in and re-strand the form) and drop mobile padding/clearance. */
+  /* Left form column: 1fr 트랙 안에서 max-width 없이 track 폭만큼 채움.
+     Reset the GLOBAL .tm-create-shell desktop cap (team-matches.css sets
+     max-width:560 + margin:auto, which would otherwise leak in and re-strand
+     the form) and drop mobile padding/clearance. */
   .tm-team-form-grid .tm-create-shell {
     max-width: none;
     margin-left: 0;
@@ -358,4 +416,15 @@
   .tm-team-form-cta.tm-hide-desktop {
     display: none !important;
   }
+}
+
+/* ─── Fix (4): team-new 모바일 스크롤 하단 여백 ─────────────────────────────────
+ * 고정 CTA(~72px 버튼 + 8px gap + 16px 상하 padding ≈ 96px) +
+ * safe-area-inset-bottom(홈 바가 있는 기기 ~34px) 합산 ≈ 124px 이상.
+ * 매치 위저드(.tm-create-shell padding-bottom) 동일 패턴 적용.
+ * desktop에서는 .tm-team-form-grid .tm-create-shell이 padding:0 0 48px으로 재정의하므로
+ * 이 규칙은 사실상 모바일(<1024)에서만 유효하다.
+ */
+.tm-team-form-main {
+  padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px));
 }

@@ -66,10 +66,12 @@
   }
 
   /* Desktop 2-column wrapper for the my home page.
+   * LEFT sidebar: 360px 고정 — 프로필/통계 콘텐츠에 충분한 폭.
+   * RIGHT main: 1fr 확장 — 우하단 대형 공백 해소 (이전: 340px 고정이라 main이 남은 폭에 늘어나지 않았음).
    * On mobile this wrapper had display:contents — override to real grid here. */
   .tm-my-desktop-layout {
     display: grid;
-    grid-template-columns: 340px 1fr;
+    grid-template-columns: 360px 1fr;
     gap: 32px;
     align-items: start;
   }
@@ -108,17 +110,14 @@
   .tm-my-desktop-sidebar .tm-my-avatar {
     width: 72px;
     height: 72px;
-    font-size: 28px;
+    font-size: var(--font-size-heading); /* 24px — R-T2 토큰, 구 28px */
     border-radius: 24px;
   }
 
-  /* Stats strip: reset the negative margin bleed, keep the grid. */
+  /* Stats strip: 이제 Card(border/radius/padding 내장) 안에 있으므로 독립 스타일 불필요.
+   * KPIStat 간격만 조정해 Card 내부 리듬을 유지함. */
   .tm-my-desktop-sidebar .tm-my-profile-stats {
-    margin: 0;
-    border: 1px solid var(--grey100);
-    border-radius: 16px;
-    padding: 14px 16px;
-    background: var(--surface);
+    margin: 8px 0 0;
   }
 
   .tm-my-desktop-sidebar .tm-my-profile-stats > div {
@@ -153,7 +152,11 @@
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
-    padding-bottom: 120px;
+    /*
+     * (1) 데스크톱에서는 fixed CTA가 static 인라인으로 전환되므로
+     *     모바일의 CTA 높이 보상 padding-bottom이 불필요하다. 폼 흐름 리듬만 확보.
+     */
+    padding-bottom: 40px;
   }
 
   /* Profile head inside edit form: horizontal layout (same as mobile) but
@@ -164,11 +167,22 @@
     border-radius: 16px;
   }
 
-  /* Fixed CTA pinned to the centered 600px column. */
+  /*
+   * (2) 데스크톱 '프로필 저장' CTA: fixed 해제 → 폼 흐름 맨 끝에 인라인으로 배치.
+   * 모바일에서는 .tm-fixed-cta(position:fixed, z-index:31)가 유지되지만,
+   * 데스크톱(≥1024px)에서는 position:static으로 override해 폼 흐름에 자연스럽게
+   * 따라오도록 합니다. border/background는 폼 카드와 시각적으로 구분하기 위해 유지.
+   */
   .tm-my-profile-edit-cta {
+    position: static;
+    transform: none;
+    width: 100%;
     max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+    z-index: auto;
   }
 }
 
@@ -186,14 +200,6 @@
     margin-right: auto;
   }
 
-  /* Notification toggle cards: slightly wider tap zone on desktop. */
-  .tm-my-settings-desktop .tm-my-toggle-button {
-    transition: background-color 0.12s;
-  }
-
-  .tm-my-settings-desktop .tm-my-toggle-button:hover {
-    background: var(--grey50);
-  }
 }
 
 /* ─── /my/reviews & /my/reviews/received: constrained column + page head ────
@@ -206,22 +212,27 @@
   .tm-review-shell {
     padding: 0 0 48px;
     max-width: 720px;
+    /* 가운데 정렬 — .tm-my-settings-desktop 패턴 일치 */
+    margin-left: auto;
+    margin-right: auto;
   }
 
-  /* Review schedule cards: hover lift. */
+  /* Review schedule cards: background highlight on hover (no lift — R-K2). */
   .tm-review-schedule-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: box-shadow 0.15s;
   }
 
   .tm-review-schedule-card:hover {
     box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
   }
 
   /* Review compose shell: same max-width. */
   .tm-review-compose-shell {
     max-width: 720px;
     padding-bottom: 120px;
+    /* 가운데 정렬 — .tm-review-shell 패턴 일치 */
+    margin-left: auto;
+    margin-right: auto;
   }
 
   /* Stats grid: 4-up on desktop. */
@@ -250,14 +261,13 @@
     gap: 16px;
   }
 
-  /* Hover lift on match cards */
+  /* Hover depth on match cards — background/shadow only, no lift (R-K2). */
   .tm-my-matches-desktop .tm-my-list-stack .tm-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: box-shadow 0.15s;
   }
 
   .tm-my-matches-desktop .tm-my-list-stack .tm-card:hover {
     box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
   }
 
   /* Segment row (joined/created toggle): constrain to ~360px, don't stretch */
@@ -285,13 +295,13 @@
     gap: 16px;
   }
 
+  /* Hover depth on team cards — background/shadow only, no lift (R-K2). */
   .tm-my-teams-desktop .tm-my-team-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: box-shadow 0.15s;
   }
 
   .tm-my-teams-desktop .tm-my-team-card:hover {
     box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
   }
 
   /* Stat grid: already 3-col on mobile — fine on desktop, no override needed. */
@@ -368,6 +378,9 @@
     display: grid;
     gap: 14px;
     max-width: 800px;
+    /* .tm-my-settings-desktop(184-186) 패턴과 동일하게 가운데 정렬 */
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .tm-my-members-desktop .tm-my-list-stack {
@@ -407,11 +420,16 @@
  */
 
 @media (min-width: 1024px) {
+  /*
+   * 모바일에서는 position:fixed인 CTA가 폼 말단 blue50 카드를 가리므로
+   * globals.css에서 padding-bottom:120px가 적용된다. 데스크톱에서는 CTA가
+   * position:static 폼 흐름으로 전환되므로 40px로 충분하다.
+   */
   .tm-my-sports-desktop {
     max-width: 640px;
     margin-left: auto;
     margin-right: auto;
-    padding-bottom: 120px;
+    padding-bottom: 40px;
   }
 
   .tm-my-sports-desktop .tm-auth-sport-grid {
@@ -419,10 +437,17 @@
     gap: 10px;
   }
 
+  /* 스포츠 설정 CTA: 프로필 편집과 동일하게 static 인라인으로 전환 */
   .tm-my-sports-cta {
+    position: static;
+    transform: none;
+    width: 100%;
     max-width: 640px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+    z-index: auto;
   }
 }
 
@@ -449,8 +474,9 @@
  */
 
 @media (min-width: 1440px) {
+  /* 1440 이상: sidebar를 380px로 소폭 확장해 main 컬럼에 공간 양보 */
   .tm-my-desktop-layout {
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 380px 1fr;
     gap: 40px;
   }
 
@@ -460,12 +486,48 @@
   }
 }
 
-/* 마이페이지 하단 로그아웃 버튼 여백 (데스크탑은 좌측 정렬 폭 제한) */
+/* 마이페이지 하단 로그아웃 버튼 여백.
+ * ghost variant이므로 좌측 정렬·폭 제한 대신 텍스트 링크처럼 자연스럽게 표시. */
 .tm-my-logout-row {
   margin-top: 20px;
 }
+
+/* ghost 로그아웃 버튼: 색=캡션, hover=text-strong. 파괴 액션이 primary CTA보다 낮은 시각 위계 유지 */
+.tm-logout-ghost {
+  color: var(--text-caption);
+  padding-left: 0;
+  padding-right: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tm-logout-ghost:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+/* ─── /my/settings/notifications: grouped toggle list ───────────────────────
+ * (2) 알림 설정 6개 개별 카드 → 단일 Card(pad=0) 내 .tm-my-menu-row 행.
+ * tm-noti-toggle-row는 .tm-my-menu-row 위에 얹는 modifier — toggle 우측 정렬.
+ * max-width는 settings 컨테이너(640px)가 이미 잡으므로 별도 불필요.
+ * 모바일에서도 동일하게 적용.
+ */
+.tm-noti-toggle-row {
+  min-height: 64px;
+}
+
+/* 토글 행 hover: settings 목록 패턴 일치 */
+.tm-noti-toggle-row:hover:not(:disabled) {
+  background: var(--grey50);
+}
+
+/* ─── /my/teams: KPI stat-grid 폭 제한 ──────────────────────────────────────
+ * (4) my-teams KPI 3-grid가 데스크톱에서 1120px 풀폭으로 늘어나는 문제.
+ * ≥1024px에서 max-width:360 + 좌측 정렬 — 콘텐츠 크기에 맞게 고정.
+ * teams·members 두 페이지 모두 .tm-my-stat-grid를 공유하므로 공통 적용.
+ */
 @media (min-width: 1024px) {
-  .tm-my-logout-row {
-    max-width: 320px;
+  .tm-my-teams-desktop .tm-my-stat-grid,
+  .tm-my-members-desktop .tm-my-stat-grid {
+    max-width: 360px;
+    margin-left: 0;
   }
 }

@@ -29,12 +29,17 @@
   }
 
   /* List: remove the mobile-inherited full-bleed padding; wrapper provides the
-     column centring. Keep the bottom padding for breathing room. */
+     column centring. Keep the bottom padding for breathing room.
+     flex column: empty/loading state를 수직 중앙 정렬하기 위해 flex context 부여.
+     min-height: 빈 상태가 너무 납작해지지 않도록 최소 높이 보장. */
   .tm-chat-list {
     max-width: 760px;
     margin-left: auto;
     margin-right: auto;
     padding-bottom: 48px;
+    display: flex;
+    flex-direction: column;
+    min-height: 480px;
   }
 
   /* Category chip row: comfortable top padding without the shell's topbar gap. */
@@ -54,6 +59,27 @@
     border-bottom: none;
     border-radius: 14px;
     margin-bottom: 4px;
+  }
+
+  /* (2) 데스크톱 unread 배지: 타임스탬프와 ~30px 떨어진 고립을 방지.
+   * .tm-chat-row-meta를 column 방향으로 바꿔 타임스탬프 아래에 배지를 배치한다.
+   * align-items:flex-end로 우측 정렬을 유지하고, gap으로 배지와 타임스탬프 간격을 조정. */
+  .tm-chat-row-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  /* (3) 빈 상태·로딩 상태: .tm-chat-list가 flex column이므로 flex:1로 남은 공간을 채우고
+   * column center 정렬로 수직 중앙에 위치시킨다. */
+  .tm-chat-empty {
+    flex: 1 1 auto;
+    min-height: 360px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Swipe actions exist only on touch; on desktop, reset the translateX so
@@ -103,12 +129,6 @@
     display: none;
   }
 
-  /* Empty state: more vertical breathing on desktop. */
-  .tm-chat-empty {
-    min-height: 320px;
-    padding-top: 72px;
-  }
-
   /* Leave confirm sheet: a centered dialog (not a bottom sheet) on desktop. */
   .tm-chat-leave-scrim {
     position: fixed;
@@ -122,6 +142,16 @@
     width: min(100%, 400px);
     border-radius: 20px;
     box-shadow: var(--shadow-2);
+  }
+}
+
+/* ─── 태블릿 (768–1023): 스와이프 액션 숨김 ──────────────────────────────────
+ * 태블릿(포인터 디바이스)에서 터치 전용 스와이프 액션이 노출되지 않도록 한다.
+ * ≥1024 블록에서도 display:none이지만, 768-1023 구간을 명시적으로 처리.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-chat-row-actions {
+    display: none;
   }
 }
 

@@ -40,7 +40,7 @@ export default function LandingPage() {
                 가장 빠르게 찾는 방법
               </h1>
               <p className="tm-landing-hero-sub">
-                풋살·농구·아이스하키·배드민턴 등 11개 종목에서 나에게 맞는 경기를 찾아드려요.
+                축구·풋살·러닝·수영 4개 종목으로 운영 중이고, 더 많은 종목을 준비하고 있어요.
                 지금 내 주변 매치를 찾아보세요.
               </p>
               <div className="tm-landing-hero-actions">
@@ -56,6 +56,7 @@ export default function LandingPage() {
               </p>
             </div>
             {/* Hero stat strip */}
+            {/* P1 숫자:단위 2:1 + tabular-nums — stat-num(24px mobile/28px desktop) : label(11px/13px) ≈ 2.2:1. tabular-nums는 .tm-landing-stat-num CSS에 적용됨 */}
             <div className="tm-landing-hero-stats" role="list">
               <div className="tm-landing-stat" role="listitem">
                 <span className="tm-landing-stat-num">124</span>
@@ -63,8 +64,8 @@ export default function LandingPage() {
               </div>
               <div className="tm-landing-stat-divider" aria-hidden="true" />
               <div className="tm-landing-stat" role="listitem">
-                <span className="tm-landing-stat-num">11</span>
-                <span className="tm-landing-stat-label">지원 종목</span>
+                <span className="tm-landing-stat-num">4+</span>
+                <span className="tm-landing-stat-label">운영 종목</span>
               </div>
               <div className="tm-landing-stat-divider" aria-hidden="true" />
               <div className="tm-landing-stat" role="listitem">
@@ -117,7 +118,7 @@ export default function LandingPage() {
                   <h3 className="tm-text-body-lg tm-landing-feature-title">팀·클럽 찾기</h3>
                   <p className="tm-text-caption tm-landing-feature-desc">
                     종목·지역·수준별 팀을 검색하고 가입 신청을 보내세요.
-                    팀 신뢰 점수로 믿을 수 있는 팀인지 미리 확인할 수 있습니다.
+                    팀 신뢰 점수로 믿을 수 있는 팀인지 미리 확인할 수 있어요.
                   </p>
                 </div>
               </li>
@@ -164,12 +165,24 @@ export default function LandingPage() {
             <div className="tm-landing-section-header">
               <h2 id="sports-heading" className="tm-text-heading">지원 종목</h2>
               <p className="tm-text-body" style={{ color: 'var(--text-muted)' }}>
-                11개 종목에서 나에게 맞는 매치를 찾아보세요
+                지금 4개 종목으로 운영 중이에요. 더 많은 종목을 순차적으로 열고 있어요.
               </p>
             </div>
             <ul className="tm-landing-sports" aria-label="지원 종목 목록">
+              {/* 활성 종목 (실제 seed) — 배지 없음 */}
               {[
-                { name: '풋살', emoji: '⚽' },
+                { name: '축구', emoji: '⚽' },
+                { name: '풋살', emoji: '🥅' },
+                { name: '러닝', emoji: '🏃' },
+                { name: '수영', emoji: '🏊' },
+              ].map(({ name, emoji }) => (
+                <li key={name} className="tm-landing-sport-chip" aria-label={name}>
+                  <span aria-hidden="true">{emoji}</span>
+                  <span>{name}</span>
+                </li>
+              ))}
+              {/* 준비중 종목 — 비색상 지표('준비중' 텍스트)로 상태 전달(a11y) */}
+              {[
                 { name: '농구', emoji: '🏀' },
                 { name: '아이스하키', emoji: '🏒' },
                 { name: '배드민턴', emoji: '🏸' },
@@ -178,12 +191,16 @@ export default function LandingPage() {
                 { name: '탁구', emoji: '🏓' },
                 { name: '야구', emoji: '⚾' },
                 { name: '배구', emoji: '🏐' },
-                { name: '수영', emoji: '🏊' },
                 { name: '클라이밍', emoji: '🧗' },
               ].map(({ name, emoji }) => (
-                <li key={name} className="tm-landing-sport-chip">
+                <li
+                  key={name}
+                  className="tm-landing-sport-chip tm-landing-sport-chip-soon"
+                  aria-label={`${name} (준비 중)`}
+                >
                   <span aria-hidden="true">{emoji}</span>
                   <span>{name}</span>
+                  <span className="tm-landing-sport-soon" aria-hidden="true">준비 중</span>
                 </li>
               ))}
             </ul>

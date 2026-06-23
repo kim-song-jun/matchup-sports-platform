@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -15,6 +15,8 @@ import {
   Megaphone,
   Send,
   Pencil,
+  Users,
+  User,
 } from 'lucide-react';
 import {
   useV1AdminTournament,
@@ -52,16 +54,18 @@ import type {
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
+
 import {
   AdminPageHeader,
+  AdminCardList,
   AdminDataTable,
-  AdminStatusPill,
   AdminTableSkeleton,
   AdminEmpty,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
 import type { AdminTableColumn } from '@/components/admin';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -183,6 +187,7 @@ interface SimpleModalProps {
 }
 
 function SimpleModal({ open, title, onClose, pending = false, children }: SimpleModalProps) {
+  const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
 
@@ -245,11 +250,11 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="simple-modal-title"
+        aria-labelledby={titleId}
         className="bg-white rounded-2xl shadow-[var(--shadow-2)] w-full max-w-[480px] overflow-hidden"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 id="simple-modal-title" className="text-sm font-bold text-gray-900">
+          <h2 id={titleId} className="text-sm font-bold text-gray-900">
             {title}
           </h2>
           <button
@@ -419,6 +424,7 @@ function RegistrationsTab({
   const rosterUnlock = useV1RosterUnlock();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
+  const { confirm: confirmCancel, ConfirmModal: CancelConfirmModal } = useConfirm();
 
   const registrations = data?.items ?? [];
 
@@ -450,7 +456,15 @@ function RegistrationsTab({
     );
   };
 
-  const handleCancel = (reg: V1AdminTournamentRegistration) => {
+  const handleCancel = async (reg: V1AdminTournamentRegistration) => {
+    const teamLabel = reg.teamName ? `"${reg.teamName}"` : '이 팀';
+    const ok = await confirmCancel({
+      title: '신청 취소',
+      message: `${teamLabel}의 신청을 취소할까요? 이 작업은 되돌릴 수 없어요.`,
+      confirmLabel: '취소 처리',
+      tone: 'danger',
+    });
+    if (!ok) return;
     cancelRegistration.mutate(
       { registrationId: reg.id },
       {
@@ -484,62 +498,40 @@ function RegistrationsTab({
   };
 
 
-  // ── AdminDataTable column definitions (f8) ───────────────────────────────
-  // loading/error/empty are delegated to AdminDataTable via props
-  const regColumns: AdminTableColumn<V1AdminTournamentRegistration>[] = [
-    {
-      key: 'teamName',
-      header: '팀명',
-      render: (r) => (
-        <span className="font-medium text-gray-900">{r.teamName ?? r.teamId}</span>
-      ),
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (r) => (
-        <AdminStatusPill status={r.status} />
-      ),
-    },
-    {
-      key: 'payment',
-      header: '결제',
-      render: (r) =>
-        r.payment ? (
-          <span className="text-[13px] text-gray-600">
-            {PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · {PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status}
-          </span>
-        ) : (
-          <span className="text-[13px] text-gray-500">—</span>
-        ),
-    },
-    {
-      key: 'depositorName',
-      header: '입금자',
-      render: (r) => (
-        <span className="text-[13px] text-gray-600">{r.depositorName ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'playerCount',
-      header: '선수 수',
-      render: (r) => (
-        <span className="tabular-nums text-gray-600">{r.playerCount}명</span>
-      ),
-    },
-  ];
-
   return (
     <>
-      {/* f8: AdminDataTable replaces custom desktop table + mobile card list */}
-      <AdminDataTable<V1AdminTournamentRegistration>
-        columns={regColumns}
+      {/* f8: AdminCardList — registrations as card grid */}
+      <AdminCardList<V1AdminTournamentRegistration>
         rows={registrations}
         keyExtractor={(r) => r.id}
+        card={(r) => ({
+          title: r.teamName ?? r.teamId,
+          subtitle: r.payment
+            ? `${PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · ${PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status}`
+            : undefined,
+          status: r.status,
+          meta: [
+            {
+              icon: <Users size={14} aria-hidden="true" />,
+              label: `${r.playerCount}명`,
+            },
+            {
+              icon: <User size={14} aria-hidden="true" />,
+              label: r.depositorName ?? '—',
+            },
+          ],
+          tone:
+            r.status === 'cancelled' || r.status === 'cancel_requested'
+              ? 'danger'
+              : r.status === 'awaiting_payment' || r.status === 'payment_checking'
+              ? 'warning'
+              : undefined,
+        })}
         loading={isPending}
         error={isError ? extractErrorMessage(error, '신청 목록을 불러오지 못했어요.') : undefined}
         onRetry={() => void refetch()}
         empty={<AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />}
+        skeletonCards={8}
         renderActions={(reg) => {
           const isLocked = !!reg.rosterLockedAt;
           return (
@@ -549,7 +541,7 @@ function RegistrationsTab({
                   onClick={() => handleConfirmPayment(reg)}
                   disabled={confirmPayment.isPending}
                   icon={<Check size={13} />}
-                  label="입금확인"
+                  label="입금 확인"
                   tone="blue"
                 />
               )}
@@ -621,6 +613,9 @@ function RegistrationsTab({
         registration={rosterRegistration}
         showToast={showToast}
       />
+
+      {/* 신청 취소 confirm modal */}
+      {CancelConfirmModal}
     </>
   );
 }
@@ -701,6 +696,7 @@ function BracketTab({
   // auto-generate state
   const [autoGenGroupId, setAutoGenGroupId] = useState('');
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const { confirm: confirmModal, ConfirmModal } = useConfirm();
 
   // ── Record result state ─────────────────────────────────────────────
   const [resultFixture, setResultFixture] = useState<V1AdminBracketFixture | null>(null);
@@ -791,9 +787,11 @@ function BracketTab({
     // Check for existing fixtures in this group
     const existingInGroup = allFixtures.filter((f) => f.groupId === targetGroupId);
     if (existingInGroup.length > 0) {
-      const ok = window.confirm(
-        `"${group.name}"에 이미 경기 일정 ${existingInGroup.length}개가 있어요. 추가로 만들까요?`,
-      );
+      const ok = await confirmModal({
+        title: '경기 일정 추가',
+        message: `"${group.name}"에 이미 경기 일정 ${existingInGroup.length}개가 있어요. 추가로 만들까요?`,
+        confirmLabel: '추가 생성',
+      });
       if (!ok) return;
     }
 
@@ -952,9 +950,13 @@ function BracketTab({
   const hasData = groups.length > 0 || fixtures.length > 0;
 
   return (
+    <>
+      {/* 확인 모달 — window.confirm 대체 */}
+      {ConfirmModal}
     <div className={[
       'flex flex-col gap-6',
-      hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_1fr] lg:items-start lg:gap-6' : '',
+      /* 우측 컬럼(브래킷)에 minmax(0,640px) 상한 추가 — 1920+에서 과폭 방지 */
+      hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_minmax(0,640px)] lg:items-start lg:gap-6' : '',
     ].join(' ')}>
 
       {/* ── 좌측 컬럼: 관리 폼 (조 만들기 · 팀 배정 · 픽스처 만들기) ── */}
@@ -1592,6 +1594,7 @@ function BracketTab({
         </form>
       </SimpleModal>
     </div>
+    </>
   );
 }
 
@@ -1800,6 +1803,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
   const { toasts, showToast } = useAdminToast();
   const updateTournament = useV1UpdateTournament(id);
+  const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
 
   const [activeTab, setActiveTab] = useState<TabId>('registrations');
 
@@ -1883,7 +1887,17 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const registrations = regData?.items ?? [];
 
   // ── Status change ────────────────────────────────────────────────────
-  const handleStatusChange = (nextStatus: V1TournamentStatus) => {
+  const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
+    // 취소는 비가역 → 반드시 확인 게이트
+    if (nextStatus === 'cancelled') {
+      const ok = await confirmStatusChange({
+        title: '대회 취소',
+        message: '대회를 취소하면 되돌릴 수 없어요. 정말 취소할까요?',
+        confirmLabel: '대회 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
     changeStatus.mutate(
       { status: nextStatus },
       {
@@ -2345,6 +2359,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
           </div>
         </form>
       </SimpleModal>
+
+      {/* 대회 상태 변경 confirm modal (취소 등 비가역 액션) */}
+      {StatusConfirmModal}
 
       <AdminToasts toasts={toasts} />
     </>

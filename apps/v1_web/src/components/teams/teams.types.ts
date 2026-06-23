@@ -48,12 +48,13 @@ export type TeamListViewModel = {
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
   };
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
-  summary: { scope: string; total: number; recruiting: number; nearby: number };
+  summary: { scope: string; total: number; recruiting: number; nearby?: number };
+  listLoading?: boolean;
   teams: TeamModel[];
 };
 
 export type TeamStateViewModel = TeamListViewModel & {
-  state: 'search' | 'empty' | 'error' | 'filter' | 'restricted';
+  state: 'empty' | 'error' | 'filter' | 'restricted';
   title: string;
   description: string;
 };
@@ -106,7 +107,7 @@ export type TeamFormViewModel = {
   form?: {
     sportId: string;
     regionId: string;
-    regions: Array<{ id: string; name: string }>;
+    regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
     sports: Array<{ id: string; name: string }>;
     joinPolicy: 'approval_required' | 'closed';
     membersVisibilityEnabled?: boolean;
@@ -124,8 +125,8 @@ export type TeamFormViewModel = {
 
 export type TeamMembersViewModel = {
   teamName: string;
-  activeTab: 'members' | 'requests';
-  tabs: Array<{ key: 'members' | 'requests'; label: string; count: number; onSelect: () => void }>;
+  activeTab: 'members' | 'requests' | 'invitations';
+  tabs: Array<{ key: 'members' | 'requests' | 'invitations'; label: string; count: number; onSelect: () => void }>;
   summary: { total: number; managers: number; pending: number };
   members: Array<{
     name: string;
@@ -143,4 +144,28 @@ export type TeamMembersViewModel = {
     actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
     actionPending?: boolean;
   }>;
+  /** owner/manager 전용 — 보낸 초대 목록 + 초대 폼 */
+  invitations?: {
+    /** 이메일 입력 폼 */
+    form: {
+      email: string;
+      message: string;
+      onEmailChange: (value: string) => void;
+      onMessageChange: (value: string) => void;
+      onSubmit: () => void;
+      submitting: boolean;
+      error: string | null;
+      successMessage: string | null;
+    };
+    /** 보낸 pending 초대 목록 */
+    items: Array<{
+      invitationId: string;
+      displayName: string;
+      createdAt: string;
+      message: string | null;
+      cancelPending: boolean;
+      onCancel: () => void;
+    }>;
+    listLoading: boolean;
+  };
 };

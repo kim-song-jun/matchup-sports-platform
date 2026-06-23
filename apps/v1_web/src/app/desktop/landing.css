@@ -364,6 +364,21 @@
   margin: 0;
 }
 
+/* ─── 태블릿 (768–1023px): features/steps 2-up 전환 ──────────────────────────
+ * 600px 프레임에서 모바일 단일 컬럼 → 2-up 그리드로 전환해 공간 활용 개선.
+ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-landing-features {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .tm-landing-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
 /* ─── Desktop (≥1024px) ────────────────────────────────────────────────────── */
 @media (min-width: 1024px) {
   /* Nav */
@@ -418,15 +433,16 @@
     padding: 0;
   }
 
-  /* Hero: two-column layout — content left, stats right */
+  /* Hero: two-column layout — content left, stats right.
+     1fr minmax(0,360px): 텍스트 컬럼이 내용에 따라 충분히 확보되도록 우측 상한 설정 */
   .tm-landing-hero {
     padding: 80px 32px 88px;
   }
 
   .tm-landing-hero .tm-landing-section-inner {
     display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 60px;
+    grid-template-columns: 1fr minmax(0, 360px);
+    gap: 40px;
     align-items: center;
   }
 

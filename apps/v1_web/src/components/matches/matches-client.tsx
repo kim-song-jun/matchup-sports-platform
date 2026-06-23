@@ -17,7 +17,7 @@ import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/l
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
-import { getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
+import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
 
 const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
 
@@ -169,7 +169,7 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
-        applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.message),
+        applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
         applyPending: applyMatch.isPending || withdrawMatch.isPending,
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
         chatLabel: chatLabel(viewerState),
@@ -230,7 +230,7 @@ function toParticipants(
   if (!match.participantsPreview?.length) {
     return [{
       name: match.host?.displayName ?? fallback[0]?.name ?? '호스트',
-      meta: '매치 만든 사람',
+      meta: '호스트',
       status: '승인완료',
       href: manageHref,
     }];
@@ -280,10 +280,6 @@ function buildMatchFilterSheet(
     { label: '마감임박', value: 'deadline', href: buildMatchHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
     { label: '최신순', value: 'latest', href: buildMatchHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
-  const viewOptions: NonNullable<MatchListViewModel['filterSheet']>['viewOptions'] = [
-    { label: '카드형', value: 'card', description: '이미지와 핵심 정보를 크게', href: buildMatchHref(params, { view: 'card', filter: '1' }), active: view === 'card' },
-    { label: '콤팩트형', value: 'compact', description: '더 많은 매치를 빠르게', href: buildMatchHref(params, { view: 'compact', filter: '1' }), active: view === 'compact' },
-  ];
   const genderOptions: NonNullable<MatchListViewModel['filterSheet']>['genderOptions'] = [
     { label: '성별 무관', value: '성별 무관', href: buildMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
     { label: '남', value: '남', href: buildMatchHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
@@ -306,7 +302,6 @@ function buildMatchFilterSheet(
     genderRule,
     levels,
     sortOptions,
-    viewOptions,
     genderOptions,
     levelOptions,
   };
@@ -403,14 +398,6 @@ function toDetailMode(viewerState: V1ViewerState, status: V1MatchApiStatus): Mat
   return 'default';
 }
 
-function applyLabel(viewerState: V1ViewerState, status: V1MatchApiStatus, message?: string) {
-  if (viewerState === 'host') return '매치 관리';
-  if (viewerState === 'requested') return '신청 취소';
-  if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
-  return message && message !== '신청할 수 있습니다.' ? message : '참가 신청';
-}
-
 function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {
   if (viewerState === 'host') return '내가 만든 매치';
   if (viewerState === 'requested') return '승인 대기';
@@ -483,7 +470,7 @@ async function shareMatch(match: V1Match): Promise<string | null> {
   if (navigator.clipboard) {
     try {
       await navigator.clipboard.writeText(url);
-      return '링크가 복사되었어요';
+      return '링크를 복사했어요';
     } catch {
       // clipboard 실패 — prompt 폴백
     }

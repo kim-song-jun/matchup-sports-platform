@@ -19,6 +19,7 @@ import {
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
 import { TeamMatchDetailPageView, TeamMatchListPageView, TeamMatchStatePageView } from './team-matches-page';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
 import {
@@ -98,6 +99,9 @@ export function TeamMatchListPageClient() {
       submitSearch(value, { source: 'recent' });
     },
   };
+  // 로딩 중(items === undefined)에는 mock matches를 렌더하지 않는다.
+  // base.matches는 존재하지 않는 ID(team-match-1~4)를 가리켜, 로딩 중에 클릭하면 404로 이어진다.
+  // #5: isLoading=true를 넘겨 TeamMatchListPageView가 EmptyState 대신 PageSkeleton을 렌더하게 한다.
   const model: TeamMatchListViewModel = items
     ? {
         ...base,
@@ -130,6 +134,9 @@ export function TeamMatchListPageClient() {
           matches: countItems,
           selectedSportId,
         }),
+        matches: [],
+        // #5: 로딩 중임을 명시 — 빈/로딩 구분
+        isLoading: query.isLoading,
       };
 
   return <TeamMatchListPageView model={model} />;
@@ -161,7 +168,9 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const router = useRouter();
   const query = useV1TeamMatch(teamMatchId);
   const viewerState = query.data ? getViewerState(query.data) : 'none';
-  const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' });
+  // guest = 비인증 사용자: viewerState가 'guest'이거나 query.data에 viewer.state='guest'로 내려오는 경우
+  const isGuest = viewerState === 'guest';
+  const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' && !isGuest });
   // Request the server max (50) so applicant teams aren't hidden behind the default
   // page size of 20. One match seeks a single opponent, so applicant teams stay well
   // within a single page — no cursor pagination needed here.
@@ -172,6 +181,8 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const [actionError, setActionError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
   const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
+  // 팀이 없는 경우: eligibility 로드 완료 후 teams 배열이 비어 있으면 소속 팀 없음 (#13)
+  const hasNoTeam = !isGuest && eligibility.isSuccess && eligibility.data.teams.length === 0;
   const withdrawTeamMatch = useV1WithdrawTeamMatchApplication(teamMatchId, selectedEligibility?.applicationId);
   const fallback = getTeamMatchDetailViewModel();
 
@@ -213,7 +224,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           ),
         },
         mode: toDetailMode(viewerState, getStatus(query.data)),
-        applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility),
+        applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam),
         applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
         chatLabel: chatLabel(viewerState, getStatus(query.data)),
@@ -231,8 +242,11 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           selectedTeamId: selectedEligibility?.teamId,
           applicationId: selectedEligibility?.applicationId,
           eligible: selectedEligibility?.eligible,
+          isGuest,
+          hasNoTeam,
           apply: (teamId) => applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }),
           withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
+          redirectTo: (href) => router.push(href),
         }),
       }
     : fallback;
@@ -316,10 +330,6 @@ function buildTeamMatchFilterSheet(
     { label: '마감임박', value: 'deadline', href: buildTeamMatchHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
     { label: '최신순', value: 'latest', href: buildTeamMatchHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
-  const viewOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['viewOptions'] = [
-    { label: '카드형', value: 'card', description: 'VS 히어로와 팀 정보', href: buildTeamMatchHref(params, { view: 'card', filter: '1' }), active: view === 'card' },
-    { label: '콤팩트형', value: 'compact', description: '더 많은 팀매치 비교', href: buildTeamMatchHref(params, { view: 'compact', filter: '1' }), active: view === 'compact' },
-  ];
   const genderOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['genderOptions'] = [
     { label: '성별 무관', value: '성별 무관', href: buildTeamMatchHref(params, { genderRule: genderRule === '성별 무관' ? null : '성별 무관', filter: '1' }), active: genderRule === '성별 무관' },
     { label: '남', value: '남', href: buildTeamMatchHref(params, { genderRule: genderRule === '남' ? null : '남', filter: '1' }), active: genderRule === '남' },
@@ -342,7 +352,6 @@ function buildTeamMatchFilterSheet(
     genderRule,
     levels,
     sortOptions,
-    viewOptions,
     genderOptions,
     levelOptions,
   };
@@ -440,11 +449,17 @@ function applyLabel(
   viewerState: V1TeamMatchViewerState,
   status: V1TeamMatchApiStatus,
   team?: { eligible: boolean; reasonCode: string; applicationId: string | null; name: string } | null,
+  isGuest?: boolean,
+  hasNoTeam?: boolean,
 ) {
   if (viewerState === 'host_team') return '매치 관리';
   if (viewerState === 'requested' || team?.reasonCode === 'ALREADY_REQUESTED') return '신청 취소';
   if (viewerState === 'approved' || status === 'matched') return '승인 완료';
   if (status !== 'recruiting') return '신청 불가';
+  // 비인증 사용자: 로그인 유도 (#13)
+  if (isGuest) return '로그인하고 신청하기';
+  // 팀 없음: 팀 만들기 유도 (#13)
+  if (hasNoTeam) return '팀 만들고 신청하기';
   if (team?.eligible) return `${team.name}으로 신청`;
   return reasonLabel(team?.reasonCode);
 }
@@ -489,18 +504,28 @@ function getApplyAction({
   selectedTeamId,
   applicationId,
   eligible,
+  isGuest,
+  hasNoTeam,
   apply,
   withdraw,
+  redirectTo,
 }: {
   viewerState: V1TeamMatchViewerState;
   selectedTeamId?: string;
   applicationId?: string | null;
   eligible?: boolean;
+  isGuest?: boolean;
+  hasNoTeam?: boolean;
   apply: (teamId: string) => Promise<unknown>;
   withdraw: () => Promise<unknown>;
+  redirectTo: (href: string) => void;
 }): (() => Promise<unknown>) | undefined {
   if ((viewerState === 'requested' || applicationId) && applicationId) return withdraw;
   if (eligible && selectedTeamId) return () => apply(selectedTeamId);
+  // 비인증: 로그인 페이지로 이동하되, 보던 팀매치 상세로 복귀하도록 redirect 전파 (Copilot)
+  if (isGuest) return async () => { redirectTo(getLoginPathForRedirect(getCurrentRedirectPath())); };
+  // 팀 없음: 팀 만들기 페이지로 이동 (#13)
+  if (hasNoTeam) return async () => { redirectTo('/teams/new'); };
   return undefined;
 }
 
@@ -509,7 +534,8 @@ function reasonLabel(reasonCode?: string) {
   if (reasonCode === 'ALREADY_APPROVED') return '승인 완료';
   if (reasonCode === 'MATCHED_ALREADY') return '이미 상대팀이 정해진 매치예요';
   if (reasonCode === 'NOT_RECRUITING') return '신청 마감된 매치예요';
-  return '신청 가능한 팀이 없어요';
+  // 팀이 없는 경우 → 팀 만들기 유도
+  return '팀을 만들고 신청할 수 있어요';
 }
 
 function parseRules(value: string | null | undefined, fallback: TeamMatchModel) {

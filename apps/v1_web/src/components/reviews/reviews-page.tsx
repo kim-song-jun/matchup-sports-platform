@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
+import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import type { V1ReviewDetail, V1ReviewTargetType } from '@/types/api';
@@ -52,9 +53,13 @@ export function ReviewsPageView({
                     </div>
                     <span className={`tm-badge ${card.state === 'done' ? 'tm-badge-green' : 'tm-badge-blue'}`}>{card.badgeLabel}</span>
                   </div>
+                  {/* #17: CTA 영역에 ChevronRight 추가 — 탭 가능한 카드임을 명시적으로 전달 */}
                   <div className="tm-review-card-foot">
                     <span className="tm-badge tm-badge-grey">{card.kindLabel}</span>
-                    <span className="tm-text-label">{card.ctaLabel}</span>
+                    <span className="tm-text-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--blue500)' }}>
+                      {card.ctaLabel}
+                      <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
+                    </span>
                   </div>
                 </Link>
               )) : null}
@@ -81,7 +86,7 @@ function ReviewsReceivedContent({
       <ReviewStats stats={model.stats} />
       {loading ? <ReviewSkeleton count={2} /> : null}
       {!loading && errorMessage ? <ReviewNotice title="받은 리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
-      {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대방이 리뷰를 보내면 경기별로 정리돼서 보여요." /> : null}
+      {!loading && !errorMessage && empty ? <ReviewEmpty title="받은 리뷰가 없어요" sub="상대방이 보낸 리뷰가 경기별로 모여서 보여요." /> : null}
       {!loading && !errorMessage && model.userGroups.length > 0 ? <ReceivedGroupSection title="내가 받은 리뷰" groups={model.userGroups} /> : null}
       {!loading && !errorMessage && model.teamGroups.length > 0 ? <ReceivedGroupSection title="내 팀이 받은 리뷰" groups={model.teamGroups} /> : null}
     </>
@@ -168,7 +173,8 @@ export function ReviewsReceivedPageView({
   model: ReviewsReceivedPageModel;
 }) {
   return (
-    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews">
+    // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
+    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received">
       <div className="tm-review-shell">
         <ReviewsReceivedContent
           errorMessage={errorMessage}
@@ -194,8 +200,8 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
           <div className="tm-text-label">{model.source.title}</div>
           <div className="tm-review-chip-row">
             <span className="tm-badge tm-badge-blue">{reviewed}명 전송</span>
-            <span className="tm-badge tm-badge-blue">별점 완료</span>
-            <span className="tm-badge tm-badge-blue">태그 완료</span>
+            <span className="tm-badge tm-badge-blue">별점 선택됨</span>
+            <span className="tm-badge tm-badge-blue">태그 선택됨</span>
             <span className="tm-badge tm-badge-grey">{remaining}명 남음</span>
           </div>
         </Card>

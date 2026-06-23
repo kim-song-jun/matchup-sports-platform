@@ -49,6 +49,7 @@
  * On desktop it becomes a 2-column grid:
  *   LEFT  main column  — 1fr (≈ 720px at 1120px viewport)
  *   RIGHT sidebar      — 360px fixed
+ * [taste-A] gap를 8px 그리드 배수 24px로 통일 — 28/36 혼용 제거.
  */
 .tm-home-desktop {
   /* Mobile: transparent to layout — children flow normally */
@@ -68,17 +69,17 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
     grid-template-rows: auto;
-    gap: 0 28px;
+    gap: 0 24px; /* [taste-A] 컬럼 간격 8px 그리드 정합(28→24) */
     align-items: start;
     /* Remove the padding the AppChrome scroll-area adds; we apply our own rhythm */
-    padding-top: 28px;
+    padding-top: 24px; /* [taste-A] 대섹션 간격 24px 통일 */
   }
 
   /* Left column: stacks its children vertically */
   .tm-home-main {
     display: flex;
     flex-direction: column;
-    gap: 28px;
+    gap: 24px; /* [taste-A] 8px 그리드 통일(28→24) */
     grid-column: 1;
     grid-row: 1;
     min-width: 0;
@@ -88,7 +89,7 @@
   .tm-home-sidebar {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px; /* [taste-A] 사이드바 내 항목 간격 8px 그리드 정합(20→16) */
     grid-column: 2;
     grid-row: 1;
     min-width: 0;
@@ -175,13 +176,12 @@
   }
 }
 
-@media (min-width: 1440px) {
-  /* 3-up grid on wide screens */
-  .tm-match-rail {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-  }
-}
+/*
+ * [clear-win] 1440+ 카드 그리드: 이전에 3-up(repeat(3,1fr))이었으나
+ * 4개 카드 기준 3열이면 1개가 고아(ragged)로 남는다.
+ * → 하단 .tm-home-desktop 1440 블록에서 repeat(2,1fr)로 재정의하므로 이 블록 삭제.
+ * 이 위치에 선언을 남기면 cascade에서 아래 블록과 순서 충돌이 생기므로 단일 블록으로 통합.
+ */
 
 /* ─── Sidebar: remove mobile wrapper padding on desktop ───────────────────── */
 /*
@@ -218,16 +218,22 @@
 }
 
 /* ─── Sidebar: weather strip ──────────────────────────────────────────────── */
+/* .tm-home-weather-head 인라인 style 대체 — 모바일 기본값(모든 폭)에서 CSS로 관리 */
+.tm-home-weather-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 @media (min-width: 1024px) {
   .tm-home-sidebar .tm-weather-strip {
     border-radius: 14px;
   }
 
-  /* Weather section: label + refresh button row */
+  /* 데스크톱: margin-bottom은 그대로 유지 */
   .tm-home-weather-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     margin-bottom: 8px;
   }
 }
@@ -282,11 +288,29 @@
   }
 }
 
+/* ─── Featured carousel → 데스크톱 wrapped grid ──────────────────────────────
+ * 모바일: 가로 스와이프 캐러셀 (overflow-x:auto, flex).
+ * 데스크톱: 가로 스크롤 해제 → 2-up 래핑 그리드, 카드가 컬럼을 균등 분할.
+ */
+@media (min-width: 1024px) {
+  .tm-home-featured-carousel {
+    overflow-x: visible;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .tm-home-featured-carousel > * {
+    /* 캐러셀 고정폭(min(88%, 400px)) 해제 — 그리드 셀 채움 */
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
 /* ─── Wide (≥1440): expand sidebar slightly ───────────────────────────────── */
 @media (min-width: 1440px) {
   .tm-home-desktop {
     grid-template-columns: minmax(0, 1fr) 380px;
-    gap: 0 36px;
+    gap: 0 24px; /* [taste-A] 8px 그리드 통일 유지(36→24) */
   }
 
   .tm-home-sidebar {
@@ -297,5 +321,13 @@
   /* Larger featured hero on wide screens */
   .tm-featured-media {
     height: 260px;
+  }
+
+  /* [clear-win] 1440+ 추천 매치 카드 2x2 그리드 — ragged 정렬 해소.
+   * 기존 3-up(repeat(3,1fr))을 2-up(repeat(2,1fr))으로 낮춰 4개 카드가
+   * 2열 2행으로 정합하게 채워진다(카드 수 ≤ 4이면 완전한 2×2 그리드). */
+  .tm-match-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
   }
 }

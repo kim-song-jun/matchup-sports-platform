@@ -20,7 +20,6 @@ export type HomeQuickAction = {
   href?: string;
   disabled?: boolean;
   color: string;
-  background: string;
 };
 
 export type HomeNotice = {

@@ -1,3 +1,7 @@
+/* [P1 Pretendard] DESIGN.md 브랜드 폰트 — CDN variable font.
+ * ★ @import 는 tailwindcss 확장보다 먼저여야 함: Tailwind v4 의 @import "tailwindcss" 가
+ *   인라인 확장되면 그 뒤 @import 가 모든 규칙 뒤로 밀려 "@import must precede all rules" 빌드 에러. */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 @import "tailwindcss";
 
 :root {
@@ -8,6 +12,7 @@
   --blue100: #d6e7ff;
   --blue500: #3182f6;
   --blue600: #2272eb;
+  --blue700: #1b64da; /* blue600보다 진한 강조색 — active 상태(.tm-review-tag-chip 등) */
   --green50: #e3f8ef;
   --green500: #03b26c;
   --orange50: #fff3e0;
@@ -35,7 +40,8 @@
   --text: var(--grey700);
   --text-body: var(--grey700);
   --text-muted: var(--grey600);
-  --text-caption: var(--grey500);
+  /* [P0 a11y] grey500(#8b95a1, 3.04:1)→grey600(#6b7684, 4.62:1) — WCAG AA 통과 */
+  --text-caption: var(--grey600);
   --muted: var(--text-muted);
   --border: var(--grey200);
   --border-strong: var(--grey300);
@@ -53,9 +59,76 @@
   --grey-300: var(--grey300);
   --grey-100: var(--grey100);
   --accent: var(--blue);
-  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);
+  /* ── [P2 Elevation] named shadow — 역할 매핑 (값 변경 없음, 의미 명문화) ──────
+   * elevation-0: flat surface (배경과 동일, shadow 없음)
+   * elevation-1: card — 콘텐츠 카드, 인라인 칩, 세그먼트 탭 활성
+   * elevation-2: dropdown / overlay — 검색 드롭다운, 툴팁, 하단 스크림
+   * elevation-3: dialog — 모달·alert dialog (--shadow-modal)
+   * elevation-4: sidebar / drawer — 사이드 네비 (--shadow-sidebar)
+   * elevation-5: toast / FAB — 화면 최상단 플로팅 (별도 box-shadow 인라인)
+   * ──────────────────────────────────────────────────────────────────────────── */
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);       /* elevation-1: card */
+  --shadow-2: 0 8px 24px rgba(20, 28, 45, 0.08);      /* elevation-2: dropdown/overlay */
+  /* ── 시맨틱 별칭 — 컴포넌트 CSS가 참조하지만 정의가 누락됐던 토큰(WS1 복구) ── */
+  --sh-1: var(--shadow-1); /* box-shadow: .tm-auth-segment-active, .tm-chat-bubble 등 */
+  --line: var(--border); /* hairline border: .tm-auth-profile-upload 등 */
+  --red-alpha-08: rgba(240, 68, 82, 0.08); /* --red500(#f04452) 8% — 에러 카드 border */
+  /* ── WS6 토큰화 — 소비자 하드코딩 hex/rgba → 의미 토큰 ── */
+  /* OAuth 브랜드 */
+  --kakao-yellow: #FEE500;
+  --naver-green: #03C75A;
+  /* 톤 카드 틴트 배경 */
+  --tint-green: rgba(3, 178, 108, 0.08);   /* --green500(#03b26c) 8% — 녹색 안내 카드 */
+  --tint-orange: rgba(254, 152, 0, 0.10);  /* --orange500(#fe9800) 10% — 주황 안내 카드 */
+  --tint-blue-border: rgba(49, 130, 246, 0.24); /* --blue500(#3182f6) 24% — 파란 카드 테두리 */
+  /* 어두운 스크림 / 오버레이 (히어로 카드, 서랍, 토스트) */
+  --scrim-dark-32: rgba(25, 31, 40, 0.32);  /* 대화상자 스크림 */
+  --scrim-dark-72: rgba(25, 31, 40, 0.72);  /* 히어로 하단바 배경 */
+  --scrim-dark-94: rgba(25, 31, 40, 0.94);  /* 검색 에러 토스트 배경 */
+  --navy-scrim-32: rgba(15, 23, 42, 0.32);  /* 채팅 데스크톱 Leave 스크림 */
+  --navy-scrim-40: rgba(10, 30, 66, 0.40);  /* 대회 고스트 버튼 배경 */
+  --navy-scrim-55: rgba(10, 30, 66, 0.55);  /* 대회 고스트 버튼 배경 hover */
+  /* 흰 반투명 오버레이 — 컬러 히어로/다크 배경 위 텍스트·UI */
+  --overlay-white-08: rgba(255, 255, 255, 0.08);  /* 푸터 구분선 */
+  --overlay-white-18: rgba(255, 255, 255, 0.18);  /* 프로모 eyebrow 뱃지 배경 */
+  --overlay-white-35: rgba(255, 255, 255, 0.35);  /* 푸터 copy 텍스트 */
+  --overlay-white-55: rgba(255, 255, 255, 0.55);  /* 푸터 링크 기본 */
+  --overlay-white-66: rgba(255, 255, 255, 0.66);  /* 랜딩 CTA 서브 */
+  --overlay-white-68: rgba(255, 255, 255, 0.68);  /* 팀매치 히어로 팀 레이블 */
+  --overlay-white-70: rgba(255, 255, 255, 0.70);  /* 대회 고스트 버튼 테두리 */
+  --overlay-white-72: rgba(255, 255, 255, 0.72);  /* 팀매치·팀 페이지 서브텍스트 */
+  --overlay-white-75: rgba(255, 255, 255, 0.75);  /* 프로모 메타 */
+  --overlay-white-76: rgba(255, 255, 255, 0.76);  /* 매치 히어로 호스트/마감 */
+  --overlay-white-82: rgba(255, 255, 255, 0.82);  /* 프로모 tagline */
+  --overlay-white-85: rgba(255, 255, 255, 0.85);  /* 푸터 링크 hover */
+  --overlay-white-86: rgba(255, 255, 255, 0.86);  /* 히어로 메시지 */
+  --overlay-white-88: rgba(255, 255, 255, 0.88);  /* 프로모 prize 레이블 */
+  --overlay-white-90: rgba(255, 255, 255, 0.90);  /* 푸터 브랜드 */
+  --overlay-white-92: rgba(255, 255, 255, 0.92);  /* 프로모 eyebrow 텍스트, CTA hover */
+  --glass-white-96: rgba(255, 255, 255, 0.96);   /* 네비/헤더 유리 배경 */
+  /* 모달·사이드바 그림자 */
+  --shadow-modal: 0 8px 32px rgba(20, 28, 45, 0.14);  /* elevation-3: dialog */
+  --shadow-sidebar: 4px 0 24px rgba(20, 28, 45, 0.12); /* elevation-4: sidebar/drawer */
+  /* 검색 포커스 링 */
+  --blue-focus-ring: rgba(49, 130, 246, 0.12);
+  /* 대회 상금 / 보조 색 */
+  --prize-gold: #ffd84d;
+  --orange600: #f08a00;
+  /* ── 타입 스케일 토큰 — desktop/tournaments.css 대진표·라운드 카드 타이포 ── */
+  --font-size-micro: 11px;
+  --font-size-caption: 12px;
+  --font-size-label: 13px;
+  /* #14: body/body-sm 토큰 추가 — 하드코딩 14/15px 대체용 */
+  --font-size-body-sm: 14px;
+  --font-size-body: 15px;
+  --font-size-body-lg: 17px;
+  --font-size-subhead: 20px;
+  --font-size-heading: 24px;
+  /* [P1 Pretendard] 브랜드 폰트 스택 — Variable→정적 폴백→시스템 폰트 순서 */
+  --font-pretendard: "Pretendard Variable", Pretendard, sans-serif;
   --font:
+    "Pretendard Variable",
+    Pretendard,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
@@ -64,6 +137,37 @@
     Arial,
     Helvetica,
     sans-serif;
+  /* ── [P1 Component 토큰] Base→Semantic→Component 3계층 완성 ──────────────────
+   * 컴포넌트는 이 계층을 참조 — Base(--blue500) 직접 참조 금지(R-X4).
+   * 테마/다크모드 파생 시 이 계층만 오버라이드하면 전파됨(System-of-System).
+   * ──────────────────────────────────────────────────────────────────────────── */
+  /* Button */
+  --button-fill-primary:        var(--blue500);
+  --button-fill-primary-hover:  var(--blue600);
+  --button-fill-neutral:        var(--grey100);
+  --button-fill-danger:         var(--red500);
+  --button-text-primary:        var(--static-white);
+  --button-text-neutral:        var(--text-strong);
+  /* Card */
+  --card-border:                var(--border);
+  --card-surface:               var(--bg);
+  --card-radius:                16px;
+  /* List row — 원래 시각(grey50 bg / grey100 border) 유지 (component 토큰 계층만 정리) */
+  --list-row-bg:                var(--grey50);
+  --list-row-border:            var(--grey100);
+  /* Input */
+  --input-border:               var(--border);
+  --input-surface:              var(--bg);
+  --input-border-focus:         var(--blue500);
+  --input-text:                 var(--text-strong);
+  --input-placeholder:          var(--text-caption);
+
+  /* ── [P1 State-layer] 공통 상호작용 투명도 토큰 (M3 state-layer 모델) ───────
+   * hover 4% / pressed 8% — 컴포넌트마다 제각각이던 hover/active 피드백을 일괄 통일.
+   * 실제 사용처: .tm-card.tm-interactive, .tm-list-row.tm-interactive ───────── */
+  --state-hover-opacity: 0.04;
+  --state-pressed-opacity: 0.08;
+
   --v1-shell-frame-width: 375px;
   --v1-app-chrome-frame-width: 480px;
   --v1-shell-wide-frame-width: 480px;
@@ -398,15 +502,17 @@ button:disabled {
   margin-top: 14px;
 }
 
-/* Email login — short form vertically centred in the card so the submit button
-   isn't stranded at the bottom of a tall frame (no big empty gap). */
+/* Email login — 짧은 폼이 화면 중앙에 떠서 아래쪽에 빈 보이드를 만들지 않도록
+   상단 정렬로 전환한다. margin-block:auto는 데스크톱 넓은 화면에서 폼을 뷰포트
+   정중앙에 띄워 위아래 공백이 과하게 생기는 원인이었다. */
 .tm-auth-email-frame .tm-auth-scroll {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
 }
 
 .tm-auth-email-frame .tm-auth-body {
-  margin-block: auto;
+  padding-top: 64px;
 }
 
 .tm-auth-email-submit {
@@ -676,7 +782,7 @@ button:disabled {
   min-height: 64px;
   padding: 15px;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  grid-template-columns: 26px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 12px;
 }
@@ -695,6 +801,9 @@ button:disabled {
 .tm-auth-check-button {
   display: grid;
   place-items: center;
+  width: 26px;
+  min-width: 26px;
+  min-height: 44px;
 }
 
 .tm-auth-agreement-main {
@@ -706,8 +815,8 @@ button:disabled {
 }
 
 .tm-auth-agreement-arrow {
-  width: 28px;
-  height: 28px;
+  width: 44px; /* WS11 a11y 터치 타깃 (28→44) */
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 999px;
@@ -832,12 +941,6 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.tm-my-toggle-button {
-  width: 100%;
-  padding: 16px;
-  text-align: left;
-}
-
 .tm-auth-progress {
   display: grid;
   gap: 10px;
@@ -850,7 +953,7 @@ button:disabled {
 
 .tm-auth-progress-bars {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 5px;
 }
 
@@ -927,42 +1030,43 @@ button:disabled {
 
 .tm-text-body-lg {
   font-size: 17px;
-  line-height: 26px;
+  line-height: 28px; /* [P1 4pt snap] 26→28 (4의 배수, ×1.65 — 한국어 +0.1 여유 포함) */
   font-weight: 700;
   color: var(--text-strong);
+  word-break: keep-all; /* [P2 한글] 카드 제목 음절 단위 줄바꿈 방지 — TDS 패턴 */
 }
 
 .tm-text-body {
   font-size: 15px;
-  line-height: 22px;
+  line-height: 24px; /* [P1 4pt snap] 22→24 (×1.6 — 한국어 권장 1.5~1.6) */
   font-weight: 500;
   color: var(--text);
 }
 
 .tm-text-label {
   font-size: 13px;
-  line-height: 19px;
+  line-height: 20px; /* [P1 4pt snap] 19→20 (4의 배수, ×1.54) */
   font-weight: 600;
   color: var(--text);
 }
 
 .tm-text-caption {
   font-size: 12px;
-  line-height: 18px;
+  line-height: 16px; /* [P1 4pt snap] 18→16 (4의 배수, ×1.33 — caption은 짧은 보조 텍스트라 압축해도 가독 OK) */
   font-weight: 400;
   color: var(--text-caption);
 }
 
 .tm-text-micro {
   font-size: 11px;
-  line-height: 15px;
+  line-height: 16px; /* [P1 4pt snap] 15→16 (4의 배수, ×1.45) */
   font-weight: 500;
 }
 
 .tm-card {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  background: var(--card-surface); /* [P1 component token] */
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
 }
 
 .tm-pressable {
@@ -981,6 +1085,7 @@ button:disabled {
   justify-content: center;
   gap: 6px;
   font-weight: 700;
+  word-break: keep-all; /* [P2 한글] TDS 패턴 — 음절 단위 줄바꿈 방지 */
 }
 
 .tm-btn-icon {
@@ -991,7 +1096,7 @@ button:disabled {
 }
 
 .tm-btn-sm {
-  min-height: 40px;
+  min-height: 44px; /* WS11 a11y 터치 타깃 (40→44) */
   padding: 0 14px;
   font-size: 13px;
 }
@@ -1018,13 +1123,13 @@ button:disabled {
 }
 
 .tm-btn-primary {
-  background: var(--blue500);
-  color: var(--static-white);
+  background: var(--button-fill-primary); /* [P1 component token] --blue500 직접 참조 → component 계층 */
+  color: var(--button-text-primary);
 }
 
 .tm-btn-neutral {
-  background: var(--grey100);
-  color: var(--text-strong);
+  background: var(--button-fill-neutral); /* [P1 component token] */
+  color: var(--button-text-neutral);
 }
 
 .tm-btn-outline {
@@ -1034,8 +1139,8 @@ button:disabled {
 }
 
 .tm-btn-danger {
-  background: var(--red500);
-  color: var(--static-white);
+  background: var(--button-fill-danger); /* [P1 component token] */
+  color: var(--button-text-primary);
 }
 
 .tm-btn-warning {
@@ -1048,8 +1153,44 @@ button:disabled {
   color: var(--static-white);
 }
 
+/* ── [P1 Interaction states] 버튼 hover / active / transition ─────────────────
+ * - transition-all 금지 → 필요한 속성만 명시 (성능 규칙)
+ * - @media(hover:hover) 가드로 터치기기에서 hover 억제 (ghost hover 방지)
+ * - active scale은 :not(:disabled) 가드로 비활성 버튼 눌림 피드백 차단
+ * ─────────────────────────────────────────────────────────────────────────── */
+.tm-btn {
+  transition: background-color 0.12s ease, transform 0.08s ease;
+}
+
+@media (hover: hover) {
+  .tm-btn-primary:hover:not(:disabled) {
+    background: var(--button-fill-primary-hover); /* --blue600 — 정의된 토큰 활성화 */
+  }
+
+  .tm-btn-neutral:hover:not(:disabled) {
+    background: var(--grey150); /* grey100 → grey150 한 단계 진하게 */
+  }
+
+  .tm-btn-outline:hover:not(:disabled) {
+    background: var(--grey50);
+  }
+
+  .tm-btn-danger:hover:not(:disabled) {
+    background: #d93040; /* red500(#f04452) 보다 한 단계 진함 */
+  }
+}
+
+.tm-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* disabled CTA — opacity만으로는 파란 배경이 유지돼 '가짜 활성' 인상을 준다.
+   배경·글자를 명시적 비활성 토큰으로 덮어써서 누르면 안 됨을 형태로 전달한다. */
 .tm-btn:disabled {
-  opacity: 0.78;
+  background: var(--grey100);
+  color: var(--text-caption);
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 /* ── Keyboard focus ring (WCAG 2.1 AA) ── */
@@ -1058,8 +1199,46 @@ button:disabled {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
+/* v1-shell 인터랙티브 요소 focus ring (WS5 a11y — 기존엔 :active만 있어 키보드 포커스 미표시) */
+.v1-icon-button:focus-visible,
+.v1-tab:focus-visible,
+.v1-button:focus-visible,
+.v1-chip:focus-visible,
+.v1-card-link:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
 
+/* ── [P1 Card / List-row interactive states] ──────────────────────────────────
+ * 실제 컴포넌트 클래스: .tm-card-interactive (예: search-result-card), .tm-list-row-interactive.
+ * 복합 .tm-card.tm-interactive 도 병행 지원(향후 사용 대비).
+ * state-layer 토큰(--state-hover-opacity:0.04) 기반 hover 피드백.
+ * @media(hover:hover) 가드로 터치기기 ghost hover 억제.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@media (hover: hover) {
+  .tm-card-interactive:hover,
+  .tm-card.tm-interactive:hover {
+    box-shadow: var(--shadow-1); /* elevation-1 lift */
+    cursor: pointer;
+  }
+
+  .tm-list-row-interactive:hover,
+  .tm-list-row.tm-interactive:hover {
+    background: var(--grey100); /* list-row-bg(grey50) → grey100 한 단계 진하게 */
+    cursor: pointer;
+  }
+}
+
+/* [P1 focus-visible] 카드 키보드 포커스 링 — base 승격 (기존 1회성 패치 통합) */
+.tm-card-interactive:focus-visible,
+.tm-card.tm-interactive:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+/* #3: .tm-btn-disabled와 .tm-btn:disabled 불일치 해소 — opacity 통일 + cursor 명시 */
 .tm-btn-disabled {
+  opacity: 0.78;
   color: var(--text-caption);
   cursor: not-allowed;
 }
@@ -1075,6 +1254,7 @@ button:disabled {
   line-height: 1;
   font-weight: 700;
   white-space: nowrap;
+  word-break: keep-all; /* [P2 한글] TDS 패턴 */
 }
 
 .tm-badge-blue {
@@ -1102,13 +1282,32 @@ button:disabled {
   color: var(--red500);
 }
 
+/* ── [P2 Badge size variants] M3 dot(6px) + Carbon SM(18px) ─────────────────
+ * .tm-badge-dot  — 라벨 없는 상태 점 (미읽음·온라인·모집중 등)
+ * .tm-badge-sm   — 밀도 높은 컨텍스트용 소형 뱃지 (font-size-2xs 토큰 참조)
+ * 색 variant(.tm-badge-blue 등)과 조합해 사용
+ * ─────────────────────────────────────────────────────────────────────────── */
+.tm-badge-dot {
+  width: 6px;
+  height: 6px;
+  min-height: unset;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.tm-badge-sm {
+  min-height: 18px;
+  font-size: 11px; /* --font-size-micro(11px) 참조 */
+  padding: 0 6px;
+}
+
 .tm-input {
   width: 100%;
   min-height: 50px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border); /* [P1 component token] */
   border-radius: 14px;
-  background: var(--bg);
-  color: var(--text-strong);
+  background: var(--input-surface);
+  color: var(--input-text);
   padding: 0 14px;
   font: inherit;
   font-size: 15px;
@@ -1116,11 +1315,44 @@ button:disabled {
 }
 
 .tm-input::placeholder {
-  color: var(--text-caption);
+  color: var(--input-placeholder);
 }
 
 .tm-input:focus {
-  border-color: var(--blue500);
+  border-color: var(--input-border-focus); /* --blue500 */
+  box-shadow: 0 0 0 3px var(--blue50); /* [P1] focus ring — WCAG 1.4.11 3:1 확보 */
+}
+
+/* [P1 focus-visible] 키보드 포커스에만 outline 표시, 마우스 클릭 시 숨김 */
+.tm-input:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+/* [P1 disabled] 브라우저 기본 스타일 대신 명시적 비활성 토큰 적용 */
+.tm-input:disabled,
+.tm-input[disabled] {
+  background: var(--grey100);
+  color: var(--text-caption);
+  cursor: not-allowed;
+  opacity: 1; /* 브라우저 기본 opacity 오버라이드 */
+}
+
+/*
+ * (3) tm-input-select — OS 기본 select 화살표(▾) 제거 후 커스텀 SVG chevron 적용.
+ * appearance:none으로 UA 기본 스타일을 제거하고, url-encoded SVG를 background-image로
+ * 삽입합니다. 색은 --text-caption 토큰(#6B7684)에 맞춘 하드코딩 없는 회색(%236B7684).
+ * padding-right은 chevron 영역 확보(40px).
+ */
+.tm-input-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7684' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px 16px;
+  cursor: pointer;
 }
 
 .tm-auth-input-error {
@@ -1132,7 +1364,7 @@ button:disabled {
 }
 
 .tm-chip {
-  min-height: 34px;
+  min-height: 44px; /* WS11 a11y 터치 타깃 (34→44) — 라이브 검증으로 토스 균형 확인 */
   border: 1px solid var(--grey200);
   border-radius: 999px;
   background: var(--bg);
@@ -1142,9 +1374,15 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* a11y R-A2: 키보드 포커스 링 — .tm-btn/:focus-visible 패턴과 통일 */
+.tm-chip:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
 }
 
 .tm-chip-active {
@@ -1233,6 +1471,7 @@ button:disabled {
   padding: 0;
   color: inherit;
   min-width: 0;
+  min-height: 44px; /* WS5 a11y — 명시적 터치 타깃(아이콘 자식에만 의존하지 않음) */
 }
 
 .tm-quick-action:disabled {
@@ -1275,10 +1514,12 @@ button:disabled {
 .tm-section-action {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  /* #15: blue500으로 격상해 '더보기' 진입점 링크로 인식되도록 */
+  color: var(--blue500);
   font-size: 13px;
-  font-weight: 500;
-  padding: 0;
+  font-weight: 600;
+  padding: 0 4px;
+  min-height: 44px; /* WS5 a11y 터치 타깃 */
   display: flex;
   align-items: center;
   gap: 2px;
@@ -1466,8 +1707,8 @@ button:disabled {
   min-height: 58px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: var(--grey50);
-  border: 1px solid var(--grey100);
+  background: var(--list-row-bg); /* [P1 component token] */
+  border: 1px solid var(--list-row-border);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1880,8 +2121,16 @@ button:disabled {
   gap: 8px;
 }
 
+/* a11y R-A2: 키보드 포커스 시 내부 input이 focus를 받으면 컨테이너에 링 표시 */
+.tm-create-input:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+  border-color: var(--blue500);
+}
+
 .tm-create-input-multiline {
-  min-height: 104px;
+  /* #25: 104px → 72px — 과대한 빈 여백 제거, textarea는 내용에 따라 자동 성장 */
+  min-height: 72px;
   align-items: flex-start;
   padding-top: 12px;
 }
@@ -2110,9 +2359,9 @@ button:disabled {
 
 .tm-list-search-clear,
 .tm-list-search-submit {
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -2182,9 +2431,9 @@ button:disabled {
 }
 
 .tm-list-filter-button {
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
+  width: 44px; /* WS11 a11y 터치 타깃 (40→44) */
+  min-width: 44px;
+  height: 44px;
   border-radius: 12px;
   display: grid;
   place-items: center;
@@ -2309,6 +2558,31 @@ button:disabled {
   gap: 10px;
 }
 
+.tm-team-card-action-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grey100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tm-team-card-action-status {
+  color: var(--blue500);
+}
+
+.tm-team-card-action-status-muted {
+  color: var(--text-caption);
+}
+
+.tm-team-card-action-link {
+  color: var(--blue500);
+  white-space: nowrap;
+}
+
 .tm-team-intro-box {
   margin-top: 14px;
   border: 1px solid var(--grey100);
@@ -2367,7 +2641,7 @@ button:disabled {
 }
 
 .tm-team-form-chip-row .tm-chip {
-  min-height: 30px;
+  /* a11y: min-height 44px 유지 (base .tm-chip 상속) — padding만 축소해 밀도 조정 */
   padding: 0 10px;
 }
 
@@ -2463,7 +2737,7 @@ button:disabled {
 .tm-chat-section-label {
   padding: 8px 20px 6px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 700;
 }
 
@@ -2539,7 +2813,7 @@ button:disabled {
   padding: 0 8px;
   background: var(--grey200);
   color: var(--text-strong);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 800;
   display: grid;
   place-items: center;
@@ -2584,7 +2858,7 @@ button:disabled {
   gap: 6px;
   min-width: 0;
   color: var(--text-caption);
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   line-height: 1.35;
 }
 
@@ -2603,21 +2877,23 @@ button:disabled {
   color: var(--text-caption);
 }
 
+/* #11: 미읽음 본문 미리보기 — blue 강조 완화해 카운트 배지가 단일 focal point */
 .tm-chat-last-message-unread {
-  color: var(--blue500);
-  font-weight: 700;
+  color: var(--text-strong);
+  font-weight: 600;
 }
 
+/* #11: 미읽음 카운트 배지 — 24px/12px로 격상(단일 focal point) */
 .tm-chat-inline-unread {
-  min-width: 20px;
-  height: 20px;
+  min-width: 24px;
+  height: 24px;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--blue500);
   color: var(--static-white);
   display: inline-grid;
   place-items: center;
-  font-size: 11px;
+  font-size: var(--font-size-caption); /* 12px — R-T2 토큰 */
   font-weight: 800;
   flex: 0 0 auto;
 }
@@ -2757,7 +3033,7 @@ button:disabled {
   display: flex;
   align-items: center;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: var(--font-size-body-sm); /* 14px — R-T2 토큰 */
   font-weight: 600;
 }
 
@@ -2787,7 +3063,7 @@ button:disabled {
   place-items: center;
   padding: 0 14px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--font-size-label); /* 13px — R-T2 토큰 */
   font-weight: 800;
 }
 
@@ -2817,8 +3093,11 @@ button:disabled {
 }
 
 .tm-notification-card-unread {
-  background: var(--blue50);
-  border-color: rgba(49,130,246,.24);
+  /* 단일 액센트 규약: 카드 면은 중립 --bg, 미읽음 신호는 좌측 6px 마커로만 표현 */
+  background: var(--bg);
+  border-color: var(--grey100);
+  border-left: 6px solid var(--blue500);
+  padding-left: 10px; /* 좌측 border 6px 보정 — 전체 패딩 14px 유지 */
 }
 
 .tm-notification-icon {
@@ -2837,10 +3116,15 @@ button:disabled {
   color: var(--static-white);
 }
 
+/* 미읽음 카드 제목 — blue500으로 마커 컬러와 일관성 */
+.tm-notification-card-unread .tm-text-body-lg {
+  color: var(--blue500);
+}
+
 .tm-notification-meta {
   margin-top: 6px;
   color: var(--text-caption);
-  font-size: 12px;
+  font-size: var(--font-size-caption); /* 12px — R-T2 토큰 */
   font-weight: 700;
 }
 
@@ -2942,6 +3226,12 @@ button:disabled {
   .tm-info-row > div:last-child {
     width: 100%;
     text-align: left !important;
+  }
+
+  /* #1(Copilot): 값 슬롯 inner flex(justify-content:flex-end)가 column 레이아웃에서도
+     좌측 정렬되도록 — text-align:left와 일치(값이 우측에 잔류하지 않게). */
+  .tm-info-row > div:last-child > div {
+    justify-content: flex-start;
   }
 
   .tm-team-info-row {
@@ -3143,8 +3433,8 @@ button:disabled {
 }
 
 .v1-icon-button {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: 999px;
   display: grid;
@@ -3548,6 +3838,13 @@ button:disabled {
   display: grid;
   gap: 14px;
   padding-top: 18px;
+  /*
+   * (1) 모바일 fixed CTA가 생년월일 등 하단 필드를 가리는 버그 수정.
+   * 버튼 높이 56px + CTA 상단 패딩 14px + 여백 16px = 86px + safe-area.
+   * tm-create-shell의 하드코딩 124px보다 이 값이 적용 순서상 뒤에 오므로
+   * specificity로 덮어씌우기 위해 별도 속성으로 선언합니다.
+   */
+  padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px) + 16px);
 }
 
 .tm-profile-edit-shell .tm-my-profile-head {
@@ -3558,7 +3855,8 @@ button:disabled {
 
 .tm-my-profile-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* KPI 3개 — 4열에서 3열로 수정해 빈 4번째 열 제거 */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: -14px -20px 2px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
@@ -3673,7 +3971,8 @@ button:disabled {
 }
 
 .tm-review-tab {
-  min-height: 38px;
+  /* a11y: 터치 타깃 44px 확보 (시각 높이 유지, grid/place-items로 내용 중앙 정렬) */
+  min-height: 44px;
   border-radius: 12px;
   display: grid;
   place-items: center;
@@ -3759,6 +4058,8 @@ button:disabled {
 }
 
 .tm-review-star {
+  /* a11y: 시각 크기 28px 유지 + ::before 투명 히트영역으로 터치 타깃 44px 확보 */
+  position: relative;
   width: 28px;
   height: 28px;
   border: 0;
@@ -3768,6 +4069,12 @@ button:disabled {
   font-size: 24px;
   line-height: 28px;
   padding: 0;
+}
+
+.tm-review-star::before {
+  content: '';
+  position: absolute;
+  inset: -8px; /* (44 - 28) / 2 = 8px 확장 → 터치 타깃 44×44 */
 }
 
 .tm-review-star[data-active="true"] {
@@ -3787,7 +4094,8 @@ button:disabled {
 }
 
 .tm-review-tag-chip {
-  min-height: 32px;
+  /* a11y: 터치 타깃 44px 확보 (패딩 증가로 시각적 변화 최소화, 시각 무게 유지) */
+  min-height: 44px;
   border: 1px solid var(--grey200);
   border-radius: 999px;
   background: var(--surface);
@@ -3795,7 +4103,7 @@ button:disabled {
   font-size: 12px;
   font-weight: 700;
   line-height: 16px;
-  padding: 7px 10px;
+  padding: 13px 10px;
 }
 
 .tm-review-tag-chip[data-active="true"] {
@@ -3875,11 +4183,15 @@ button:disabled {
   gap: 14px;
 }
 
+/* WCAG 1.4.1 — off 상태는 배경색(grey200)만으로 형태를 나타내고 있어
+   색만으로 정보를 전달하는 위반이다. 1px 테두리를 추가해 색각 이상
+   사용자도 트랙 경계를 구분할 수 있도록 형태 단서를 제공한다. */
 .tm-toggle {
   width: 46px;
   height: 28px;
   border-radius: 999px;
   background: var(--grey200);
+  border: 1px solid var(--grey300);
   position: relative;
   flex: 0 0 auto;
 }
@@ -3896,8 +4208,10 @@ button:disabled {
   transition: transform .18s ease;
 }
 
+/* on 상태: 파란 배경이 이미 충분한 형태 단서 — off 상태 보조 테두리 제거 */
 .tm-toggle-on {
   background: var(--blue500);
+  border-color: transparent;
 }
 
 .tm-toggle-on::after {
@@ -3987,6 +4301,41 @@ button:disabled {
   }
   .tm-skeleton {
     animation: none;
+  }
+}
+
+/* ── [P2 마이크로인터랙션] 완료 체크 애니메이션 ────────────────────────────────
+ * 결제 완료·매칭 확정·팀 배정 등 비동기 완료 지점에서 사용.
+ * 컴포넌트가 이 클래스를 붙이면 체크 아이콘이 scale+opacity로 등장.
+ * prefers-reduced-motion 미충족 시: opacity만으로 부드럽게 페이드 (motion 없음).
+ * ──────────────────────────────────────────────────────────────────────────── */
+@keyframes tm-complete-check {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes tm-complete-check-reduced {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.tm-complete-check {
+  animation: tm-complete-check 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-complete-check {
+    animation: tm-complete-check-reduced 0.18s ease both;
   }
 }
 
@@ -4118,4 +4467,168 @@ button:disabled {
   width: 0;
   height: 0;
   display: none;
+}
+
+/* ── 랜딩 종목 칩 — 준비중 상태 ────────────────────────────────────────────
+ * .tm-landing-sport-chip (활성) 스타일과 시각 일관성 유지.
+ * 컬러만으로 구분하지 않음 — '준비중' 텍스트 배지가 비색상 지표(a11y).
+ * 하드코딩 색 없음 — 전부 토큰 참조. ─────────────────────────────────────*/
+
+/* 준비중 칩 컨테이너 — 활성 칩 대비 opacity로 muted 처리 */
+.tm-landing-sport-chip-soon {
+  opacity: 0.55;
+  cursor: default;
+  position: relative;
+}
+
+/* '준비중' 텍스트 배지 — 칩 우상단 인라인 뱃지 */
+.tm-landing-sport-soon {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+  background: var(--grey150);
+  color: var(--grey600);
+  /* 비색상 지표: 텍스트 '준비중'이 상태를 전달 */
+}
+
+/* ── Team Invitation UI ───────────────────────────────────────────────────────
+ * light-only. dark: variant 절대 사용 금지.
+ * 모든 색은 CSS 변수(--grey*, --blue*, --text-*, --bg, --border) 참조.
+ * .tm-card / .tm-input / .tm-btn 과 동일한 radius/padding 리듬 사용.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* 이메일 초대 폼 컨테이너 — 입력과 버튼을 한 줄 row로 배치 */
+.tm-invitation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tm-invitation-form-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+/* 폼 내부의 input은 .tm-input 확장 — flex 1로 버튼 옆 채움 */
+.tm-invitation-form .tm-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 초대 카드 — 보낸 초대/받은 초대 공용 */
+.tm-invitation-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;           /* .tm-card 와 동일 radius */
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 카드 상단: 아바타 + 이름/이메일 + 상태 뱃지를 가로 배치 */
+.tm-invitation-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 카드 상단 텍스트 블록 — 이름·이메일·팀명 등 */
+.tm-invitation-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-invitation-meta-name {
+  font-size: var(--font-size-body-sm);  /* 14px */
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-invitation-meta-sub {
+  font-size: var(--font-size-label);    /* 13px */
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-invitation-meta-date {
+  font-size: var(--font-size-caption);  /* 12px */
+  color: var(--text-caption);
+}
+
+/* 카드 메시지 미리보기 */
+.tm-invitation-message {
+  font-size: var(--font-size-label);    /* 13px */
+  color: var(--text-body);
+  background: var(--grey50);
+  border-radius: 10px;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+/* 카드 하단 CTA 버튼 그룹 */
+.tm-invitation-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+/* 상태 뱃지 — .tm-badge 기반에 invitation 전용 시맨틱 */
+.tm-invitation-status {
+  /* .tm-badge 와 동일 구조, 추가 override만 선언 */
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-caption);  /* 12px */
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* pending: 파란 tint — 비색상 지표: 텍스트 '초대중' 병기 필수 */
+.tm-invitation-status-pending {
+  background: var(--blue50);
+  color: var(--blue500);
+}
+
+/* accepted: 초록 tint — 비색상 지표: 텍스트 '수락됨' 병기 */
+.tm-invitation-status-accepted {
+  background: var(--green50);
+  color: var(--green500);
+}
+
+/* declined: 회색 tint — 비색상 지표: 텍스트 '거절됨' 병기 */
+.tm-invitation-status-declined {
+  background: var(--grey100);
+  color: var(--text-muted);
+}
+
+/* cancelled: 회색 tint — 비색상 지표: 텍스트 '취소됨' 병기 */
+.tm-invitation-status-cancelled {
+  background: var(--grey100);
+  color: var(--text-caption);
+}
+
+/* focus ring — .tm-btn:focus-visible 패턴과 통일 */
+.tm-invitation-card:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
 }

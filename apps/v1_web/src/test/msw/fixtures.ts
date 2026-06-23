@@ -38,9 +38,39 @@ export const v1SportsFixture: V1Sport[] = [
 ];
 
 export const v1RegionsFixture: V1Region[] = [
-  { id: 'region-seoul', name: '서울', parentId: null },
-  { id: 'region-gangdong', name: '강동', parentId: 'region-seoul' },
-  { id: 'region-songpa', name: '송파', parentId: 'region-seoul' },
+  {
+    id: 'region-seoul',
+    code: 'seoul',
+    name: '서울',
+    parentId: null,
+    level: 1,
+    children: [
+      { id: 'region-gangdong', code: 'seoul-gangdong', name: '강동구', parentId: 'region-seoul', level: 2 },
+      { id: 'region-songpa', code: 'seoul-songpa', name: '송파구', parentId: 'region-seoul', level: 2 },
+    ],
+  },
+  {
+    id: 'region-busan',
+    code: 'busan',
+    name: '부산',
+    parentId: null,
+    level: 1,
+    children: [
+      { id: 'region-busan-haeundae', code: 'busan-haeundae', name: '해운대구', parentId: 'region-busan', level: 2 },
+      { id: 'region-busan-suyeong', code: 'busan-suyeong', name: '수영구', parentId: 'region-busan', level: 2 },
+    ],
+  },
+  {
+    id: 'region-jeju',
+    code: 'jeju',
+    name: '제주',
+    parentId: null,
+    level: 1,
+    children: [
+      { id: 'region-jeju-jeju', code: 'jeju-jeju', name: '제주시', parentId: 'region-jeju', level: 2 },
+      { id: 'region-jeju-seogwipo', code: 'jeju-seogwipo', name: '서귀포시', parentId: 'region-jeju', level: 2 },
+    ],
+  },
 ];
 
 export const v1RecentSearchesFixture: V1RecentSearch[] = [
@@ -494,7 +524,7 @@ export const v1NotificationsFixture = {
       notificationId: 'notification-2',
       type: 'team_match',
       title: '팀매치 신청 도착',
-      body: '상대팀 신청이 들어왔습니다. 조건을 확인해 주세요.',
+      body: '상대팀 신청이 들어왔어요. 조건을 확인해 주세요.',
       target: { type: 'team_match', id: 'team-match-1', route: '/team-matches/team-match-1' },
       status: 'created',
       readAt: null,
@@ -504,7 +534,7 @@ export const v1NotificationsFixture = {
       notificationId: 'notification-3',
       type: 'chat',
       title: '새 메시지',
-      body: '주말 풋살 매치 채팅방에 새 메시지가 있습니다.',
+      body: '주말 풋살 매치 채팅방에 새 메시지가 있어요.',
       target: { type: 'chat', id: 'chat-1', route: '/chat/rooms/chat-1' },
       status: 'read',
       readAt: '2026-05-24T08:10:00.000Z',
@@ -514,7 +544,7 @@ export const v1NotificationsFixture = {
       notificationId: 'notification-4',
       type: 'notice',
       title: '공지 업데이트',
-      body: '이번 주 고정 공지가 업데이트되었습니다.',
+      body: '이번 주 고정 공지가 업데이트됐어요.',
       target: { type: 'notice', id: 'notice-1', route: '/notices/notice-1' },
       status: 'read',
       readAt: '2026-05-24T08:12:00.000Z',

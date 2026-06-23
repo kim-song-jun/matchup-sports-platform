@@ -135,17 +135,21 @@
   .tm-tournament-list-grid {
     display: grid;
     flex-direction: unset;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    /* auto-fit: 아이템이 적을 때 빈 열이 생기지 않고 자연스럽게 collapse됨 */
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 16px;
+    /* 카드 하단 라인을 맞추기 위해 stretch 적용 */
+    align-items: stretch;
   }
 
   .tm-tournament-list-grid .tm-card {
-    transition: box-shadow 0.15s, transform 0.15s;
+    transition: background 0.15s;
+    /* 카드가 그리드 셀 전체 높이를 채우도록 */
+    height: 100%;
   }
 
   .tm-tournament-list-grid .tm-card:hover {
-    box-shadow: var(--shadow-2);
-    transform: translateY(-2px);
+    background: var(--grey50);
   }
 }
 
@@ -376,7 +380,7 @@
 .tm-tournament-promo-prize-amount {
   font-size: 40px;
   font-weight: 800;
-  color: #ffd84d;
+  color: var(--prize-gold);
   line-height: 1.1;
   letter-spacing: -0.5px;
 }
@@ -532,6 +536,8 @@
   place-items: center;
   background: var(--blue50);
   border-radius: 12px;
+  /* 테두리로 아이콘 박스를 더 정제되게 */
+  box-shadow: 0 0 0 1px var(--blue100, rgba(49, 130, 246, 0.15));
 }
 
 .tm-tournament-promo-step-num {
@@ -544,9 +550,19 @@
 .tm-tournament-promo-step-label {
   font-size: var(--font-size-micro);
   color: var(--text-body);
-  font-weight: 500;
+  font-weight: 600;
   text-align: center;
   white-space: nowrap;
+}
+
+/* 단계 한 줄 설명 — label 아래 muted 보조 텍스트 */
+.tm-tournament-promo-step-sub {
+  font-size: var(--font-size-micro);
+  color: var(--text-caption);
+  font-weight: 400;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.3;
 }
 
 /* Connectors hidden in grid layout — grid spacing is the separator */
@@ -732,16 +748,19 @@
 
   /* Prize cards: stay 3-col on desktop (already set) */
 
-  /* Desktop: revert to single-row flex so all 6 steps sit on one horizontal line */
+  /* Desktop: revert to single-row flex so all 6 steps sit on one horizontal line.
+     max-width 유지, margin-inline: 0 으로 좌측 정렬 (중앙 centering 제거). */
   .tm-tournament-promo-steps {
     display: flex;
     grid-template-columns: unset;
     flex-wrap: nowrap;
     gap: 4px;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     padding-bottom: 0;
     margin-bottom: 20px;
+    max-width: 700px;
+    margin-inline: 0;
   }
 
   .tm-tournament-promo-step {
@@ -820,7 +839,7 @@
 }
 
 .tm-bracket-col-head {
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 700;
   color: var(--text-muted);
   padding: 4px 0 8px;
@@ -871,7 +890,7 @@
 }
 
 .tm-bk-team {
-  font-size: 14px;
+  font-size: var(--font-size-body-sm);
   font-weight: 600;
   color: var(--text-strong);
   overflow: hidden;
@@ -885,7 +904,7 @@
 }
 
 .tm-bk-score {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: 700;
   color: var(--text-strong);
   flex-shrink: 0;
@@ -897,7 +916,7 @@
 }
 
 .tm-bk-status {
-  font-size: 11px;
+  font-size: var(--font-size-micro);
   color: var(--text-caption);
   text-align: center;
   padding: 5px 0;
@@ -933,12 +952,12 @@
 }
 
 .tm-bk-champ-decided .tm-bk-champ-icon {
-  background: linear-gradient(135deg, var(--orange500), #f08a00);
+  background: linear-gradient(135deg, var(--orange500), var(--orange600));
   color: var(--static-white);
 }
 
 .tm-bk-champ-name {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: 700;
   color: var(--text-strong);
 }
@@ -961,7 +980,7 @@
 }
 
 .tm-bracket-third-pill {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   color: var(--text-muted);
   padding: 3px 10px;
@@ -1038,7 +1057,7 @@
 
 /* ── 대회 진행 방식 — numbered step timeline ─────────────────────────────── */
 .tm-tourn-flow-format {
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 700;
   color: var(--blue500);
   margin-bottom: 16px;
@@ -1076,7 +1095,7 @@
   border-radius: 50%;
   background: var(--blue50);
   color: var(--blue500);
-  font-size: 13px;
+  font-size: var(--font-size-label);
   font-weight: 700;
   display: grid;
   place-items: center;

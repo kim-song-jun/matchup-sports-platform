@@ -5,6 +5,25 @@ import type {
   MatchListViewModel,
   MatchStateViewModel,
 } from './matches.types';
+import type { V1MatchApiStatus, V1ViewerState } from '@/types/api';
+
+/**
+ * 매치 상세 '참가' CTA 라벨.
+ * eligible(불리언)이 단일 진실원천 — eligible이면 항상 '참가 신청', 아니면 백엔드 차단 사유 메시지.
+ * OK 메시지를 문자열 비교로 거르던 방식은 카피 변경(합니다체→해요체)에 취약했음 (Copilot).
+ */
+export function applyLabel(
+  viewerState: V1ViewerState,
+  status: V1MatchApiStatus,
+  eligible?: boolean,
+  message?: string,
+) {
+  if (viewerState === 'host') return '매치 관리';
+  if (viewerState === 'requested') return '신청 취소';
+  if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
+  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
+  return !eligible && message ? message : '참가 신청';
+}
 
 const matches = [
   {
@@ -118,7 +137,7 @@ const matchDetailByMode: Record<MatchDetailViewModel['mode'], (typeof matches)[n
 
 const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel['match'], 'description' | 'address' | 'rules' | 'participants'>> = {
   default: {
-    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치입니다. 경기 전 10분 일찍 모여 팀을 나누고 가볍게 몸을 풉니다.',
+    description: '초보도 편하게 참여할 수 있는 주말 풋살 매치예요. 경기 전 10분 일찍 모여 팀을 나누고 가볍게 몸을 풀어요.',
     address: '서울 양천구 안양천로 939',
     rules: ['풋살화 착용', '개인 물 지참', '지각 시 호스트에게 미리 연락'],
     participants: [
@@ -128,7 +147,7 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
     ],
   },
   pending: {
-    description: '참가 신청이 접수된 러닝 매치입니다. 호스트가 프로필과 최근 참여 이력을 확인한 뒤 승인 여부를 결정합니다.',
+    description: '참가 신청이 접수된 러닝 매치예요. 호스트가 프로필과 최근 참여 이력을 확인한 뒤 승인 여부를 결정해요.',
     address: '서울 송파구 올림픽로 25',
     rules: ['러닝화 착용', '개인 물 지참', '승인 전까지 참가 확정 아님'],
     participants: [
@@ -137,7 +156,7 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
     ],
   },
   approved: {
-    description: '승인이 완료된 수영 매치입니다. 참가가 확정되었으므로 경기 전 안내와 준비물을 계속 확인할 수 있습니다.',
+    description: '승인이 완료된 수영 매치예요. 참가가 확정되었으므로 경기 전 안내와 준비물을 계속 확인할 수 있어요.',
     address: '서울 마포구 월드컵로 25',
     rules: ['수모 착용', '입장 15분 전 도착', '승인 완료자는 채팅 안내 확인'],
     participants: [
@@ -146,7 +165,7 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
     ],
   },
   mine: {
-    description: '내가 만든 농구 픽업 매치입니다. 신청자를 승인하거나 거절하고, 필요하면 매치 정보를 수정할 수 있습니다.',
+    description: '내가 만든 농구 픽업 매치예요. 신청자를 승인하거나 거절하고, 필요하면 매치 정보를 수정할 수 있어요.',
     address: '서울 성동구 아차산로 17',
     rules: ['실내화 착용', '팀 조끼 제공', '신청자는 호스트 승인 후 확정'],
     participants: [
@@ -202,28 +221,18 @@ export function getMatchStateViewModel(state: MatchStateViewModel['state']): Mat
   const copy = {
     empty: {
       title: '조건에 맞는 매치가 없어요',
-      description: '지역, 시간, 종목 조건을 줄이면 참여 가능한 매치를 다시 볼 수 있습니다.',
+      description: '지역, 시간, 종목 조건을 줄이면 참여 가능한 매치를 다시 볼 수 있어요.',
       matches: [],
     },
     error: {
       title: '매치 목록을 불러오지 못했어요',
-      description: '일시적으로 목록을 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+      description: '일시적으로 목록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.',
       matches: [],
-    },
-    filter: {
-      title: '필터',
-      description: '원하는 종목, 지역, 모집 상태를 선택해 참여 가능한 매치를 찾아보세요.',
-      matches: base.matches,
     },
     joined: {
       title: '참여한 매치',
-      description: '신청 대기와 승인 완료 상태의 개인 매치를 모아 보여줍니다.',
+      description: '신청 대기와 승인 완료 상태의 개인 매치를 모아 볼 수 있어요.',
       matches: base.matches.filter((match) => match.status === 'pending' || match.status === 'approved'),
-    },
-    participants: {
-      title: '참가자',
-      description: '참가 신청과 승인 상태를 확인할 수 있습니다.',
-      matches: base.matches,
     },
   }[state];
 

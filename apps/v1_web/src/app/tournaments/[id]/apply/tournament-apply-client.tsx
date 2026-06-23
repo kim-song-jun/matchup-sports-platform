@@ -11,6 +11,7 @@ import {
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatEntryFee } from '@/lib/date-utils';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod } from '@/types/api';
 
 /* ── Helpers ── */
@@ -18,11 +19,6 @@ import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod } from '@/
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] | undefined {
   if (!data) return undefined;
   return 'items' in data ? data.items : (data as V1MyTeam[]);
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
 }
 
 function formatPrizePool(prize: number): string {
@@ -41,12 +37,22 @@ const STEPS: Array<{ id: ApplyStep; label: string }> = [
 
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
+  const currentLabel = STEPS[currentIndex]?.label ?? '';
   const nextStep = STEPS[currentIndex + 1];
   return (
     <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
+      {/* a11y: 단계 전환 시 스크린리더에 현재 단계 공지 (aria-live polite) */}
+      <span
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {`${currentIndex + 1}단계 중 ${STEPS.length}단계: ${currentLabel}`}
+      </span>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span className="tm-badge tm-badge-blue">{`${currentIndex + 1}/${STEPS.length} 단계`}</span>
-        <span className="tm-text-caption" style={{ marginLeft: 8 }}>{STEPS[currentIndex]?.label}</span>
+        <span className="tm-text-caption" style={{ marginLeft: 8 }}>{currentLabel}</span>
       </div>
       <div className="tm-create-bars" style={{ gridTemplateColumns: `repeat(${STEPS.length}, 1fr)` }}>
         {STEPS.map((step, index) => (
@@ -319,13 +325,13 @@ function TeamSelectStep({
                           display: 'grid',
                           placeItems: 'center',
                           color: 'var(--text-caption)',
-                          fontSize: 17,
+                          fontSize: 'var(--font-size-body-lg)',
                         }}
                       >
                         {team.logoUrl ? (
                           <img src={team.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
-                          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-caption)' }}>
+                          <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-caption)' }}>
                             {team.name?.charAt(0)}
                           </span>
                         )}
@@ -378,7 +384,7 @@ function TeamSelectStep({
                             display: 'grid',
                             placeItems: 'center',
                             color: 'var(--static-white)',
-                            fontSize: 11,
+                            fontSize: 'var(--font-size-micro)',
                             fontWeight: 800,
                           }}
                         >
@@ -497,6 +503,7 @@ function ExpandableCheckRow({
             aria-expanded={expanded}
             aria-controls={bodyId}
             aria-label={expanded ? '내용 접기' : '내용 보기'}
+            className="tm-pressable"
             style={{
               flexShrink: 0,
               background: 'none',
@@ -510,10 +517,7 @@ function ExpandableCheckRow({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 8,
-              outline: 'none',
             }}
-            onFocus={(e) => (e.currentTarget.style.outline = '2px solid var(--blue500)')}
-            onBlur={(e) => (e.currentTarget.style.outline = 'none')}
           >
             <svg
               aria-hidden="true"
@@ -688,7 +692,7 @@ function AgreementsStep({
                 계좌이체
               </div>
               <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-                신청하면 안내해 드리는 계좌로 입금하면 돼요.
+                신청이 완료되면 안내해 드리는 계좌로 참가비를 입금해 주세요.
               </div>
             </div>
           </div>
@@ -823,7 +827,35 @@ function PaymentGuideStep({
         className="sr-only"
       />
 
-      <section aria-labelledby="bank-guide-heading" style={{ marginTop: 20 }}>
+      {/* P2 마이크로인터랙션 — 신청 완료 체크 피드백 (globals.css .tm-complete-check, reduced-motion 안전) */}
+      {/* P2 능동형: "신청이 완료됐어요" → "신청했어요" */}
+      <div
+        role="status"
+        aria-label="신청했어요"
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '24px 0 8px' }}
+      >
+        <div
+          className="tm-complete-check"
+          aria-hidden="true"
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: 'var(--blue500)',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'var(--static-white)',
+          }}
+        >
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>신청했어요</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>아래 계좌로 참가비를 입금해 주세요</div>
+      </div>
+
+      <section aria-labelledby="bank-guide-heading" style={{ marginTop: 12 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle title="입금 안내" />
         </div>
@@ -876,7 +908,7 @@ function PaymentGuideStep({
             <div style={{ padding: '0 16px 14px' }}>
               <AlertBanner
                 tone="info"
-                message="입금 계좌는 신청 확인 후 알림으로 보내드려요. 먼저 신청만 완료해 주세요."
+                message="신청했어요. 계좌 정보는 확인 후 알림으로 안내드릴게요."
               />
               <div style={{ marginTop: 10 }}>
                 <InfoRow
@@ -1054,10 +1086,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   return (
     <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
-      <div
-        className="tm-tournament-apply-body"
-        style={{ maxWidth: 'var(--v1-app-chrome-frame-width)', marginInline: 'auto', width: '100%' }}
-      >
+      {/* maxWidth/marginInline 인라인 스타일 제거:
+          모바일은 globals.css 기본값이 처리, 데스크톱은 tournaments.css의
+          .tm-tournament-apply-body { max-width:unset } + .tm-tournament-form-grid 가 담당 */}
+      <div className="tm-tournament-apply-body">
         <StepIndicator current={step} />
 
         {/* Desktop 2-column layout via .tm-tournament-form-grid */}
@@ -1131,7 +1163,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(25,31,40,0.32)',
+              background: 'var(--scrim-dark-32)',
               display: 'grid',
               placeItems: 'center',
               zIndex: 9999,
@@ -1139,7 +1171,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           >
             <div
               className="tm-text-label"
-              style={{ color: 'var(--static-white)', background: 'rgba(25,31,40,0.72)', padding: '12px 20px', borderRadius: 14 }}
+              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 14 }}
             >
               잠깐만요…
             </div>

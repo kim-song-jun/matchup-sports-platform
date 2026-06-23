@@ -10,7 +10,7 @@ export type AuthAction = {
 export type LoginProvider = {
   label: string;
   background: string;
-  color: string;
+  foreground: string;
   href?: string;
   disabled?: boolean;
 };

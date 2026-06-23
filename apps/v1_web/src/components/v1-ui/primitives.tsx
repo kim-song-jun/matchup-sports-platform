@@ -1,7 +1,106 @@
 import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { ChevronRightIcon } from './icons';
 import { InboxIcon } from 'lucide-react';
+
+/* ── TextField ── */
+/* Carbon/Ant 표준 error a11y 패턴:
+ *   (a) aria-invalid="true"       — input이 잘못된 상태임을 AT에 전달
+ *   (b) aria-describedby={errorId} — error 메시지 노드 id를 input에 연결
+ *   (c) id={errorId} role="alert"  — error 메시지가 자동으로 읽힘
+ */
+
+type TextFieldBaseProps = {
+  /** 레이블 텍스트 */
+  label: string;
+  /** 선택 항목임을 표시할 때 true */
+  optional?: boolean;
+  /** 에러 메시지. 있으면 aria-invalid + role="alert" 자동 적용 */
+  error?: string | null;
+  /** 성공 메시지. error가 없을 때만 표시됨 */
+  success?: string | null;
+  /** 외부에서 고정 id를 주입할 때 사용 (기본값: label 기반 자동 생성) */
+  fieldId?: string;
+  /** label + input + helper를 묶는 컨테이너 className */
+  className?: string;
+};
+
+type TextFieldInputProps = TextFieldBaseProps & InputHTMLAttributes<HTMLInputElement> & {
+  multiline?: false;
+  /** label 옆에 렌더할 추가 노드 (중복 확인 버튼 등) */
+  action?: ReactNode;
+};
+
+type TextFieldTextareaProps = TextFieldBaseProps & TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  multiline: true;
+  action?: never;
+};
+
+export type TextFieldProps = TextFieldInputProps | TextFieldTextareaProps;
+
+/**
+ * TextField — 레이블 + 입력 + 에러/성공 헬퍼를 하나로 묶은 a11y 표준 필드 컴포넌트.
+ *
+ * 에러가 있을 때:
+ *  - input/textarea에 aria-invalid="true" 자동 적용
+ *  - input/textarea에 aria-describedby="{fieldId}-error" 자동 적용
+ *  - 에러 메시지 span에 id="{fieldId}-error" role="alert" 자동 적용
+ */
+export function TextField(props: TextFieldProps) {
+  const { label, optional, error, success, fieldId: externalId, className, multiline, ...rest } = props;
+  // id 생성: 외부 주입 > label 기반 slug
+  const fieldId = externalId ?? `tf-${label.replace(/[^a-zA-Z0-9가-힣]/g, '-')}`;
+  const errorId = `${fieldId}-error`;
+  const successId = `${fieldId}-success`;
+  const hasError = Boolean(error);
+  const hasSuccess = !hasError && Boolean(success);
+
+  const sharedAriaProps = {
+    id: fieldId,
+    'aria-invalid': hasError ? (true as const) : undefined,
+    'aria-describedby': hasError ? errorId : hasSuccess ? successId : undefined,
+  };
+
+  return (
+    <div className={`tm-create-field ${className ?? ''}`.trim()}>
+      <label className="tm-text-label" htmlFor={fieldId}>
+        {label}
+        {optional ? <em className="tm-auth-optional" style={{ marginLeft: 4 }}>선택</em> : null}
+      </label>
+      {!multiline && 'action' in props && props.action ? (
+        <span className="tm-auth-field-with-action">
+          <input
+            className={`tm-input ${hasError ? 'tm-auth-input-error' : hasSuccess ? 'tm-auth-input-success' : ''}`}
+            {...sharedAriaProps}
+            {...(rest as InputHTMLAttributes<HTMLInputElement>)}
+          />
+          {props.action}
+        </span>
+      ) : multiline ? (
+        <textarea
+          className={`tm-input tm-create-input-multiline ${hasError ? 'tm-auth-input-error' : ''}`}
+          {...sharedAriaProps}
+          {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
+        />
+      ) : (
+        <input
+          className={`tm-input ${hasError ? 'tm-auth-input-error' : hasSuccess ? 'tm-auth-input-success' : ''}`}
+          {...sharedAriaProps}
+          {...(rest as InputHTMLAttributes<HTMLInputElement>)}
+        />
+      )}
+      {hasError ? (
+        <span id={errorId} role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">
+          {error}
+        </span>
+      ) : hasSuccess ? (
+        <span id={successId} className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">
+          {success}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 /* ── AlertBanner ── */
 
@@ -33,8 +132,10 @@ export function AlertBanner({
         background: s.bg,
         color: s.color,
         lineHeight: 1.55,
+        /* #6: error tone은 weight 700으로 시각 강도 격상 */
+        fontWeight: isError ? 700 : undefined,
       }}
-      className="tm-text-caption"
+      className="tm-text-label"
     >
       {message}
     </div>
@@ -80,7 +181,8 @@ export function NumberDisplay({ value, unit = '원', size = 32, sub }: NumberDis
         }}
       >
         {typeof value === 'number' ? value.toLocaleString('ko-KR') : value}
-        <span style={{ fontSize: size * 0.5, fontWeight: 600, color: 'var(--text-muted)' }}>{unit}</span>
+        {/* #20: unit은 토큰 고정 15px(--font-size-body) — size 비율 대신 고정값으로 일관성 확보 */}
+        <span className="tm-text-body" style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{unit}</span>
       </div>
       {sub ? <div className="tm-text-caption" style={{ marginTop: 4 }}>{sub}</div> : null}
     </div>
@@ -96,10 +198,12 @@ type KPIStatProps = {
 export function KPIStat({ label, value, unit }: KPIStatProps) {
   return (
     <div>
-      <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{label}</div>
+      {/* #1: 라벨은 micro/muted로 recede — 값이 상대적으로 pop */}
+      <div className="tm-text-micro" style={{ color: 'var(--text-caption)' }}>{label}</div>
       <div className="tab-num" style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-strong)', marginTop: 4 }}>
         {typeof value === 'number' ? value.toLocaleString('ko-KR') : value}
-        {unit ? <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-muted)', marginLeft: 2 }}>{unit}</span> : null}
+        {/* #16: unit을 tm-text-micro(11px)로 낮춰 값 숫자 단독 prominence 확보 */}
+        {unit ? <span className="tm-text-micro" style={{ fontWeight: 500, color: 'var(--text-muted)', marginLeft: 2 }}>{unit}</span> : null}
       </div>
     </div>
   );
@@ -156,7 +260,8 @@ export function ListItem({ title, sub, trailing, chev, href }: ListItemProps) {
         </div>
         {sub ? <div className="tm-text-caption" style={{ marginTop: 2 }}>{sub}</div> : null}
       </div>
-      {trailing ? <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>{trailing}</div> : null}
+      {/* #1: trailing(상태/수치)은 text-strong으로 — 라벨 muted와 대비 */}
+      {trailing ? <div className="tm-text-label" style={{ color: 'var(--text-strong)', flexShrink: 0 }}>{trailing}</div> : null}
       {chev ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}
     </>
   );
@@ -255,19 +360,34 @@ type InfoRowProps = {
   valueColor?: string;
   /** Pass true on the final row of a card to remove the redundant bottom hairline. */
   isLast?: boolean;
+  /** Optional sub-text rendered below the value in micro/caption style. (#13: matches-page InfoRow 통합) */
+  sub?: string;
+  /** Optional inline badge node rendered after the value. (#2: 희소성 배지) */
+  badge?: React.ReactNode;
 };
 
-export function InfoRow({ label, value, valueColor, isLast }: InfoRowProps) {
+export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRowProps) {
   return (
     <div
       className="tm-info-row"
       style={{ ...(isLast ? { borderBottom: 'none' } : {}) }}
     >
-      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+      {/* #1: 라벨은 caption/muted로 recede */}
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
         {label}
       </div>
-      <div className="tm-text-label" style={{ textAlign: 'right', color: valueColor ?? 'var(--text-strong)' }}>
-        {value}
+      {/* #1: 값 슬롯 — body(15px)+weight600+strong으로 라벨 대비 명확한 위계 */}
+      <div style={{ textAlign: 'right', minWidth: 0 }}>
+        <div
+          className="tm-text-body"
+          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
+        >
+          {value}
+          {/* #2: 희소성/마감 인라인 배지 */}
+          {badge}
+        </div>
+        {/* #13: sub-text 지원 — matches-page 로컬 InfoRow 통합 */}
+        {sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}
       </div>
     </div>
   );

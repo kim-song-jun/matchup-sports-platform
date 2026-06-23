@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { Button } from '@/components/v1-ui/button';
 import { useV1CompleteSocialTerms } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { saveSignupTermsAccepted } from '@/lib/signup-terms-storage';
@@ -15,6 +16,7 @@ export function TermsClient() {
   const searchParams = useSearchParams();
   const socialTerms = useV1CompleteSocialTerms();
   const mode = searchParams.get('mode');
+  const document = searchParams.get('document');
   const isSocialMode = mode === 'social';
   const [checkedByTitle, setCheckedByTitle] = useState(() =>
     Object.fromEntries(model.agreements.map((agreement) => [agreement.title, false])),
@@ -71,14 +73,37 @@ export function TermsClient() {
     router.push('/signup');
   };
 
+  if (document === 'privacy' || document === 'terms') {
+    const item = model.agreements.find((agreement) =>
+      document === 'privacy' ? agreement.title.includes('개인정보') : agreement.title.includes('이용약관'),
+    );
+
+    return (
+      <AuthFrame topTitle={item?.title ?? '약관'} backHref="/login">
+        <div className="tm-auth-body">
+          <h1 className="tm-text-heading tm-auth-heading">{item?.title ?? '약관'}</h1>
+          <p className="tm-text-body tm-auth-sub">{item?.detail ?? '약관 내용을 불러오지 못했어요.'}</p>
+        </div>
+      </AuthFrame>
+    );
+  }
+
   return (
     <AuthFrame
       topTitle="약관 동의"
       backHref={isSocialMode ? undefined : model.backHref}
       fixedAction={
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!requiredAccepted || socialTerms.isPending} onClick={continueToSignup} type="button">
-          {socialTerms.isPending ? '저장 중' : requiredAccepted ? model.primary.label : '필수 약관에 동의해 주세요'}
-        </button>
+        <Button
+          block
+          disabled={!requiredAccepted}
+          loading={socialTerms.isPending}
+          onClick={continueToSignup}
+          size="lg"
+          type="button"
+          variant="primary"
+        >
+          {requiredAccepted ? model.primary.label : '필수 약관에 동의해 주세요'}
+        </Button>
       }
     >
       <div className="tm-auth-body">
@@ -90,7 +115,7 @@ export function TermsClient() {
             <div className="tm-text-caption">{error}</div>
           </div>
         ) : null}
-        <button className="tm-card tm-auth-agree-all tm-auth-agree-button tm-pressable" onClick={() => setRequired(!requiredChecked)} type="button">
+        <button className="tm-card tm-auth-agree-all tm-auth-agree-button tm-pressable" onClick={() => setRequired(!requiredChecked)} type="button" aria-pressed={requiredChecked}>
           <TermsCheck checked={requiredChecked} />
           <span className="tm-text-body-lg">필수 약관 전체 동의</span>
         </button>

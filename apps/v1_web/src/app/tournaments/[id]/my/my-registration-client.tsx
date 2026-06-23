@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
@@ -14,6 +14,7 @@ import {
   useV1Team,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatEntryFee } from '@/lib/date-utils';
 import type {
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
@@ -57,13 +58,8 @@ function paymentStatusLabel(status: string): string {
     case 'paid': return '결제 완료';
     case 'cancelled': return '결제 취소';
     case 'refunded': return '환불';
-    default: return status;
+    default: return '알 수 없음';
   }
-}
-
-function formatEntryFee(fee: number): string {
-  if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
 }
 
 /** Returns the badge class + label for the roster shortage badge.
@@ -181,12 +177,57 @@ function RegistrationPass({
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
+  /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
+  if (status === 'awaiting_payment') {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 16,
+          overflow: 'hidden',
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ padding: '16px 18px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }}>
+            <span className="tm-badge tm-badge-orange">입금 대기</span>
+          </div>
+          <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700, lineHeight: 1.35 }}>
+            {title}
+          </div>
+          {teamName ? (
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+              {teamName}
+            </div>
+          ) : null}
+        </div>
+        <div
+          style={{
+            borderTop: '1px dashed var(--border)',
+            padding: '13px 18px',
+            display: 'flex', flexDirection: 'column', gap: 9,
+          }}
+        >
+          <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDay(scheduledAt) || '일정 미정'} />
+          <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
+          {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
+        </div>
+        <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
+          <p className="tm-text-caption" style={{ color: 'var(--orange500)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
+            신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (status !== 'confirmed' && status !== 'waitlisted' && status !== 'paid') return null;
 
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);
-  const topAccent =
-    status === 'waitlisted' ? 'var(--orange500)' : status === 'paid' ? 'var(--blue500)' : 'var(--green500)';
   const dateStr = formatMonthDay(scheduledAt);
   /* Roster next-step applies to active registrations; waitlisted shows a status note instead. */
   const showRosterFooter = status === 'confirmed' || status === 'paid';
@@ -198,7 +239,6 @@ function RegistrationPass({
       style={{
         background: 'var(--surface)',
         border: '1px solid var(--border)',
-        borderTop: `3px solid ${topAccent}`,
         borderRadius: 16,
         overflow: 'hidden',
         marginBottom: 16,
@@ -303,6 +343,75 @@ function CancelModal({
   error: string | null;
 }) {
   const [reason, setReason] = useState('');
+  const sheetRef = useRef<HTMLElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+
+  // 열릴 때 이전 포커스 저장, 닫힐 때 복원 (WCAG 2.4.3)
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+    return () => {
+      const el = previousFocusRef.current;
+      if (el && typeof (el as HTMLElement).focus === 'function') {
+        (el as HTMLElement).focus();
+      }
+    };
+  }, []);
+
+  // 열릴 때 닫기 버튼에 초기 포커스 — 실수로 취소 요청 누르는 것을 방지
+  useEffect(() => {
+    const id = setTimeout(() => closeBtnRef.current?.focus(), 60);
+    return () => clearTimeout(id);
+  }, []);
+
+  // ESC 키로 모달 닫기
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !isSubmitting) {
+        onClose();
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSubmitting, onClose]);
+
+  // focus-trap: Tab / Shift-Tab을 대화 상자 안에서만 순환
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
+    function trap(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+      const focusable = Array.from(sheet!.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
+  }, []);
+
+  // body 스크롤 잠금 — 모달 뒤 콘텐츠 스크롤 방지
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   return (
     <>
@@ -315,6 +424,7 @@ function CancelModal({
       {/* Sheet layer */}
       <div className="tm-filter-layer">
         <section
+          ref={sheetRef}
           className="tm-filter-sheet"
           role="dialog"
           aria-modal="true"
@@ -358,6 +468,7 @@ function CancelModal({
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <button
+              ref={closeBtnRef}
               type="button"
               className="tm-btn tm-btn-lg tm-btn-neutral"
               style={{ flex: 1 }}
@@ -427,6 +538,9 @@ function RegistrationDetailView({
     maxPlayers: number;
     scheduledAt: string | null;
     venue: string | null;
+    bankName: string | null;
+    bankAccount: string | null;
+    bankHolder: string | null;
   };
   registration: V1TournamentRegistration;
 }) {
@@ -565,7 +679,7 @@ function RegistrationDetailView({
           onClick={() => { setCancelError(null); setShowCancelModal(true); }}
           style={{ marginTop: 4 }}
         >
-          참가 취소 신청
+          참가 취소 요청
         </button>
       ) : null}
     </>
@@ -645,14 +759,28 @@ function RegistrationDetailView({
                       <InfoRow
                         label="참가비"
                         value={formatEntryFee(tournament.entryFee)}
-                        isLast={!registration.depositorName}
+                        isLast={!registration.depositorName && registration.status !== 'awaiting_payment'}
                       />
                       {registration.depositorName ? (
-                        <InfoRow label="입금자명" value={registration.depositorName} isLast />
+                        <InfoRow
+                          label="입금자명"
+                          value={registration.depositorName}
+                          isLast={registration.status !== 'awaiting_payment'}
+                        />
+                      ) : null}
+                      {/* awaiting_payment 상태이고 계좌 정보가 있으면 입금 안내 렌더 */}
+                      {registration.status === 'awaiting_payment' && tournament.bankName ? (
+                        <>
+                          <InfoRow label="은행" value={tournament.bankName} />
+                          <InfoRow label="계좌번호" value={tournament.bankAccount ?? ''} />
+                          <InfoRow label="예금주" value={tournament.bankHolder ?? ''} isLast />
+                        </>
                       ) : null}
                       <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
                         {registration.status === 'awaiting_payment'
-                          ? '입금 완료 후 자동으로 상태가 변경돼요.'
+                          ? tournament.bankName
+                            ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 자동으로 상태가 변경돼요.'
+                            : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 자동으로 상태가 변경돼요.'
                           : '아직 결제 정보가 없어요.'}
                       </div>
                     </div>
@@ -670,8 +798,16 @@ function RegistrationDetailView({
               <Card pad={16} style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
-                    <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
-                      {players.length}명 등록됨
+                    {/* P1 숫자:단위 2:1 + tabular-nums */}
+                  <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                      <span
+                        className="tab-num"
+                        style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}
+                      >
+                        {players.length}
+                      </span>
+                      <span style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-strong)', fontWeight: 500, lineHeight: 1.2 }}>명</span>
+                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>등록됨</span>
                     </div>
                     <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
                       {`최소 ${tournament.minPlayers}명 · 최대 ${tournament.maxPlayers}명`}
@@ -733,7 +869,7 @@ function RegistrationDetailView({
                   className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
                   onClick={() => { setCancelError(null); setShowCancelModal(true); }}
                 >
-                  참가 취소 신청
+                  참가 취소 요청
                 </button>
               ) : null}
             </div>
@@ -872,6 +1008,9 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           maxPlayers: tournament.maxPlayers,
           scheduledAt: tournament.scheduledAt,
           venue: tournament.venue,
+          bankName: tournament.bankName,
+          bankAccount: tournament.bankAccount,
+          bankHolder: tournament.bankHolder,
         }}
         registration={registration}
       />

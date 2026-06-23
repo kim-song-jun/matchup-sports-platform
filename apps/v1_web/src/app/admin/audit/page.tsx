@@ -5,13 +5,13 @@ import { useV1AdminActionLogs, useV1AdminStatusChangeLogs } from '@/hooks/use-v1
 import type { AdminListFilters, V1AdminLog, V1AdminStatusChangeLog } from '@/types/api';
 import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
 import {
-  AdminDataTable,
+  AdminCardList,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
   AdminTableSkeleton,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
+import { Clock, User, Hash, Tag } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 type TargetTypeFilter = '' | 'user' | 'match' | 'team' | 'team_match' | 'tournament';
@@ -62,115 +62,7 @@ function shortId(id: string | null | undefined): string {
   return `…${id.slice(-8)}`;
 }
 
-// ── Action log columns ────────────────────────────────────────────────────
-const ACTION_LOG_COLUMNS: AdminTableColumn<V1AdminLog>[] = [
-  {
-    key: 'createdAt',
-    header: '시각',
-    render: (row) => (
-      <time dateTime={row.createdAt} className="text-[13px] text-gray-600 tabular-nums">
-        {formatDateTime(row.createdAt)}
-      </time>
-    ),
-  },
-  {
-    key: 'adminUserId',
-    header: '관리자',
-    render: (row) => (
-      <span className="text-[13px] text-gray-700 font-mono">{shortId(row.adminUserId)}</span>
-    ),
-  },
-  {
-    key: 'actionType',
-    header: '액션',
-    render: (row) => (
-      <span className="text-[13px] text-gray-800 font-medium">{adminActionLabel(row.actionType)}</span>
-    ),
-  },
-  {
-    key: 'target',
-    header: '대상',
-    render: (row) => (
-      <span className="flex items-center gap-1.5">
-        <AdminStatusPill status={row.targetType} label={adminTargetTypeLabel(row.targetType)} />
-        <span className="font-mono text-[12px] text-gray-400">{shortId(row.targetId)}</span>
-      </span>
-    ),
-  },
-  {
-    key: 'reason',
-    header: '사유',
-    render: (row) => (
-      <span className="text-[13px] text-gray-500 max-w-[200px] truncate block">
-        {row.reason ?? '—'}
-      </span>
-    ),
-  },
-];
-
-// ── Status change log columns ─────────────────────────────────────────────
-const STATUS_LOG_COLUMNS: AdminTableColumn<V1AdminStatusChangeLog>[] = [
-  {
-    key: 'createdAt',
-    header: '시각',
-    render: (row) => (
-      <time dateTime={row.createdAt} className="text-[13px] text-gray-600 tabular-nums">
-        {formatDateTime(row.createdAt)}
-      </time>
-    ),
-  },
-  {
-    key: 'targetType',
-    header: '대상',
-    render: (row) => <AdminStatusPill status={row.targetType} label={adminTargetTypeLabel(row.targetType)} />,
-  },
-  {
-    key: 'statusChange',
-    header: '변경',
-    render: (row) => (
-      <span className="flex items-center gap-1.5 flex-wrap">
-        <AdminStatusPill status={row.fromStatus} />
-        <span className="text-gray-400 text-[11px]" aria-hidden="true">→</span>
-        <AdminStatusPill status={row.toStatus} />
-      </span>
-    ),
-  },
-  {
-    key: 'actor',
-    header: '처리자',
-    render: (row) => (
-      <span className="text-[13px] text-gray-700 font-mono">
-        {shortId(row.adminUserId ?? row.actorUserId)}
-      </span>
-    ),
-  },
-  {
-    key: 'reason',
-    header: '사유',
-    render: (row) => (
-      <span className="text-[13px] text-gray-500 max-w-[200px] truncate block">
-        {row.reason ?? '—'}
-      </span>
-    ),
-  },
-];
-
-// ── Error / load-more shared UI ───────────────────────────────────────────
-function PanelError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 flex flex-col items-center gap-3 text-center">
-      <p className="text-sm text-red-500 font-medium">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-      >
-        다시 시도하기
-      </button>
-    </div>
-  );
-}
-
+// ── Load-more shared UI ───────────────────────────────────────────────────
 function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
   return (
     <div className="flex justify-center">
@@ -178,7 +70,7 @@ function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: bo
         type="button"
         onClick={onClick}
         disabled={loading}
-        className="inline-flex items-center justify-center h-[44px] px-6 bg-white border border-gray-200 rounded-xl text-[14px] text-gray-700 font-medium hover:border-blue-300 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="inline-flex items-center justify-center h-[44px] px-6 bg-white border border-gray-200 rounded-xl text-[var(--font-size-body-sm)] text-gray-700 font-medium hover:border-blue-300 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? '불러오는 중…' : '더 보기'}
       </button>
@@ -222,27 +114,42 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
     if (next) setCursor(next);
   }
 
-  if (isPending && rows.length === 0) return <AdminTableSkeleton rows={8} cols={5} />;
-  if (isError && rows.length === 0) {
-    return (
-      <PanelError message="감사 로그를 불러오지 못했어요." onRetry={() => refetch()} />
-    );
-  }
+  const errorMessage = isError && rows.length === 0 ? '감사 로그를 불러오지 못했어요.' : undefined;
 
   return (
     <div className="flex flex-col gap-3">
-      <AdminDataTable<V1AdminLog>
-        columns={ACTION_LOG_COLUMNS}
+      <AdminCardList<V1AdminLog>
         rows={rows}
         keyExtractor={(r) => r.actionLogId}
+        card={(row) => ({
+          title: adminActionLabel(row.actionType),
+          subtitle: `${adminTargetTypeLabel(row.targetType)} ${shortId(row.targetId)}`,
+          statusNode: (
+            <AdminStatusPill
+              status={row.targetType}
+              label={adminTargetTypeLabel(row.targetType)}
+            />
+          ),
+          meta: [
+            { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
+            { icon: <User size={14} aria-hidden="true" />, label: shortId(row.adminUserId) },
+            { icon: <Hash size={14} aria-hidden="true" />, label: shortId(row.targetId) },
+            { icon: <Tag size={14} aria-hidden="true" />, label: row.reason ?? '—' },
+          ],
+        })}
+        loading={isPending && rows.length === 0}
         empty={
           <AdminEmpty
             title="로그가 없어요"
             description="해당 조건의 운영 활동이 없어요."
           />
         }
+        error={errorMessage}
+        onRetry={() => void refetch()}
+        skeletonCards={8}
       />
       {hasMore && <LoadMoreButton onClick={loadMore} loading={isPending} />}
+      {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
     </div>
   );
 }
@@ -283,30 +190,57 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
     if (next) setCursor(next);
   }
 
-  if (isPending && rows.length === 0) return <AdminTableSkeleton rows={8} cols={5} />;
-  if (isError && rows.length === 0) {
-    return (
-      <PanelError
-        message="상태 변경 로그를 불러오지 못했어요."
-        onRetry={() => refetch()}
-      />
-    );
-  }
+  const errorMessage =
+    isError && rows.length === 0 ? '상태 변경 로그를 불러오지 못했어요.' : undefined;
 
   return (
     <div className="flex flex-col gap-3">
-      <AdminDataTable<V1AdminStatusChangeLog>
-        columns={STATUS_LOG_COLUMNS}
+      <AdminCardList<V1AdminStatusChangeLog>
         rows={rows}
         keyExtractor={(r) => r.statusChangeLogId}
+        card={(row) => ({
+          title: `${adminTargetTypeLabel(row.targetType)} ${shortId(row.targetId)}`,
+          statusNode: (
+            <span className="flex items-center gap-1 flex-wrap">
+              <AdminStatusPill status={row.fromStatus} />
+              <span className="text-gray-400 text-[var(--font-size-micro)]" aria-hidden="true">→</span>
+              <AdminStatusPill status={row.toStatus} />
+            </span>
+          ),
+          meta: [
+            {
+              icon: <Clock size={14} aria-hidden="true" />,
+              label: formatDateTime(row.createdAt),
+            },
+            {
+              icon: <User size={14} aria-hidden="true" />,
+              label: shortId(row.adminUserId ?? row.actorUserId),
+            },
+            {
+              icon: <Tag size={14} aria-hidden="true" />,
+              label: row.reason ?? '—',
+            },
+          ],
+          tone:
+            row.toStatus === 'cancelled' || row.toStatus === 'blocked' || row.toStatus === 'deleted'
+              ? 'danger'
+              : row.toStatus === 'suspended' || row.toStatus === 'withdrawal_pending'
+                ? 'warning'
+                : undefined,
+        })}
+        loading={isPending && rows.length === 0}
         empty={
           <AdminEmpty
             title="로그가 없어요"
             description="해당 조건의 상태 변경 기록이 없어요."
           />
         }
+        error={errorMessage}
+        onRetry={() => void refetch()}
+        skeletonCards={8}
       />
       {hasMore && <LoadMoreButton onClick={loadMore} loading={isPending} />}
+      {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
     </div>
   );
 }
@@ -347,7 +281,7 @@ export default function AdminAuditPage() {
               type="button"
               onClick={() => handleTabChange(tab.key)}
               className={[
-                'px-4 min-h-[44px] rounded-lg text-[13px] font-medium transition-colors',
+                'px-4 min-h-[44px] rounded-lg text-[var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
                   ? 'bg-white text-gray-900 shadow-sm'
@@ -375,7 +309,7 @@ export default function AdminAuditPage() {
               onClick={() => setTargetType(opt.value)}
               aria-pressed={isActive}
               className={[
-                'inline-flex items-center px-3 h-[34px] rounded-full text-[13px] font-medium transition-colors',
+                'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 isActive
                   ? 'bg-blue-500 text-white'

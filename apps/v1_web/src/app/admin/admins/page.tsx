@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, ShieldMinus, Shield, X, Search, RotateCcw } from 'lucide-react';
+import { ShieldCheck, ShieldMinus, Shield, X, Search, RotateCcw, Calendar, Clock, Activity } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminAdmins,
@@ -13,16 +13,13 @@ import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
-  AdminDataTable,
-  AdminStatusPill,
+  AdminCardList,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
-  STATUS_META,
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { AdminTableColumn } from '@/components/admin';
 import type { V1AdminRow, V1AdminUserRow, CursorPage } from '@/types/api';
 
 // ── Date formatter ─────────────────────────────────────────────────────────
@@ -43,7 +40,7 @@ function formatDateCompact(dateStr: string | null | undefined): string {
 function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   if (role === 'owner') {
     return (
-      <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
         <ShieldCheck size={11} aria-hidden="true" />
         최고운영자
       </span>
@@ -51,7 +48,7 @@ function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   }
   if (role === 'ops') {
     return (
-      <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-[var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
         <Shield size={11} aria-hidden="true" />
         운영
       </span>
@@ -59,7 +56,7 @@ function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   }
   // support
   return (
-    <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-600 text-[var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
       <ShieldMinus size={11} aria-hidden="true" />
       지원
     </span>
@@ -213,7 +210,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="grant-modal-title"
-        className="bg-white rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[480px] overflow-hidden"
+        className="bg-white rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[480px] overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -235,17 +232,17 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
           <div className="px-5 py-5 flex flex-col gap-4">
             {/* User search */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-user-search" className="text-[13px] font-semibold text-gray-700">
+              <label htmlFor="grant-user-search" className="text-[var(--font-size-label)] font-semibold text-gray-700">
                 회원 검색
               </label>
               {selectedUser ? (
                 <div className="flex items-center justify-between h-[44px] px-3 bg-blue-50 border border-blue-200 rounded-xl">
                   <div className="flex flex-col">
-                    <span className="text-[13px] font-semibold text-blue-800">
+                    <span className="text-[var(--font-size-label)] font-semibold text-blue-800">
                       {selectedUser.nickname ?? selectedUser.displayName ?? '(이름 없음)'}
                     </span>
                     {selectedUser.email && (
-                      <span className="text-[11px] text-blue-600">{selectedUser.email}</span>
+                      <span className="text-[var(--font-size-micro)] text-blue-600">{selectedUser.email}</span>
                     )}
                   </div>
                   <button
@@ -256,7 +253,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                       setDebouncedSearch('');
                     }}
                     aria-label="선택 해제"
-                    className="flex items-center justify-center w-[32px] h-[32px] rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     <X size={14} aria-hidden="true" />
                   </button>
@@ -318,9 +315,9 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                       className="absolute left-0 right-0 top-[48px] bg-white border border-gray-200 rounded-xl shadow-md z-10 overflow-hidden max-h-[240px] overflow-y-auto"
                     >
                       {usersPending ? (
-                        <p className="px-4 py-3 text-[13px] text-gray-400">검색 중…</p>
+                        <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">검색 중…</p>
                       ) : userResults.length === 0 ? (
-                        <p className="px-4 py-3 text-[13px] text-gray-400">결과가 없어요.</p>
+                        <p className="px-4 py-3 text-[var(--font-size-label)] text-gray-400">결과가 없어요.</p>
                       ) : (
                         <div role="menu" aria-label="회원 검색 결과">
                           {userResults.map((user, idx) => (
@@ -362,16 +359,16 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                                 menuHighlightIdx === idx ? 'bg-blue-50' : '',
                               ].join(' ')}
                             >
-                              <span className="text-[13px] font-semibold text-gray-900">
+                              <span className="text-[var(--font-size-label)] font-semibold text-gray-900">
                                 {user.nickname ?? user.displayName ?? '(이름 없음)'}
                                 {user.adminRole && (
-                                  <span className="ml-1.5 text-[11px] text-blue-600 font-medium">
+                                  <span className="ml-1.5 text-[var(--font-size-micro)] text-blue-600 font-medium">
                                     (이미 운영자)
                                   </span>
                                 )}
                               </span>
                               {user.email && (
-                                <span className="text-[12px] text-gray-400">{user.email}</span>
+                                <span className="text-[var(--font-size-caption)] text-gray-400">{user.email}</span>
                               )}
                             </button>
                           ))}
@@ -385,7 +382,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
 
             {/* Role selection */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-role" className="text-[13px] font-semibold text-gray-700">
+              <label htmlFor="grant-role" className="text-[var(--font-size-label)] font-semibold text-gray-700">
                 부여할 역할
               </label>
               <select
@@ -406,7 +403,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
 
             {/* Reason */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="grant-reason" className="text-[13px] font-semibold text-gray-700">
+              <label htmlFor="grant-reason" className="text-[var(--font-size-label)] font-semibold text-gray-700">
                 부여 사유{' '}
                 <span className="text-red-500" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -427,7 +424,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                 ].join(' ')}
                 aria-required="true"
               />
-              <p className="text-[11px] text-right text-gray-400 tabular-nums">
+              <p className="text-[var(--font-size-micro)] text-right text-gray-400 tabular-nums">
                 {reason.length} / 500
               </p>
             </div>
@@ -439,7 +436,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
               type="button"
               onClick={() => !grantMutation.isPending && onClose()}
               disabled={grantMutation.isPending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[var(--font-size-body)] font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -447,7 +444,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[15px] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[var(--font-size-body)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
@@ -521,7 +518,7 @@ export default function AdminAdminsPage() {
     return (
       <AdminEmpty
         title="최고운영자 전용이에요"
-        description="이 페이지는 최고운영자(owner)만 접근할 수 있어요. 권한을 확인해 주세요."
+        description="이 페이지는 최고운영자만 접근할 수 있어요. 권한을 확인해 주세요."
       />
     );
   }
@@ -564,10 +561,15 @@ export default function AdminAdminsPage() {
       vars = { userId: row.userId, adminRole: status as 'ops' | 'support', reason };
     }
 
+    const successMessage =
+      action === 'revoke' ? '권한을 회수했어요.' :
+      action === 'reactivate' ? '권한을 재부여했어요.' :
+      '역할을 변경했어요.';
+
     updateAdminRole.mutate(vars, {
       onSuccess: () => {
         setActionModal(null);
-        showToast('처리했어요.', 'success');
+        showToast(successMessage, 'success');
       },
       onError: (err) => {
         showToast(resolveAdminErrorMessage(err, '처리에 실패했어요.'), 'error');
@@ -575,59 +577,10 @@ export default function AdminAdminsPage() {
     });
   }
 
-  // ── Table columns ─────────────────────────────────────────────────────────
-  const columns: AdminTableColumn<V1AdminRow>[] = [
-    {
-      key: 'member',
-      header: '운영자',
-      render: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-semibold text-gray-900 text-[14px]">
-            {row.nickname ?? row.displayName ?? '(이름 없음)'}
-          </span>
-          {row.email && <span className="text-[12px] text-gray-400">{row.email}</span>}
-        </div>
-      ),
-    },
-    {
-      key: 'adminRole',
-      header: '역할',
-      render: (row) => <AdminRoleBadge role={row.adminRole} />,
-    },
-    {
-      key: 'status',
-      header: '상태',
-      render: (row) => {
-        const statusKey = row.status === 'revoked' ? 'cancelled' : row.status;
-        const label =
-          row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지';
-        return <AdminStatusPill status={statusKey} label={label} />;
-      },
-    },
-    {
-      key: 'grantedAt',
-      header: '부여일',
-      render: (row) => (
-        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
-          {formatDateCompact(row.grantedAt)}
-        </span>
-      ),
-    },
-    {
-      key: 'revokedAt',
-      header: '회수일',
-      render: (row) => (
-        <span className="text-[13px] text-gray-500 tabular-nums whitespace-nowrap">
-          {row.revokedAt ? formatDateCompact(row.revokedAt) : '—'}
-        </span>
-      ),
-    },
-  ];
-
   // Role change status options (only ops / support are assignable, not owner)
   const roleChangeOptions = [
-    { value: 'ops', label: '운영 (ops)' },
-    { value: 'support', label: '지원 (support)' },
+    { value: 'ops', label: '운영' },
+    { value: 'support', label: '지원' },
   ];
 
   const errorMessage = isError
@@ -673,7 +626,7 @@ export default function AdminAdminsPage() {
             onClick={() => setGrantModalOpen(true)}
             className={[
               'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-5 rounded-xl',
-              'bg-blue-500 hover:bg-blue-600 text-white text-[14px] font-semibold',
+              'bg-blue-500 hover:bg-blue-600 text-white text-[var(--font-size-body-sm)] font-semibold',
               'transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
             ].join(' ')}
           >
@@ -684,28 +637,50 @@ export default function AdminAdminsPage() {
       />
 
       <div className="flex flex-col gap-4">
-        {/* Data table */}
-        <AdminDataTable<V1AdminRow>
-          columns={columns}
+        {/* Card list */}
+        <AdminCardList<V1AdminRow>
           rows={rows}
           keyExtractor={(row) => row.adminUserId}
-          actionsHeader="작업"
+          card={(row) => ({
+            title: row.nickname ?? row.displayName ?? '(이름 없음)',
+            subtitle: row.email ?? undefined,
+            statusNode: <AdminRoleBadge role={row.adminRole} />,
+            meta: [
+              {
+                icon: <Activity size={14} aria-hidden="true" />,
+                label: row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지',
+              },
+              {
+                icon: <Calendar size={14} aria-hidden="true" />,
+                label: `부여 ${formatDateCompact(row.grantedAt)}`,
+              },
+              {
+                icon: <Clock size={14} aria-hidden="true" />,
+                label: row.revokedAt ? `회수 ${formatDateCompact(row.revokedAt)}` : '회수일 없음',
+              },
+            ],
+            tone:
+              row.status === 'revoked'
+                ? 'danger'
+                : row.status === 'suspended'
+                  ? 'warning'
+                  : undefined,
+          })}
           renderActions={(row) => {
-            // Hide actions for owner rows (including self) — owner role cannot be changed via UI
+            // Hide actions for owner rows — owner role cannot be changed via UI
             if (row.adminRole === 'owner') return null;
             // Hide actions for own row (self-modification guard)
             if (row.adminUserId === myAdminUserId) return null;
 
             return (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 w-full">
                 {row.status === 'active' && (
                   <>
-                    {/* Role change: only for ops/support (not owner) */}
                     <button
                       type="button"
                       onClick={() => setActionModal({ row, action: 'changeRole' })}
                       className={[
-                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium',
+                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
                         'text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors whitespace-nowrap',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       ].join(' ')}
@@ -713,12 +688,11 @@ export default function AdminAdminsPage() {
                     >
                       역할 변경
                     </button>
-                    {/* Revoke */}
                     <button
                       type="button"
                       onClick={() => setActionModal({ row, action: 'revoke' })}
                       className={[
-                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[13px] font-medium',
+                        'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
                         'text-red-600 bg-red-50 hover:bg-red-100 transition-colors whitespace-nowrap',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       ].join(' ')}
@@ -733,7 +707,7 @@ export default function AdminAdminsPage() {
                     type="button"
                     onClick={() => setActionModal({ row, action: 'reactivate' })}
                     className={[
-                      'inline-flex items-center justify-center gap-1 min-h-[44px] px-3 rounded-lg text-[13px] font-medium',
+                      'inline-flex items-center justify-center gap-1 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
                       'text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors whitespace-nowrap',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                     ].join(' ')}
@@ -755,7 +729,7 @@ export default function AdminAdminsPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonRows={5}
+          skeletonCards={5}
         />
 
         {/* Load more */}
@@ -765,7 +739,7 @@ export default function AdminAdminsPage() {
               type="button"
               onClick={() => void loadMore()}
               className={[
-                'h-[44px] px-6 rounded-xl text-[14px] font-semibold transition-colors',
+                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
                 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               ].join(' ')}

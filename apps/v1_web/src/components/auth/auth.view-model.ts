@@ -1,18 +1,20 @@
 import type { AuthExceptionKind, AuthExceptionViewModel, EmailLoginViewModel, LoginViewModel, SignupCompleteViewModel, SignupFormViewModel, TermsViewModel } from './auth.types';
 
-export function getLoginViewModel(): LoginViewModel {
+export function getLoginViewModel(redirectPath?: string | null): LoginViewModel {
   const kakaoHref = buildKakaoAuthUrl();
+  // redirect 파라미터가 있으면 이메일 로그인 버튼도 해당 경로를 보존해야 세션 만료 후 복귀가 끊기지 않음.
+  const emailHref = redirectPath ? `/login/email?redirect=${encodeURIComponent(redirectPath)}` : '/login/email';
 
   return {
     heroTitle: '같이 뛸 사람을\n한 번에 찾아요',
     heroSub: 'Teameet에 오신 걸 환영해요',
-    emailHref: '/login/email',
+    emailHref,
     guestHref: '/home',
     signupHref: '/terms',
     providers: [
-      { label: '카카오', background: '#FEE500', color: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
-      { label: '네이버', background: '#03C75A', color: 'var(--static-white)', disabled: true },
-      { label: 'Apple', background: 'var(--static-black)', color: 'var(--static-white)', disabled: true },
+      { label: '카카오', background: 'var(--kakao-yellow)', foreground: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
+      { label: '네이버', background: 'var(--naver-green)', foreground: 'var(--static-white)', disabled: true },
+      { label: 'Apple', background: 'var(--static-black)', foreground: 'var(--static-white)', disabled: true },
     ],
   };
 }
@@ -53,6 +55,7 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       backHref: '/login',
       badge: '소셜 권한 거부',
       title: '로그인을 완료하지 못했어요',
+      /* P2 UX 라이팅: 불안 상황(권한 거부) — 능동형보다 안심 유도 수동형 유지 */
       body: '필수 정보 제공 동의가 취소됐어요. 계정은 만들어지지 않았으니 같은 방법 또는 다른 로그인으로 다시 시도해 보세요.',
       tone: 'orange',
       primary: { label: '다시 로그인하기', href: '/login' },
@@ -98,7 +101,7 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       backHref: '/login/email',
       badge: '비밀번호 찾기',
       title: '이메일 로그인으로 다시 시도해 주세요',
-      body: '비밀번호를 잊었다면 이메일 가입 정보를 확인한 뒤 다시 로그인해 주세요. 계정에 접근하기 어려우면 새 이메일로 가입할 수 있어요.',
+      body: '현재는 비밀번호 재설정 이메일 발송 기능을 준비 중이에요. 가입했던 이메일과 비밀번호로 로그인해 주세요.',
       tone: 'orange',
       primary: { label: '이메일 로그인으로 돌아가기', href: '/login/email' },
       secondary: { label: '간편 로그인으로 이동', href: '/login', tone: 'neutral' },
@@ -162,11 +165,12 @@ export function getSignupFormViewModel(): SignupFormViewModel {
 
 export function getSignupCompleteViewModel(): SignupCompleteViewModel {
   return {
-    title: '회원가입이 완료됐어요',
-    sub: '이제 운동 설정을 하면 더 정확한 매치 추천을 받을 수 있어요.',
+    /* P2 UX 라이팅: 수동형("완료됐어요") → 능동형("완료했어요") */
+    title: '회원가입을 완료했어요',
+    sub: '운동 설정을 하면 더 정확한 매치를 추천받을 수 있어요.',
     steps: [
-      { title: '약관 동의 완료', body: '필수 약관 동의가 저장됐어요.', done: true },
-      { title: '회원가입 완료', body: '계정 만들기가 완료됐어요. 뒤로 가도 계정은 유지돼요.', done: true },
+      { title: '약관 동의 완료', body: '필수 약관에 동의했어요.', done: true },
+      { title: '회원가입 완료', body: '계정을 만들었어요. 뒤로 가도 계정은 유지돼요.', done: true },
     ],
     primary: { label: '운동 설정 시작하기', href: '/onboarding/sport' },
     secondary: { label: '나중에 설정하기', href: '/home', tone: 'neutral' },

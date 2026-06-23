@@ -9,6 +9,7 @@ export type MyUser = {
   monthly: Array<{ label: string; value: number | string; unit?: string }>;
 };
 
+/** icon 값은 Lucide コンポーネント명 문자열 — MenuSection에서 매핑 후 렌더됨 */
 export type MyMenuItem = {
   label: string;
   sub: string;
@@ -81,6 +82,8 @@ export type MyTeamDetailViewModel = {
 };
 
 export type MyMember = {
+  /** membershipId(멤버) 또는 applicationId(가입 요청) — React list key에 사용 */
+  id: string;
   name: string;
   role: string;
   meta: string;
@@ -107,6 +110,24 @@ export type ProfileEditViewModel = {
 export type SettingsViewModel = {
   title: string;
   groups: MyMenuSection[];
+};
+
+export type MyInvitationItem = {
+  invitationId: string;
+  teamName: string;
+  teamLogo: string;
+  invitedByName: string;
+  message: string | null;
+  dateLabel: string;
+};
+
+export type MyInvitationsViewModel = {
+  invitations: MyInvitationItem[];
+  error: boolean;
+  actionPending: boolean;
+  onAccept: (invitationId: string) => void;
+  onDecline: (invitationId: string) => void;
+  onRetry: () => void;
 };
 
 export type NotificationSetting = {

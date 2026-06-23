@@ -18,6 +18,7 @@ const TEAM = '00000000-0000-4000-8000-000000000101';
 const TEAM2 = '00000000-0000-4000-8000-000000000102';
 const TMATCH = '00000000-0000-4000-8000-000000001406';
 const CHAT = '5c6a8892-0405-4594-98b8-92e70d49b869';
+const TOURN = 'efc6a994-2349-4316-87b0-4e6cd351b4b5';
 
 const BREAKPOINTS = [
   { key: 'mobile', width: 390, height: 844 },
@@ -48,7 +49,8 @@ const CONSUMER = [
   ['19-team-detail', `/teams/${TEAM}`],
   ['20-team-members', `/teams/${TEAM2}/members`],
   ['21-team-new', '/teams/new'],
-  ['22-teams-search', '/teams/search', '풋살'],
+  ['22-tournaments-list', '/tournaments'],
+  ['22b-tournament-detail', `/tournaments/${TOURN}`],
   ['23-chat-list', '/chat'],
   ['24-chat-room', `/chat/${CHAT}`],
   ['25-search', '/search'],
@@ -163,19 +165,19 @@ async function captureOnboarding(ctx, dir, results) {
 
     // onboarding (ONB auth)
     const onb = await browser.newContext(vp);
-    await onb.addInitScript(([i, e]) => { localStorage.setItem('teameet.v1.userId', i); localStorage.setItem('teameet.v1.userEmail', e); localStorage.removeItem('teameet.v1.onboardingDraft'); }, ONB);
+    await onb.addInitScript(([i, e]) => { localStorage.removeItem('teameet.v1.userId'); localStorage.setItem('teameet.v1.userEmail', e); localStorage.removeItem('teameet.v1.onboardingDraft'); }, ONB);
     await captureOnboarding(onb, dir, results);
     await onb.close();
 
     // consumer (host auth)
     const host = await browser.newContext(vp);
-    await host.addInitScript(([i, e]) => { localStorage.setItem('teameet.v1.userId', i); localStorage.setItem('teameet.v1.userEmail', e); }, HOST);
+    await host.addInitScript(([i, e]) => { localStorage.removeItem('teameet.v1.userId'); localStorage.setItem('teameet.v1.userEmail', e); }, HOST);
     await captureSimple(host, dir, CONSUMER, results);
     await host.close();
 
     // admin (admin auth)
     const adm = await browser.newContext(vp);
-    await adm.addInitScript(([i, e]) => { localStorage.setItem('teameet.v1.userId', i); localStorage.setItem('teameet.v1.userEmail', e); }, ADMIN);
+    await adm.addInitScript(([i, e]) => { localStorage.removeItem('teameet.v1.userId'); localStorage.setItem('teameet.v1.userEmail', e); }, ADMIN);
     await captureSimple(adm, dir, ADMIN_PAGES, results);
     await adm.close();
 

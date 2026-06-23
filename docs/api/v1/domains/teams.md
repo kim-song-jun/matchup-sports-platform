@@ -19,6 +19,19 @@
 | `POST` | `/api/v1/team-join-applications/:applicationId/approve` | owner/manager | `{ note?: string | null }` | approved application and membership |
 | `POST` | `/api/v1/team-join-applications/:applicationId/reject` | owner/manager | `{ reason?: string | null }` | rejected application |
 
+## Member Response Contract
+
+`GET /api/v1/teams/:teamId/members` returns every visible team member for the caller's role, including members that cannot currently be used in tournament roster registration.
+
+Each member item includes:
+
+- `displayName`: UI display name, falling back to nickname/member label.
+- `realName`: nullable profile real name snapshot source.
+- `birthDate`: nullable profile birth date snapshot source.
+- `phone`: nullable account phone source.
+
+Tournament roster clients must keep members with missing `realName`, `birthDate`, or `phone` visible, but disable selection and explain the missing fields.
+
 ## DTO Highlights
 
 `TeamsQueryDto` includes `cursor`, `limit`, `query`, `sportId`, `regionId`, `joinPolicy`, `sort`, and `view`.

@@ -45,22 +45,30 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
               {dash ? '안녕하세요' : `안녕하세요, ${model.viewerName}님`}
             </div>
+            {/*
+             * [taste-A] 통계 위계 후퇴: NumberDisplay 36→24 + 한 줄 컴팩트 스트립.
+             * 통계가 인사말보다 시각 무게를 과점하던 위계 역전을 교정한다.
+             * 두 항목을 gap 24px 수평 스트립으로 압축하고, 숫자 크기를 heading 레벨
+             * (24px, --font-size-heading)로 낮춰 제목 레벨 아이덴티티를 유지하면서도
+             * 히어로 카드·섹션 타이틀이 시각 우선순위를 되찾게 한다.
+             */}
             <div className="tm-home-stats">
               <div>
-                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
+                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
                 <NumberDisplay
                   value={dash ? '-' : model.stats.monthlyActivity}
                   unit={dash ? '' : '경기'}
-                  size={36}
+                  size={24}
                   sub={dash ? undefined : model.stats.monthlyActivitySub}
                 />
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
+                <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
                 <NumberDisplay
                   value={dash ? '-' : model.stats.mannerScore}
-                  unit={dash ? '' : '점'}
-                  size={36}
+                  /* 점수 없을 때(빈 sentinel '-')는 '점' 단위 숨김 → "- 점" 어색함 방지 */
+                  unit={dash || model.stats.mannerScore === '-' ? '' : '점'}
+                  size={24}
                   sub={
                     /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
                     dash || model.stats.mannerScoreSub === '-'
@@ -86,10 +94,11 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
           <div className="tm-home-matches-block">
-            <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '실력에 맞는 경기 5개'} action="전체보기" actionHref="/matches" />
+            <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '내 실력에 맞는 매치 추천'} action="전체보기" actionHref="/matches" />
             {model.network ? (
               <div style={{ padding: '0 20px 8px' }}>
-                <EmptyState title="새로고침이 필요해요" sub="추천 목록과 대표 매치를 다시 불러와야 해요." cta="다시 불러오기" onCta={model.retry} />
+                {/* [P2 UX 라이팅] 능동형 + 해요체 */}
+                <EmptyState title="목록을 불러오지 못했어요" sub="아래 버튼으로 다시 불러올 수 있어요." cta="다시 불러오기" onCta={model.retry} />
               </div>
             ) : (
               <RecommendedMatchRail matches={model.recommendedMatches} />
@@ -112,7 +121,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
           {/* Weather strip */}
           <div className="tm-home-sidebar-weather-wrap">
-            <div className="tm-home-weather-head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 10 }}>
+            {/* 인라인 style 제거 → home.css .tm-home-weather-head 규칙으로 이전 */}
+            <div className="tm-home-weather-head">
               <div className="tm-text-label">현재 위치 날씨</div>
               <button
                 className="tm-btn tm-btn-icon tm-btn-neutral"
@@ -135,7 +145,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             <div className="tm-home-sidebar-notices">
               <div className="tm-notice-head">
                 <div className="tm-text-body-lg">공지사항</div>
-                <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}>
+                <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/notices" style={{ alignSelf: 'flex-end', padding: '0 4px' }}>
                   전체보기
                 </Link>
               </div>
@@ -159,9 +169,16 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
 function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   return (
-    <Link className="tm-floating-fab tm-home-chat-fab" href={model.chatHref} aria-label={`읽지 않은 채팅 ${model.chatUnreadCount}개`}>
+    <Link
+      className="tm-floating-fab tm-home-chat-fab"
+      href={model.chatHref}
+      aria-label={model.chatUnreadCount > 0 ? `채팅 — 읽지 않은 메시지 ${model.chatUnreadCount}개` : '채팅'}
+    >
       <ChatIcon size={22} strokeWidth={2.2} />
-      {model.chatUnreadCount > 0 ? <span className="tm-floating-count tab-num">{model.chatUnreadCount}</span> : null}
+      {/* [P0/P1 아이콘+컬러] 미읽음: 색상(뱃지) + 숫자 텍스트 병행 — 컬러만 의존 금지 */}
+      {model.chatUnreadCount > 0 ? (
+        <span className="tm-floating-count tab-num" aria-hidden="true">{model.chatUnreadCount}</span>
+      ) : null}
     </Link>
   );
 }
@@ -187,7 +204,13 @@ function QuickActionIcon({ item }: { item: HomeQuickAction }) {
 function QuickAction({ item }: { item: HomeQuickAction }) {
   const content = (
     <>
-      <div className="tm-quick-icon" style={{ background: item.background, color: item.color }}>
+      {/*
+       * [taste-A] 퀵액션 아이콘 색 강조 낮춤 — 아이콘만 컬러, 배경은 중립 grey50.
+       * 기존: orange·green·blue 배경이 동시에 노출 → 다중 강조색 충돌(R-C1 위반 경계).
+       * 변경: 배경은 통일 var(--grey50), 아이콘 컬러만 item.color로 종목/기능 식별.
+       * 아이콘+라벨 텍스트 병행으로 컬러만으로 정보 전달하지 않는다(R-C3 준수).
+       */}
+      <div className="tm-quick-icon" style={{ background: 'var(--grey50)', color: item.color }}>
         <QuickActionIcon item={item} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -249,7 +272,8 @@ function FeaturedMatchCard({
       <div style={{ padding: 16 }}>
         {network ? (
           <>
-            <div className="tm-text-body-lg">새로고침이 필요해요</div>
+            {/* [P2 UX 라이팅] 에러 상황: 수동형 유지(실패 사실 전달) + CTA 능동형 */}
+            <div className="tm-text-body-lg">목록을 불러오지 못했어요</div>
             <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 10 }} onClick={onRetry}>
               다시 불러오기
             </button>
@@ -257,9 +281,34 @@ function FeaturedMatchCard({
         ) : (
           <>
             <div className="tm-text-body-lg">{match.venue}</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              {match.date} {match.time} · {match.currentParticipants}/{match.maxParticipants}명
+            <div className="tm-text-caption" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {match.date} {match.time} ·{' '}
+              {/* [P1 숫자:단위 2:1 + tabular-nums] 참가 인원 조판 */}
+              <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{match.currentParticipants}/{match.maxParticipants}</span>
+                <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>명</span>
+              </span>
+              {/* #8: 잔여 자리 ≤3일 때 orange 배지로 희소성 강조 */}
+              {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants
+                ? <span className="tm-badge tm-badge-orange">마감 임박</span>
+                : null}
             </div>
+            {/*
+             * [taste-A] 히어로 카드 주요 CTA — solid blue primary 버튼 1개.
+             * 기존에는 카드 자체(Link)가 CTA 역할을 암묵적으로 맡고 있었으나,
+             * 시각적 종착점(explicit CTA)이 없어 행동 유도력이 약했다.
+             * 카드 전체 Link를 유지하되, 카드 내부 CTA 버튼을 추가해
+             * 명시적 행동 신호를 제공한다. (R-K5: CTA 화면당 최대 1개)
+             */}
+            <button
+              className="tm-btn tm-btn-primary tm-btn-sm"
+              type="button"
+              style={{ marginTop: 12, width: '100%', pointerEvents: 'none' }}
+              aria-hidden="true"
+              tabIndex={-1}
+            >
+              {match.actionLabel ?? '신청하기'}
+            </button>
           </>
         )}
       </div>
@@ -289,19 +338,21 @@ function SidebarTournamentsWidget() {
         <Link
           className="tm-btn tm-btn-sm tm-btn-ghost"
           href="/tournaments"
-          style={{ alignSelf: 'flex-end', minHeight: 30, padding: '0 4px' }}
+          style={{ alignSelf: 'flex-end', padding: '0 4px' }}
         >
           전체보기
         </Link>
       </div>
 
       {isLoading ? (
+        /* [P2 UX 라이팅] 능동형 로딩 안내 */
         <div
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', paddingTop: 8 }}
           aria-busy="true"
+          role="status"
         >
-          대회 목록을 불러오는 중이에요…
+          대회 목록을 가져오고 있어요…
         </div>
       ) : items.length === 0 ? (
         <div
@@ -355,13 +406,17 @@ function SidebarTournamentsWidget() {
                     {t.title}
                   </div>
                   <div
-                    className="tm-text-micro tab-num"
-                    style={{ color: 'var(--text-muted)', marginTop: 2 }}
+                    className="tm-text-micro"
+                    style={{ color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' }}
                   >
                     {t.sport.name}
                     {dateLabel ? ` · ${dateLabel}` : ''}
                     {' · '}
-                    <span>{t.confirmedCount}/{t.teamCount}팀</span>
+                    {/* [P1 숫자:단위 2:1 + tabular-nums] 팀 수 */}
+                    <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                      <span style={{ fontWeight: 600 }}>{t.confirmedCount}/{t.teamCount}</span>
+                      <span style={{ fontSize: 9 }}>팀</span>
+                    </span>
                   </div>
                 </div>
                 <ChevronRightIcon size={14} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--text-muted)' }} aria-hidden="true" />
@@ -380,15 +435,30 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
       {matches.map((match) => (
         <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
           <div className="tm-match-card-media" style={{ background: `${cssUrl(match.imageUrl)} center/cover` }} />
-          <div style={{ padding: 12 }}>
+          <div style={{ padding: 16 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue500)' }}>{match.sportLabel}</div>
             <div className="tm-text-label line-clamp-2" style={{ color: 'var(--text-strong)', marginTop: 4, minHeight: 36 }}>
               {match.title}
             </div>
             <div className="tm-match-card-footer">
-              <span className="tm-text-micro tab-num" style={{ color: 'var(--text-muted)' }}>
-                {match.currentParticipants}/{match.maxParticipants}명
-              </span>
+              {/* #8: 잔여 자리 ≤3일 때 인원 수치를 orange로 + 텍스트 강조 */}
+              {/* [P1 숫자:단위 2:1 + tabular-nums] 인원수 조판: 숫자 font-weight 700, 단위 절반 크기 */}
+              {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants ? (
+                <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, fontVariantNumeric: 'tabular-nums' }}>
+                  <span className="tm-text-micro" style={{ color: 'var(--orange600)', fontWeight: 700 }}>
+                    {match.currentParticipants}/{match.maxParticipants}
+                  </span>
+                  <span style={{ fontSize: 9, color: 'var(--orange600)', fontWeight: 600 }}>명</span>
+                  <span className="tm-badge tm-badge-orange" style={{ marginLeft: 2 }}>마감 임박</span>
+                </span>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1, fontVariantNumeric: 'tabular-nums' }}>
+                  <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {match.currentParticipants}/{match.maxParticipants}
+                  </span>
+                  <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>명</span>
+                </span>
+              )}
               <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
                 {match.actionLabel}
               </span>

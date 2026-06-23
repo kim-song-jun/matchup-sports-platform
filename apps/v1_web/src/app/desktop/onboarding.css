@@ -15,9 +15,28 @@
  *  - Confirm panel: two-column summary cards.
  *  - Resume panel: summary cards side-by-side.
  *  - Consistent 44px touch targets and focus rings throughout.
+ *  - Sport option card: flex-column layout + SportGlyph icon (all viewports).
  *
- * Mobile (<768) is NEVER touched here — only @media (min-width:1024px) blocks.
+ * Mobile (<768): only the sport option card base layout rules below are
+ * viewport-agnostic (no media query) because globals.css does not own them
+ * and the icon layout must work on mobile too. Everything else is ≥1024 only.
  */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 0. Sport option card base layout — all viewports.
+ *    globals.css sets tm-auth-option-card { min-height: 88px } with no flex or
+ *    padding. The <button> element needs an explicit column layout so the
+ *    SportGlyph icon stacks above the sport name and selection hint.
+ *    Padding 16px keeps content clear of the card border.
+ *    align-items: flex-start + text-align: left give left-aligned Toss rhythm.
+ * ───────────────────────────────────────────────────────────────────────────── */
+.tm-auth-option-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  text-align: left;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * 1. Widen the auth frame for the onboarding wizard.
@@ -55,9 +74,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     color: var(--grey700);
     text-decoration: none;
     flex-shrink: 0;
@@ -72,11 +91,11 @@
   .tm-onboarding-desktop-back:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 10px;
+    border-radius: 12px;
   }
 
   .tm-onboarding-desktop-nav-title {
-    font-size: 15px;
+    font-size: var(--font-size-body);
     font-weight: 600;
     color: var(--grey800);
   }
@@ -120,19 +139,23 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * 5. Sport selection grid — 3 columns inside the 560px card.
- *    Each card ≈ (560 - 32*2 - 12*2) / 3 ≈ 154px — comfortable tap target.
+ * 5. Sport selection grid — 2×2 square layout inside the 560px card.
+ *    [taste-A] 4종목이 정확히 2×2 정사각 배치로 채워져 데스크톱 하단·우측
+ *    대형 공백을 해소한다. 3열이면 2행에 카드 1개 + 빈 칸 2개로 공백이 생김.
+ *    Each card ≈ (560 - 32*2 - 10) / 2 ≈ 243px — 넓은 카드로 시각 안정감.
  *    auth.css already sets gap:12px, margin-top:28px — keep those.
  * ───────────────────────────────────────────────────────────────────────────── */
 @media (min-width: 1024px) {
   .tm-onboarding-frame .tm-auth-sport-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
     margin-top: 24px;
   }
 
+  /* 아이콘(28px) + margin(6px) + body-lg(22px) + caption(16px) + padding(32px) ≈ 104px.
+     2열 넓은 카드에서 정사각 비율에 가깝게 더 여유 있는 높이로 조정. */
   .tm-onboarding-frame .tm-auth-option-card {
-    min-height: 76px;
+    min-height: 110px;
   }
 }
 

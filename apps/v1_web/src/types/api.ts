@@ -535,6 +535,9 @@ export type V1TeamMember = {
   membershipId: string;
   userId: string;
   displayName: string;
+  realName: string | null;
+  phone: string | null;
+  birthDate: string | null;
   profileImageUrl: string | null;
   role: 'owner' | 'manager' | 'member';
   status: string;

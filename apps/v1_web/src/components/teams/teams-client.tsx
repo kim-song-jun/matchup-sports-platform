@@ -187,14 +187,14 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
         team: {
           ...fallback.team,
           ...toTeamDetail(query.data, fallback.team),
-          description: query.data.profile.introduction ?? fallback.team.description,
-          activity: query.data.profile.activityAreaText ?? fallback.team.activity,
-          condition: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? fallback.team.condition,
+          description: query.data.profile.introduction ?? '',
+          activity: query.data.profile.activityAreaText ?? '',
+          condition: formatTeamDetailLevel(query.data),
           genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
-          schedule: fallback.team.schedule,
-          city: fallback.team.city,
+          schedule: '',
+          city: query.data.region?.name?.split(' ')[0] ?? '',
           county: query.data.region?.name ?? fallback.team.county,
-          level: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? fallback.team.level,
+          level: formatTeamDetailLevel(query.data) || fallback.team.level,
           membersList: query.data.membersPreview.map((member) => ({
             name: member.displayName,
             role: roleLabel(member.role),
@@ -389,9 +389,10 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
   const id = team.teamId ?? team.id;
   const sportName = team.sport?.name ?? team.sportName;
   const regionName = team.region?.name ?? team.regionName ?? '지역 미정';
+  const levelTag = formatTeamLevelTag(team);
+  const genderRule = team.genderRule ?? '';
 
   return {
-    ...fallback,
     id,
     name: team.name,
     logo: team.name.slice(0, 1),
@@ -399,13 +400,23 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     sports: [sportName],
     region: regionName,
     members: team.memberCount,
-    capacity: team.memberCount,
+    capacity: 0,
     status: team.joinPolicy === 'closed' ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '마감' : '모집 중',
-    tags: [team.levelLabel ?? team.skillLevelText ?? fallback.tags[0] ?? '전체 레벨', fallback.tags[1] ?? '주 1회', team.genderRule ?? fallback.genderRule],
-    genderRule: team.genderRule ?? fallback.genderRule,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요. 가입은 운영진이 검토한 후 확정돼요.`,
+    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : '가입 신청 가능',
+    tags: [levelTag, genderRule].filter(Boolean),
+    genderRule,
+    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
+    next: '',
   };
+}
+
+function formatTeamLevelTag(team: V1Team) {
+  const explicitLabel = team.levelLabel?.trim() || team.skillLevelText?.trim();
+  if (explicitLabel) return explicitLabel;
+  const minName = team.minLevel?.name?.trim();
+  const maxName = team.maxLevel?.name?.trim();
+  if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
+  return minName ?? maxName ?? '레벨 미설정';
 }
 
 function buildTeamSportChips(
@@ -442,7 +453,7 @@ function buildTeamFilterSheet(
 ): NonNullable<TeamListViewModel['filterSheet']> {
   const sortOptions: NonNullable<TeamListViewModel['filterSheet']>['sortOptions'] = [
     { label: '추천순', value: 'recommended', href: buildTeamHref(params, { sort: sort === 'recommended' ? null : 'recommended', filter: '1' }), active: sort === 'recommended' },
-    { label: '마감임박', value: 'deadline', href: buildTeamHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
+    { label: '가입 가능', value: 'deadline', href: buildTeamHref(params, { sort: sort === 'deadline' ? null : 'deadline', filter: '1' }), active: sort === 'deadline' },
     { label: '최신순', value: 'latest', href: buildTeamHref(params, { sort: sort === 'latest' ? null : 'latest', filter: '1' }), active: sort === 'latest' },
   ];
   const genderOptions: NonNullable<TeamListViewModel['filterSheet']>['genderOptions'] = [
@@ -505,6 +516,7 @@ function countTeamFilters(
 }
 
 function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
+  const levelLabel = formatTeamDetailLevel(team);
   return {
     ...fallback,
     id: team.teamId,
@@ -519,7 +531,17 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     statusLabel: team.profile.joinPolicy === 'closed' ? '마감' : team.viewer.joinState === 'requested' ? '검토 중' : team.viewer.role !== 'none' ? '내 팀' : '모집 중',
     genderRule: team.profile.genderRule ?? fallback.genderRule,
     intro: team.profile.introduction ?? fallback.intro,
+    tags: levelLabel ? [levelLabel, team.profile.genderRule ?? fallback.genderRule] : fallback.tags,
   };
+}
+
+function formatTeamDetailLevel(team: V1TeamDetail) {
+  const explicitLabel = team.profile.levelLabel?.trim() || team.profile.skillLevelText?.trim();
+  if (explicitLabel) return explicitLabel;
+  const minName = team.profile.minLevel?.name?.trim();
+  const maxName = team.profile.maxLevel?.name?.trim();
+  if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
+  return minName ?? maxName ?? '';
 }
 
 function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {

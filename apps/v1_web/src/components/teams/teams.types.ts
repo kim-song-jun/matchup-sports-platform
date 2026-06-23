@@ -107,7 +107,7 @@ export type TeamFormViewModel = {
   form?: {
     sportId: string;
     regionId: string;
-    regions: Array<{ id: string; name: string }>;
+    regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
     sports: Array<{ id: string; name: string }>;
     joinPolicy: 'approval_required' | 'closed';
     membersVisibilityEnabled?: boolean;

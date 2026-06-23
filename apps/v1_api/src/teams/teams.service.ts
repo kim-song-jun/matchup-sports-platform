@@ -365,7 +365,8 @@ export class TeamsService {
       include: {
         user: {
           select: {
-            profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
+            phone: true,
+            profile: { select: { nickname: true, displayName: true, profileImageUrl: true, birthDate: true } },
           },
         },
       },
@@ -387,6 +388,9 @@ export class TeamsService {
           membershipId: membership.id,
           userId: membership.userId,
           displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
+          realName: membership.user.profile?.displayName ?? null,
+          phone: membership.user.phone ?? null,
+          birthDate: membership.user.profile?.birthDate ?? null,
           profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
           role: membership.role,
           status: membership.status,

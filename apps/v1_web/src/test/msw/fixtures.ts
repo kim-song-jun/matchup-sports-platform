@@ -38,9 +38,39 @@ export const v1SportsFixture: V1Sport[] = [
 ];
 
 export const v1RegionsFixture: V1Region[] = [
-  { id: 'region-seoul', name: '서울', parentId: null },
-  { id: 'region-gangdong', name: '강동', parentId: 'region-seoul' },
-  { id: 'region-songpa', name: '송파', parentId: 'region-seoul' },
+  {
+    id: 'region-seoul',
+    code: 'seoul',
+    name: '서울',
+    parentId: null,
+    level: 1,
+    children: [
+      { id: 'region-gangdong', code: 'seoul-gangdong', name: '강동구', parentId: 'region-seoul', level: 2 },
+      { id: 'region-songpa', code: 'seoul-songpa', name: '송파구', parentId: 'region-seoul', level: 2 },
+    ],
+  },
+  {
+    id: 'region-busan',
+    code: 'busan',
+    name: '부산',
+    parentId: null,
+    level: 1,
+    children: [
+      { id: 'region-busan-haeundae', code: 'busan-haeundae', name: '해운대구', parentId: 'region-busan', level: 2 },
+      { id: 'region-busan-suyeong', code: 'busan-suyeong', name: '수영구', parentId: 'region-busan', level: 2 },
+    ],
+  },
+  {
+    id: 'region-jeju',
+    code: 'jeju',
+    name: '제주',
+    parentId: null,
+    level: 1,
+    children: [
+      { id: 'region-jeju-jeju', code: 'jeju-jeju', name: '제주시', parentId: 'region-jeju', level: 2 },
+      { id: 'region-jeju-seogwipo', code: 'jeju-seogwipo', name: '서귀포시', parentId: 'region-jeju', level: 2 },
+    ],
+  },
 ];
 
 export const v1RecentSearchesFixture: V1RecentSearch[] = [

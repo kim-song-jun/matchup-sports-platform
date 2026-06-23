@@ -27,6 +27,7 @@ Canonical sources:
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team Matches](./domains/team-matches.md)
+- [Tournaments](./domains/tournaments.md)
 - [Chat And Notifications](./domains/chat-notifications.md)
 - [Profile And Settings](./domains/profile-settings.md)
 - [Admin And Audit](./domains/admin-audit.md)

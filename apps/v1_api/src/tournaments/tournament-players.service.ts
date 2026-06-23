@@ -125,11 +125,28 @@ export class TournamentPlayersService {
         status: 'active',
         team: { status: 'active', deletedAt: null },
       },
+      include: {
+        user: {
+          select: {
+            phone: true,
+            profile: { select: { displayName: true, birthDate: true } },
+          },
+        },
+      },
     });
     if (!teamMembership) {
       throw new BadRequestException({
         code: 'USER_NOT_TEAM_MEMBER',
         message: '해당 팀의 활성 멤버가 아니에요.',
+      });
+    }
+    const memberRealName = teamMembership.user.profile?.displayName?.trim();
+    const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
+    const memberPhone = teamMembership.user.phone?.trim();
+    if (!memberRealName || !memberBirthDate || !memberPhone) {
+      throw new BadRequestException({
+        code: 'PLAYER_REQUIRED_PROFILE_MISSING',
+        message: '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
       });
     }
 
@@ -151,13 +168,13 @@ export class TournamentPlayersService {
       create: {
         registrationId,
         userId: dto.userId,
-        realName: dto.realName,
-        birthDateSnapshot: dto.birthDate ?? null,
+        realName: memberRealName,
+        birthDateSnapshot: memberBirthDate,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
       },
       update: {
-        realName: dto.realName,
-        birthDateSnapshot: dto.birthDate ?? null,
+        realName: memberRealName,
+        birthDateSnapshot: memberBirthDate,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
         eligibilityNote: null,
         removedAt: null,

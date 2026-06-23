@@ -50,6 +50,7 @@ type AddPlayerFormState = {
   userId: string;
   realName: string;
   birthDate: string;
+  phone: string;
   eligibilityStatus: V1PlayerEligibilityStatus;
 };
 
@@ -57,6 +58,7 @@ const EMPTY_FORM: AddPlayerFormState = {
   userId: '',
   realName: '',
   birthDate: '',
+  phone: '',
   eligibilityStatus: 'non_pro',
 };
 
@@ -73,6 +75,25 @@ function memberRoleLabel(role: 'owner' | 'manager' | 'member'): string {
     case 'manager': return '관리자';
     case 'member': return '멤버';
   }
+}
+
+function normalizeBirthDateForInput(v: string | null | undefined): string {
+  if (!v) return '';
+  if (/^\d{8}$/.test(v)) return `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
+  return v;
+}
+
+function isRegisterableMember(member: { realName?: string | null; birthDate?: string | null; phone?: string | null }) {
+  return Boolean(member.realName?.trim() && member.birthDate?.trim() && member.phone?.trim());
+}
+
+function memberMissingReason(member: { realName?: string | null; birthDate?: string | null; phone?: string | null }): string {
+  const missing = [
+    !member.realName?.trim() ? '실명' : null,
+    !member.birthDate?.trim() ? '생년월일' : null,
+    !member.phone?.trim() ? '휴대폰 번호' : null,
+  ].filter(Boolean);
+  return `${missing.join(', ')} 미입력`;
 }
 
 function AddPlayerForm({
@@ -117,6 +138,10 @@ function AddPlayerForm({
     () => membersPages?.pages.flatMap((p) => p.items) ?? [],
     [membersPages],
   );
+  const unavailableMembers = useMemo(
+    () => members.filter((member) => !isRegisterableMember(member)),
+    [members],
+  );
 
   function patch(partial: Partial<AddPlayerFormState>) {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -125,26 +150,22 @@ function AddPlayerForm({
   /** When a member is chosen from the dropdown, pre-fill 실명 with their displayName. */
   function handleMemberChange(userId: string) {
     const member = members.find((m) => m.userId === userId);
+    if (member && !isRegisterableMember(member)) return;
     patch({
       userId,
-      // Pre-fill only when a real selection is made; clear when deselected.
-      realName: member ? member.displayName : '',
+      realName: member?.realName ?? '',
+      birthDate: normalizeBirthDateForInput(member?.birthDate),
+      phone: member?.phone ?? '',
     });
-  }
-
-  function handleBirthDateChange(v: string) {
-    patch({ birthDate: v });
-    if (v && !isValidBirthDate(v)) {
-      setBirthDateError('생년월일을 YYYY-MM-DD 형식으로 입력해 주세요. (예: 1995-03-21)');
-    } else {
-      setBirthDateError(null);
-    }
+    setBirthDateError(null);
   }
 
   const birthDateValid = isValidBirthDate(form.birthDate);
   const canSubmit =
     form.realName.trim().length > 0 &&
     form.userId.trim().length > 0 &&
+    form.birthDate.trim().length > 0 &&
+    form.phone.trim().length > 0 &&
     birthDateValid;
 
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
@@ -190,12 +211,25 @@ function AddPlayerForm({
                 aria-required="true"
               >
                 <option value="">팀원을 선택해 주세요</option>
-                {members.map((m) => (
-                  <option key={m.userId} value={m.userId}>
-                    {m.displayName} ({memberRoleLabel(m.role)})
-                  </option>
-                ))}
+                {members.map((m) => {
+                  const registerable = isRegisterableMember(m);
+                  return (
+                    <option key={m.userId} value={m.userId} disabled={!registerable}>
+                      {m.displayName} ({memberRoleLabel(m.role)})
+                      {registerable ? '' : ` - ${memberMissingReason(m)}`}
+                    </option>
+                  );
+                })}
               </select>
+              {unavailableMembers.length > 0 ? (
+                <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                  {unavailableMembers.map((m) => (
+                    <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
+                      {m.displayName}은 {memberMissingReason(m)}으로 등록할 수 없어요.
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {hasNextPage ? (
                 <button
                   type="button"
@@ -211,25 +245,25 @@ function AddPlayerForm({
           )}
         </FormField>
 
-        {/* #8: realName pre-filled from selected member; still fully editable */}
+        {/* Selected member profile fields are read-only snapshots for tournament roster registration. */}
         <FormField id="player-realname" label="실명" required>
           <input
             id="player-realname"
             type="text"
             value={form.realName}
-            onChange={(e) => patch({ realName: e.target.value })}
             placeholder="홍길동"
             maxLength={40}
             className="tm-input"
             aria-required="true"
+            readOnly
           />
         </FormField>
 
-        {/* #7b: Tokenized text input — Pretendard, blue focus ring, no OS date picker chrome */}
         <FormField
           id="player-birthdate"
           label="생년월일"
-          hint="선택 사항 · 예: 1995-03-21"
+          required
+          hint="팀원 선택 시 자동으로 조회돼요."
           errorMessage={birthDateError ?? undefined}
         >
           <input
@@ -237,13 +271,26 @@ function AddPlayerForm({
             type="text"
             inputMode="numeric"
             value={form.birthDate}
-            onChange={(e) => handleBirthDateChange(e.target.value)}
             placeholder="예: 1995-03-21"
             maxLength={10}
             className="tm-input"
             aria-describedby={birthDateError ? 'player-birthdate-error' : undefined}
             aria-invalid={birthDateError ? true : undefined}
             style={{ fontFamily: 'var(--font-pretendard)' }}
+            readOnly
+          />
+        </FormField>
+
+        <FormField id="player-phone" label="휴대폰 번호" required hint="팀원 선택 시 자동으로 조회돼요.">
+          <input
+            id="player-phone"
+            type="tel"
+            value={form.phone}
+            placeholder="01012345678"
+            maxLength={20}
+            className="tm-input"
+            aria-required="true"
+            readOnly
           />
         </FormField>
 

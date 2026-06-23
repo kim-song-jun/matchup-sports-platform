@@ -129,6 +129,42 @@ export const v1MswHandlers = [
     return ok(page(teams));
   }),
   http.get(`${api}/teams/:teamId`, ({ params }) => ok(teamDetail(String(params.teamId)))),
+  http.get(`${api}/teams/:teamId/members`, () => ok({
+    items: [
+      {
+        membershipId: 'membership-1',
+        userId: 'user-1',
+        displayName: '김도윤',
+        realName: '김도윤',
+        phone: '01012345678',
+        birthDate: '1995-03-15',
+        profileImageUrl: null,
+        role: 'owner',
+        status: 'active',
+        joinedAt: '2026-05-18T00:00:00.000Z',
+        canChangeRole: false,
+        canRemove: false,
+      },
+      {
+        membershipId: 'membership-2',
+        userId: 'user-2',
+        displayName: '박서준',
+        realName: '박서준',
+        phone: null,
+        birthDate: '1997-08-20',
+        profileImageUrl: null,
+        role: 'member',
+        status: 'active',
+        joinedAt: '2026-05-18T00:00:00.000Z',
+        canChangeRole: true,
+        canRemove: true,
+      },
+    ],
+    summary: { ownerCount: 1, managerCount: 0, memberCount: 2 },
+    viewerRole: 'owner',
+    membersVisibilityEnabled: true,
+    pageInfo: { nextCursor: null, hasNext: false },
+  })),
   http.get(`${api}/me/teams`, () => ok(v1TeamsFixture)),
   http.get(`${api}/team-matches`, ({ request }) => {
     const sportId = new URL(request.url).searchParams.get('sportId');

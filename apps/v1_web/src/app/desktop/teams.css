@@ -354,6 +354,22 @@
   width: 100%;
 }
 
+.tm-team-form-main .tm-create-field {
+  display: block;
+}
+
+.tm-region-select-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tm-region-select-grid .tm-create-input {
+  width: 100%;
+  margin-top: 0;
+}
+
 @media (min-width: 1024px) {
   /* Fix (2): 좌측 폼 컬럼 과확장 방지.
      minmax(0, 560px)으로 상한을 두어 넓은 뷰포트에서 입력칸이 ~690px 이상 늘어나지 않게 함.

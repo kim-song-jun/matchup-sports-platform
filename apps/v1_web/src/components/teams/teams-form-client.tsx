@@ -185,7 +185,7 @@ function buildModel({
   joinPolicy: 'approval_required' | 'closed';
   membersVisibilityEnabled?: boolean;
   sports: Array<{ id: string; name: string }>;
-  regions: Array<{ id: string; name: string }>;
+  regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   error: string | null;
   submitting: boolean;
   setDraft: (updater: (current: TeamDraft) => TeamDraft) => void;

@@ -225,9 +225,9 @@ function TournamentsListContent() {
                   borderRadius: 999,
                   fontSize: 'var(--font-size-caption)',
                   fontWeight: isActive ? 700 : 500,
-                  background: isActive ? accent.badgeBg : 'var(--grey100)',
-                  color: isActive ? accent.badgeText : 'var(--text-body)',
-                  border: isActive ? `1.5px solid ${accent.dot}` : '1.5px solid transparent',
+                  background: isActive ? 'var(--blue500)' : 'var(--grey100)',
+                  color: isActive ? 'var(--static-white)' : 'var(--text-body)',
+                  border: isActive ? '1.5px solid var(--blue500)' : '1.5px solid transparent',
                   cursor: 'pointer',
                   /* a11y: 터치 타깃 최소 44px (WCAG 2.5.5) */
                   minHeight: 44,
@@ -242,7 +242,7 @@ function TournamentsListContent() {
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: isActive ? accent.dot : 'var(--grey400)',
+                    background: isActive ? 'var(--static-white)' : 'var(--grey400)',
                     flexShrink: 0,
                   }}
                 />

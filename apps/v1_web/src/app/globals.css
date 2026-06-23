@@ -2558,6 +2558,31 @@ button:disabled {
   gap: 10px;
 }
 
+.tm-team-card-action-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grey100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tm-team-card-action-status {
+  color: var(--blue500);
+}
+
+.tm-team-card-action-status-muted {
+  color: var(--text-caption);
+}
+
+.tm-team-card-action-link {
+  color: var(--blue500);
+  white-space: nowrap;
+}
+
 .tm-team-intro-box {
   margin-top: 14px;
   border: 1px solid var(--grey100);

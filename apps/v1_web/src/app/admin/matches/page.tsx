@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   useV1AdminMe,
@@ -58,6 +58,14 @@ const MATCH_STATUS_FILTER_OPTIONS = [
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AdminMatchesPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminMatchesPageContent />
+    </Suspense>
+  );
+}
+
+function AdminMatchesPageContent() {
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') ?? '';
 

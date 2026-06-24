@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname, '../..'),
   },
   async rewrites() {
-    return [
+    const proxyRewrites = [
       {
         source: '/api/:path*',
         destination: `${internalApiOrigin}/api/:path*`,
@@ -35,6 +35,18 @@ const nextConfig: NextConfig = {
         destination: `${internalApiOrigin}/uploads/:path*`,
       },
     ];
+
+    if (basePath) return proxyRewrites;
+
+    return {
+      beforeFiles: [
+        {
+          source: '/v1/:path*',
+          destination: '/:path*',
+        },
+      ],
+      afterFiles: proxyRewrites,
+    };
   },
 };
 

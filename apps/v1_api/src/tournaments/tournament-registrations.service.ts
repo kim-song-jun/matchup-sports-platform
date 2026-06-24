@@ -69,6 +69,9 @@ export class TournamentRegistrationsService {
     const existing = await this.prisma.v1TournamentRegistration.findUnique({
       where: { tournamentId_teamId: { tournamentId, teamId: dto.teamId } },
     });
+    if (existing?.status === 'draft') {
+      return this.serialize(existing, null, await this.countPlayers(existing.id));
+    }
     if (existing && existing.status !== 'cancelled') {
       throw new ConflictException({
         code: 'ALREADY_REGISTERED',

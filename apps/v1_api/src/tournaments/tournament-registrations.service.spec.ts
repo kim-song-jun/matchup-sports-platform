@@ -97,6 +97,18 @@ describe('TournamentRegistrationsService', () => {
     expect(result).toMatchObject({ id: 'reg-1', status: 'draft', playerCount: 0 });
   });
 
+  it('create: existing draft → resumes same draft instead of ALREADY_REGISTERED', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ id: 'draft-reg-1' }));
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+
+    const result = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    expect(result).toMatchObject({ id: 'draft-reg-1', status: 'draft', playerCount: 2 });
+    expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
   it('create: reactivates a previously cancelled registration (unique constraint) → draft', async () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'cancelled' }));

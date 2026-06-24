@@ -7,6 +7,7 @@ import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/pri
 import {
   useV1Tournament,
   useV1MyTeams,
+  useV1MyRegistration,
   useV1CreateRegistration,
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
@@ -967,6 +968,7 @@ function LoadingSkeleton() {
 export function TournamentApplyPageClient({ tournamentId }: { tournamentId: string }) {
   const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
+  const { data: myRegistration, isLoading: loadingMyRegistration } = useV1MyRegistration(tournamentId);
 
   const myTeams = normalizeMyTeams(myTeamsData) ?? [];
 
@@ -993,6 +995,29 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     if (first) setSelectedTeamId(first.teamId);
   }, [myTeams, selectedTeamId]);
 
+  useEffect(() => {
+    if (!myRegistration || registrationId) return;
+
+    if (myRegistration.status === 'draft') {
+      setRegistrationId(myRegistration.id);
+      setSelectedTeamId(myRegistration.teamId);
+      setStep('agreements');
+      setSubmitError(null);
+      return;
+    }
+
+    if (
+      myRegistration.status === 'awaiting_payment' &&
+      myRegistration.payment?.method === 'bank_transfer' &&
+      myRegistration.payment.status === 'ready'
+    ) {
+      setRegistrationId(myRegistration.id);
+      setSelectedTeamId(myRegistration.teamId);
+      setStep('payment');
+      setSubmitError(null);
+    }
+  }, [myRegistration, registrationId]);
+
   const selectedTeam = myTeams.find((t) => t.teamId === selectedTeamId);
 
   const allRequiredAgreed = agreements.agreedRules && agreements.agreedPrivacy && agreements.agreedRefund;
@@ -1002,7 +1027,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   const isCreating = createRegistration.isPending;
 
-  if (loadingTournament) {
+  if (loadingTournament || loadingMyRegistration) {
     return (
       <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
         <LoadingSkeleton />
@@ -1041,6 +1066,38 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 14 }}
+          >
+            대회 상세로 돌아가기
+          </Link>
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const isResumablePaymentGuide =
+    myRegistration?.status === 'awaiting_payment' &&
+    myRegistration.payment?.method === 'bank_transfer' &&
+    myRegistration.payment.status === 'ready';
+
+  if (myRegistration && myRegistration.status !== 'draft' && myRegistration.status !== 'cancelled' && !isResumablePaymentGuide) {
+    return (
+      <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
+        <div style={{ padding: '0 20px', marginTop: 24 }}>
+          <AlertBanner
+            message="이미 제출된 신청이 있어요. 신청 내역에서 결제 안내와 상태를 확인해 주세요."
+            tone="info"
+          />
+          <Link
+            href={`/tournaments/${tournamentId}/my?reg=${myRegistration.id}`}
+            className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
+            style={{ marginTop: 14 }}
+          >
+            내 신청 확인하기
+          </Link>
+          <Link
+            href={`/tournaments/${tournamentId}`}
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 8 }}
           >
             대회 상세로 돌아가기
           </Link>

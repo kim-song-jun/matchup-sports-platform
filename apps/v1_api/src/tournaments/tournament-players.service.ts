@@ -216,6 +216,40 @@ export class TournamentPlayersService {
     return this.serializePlayer(removed);
   }
 
+  // ─── 팀 명단 선수 정보 수정 ─────────────────────────────────────────────────
+
+  async updatePlayer(
+    user: V1AuthUser,
+    tournamentId: string,
+    registrationId: string,
+    playerId: string,
+    dto: UpdatePlayerEligibilityDto,
+  ) {
+    const registration = await this.loadRegistration(tournamentId, registrationId);
+    await this.assertTeamManager(registration.teamId, user.id);
+
+    if (registration.rosterLockedAt) {
+      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
+    }
+
+    const player = await this.prisma.v1TournamentPlayer.findFirst({
+      where: { id: playerId, registrationId, removedAt: null },
+    });
+    if (!player) {
+      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+    }
+
+    const updated = await this.prisma.v1TournamentPlayer.update({
+      where: { id: playerId },
+      data: {
+        eligibilityStatus: dto.eligibilityStatus,
+        eligibilityNote: null,
+      },
+    });
+
+    return this.serializePlayer(updated);
+  }
+
   // ─── 어드민: CSV 다운로드 ──────────────────────────────────────────────────────
 
   /**

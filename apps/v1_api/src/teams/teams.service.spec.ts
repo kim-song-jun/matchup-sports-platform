@@ -122,8 +122,8 @@ describe('TeamsService', () => {
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
-    v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
-    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
+    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     $transaction: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
@@ -155,8 +155,8 @@ describe('TeamsService', () => {
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
-      v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
-      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
+      v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
+      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       $transaction: jest.fn(),
     };
 
@@ -164,6 +164,8 @@ describe('TeamsService', () => {
     (prisma.$transaction as jest.Mock).mockImplementation(
       (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma),
     );
+    prisma.v1ChatRoom.upsert.mockResolvedValue({ id: 'room-1' });
+    prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
 
     notifications = {
       emitNotification: jest.fn().mockResolvedValue(undefined),
@@ -312,6 +314,64 @@ describe('TeamsService', () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'STATE_CONFLICT' }),
     });
+  });
+
+  it('approveJoinApplication: requested 신청 승인 → 멤버십/팀 채팅 참가자를 upsert로 활성화', async () => {
+    const application = applicationRow({
+      status: 'requested',
+      team: teamRow({ joinPolicy: 'approval_required', status: 'active', memberCount: 5 }),
+    });
+    const membership = membershipRow({
+      id: 'new-member-mem',
+      teamId: application.teamId,
+      userId: application.applicantUserId,
+      role: 'member',
+      status: 'active',
+    });
+
+    prisma.v1TeamJoinApplication.findFirst.mockResolvedValueOnce(application);
+    prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ id: 'manager-mem', role: 'manager' });
+    prisma.v1TeamJoinApplication.update.mockResolvedValue({ ...application, status: 'approved' });
+    prisma.v1TeamMembership.findUnique.mockResolvedValue(null);
+    prisma.v1TeamMembership.upsert.mockResolvedValue(membership);
+    prisma.v1Team.update.mockResolvedValue(teamRow({ memberCount: 6 }));
+    prisma.v1ChatRoom.findUnique.mockResolvedValue(null);
+    prisma.v1ChatRoom.upsert.mockResolvedValue({ id: 'team-room-1' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue(null);
+    prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({ id: 'team-room-participant-1' });
+    prisma.v1StatusChangeLog.create.mockResolvedValue({ id: 'chat-log-1' });
+    prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 2 });
+
+    const result = await service.approveJoinApplication(manager, application.id, { note: '환영합니다.' });
+
+    expect(result).toMatchObject({
+      applicationId: application.id,
+      status: 'approved',
+      joinState: 'member',
+      membershipId: 'new-member-mem',
+      memberCount: 6,
+    });
+    expect(prisma.v1TeamMembership.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { teamId_userId: { teamId: application.teamId, userId: application.applicantUserId } },
+      }),
+    );
+    expect(prisma.v1ChatRoom.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { teamId: application.teamId },
+        create: { teamId: application.teamId, status: 'active' },
+      }),
+    );
+    expect(prisma.v1ChatRoomParticipant.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { chatRoomId_userId: { chatRoomId: 'team-room-1', userId: application.applicantUserId } },
+      }),
+    );
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      application.applicantUserId,
+      'team_join_application_accepted',
+      application.teamId,
+    );
   });
 
   // ─── withdrawJoinApplication: 본인이 아닌 사용자가 철회 불가 → 403 ───────────

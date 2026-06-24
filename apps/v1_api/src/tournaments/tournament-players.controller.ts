@@ -40,6 +40,17 @@ export class TournamentPlayersController {
   ) {
     return this.playersService.removePlayer(user, tournamentId, registrationId, playerId);
   }
+
+  @Patch(':playerId')
+  updatePlayer(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('registrationId') registrationId: string,
+    @Param('playerId') playerId: string,
+    @Body() dto: UpdatePlayerEligibilityDto,
+  ) {
+    return this.playersService.updatePlayer(user, tournamentId, registrationId, playerId, dto);
+  }
 }
 
 // ─── 어드민 라우트 ──────────────────────────────────────────────────────────────

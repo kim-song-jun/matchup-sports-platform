@@ -1204,6 +1204,7 @@ model V1TournamentRegistration {
   confirmedAt            DateTime?                      @map("confirmed_at")
   rosterLockedAt         DateTime?                      @map("roster_locked_at")
   cancelRequestedAt      DateTime?                      @map("cancel_requested_at")
+  cancelPreviousStatus   V1TournamentRegistrationStatus? @map("cancel_previous_status")
   cancelReason           String?                        @map("cancel_reason")
   createdAt              DateTime                       @default(now()) @map("created_at")
   updatedAt              DateTime                       @updatedAt @map("updated_at")

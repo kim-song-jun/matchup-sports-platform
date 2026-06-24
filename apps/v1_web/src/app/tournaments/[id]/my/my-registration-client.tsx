@@ -2,15 +2,18 @@
 
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { getSportAccent } from '@/lib/v1-sport-accent';
+import { appRoute } from '@/lib/app-route';
 import {
   useV1Tournament,
   useV1MyRegistration,
   useV1TournamentPlayers,
   useV1CancelRegistrationRequest,
+  useV1WithdrawCancelRegistrationRequest,
   useV1Team,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -60,6 +63,24 @@ function paymentStatusLabel(status: string): string {
     case 'refunded': return '환불';
     default: return '알 수 없음';
   }
+}
+
+export function shouldShowBankTransferAccountInfo({
+  paymentMethod,
+  paymentStatus,
+  bankName,
+  bankAccount,
+  bankHolder,
+}: {
+  paymentMethod: V1TournamentPaymentMethod | null | undefined;
+  paymentStatus: string | null | undefined;
+  bankName: string | null | undefined;
+  bankAccount: string | null | undefined;
+  bankHolder: string | null | undefined;
+}) {
+  return paymentMethod === 'bank_transfer' &&
+    paymentStatus === 'ready' &&
+    Boolean(bankName?.trim() && bankAccount?.trim() && bankHolder?.trim());
 }
 
 /** Returns the badge class + label for the roster shortage badge.
@@ -177,6 +198,9 @@ function RegistrationPass({
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
+  const pathname = usePathname();
+  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`, pathname);
+
   /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
   if (status === 'awaiting_payment') {
     return (
@@ -304,7 +328,7 @@ function RegistrationPass({
           </div>
           {!isRosterLocked ? (
             <Link
-              href={`/tournaments/${tournamentId}/registrations/${registrationId}/roster`}
+              href={rosterHref}
               className="tm-text-label"
               aria-label={belowMinimum ? '선수 명단 등록하기' : '선수 명단 수정하기'}
               style={{
@@ -522,6 +546,23 @@ function InfoRow({
   );
 }
 
+function StatusInfoRow({
+  label,
+  statusConfig,
+}: {
+  label: string;
+  statusConfig: StatusConfig;
+}) {
+  return (
+    <div className="tm-info-row">
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+        {label}
+      </div>
+      <span className={`tm-badge ${statusConfig.badgeClass}`}>{statusConfig.label}</span>
+    </div>
+  );
+}
+
 /* ── Registration detail view ── */
 
 function RegistrationDetailView({
@@ -544,12 +585,17 @@ function RegistrationDetailView({
   };
   registration: V1TournamentRegistration;
 }) {
+  const pathname = usePathname();
+  const tournamentHref = appRoute(`/tournaments/${tournamentId}`, pathname);
+  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registration.id}/roster`, pathname);
   const { data: rosterData } = useV1TournamentPlayers(tournamentId, registration.id);
   const cancelRequest = useV1CancelRegistrationRequest(tournamentId, registration.id);
+  const withdrawCancelRequest = useV1WithdrawCancelRegistrationRequest(tournamentId, registration.id);
   const { data: teamData } = useV1Team(registration.teamId);
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [withdrawCancelError, setWithdrawCancelError] = useState<string | null>(null);
 
   const statusConfig = registrationStatusConfig(registration.status);
   const players = rosterData?.players ?? [];
@@ -561,6 +607,7 @@ function RegistrationDetailView({
     registration.status === 'paid' ||
     registration.status === 'confirmed' ||
     registration.status === 'waitlisted';
+  const canWithdrawCancelRequest = registration.status === 'cancel_requested';
 
   /* #8: prominent nudge triggers when confirmed/paid AND roster is below minimum */
   const showRosterNudge =
@@ -577,6 +624,13 @@ function RegistrationDetailView({
    * card only renders for states without a pass (e.g. awaiting_payment). */
   const passShowsRoster =
     registration.status === 'confirmed' || registration.status === 'paid';
+  const shouldShowBankTransferAccount = shouldShowBankTransferAccountInfo({
+    paymentMethod: registration.payment?.method,
+    paymentStatus: registration.payment?.status,
+    bankName: tournament.bankName,
+    bankAccount: tournament.bankAccount,
+    bankHolder: tournament.bankHolder,
+  });
 
   async function handleCancelConfirm(reason: string) {
     setCancelError(null);
@@ -585,6 +639,15 @@ function RegistrationDetailView({
       setShowCancelModal(false);
     } catch (err) {
       setCancelError(extractErrorMessage(err, '취소 요청 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
+    }
+  }
+
+  async function handleWithdrawCancelRequest() {
+    setWithdrawCancelError(null);
+    try {
+      await withdrawCancelRequest.mutateAsync();
+    } catch (err) {
+      setWithdrawCancelError(extractErrorMessage(err, '취소 요청 철회 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
     }
   }
 
@@ -635,7 +698,7 @@ function RegistrationDetailView({
       {/* Primary CTA: roster registration if nudge is active */}
       {showRosterNudge ? (
         <Link
-          href={`/tournaments/${tournamentId}/registrations/${registration.id}/roster`}
+          href={rosterHref}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
           aria-label="선수 명단 등록하기"
           style={{ marginBottom: 8 }}
@@ -644,7 +707,7 @@ function RegistrationDetailView({
         </Link>
       ) : !isRosterLocked ? (
         <Link
-          href={`/tournaments/${tournamentId}/registrations/${registration.id}/roster`}
+          href={rosterHref}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
           aria-label="선수 명단 수정하기"
           style={{ marginBottom: 8 }}
@@ -655,7 +718,7 @@ function RegistrationDetailView({
 
       {/* Secondary CTAs */}
       <Link
-        href={`/tournaments/${tournamentId}`}
+        href={tournamentHref}
         className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
         style={{ marginBottom: 8 }}
       >
@@ -676,11 +739,29 @@ function RegistrationDetailView({
         <button
           type="button"
           className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-          onClick={() => { setCancelError(null); setShowCancelModal(true); }}
+          onClick={() => { setCancelError(null); setWithdrawCancelError(null); setShowCancelModal(true); }}
           style={{ marginTop: 4 }}
         >
           참가 취소 요청
         </button>
+      ) : null}
+
+      {canWithdrawCancelRequest ? (
+        <button
+          type="button"
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          onClick={handleWithdrawCancelRequest}
+          disabled={withdrawCancelRequest.isPending}
+          style={{ marginTop: 4 }}
+        >
+          {withdrawCancelRequest.isPending ? '철회 중...' : '취소 요청 철회'}
+        </button>
+      ) : null}
+
+      {withdrawCancelError ? (
+        <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', marginTop: 8, lineHeight: 1.5 }}>
+          {withdrawCancelError}
+        </div>
       ) : null}
     </>
   );
@@ -719,6 +800,7 @@ function RegistrationDetailView({
               <Card pad={16} style={{ marginTop: 8 }}>
                 {/* 신청 group */}
                 <div id="reg-detail-heading" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <StatusInfoRow label="신청 상태" statusConfig={statusConfig} />
                   <InfoRow
                     label="신청일"
                     value={formatDateShort(registration.createdAt)}
@@ -748,10 +830,20 @@ function RegistrationDetailView({
                       <InfoRow
                         label="결제 상태"
                         value={paymentStatusLabel(registration.payment.status)}
-                        isLast={!registration.payment.paidAt}
+                        isLast={!registration.payment.paidAt && !shouldShowBankTransferAccount}
                       />
                       {registration.payment.paidAt ? (
-                        <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast />
+                        <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast={!shouldShowBankTransferAccount} />
+                      ) : null}
+                      {shouldShowBankTransferAccount ? (
+                        <>
+                          <InfoRow label="은행" value={tournament.bankName ?? ''} />
+                          <InfoRow label="계좌번호" value={tournament.bankAccount ?? ''} />
+                          <InfoRow label="예금주" value={tournament.bankHolder ?? ''} isLast />
+                          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
+                            위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.
+                          </div>
+                        </>
                       ) : null}
                     </div>
                   ) : (
@@ -825,7 +917,7 @@ function RegistrationDetailView({
                     ) : null}
                     {!isRosterLocked ? (
                       <Link
-                        href={`/tournaments/${tournamentId}/registrations/${registration.id}/roster`}
+                        href={rosterHref}
                         className="tm-btn tm-btn-md tm-btn-neutral"
                         aria-label="선수 명단 수정하기"
                         style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
@@ -867,10 +959,27 @@ function RegistrationDetailView({
                 <button
                   type="button"
                   className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-                  onClick={() => { setCancelError(null); setShowCancelModal(true); }}
+                  onClick={() => { setCancelError(null); setWithdrawCancelError(null); setShowCancelModal(true); }}
                 >
                   참가 취소 요청
                 </button>
+              ) : null}
+
+              {canWithdrawCancelRequest ? (
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+                  onClick={handleWithdrawCancelRequest}
+                  disabled={withdrawCancelRequest.isPending}
+                >
+                  {withdrawCancelRequest.isPending ? '철회 중...' : '취소 요청 철회'}
+                </button>
+              ) : null}
+
+              {withdrawCancelError ? (
+                <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', lineHeight: 1.5 }}>
+                  {withdrawCancelError}
+                </div>
               ) : null}
             </div>
 

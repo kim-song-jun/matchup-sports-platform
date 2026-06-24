@@ -37,6 +37,7 @@
 - `nickname: string`, min 2, max 40
 - `email: string`, max 320; duplicate email returns `EMAIL_CONFLICT`
 - `profileImageUrl?: string | null`
+- Authenticated profile edit uploads selected image files through `POST /api/v1/uploads` first and saves the returned root-relative URL. The edit screen must not persist a local `data:` preview as if it were an uploaded profile image.
 - `phone?: string | null`; when present, 11 digits only; duplicate phone returns `PHONE_CONFLICT`
 - `birthDate?: string | null`; when present, 8 digit `YYYYMMDD` and a valid calendar date
 - `bio?: string | null`, max 500

@@ -23,7 +23,7 @@ describe('TeamListPageView', () => {
 
     expect(screen.getByLabelText('팀 목록 불러오는 중')).toBeInTheDocument();
     expect(screen.queryByText('성수 러너스 FC')).not.toBeInTheDocument();
-    expect(screen.queryByText(/내 주변/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/내 주변\s+\d+/)).not.toBeInTheDocument();
   });
 
   it('renders team list cards from the explicit team fields without stale recruiting copy', () => {

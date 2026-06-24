@@ -69,6 +69,9 @@ export class TournamentRegistrationsService {
     const existing = await this.prisma.v1TournamentRegistration.findUnique({
       where: { tournamentId_teamId: { tournamentId, teamId: dto.teamId } },
     });
+    if (existing?.status === 'draft') {
+      return this.serialize(existing, null, await this.countPlayers(existing.id));
+    }
     if (existing && existing.status !== 'cancelled') {
       throw new ConflictException({
         code: 'ALREADY_REGISTERED',
@@ -89,6 +92,7 @@ export class TournamentRegistrationsService {
             agreedRefund: false,
             agreedMediaConsent: false,
             cancelRequestedAt: null,
+            cancelPreviousStatus: null,
             cancelReason: null,
           },
         })
@@ -135,6 +139,7 @@ export class TournamentRegistrationsService {
           agreedPrivacy: dto.agreedPrivacy,
           agreedRefund: dto.agreedRefund,
           agreedMediaConsent: dto.agreedMediaConsent ?? false,
+          cancelPreviousStatus: null,
         },
       });
       const payment = await tx.v1TournamentPayment.upsert({
@@ -178,7 +183,12 @@ export class TournamentRegistrationsService {
     if (registration.status === 'draft') {
       const cancelled = await this.prisma.v1TournamentRegistration.update({
         where: { id: registrationId },
-        data: { status: 'cancelled', cancelRequestedAt: new Date(), cancelReason: dto.reason ?? null },
+        data: {
+          status: 'cancelled',
+          cancelRequestedAt: new Date(),
+          cancelPreviousStatus: null,
+          cancelReason: dto.reason ?? null,
+        },
       });
       return this.serialize(cancelled, null, 0);
     }
@@ -191,9 +201,42 @@ export class TournamentRegistrationsService {
 
     const updated = await this.prisma.v1TournamentRegistration.update({
       where: { id: registrationId },
-      data: { status: 'cancel_requested', cancelRequestedAt: new Date(), cancelReason: dto.reason ?? null },
+      data: {
+        status: 'cancel_requested',
+        cancelRequestedAt: new Date(),
+        cancelPreviousStatus: registration.status,
+        cancelReason: dto.reason ?? null,
+      },
     });
     return this.serialize(updated, null, await this.countPlayers(registrationId));
+  }
+
+  async withdrawCancelRequest(user: V1AuthUser, tournamentId: string, registrationId: string) {
+    const registration = await this.loadRegistration(tournamentId, registrationId);
+    await this.assertTeamManager(registration.teamId, user.id);
+
+    if (registration.status !== 'cancel_requested') {
+      throw new ConflictException({
+        code: 'REGISTRATION_CANCEL_REQUEST_NOT_WITHDRAWABLE',
+        message: '취소 요청 중인 신청만 철회할 수 있어요.',
+      });
+    }
+
+    const restoredStatus = registration.cancelPreviousStatus ?? 'awaiting_payment';
+    const updated = await this.prisma.v1TournamentRegistration.update({
+      where: { id: registrationId },
+      data: {
+        status: restoredStatus,
+        cancelRequestedAt: null,
+        cancelPreviousStatus: null,
+        cancelReason: null,
+      },
+    });
+    const [payment, playerCount] = await Promise.all([
+      this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
+      this.countPlayers(registrationId),
+    ]);
+    return this.serialize(updated, payment, playerCount);
   }
 
   async get(user: V1AuthUser, tournamentId: string, registrationId: string) {

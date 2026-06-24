@@ -1375,6 +1375,26 @@ export function useV1CancelRegistrationRequest(tournamentId: string, registratio
   });
 }
 
+export function useV1WithdrawCancelRegistrationRequest(tournamentId: string, registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      v1Post<V1TournamentRegistration>(
+        `/tournaments/${tournamentId}/registrations/${registrationId}/cancel-request/withdraw`,
+        {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
+    },
+  });
+}
+
 export function useV1TournamentPlayers(tournamentId: string, registrationId: string) {
   return useQuery({
     queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),

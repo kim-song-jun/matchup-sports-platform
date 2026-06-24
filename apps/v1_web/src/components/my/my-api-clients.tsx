@@ -1077,6 +1077,7 @@ function toMyHomeModel(
   hasPendingReviews?: boolean,
 ): MyHomeViewModel {
   const displayName = profile.profile.displayName;
+  const nickname = profile.profile.nickname?.trim() || displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
   const communitySection = sections.find((section) => section.title === '커뮤니티');
@@ -1095,10 +1096,10 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
-      name: displayName,
-      handle: profile.email ?? authProviderLabel(profile.authProvider),
+      name: nickname,
+      handle: `@${nickname}`,
       region: profile.regionName ?? myHomeModel.user.region,
-      initials: initials(displayName),
+      initials: initials(nickname),
       intro: profile.profile.bio ?? '',
       sports: (profile.sports ?? []).map((sport) =>
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,
@@ -1289,12 +1290,6 @@ function formatScore(value: number | null | undefined) {
 function formatWinRate(value: number | null | undefined) {
   if (typeof value !== 'number') return '-';
   return `${Math.round(value)}%`;
-}
-
-function authProviderLabel(provider: V1Profile['authProvider']) {
-  if (provider === 'kakao') return '카카오 로그인';
-  if (provider === 'naver') return '네이버 로그인';
-  return '소셜 로그인';
 }
 
 function toDigits(value: string, maxLength: number) {

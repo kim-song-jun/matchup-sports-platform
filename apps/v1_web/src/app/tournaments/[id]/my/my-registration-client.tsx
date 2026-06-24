@@ -11,6 +11,7 @@ import {
   useV1MyRegistration,
   useV1TournamentPlayers,
   useV1CancelRegistrationRequest,
+  useV1WithdrawCancelRegistrationRequest,
   useV1Team,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -522,6 +523,23 @@ function InfoRow({
   );
 }
 
+function StatusInfoRow({
+  label,
+  statusConfig,
+}: {
+  label: string;
+  statusConfig: StatusConfig;
+}) {
+  return (
+    <div className="tm-info-row">
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+        {label}
+      </div>
+      <span className={`tm-badge ${statusConfig.badgeClass}`}>{statusConfig.label}</span>
+    </div>
+  );
+}
+
 /* ── Registration detail view ── */
 
 function RegistrationDetailView({
@@ -546,10 +564,12 @@ function RegistrationDetailView({
 }) {
   const { data: rosterData } = useV1TournamentPlayers(tournamentId, registration.id);
   const cancelRequest = useV1CancelRegistrationRequest(tournamentId, registration.id);
+  const withdrawCancelRequest = useV1WithdrawCancelRegistrationRequest(tournamentId, registration.id);
   const { data: teamData } = useV1Team(registration.teamId);
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [withdrawCancelError, setWithdrawCancelError] = useState<string | null>(null);
 
   const statusConfig = registrationStatusConfig(registration.status);
   const players = rosterData?.players ?? [];
@@ -561,6 +581,7 @@ function RegistrationDetailView({
     registration.status === 'paid' ||
     registration.status === 'confirmed' ||
     registration.status === 'waitlisted';
+  const canWithdrawCancelRequest = registration.status === 'cancel_requested';
 
   /* #8: prominent nudge triggers when confirmed/paid AND roster is below minimum */
   const showRosterNudge =
@@ -585,6 +606,15 @@ function RegistrationDetailView({
       setShowCancelModal(false);
     } catch (err) {
       setCancelError(extractErrorMessage(err, '취소 요청 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
+    }
+  }
+
+  async function handleWithdrawCancelRequest() {
+    setWithdrawCancelError(null);
+    try {
+      await withdrawCancelRequest.mutateAsync();
+    } catch (err) {
+      setWithdrawCancelError(extractErrorMessage(err, '취소 요청 철회 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
     }
   }
 
@@ -676,11 +706,29 @@ function RegistrationDetailView({
         <button
           type="button"
           className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-          onClick={() => { setCancelError(null); setShowCancelModal(true); }}
+          onClick={() => { setCancelError(null); setWithdrawCancelError(null); setShowCancelModal(true); }}
           style={{ marginTop: 4 }}
         >
           참가 취소 요청
         </button>
+      ) : null}
+
+      {canWithdrawCancelRequest ? (
+        <button
+          type="button"
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          onClick={handleWithdrawCancelRequest}
+          disabled={withdrawCancelRequest.isPending}
+          style={{ marginTop: 4 }}
+        >
+          {withdrawCancelRequest.isPending ? '철회 중...' : '취소 요청 철회'}
+        </button>
+      ) : null}
+
+      {withdrawCancelError ? (
+        <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', marginTop: 8, lineHeight: 1.5 }}>
+          {withdrawCancelError}
+        </div>
       ) : null}
     </>
   );
@@ -719,6 +767,7 @@ function RegistrationDetailView({
               <Card pad={16} style={{ marginTop: 8 }}>
                 {/* 신청 group */}
                 <div id="reg-detail-heading" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <StatusInfoRow label="신청 상태" statusConfig={statusConfig} />
                   <InfoRow
                     label="신청일"
                     value={formatDateShort(registration.createdAt)}
@@ -867,10 +916,27 @@ function RegistrationDetailView({
                 <button
                   type="button"
                   className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-                  onClick={() => { setCancelError(null); setShowCancelModal(true); }}
+                  onClick={() => { setCancelError(null); setWithdrawCancelError(null); setShowCancelModal(true); }}
                 >
                   참가 취소 요청
                 </button>
+              ) : null}
+
+              {canWithdrawCancelRequest ? (
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+                  onClick={handleWithdrawCancelRequest}
+                  disabled={withdrawCancelRequest.isPending}
+                >
+                  {withdrawCancelRequest.isPending ? '철회 중...' : '취소 요청 철회'}
+                </button>
+              ) : null}
+
+              {withdrawCancelError ? (
+                <div className="tm-text-caption" role="alert" style={{ color: 'var(--red500)', lineHeight: 1.5 }}>
+                  {withdrawCancelError}
+                </div>
               ) : null}
             </div>
 

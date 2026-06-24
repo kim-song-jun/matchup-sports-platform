@@ -37,41 +37,62 @@ export const v1SportsFixture: V1Sport[] = [
   { id: 'sport-swimming', name: '수영', levels: [{ id: 'swimming-beginner', name: '입문' }, { id: 'swimming-novice', name: '초보' }, { id: 'swimming-intermediate', name: '중수' }, { id: 'swimming-advanced', name: '고수' }] },
 ];
 
-export const v1RegionsFixture: V1Region[] = [
-  {
-    id: 'region-seoul',
-    code: 'seoul',
-    name: '서울',
+const v1RegionGroups = [
+  ['seoul', '서울', ['종로구', '중구', '용산구', '성동구', '광진구', '동대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구', '은평구', '서대문구', '마포구', '양천구', '강서구', '구로구', '금천구', '영등포구', '동작구', '관악구', '서초구', '강남구', '송파구', '강동구']],
+  ['busan', '부산', ['중구', '서구', '동구', '영도구', '부산진구', '동래구', '남구', '북구', '해운대구', '사하구', '금정구', '강서구', '연제구', '수영구', '사상구', '기장군']],
+  ['daegu', '대구', ['중구', '동구', '서구', '남구', '북구', '수성구', '달서구', '달성군', '군위군']],
+  ['incheon', '인천', ['중구', '동구', '미추홀구', '연수구', '남동구', '부평구', '계양구', '서구', '강화군', '옹진군']],
+  ['gwangju', '광주', ['동구', '서구', '남구', '북구', '광산구']],
+  ['daejeon', '대전', ['동구', '중구', '서구', '유성구', '대덕구']],
+  ['ulsan', '울산', ['중구', '남구', '동구', '북구', '울주군']],
+  ['sejong', '세종', ['세종시']],
+  ['gyeonggi', '경기', ['수원시', '성남시', '의정부시', '안양시', '부천시', '광명시', '평택시', '동두천시', '안산시', '고양시', '과천시', '구리시', '남양주시', '오산시', '시흥시', '군포시', '의왕시', '하남시', '용인시', '파주시', '이천시', '안성시', '김포시', '화성시', '광주시', '양주시', '포천시', '여주시', '연천군', '가평군', '양평군']],
+  ['gangwon', '강원', ['춘천시', '원주시', '강릉시', '동해시', '태백시', '속초시', '삼척시', '홍천군', '횡성군', '영월군', '평창군', '정선군', '철원군', '화천군', '양구군', '인제군', '고성군', '양양군']],
+  ['chungbuk', '충북', ['청주시', '충주시', '제천시', '보은군', '옥천군', '영동군', '증평군', '진천군', '괴산군', '음성군', '단양군']],
+  ['chungnam', '충남', ['천안시', '공주시', '보령시', '아산시', '서산시', '논산시', '계룡시', '당진시', '금산군', '부여군', '서천군', '청양군', '홍성군', '예산군', '태안군']],
+  ['jeonbuk', '전북', ['전주시', '군산시', '익산시', '정읍시', '남원시', '김제시', '완주군', '진안군', '무주군', '장수군', '임실군', '순창군', '고창군', '부안군']],
+  ['jeonnam', '전남', ['목포시', '여수시', '순천시', '나주시', '광양시', '담양군', '곡성군', '구례군', '고흥군', '보성군', '화순군', '장흥군', '강진군', '해남군', '영암군', '무안군', '함평군', '영광군', '장성군', '완도군', '진도군', '신안군']],
+  ['gyeongbuk', '경북', ['포항시', '경주시', '김천시', '안동시', '구미시', '영주시', '영천시', '상주시', '문경시', '경산시', '의성군', '청송군', '영양군', '영덕군', '청도군', '고령군', '성주군', '칠곡군', '예천군', '봉화군', '울진군', '울릉군']],
+  ['gyeongnam', '경남', ['창원시', '진주시', '통영시', '사천시', '김해시', '밀양시', '거제시', '양산시', '의령군', '함안군', '창녕군', '고성군', '남해군', '하동군', '산청군', '함양군', '거창군', '합천군']],
+  ['jeju', '제주', ['제주시', '서귀포시']],
+] as const;
+
+function toRegionCode(parentCode: string, name: string) {
+  const romanized: Record<string, string> = {
+    강남구: 'gangnam', 강동구: 'gangdong', 강북구: 'gangbuk', 강서구: 'gangseo', 강화군: 'ganghwa', 강릉시: 'gangneung', 강진군: 'gangjin',
+    거제시: 'geoje', 거창군: 'geochang', 경산시: 'gyeongsan', 경주시: 'gyeongju', 계룡시: 'gyeryong', 계양구: 'gyeyang', 고령군: 'goryeong', 고성군: 'goseong', 고양시: 'goyang', 고창군: 'gochang', 고흥군: 'goheung', 곡성군: 'gokseong', 공주시: 'gongju', 과천시: 'gwacheon', 관악구: 'gwanak', 광명시: 'gwangmyeong', 광산구: 'gwangsan', 광양시: 'gwangyang', 광주시: 'gwangju', 광진구: 'gwangjin', 괴산군: 'goesan', 구례군: 'gurye', 구로구: 'guro', 구리시: 'guri', 구미시: 'gumi', 군산시: 'gunsan', 군위군: 'gunwi', 군포시: 'gunpo', 금산군: 'geumsan', 금정구: 'geumjeong', 금천구: 'geumcheon', 기장군: 'gijang', 김제시: 'gimje', 김천시: 'gimcheon', 김포시: 'gimpo', 김해시: 'gimhae',
+    나주시: 'naju', 남구: 'nam', 남동구: 'namdong', 남양주시: 'namyangju', 남원시: 'namwon', 남해군: 'namhae', 노원구: 'nowon', 논산시: 'nonsan',
+    단양군: 'danyang', 달서구: 'dalseo', 달성군: 'dalseong', 담양군: 'damyang', 당진시: 'dangjin', 대덕구: 'daedeok', 도봉구: 'dobong', 동구: 'dong', 동대문구: 'dongdaemun', 동두천시: 'dongducheon', 동래구: 'dongnae', 동작구: 'dongjak', 동해시: 'donghae',
+    마포구: 'mapo', 목포시: 'mokpo', 무안군: 'muan', 무주군: 'muju', 문경시: 'mungyeong', 미추홀구: 'michuhol', 밀양시: 'miryang',
+    보령시: 'boryeong', 보성군: 'boseong', 보은군: 'boeun', 봉화군: 'bonghwa', 부산진구: 'busanjin', 부안군: 'buan', 부여군: 'buyeo', 부천시: 'bucheon', 부평구: 'bupyeong', 북구: 'buk',
+    사상구: 'sasang', 사천시: 'sacheon', 사하구: 'saha', 산청군: 'sancheong', 삼척시: 'samcheok', 상주시: 'sangju', 서구: 'seo', 서귀포시: 'seogwipo', 서대문구: 'seodaemun', 서산시: 'seosan', 서천군: 'seocheon', 서초구: 'seocho', 성남시: 'seongnam', 성동구: 'seongdong', 성북구: 'seongbuk', 성주군: 'seongju', 세종시: 'city', 속초시: 'sokcho', 송파구: 'songpa', 수성구: 'suseong', 수영구: 'suyeong', 수원시: 'suwon', 순창군: 'sunchang', 순천시: 'suncheon', 시흥시: 'siheung', 신안군: 'sinan',
+    아산시: 'asan', 안동시: 'andong', 안산시: 'ansan', 안성시: 'anseong', 안양시: 'anyang', 양구군: 'yanggu', 양산시: 'yangsan', 양양군: 'yangyang', 양주시: 'yangju', 양천구: 'yangcheon', 양평군: 'yangpyeong', 여수시: 'yeosu', 여주시: 'yeoju', 연수구: 'yeonsu', 연제구: 'yeonje', 연천군: 'yeoncheon', 영광군: 'yeonggwang', 영덕군: 'yeongdeok', 영도구: 'yeongdo', 영동군: 'yeongdong', 영등포구: 'yeongdeungpo', 영암군: 'yeongam', 영양군: 'yeongyang', 영월군: 'yeongwol', 영주시: 'yeongju', 영천시: 'yeongcheon', 예산군: 'yesan', 예천군: 'yecheon', 오산시: 'osan', 옥천군: 'okcheon', 완도군: 'wando', 완주군: 'wanju', 용산구: 'yongsan', 용인시: 'yongin', 울릉군: 'ulleung', 울주군: 'ulju', 울진군: 'uljin', 원주시: 'wonju', 유성구: 'yuseong', 은평구: 'eunpyeong', 음성군: 'eumseong', 의령군: 'uiryeong', 의성군: 'uiseong', 의왕시: 'uiwang', 의정부시: 'uijeongbu', 이천시: 'icheon', 익산시: 'iksan', 인제군: 'inje',
+    장성군: 'jangseong', 장수군: 'jangsu', 장흥군: 'jangheung', 전주시: 'jeonju', 정선군: 'jeongseon', 정읍시: 'jeongeup', 제주시: 'jeju', 제천시: 'jecheon', 종로구: 'jongno', 중구: 'jung', 중랑구: 'jungnang', 증평군: 'jeungpyeong', 진도군: 'jindo', 진안군: 'jinan', 진주시: 'jinju', 진천군: 'jincheon',
+    창녕군: 'changnyeong', 창원시: 'changwon', 천안시: 'cheonan', 철원군: 'cheorwon', 청도군: 'cheongdo', 청송군: 'cheongsong', 청양군: 'cheongyang', 청주시: 'cheongju', 춘천시: 'chuncheon', 충주시: 'chungju', 칠곡군: 'chilgok',
+    태백시: 'taebaek', 태안군: 'taean', 통영시: 'tongyeong',
+    파주시: 'paju', 평창군: 'pyeongchang', 평택시: 'pyeongtaek', 포천시: 'pocheon', 포항시: 'pohang',
+    하남시: 'hanam', 하동군: 'hadong', 함안군: 'haman', 함양군: 'hamyang', 함평군: 'hampyeong', 합천군: 'hapcheon', 해남군: 'haenam', 해운대구: 'haeundae', 홍성군: 'hongseong', 홍천군: 'hongcheon', 화성시: 'hwaseong', 화순군: 'hwasun', 화천군: 'hwacheon', 횡성군: 'hoengseong',
+  };
+  return `${parentCode}-${romanized[name] ?? name}`;
+}
+
+export const v1RegionsFixture: V1Region[] = v1RegionGroups.map(([code, name, children]) => {
+  const parentId = `region-${code}`;
+  return {
+    id: parentId,
+    code,
+    name,
     parentId: null,
     level: 1,
-    children: [
-      { id: 'region-gangdong', code: 'seoul-gangdong', name: '강동구', parentId: 'region-seoul', level: 2 },
-      { id: 'region-songpa', code: 'seoul-songpa', name: '송파구', parentId: 'region-seoul', level: 2 },
-    ],
-  },
-  {
-    id: 'region-busan',
-    code: 'busan',
-    name: '부산',
-    parentId: null,
-    level: 1,
-    children: [
-      { id: 'region-busan-haeundae', code: 'busan-haeundae', name: '해운대구', parentId: 'region-busan', level: 2 },
-      { id: 'region-busan-suyeong', code: 'busan-suyeong', name: '수영구', parentId: 'region-busan', level: 2 },
-    ],
-  },
-  {
-    id: 'region-jeju',
-    code: 'jeju',
-    name: '제주',
-    parentId: null,
-    level: 1,
-    children: [
-      { id: 'region-jeju-jeju', code: 'jeju-jeju', name: '제주시', parentId: 'region-jeju', level: 2 },
-      { id: 'region-jeju-seogwipo', code: 'jeju-seogwipo', name: '서귀포시', parentId: 'region-jeju', level: 2 },
-    ],
-  },
-];
+    children: children.map((childName) => ({
+      id: `region-${toRegionCode(code, childName)}`,
+      code: toRegionCode(code, childName),
+      name: childName,
+      parentId,
+      level: 2,
+    })),
+  };
+});
 
 export const v1RecentSearchesFixture: V1RecentSearch[] = [
   { id: 'recent-1', query: '풋살', searchedAt: '2026-05-18T09:00:00.000Z' },

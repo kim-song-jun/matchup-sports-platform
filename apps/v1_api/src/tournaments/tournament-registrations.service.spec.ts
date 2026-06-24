@@ -19,7 +19,8 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'reg-1', tournamentId: 'tournament-1', teamId: 'team-1', appliedByUserId: 'manager-user',
     status: 'draft', depositorName: null, agreedRules: false, agreedPrivacy: false, agreedRefund: false,
-    agreedMediaConsent: false, confirmedAt: null, rosterLockedAt: null, cancelRequestedAt: null, cancelReason: null,
+    agreedMediaConsent: false, confirmedAt: null, rosterLockedAt: null, cancelRequestedAt: null,
+    cancelPreviousStatus: null, cancelReason: null,
     createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'), ...overrides,
   };
 }
@@ -163,9 +164,14 @@ describe('TournamentRegistrationsService', () => {
 
   it('cancel-request: confirmed → cancel_requested (admin handles)', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'confirmed' }));
-    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancel_requested' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }));
     const result = await service.cancelRequest(manager, 'tournament-1', 'reg-1', { reason: '사정' });
     expect(result).toMatchObject({ status: 'cancel_requested' });
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
+      }),
+    );
   });
 
   it('cancel-request: already cancelled → 409 NOT_CANCELLABLE', async () => {
@@ -176,6 +182,45 @@ describe('TournamentRegistrationsService', () => {
   });
 
   // ─── get ────────────────────────────────────────────────────────────────────────
+
+  it('withdrawCancelRequest: cancel_requested -> previous status and clears cancel fields', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({
+        status: 'cancel_requested',
+        cancelPreviousStatus: 'confirmed',
+        cancelRequestedAt: new Date('2026-06-15T00:00:00Z'),
+        cancelReason: '사정',
+      }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue({
+      method: 'bank_transfer',
+      status: 'paid',
+      amount: 120000,
+      paidAt: null,
+    });
+
+    const result = await service.withdrawCancelRequest(manager, 'tournament-1', 'reg-1');
+
+    expect(result).toMatchObject({ status: 'confirmed' });
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'confirmed',
+          cancelRequestedAt: null,
+          cancelPreviousStatus: null,
+          cancelReason: null,
+        }),
+      }),
+    );
+  });
+
+  it('withdrawCancelRequest: non cancel_requested -> 409 NOT_WITHDRAWABLE', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    await expect(service.withdrawCancelRequest(manager, 'tournament-1', 'reg-1')).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_CANCEL_REQUEST_NOT_WITHDRAWABLE' },
+    });
+  });
 
   it('get: unknown registration → 404', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(null);

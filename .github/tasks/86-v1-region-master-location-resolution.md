@@ -55,6 +55,7 @@
 - 2026-05-26: Implemented v1 region master expansion for Seoul/Gyeonggi, DB center coordinates, server-side location resolver, onboarding resolver integration, and district-only form selection for match/team/team-match. Local v1 DB was synced with `db push`, seeded, and v1 API/Web were restarted.
 - 2026-05-26: Follow-up requested for my-page location management and home weather refresh. Current implementation only resolves location during onboarding and weather auto-load; my profile/settings cannot refresh activity region yet.
 - 2026-05-26: Added `PATCH /api/v1/me/regions`, `/v1/my/settings/location`, manual/current-location primary region update, and home weather refresh. Fixed existing v1 seed `index` build error encountered during validation.
+- 2026-06-24: Added a v1 data migration that upserts nationwide parent regions and level-2 districts/cities/counties by stable `code`, so fresh and existing DBs can query all regions through `GET /api/v1/master/regions` without relying on a seed rerun. Synced the v1 web MSW region fixture to generate the same nationwide region surface for tests and mock-backed screens.
 
 ## Validation
 

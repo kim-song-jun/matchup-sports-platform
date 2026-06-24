@@ -147,13 +147,12 @@ function AddPlayerForm({
     setForm((prev) => ({ ...prev, ...partial }));
   }
 
-  /** When a member is chosen from the dropdown, pre-fill 실명 with their displayName. */
+  /** When a member is chosen from the dropdown, pre-fill profile snapshots returned by the API. */
   function handleMemberChange(userId: string) {
     const member = members.find((m) => m.userId === userId);
-    if (member && !isRegisterableMember(member)) return;
     patch({
       userId,
-      realName: member?.realName ?? '',
+      realName: member?.realName ?? member?.displayName ?? '',
       birthDate: normalizeBirthDateForInput(member?.birthDate),
       phone: member?.phone ?? '',
     });
@@ -162,10 +161,7 @@ function AddPlayerForm({
 
   const birthDateValid = isValidBirthDate(form.birthDate);
   const canSubmit =
-    form.realName.trim().length > 0 &&
     form.userId.trim().length > 0 &&
-    form.birthDate.trim().length > 0 &&
-    form.phone.trim().length > 0 &&
     birthDateValid;
 
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
@@ -214,7 +210,7 @@ function AddPlayerForm({
                 {members.map((m) => {
                   const registerable = isRegisterableMember(m);
                   return (
-                    <option key={m.userId} value={m.userId} disabled={!registerable}>
+                    <option key={m.userId} value={m.userId}>
                       {m.displayName} ({memberRoleLabel(m.role)})
                       {registerable ? '' : ` - ${memberMissingReason(m)}`}
                     </option>
@@ -225,7 +221,7 @@ function AddPlayerForm({
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {unavailableMembers.map((m) => (
                     <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
-                      {m.displayName}은 {memberMissingReason(m)}으로 등록할 수 없어요.
+                      {m.displayName}은 {memberMissingReason(m)}으로 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
                     </div>
                   ))}
                 </div>

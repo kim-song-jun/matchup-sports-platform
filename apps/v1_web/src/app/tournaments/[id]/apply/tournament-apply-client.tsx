@@ -401,7 +401,7 @@ function TeamSelectStep({
 
         {/* Info card: entry fee */}
         {tournament.entryFee > 0 ? (
-          <Card pad={0} style={{ marginTop: 16, background: 'var(--grey50)' }}>
+          <Card pad={16} style={{ marginTop: 16, background: 'var(--grey50)' }}>
             <InfoRow
               label="참가비"
               value={formatEntryFee(tournament.entryFee)}

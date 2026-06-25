@@ -79,8 +79,8 @@ export function MyHomePageClient() {
           initials: '—',
           intro: '',
           sports: [],
-          stats: myHomeModel.user.stats.map((stat) => ({ ...stat, value: '—' })),
-          monthly: myHomeModel.user.monthly.map((stat) => ({ ...stat, value: '—' })),
+          stats: myHomeModel.user.stats.map((stat) => ({ label: stat.label, value: '—' })),
+          monthly: myHomeModel.user.monthly.map((stat) => ({ label: stat.label, value: '—' })),
         },
       };
     }
@@ -649,14 +649,17 @@ export function SportsSettingsPageClient() {
   const sports = sportsQuery.data ?? [];
   const regions = toDistrictRegionOptions(regionsQuery.data ?? []);
   const [selectedSports, setSelectedSports] = useState<Array<{ sportId: string; levelId: string | null }>>([]);
-  const [selectedRegionId, setSelectedRegionId] = useState('');
+  const [selectedRegionIds, setSelectedRegionIds] = useState<[string, string]>(['', '']);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile.data || hydratedUserId === profile.data.userId) return;
     setSelectedSports((profile.data.sports ?? []).map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })));
-    setSelectedRegionId(profile.data.regions?.find((region) => region.primary)?.regionId ?? profile.data.regions?.[0]?.regionId ?? '');
+    const profileRegions = profile.data.regions ?? [];
+    const primaryRegion = profileRegions.find((region) => region.primary) ?? profileRegions[0];
+    const secondaryRegion = profileRegions.find((region) => region.regionId !== primaryRegion?.regionId);
+    setSelectedRegionIds([primaryRegion?.regionId ?? '', secondaryRegion?.regionId ?? '']);
     setHydratedUserId(profile.data.userId);
   }, [hydratedUserId, profile.data]);
 
@@ -672,6 +675,9 @@ export function SportsSettingsPageClient() {
   };
 
   const missingLevels = selectedSports.some((sport) => !sport.levelId);
+  const selectedRegionPayload = selectedRegionIds
+    .filter((regionId, index, self) => regionId && self.indexOf(regionId) === index)
+    .map((regionId, index) => ({ regionId, primary: index === 0 }));
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage(null);
@@ -683,7 +689,7 @@ export function SportsSettingsPageClient() {
     try {
       await updatePreferences.mutateAsync({
         sports: selectedSports,
-        regions: selectedRegionId ? [{ regionId: selectedRegionId, primary: true }] : [],
+        regions: selectedRegionPayload,
       });
       router.replace('/my');
     } catch (error) {
@@ -738,13 +744,33 @@ export function SportsSettingsPageClient() {
 
         <Card pad={16}>
           <div className="tm-text-body-lg">기본 활동 지역</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치와 팀 추천에 사용할 기본 지역이에요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치와 팀 추천에 사용할 지역을 최대 2개까지 나눠 관리해요.</div>
           <label className="tm-create-field" style={{ marginTop: 14 }}>
-            <span className="tm-text-label">지역</span>
-            <select className="tm-input" value={selectedRegionId} onChange={(event) => setSelectedRegionId(event.target.value)}>
+            <span className="tm-text-label">기본 활동 지역 1</span>
+            <select
+              className="tm-input"
+              value={selectedRegionIds[0]}
+              onChange={(event) => setSelectedRegionIds((current) => {
+                const nextPrimary = event.target.value;
+                return [nextPrimary, current[1] === nextPrimary ? '' : current[1]];
+              })}
+            >
               <option value="">지역 선택 안 함</option>
               {regions.map((region) => (
-                <option key={region.id} value={region.id}>{region.name}</option>
+                <option key={region.id} value={region.id} disabled={region.id === selectedRegionIds[1]}>{region.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="tm-create-field" style={{ marginTop: 14 }}>
+            <span className="tm-text-label">기본 활동 지역 2</span>
+            <select
+              className="tm-input"
+              value={selectedRegionIds[1]}
+              onChange={(event) => setSelectedRegionIds((current) => [current[0], event.target.value])}
+            >
+              <option value="">지역 선택 안 함</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id} disabled={region.id === selectedRegionIds[0]}>{region.name}</option>
               ))}
             </select>
           </label>
@@ -1110,7 +1136,7 @@ function toMyHomeModel(
       ...myHomeModel.user,
       name: nickname,
       handle: `@${nickname}`,
-      region: profile.regionName ?? myHomeModel.user.region,
+      region: profile.regionName ?? '지역 미정',
       initials: initials(nickname),
       intro: profile.profile.bio ?? '',
       sports: (profile.sports ?? []).map((sport) =>

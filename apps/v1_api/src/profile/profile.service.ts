@@ -32,29 +32,11 @@ export class ProfileService {
       select: { teamId: true },
     });
     const teamIds = activeMemberships.map((membership) => membership.teamId);
-    const teamMatchWhere = teamIds.length
-      ? {
-          deletedAt: null,
-          OR: [
-            { hostTeamId: { in: teamIds } },
-            {
-              applications: {
-                some: {
-                  applicantTeamId: { in: teamIds },
-                  status: { in: ['requested' as const, 'approved' as const] },
-                },
-              },
-            },
-          ],
-        }
-      : null;
 
     const [
       receivedReviewAggregate,
       personalActivityCount,
       monthlyPersonalMatchCount,
-      teamActivityCount,
-      monthlyTeamMatchCount,
     ] = await Promise.all([
       this.prisma.v1PostEventReview.aggregate({
         where: { targetUserId: user.id, targetType: 'user', status: 'submitted' },
@@ -63,26 +45,17 @@ export class ProfileService {
       this.prisma.v1MatchParticipant.count({
         where: {
           userId: user.id,
-          status: { in: ['active', 'completed'] },
-          match: { deletedAt: null },
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null },
         },
       }),
       this.prisma.v1MatchParticipant.count({
         where: {
           userId: user.id,
-          status: { in: ['active', 'completed'] },
-          match: { deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
         },
       }),
-      teamMatchWhere ? this.prisma.v1TeamMatch.count({ where: teamMatchWhere }) : 0,
-      teamMatchWhere
-        ? this.prisma.v1TeamMatch.count({
-            where: {
-              ...teamMatchWhere,
-              startAt: { gte: monthStart, lt: nextMonthStart },
-            },
-          })
-        : 0,
     ]);
     const mannerScore = receivedReviewAggregate._avg.rating === null
       ? null
@@ -90,12 +63,12 @@ export class ProfileService {
 
     return {
       totals: {
-        activityCount: personalActivityCount + teamActivityCount,
+        activityCount: personalActivityCount,
         teamCount: teamIds.length,
         mannerScore,
       },
       monthly: {
-        matchCount: monthlyPersonalMatchCount + monthlyTeamMatchCount,
+        matchCount: monthlyPersonalMatchCount,
         mannerScore,
         winRate: null,
       },

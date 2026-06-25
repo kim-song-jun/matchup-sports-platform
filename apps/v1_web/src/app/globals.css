@@ -3855,12 +3855,9 @@ button:disabled {
 
 .tm-my-profile-stats {
   display: grid;
-  /* KPI 3개 — 4열에서 3열로 수정해 빈 4번째 열 제거 */
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: -14px -20px 2px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--grey50);
+  gap: 0;
+  margin-top: 14px;
 }
 
 .tm-my-profile-stats > div {
@@ -3881,9 +3878,19 @@ button:disabled {
 
 .tm-my-monthly {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
   margin-top: 14px;
+}
+
+.tm-my-monthly > div {
+  min-width: 0;
+  text-align: center;
+  border-right: 1px solid var(--border);
+}
+
+.tm-my-monthly > div:last-child {
+  border-right: 0;
 }
 
 .tm-my-section-label {

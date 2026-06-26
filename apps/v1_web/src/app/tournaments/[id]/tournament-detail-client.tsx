@@ -6,6 +6,7 @@ import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { useV1Tournament, useV1MyRegistration } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
@@ -194,8 +195,11 @@ function ApplyCTA({
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
+  const canQueryMyRegistration = hasStoredV1Session();
   // 404 is expected when no registration exists — the hook suppresses retries for 404.
-  const { data: myRegistration = null } = useV1MyRegistration(tournamentId);
+  const { data: myRegistration = null } = useV1MyRegistration(tournamentId, {
+    enabled: canQueryMyRegistration,
+  });
 
   if (isLoading) {
     return (

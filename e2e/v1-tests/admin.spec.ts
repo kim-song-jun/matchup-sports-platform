@@ -12,7 +12,7 @@ test.describe('[admin] 운영 대시보드 플로우', () => {
   });
 
   test('/admin — 운영 개요 페이지가 렌더되고 KPI 섹션이 존재한다', async ({ page }) => {
-    await page.goto('/admin');
+    await page.goto('/v1/admin');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // AdminPageHeader: "운영 개요" 또는 "운영 대시보드"
@@ -23,7 +23,7 @@ test.describe('[admin] 운영 대시보드 플로우', () => {
   });
 
   test('/admin/users — 회원 관리 테이블이 도달·렌더된다', async ({ page }) => {
-    await page.goto('/admin/users');
+    await page.goto('/v1/admin/users');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // 회원 테이블 또는 헤딩 확인
@@ -31,13 +31,13 @@ test.describe('[admin] 운영 대시보드 플로우', () => {
   });
 
   test('/admin → /admin/users 직접 이동 도달', async ({ page }) => {
-    await page.goto('/admin');
+    await page.goto('/v1/admin');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     await expect(main).toContainText(/운영 개요|운영 대시보드/);
 
     // admin 사이드바 링크는 데스크톱에서만 visible — 뷰포트 무관하게 직접 이동으로 도달 확인
-    await page.goto('/admin/users');
+    await page.goto('/v1/admin/users');
     await expect(page).toHaveURL(/\/admin\/users/);
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('main')).toContainText(/회원|닉네임|상태/);

@@ -97,7 +97,7 @@ export function TournamentSponsorSection({
                     key={link.label}
                     href={link.href}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                     className="tm-btn tm-btn-sm tm-btn-neutral"
                   >
                     {link.label}

@@ -13,7 +13,7 @@ test.describe('[member] 설정 페이지 플로우', () => {
   });
 
   test('/my/settings — 설정 페이지가 렌더되고 주요 메뉴가 존재한다', async ({ page }) => {
-    await page.goto('/my/settings');
+    await page.goto('/v1/my/settings');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // settingsModel: '계정' 섹션 헤딩
@@ -25,21 +25,21 @@ test.describe('[member] 설정 페이지 플로우', () => {
   });
 
   test('/my/settings/notifications — 알림 설정 페이지에 도달한다', async ({ page }) => {
-    await page.goto('/my/settings/notifications');
+    await page.goto('/v1/my/settings/notifications');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     await expect(main).toContainText('알림 설정');
   });
 
   test('/my/settings/legal — 약관 및 정책 페이지에 도달한다', async ({ page }) => {
-    await page.goto('/my/settings/legal');
+    await page.goto('/v1/my/settings/legal');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     await expect(main).toContainText('약관 및 정책');
   });
 
   test('/my/settings → 알림 설정 링크 클릭으로 도달한다', async ({ page }) => {
-    await page.goto('/my/settings');
+    await page.goto('/v1/my/settings');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
 
@@ -51,7 +51,7 @@ test.describe('[member] 설정 페이지 플로우', () => {
       await expect(page.getByRole('main')).toContainText('알림 설정');
     } else {
       // 링크가 버튼으로 렌더된 경우 직접 이동
-      await page.goto('/my/settings/notifications');
+      await page.goto('/v1/my/settings/notifications');
       await expect(page.getByRole('main')).toContainText('알림 설정');
     }
   });

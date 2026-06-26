@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
@@ -175,6 +176,30 @@ export function SignupClient() {
     }
   };
 
+  const handleNicknameInput = (event: FormEvent<HTMLInputElement>) => {
+    setNickname(event.currentTarget.value);
+    setNicknameCheck({ status: 'idle', value: '' });
+    setFieldError(null);
+  };
+
+  const handleEmailInput = (event: FormEvent<HTMLInputElement>) => {
+    setEmail(event.currentTarget.value);
+    setEmailCheck({ status: 'idle', value: '' });
+    setFieldError(null);
+  };
+
+  const handlePasswordInput = (event: FormEvent<HTMLInputElement>) => {
+    setPassword(event.currentTarget.value);
+  };
+
+  const handlePasswordConfirmInput = (event: FormEvent<HTMLInputElement>) => {
+    setPasswordConfirm(event.currentTarget.value);
+  };
+
+  const handleBirthDateInput = (event: FormEvent<HTMLInputElement>) => {
+    setBirthDate(event.currentTarget.value);
+  };
+
   const primary: { label: string; disabled: boolean; onClick: () => void } =
     step === 'nickname'
       ? { label: '다음', disabled: checkNickname.isPending || !nicknameVerified, onClick: () => setStep('email') }
@@ -273,11 +298,8 @@ export function SignupClient() {
                   className={`tm-input tm-auth-input ${fieldError ? 'tm-auth-input-error' : nicknameVerified ? 'tm-auth-input-success' : ''}`}
                   minLength={2}
                   autoFocus
-                  onChange={(event) => {
-                    setNickname(event.target.value);
-                    setNicknameCheck({ status: 'idle', value: '' });
-                    setFieldError(null);
-                  }}
+                  onInput={handleNicknameInput}
+                  onChange={handleNicknameInput}
                   placeholder="사용할 닉네임"
                   type="text"
                   value={nickname}
@@ -305,11 +327,8 @@ export function SignupClient() {
                 <input
                   className={`tm-input tm-auth-input ${fieldError ? 'tm-auth-input-error' : emailVerified ? 'tm-auth-input-success' : ''}`}
                   autoFocus
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setEmailCheck({ status: 'idle', value: '' });
-                    setFieldError(null);
-                  }}
+                  onInput={handleEmailInput}
+                  onChange={handleEmailInput}
                   placeholder="예: 이름@이메일.com"
                   type="email"
                   value={email}
@@ -339,7 +358,8 @@ export function SignupClient() {
                     className={`tm-input tm-auth-input ${passwordTooShort ? 'tm-auth-input-error' : passwordLongEnough ? 'tm-auth-input-success' : ''}`}
                     minLength={8}
                     autoFocus
-                    onChange={(event) => setPassword(event.target.value)}
+                    onInput={handlePasswordInput}
+                    onChange={handlePasswordInput}
                     placeholder="8자 이상"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
@@ -362,7 +382,8 @@ export function SignupClient() {
                   <input
                     className={`tm-input tm-auth-input ${passwordMismatch ? 'tm-auth-input-error' : passwordMatch ? 'tm-auth-input-success' : ''}`}
                     minLength={8}
-                    onChange={(event) => setPasswordConfirm(event.target.value)}
+                    onInput={handlePasswordConfirmInput}
+                    onChange={handlePasswordConfirmInput}
                     placeholder="비밀번호 다시 입력"
                     type={showPasswordConfirm ? 'text' : 'password'}
                     value={passwordConfirm}
@@ -390,7 +411,8 @@ export function SignupClient() {
                 type="date"
                 max={today}
                 value={birthDate}
-                onChange={(event) => setBirthDate(event.target.value)}
+                onInput={handleBirthDateInput}
+                onChange={handleBirthDateInput}
               />
             </label>
           ) : null}

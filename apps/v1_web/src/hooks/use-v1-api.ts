@@ -1324,14 +1324,14 @@ export function useV1Registration(tournamentId: string, registrationId: string) 
 }
 
 /** 로그인 유저 본인의 신청을 registrationId 없이 조회한다. 없으면 404 (data=undefined). */
-export function useV1MyRegistration(tournamentId: string) {
+export function useV1MyRegistration(tournamentId: string, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.myTournamentRegistration(tournamentId),
     queryFn: () =>
       v1Get<V1TournamentRegistration>(
         `/tournaments/${tournamentId}/registrations/my-registration`,
       ),
-    enabled: !!tournamentId,
+    enabled: (options?.enabled ?? true) && !!tournamentId,
     retry: (failureCount, error) => {
       // 404 (no registration yet) is expected — do not retry
       if (error instanceof V1ApiError && error.statusCode === 404) return false;

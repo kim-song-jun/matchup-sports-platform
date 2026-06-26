@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import type {
   V1TournamentFixture,
@@ -97,9 +98,9 @@ export function TournamentPostEventHubSection({
               <StatusBadge status={card.status} />
             </div>
             {card.actionLabel && card.href ? (
-              <a href={card.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 12 }}>
+              <Link href={card.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 12 }}>
                 {card.actionLabel}
-              </a>
+              </Link>
             ) : null}
           </Card>
         ))}
@@ -122,9 +123,9 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
           {item.detail}
         </div>
         {item.actionLabel && item.href ? (
-          <a href={item.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 8 }}>
+          <Link href={item.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 8 }}>
             {item.actionLabel}
-          </a>
+          </Link>
         ) : null}
       </div>
       <StatusBadge status={item.status} />

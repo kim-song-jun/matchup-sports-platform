@@ -30,6 +30,23 @@ function formatPrize(amount: number): string {
   return `${amount.toLocaleString('ko-KR')}원`;
 }
 
+const TOURNAMENT_LIST_ERROR_FALLBACK = '대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+
+function getTournamentListErrorMessage(err: unknown): string {
+  const message = extractErrorMessage(err, TOURNAMENT_LIST_ERROR_FALLBACK);
+  const maybeApiError = err as { code?: unknown; statusCode?: unknown } | null;
+
+  if (
+    maybeApiError?.code === 'UNAUTHENTICATED' ||
+    maybeApiError?.statusCode === 401 ||
+    /authentication is required/i.test(message)
+  ) {
+    return '세션 정보를 확인하는 중 문제가 생겼어요. 로그인 상태를 새로고침한 뒤 목록을 다시 불러와 주세요.';
+  }
+
+  return message;
+}
+
 /* ── Status helpers ── */
 
 type StatusConfig = {
@@ -256,8 +273,10 @@ function TournamentsListContent() {
           <TournamentSkeletonList />
         ) : isError ? (
           <ErrorState
-            message={extractErrorMessage(error, '대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')}
+            title="대회 목록을 불러오지 못했어요"
+            message={getTournamentListErrorMessage(error)}
             onRetry={() => void refetch()}
+            retryLabel="목록 다시 불러오기"
           />
         ) : displayItems.length === 0 ? (
           <EmptyState
@@ -293,28 +312,37 @@ function TournamentsListContent() {
         )}
       </section>
 
-      {/* ── 진행 방식 (슬림 안내 — 리스트 아래) ── */}
       <section
         aria-labelledby="process-flow-heading"
         className="tm-tournament-promo-section"
         style={{ paddingTop: 28, paddingBottom: 4 }}
       >
-        <h2 id="process-flow-heading" className="tm-tournament-promo-section-title">대회는 이렇게 진행돼요</h2>
-        <div className="tm-tournament-promo-steps">
+        <div className="tm-tournament-process-head">
+          <div>
+            <h2 id="process-flow-heading" className="tm-tournament-promo-section-title">대회 참가 흐름</h2>
+            <p className="tm-tournament-process-summary">
+              대회 카드를 고르면 참가 조건을 확인하고, 팀 신청부터 결제·로스터 확정까지 이어서 진행돼요.
+            </p>
+          </div>
+          <span className="tm-tournament-process-note">팀 대표 기준</span>
+        </div>
+        <ol className="tm-tournament-promo-steps">
           {PROCESS_STEPS.map((step, i) => (
-            <div key={step.label} className="tm-tournament-promo-step">
-              <div className="tm-tournament-promo-step-icon" aria-hidden="true" style={{ color: 'var(--blue500)' }}>
+            <li key={step.label} className="tm-tournament-promo-step">
+              <span className="tm-tournament-promo-step-index">{String(i + 1).padStart(2, '0')}</span>
+              <div className="tm-tournament-promo-step-icon" aria-hidden="true">
                 {step.icon}
               </div>
-              <span className="tm-tournament-promo-step-num" aria-hidden="true">{i + 1}</span>
-              <span className="tm-tournament-promo-step-label">{step.label}</span>
-              <span className="tm-tournament-promo-step-sub" aria-hidden="true">{step.sub}</span>
+              <div className="tm-tournament-promo-step-copy">
+                <span className="tm-tournament-promo-step-label">{step.label}</span>
+                <span className="tm-tournament-promo-step-sub">{step.sub}</span>
+              </div>
               {i < PROCESS_STEPS.length - 1 ? (
                 <span className="tm-tournament-promo-step-connector" aria-hidden="true" />
               ) : null}
-            </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
     </div>
   );
@@ -387,12 +415,10 @@ function IconTournamentBracket({ size = 24 }: { size?: number }) {
 /* ── Static data ── */
 
 const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string; sub: string }> = [
-  { icon: <IconPencilForm size={20} />,        label: '신청',      sub: '팀 정보 입력' },
-  { icon: <IconWalletCheck size={20} />,       label: '결제',      sub: '참가비 납부' },
-  { icon: <IconCheckList size={20} />,         label: '선수 명단', sub: '로스터 확정' },
-  { icon: <IconGrid size={20} />,              label: '조별 리그', sub: '라운드 로빈' },
-  { icon: <IconTournamentBracket size={20} />, label: '결선',      sub: '단판 토너먼트' },
-  { icon: <TrophyIcon size={20} strokeWidth={1.8} />, label: '우승', sub: '시상 및 정산' },
+  { icon: <IconPencilForm size={20} />, label: '참가 조건 확인', sub: '일정·장소·참가비를 먼저 보고 팀 대표가 신청해요.' },
+  { icon: <IconWalletCheck size={20} />, label: '신청과 결제', sub: '팀 정보 제출 후 참가비 납부가 확인되면 확정 대기 상태가 돼요.' },
+  { icon: <IconCheckList size={20} />, label: '로스터 확정', sub: '마감 전 선수 명단을 채우고, 변경이 필요하면 신청 상세에서 관리해요.' },
+  { icon: <IconTournamentBracket size={20} />, label: '경기와 시상', sub: '조별 리그 결과로 결선 진출 팀을 가리고 우승팀을 시상해요.' },
 ];
 
 /* ── Tournament card ── */

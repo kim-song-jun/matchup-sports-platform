@@ -1,5 +1,14 @@
 # V1 Tournaments API
 
+## Public Read Endpoints
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/tournaments` | public | `TournamentListQueryDto` | cursor page of public tournaments |
+| `GET` | `/api/v1/tournaments/:id` | public | path id | public tournament detail |
+
+Public read endpoints expose only tournaments with `open`, `closed`, `in_progress`, or `completed` status and `deletedAt = null`. Registration, roster, and admin tournament routes remain authenticated.
+
 ## Registration Endpoints
 
 | Method | Path | Auth | Request | Response |

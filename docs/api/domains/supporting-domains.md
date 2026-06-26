@@ -130,8 +130,8 @@
 
 | Method | Path | Auth | 용도 |
 |---|---|---|---|
-| `GET` | `/api/v1/tournaments` | Required | 대회 목록(cursor) |
-| `GET` | `/api/v1/tournaments/:id` | Required | 대회 상세 |
+| `GET` | `/api/v1/tournaments` | Public | 대회 목록(cursor) |
+| `GET` | `/api/v1/tournaments/:id` | Public | 대회 상세 |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations` | Required | 팀 단위 신청 draft 생성 |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registration` | Required | 내 신청 조회 |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId` | Required | 신청 상세 조회 |
@@ -177,7 +177,8 @@
 
 ### 공개 상세 응답 계약
 
-- `GET /api/v1/tournaments/:id`는 `V1AuthGuard` 통과 후 대회 기본 정보, `groups`, `fixtures`, `announcements`, `confirmedCount`를 반환한다.
+- `GET /api/v1/tournaments`와 `GET /api/v1/tournaments/:id`는 로그인 없이 접근 가능한 공개 탐색 API다. 신청, 내 신청, 로스터, 관리자 조작은 별도 guarded endpoint에서만 처리한다.
+- `GET /api/v1/tournaments/:id`는 대회 기본 정보, `groups`, `fixtures`, `announcements`, `confirmedCount`를 반환한다.
 - `announcements`는 public detail에서 `publishedAt != null`인 공지만 포함한다.
   - 필드: `id`, `title`, `body`, `category`, `audience`, `publishedAt`, `createdAt`
   - `category`: `general | venue | sponsor | media | results | review`

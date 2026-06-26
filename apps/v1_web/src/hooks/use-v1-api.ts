@@ -980,6 +980,9 @@ export function useV1UpdateProfile() {
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
     },
   });
 }
@@ -1379,6 +1382,26 @@ export function useV1CancelRegistrationRequest(tournamentId: string, registratio
   });
 }
 
+export function useV1WithdrawCancelRegistrationRequest(tournamentId: string, registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      v1Post<V1TournamentRegistration>(
+        `/tournaments/${tournamentId}/registrations/${registrationId}/cancel-request/withdraw`,
+        {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
+    },
+  });
+}
+
 export function useV1TournamentPlayers(tournamentId: string, registrationId: string) {
   return useQuery({
     queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
@@ -1396,6 +1419,28 @@ export function useV1AddPlayer(tournamentId: string, registrationId: string) {
     mutationFn: (body: V1AddPlayerPayload) =>
       v1Post<V1TournamentPlayer>(
         `/tournaments/${tournamentId}/registrations/${registrationId}/players`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.tournamentPlayers(tournamentId, registrationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
+    },
+  });
+}
+
+export function useV1UpdatePlayer(tournamentId: string, registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ playerId, body }: { playerId: string; body: V1UpdatePlayerEligibilityPayload }) =>
+      v1Patch<V1TournamentPlayer>(
+        `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}`,
         body,
       ),
     onSuccess: () => {

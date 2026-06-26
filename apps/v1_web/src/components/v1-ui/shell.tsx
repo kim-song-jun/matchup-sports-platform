@@ -12,6 +12,7 @@ import {
 } from './icons';
 import { DesktopScrollTop } from './desktop-scroll-top';
 import { BrandMark } from './brand-logo';
+import { AppBackLink } from './app-back-link';
 
 export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
 
@@ -70,9 +71,9 @@ export function AppChrome({
         <header className={centerTitle ? 'tm-topbar tm-topbar-centered' : 'tm-topbar'}>
           <div className="tm-topbar-title">
             {backHref ? (
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label="뒤로가기">
+              <AppBackLink className="tm-btn tm-btn-icon tm-btn-ghost" fallbackHref={backHref}>
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
-              </Link>
+              </AppBackLink>
             ) : null}
             <div className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</div>
           </div>

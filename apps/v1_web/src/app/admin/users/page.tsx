@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Activity, Calendar, Clock, Shield } from 'lucide-react';
 import {
@@ -57,6 +57,14 @@ const USER_STATUS_FILTER_OPTIONS = [
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminUsersPageContent />
+    </Suspense>
+  );
+}
+
+function AdminUsersPageContent() {
   const searchParams = useSearchParams();
   const initialStatus = searchParams.get('status') ?? '';
 

@@ -11,6 +11,7 @@ import {
   useV1Tournament,
   useV1Registration,
   useV1AddPlayer,
+  useV1UpdatePlayer,
   useV1RemovePlayer,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
@@ -38,10 +39,31 @@ function eligibilityBadgeClass(status: V1PlayerEligibilityStatus): string {
   }
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '미입력';
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+export function normalizeProfileText(v: unknown): string {
+  if (v == null) return '';
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10);
+  return String(v).trim();
+}
+
+export function normalizeBirthDateForInput(v: unknown): string {
+  const raw = normalizeProfileText(v);
+  if (!raw) return '';
+  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+  const ymd = raw.match(/^(\d{4})[-./년\s]*(\d{1,2})[-./월\s]*(\d{1,2})/);
+  if (ymd) {
+    const [, year, month, day] = ymd;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  const d = new Date(raw);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return raw;
+}
+
+export function formatRosterBirthDate(dateStr: string | null): string {
+  const normalized = normalizeBirthDateForInput(dateStr);
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return '미입력';
+  const [year, month, day] = normalized.split('-');
+  return `${year}.${month}.${day}`;
 }
 
 /* ── Add player form ── */
@@ -50,6 +72,7 @@ type AddPlayerFormState = {
   userId: string;
   realName: string;
   birthDate: string;
+  phone: string;
   eligibilityStatus: V1PlayerEligibilityStatus;
 };
 
@@ -57,6 +80,7 @@ const EMPTY_FORM: AddPlayerFormState = {
   userId: '',
   realName: '',
   birthDate: '',
+  phone: '',
   eligibilityStatus: 'non_pro',
 };
 
@@ -73,6 +97,27 @@ function memberRoleLabel(role: 'owner' | 'manager' | 'member'): string {
     case 'manager': return '관리자';
     case 'member': return '멤버';
   }
+}
+
+function isRegisterableMember(member: { realName?: unknown; birthDate?: unknown; phone?: unknown }) {
+  return Boolean(
+    normalizeProfileText(member.realName) &&
+    normalizeBirthDateForInput(member.birthDate) &&
+    normalizeProfileText(member.phone),
+  );
+}
+
+function isRegisterableForm(form: AddPlayerFormState) {
+  return Boolean(form.realName.trim() && form.birthDate.trim() && form.phone.trim());
+}
+
+function memberMissingReason(member: { realName?: unknown; birthDate?: unknown; phone?: unknown }): string {
+  const missing = [
+    !normalizeProfileText(member.realName) ? '실명' : null,
+    !normalizeBirthDateForInput(member.birthDate) ? '생년월일' : null,
+    !normalizeProfileText(member.phone) ? '휴대폰 번호' : null,
+  ].filter(Boolean);
+  return `${missing.join(', ')} 미입력`;
 }
 
 function AddPlayerForm({
@@ -117,35 +162,33 @@ function AddPlayerForm({
     () => membersPages?.pages.flatMap((p) => p.items) ?? [],
     [membersPages],
   );
+  const unavailableMembers = useMemo(
+    () => members.filter((member) => !isRegisterableMember(member)),
+    [members],
+  );
 
   function patch(partial: Partial<AddPlayerFormState>) {
     setForm((prev) => ({ ...prev, ...partial }));
   }
 
-  /** When a member is chosen from the dropdown, pre-fill 실명 with their displayName. */
+  /** When a member is chosen from the dropdown, pre-fill profile snapshots returned by the API. */
   function handleMemberChange(userId: string) {
     const member = members.find((m) => m.userId === userId);
     patch({
       userId,
-      // Pre-fill only when a real selection is made; clear when deselected.
-      realName: member ? member.displayName : '',
+      realName: normalizeProfileText(member?.realName) || normalizeProfileText(member?.displayName),
+      birthDate: normalizeBirthDateForInput(member?.birthDate),
+      phone: normalizeProfileText(member?.phone),
     });
-  }
-
-  function handleBirthDateChange(v: string) {
-    patch({ birthDate: v });
-    if (v && !isValidBirthDate(v)) {
-      setBirthDateError('생년월일을 YYYY-MM-DD 형식으로 입력해 주세요. (예: 1995-03-21)');
-    } else {
-      setBirthDateError(null);
-    }
+    setBirthDateError(null);
   }
 
   const birthDateValid = isValidBirthDate(form.birthDate);
   const canSubmit =
-    form.realName.trim().length > 0 &&
     form.userId.trim().length > 0 &&
+    isRegisterableForm(form) &&
     birthDateValid;
+  const selectedMemberMissing = form.userId && !isRegisterableForm(form);
 
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
   return (
@@ -190,12 +233,30 @@ function AddPlayerForm({
                 aria-required="true"
               >
                 <option value="">팀원을 선택해 주세요</option>
-                {members.map((m) => (
-                  <option key={m.userId} value={m.userId}>
-                    {m.displayName} ({memberRoleLabel(m.role)})
-                  </option>
-                ))}
+                {members.map((m) => {
+                  const registerable = isRegisterableMember(m);
+                  return (
+                    <option key={m.userId} value={m.userId} disabled={!registerable}>
+                      {m.displayName} ({memberRoleLabel(m.role)})
+                      {registerable ? '' : ` - ${memberMissingReason(m)}`}
+                    </option>
+                  );
+                })}
               </select>
+              {selectedMemberMissing ? (
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '6px 0 0' }}>
+                  실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.
+                </p>
+              ) : null}
+              {unavailableMembers.length > 0 ? (
+                <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                  {unavailableMembers.map((m) => (
+                    <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
+                      {m.displayName}은 {memberMissingReason(m)}으로 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {hasNextPage ? (
                 <button
                   type="button"
@@ -211,25 +272,25 @@ function AddPlayerForm({
           )}
         </FormField>
 
-        {/* #8: realName pre-filled from selected member; still fully editable */}
+        {/* Selected member profile fields are read-only snapshots for tournament roster registration. */}
         <FormField id="player-realname" label="실명" required>
           <input
             id="player-realname"
             type="text"
             value={form.realName}
-            onChange={(e) => patch({ realName: e.target.value })}
             placeholder="홍길동"
             maxLength={40}
             className="tm-input"
             aria-required="true"
+            readOnly
           />
         </FormField>
 
-        {/* #7b: Tokenized text input — Pretendard, blue focus ring, no OS date picker chrome */}
         <FormField
           id="player-birthdate"
           label="생년월일"
-          hint="선택 사항 · 예: 1995-03-21"
+          required
+          hint="팀원 선택 시 자동으로 조회돼요."
           errorMessage={birthDateError ?? undefined}
         >
           <input
@@ -237,13 +298,26 @@ function AddPlayerForm({
             type="text"
             inputMode="numeric"
             value={form.birthDate}
-            onChange={(e) => handleBirthDateChange(e.target.value)}
             placeholder="예: 1995-03-21"
             maxLength={10}
             className="tm-input"
             aria-describedby={birthDateError ? 'player-birthdate-error' : undefined}
             aria-invalid={birthDateError ? true : undefined}
             style={{ fontFamily: 'var(--font-pretendard)' }}
+            readOnly
+          />
+        </FormField>
+
+        <FormField id="player-phone" label="휴대폰 번호" required hint="팀원 선택 시 자동으로 조회돼요.">
+          <input
+            id="player-phone"
+            type="tel"
+            value={form.phone}
+            placeholder="01012345678"
+            maxLength={20}
+            className="tm-input"
+            aria-required="true"
+            readOnly
           />
         </FormField>
 
@@ -404,69 +478,190 @@ function FormField({
 
 function PlayerRow({
   player,
+  onUpdate,
   onRemove,
+  isUpdating,
   isRemoving,
   isLocked,
 }: {
   player: V1TournamentPlayer;
+  onUpdate: (playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) => Promise<void>;
   onRemove: (playerId: string) => void;
+  isUpdating: boolean;
   isRemoving: boolean;
   isLocked: boolean;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftEligibility, setDraftEligibility] = useState<V1PlayerEligibilityStatus>(player.eligibilityStatus);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setEditError(null);
+    try {
+      await onUpdate(player.id, draftEligibility);
+      setIsEditing(false);
+    } catch (err) {
+      setEditError(extractErrorMessage(err, '선수 정보를 수정하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+    }
+  }
+
   return (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
         padding: '12px 14px',
         borderTop: '1px solid var(--grey100)',
       }}
     >
-      {/* Avatar placeholder — inline styles avoid coupling to tm-review-avatar (review domain) */}
-      <div
-        aria-hidden="true"
-        style={{
-          flexShrink: 0,
-          width: 36,
-          height: 36,
-          borderRadius: 12,
-          background: 'var(--grey100)',
-          color: 'var(--text-strong)',
-          display: 'grid',
-          placeItems: 'center',
-          fontSize: 'var(--font-size-body-sm)',
-          fontWeight: 700,
-        }}
-      >
-        {player.realName.charAt(0)}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
-            {player.realName}
-          </span>
-          <span className={`tm-badge ${eligibilityBadgeClass(player.eligibilityStatus)}`}>
-            {eligibilityLabel(player.eligibilityStatus)}
-          </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 36,
+            height: 36,
+            borderRadius: 12,
+            background: 'var(--grey100)',
+            color: 'var(--text-strong)',
+            display: 'grid',
+            placeItems: 'center',
+            fontSize: 'var(--font-size-body-sm)',
+            fontWeight: 700,
+          }}
+        >
+          {player.realName.charAt(0)}
         </div>
-        {player.birthDateSnapshot ? (
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
+              {player.realName}
+            </span>
+            <span className={`tm-badge ${eligibilityBadgeClass(player.eligibilityStatus)}`}>
+              {eligibilityLabel(player.eligibilityStatus)}
+            </span>
+          </div>
           <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-            {formatDate(player.birthDateSnapshot)}
+            {formatRosterBirthDate(player.birthDateSnapshot)}
+          </div>
+        </div>
+        {!isLocked ? (
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button
+              type="button"
+              className="tm-btn tm-btn-sm tm-btn-neutral"
+              style={{ minWidth: 44, padding: '0 10px' }}
+              onClick={() => {
+                setDraftEligibility(player.eligibilityStatus);
+                setEditError(null);
+                setIsEditing((prev) => !prev);
+              }}
+              disabled={isUpdating || isRemoving}
+              aria-expanded={isEditing}
+              aria-label={`${player.realName} 수정`}
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              className="tm-btn tm-btn-sm tm-btn-danger"
+              style={{ minWidth: 44, padding: '0 10px' }}
+              onClick={() => onRemove(player.id)}
+              disabled={isRemoving || isUpdating}
+              aria-label={`${player.realName} 삭제`}
+            >
+              삭제
+            </button>
           </div>
         ) : null}
       </div>
-      {!isLocked ? (
-        <button
-          type="button"
-          className="tm-btn tm-btn-sm tm-btn-danger"
-          style={{ flexShrink: 0, minWidth: 44, padding: '0 10px' }}
-          onClick={() => onRemove(player.id)}
-          disabled={isRemoving}
-          aria-label={`${player.realName} 삭제`}
-        >
-          삭제
-        </button>
+
+      {isEditing && !isLocked ? (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--grey100)' }}>
+          <FormField id={`player-${player.id}-eligibility`} label="선출 여부" labelId={`player-${player.id}-eligibility-label`}>
+            <div
+              role="radiogroup"
+              aria-labelledby={`player-${player.id}-eligibility-label`}
+              style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
+            >
+              {(['non_pro', 'pro', 'needs_review'] as const).map((val) => {
+                const selected = draftEligibility === val;
+                return (
+                  <label
+                    key={val}
+                    htmlFor={`player-${player.id}-eligibility-${val}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 36 }}
+                  >
+                    <input
+                      id={`player-${player.id}-eligibility-${val}`}
+                      type="radio"
+                      name={`player-${player.id}-eligibility`}
+                      value={val}
+                      checked={selected}
+                      onChange={() => setDraftEligibility(val)}
+                      className="sr-only"
+                    />
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        flexShrink: 0,
+                        width: 20,
+                        height: 20,
+                        borderRadius: '50%',
+                        border: selected ? '2px solid var(--blue500)' : '1px solid var(--grey200)',
+                        background: selected ? 'var(--blue500)' : 'var(--bg)',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      {selected ? (
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            background: 'var(--static-white)',
+                            display: 'block',
+                          }}
+                        />
+                      ) : null}
+                    </span>
+                    <span className="tm-text-caption" style={{ color: 'var(--text-strong)' }}>
+                      {eligibilityLabel(val)}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </FormField>
+          {editError ? (
+            <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '8px 0 0' }}>
+              {editError}
+            </p>
+          ) : null}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button
+              type="button"
+              className="tm-btn tm-btn-sm tm-btn-neutral"
+              style={{ flex: 1, minHeight: 40 }}
+              onClick={() => {
+                setDraftEligibility(player.eligibilityStatus);
+                setEditError(null);
+                setIsEditing(false);
+              }}
+              disabled={isUpdating}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className="tm-btn tm-btn-sm tm-btn-primary"
+              style={{ flex: 1, minHeight: 40 }}
+              onClick={() => void handleSave()}
+              disabled={isUpdating || draftEligibility === player.eligibilityStatus}
+            >
+              {isUpdating ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   );
@@ -492,6 +687,7 @@ export function TournamentRosterPageClient({
   } = useV1TournamentPlayers(tournamentId, registrationId);
 
   const addPlayer = useV1AddPlayer(tournamentId, registrationId);
+  const updatePlayer = useV1UpdatePlayer(tournamentId, registrationId);
   const removePlayer = useV1RemovePlayer(tournamentId, registrationId);
   const { confirm: confirmRemove, ConfirmModal: RemoveConfirmModal } = useConfirm();
 
@@ -585,6 +781,16 @@ export function TournamentRosterPageClient({
     } catch (err) {
       setRemoveError(extractErrorMessage(err, '선수 삭제에 실패했어요. 잠시 후 다시 시도해 주세요.'));
     }
+  }
+
+  async function handleUpdatePlayer(playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) {
+    setRemoveError(null);
+    setAddSuccess(null);
+    await updatePlayer.mutateAsync({
+      playerId,
+      body: { eligibilityStatus },
+    });
+    setAddSuccess('선수 정보를 수정했어요.');
   }
 
   const atMax = players.length >= maxPlayers;
@@ -707,7 +913,9 @@ export function TournamentRosterPageClient({
               <PlayerRow
                 key={player.id}
                 player={player}
+                onUpdate={handleUpdatePlayer}
                 onRemove={handleRemovePlayer}
+                isUpdating={updatePlayer.isPending}
                 isRemoving={removePlayer.isPending}
                 isLocked={isRosterLocked}
               />

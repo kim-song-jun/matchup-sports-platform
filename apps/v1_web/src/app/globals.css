@@ -782,7 +782,7 @@ button:disabled {
   min-height: 64px;
   padding: 15px;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  grid-template-columns: 26px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 12px;
 }
@@ -801,7 +801,8 @@ button:disabled {
 .tm-auth-check-button {
   display: grid;
   place-items: center;
-  min-width: 44px; /* WS11 a11y 터치 타깃 */
+  width: 26px;
+  min-width: 26px;
   min-height: 44px;
 }
 
@@ -2555,6 +2556,31 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+
+.tm-team-card-action-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grey100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tm-team-card-action-status {
+  color: var(--blue500);
+}
+
+.tm-team-card-action-status-muted {
+  color: var(--text-caption);
+}
+
+.tm-team-card-action-link {
+  color: var(--blue500);
+  white-space: nowrap;
 }
 
 .tm-team-intro-box {

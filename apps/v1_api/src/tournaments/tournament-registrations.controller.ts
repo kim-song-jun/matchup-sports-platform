@@ -59,4 +59,13 @@ export class TournamentRegistrationsController {
   ) {
     return this.registrationsService.cancelRequest(user, tournamentId, registrationId, dto);
   }
+
+  @Post(':registrationId/cancel-request/withdraw')
+  withdrawCancelRequest(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('registrationId') registrationId: string,
+  ) {
+    return this.registrationsService.withdrawCancelRequest(user, tournamentId, registrationId);
+  }
 }

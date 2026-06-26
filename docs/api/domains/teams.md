@@ -25,6 +25,12 @@
 | POST | `/team-invitations/:invitationId/accept` | Yes | 초대 수락 (피초대자 본인) |
 | POST | `/team-invitations/:invitationId/decline` | Yes | 초대 거절 (피초대자 본인) |
 
+## GET /teams/:id/members
+
+- 멤버 항목은 `displayName`, `realName`, `birthDate`, `phone`을 포함한다.
+- `realName`, `birthDate`, `phone`은 nullable이다.
+- 대회 로스터 등록 화면은 세 값 중 하나라도 없으면 해당 팀원을 목록에는 유지하되 선택 불가로 표시한다.
+
 ## GET /teams
 
 Query:

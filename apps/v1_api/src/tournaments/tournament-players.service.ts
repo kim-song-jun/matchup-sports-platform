@@ -125,11 +125,28 @@ export class TournamentPlayersService {
         status: 'active',
         team: { status: 'active', deletedAt: null },
       },
+      include: {
+        user: {
+          select: {
+            phone: true,
+            profile: { select: { displayName: true, birthDate: true } },
+          },
+        },
+      },
     });
     if (!teamMembership) {
       throw new BadRequestException({
         code: 'USER_NOT_TEAM_MEMBER',
         message: '해당 팀의 활성 멤버가 아니에요.',
+      });
+    }
+    const memberRealName = teamMembership.user.profile?.displayName?.trim();
+    const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
+    const memberPhone = teamMembership.user.phone?.trim();
+    if (!memberRealName || !memberBirthDate || !memberPhone) {
+      throw new BadRequestException({
+        code: 'PLAYER_REQUIRED_PROFILE_MISSING',
+        message: '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
       });
     }
 
@@ -151,13 +168,13 @@ export class TournamentPlayersService {
       create: {
         registrationId,
         userId: dto.userId,
-        realName: dto.realName,
-        birthDateSnapshot: dto.birthDate ?? null,
+        realName: memberRealName,
+        birthDateSnapshot: memberBirthDate,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
       },
       update: {
-        realName: dto.realName,
-        birthDateSnapshot: dto.birthDate ?? null,
+        realName: memberRealName,
+        birthDateSnapshot: memberBirthDate,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
         eligibilityNote: null,
         removedAt: null,
@@ -197,6 +214,40 @@ export class TournamentPlayersService {
     });
 
     return this.serializePlayer(removed);
+  }
+
+  // ─── 팀 명단 선수 정보 수정 ─────────────────────────────────────────────────
+
+  async updatePlayer(
+    user: V1AuthUser,
+    tournamentId: string,
+    registrationId: string,
+    playerId: string,
+    dto: UpdatePlayerEligibilityDto,
+  ) {
+    const registration = await this.loadRegistration(tournamentId, registrationId);
+    await this.assertTeamManager(registration.teamId, user.id);
+
+    if (registration.rosterLockedAt) {
+      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
+    }
+
+    const player = await this.prisma.v1TournamentPlayer.findFirst({
+      where: { id: playerId, registrationId, removedAt: null },
+    });
+    if (!player) {
+      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+    }
+
+    const updated = await this.prisma.v1TournamentPlayer.update({
+      where: { id: playerId },
+      data: {
+        eligibilityStatus: dto.eligibilityStatus,
+        eligibilityNote: null,
+      },
+    });
+
+    return this.serializePlayer(updated);
   }
 
   // ─── 어드민: CSV 다운로드 ──────────────────────────────────────────────────────

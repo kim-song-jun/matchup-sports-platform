@@ -365,7 +365,8 @@ export class TeamsService {
       include: {
         user: {
           select: {
-            profile: { select: { nickname: true, displayName: true, profileImageUrl: true } },
+            phone: true,
+            profile: { select: { nickname: true, displayName: true, profileImageUrl: true, birthDate: true } },
           },
         },
       },
@@ -387,6 +388,9 @@ export class TeamsService {
           membershipId: membership.id,
           userId: membership.userId,
           displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
+          realName: membership.user.profile?.displayName ?? null,
+          phone: membership.user.phone ?? null,
+          birthDate: membership.user.profile?.birthDate ?? null,
           profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
           role: membership.role,
           status: membership.status,
@@ -1410,31 +1414,22 @@ export class TeamsService {
     actorUserId: string,
     reason: string,
   ) {
-    const existingRoom = await tx.v1ChatRoom.findUnique({ where: { teamId }, select: { id: true } });
-    const room = existingRoom
-      ? await tx.v1ChatRoom.update({
-          where: { id: existingRoom.id },
-          data: { status: 'active' },
-          select: { id: true },
-        })
-      : await tx.v1ChatRoom.create({
-          data: { teamId, status: 'active' },
-          select: { id: true },
-        });
+    const room = await tx.v1ChatRoom.upsert({
+      where: { teamId },
+      update: { status: 'active' },
+      create: { teamId, status: 'active' },
+      select: { id: true },
+    });
     const existingParticipant = await tx.v1ChatRoomParticipant.findUnique({
       where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
       select: { id: true, status: true },
     });
-    const participant = existingParticipant
-      ? await tx.v1ChatRoomParticipant.update({
-          where: { id: existingParticipant.id },
-          data: { status: 'active', leftAt: null },
-          select: { id: true },
-        })
-      : await tx.v1ChatRoomParticipant.create({
-          data: { chatRoomId: room.id, userId, status: 'active' },
-          select: { id: true },
-        });
+    const participant = await tx.v1ChatRoomParticipant.upsert({
+      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
+      update: { status: 'active', leftAt: null },
+      create: { chatRoomId: room.id, userId, status: 'active' },
+      select: { id: true },
+    });
 
     if (!existingParticipant || existingParticipant.status !== 'active') {
       await tx.v1StatusChangeLog.create({

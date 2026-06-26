@@ -31,6 +31,7 @@ import {
   useV1TeamDetail,
   useV1TeamJoinApplications,
   useV1TeamMembers,
+  useV1UploadImages,
   useV1UpdateMyPreferences,
   useV1UpdateMyRegion,
   useV1UpdateProfile,
@@ -268,6 +269,7 @@ export function ProfileEditPageClient() {
   const router = useRouter();
   const profile = useV1Profile();
   const update = useV1UpdateProfile();
+  const uploadImages = useV1UploadImages();
   const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
   const [displayName, setDisplayName] = useState('');
@@ -277,6 +279,7 @@ export function ProfileEditPageClient() {
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageName, setProfileImageName] = useState('');
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [bio, setBio] = useState('');
   const [visibilityStatus, setVisibilityStatus] = useState<'public' | 'members_only' | 'private'>('public');
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
@@ -306,7 +309,7 @@ export function ProfileEditPageClient() {
   const emailChanged = normalizedEmail !== originalEmail;
   const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
   const emailVerified = !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
-  const isBlocked = update.isPending || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified;
+  const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified;
 
   const runNicknameCheck = () => {
     setFieldErrors((current) => ({ ...current, nickname: undefined, form: undefined }));
@@ -356,7 +359,7 @@ export function ProfileEditPageClient() {
     });
   };
 
-  const selectProfileImage = (event: ChangeEvent<HTMLInputElement>) => {
+  const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setFieldErrors((current) => ({ ...current, profileImage: undefined, form: undefined }));
     if (!file) return;
@@ -373,17 +376,24 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setProfileImageUrl(reader.result);
-        setProfileImageName(file.name);
+    setUploadingProfileImage(true);
+    try {
+      const result = await uploadImages.mutateAsync([file]);
+      const nextUrl = result.urls[0];
+      if (!nextUrl) {
+        throw new Error('업로드 응답에 이미지 URL이 없어요.');
       }
-    };
-    reader.onerror = () => {
-      setFieldErrors((current) => ({ ...current, profileImage: '이미지를 불러오지 못했어요. 다시 선택해 주세요.' }));
-    };
-    reader.readAsDataURL(file);
+      setProfileImageUrl(nextUrl);
+      setProfileImageName(file.name);
+    } catch (err) {
+      setFieldErrors((current) => ({
+        ...current,
+        profileImage: err instanceof Error ? err.message : '이미지를 업로드하지 못했어요. 다시 선택해 주세요.',
+      }));
+      event.target.value = '';
+    } finally {
+      setUploadingProfileImage(false);
+    }
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -465,18 +475,18 @@ export function ProfileEditPageClient() {
         </div>
         <section className="tm-my-profile-head">
           <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: `url(${profileImageUrl})` } : undefined}>
-            {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName)}</span>}
+            {profileImageUrl ? null : <span className="tm-text-caption">{initials(normalizedNickname || nickname || displayName)}</span>}
           </div>
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 목록과 신청서에 함께 보여요.</div>
             <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
               <label className="tm-btn tm-btn-md tm-btn-neutral">
-                {profileImageUrl ? '사진 변경' : '사진 선택'}
-                <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} />
+                {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
+                <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
               </label>
               {profileImageUrl ? (
-                <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" onClick={() => { setProfileImageUrl(''); setProfileImageName(''); }}>
+                <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageName(''); }}>
                   제거
                 </button>
               ) : null}
@@ -1077,7 +1087,10 @@ function toMyHomeModel(
   hasPendingReviews?: boolean,
 ): MyHomeViewModel {
   const displayName = profile.profile.displayName;
+  const nickname = profile.profile.nickname?.trim() || displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
+  const activityCount = activitySummary?.totals.activityCount ?? '—';
+  const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
   const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
   const communitySection = sections.find((section) => section.title === '커뮤니티');
   if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
@@ -1095,22 +1108,22 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
-      name: displayName,
-      handle: profile.email ?? authProviderLabel(profile.authProvider),
+      name: nickname,
+      handle: `@${nickname}`,
       region: profile.regionName ?? myHomeModel.user.region,
-      initials: initials(displayName),
+      initials: initials(nickname),
       intro: profile.profile.bio ?? '',
       sports: (profile.sports ?? []).map((sport) =>
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,
       ),
       stats: [
-        { label: '활동', value: activitySummary?.totals.activityCount ?? profile.reputation.activityCount, unit: '회' },
+        { label: '활동', value: activityCount, unit: activitySummary ? '회' : undefined },
         { label: '소속 팀', value: activitySummary?.totals.teamCount ?? teams.length, unit: '팀' },
         { label: '매너 점수', value: formatScore(totalMannerScore) },
       ],
       // '매너 점수'는 상단 활동 요약(stats)에만 표시. monthly는 경기 수·승률만 — 이중 표기 해소.
       monthly: [
-        { label: '이번 달 경기', value: activitySummary?.monthly.matchCount ?? 0, unit: '경기' },
+        { label: '이번 달 경기', value: monthlyMatchCount, unit: activitySummary ? '경기' : undefined },
         { label: '승률', value: formatWinRate(activitySummary?.monthly.winRate) },
       ],
     },
@@ -1289,12 +1302,6 @@ function formatScore(value: number | null | undefined) {
 function formatWinRate(value: number | null | undefined) {
   if (typeof value !== 'number') return '-';
   return `${Math.round(value)}%`;
-}
-
-function authProviderLabel(provider: V1Profile['authProvider']) {
-  if (provider === 'kakao') return '카카오 로그인';
-  if (provider === 'naver') return '네이버 로그인';
-  return '소셜 로그인';
 }
 
 function toDigits(value: string, maxLength: number) {

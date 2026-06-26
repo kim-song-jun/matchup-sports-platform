@@ -40,19 +40,40 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
             desktop에는 이미 .tm-team-desktop-header가 제목을 담당하므로 모바일에서만 노출. */}
         <h2 className="tm-text-heading tm-hide-desktop tm-team-mobile-heading">{model.summary.scope}</h2>
         <div className="tm-team-summary-bar">
-          {/* P1: 통계 숫자에 tabular-nums 적용. 전체 줄은 이미 tab-num 클래스 보유 — 인라인 강조만 추가 */}
-          <div className="tm-text-caption tab-num tm-hide-desktop">
-            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.total}</span>팀 · 모집 중 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.recruiting}</span> · 내 주변 {model.summary.nearby}
-          </div>
+          <div className="tm-text-caption tab-num tm-hide-desktop"><TeamSummaryText summary={model.summary} /></div>
           <div className="tm-text-label tm-show-desktop">{model.summary.scope}</div>
-          <div className="tm-text-caption tab-num tm-show-desktop">
-            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.total}</span>팀 · 모집 중 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.recruiting}</span> · 내 주변 {model.summary.nearby}
-          </div>
+          <div className="tm-text-caption tab-num tm-show-desktop"><TeamSummaryText summary={model.summary} /></div>
         </div>
-        {model.teams.length ? <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div> : <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />}
+        {model.listLoading ? (
+          <TeamListSkeleton />
+        ) : model.teams.length ? (
+          <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
+        ) : (
+          <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
+        )}
       </div>
       {model.filterSheet?.open ? <TeamFilterSheet model={model} /> : null}
     </AppChrome>
+  );
+}
+
+function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] }) {
+  return (
+    <>
+      <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.total}</span>
+      팀 · 가입 가능 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.recruiting}</span>
+      {typeof summary.nearby === 'number' ? <> · 내 주변 {summary.nearby}</> : null}
+    </>
+  );
+}
+
+function TeamListSkeleton() {
+  return (
+    <div className="tm-team-card-stack" aria-busy="true" aria-label="팀 목록 불러오는 중">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="tm-review-skeleton" style={{ height: 164, borderRadius: 16 }} aria-hidden="true" />
+      ))}
+    </div>
   );
 }
 
@@ -110,7 +131,7 @@ function TeamFilterPageView({ model }: { model: TeamStateViewModel }) {
           <div className="tm-text-body-lg">가입 조건</div>
           <div className="tm-my-list-stack" style={{ marginTop: 12 }}>
             <ListItem title="지역" sub="서울 전체" trailing="변경 가능" />
-            <ListItem title="모집 상태" sub="모집 중 우선" trailing="1개" />
+            <ListItem title="가입 상태" sub="가입 신청 가능" trailing="1개" />
             <ListItem title="활동 빈도" sub="주 1회 이상" trailing="1개" />
           </div>
         </Card>
@@ -252,8 +273,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <InfoRow label="레벨" value={team.level} />
             <InfoRow label="성별 조건" value={team.genderRule} />
             <InfoRow label="정원" value={`${team.capacity}명`} />
-            <InfoRow label="모집 여부" value={`${team.statusLabel} · ${team.activity}`} />
-            <InfoRow label="정기 일정" value={team.schedule} />
+            <InfoRow label="모집 여부" value={team.activity ? `${team.statusLabel} · ${team.activity}` : team.statusLabel} />
+            {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
           </Card>
           {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
           <Card pad={16} style={{ marginTop: 14 }}>
@@ -339,8 +360,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <InfoRow label="레벨" value={team.level} />
           <InfoRow label="성별 조건" value={team.genderRule} />
           <InfoRow label="정원" value={`${team.capacity}명`} />
-          <InfoRow label="모집 여부" value={`${team.statusLabel} · ${team.activity}`} />
-          <InfoRow label="정기 일정" value={team.schedule} />
+          <InfoRow label="모집 여부" value={team.activity ? `${team.statusLabel} · ${team.activity}` : team.statusLabel} />
+          {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
         </Card>
         {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
         <Card pad={16} style={{ marginTop: 14 }}>
@@ -978,37 +999,24 @@ function formatInvitationDate(value: string) {
 }
 
 function TeamCard({ team }: { team: TeamModel }) {
-  // intro가 10자 미만이면 "내용 없음"으로 간주해 intro-box 자체를 숨긴다.
-  // 빈 박스가 카드 공간을 차지하면서 시각적 밀도를 낮추는 것을 방지하기 위함.
-  const hasIntro = team.intro.trim().length >= 10;
+  const hasIntro = team.intro.trim().length > 0;
 
   return (
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <TeamLogo team={team} />
-        <div style={{ flex: 1, minWidth: 0 }}><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div>
-              {/* P0/P1: 상태를 색상+아이콘+텍스트로 병행 표시 (WCAG 1.4.1) */}
-              <span className={`tm-badge ${team.status === 'closed' ? 'tm-badge-grey' : team.status === 'reviewing' ? 'tm-badge-orange' : 'tm-badge-blue'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                {/* 색상 구분에 아이콘 병행 */}
-                {team.status === 'closed' ? (
-                  <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" opacity={0.55} /></svg>
-                ) : team.status === 'reviewing' ? (
-                  <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-                ) : (
-                  <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-                )}
-                {team.statusLabel}
-              </span>
-            </div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{team.members}</span>명</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
+        <div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{team.members}</span>명</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
       </div>
-      {/* intro가 충분히 있을 때만 intro-box를 렌더한다. '팀 소개' 라벨은 시각 노이즈이므로 제거하고 본문만 표시. */}
+      {/* 실제 팀 소개가 있을 때만 intro-box를 렌더한다. */}
       {hasIntro ? (
         <div className="tm-team-intro-box">
           <div className="tm-text-body line-clamp-2" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
         </div>
       ) : null}
-      {/* '팀 보기' CTA: 반복 파란 solid 버튼 대신 ghost 텍스트 링크로 절제. closed 팀의 '알림받기'는 neutral 유지. */}
-      <div className="tm-team-card-footer"><span className="tm-text-caption">{team.next}</span><span className={`tm-btn tm-btn-sm ${team.status === 'closed' ? 'tm-btn-neutral' : 'tm-btn-ghost tm-team-card-view-link'}`}>{team.status === 'closed' ? '알림받기' : '팀 보기 ›'}</span></div>
+      <div className="tm-team-card-action-row" aria-hidden="true">
+        <span className={`tm-team-card-action-status ${team.status === 'closed' ? 'tm-team-card-action-status-muted' : ''}`}>{team.statusLabel}</span>
+        <span className="tm-team-card-action-link">자세히 보기 ›</span>
+      </div>
     </Link>
   );
 }
@@ -1168,6 +1176,68 @@ function CreateField({ label, value, placeholder, suffix, multiline, type = 'tex
   return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
 }
 
-function RegionSelect({ value, regions, onChange }: { value: string; regions: Array<{ id: string; name: string }>; onChange?: (regionId: string) => void }) {
-  return <label className="tm-create-field"><div className="tm-text-label">활동 지역</div><select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">활동 지역을 선택해 주세요</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>팀 추천과 지역 검색에 쓰여요. 활동 장소는 아래 '활동 방식'에 자유롭게 적어 주세요.</div></label>;
+function RegionSelect({
+  value,
+  regions,
+  onChange,
+}: {
+  value: string;
+  regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
+  onChange?: (regionId: string) => void;
+}) {
+  const normalizedRegions = regions.map((region) => {
+    if (region.parentName || region.shortName) return region;
+    const [parentName = '', ...shortNameParts] = region.name.split(' ');
+    return {
+      ...region,
+      parentName,
+      shortName: shortNameParts.join(' ') || region.name,
+    };
+  });
+  const parentNames = Array.from(new Set(normalizedRegions.map((region) => region.parentName).filter(Boolean)));
+  const selectedRegion = normalizedRegions.find((region) => region.id === value);
+  const selectedParentName = selectedRegion?.parentName ?? parentNames[0] ?? '';
+  const districtOptions = selectedParentName
+    ? normalizedRegions.filter((region) => region.parentName === selectedParentName)
+    : normalizedRegions;
+
+  const handleParentChange = (parentName: string) => {
+    const firstRegion = normalizedRegions.find((region) => region.parentName === parentName);
+    if (firstRegion) onChange?.(firstRegion.id);
+  };
+
+  return (
+    <label className="tm-create-field">
+      <div className="tm-text-label">활동 지역</div>
+      <div className="tm-region-select-grid">
+        <select
+          className="tm-create-input tm-create-select-control"
+          value={selectedParentName}
+          onChange={(event) => handleParentChange(event.target.value)}
+          aria-label="광역 지역"
+        >
+          {parentNames.length === 0 ? <option value="">광역 지역</option> : null}
+          {parentNames.map((parentName) => (
+            <option key={parentName} value={parentName}>
+              {parentName}
+            </option>
+          ))}
+        </select>
+        <select
+          className="tm-create-input tm-create-select-control"
+          value={value}
+          onChange={(event) => onChange?.(event.target.value)}
+          aria-label="시군구"
+        >
+          {districtOptions.length === 0 ? <option value="">구/시 선택</option> : null}
+          {districtOptions.map((region) => (
+            <option key={region.id} value={region.id}>
+              {region.shortName ?? region.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>팀 추천과 지역 검색에 쓰여요. 활동 장소는 아래 '활동 방식'에 자유롭게 적어 주세요.</div>
+    </label>
+  );
 }

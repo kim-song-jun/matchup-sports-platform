@@ -60,18 +60,18 @@ function TournamentsListContent() {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [allItems, setAllItems] = useState<V1TournamentListItem[]>([]);
   // D3: 종목 필터 — null = '전체'
-  const [activeSportCode, setActiveSportCode] = useState<string | null>(null);
+  const [activeSportId, setActiveSportId] = useState<string | null>(null);
 
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
   const { data: sportsData } = useV1MasterSports();
-  const filterSports: Array<{ code: string; label: string }> = (sportsData ?? [])
-    .filter((s) => s.code)
-    .map((s) => ({ code: s.code as string, label: s.name }));
+  const filterSports: Array<{ id: string; code: string; label: string }> = (sportsData ?? [])
+    .filter((s) => s.id)
+    .map((s) => ({ id: s.id, code: s.code ?? s.id, label: s.name }));
 
   const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({
     cursor,
     limit: 20,
-    sportId: activeSportCode ?? undefined,
+    sportId: activeSportId ?? undefined,
   });
 
   // Accumulate pages when cursor is set
@@ -111,10 +111,14 @@ function TournamentsListContent() {
 
   /** D3: 종목 칩 선택 — 페이지/누적 목록 리셋 후 필터 적용 */
   const handleSportFilter = (code: string | null) => {
-    setActiveSportCode(code);
+    setActiveSportId(code);
     setCursor(undefined);
     setAllItems([]);
   };
+
+  const activeSportLabel = activeSportId
+    ? filterSports.find((sport) => sport.id === activeSportId)?.label
+    : null;
 
   return (
     <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
@@ -179,16 +183,16 @@ function TournamentsListContent() {
           <button
             type="button"
             onClick={() => handleSportFilter(null)}
-            aria-pressed={activeSportCode === null}
+            aria-pressed={activeSportId === null}
             aria-label="전체 종목"
             className="tm-btn"
             style={{
               padding: '0 12px',
               borderRadius: 999,
               fontSize: 'var(--font-size-caption)',
-              fontWeight: activeSportCode === null ? 700 : 500,
-              background: activeSportCode === null ? 'var(--blue500)' : 'var(--grey100)',
-              color: activeSportCode === null ? 'var(--static-white)' : 'var(--text-body)',
+              fontWeight: activeSportId === null ? 700 : 500,
+              background: activeSportId === null ? 'var(--blue500)' : 'var(--grey100)',
+              color: activeSportId === null ? 'var(--static-white)' : 'var(--text-body)',
               border: 'none',
               cursor: 'pointer',
               /* a11y: 터치 타깃 최소 44px (WCAG 2.5.5) */
@@ -202,14 +206,14 @@ function TournamentsListContent() {
             전체
           </button>
 
-          {filterSports.map(({ code, label }) => {
+          {filterSports.map(({ id, code, label }) => {
             const accent = getSportAccent(code);
-            const isActive = activeSportCode === code;
+            const isActive = activeSportId === id;
             return (
               <button
-                key={code}
+                key={id}
                 type="button"
-                onClick={() => handleSportFilter(code)}
+                onClick={() => handleSportFilter(id)}
                 aria-pressed={isActive}
                 aria-label={`${label} 종목만 보기`}
                 className="tm-btn"
@@ -221,9 +225,9 @@ function TournamentsListContent() {
                   borderRadius: 999,
                   fontSize: 'var(--font-size-caption)',
                   fontWeight: isActive ? 700 : 500,
-                  background: isActive ? accent.badgeBg : 'var(--grey100)',
-                  color: isActive ? accent.badgeText : 'var(--text-body)',
-                  border: isActive ? `1.5px solid ${accent.dot}` : '1.5px solid transparent',
+                  background: isActive ? 'var(--blue500)' : 'var(--grey100)',
+                  color: isActive ? 'var(--static-white)' : 'var(--text-body)',
+                  border: isActive ? '1.5px solid var(--blue500)' : '1.5px solid transparent',
                   cursor: 'pointer',
                   /* a11y: 터치 타깃 최소 44px (WCAG 2.5.5) */
                   minHeight: 44,
@@ -238,7 +242,7 @@ function TournamentsListContent() {
                     width: 6,
                     height: 6,
                     borderRadius: '50%',
-                    background: isActive ? accent.dot : 'var(--grey400)',
+                    background: isActive ? 'var(--static-white)' : 'var(--grey400)',
                     flexShrink: 0,
                   }}
                 />
@@ -257,8 +261,8 @@ function TournamentsListContent() {
           />
         ) : displayItems.length === 0 ? (
           <EmptyState
-            title="현재 모집 중인 대회가 없어요"
-            sub="새로운 대회가 열리면 앱 알림으로 안내드릴게요."
+            title={activeSportLabel ? `${activeSportLabel} 모집 중인 대회가 없어요` : '현재 모집 중인 대회가 없어요'}
+            sub={activeSportLabel ? '다른 종목을 선택하거나 새로운 대회 알림을 기다려 주세요.' : '새로운 대회가 열리면 앱 알림으로 안내드릴게요.'}
             icon={<TrophyIcon size={36} strokeWidth={1.5} />}
           />
         ) : (

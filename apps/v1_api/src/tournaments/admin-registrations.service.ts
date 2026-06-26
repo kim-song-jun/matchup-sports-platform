@@ -250,7 +250,7 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
-        data: { status: 'cancelled', cancelReason: dto.reason ?? null },
+        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? null },
       });
 
       // 결제가 있고 아직 cancelled 아니면 payment도 cancelled로 변경.

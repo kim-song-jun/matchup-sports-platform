@@ -97,6 +97,21 @@ function playerRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'mem-2',
+    role: 'member',
+    user: {
+      phone: '01012345678',
+      profile: {
+        displayName: '홍길동',
+        birthDate: '1995-03-15',
+      },
+    },
+    ...overrides,
+  };
+}
+
 // ─── 테스트 스위트 ───────────────────────────────────────────────────────────────
 
 describe('TournamentPlayersService', () => {
@@ -279,7 +294,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' }) // manager 체크
-      .mockResolvedValueOnce({ id: 'mem-2', role: 'member' }); // 팀 멤버 체크
+      .mockResolvedValueOnce(teamPlayerMembershipRow()); // 팀 멤버 체크
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.count.mockResolvedValue(2);
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow()); // 이미 존재
@@ -299,7 +314,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
-      .mockResolvedValueOnce({ id: 'mem-2', role: 'member' });
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.count.mockResolvedValue(2);
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null); // 중복 없음
@@ -323,10 +338,28 @@ describe('TournamentPlayersService', () => {
           registrationId: 'reg-1',
           userId: 'player-user-id',
           realName: '홍길동',
+          birthDateSnapshot: '1995-03-15',
           eligibilityStatus: 'needs_review',
         }),
       }),
     );
+  });
+
+  it('addPlayer: team member missing required profile → 400 PLAYER_REQUIRED_PROFILE_MISSING', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow({ user: { phone: null, profile: { displayName: '홍길동', birthDate: '1995-03-15' } } }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_REQUIRED_PROFILE_MISSING' } });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
   });
 
   // ─── 8. 명단 조회 + belowMinimum ────────────────────────────────────────
@@ -387,6 +420,77 @@ describe('TournamentPlayersService', () => {
     await expect(
       service.removePlayer(manager, 'tournament-1', 'reg-1', 'ghost-player'),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('updatePlayer: manager + unlocked → updates eligibility status', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
+
+    const result = await service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
+      eligibilityStatus: 'pro',
+    });
+
+    expect(result).toMatchObject({ id: 'player-1', eligibilityStatus: 'pro' });
+    expect(prisma.v1TournamentPlayer.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'player-1' },
+        data: {
+          eligibilityStatus: 'pro',
+          eligibilityNote: null,
+        },
+      }),
+    );
+  });
+
+  it('updatePlayer: latest team member profile is not revalidated for eligibility-only edit', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
+
+    const result = await service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
+      eligibilityStatus: 'pro',
+    });
+
+    expect(result).toMatchObject({ id: 'player-1', eligibilityStatus: 'pro' });
+    expect(prisma.v1TeamMembership.findFirst).toHaveBeenCalledTimes(1);
+    expect(prisma.v1TournamentPlayer.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'player-1' },
+        data: {
+          eligibilityStatus: 'pro',
+          eligibilityNote: null,
+        },
+      }),
+    );
+  });
+
+  it('updatePlayer: rosterLockedAt set → 409 ROSTER_LOCKED', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ rosterLockedAt: new Date('2026-06-10T00:00:00Z') }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+
+    await expect(
+      service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
+        eligibilityStatus: 'non_pro',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_LOCKED' } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayer: player not found → 404 PLAYER_NOT_FOUND', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updatePlayer(manager, 'tournament-1', 'reg-1', 'ghost-player', {
+        eligibilityStatus: 'non_pro',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_NOT_FOUND' } });
   });
 
   // ─── 10. 어드민 선출여부 확정 ─────────────────────────────────────────────

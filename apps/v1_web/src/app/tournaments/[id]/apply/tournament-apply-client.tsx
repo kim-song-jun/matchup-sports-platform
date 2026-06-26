@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
+import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
 import {
   useV1Tournament,
   useV1MyTeams,
@@ -236,7 +238,7 @@ function TeamSelectStep({
   const hasManagerTeam = managerTeams.length > 0;
 
   return (
-    <div style={{ padding: '0 20px 120px' }}>
+    <div style={{ padding: '0 20px 168px' }}>
       <section aria-labelledby="team-select-heading" style={{ marginTop: 20 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="team-select-heading" title="참가 팀 선택" />
@@ -786,10 +788,12 @@ function AgreementsStep({
 function PaymentGuideStep({
   tournament,
   registrationId,
+  paymentDueAt,
   onBack,
 }: {
   tournament: V1TournamentDetail;
   registrationId: string;
+  paymentDueAt: string | null;
   onBack: () => void;
 }) {
   const hasBankInfo =
@@ -799,6 +803,13 @@ function PaymentGuideStep({
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
+  const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
+  const rosterNextStep = getTournamentRosterNextStep({
+    tournamentId: tournament.id,
+    registrationId,
+    minPlayers: tournament.minPlayers,
+    maxPlayers: tournament.maxPlayers,
+  });
 
   function handleCopyAccount() {
     if (!tournament.bankAccount) return;
@@ -901,8 +912,11 @@ function PaymentGuideStep({
               <InfoRow
                 label="입금액"
                 value={formatEntryFee(tournament.entryFee)}
-                isLast
+                isLast={!paymentDeadline}
               />
+              {paymentDeadline ? (
+                <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
+              ) : null}
             </div>
           ) : (
             <div style={{ padding: '0 16px 14px' }}>
@@ -914,8 +928,11 @@ function PaymentGuideStep({
                 <InfoRow
                   label="입금액"
                   value={formatEntryFee(tournament.entryFee)}
-                  isLast
+                  isLast={!paymentDeadline}
                 />
+                {paymentDeadline ? (
+                  <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
+                ) : null}
               </div>
             </div>
           )}
@@ -923,9 +940,36 @@ function PaymentGuideStep({
 
         <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-            입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
+            {paymentDeadline
+              ? `${paymentDeadline.message} 입금자명이 다르면 확인이 늦어질 수 있어요.`
+              : '입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.'}
           </p>
         </Card>
+
+        <section aria-labelledby="roster-next-step-heading" style={{ marginTop: 12, scrollMarginBottom: 144 }}>
+          <Card pad={14}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div id="roster-next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+                  {rosterNextStep.title}
+                </div>
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: '4px 0 0' }}>
+                  {rosterNextStep.body}
+                </p>
+              </div>
+              <span className="tm-badge tm-badge-grey" style={{ whiteSpace: 'nowrap' }}>
+                {rosterNextStep.rosterRangeLabel}
+              </span>
+            </div>
+            <Link
+              href={rosterNextStep.href}
+              className="tm-btn tm-btn-md tm-btn-neutral"
+              style={{ marginTop: 12 }}
+            >
+              {rosterNextStep.ctaLabel}
+            </Link>
+          </Card>
+        </section>
       </section>
 
       {/* Fixed CTA — hidden on desktop (rail takes over) */}
@@ -973,6 +1017,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const [step, setStep] = useState<ApplyStep>('team');
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const [paymentDueAt, setPaymentDueAt] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<AgreementsState>({
     agreedRules: false,
     agreedPrivacy: false,
@@ -1070,7 +1115,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     if (!registrationId) return;
     setSubmitError(null);
     try {
-      await submitRegistration.mutateAsync({
+      const submittedRegistration = await submitRegistration.mutateAsync({
         paymentMethod: agreements.paymentMethod,
         depositorName: agreements.paymentMethod === 'bank_transfer' ? agreements.depositorName : undefined,
         agreedRules: agreements.agreedRules,
@@ -1078,6 +1123,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         agreedRefund: agreements.agreedRefund,
         agreedMediaConsent: agreements.agreedMediaConsent,
       });
+      setPaymentDueAt(submittedRegistration.payment?.paymentDueAt ?? null);
       setStep('payment');
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '신청 제출 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
@@ -1128,6 +1174,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               <PaymentGuideStep
                 tournament={tournament}
                 registrationId={registrationId}
+                paymentDueAt={paymentDueAt}
                 onBack={() => setStep('agreements')}
               />
             ) : null}

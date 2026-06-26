@@ -16,6 +16,10 @@ import {
   AdminRegistrationListQueryDto,
   AdminRosterLockDto,
 } from './dto/admin-registration.dto';
+import {
+  getTournamentPaymentDueAt,
+  TournamentPaymentExpiryService,
+} from './tournament-payment-expiry.service';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -39,6 +43,7 @@ export class AdminRegistrationsService {
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
     private readonly notifications: NotificationsService,
+    private readonly paymentExpiry: TournamentPaymentExpiryService,
   ) {}
 
   async list(user: V1AuthUser, tournamentId: string, query: AdminRegistrationListQueryDto) {
@@ -70,10 +75,16 @@ export class AdminRegistrationsService {
 
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
+    const resolvedItems = await Promise.all(
+      pageItems.map(async (row) => ({
+        row,
+        expiry: await this.paymentExpiry.expireIfOverdue(row, row.payment ?? null),
+      })),
+    );
 
     return {
-      items: pageItems.map((row) => ({
-        ...this.serialize(row, row.payment ?? null, row._count.players),
+      items: resolvedItems.map(({ row, expiry }) => ({
+        ...this.serialize(expiry.registration, expiry.payment, row._count.players),
         teamName: row.team?.name ?? null,
       })),
       pageInfo: {
@@ -86,22 +97,29 @@ export class AdminRegistrationsService {
   async confirmPayment(user: V1AuthUser, registrationId: string, dto: AdminConfirmPaymentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const registration = await this.loadRegistration(registrationId);
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const expiry = await this.paymentExpiry.expireIfOverdue(registration, payment ?? null);
+    if (expiry.expired) {
+      throw new ConflictException({
+        code: 'PAYMENT_DEADLINE_EXPIRED',
+        message: '입금 안내 후 2시간이 지나 신청이 자동 취소됐어요.',
+      });
+    }
 
-    if (registration.status !== 'awaiting_payment') {
+    if (expiry.registration.status !== 'awaiting_payment') {
       throw new ConflictException({
         code: 'REGISTRATION_STATUS_INVALID',
         message: '현재 상태에서는 입금 확인을 할 수 없어요.',
       });
     }
 
-    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
     if (!payment) {
       throw new ConflictException({
         code: 'PAYMENT_NOT_FOUND',
         message: '결제 정보를 찾을 수 없어요.',
       });
     }
-    if (payment.status !== 'ready') {
+    if (expiry.payment?.status !== 'ready') {
       throw new ConflictException({
         code: 'PAYMENT_STATUS_INVALID',
         message: '이미 처리된 결제예요.',
@@ -128,9 +146,9 @@ export class AdminRegistrationsService {
           targetType: 'tournament_registration',
           targetId: registrationId,
           reason: dto.note ?? null,
-          beforeJson: { registrationStatus: registration.status, paymentStatus: payment.status },
+          beforeJson: { registrationStatus: expiry.registration.status, paymentStatus: payment.status },
           afterJson: { registrationStatus: 'payment_checking', paymentStatus: 'paid' },
-          fromStatus: registration.status,
+          fromStatus: expiry.registration.status,
           toStatus: 'payment_checking',
         },
         tx,
@@ -385,6 +403,7 @@ export class AdminRegistrationsService {
             status: payment.status,
             amount: payment.amount,
             paidAt: payment.paidAt?.toISOString() ?? null,
+            paymentDueAt: getTournamentPaymentDueAt(payment).toISOString(),
             confirmedByAdminUserId: payment.confirmedByAdminUserId,
           }
         : null,

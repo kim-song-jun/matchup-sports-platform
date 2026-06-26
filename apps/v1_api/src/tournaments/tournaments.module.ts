@@ -16,6 +16,9 @@ import { TournamentsReadController } from './tournaments-read.controller';
 import { TournamentsReadService } from './tournaments-read.service';
 import { TournamentAnnouncementsController } from './tournament-announcements.controller';
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
+import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
+import { TournamentSponsorsController } from './tournament-sponsors.controller';
+import { TournamentSponsorsService } from './tournament-sponsors.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -35,6 +38,7 @@ import { TournamentAnnouncementsService } from './tournament-announcements.servi
     TournamentPlayersAdminController,
     TournamentRegistrationsController,
     TournamentAnnouncementsController,
+    TournamentSponsorsController,
     TournamentsReadController,
   ],
   providers: [
@@ -45,6 +49,8 @@ import { TournamentAnnouncementsService } from './tournament-announcements.servi
     TournamentPlayersService,
     TournamentsReadService,
     TournamentAnnouncementsService,
+    TournamentSponsorsService,
+    TournamentPaymentExpiryService,
     V1AuthGuard,
   ],
 })

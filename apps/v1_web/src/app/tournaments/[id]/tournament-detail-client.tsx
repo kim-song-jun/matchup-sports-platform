@@ -8,6 +8,16 @@ import { useV1Tournament, useV1MyRegistration } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import {
+  TournamentApplicationGuideSection,
+  TournamentParticipantSection,
+} from '@/components/tournaments/tournament-event-hub-sections';
+import {
+  TournamentPostEventHubSection,
+  TournamentVenuePrepSection,
+} from '@/components/tournaments/tournament-venue-retention-sections';
+import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import { formatTournamentDateShort, formatTournamentDateLong, formatEntryFee } from '@/lib/date-utils';
 import type {
   V1TournamentDetail,
@@ -19,6 +29,8 @@ import type {
   V1TournamentStanding,
   V1TournamentRegistration,
 } from '@/types/api';
+
+export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-event-hub-sections';
 
 /* ── Status helpers ── */
 
@@ -53,6 +65,37 @@ function getFormatLabel(format: V1TournamentFormat): string {
 
 function formatPrize(amount: number): string {
   return `${amount.toLocaleString('ko-KR')}원`;
+}
+
+export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
+  if (!prizeBreakdown) return [];
+
+  const chips: string[] = [];
+  let current = '';
+
+  for (let index = 0; index < prizeBreakdown.length; index += 1) {
+    const char = prizeBreakdown[index];
+    const previous = prizeBreakdown[index - 1] ?? '';
+    const next = prizeBreakdown[index + 1] ?? '';
+    const isNumericComma = char === ',' && isAsciiDigit(previous) && isAsciiDigit(next);
+    const isSeparator = char === '/' || char === '·' || char === '\n' || (char === ',' && !isNumericComma);
+
+    if (isSeparator) {
+      const segment = current.trim();
+      if (segment) chips.push(segment);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  const last = current.trim();
+  if (last) chips.push(last);
+  return chips;
+}
+
+function isAsciiDigit(value: string): boolean {
+  return value >= '0' && value <= '9';
 }
 
 function formatPublishedAt(dateStr: string): string {
@@ -212,9 +255,7 @@ function TournamentDetailView({
     myRegistration !== null && myRegistration.status !== 'cancelled';
 
   /* ── Prize card — rendered in left column just after metric strip ── */
-  const prizeChips = tournament.prizeBreakdown
-    ? tournament.prizeBreakdown.split(/[/·,\n]+/).map((s) => s.trim()).filter(Boolean)
-    : [];
+  const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
   const prizeCard = hasPrize ? (
     <section aria-label="상금 안내" style={{ marginTop: 16 }}>
       <Card pad={18} style={{ background: 'var(--orange50)' }}>
@@ -393,6 +434,24 @@ function TournamentDetailView({
       {/* ── Prize card — shown HIGH in left column, right after metric strip ── */}
       {prizeCard}
 
+      <TournamentApplicationGuideSection
+        minPlayers={tournament.minPlayers}
+        maxPlayers={tournament.maxPlayers}
+      />
+
+      <TournamentParticipantSection
+        teams={tournament.participantTeams}
+        teamCount={tournament.teamCount}
+      />
+
+      <TournamentVenuePrepSection
+        venue={tournament.venue}
+        hasRules={Boolean(tournament.rulesText)}
+        minPlayers={tournament.minPlayers}
+        maxPlayers={tournament.maxPlayers}
+        announcements={tournament.announcements}
+      />
+
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
       <TournamentFlowSection tournament={tournament} />
 
@@ -412,8 +471,20 @@ function TournamentDetailView({
         </section>
       ) : null}
 
+      <TournamentSponsorSection sponsors={tournament.sponsors} />
+
+      <TournamentPostEventHubSection
+        status={tournament.status}
+        fixtures={tournament.fixtures}
+        hasAnnouncements={hasAnnouncements}
+        sponsorCount={tournament.sponsors.length}
+        announcements={tournament.announcements}
+      />
+
       {/* ── Section 3 + 4: Format-aware fixtures / standings (non-bracket portions) ── */}
-      <FormatLeftSections tournament={tournament} />
+      <div id="tournament-results">
+        <FormatLeftSections tournament={tournament} />
+      </div>
 
     </>
   );
@@ -1185,22 +1256,27 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
 
 function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnouncement }) {
   return (
-    <Card pad={16}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0 }}>
-          {announcement.title}
+    <div id={`announcement-${announcement.id}`} style={{ scrollMarginTop: 96 }}>
+      <Card pad={16}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0 }}>
+            {announcement.title}
+          </div>
+          <span className="tm-text-micro" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
+            {formatPublishedAt(announcement.publishedAt)}
+          </span>
         </div>
-        <span className="tm-text-micro" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
-          {formatPublishedAt(announcement.publishedAt)}
+        <span className="tm-badge tm-badge-grey" style={{ marginTop: 8 }}>
+          {getTournamentAnnouncementCategoryLabel(announcement.category)}
         </span>
-      </div>
-      <p
-        className="tm-text-caption"
-        style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}
-      >
-        {announcement.body}
-      </p>
-    </Card>
+        <p
+          className="tm-text-caption"
+          style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}
+        >
+          {announcement.body}
+        </p>
+      </Card>
+    </div>
   );
 }
 
@@ -1240,4 +1316,3 @@ function TournamentDetailSkeleton() {
     </div>
   );
 }
-

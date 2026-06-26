@@ -52,6 +52,8 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'bracket'] as const,
   adminTournamentAnnouncements: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'announcements'] as const,
+  adminTournamentSponsors: (tournamentId: string) =>
+    [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'sponsors'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
 };

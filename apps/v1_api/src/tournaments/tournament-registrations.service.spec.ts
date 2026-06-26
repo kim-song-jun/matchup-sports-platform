@@ -8,6 +8,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
 
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -23,6 +24,14 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'), ...overrides,
   };
 }
+function paymentRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'pay-1', registrationId: 'reg-1', method: 'bank_transfer', provider: null, providerTxId: null,
+    amount: 120000, status: 'ready', paidAt: null, cancelledAt: null, refundedAt: null,
+    confirmedByAdminUserId: null, rawWebhookRef: null, createdAt: new Date(), updatedAt: new Date(),
+    ...overrides,
+  };
+}
 const validSubmit = { paymentMethod: 'bank_transfer' as const, depositorName: '홍길동', agreedRules: true, agreedPrivacy: true, agreedRefund: true };
 
 describe('TournamentRegistrationsService', () => {
@@ -31,7 +40,7 @@ describe('TournamentRegistrationsService', () => {
     v1TeamMembership: { findFirst: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
-    v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock };
+    v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -41,7 +50,7 @@ describe('TournamentRegistrationsService', () => {
       v1TeamMembership: { findFirst: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
-      v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn() },
+      v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0) },
       $transaction: jest.fn(),
     };
@@ -51,7 +60,7 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TournamentRegistrationsService, { provide: PrismaService, useValue: prisma }],
+      providers: [TournamentRegistrationsService, TournamentPaymentExpiryService, { provide: PrismaService, useValue: prisma }],
     }).compile();
     service = module.get(TournamentRegistrationsService);
   });
@@ -132,10 +141,19 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment', depositorName: '홍길동' }));
-    prisma.v1TournamentPayment.upsert.mockResolvedValue({ method: 'bank_transfer', status: 'ready', amount: 120000, paidAt: null });
+    const paymentCreatedAt = new Date('2026-06-14T00:00:00.000Z');
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow({ createdAt: paymentCreatedAt }));
 
     const result = await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
-    expect(result).toMatchObject({ status: 'awaiting_payment', payment: { method: 'bank_transfer', status: 'ready', amount: 120000 } });
+    expect(result).toMatchObject({
+      status: 'awaiting_payment',
+      payment: {
+        method: 'bank_transfer',
+        status: 'ready',
+        amount: 120000,
+        paymentDueAt: '2026-06-14T02:00:00.000Z',
+      },
+    });
     expect(prisma.v1TournamentPayment.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ create: expect.objectContaining({ method: 'bank_transfer', amount: 120000, status: 'ready' }) }),
     );
@@ -145,7 +163,7 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
-    prisma.v1TournamentPayment.upsert.mockResolvedValue({ method: 'pg', status: 'ready', amount: 120000, paidAt: null });
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow({ method: 'pg' }));
     const result = await service.submit(manager, 'tournament-1', 'reg-1', {
       paymentMethod: 'pg', agreedRules: true, agreedPrivacy: true, agreedRefund: true,
     });
@@ -187,9 +205,7 @@ describe('TournamentRegistrationsService', () => {
   it('getMyRegistration: returns the caller\'s most-recent registration', async () => {
     const row = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(row);
-    prisma.v1TournamentPayment.findUnique.mockResolvedValue({
-      method: 'bank_transfer', status: 'ready', amount: 120000, paidAt: null,
-    });
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow());
     const result = await service.getMyRegistration(manager, 'tournament-1');
     expect(result).toMatchObject({
       id: 'reg-1',
@@ -203,6 +219,50 @@ describe('TournamentRegistrationsService', () => {
         where: expect.objectContaining({ tournamentId: 'tournament-1', appliedByUserId: manager.id }),
       }),
     );
+  });
+
+  it('getMyRegistration: overdue awaiting-payment is cancelled before serialization', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-14T02:01:00.000Z'));
+    const createdAt = new Date('2026-06-14T00:00:00.000Z');
+    const overdueRegistration = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
+    const overduePayment = paymentRow({ createdAt, status: 'ready' });
+    const cancelledRegistration = registrationRow({
+      appliedByUserId: manager.id,
+      status: 'cancelled',
+      cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
+    });
+    const cancelledPayment = paymentRow({
+      createdAt,
+      status: 'cancelled',
+      cancelledAt: new Date('2026-06-14T02:01:00.000Z'),
+    });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(overdueRegistration);
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(overduePayment);
+    prisma.v1TournamentRegistration.update.mockResolvedValue(cancelledRegistration);
+    prisma.v1TournamentPayment.update.mockResolvedValue(cancelledPayment);
+
+    const result = await service.getMyRegistration(manager, 'tournament-1');
+
+    expect(result).toMatchObject({
+      status: 'cancelled',
+      cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
+      payment: {
+        status: 'cancelled',
+        paymentDueAt: '2026-06-14T02:00:00.000Z',
+      },
+    });
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'cancelled',
+          cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
+        }),
+      }),
+    );
+    expect(prisma.v1TournamentPayment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+    );
+    jest.useRealTimers();
   });
 
   it('getMyRegistration: 404 TOURNAMENT_REGISTRATION_NOT_FOUND when no registration exists', async () => {

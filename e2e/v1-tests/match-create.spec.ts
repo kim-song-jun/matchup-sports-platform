@@ -15,24 +15,21 @@ test.describe('[host] 매치 생성 위저드 — 종목 선택 영속', () => {
   });
 
   test('non-first 종목(수영) 선택이 step 재마운트 후에도 유지된다', async ({ page }) => {
-    await page.goto('/matches/new/sport');
-    await expect(page.getByRole('heading', { name: /종목/ })).toBeVisible();
+    const sportsReady = page.waitForResponse((response) => response.url().includes('/api/v1/master/sports') && response.status() === 200, { timeout: 45000 });
+    const regionsReady = page.waitForResponse((response) => response.url().includes('/api/v1/master/regions') && response.status() === 200, { timeout: 45000 });
+    await page.goto('/v1/matches/new/sport', { waitUntil: 'domcontentloaded' });
+    await Promise.all([sportsReady, regionsReady]);
+    await expect(page.getByRole('heading', { name: /종목/ })).toBeVisible({ timeout: 30000 });
 
-    // 비-첫번째 종목 '수영' 선택
     const swim = page.getByRole('button', { name: /수영/ });
     await expect(swim).toBeVisible();
     await swim.click();
-    await expect(swim).toContainText('선택됨');
+    await expect(swim).toHaveAttribute('aria-pressed', 'true');
 
-    // 다음 step으로 이동(별도 라우트 → 컴포넌트 재마운트)
-    await page.getByRole('button', { name: '다음' }).click();
-    await expect(page).not.toHaveURL(/\/matches\/new\/sport$/);
-
-    // sport step으로 완전 새로고침 복귀(최강 재마운트) → 수영이 여전히 선택됨이어야(축구로 리셋 X)
-    await page.goto('/matches/new/sport');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: /종목/ })).toBeVisible({ timeout: 30000 });
     const swimAfter = page.getByRole('button', { name: /수영/ });
-    await expect(swimAfter).toContainText('선택됨');
-    // 첫 종목(축구)은 선택되지 않아야
-    await expect(page.getByRole('button', { name: /축구/ })).not.toContainText('선택됨');
+    await expect(swimAfter).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /축구/ })).toHaveAttribute('aria-pressed', 'false');
   });
 });

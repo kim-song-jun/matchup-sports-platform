@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
 import {
@@ -32,6 +33,8 @@ function registrationStatusConfig(status: V1TournamentRegistrationStatus): Statu
   switch (status) {
     case 'draft':
       return { badgeClass: 'tm-badge-grey', label: '임시저장' };
+    case 'submitted':
+      return { badgeClass: 'tm-badge-blue', label: '운영진 확인 중' };
     case 'awaiting_payment':
       return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
     case 'payment_checking':
@@ -179,6 +182,7 @@ function RegistrationPass({
   scheduledAt,
   venue,
   paymentSummary,
+  paymentDueAt,
   rosterCount,
   minPlayers,
   isRosterLocked,
@@ -193,11 +197,13 @@ function RegistrationPass({
   scheduledAt: string | null;
   venue: string | null;
   paymentSummary: string | null;
+  paymentDueAt: string | null;
   rosterCount: number;
   minPlayers: number;
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
+  const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
   const pathname = usePathname();
   const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`, pathname);
 
@@ -238,10 +244,11 @@ function RegistrationPass({
           <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDay(scheduledAt) || '일정 미정'} />
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
+          {paymentDeadline ? <PassFact icon={<ReceiptIcon />} label="기한" value={paymentDeadline.label} /> : null}
         </div>
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--orange500)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
-            신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
+            {paymentDeadline ? paymentDeadline.message : '신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.'}
           </p>
         </div>
       </div>
@@ -619,6 +626,8 @@ function RegistrationDetailView({
   const paymentSummary = registration.payment
     ? `${formatEntryFee(registration.payment.amount)} · ${paymentStatusLabel(registration.payment.status)}`
     : formatEntryFee(tournament.entryFee);
+  const paymentDeadline = getTournamentPaymentDeadlineState(registration.payment?.paymentDueAt ?? null);
+  const showPaymentDeadline = Boolean(paymentDeadline) && registration.payment?.status === 'ready';
 
   /* The pass owns the roster glance+action for active states; the standalone roster
    * card only renders for states without a pass (e.g. awaiting_payment). */
@@ -786,6 +795,7 @@ function RegistrationDetailView({
               scheduledAt={tournament.scheduledAt}
               venue={tournament.venue}
               paymentSummary={paymentSummary}
+              paymentDueAt={registration.payment?.paymentDueAt ?? null}
               rosterCount={players.length}
               minPlayers={tournament.minPlayers}
               isRosterLocked={isRosterLocked}
@@ -804,17 +814,24 @@ function RegistrationDetailView({
                   <InfoRow
                     label="신청일"
                     value={formatDateShort(registration.createdAt)}
-                    isLast={!registration.confirmedAt && !registration.cancelRequestedAt}
+                    isLast={!registration.confirmedAt && !registration.cancelRequestedAt && !registration.cancelReason}
                   />
                   {registration.confirmedAt ? (
                     <InfoRow
                       label="확정일"
                       value={formatDateShort(registration.confirmedAt)}
-                      isLast={!registration.cancelRequestedAt}
+                      isLast={!registration.cancelRequestedAt && !registration.cancelReason}
                     />
                   ) : null}
                   {registration.cancelRequestedAt ? (
-                    <InfoRow label="취소 요청일" value={formatDateShort(registration.cancelRequestedAt)} isLast />
+                    <InfoRow
+                      label="취소 요청일"
+                      value={formatDateShort(registration.cancelRequestedAt)}
+                      isLast={!registration.cancelReason}
+                    />
+                  ) : null}
+                  {registration.cancelReason ? (
+                    <InfoRow label="취소 사유" value={registration.cancelReason} isLast />
                   ) : null}
                 </div>
 
@@ -830,8 +847,15 @@ function RegistrationDetailView({
                       <InfoRow
                         label="결제 상태"
                         value={paymentStatusLabel(registration.payment.status)}
-                        isLast={!registration.payment.paidAt && !shouldShowBankTransferAccount}
+                        isLast={!showPaymentDeadline && !registration.payment.paidAt && !shouldShowBankTransferAccount}
                       />
+                      {showPaymentDeadline && paymentDeadline ? (
+                        <InfoRow
+                          label="입금 기한"
+                          value={paymentDeadline.label}
+                          isLast={!registration.payment.paidAt}
+                        />
+                      ) : null}
                       {registration.payment.paidAt ? (
                         <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast={!shouldShowBankTransferAccount} />
                       ) : null}

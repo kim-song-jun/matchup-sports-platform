@@ -63,6 +63,7 @@ export class TournamentAnnouncementsService {
 
     const publishedAt = dto.publish ? new Date() : null;
     const audience = dto.audience ?? 'all_registered';
+    const category = dto.category ?? 'general';
 
     const announcement = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1TournamentAnnouncement.create({
@@ -70,6 +71,7 @@ export class TournamentAnnouncementsService {
           tournamentId,
           title: dto.title,
           body: dto.body,
+          category,
           audience,
           publishedAt,
         },
@@ -83,6 +85,7 @@ export class TournamentAnnouncementsService {
           afterJson: {
             tournamentId,
             title: created.title,
+            category: created.category,
             audience: created.audience,
             publishedAt: created.publishedAt?.toISOString() ?? null,
           },
@@ -147,6 +150,7 @@ export class TournamentAnnouncementsService {
     tournamentId: string;
     title: string;
     body: string;
+    category: string;
     audience: string;
     publishedAt: Date | null;
     createdAt: Date;
@@ -157,6 +161,7 @@ export class TournamentAnnouncementsService {
       tournamentId: row.tournamentId,
       title: row.title,
       body: row.body,
+      category: row.category,
       audience: row.audience,
       publishedAt: row.publishedAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),

@@ -24,6 +24,7 @@ const selectionKey = 'teameet:v1:match-selection';
 const defaultGenderRule = '성별 무관';
 
 type MatchDraft = MatchCreateViewModel['draft'];
+type MatchSelection = { sportId: string; regionId: string };
 
 export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep, 'edit'> }) {
   const router = useRouter();
@@ -35,7 +36,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // 위저드 step이 각각 별도 라우트라 step 이동 시 이 컴포넌트가 재마운트된다. 종목/지역 선택을
   // 로컬 useState에만 두면 매 step 첫 항목으로 리셋돼(풋살 선택→다음 step에서 축구로 소실)
   // 잘못된 종목/지역으로 매치가 생성된다. draft와 동일하게 localStorage에 영속한다.
-  const [selection, setSelection] = useState<{ sportId: string; regionId: string }>({ sportId: '', regionId: '' });
+  const [selection, setSelection] = useState<MatchSelection>({ sportId: '', regionId: '' });
   const [selectionHydrated, setSelectionHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,6 +72,13 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 
   const selectedSportId = selection.sportId;
   const regionId = selection.regionId;
+  const updateSelection = (updater: (current: MatchSelection) => MatchSelection) => {
+    setSelection((current) => {
+      const next = updater(current);
+      window.localStorage.setItem(selectionKey, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const model = buildCreateModel({
     step,
@@ -83,10 +91,10 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     submitting: createMatch.isPending,
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
-      if (sport) setSelection((current) => ({ ...current, sportId: sport.id }));
+      if (sport) updateSelection((current) => ({ ...current, sportId: sport.id }));
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: (value) => setSelection((current) => ({ ...current, regionId: value })),
+    onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
     onBack: () => router.push(previousCreateHref(step)),
     onNext: () => router.push(nextCreateHref(step)),
     uploadImage: async (file: File) => {

@@ -62,12 +62,18 @@ CAUTION:
 | `regionId` | uuid | No |
 | `introduction` | string | No |
 | `activityAreaText` | string | No |
+| `activityDays` | string[] | No |
+| `activityFrequency` | string | No |
+| `activityTimeSlots` | string[] | No |
+| `activityTypes` | string[] | No |
+| `activityMemo` | string | No |
 | `skillLevelText` | string | No |
 | `minLevelCode` | level code | No |
 | `maxLevelCode` | level code | No |
 | `genderRule` | string | No |
 | `joinPolicy` | string | No |
 
+- Activity profile fields are structured on `v1_team_profiles`: `activity_days`, `activity_frequency`, `activity_time_slots`, and `activity_types`. Responses include `activitySummary`; `activityAreaText` remains as a compatibility fallback from `activity_note`.
 - Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
 - `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
 - `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.
@@ -137,6 +143,12 @@ CAUTION:
 - deleted team은 active team list/detail surfaces에서 기본적으로 제외된다
 - deleted team detail/hub read는 `404`로 취급한다
 - deleted team에 대한 mutation은 `TEAM_DELETED` 계약으로 거절될 수 있다
+
+## Route Notes
+
+- Team detail UI source of truth is `/teams/:id`; `/my/teams/:id` redirects to it.
+- Owner/manager `manageRoute` points to `/teams/:id/members`. Full edit/member/team-match operations are shown on `/teams/:id`.
+- There is no v1 `/teams/:id/manage` route.
 
 ## Source References
 

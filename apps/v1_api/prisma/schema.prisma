@@ -673,6 +673,10 @@ model V1TeamProfile {
   coverImageUrl   String?   @map("cover_image_url")
   description     String?
   activityNote    String?   @map("activity_note")
+  activityDays      String[] @default([]) @map("activity_days")
+  activityFrequency String?  @map("activity_frequency")
+  activityTimeSlots String[] @default([]) @map("activity_time_slots")
+  activityTypes     String[] @default([]) @map("activity_types")
   skillNote       String?   @map("skill_note")
   minSportLevelId String?   @map("min_sport_level_id")
   maxSportLevelId String?   @map("max_sport_level_id")

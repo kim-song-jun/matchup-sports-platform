@@ -217,6 +217,7 @@ export function getTeamFormViewModel(mode: TeamFormViewModel['mode']): TeamFormV
     team: {
       name: mode === 'edit' ? '성수 러너스 FC' : '',
       logoUrl: null,
+      coverImageUrl: null,
       sport: '풋살',
       region: '서울 성동구',
       description: mode === 'edit' ? '주 1회 꾸준히 함께 경기할 멤버를 찾아요.' : '',
@@ -225,7 +226,11 @@ export function getTeamFormViewModel(mode: TeamFormViewModel['mode']): TeamFormV
       county: mode === 'edit' ? '성동구' : '',
       level: mode === 'edit' ? '초보-중수' : '전체 레벨',
       genderRule: '성별 무관',
-      activity: mode === 'edit' ? '평일 저녁 · 주 1회' : '',
+      activityDays: mode === 'edit' ? ['mon', 'wed'] : [],
+      activityFrequency: mode === 'edit' ? 'weekly_1' : '',
+      activityTimeSlots: mode === 'edit' ? ['evening'] : [],
+      activityTypes: mode === 'edit' ? ['regular_meetup'] : [],
+      activityMemo: '',
       capacity: 24,
     },
   };

@@ -123,8 +123,8 @@ function DesktopFooter() {
         </div>
         <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
           <Link href="/notices">공지사항</Link>
-          <Link href="/terms">이용약관</Link>
-          <Link href="/my/settings/legal">개인정보·정책</Link>
+          <Link href="/terms?document=terms">이용약관</Link>
+          <Link href="/terms?document=privacy">개인정보·정책</Link>
           <Link href="/search">탐색</Link>
         </nav>
         <p className="tm-desktop-footer-copy">© 2026 Teameet</p>

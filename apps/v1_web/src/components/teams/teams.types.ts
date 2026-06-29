@@ -4,6 +4,8 @@ export type TeamModel = {
   id: string;
   name: string;
   logo: string;
+  logoUrl?: string | null;
+  coverImageUrl?: string | null;
   sport: string;
   sports: string[];
   region: string;
@@ -79,8 +81,11 @@ export type TeamDetailViewModel = {
   mode: 'default' | 'pending' | 'mine' | 'closed';
   ctaLabel?: string;
   ctaPending?: boolean;
-  onCta?: () => void;
+  onCta?: () => void | Promise<unknown>;
   onShare?: () => void | Promise<void>;
+  ctaSuccessMessage?: string;
+  ctaFailureMessage?: string;
+  operations?: Array<{ label: string; sub: string; href: string }>;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
   openMatchesLoading?: boolean;
@@ -93,6 +98,7 @@ export type TeamFormViewModel = {
   team: {
     name: string;
     logoUrl: string | null;
+    coverImageUrl: string | null;
     sport: string;
     region: string;
     description: string;
@@ -101,7 +107,11 @@ export type TeamFormViewModel = {
     county: string;
     level: string;
     genderRule: string;
-    activity: string;
+    activityDays: string[];
+    activityFrequency: string;
+    activityTimeSlots: string[];
+    activityTypes: string[];
+    activityMemo: string;
     capacity: number;
   };
   form?: {

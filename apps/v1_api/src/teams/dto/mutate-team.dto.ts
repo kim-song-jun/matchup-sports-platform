@@ -1,5 +1,19 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+
+const ACTIVITY_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+const ACTIVITY_FREQUENCIES = ['weekly_1', 'weekly_2', 'weekly_3', 'weekly_4_plus', 'biweekly_1', 'irregular'] as const;
+const ACTIVITY_TIME_SLOTS = ['morning', 'lunch', 'afternoon', 'evening', 'late_night'] as const;
+const ACTIVITY_TYPES = [
+  'regular_meetup',
+  'friendly_match',
+  'team_match',
+  'tournament_prep',
+  'training',
+  'free_participation',
+  'beginner_friendly',
+  'competitive',
+] as const;
 
 export class MutateTeamDto {
   @IsUUID()
@@ -29,6 +43,30 @@ export class MutateTeamDto {
   @IsString()
   @MaxLength(500)
   activityAreaText?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(ACTIVITY_DAYS, { each: true })
+  activityDays?: string[];
+
+  @IsOptional()
+  @IsIn(ACTIVITY_FREQUENCIES)
+  activityFrequency?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(ACTIVITY_TIME_SLOTS, { each: true })
+  activityTimeSlots?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(ACTIVITY_TYPES, { each: true })
+  activityTypes?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  activityMemo?: string | null;
 
   @IsOptional()
   @IsString()

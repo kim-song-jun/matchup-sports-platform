@@ -7,6 +7,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { cssUrl } from '@/lib/assets';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
@@ -77,6 +78,7 @@ export function MyHomePageClient() {
           handle: '—',
           region: '—',
           initials: '—',
+          profileImageUrl: null,
           intro: '',
           sports: [],
           stats: myHomeModel.user.stats.map((stat) => ({ label: stat.label, value: '—' })),
@@ -92,6 +94,10 @@ export function MyHomePageClient() {
       hasPendingReview(pendingReviews.data),
     );
   }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data]);
+
+  if (profile.isError) {
+    return <ErrorState message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void profile.refetch()} />;
+  }
 
   return <MyHomePageView model={model} />;
 }
@@ -127,7 +133,7 @@ export function MyInvitationsPageClient() {
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
-          router.push(`/my/teams/${result.teamId}`);
+          router.push(`/teams/${result.teamId}`);
         } else {
           void query.refetch();
         }
@@ -184,13 +190,13 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
 
   const viewerRole = team.viewer.role;
   // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
-  const canManage = viewerRole === 'owner' || viewerRole === 'manager';
+  const canManage = isTeamOperatorRole(viewerRole);
   const actions: MyTeamDetailViewModel['actions'] = [
     { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'ClipboardList' },
     ...(canManage
       ? [
-          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'Users' },
-          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /my/teams/[id] 복귀 유도
+          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/teams/${team.teamId}/members`, icon: 'Users' },
+          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /teams/[id] 복귀 유도
           { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'Settings' },
         ]
       : []),
@@ -211,7 +217,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
-  const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
+  const canReviewApplications = isTeamOperatorRole(team.data?.viewer.role);
   const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
   const changeRole = useV1ChangeTeamMembershipRole(teamId);
   const removeMember = useV1RemoveTeamMembership(teamId);
@@ -222,7 +228,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const requests = applications.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
   const viewerRole = team.data?.viewer.role;
-  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
+  const canManageMembers = isTeamOperatorRole(viewerRole);
   const canDelegateOwner = viewerRole === 'owner';
   const model = {
     teamName: team.data?.name ?? '팀',
@@ -260,7 +266,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
     <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
-      <MyTeamMembersPageView model={model} backHref={`/my/teams/${teamId}`} />
+      <MyTeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
     </>
   );
 }
@@ -474,7 +480,7 @@ export function ProfileEditPageClient() {
           <h1 className="tm-text-heading">프로필 수정</h1>
         </div>
         <section className="tm-my-profile-head">
-          <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: `url(${profileImageUrl})` } : undefined}>
+          <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
             {profileImageUrl ? null : <span className="tm-text-caption">{initials(normalizedNickname || nickname || displayName)}</span>}
           </div>
           <div>
@@ -1138,6 +1144,7 @@ function toMyHomeModel(
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
       initials: initials(nickname),
+      profileImageUrl: profile.profile.profileImageUrl ?? null,
       intro: profile.profile.bio ?? '',
       sports: (profile.sports ?? []).map((sport) =>
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,
@@ -1161,6 +1168,8 @@ function toMyTeam(item: V1MyTeam): MyTeam {
     id: item.teamId,
     name: item.name,
     logo: item.name.slice(0, 1),
+    logoUrl: item.logoUrl ?? null,
+    coverImageUrl: item.coverImageUrl ?? null,
     sport: item.sport.name,
     region: item.region?.name ?? '지역 미정',
     role: item.role,
@@ -1177,13 +1186,15 @@ function toTeamDetailModel(team: V1TeamDetail): MyTeam {
     id: team.teamId,
     name: team.name,
     logo: team.name.slice(0, 1),
+    logoUrl: team.profile.logoUrl ?? null,
+    coverImageUrl: team.profile.coverImageUrl ?? null,
     sport: team.sport.name,
     region: team.region?.name ?? '지역 미정',
     role: team.viewer.role as MyTeam['role'],
     roleLabel: roleLabel(team.viewer.role),
     members: team.memberCount,
     manner: team.trust.score && hasTrustValue(team.trust.trustState) ? String(team.trust.score) : '-',
-    next: team.profile.activityAreaText ?? '팀매치에서 일정을 확인해 보세요',
+    next: team.profile.activitySummary ?? team.profile.activityAreaText ?? '팀매치에서 일정을 확인해 보세요',
     description: team.profile.introduction ?? '아직 팀 소개가 없어요.',
   };
 }
@@ -1287,7 +1298,7 @@ function toMyInvitationItem(invitation: V1ReceivedInvitation): MyInvitationItem 
 function buildTeamSummary(teams: MyTeam[]) {
   return [
     { label: '소속 팀', value: teams.length, unit: '팀' },
-    { label: '운영 중인 팀', value: teams.filter((team) => team.role === 'owner' || team.role === 'manager' || team.role === 'admin').length, unit: '팀' },
+    { label: '운영 중인 팀', value: teams.filter((team) => isTeamOperatorRole(team.role)).length, unit: '팀' },
     { label: '평균 매너', value: '-' },
   ];
 }
@@ -1313,6 +1324,10 @@ function roleLabel(role: string) {
   if (role === 'manager' || role === 'admin') return '운영진';
   if (role === 'member') return '멤버';
   return '비회원';
+}
+
+function isTeamOperatorRole(role?: string | null) {
+  return role === 'owner' || role === 'manager' || role === 'admin';
 }
 
 

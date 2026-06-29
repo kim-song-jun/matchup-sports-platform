@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock } from 'lucide-react';
+import { ChevronDown, Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { cssUrl, publicAssetPath } from '@/lib/assets';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -16,6 +17,52 @@ import type {
   TeamModel,
   TeamStateViewModel,
 } from './teams.types';
+
+const ACTIVITY_DAY_OPTIONS = [
+  { value: 'mon', label: '월' },
+  { value: 'tue', label: '화' },
+  { value: 'wed', label: '수' },
+  { value: 'thu', label: '목' },
+  { value: 'fri', label: '금' },
+  { value: 'sat', label: '토' },
+  { value: 'sun', label: '일' },
+] as const;
+
+const ACTIVITY_DAY_PRESETS = [
+  { label: '평일', values: ['mon', 'tue', 'wed', 'thu', 'fri'] },
+  { label: '주말', values: ['sat', 'sun'] },
+  { label: '매일', values: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
+  { label: '초기화', values: [] },
+] as const;
+
+const ACTIVITY_FREQUENCY_OPTIONS = [
+  { value: '', label: '선택 안 함' },
+  { value: 'weekly_1', label: '주 1회' },
+  { value: 'weekly_2', label: '주 2회' },
+  { value: 'weekly_3', label: '주 3회' },
+  { value: 'weekly_4_plus', label: '주 4회 이상' },
+  { value: 'biweekly_1', label: '격주 1회' },
+  { value: 'irregular', label: '비정기' },
+] as const;
+
+const ACTIVITY_TIME_SLOT_OPTIONS = [
+  { value: 'morning', label: '오전' },
+  { value: 'lunch', label: '점심' },
+  { value: 'afternoon', label: '오후' },
+  { value: 'evening', label: '저녁' },
+  { value: 'late_night', label: '심야' },
+] as const;
+
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: 'regular_meetup', label: '정기 모임' },
+  { value: 'friendly_match', label: '친선 경기' },
+  { value: 'team_match', label: '팀매치' },
+  { value: 'tournament_prep', label: '대회 준비' },
+  { value: 'training', label: '훈련/레슨' },
+  { value: 'free_participation', label: '자유 참여' },
+  { value: 'beginner_friendly', label: '초보 환영' },
+  { value: 'competitive', label: '실력 중심' },
+] as const;
 
 export function TeamListPageView({ model }: { model: TeamListViewModel }) {
   return (
@@ -210,6 +257,46 @@ function TeamOpenMatchesSection({
   );
 }
 
+function TeamOperationsSection({
+  operations,
+  compact = false,
+}: {
+  operations?: TeamDetailViewModel['operations'];
+  compact?: boolean;
+}) {
+  if (!operations?.length) return null;
+  return (
+    <section style={{ display: 'grid', gap: 10, marginTop: compact ? 0 : 14, marginBottom: compact ? 14 : 0 }}>
+      <div>
+        <div className="tm-text-body-lg">운영 메뉴</div>
+        <div className="tm-text-caption" style={{ marginTop: 3 }}>팀 정보와 멤버 운영을 이 화면에서 이어서 관리해요.</div>
+      </div>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {operations.map((operation) => (
+          <Link
+            key={operation.href}
+            className="tm-pressable"
+            href={operation.href}
+            style={{
+              display: 'grid',
+              gap: 4,
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: compact ? '12px 14px' : '14px 16px',
+              background: 'var(--bg)',
+              color: 'inherit',
+              textDecoration: 'none',
+            }}
+          >
+            <span className="tm-text-label">{operation.label}</span>
+            <span className="tm-text-caption">{operation.sub}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
@@ -217,7 +304,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
   const [heroMessage, setHeroMessage] = useState('');
 
-  const runHeroAction = (action: (() => void | Promise<void>) | undefined, successMessage: string) => {
+  const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string, failureMessage = '잠시 후 다시 시도해 주세요.') => {
     if (!action) return;
     void Promise.resolve(action())
       .then(() => {
@@ -225,7 +312,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         window.setTimeout(() => setHeroMessage(''), 2000);
       })
       .catch(() => {
-        setHeroMessage('잠시 후 다시 시도해 주세요.');
+        setHeroMessage(failureMessage);
         window.setTimeout(() => setHeroMessage(''), 2000);
       });
   };
@@ -244,7 +331,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <div className="tm-team-detail-desktop-layout tm-show-desktop">
         {/* LEFT: hero + info */}
         <div className="tm-team-detail-desktop-main">
-          <Card pad={18} className="tm-team-detail-hero-card" style={{ position: 'relative' }}>
+          <Card pad={18} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
             <button
               className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
               type="button"
@@ -273,15 +360,22 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <InfoRow label="레벨" value={team.level} />
             <InfoRow label="성별 조건" value={team.genderRule} />
             <InfoRow label="정원" value={`${team.capacity}명`} />
-            <InfoRow label="모집 여부" value={team.activity ? `${team.statusLabel} · ${team.activity}` : team.statusLabel} />
+            <InfoRow label="모집 여부" value={team.statusLabel} />
+            <InfoRow label="활동 일정" value={team.activity || '활동 일정 미정'} muted={!team.activity} />
             {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
           </Card>
+          <TeamOperationsSection operations={model.operations} />
           {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
           <Card pad={16} style={{ marginTop: 14 }}>
             <div className="tm-section-row" style={{ marginTop: 0 }}>
               <div>
                 <div className="tm-text-body-lg">주요 멤버</div>
-                <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  <span className={`tm-badge ${team.memberAccess.enabled ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
+                    {team.memberAccess.enabled ? '공개' : '비공개'}
+                  </span>
+                  <span className="tm-text-caption">{team.memberAccess.message}</span>
+                </div>
               </div>
               {team.memberAccess.canView ? (
                 <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
@@ -305,6 +399,11 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
             <span className="tm-badge tm-badge-grey">{team.members}/{team.capacity}명</span>
           </div>
+          {team.activity ? (
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              활동 일정 · {team.activity}
+            </div>
+          ) : null}
           {team.schedule ? (
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
               정기 일정 · {team.schedule}
@@ -321,7 +420,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`}
               type="button"
               disabled={!model.onCta || model.ctaPending}
-              onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}
+              onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}
             >
               {model.ctaPending ? '처리 중' : cta}
             </button>
@@ -331,7 +430,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
 
       {/* Mobile layout (unchanged) */}
       <article className="tm-team-detail-body tm-hide-desktop">
-        <Card pad={18} className="tm-team-detail-hero-card" style={{ position: 'relative' }}>
+        <Card pad={18} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
             type="button"
@@ -360,15 +459,22 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <InfoRow label="레벨" value={team.level} />
           <InfoRow label="성별 조건" value={team.genderRule} />
           <InfoRow label="정원" value={`${team.capacity}명`} />
-          <InfoRow label="모집 여부" value={team.activity ? `${team.statusLabel} · ${team.activity}` : team.statusLabel} />
+          <InfoRow label="모집 여부" value={team.statusLabel} />
+          <InfoRow label="활동 일정" value={team.activity || '활동 일정 미정'} muted={!team.activity} />
           {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
         </Card>
+        <TeamOperationsSection operations={model.operations} />
         {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
         <Card pad={16} style={{ marginTop: 14 }}>
           <div className="tm-section-row" style={{ marginTop: 0 }}>
             <div>
               <div className="tm-text-body-lg">주요 멤버</div>
-              <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.memberAccess.message}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                <span className={`tm-badge ${team.memberAccess.enabled ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
+                  {team.memberAccess.enabled ? '공개' : '비공개'}
+                </span>
+                <span className="tm-text-caption">{team.memberAccess.message}</span>
+              </div>
             </div>
             {team.memberAccess.canView ? (
               <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
@@ -386,7 +492,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}
-        <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.')}>
+        <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
           {model.ctaPending ? '처리 중' : cta}
         </button>
       </div>
@@ -399,6 +505,16 @@ function teamDetailStatusBadgeClass(mode: TeamDetailViewModel['mode']) {
   if (mode === 'mine') return 'tm-badge-green';
   if (mode === 'closed') return 'tm-badge-grey';
   return 'tm-badge-blue';
+}
+
+function teamHeroStyle(team: Pick<TeamModel, 'coverImageUrl'>): CSSProperties {
+  if (!team.coverImageUrl) return { position: 'relative' };
+  return {
+    position: 'relative',
+    backgroundImage: `linear-gradient(180deg, rgba(20, 24, 31, 0.45), rgba(20, 24, 31, 0.72)), ${cssUrl(team.coverImageUrl)}`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  };
 }
 
 export function TeamFormPageView({
@@ -445,10 +561,11 @@ export function TeamFormPageView({
               </div>
             </Card>
           ) : null}
-          <h2 className="tm-text-heading">{edit ? '팀 정보를 수정해요' : '새 팀을 만들어요'}</h2>
+          {!edit ? <h2 className="tm-text-heading">새 팀을 만들어요</h2> : null}
           {form?.error ? <Card pad={16} style={{ marginTop: 14, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{form.error}</div></Card> : null}
           <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" onChange={(value) => form?.onFieldChange('name', value)} />
           <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
+          <TeamCoverImageField coverImageUrl={team.coverImageUrl} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('coverImageUrl', url)} />
           <div className="tm-create-field">
             <div className="tm-text-label">종목</div>
             {/* Fix (3): 하드코딩 fallback 제거.
@@ -488,7 +605,7 @@ export function TeamFormPageView({
           <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline onChange={(value) => form?.onFieldChange('description', value)} />
           <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
           <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
-          <CreateField label="활동 방식" value={team.activity} placeholder="예: 평일 저녁 · 주 1회" onChange={(value) => form?.onFieldChange('activity', value)} />
+          <TeamActivityFields team={team} form={form} />
         </div>
         {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
@@ -500,6 +617,158 @@ export function TeamFormPageView({
       <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </AppChrome>
   );
+}
+
+function TeamActivityFields({
+  team,
+  form,
+}: {
+  team: TeamFormViewModel['team'];
+  form?: TeamFormViewModel['form'];
+}) {
+  const [open, setOpen] = useState(false);
+  const updateMulti = (
+    field: 'activityDays' | 'activityTimeSlots' | 'activityTypes',
+    value: string,
+  ) => {
+    if (!form) return;
+    const current = team[field];
+    const next = current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+    form.onFieldChange(field, next);
+  };
+  const summary = formatActivityPreview(team);
+
+  return (
+    <Card pad={16} style={{ display: 'grid', gap: open ? 16 : 0, marginTop: 12 }}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          width: '100%',
+          padding: 0,
+          border: 0,
+          background: 'transparent',
+          color: 'inherit',
+          textAlign: 'left',
+          cursor: 'pointer',
+        }}
+      >
+        <div>
+          <div className="tm-text-body-lg">활동 일정</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>{summary || '선택하지 않아도 돼요'}</div>
+        </div>
+        <ChevronDown
+          size={20}
+          aria-hidden="true"
+          style={{
+            flex: '0 0 auto',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 160ms ease',
+            color: 'var(--text-caption)',
+          }}
+        />
+      </button>
+      {open ? (
+        <>
+          <div className="tm-create-field" style={{ marginTop: 0 }}>
+            <div className="tm-text-label">활동 요일</div>
+            <div className="tm-team-form-chip-row" style={{ marginTop: 8 }}>
+              {ACTIVITY_DAY_PRESETS.map((preset) => (
+                <button key={preset.label} className="tm-chip" type="button" onClick={() => form?.onFieldChange('activityDays', [...preset.values])}>
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="tm-team-form-chip-row" role="group" aria-label="활동 요일" style={{ marginTop: 8 }}>
+              {ACTIVITY_DAY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  className={`tm-chip ${team.activityDays.includes(option.value) ? 'tm-chip-active' : ''}`}
+                  type="button"
+                  aria-pressed={team.activityDays.includes(option.value)}
+                  onClick={() => updateMulti('activityDays', option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="tm-create-field" style={{ marginTop: 0 }}>
+            <span className="tm-text-label">주 활동 횟수</span>
+            <select className="tm-input tm-input-select" value={team.activityFrequency} onChange={(event) => form?.onFieldChange('activityFrequency', event.target.value)}>
+              {ACTIVITY_FREQUENCY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <ActivityChipGroup label="활동 시간대" values={team.activityTimeSlots} options={ACTIVITY_TIME_SLOT_OPTIONS} onToggle={(value) => updateMulti('activityTimeSlots', value)} />
+          <ActivityChipGroup label="활동 유형" values={team.activityTypes} options={ACTIVITY_TYPE_OPTIONS} onToggle={(value) => updateMulti('activityTypes', value)} />
+          <CreateField label="활동 메모" value={team.activityMemo} placeholder="예: 우천 시 실내 구장으로 변경" onChange={(value) => form?.onFieldChange('activityMemo', value)} />
+          <div className="tm-auth-soft-card" style={{ padding: 12 }}>
+            <div className="tm-text-label">미리보기</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>{summary || '활동 일정 미정'}</div>
+          </div>
+        </>
+      ) : null}
+    </Card>
+  );
+}
+
+function ActivityChipGroup({
+  label,
+  values,
+  options,
+  onToggle,
+}: {
+  label: string;
+  values: string[];
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="tm-create-field" style={{ marginTop: 0 }}>
+      <div className="tm-text-label">{label}</div>
+      <div className="tm-team-form-chip-row" role="group" aria-label={label} style={{ marginTop: 8 }}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            className={`tm-chip ${values.includes(option.value) ? 'tm-chip-active' : ''}`}
+            type="button"
+            aria-pressed={values.includes(option.value)}
+            onClick={() => onToggle(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatActivityPreview(team: TeamFormViewModel['team']) {
+  const parts = [
+    formatActivityDays(team.activityDays),
+    labelFromOptions(ACTIVITY_TIME_SLOT_OPTIONS, team.activityTimeSlots).join('/'),
+    ACTIVITY_FREQUENCY_OPTIONS.find((option) => option.value === team.activityFrequency)?.label.replace('선택 안 함', ''),
+    labelFromOptions(ACTIVITY_TYPE_OPTIONS, team.activityTypes).join('/'),
+    team.activityMemo.trim(),
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+function formatActivityDays(days: string[]) {
+  const ordered = ACTIVITY_DAY_OPTIONS.map((option) => option.value).filter((day) => days.includes(day));
+  if (ordered.length === 7) return '매일';
+  if (ordered.join(',') === 'mon,tue,wed,thu,fri') return '평일';
+  if (ordered.join(',') === 'sat,sun') return '주말';
+  return ACTIVITY_DAY_OPTIONS.filter((option) => ordered.includes(option.value)).map((option) => option.label).join('·');
+}
+
+function labelFromOptions(options: ReadonlyArray<{ value: string; label: string }>, values: string[]) {
+  return options.filter((option) => values.includes(option.value)).map((option) => option.label);
 }
 
 /**
@@ -547,7 +816,7 @@ function TeamLogoField({
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
         <div className="tm-team-logo tm-team-logo-large" style={{ overflow: 'hidden' }} aria-hidden="true">
           {logoUrl ? (
-            <img src={logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={publicAssetPath(logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
             fallbackChar
           )}
@@ -591,6 +860,84 @@ function TeamLogoField({
  * bound to the form draft so input is reflected instantly. aria-hidden because it
  * is a redundant visual mirror of the form fields; the CTA beside it stays focusable.
  */
+function TeamCoverImageField({
+  coverImageUrl,
+  uploadImage,
+  onChange,
+}: {
+  coverImageUrl: string | null;
+  uploadImage?: (file: File) => Promise<string>;
+  onChange: (url: string | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file || !uploadImage) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      onChange(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '이미지를 올리지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">
+        상단 이미지 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 4 }}>팀 상세 상단에 표시되는 대표 이미지예요.</div>
+      <div
+        style={{
+          marginTop: 10,
+          minHeight: 132,
+          borderRadius: 14,
+          border: '1px solid var(--border)',
+          background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--grey50)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        }}
+        aria-hidden="true"
+      >
+        {coverImageUrl ? null : <span className="tm-text-caption">상단 이미지를 선택해 주세요</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+        <button
+          type="button"
+          className="tm-btn tm-btn-sm tm-btn-neutral"
+          disabled={uploading || !uploadImage}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? '올리는 중…' : coverImageUrl ? '변경' : '이미지 선택'}
+        </button>
+        {coverImageUrl ? (
+          <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={uploading} onClick={() => onChange(null)}>
+            제거
+          </button>
+        ) : null}
+        <span className="tm-text-caption">JPG, PNG, WebP</span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(event) => handleFile(event.target.files?.[0])}
+        />
+      </div>
+      {error ? <div className="tm-text-caption" style={{ color: 'var(--red500)', marginTop: 6 }}>{error}</div> : null}
+    </div>
+  );
+}
+
 function TeamFormPreview({
   team,
   sportName,
@@ -608,6 +955,7 @@ function TeamFormPreview({
   const capacity = team.capacity ? `${team.capacity}명` : '정원 미정';
   const gender = team.genderRule || '성별 무관';
   const intro = team.description.trim();
+  const activity = formatActivityPreview(team);
   const logoChar = hasName ? Array.from(trimmedName)[0] : '팀';
   return (
     <div aria-hidden="true">
@@ -618,7 +966,7 @@ function TeamFormPreview({
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <div className="tm-team-logo" style={{ overflow: 'hidden' }}>
             {team.logoUrl ? (
-              <img src={team.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               logoChar
             )}
@@ -633,6 +981,7 @@ function TeamFormPreview({
               <span className="tm-badge tm-badge-grey">{capacity}</span>
               <span className="tm-badge tm-badge-grey">{gender}</span>
             </div>
+            {activity ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{activity}</div> : null}
           </div>
         </div>
         <div className="tm-team-intro-box">
@@ -1000,6 +1349,7 @@ function formatInvitationDate(value: string) {
 
 function TeamCard({ team }: { team: TeamModel }) {
   const hasIntro = team.intro.trim().length > 0;
+  const activity = team.next.trim();
 
   return (
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
@@ -1014,8 +1364,12 @@ function TeamCard({ team }: { team: TeamModel }) {
         </div>
       ) : null}
       <div className="tm-team-card-action-row" aria-hidden="true">
-        <span className={`tm-team-card-action-status ${team.status === 'closed' ? 'tm-team-card-action-status-muted' : ''}`}>{team.statusLabel}</span>
-        <span className="tm-team-card-action-link">자세히 보기 ›</span>
+        <span className="tm-text-caption line-clamp-1" style={{ color: 'var(--text-muted)', minWidth: 0 }}>
+          {activity || '활동 일정 미정'}
+        </span>
+        <span className={`tm-team-card-action-status ${team.status === 'closed' ? 'tm-team-card-action-status-muted' : ''}`}>
+          {team.statusLabel}
+        </span>
       </div>
     </Link>
   );
@@ -1025,8 +1379,16 @@ function dedupeTags(tags: string[]) {
   return Array.from(new Set(tags.filter(Boolean)));
 }
 
-function TeamLogo({ team, large }: { team: Pick<TeamModel, 'logo'>; large?: boolean }) {
-  return <div className={`tm-team-logo ${large ? 'tm-team-logo-large' : ''}`}>{team.logo}</div>;
+function TeamLogo({ team, large }: { team: Pick<TeamModel, 'logo' | 'logoUrl'>; large?: boolean }) {
+  return (
+    <div className={`tm-team-logo ${large ? 'tm-team-logo-large' : ''}`} style={{ overflow: 'hidden' }}>
+      {team.logoUrl ? (
+        <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        team.logo
+      )}
+    </div>
+  );
 }
 
 function SectionTitle({ title, sub }: { title: string; sub: string }) {
@@ -1237,7 +1599,7 @@ function RegionSelect({
           ))}
         </select>
       </div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>팀 추천과 지역 검색에 쓰여요. 활동 장소는 아래 '활동 방식'에 자유롭게 적어 주세요.</div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>팀 추천과 지역 검색에 쓰여요. 세부 장소나 예외 일정은 아래 활동 메모에 적어 주세요.</div>
     </label>
   );
 }

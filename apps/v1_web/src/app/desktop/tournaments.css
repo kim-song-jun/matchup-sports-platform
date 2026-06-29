@@ -185,8 +185,6 @@
 
 @media (min-width: 1024px) {
   .tm-tournament-rail {
-    position: sticky;
-    top: 88px; /* 64px desktop nav + 24px breathing */
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -209,6 +207,8 @@
 
 @media (min-width: 1024px) {
   .tm-tournament-detail-aside {
+    position: sticky;
+    top: 88px; /* 64px desktop nav + 24px breathing */
     margin-top: 0;
     padding: 0;
     gap: 20px;

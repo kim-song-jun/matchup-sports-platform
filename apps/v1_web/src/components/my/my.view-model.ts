@@ -10,6 +10,7 @@ export const myUser = {
   sports: [],
   intro: '',
   initials: '—',
+  profileImageUrl: null,
   stats: [
     { label: '활동', value: '—' },
     { label: '소속 팀', value: '—' },

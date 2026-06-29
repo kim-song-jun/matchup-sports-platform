@@ -41,6 +41,10 @@ type TeamWithRelations = V1Team & {
     coverImageUrl: string | null;
     description: string | null;
     activityNote: string | null;
+    activityDays: string[];
+    activityFrequency: string | null;
+    activityTimeSlots: string[];
+    activityTypes: string[];
     skillNote: string | null;
     minSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
     maxSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
@@ -128,6 +132,12 @@ export class TeamsService {
         coverImageUrl: team.profile?.coverImageUrl ?? null,
         introduction: team.profile?.description ?? null,
         activityAreaText: team.profile?.activityNote ?? null,
+        activityDays: team.profile?.activityDays ?? [],
+        activityFrequency: team.profile?.activityFrequency ?? null,
+        activityTimeSlots: team.profile?.activityTimeSlots ?? [],
+        activityTypes: team.profile?.activityTypes ?? [],
+        activityMemo: team.profile?.activityNote ?? null,
+        activitySummary: formatTeamActivitySummary(team.profile),
         skillLevelText: team.profile?.skillNote ?? null,
         levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
         minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
@@ -199,7 +209,11 @@ export class TeamsService {
               logoUrl: dto.logoUrl ?? null,
               coverImageUrl: dto.coverImageUrl ?? null,
               description: dto.introduction ?? null,
-              activityNote: dto.activityAreaText ?? null,
+              activityNote: dto.activityMemo ?? dto.activityAreaText ?? null,
+              activityDays: dto.activityDays ?? [],
+              activityFrequency: dto.activityFrequency ?? null,
+              activityTimeSlots: dto.activityTimeSlots ?? [],
+              activityTypes: dto.activityTypes ?? [],
               skillNote: dto.skillLevelText ?? null,
               minSportLevelId: levelRange.minSportLevelId,
               maxSportLevelId: levelRange.maxSportLevelId,
@@ -252,7 +266,7 @@ export class TeamsService {
       role: result.membership.role,
       status: result.team.status,
       detailRoute: `/teams/${result.team.id}`,
-      manageRoute: `/teams/${result.team.id}/manage`,
+      manageRoute: `/teams/${result.team.id}/members`,
     };
   }
 
@@ -284,7 +298,11 @@ export class TeamsService {
           logoUrl: dto.logoUrl ?? null,
           coverImageUrl: dto.coverImageUrl ?? null,
           description: dto.introduction ?? null,
-          activityNote: dto.activityAreaText ?? null,
+          activityNote: dto.activityMemo ?? dto.activityAreaText ?? null,
+          activityDays: dto.activityDays ?? [],
+          activityFrequency: dto.activityFrequency ?? null,
+          activityTimeSlots: dto.activityTimeSlots ?? [],
+          activityTypes: dto.activityTypes ?? [],
           skillNote: dto.skillLevelText ?? null,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
@@ -295,7 +313,11 @@ export class TeamsService {
           logoUrl: dto.logoUrl ?? null,
           coverImageUrl: dto.coverImageUrl ?? null,
           description: dto.introduction ?? null,
-          activityNote: dto.activityAreaText ?? null,
+          activityNote: dto.activityMemo ?? dto.activityAreaText ?? null,
+          activityDays: dto.activityDays ?? [],
+          activityFrequency: dto.activityFrequency ?? null,
+          activityTimeSlots: dto.activityTimeSlots ?? [],
+          activityTypes: dto.activityTypes ?? [],
           skillNote: dto.skillLevelText ?? null,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
@@ -434,6 +456,10 @@ export class TeamsService {
                 coverImageUrl: true,
                 description: true,
                 activityNote: true,
+                activityDays: true,
+                activityFrequency: true,
+                activityTimeSlots: true,
+                activityTypes: true,
                 skillNote: true,
                 genderRule: true,
               },
@@ -454,6 +480,14 @@ export class TeamsService {
           role: membership.role,
           status: membership.status,
           logoUrl: membership.team.profile?.logoUrl ?? null,
+          coverImageUrl: membership.team.profile?.coverImageUrl ?? null,
+          activityAreaText: membership.team.profile?.activityNote ?? null,
+          activityDays: membership.team.profile?.activityDays ?? [],
+          activityFrequency: membership.team.profile?.activityFrequency ?? null,
+          activityTimeSlots: membership.team.profile?.activityTimeSlots ?? [],
+          activityTypes: membership.team.profile?.activityTypes ?? [],
+          activityMemo: membership.team.profile?.activityNote ?? null,
+          activitySummary: formatTeamActivitySummary(membership.team.profile),
           sport: { sportId: membership.team.sport.id, name: membership.team.sport.name },
           region: membership.team.region
             ? { regionId: membership.team.region.id, name: membership.team.region.name }
@@ -468,7 +502,7 @@ export class TeamsService {
           detailRoute: `/teams/${membership.teamId}`,
           manageRoute:
             membership.role === 'owner' || membership.role === 'manager'
-              ? `/teams/${membership.teamId}/manage`
+              ? `/teams/${membership.teamId}/members`
               : null,
         })),
     };
@@ -1625,6 +1659,10 @@ export class TeamsService {
           coverImageUrl: true,
           description: true,
           activityNote: true,
+          activityDays: true,
+          activityFrequency: true,
+          activityTimeSlots: true,
+          activityTypes: true,
           skillNote: true,
           minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
           maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
@@ -1672,6 +1710,13 @@ export class TeamsService {
       regionName: team.region?.name ?? null,
       region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
       introductionPreview: team.profile?.description ? team.profile.description.slice(0, 120) : null,
+      activityAreaText: team.profile?.activityNote ?? null,
+      activityDays: team.profile?.activityDays ?? [],
+      activityFrequency: team.profile?.activityFrequency ?? null,
+      activityTimeSlots: team.profile?.activityTimeSlots ?? [],
+      activityTypes: team.profile?.activityTypes ?? [],
+      activityMemo: team.profile?.activityNote ?? null,
+      activitySummary: formatTeamActivitySummary(team.profile),
       skillLevelText: team.profile?.skillNote ?? null,
       levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
       minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
@@ -1709,7 +1754,7 @@ export class TeamsService {
         disabledReason: 'ALREADY_MEMBER',
         manageRoute:
           membership.role === 'owner' || membership.role === 'manager'
-            ? `/teams/${team.id}/manage`
+            ? `/teams/${team.id}/members`
             : null,
       };
     }
@@ -1743,6 +1788,84 @@ export class TeamsService {
     if (viewer.role === 'owner' || viewer.role === 'manager') return true;
     return viewer.role === 'member' && team.membersVisible;
   }
+}
+
+type ActivityProfileLike = {
+  activityNote?: string | null;
+  activityDays?: string[] | null;
+  activityFrequency?: string | null;
+  activityTimeSlots?: string[] | null;
+  activityTypes?: string[] | null;
+} | null | undefined;
+
+const ACTIVITY_DAY_LABELS: Record<string, string> = {
+  mon: '월',
+  tue: '화',
+  wed: '수',
+  thu: '목',
+  fri: '금',
+  sat: '토',
+  sun: '일',
+};
+
+const ACTIVITY_FREQUENCY_LABELS: Record<string, string> = {
+  weekly_1: '주 1회',
+  weekly_2: '주 2회',
+  weekly_3: '주 3회',
+  weekly_4_plus: '주 4회 이상',
+  biweekly_1: '격주 1회',
+  irregular: '비정기',
+};
+
+const ACTIVITY_TIME_SLOT_LABELS: Record<string, string> = {
+  morning: '오전',
+  lunch: '점심',
+  afternoon: '오후',
+  evening: '저녁',
+  late_night: '심야',
+};
+
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  regular_meetup: '정기 모임',
+  friendly_match: '친선 경기',
+  team_match: '팀매치',
+  tournament_prep: '대회 준비',
+  training: '훈련/레슨',
+  free_participation: '자유 참여',
+  beginner_friendly: '초보 환영',
+  competitive: '실력 중심',
+};
+
+function formatTeamActivitySummary(profile: ActivityProfileLike) {
+  if (!profile) return null;
+
+  const parts = [
+    formatActivityDays(profile.activityDays ?? []),
+    formatActivityTimeSlots(profile.activityTimeSlots ?? []),
+    profile.activityFrequency ? ACTIVITY_FREQUENCY_LABELS[profile.activityFrequency] : null,
+    formatActivityTypes(profile.activityTypes ?? []),
+    profile.activityNote?.trim() || null,
+  ].filter(Boolean) as string[];
+
+  if (parts.length > 0) return parts.join(' · ');
+  return null;
+}
+
+function formatActivityDays(days: string[]) {
+  if (days.length === 0) return null;
+  const normalized = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter((day) => days.includes(day));
+  if (normalized.length === 7) return '매일';
+  if (normalized.join(',') === 'mon,tue,wed,thu,fri') return '평일';
+  if (normalized.join(',') === 'sat,sun') return '주말';
+  return normalized.map((day) => ACTIVITY_DAY_LABELS[day]).filter(Boolean).join('·') || null;
+}
+
+function formatActivityTimeSlots(slots: string[]) {
+  return slots.map((slot) => ACTIVITY_TIME_SLOT_LABELS[slot]).filter(Boolean).join('/') || null;
+}
+
+function formatActivityTypes(types: string[]) {
+  return types.map((type) => ACTIVITY_TYPE_LABELS[type]).filter(Boolean).join('/') || null;
 }
 
 function getTeamOrderBy(sort: TeamsQueryDto['sort']): Prisma.V1TeamOrderByWithRelationInput[] {

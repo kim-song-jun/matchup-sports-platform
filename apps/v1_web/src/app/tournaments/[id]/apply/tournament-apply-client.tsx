@@ -12,6 +12,7 @@ import {
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { publicAssetPath } from '@/lib/assets';
 import { formatEntryFee } from '@/lib/date-utils';
 import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod } from '@/types/api';
 
@@ -330,7 +331,7 @@ function TeamSelectStep({
                         }}
                       >
                         {team.logoUrl ? (
-                          <img src={team.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-caption)' }}>
                             {team.name?.charAt(0)}

@@ -353,6 +353,13 @@ export type V1Team = {
   logoUrl?: string | null;
   coverImageUrl?: string | null;
   introductionPreview?: string | null;
+  activityAreaText?: string | null;
+  activityDays?: string[];
+  activityFrequency?: string | null;
+  activityTimeSlots?: string[];
+  activityTypes?: string[];
+  activityMemo?: string | null;
+  activitySummary?: string | null;
   skillLevelText?: string | null;
   levelLabel?: string | null;
   minLevel?: { code: string; name: string } | null;
@@ -369,6 +376,14 @@ export type V1MyTeam = {
   role: 'owner' | 'manager' | 'member';
   status: string;
   logoUrl: string | null;
+  coverImageUrl?: string | null;
+  activityAreaText?: string | null;
+  activityDays?: string[];
+  activityFrequency?: string | null;
+  activityTimeSlots?: string[];
+  activityTypes?: string[];
+  activityMemo?: string | null;
+  activitySummary?: string | null;
   sport: { sportId: string; name: string };
   region: { regionId: string; name: string } | null;
   trust?: {
@@ -406,6 +421,12 @@ export type V1TeamDetail = {
     coverImageUrl: string | null;
     introduction: string | null;
     activityAreaText: string | null;
+    activityDays: string[];
+    activityFrequency: string | null;
+    activityTimeSlots: string[];
+    activityTypes: string[];
+    activityMemo: string | null;
+    activitySummary: string | null;
     skillLevelText: string | null;
     levelLabel?: string | null;
     minLevel?: { code: string; name: string } | null;
@@ -449,6 +470,11 @@ export type V1TeamMutationPayload = {
   coverImageUrl?: string | null;
   introduction?: string | null;
   activityAreaText?: string | null;
+  activityDays?: string[];
+  activityFrequency?: string | null;
+  activityTimeSlots?: string[];
+  activityTypes?: string[];
+  activityMemo?: string | null;
   skillLevelText?: string | null;
   minLevelCode?: string | null;
   maxLevelCode?: string | null;

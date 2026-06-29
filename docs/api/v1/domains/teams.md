@@ -45,7 +45,23 @@ Tournament roster clients must keep members with missing `realName`, `birthDate`
 
 Optional fields include `logoUrl`, `coverImageUrl`, `introduction`, `activityAreaText`, `skillLevelText`, and `memberGoalCount`.
 
+Structured activity profile fields:
+
+- `activityDays: string[]` — `mon|tue|wed|thu|fri|sat|sun`
+- `activityFrequency: string | null` — `weekly_1|weekly_2|weekly_3|weekly_4_plus|biweekly_1|irregular`
+- `activityTimeSlots: string[]` — `morning|lunch|afternoon|evening|late_night`
+- `activityTypes: string[]` — `regular_meetup|friendly_match|team_match|tournament_prep|training|free_participation|beginner_friendly|competitive`
+- `activityMemo: string | null`
+
+Team list, detail, and `/me/teams` responses include those fields plus `activitySummary`. `activityAreaText` remains as a compatibility/fallback field backed by the existing `activity_note` column.
+
 `UpdateTeamDto` adds `version: string`.
+
+## Route Fields
+
+- `detailRoute` for create/my-team/team detail responses points to `/teams/:teamId`.
+- `manageRoute` is only present for owner/manager viewers and points to `/teams/:teamId/members`; full team operations are exposed from the canonical `/teams/:teamId` detail UI.
+- There is no v1 `/teams/:teamId/manage` route.
 
 ## State And Permissions
 

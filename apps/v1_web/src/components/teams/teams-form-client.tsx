@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
@@ -30,6 +31,14 @@ export function TeamCreatePageClient() {
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
   const [error, setError] = useState<string | null>(null);
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+  const createTeamWithActivityCompatibility = async (payload: V1TeamMutationPayload, draft: TeamDraft) => {
+    try {
+      return await createTeam.mutateAsync(payload);
+    } catch (err) {
+      if (!isUnsupportedActivityFieldsError(err)) throw err;
+      return createTeam.mutateAsync(toLegacyActivityPayload(payload, draft));
+    }
+  };
 
   useEffect(() => {
     if (!sportId && sports.data?.[0]) setSportId(sports.data[0].id);
@@ -61,10 +70,9 @@ export function TeamCreatePageClient() {
         setError('팀 이름, 종목, 지역을 모두 입력해 주세요.');
         return;
       }
-      createTeam.mutate(payload, {
-        onSuccess: (result) => router.push(result.detailRoute || `/teams/${result.teamId}`),
-        onError: (err) => setError(err instanceof Error ? err.message : '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'),
-      });
+      void createTeamWithActivityCompatibility(payload, draft)
+        .then((result) => router.push(result.detailRoute || `/teams/${result.teamId}`))
+        .catch((err) => setError(err instanceof Error ? err.message : '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'));
     },
   });
 
@@ -73,12 +81,12 @@ export function TeamCreatePageClient() {
 
 export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
-  // #16: my 컨텍스트(/my/teams/[id]) 경유 진입 여부 판별
-  // from=my 파라미터가 있으면 취소·저장 후 /my/teams/[id]로 복귀
+  // #16: my 컨텍스트 경유 진입 여부 판별
+  // from=my 파라미터가 있으면 취소·저장 후 canonical /teams/[id]로 복귀
   const searchParams = useSearchParams();
   const fromMy = searchParams.get('from') === 'my';
-  const cancelHref = fromMy ? `/my/teams/${teamId}` : '/teams';
-  const successHref = fromMy ? `/my/teams/${teamId}` : undefined; // undefined이면 API 응답 detailRoute 사용
+  const cancelHref = fromMy && teamId ? `/teams/${teamId}` : '/teams';
+  const successHref = fromMy && teamId ? `/teams/${teamId}` : undefined; // undefined이면 API 응답 detailRoute 사용
   const query = useV1TeamDetail(teamId);
   const updateTeam = useV1UpdateTeam(teamId);
   const uploadImages = useV1UploadImages();
@@ -95,6 +103,17 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const [membersVisibilityEnabled, setMembersVisibilityEnabled] = useState(false);
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const updateTeamWithActivityCompatibility = async (
+    payload: V1TeamMutationPayload & { version: string; membersVisibilityEnabled?: boolean },
+    draft: TeamDraft,
+  ) => {
+    try {
+      return await updateTeam.mutateAsync(payload);
+    } catch (err) {
+      if (!isUnsupportedActivityFieldsError(err)) throw err;
+      return updateTeam.mutateAsync(toLegacyActivityPayload(payload, draft));
+    }
+  };
 
   useEffect(() => {
     if (!query.data) return;
@@ -102,6 +121,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       ...getTeamFormViewModel('edit').team,
       name: query.data.name,
       logoUrl: query.data.profile.logoUrl ?? null,
+      coverImageUrl: query.data.profile.coverImageUrl ?? null,
       sport: query.data.sport.name,
       region: query.data.region?.name ?? '지역 미정',
       description: query.data.profile.introduction ?? '',
@@ -110,7 +130,11 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       county: '',
       level: query.data.profile.levelLabel ?? query.data.profile.skillLevelText ?? '',
       genderRule: query.data.profile.genderRule ?? '성별 무관',
-      activity: query.data.profile.activityAreaText ?? '',
+      activityDays: query.data.profile.activityDays ?? [],
+      activityFrequency: query.data.profile.activityFrequency ?? '',
+      activityTimeSlots: query.data.profile.activityTimeSlots ?? [],
+      activityTypes: query.data.profile.activityTypes ?? [],
+      activityMemo: normalizeHydratedActivityMemo(query.data.profile),
       capacity: query.data.profile.memberGoalCount ?? query.data.memberCount,
     });
     setSportId(query.data.sport.sportId);
@@ -144,14 +168,10 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
         setError('팀 정보를 다시 확인하고 저장해 주세요.');
         return;
       }
-      updateTeam.mutate(
-        { ...payload, version, membersVisibilityEnabled },
-        {
-          // #16: from=my이면 저장 후 /my/teams/[id]로 복귀, 아니면 API 응답 경로 사용
-          onSuccess: (result) => router.push(successHref ?? result.detailRoute ?? `/teams/${teamId}`),
-          onError: (err) => setError(err instanceof Error ? err.message : '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'),
-        },
-      );
+      void updateTeamWithActivityCompatibility({ ...payload, version, membersVisibilityEnabled }, draft)
+        // #16: from=my이면 저장 후 canonical /teams/[id]로 복귀, 아니면 API 응답 경로 사용
+        .then((result) => router.push(successHref ?? result.detailRoute ?? `/teams/${teamId}`))
+        .catch((err) => setError(err instanceof Error ? err.message : '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'));
     },
   });
 
@@ -237,9 +257,14 @@ function buildPayload(draft: TeamDraft, sportId: string, regionId: string, joinP
     regionId,
     name: draft.name.trim(),
     logoUrl: draft.logoUrl || null,
-    coverImageUrl: null,
+    coverImageUrl: draft.coverImageUrl || null,
     introduction: draft.description.trim() || null,
-    activityAreaText: draft.activity.trim() || null,
+    activityAreaText: draft.activityMemo.trim() || null,
+    activityDays: draft.activityDays,
+    activityFrequency: draft.activityFrequency || null,
+    activityTimeSlots: draft.activityTimeSlots,
+    activityTypes: draft.activityTypes,
+    activityMemo: draft.activityMemo.trim() || null,
     skillLevelText: draft.level.trim() || null,
     minLevelCode: minLevelText ? labelToLevelCode(minLevelText) : null,
     maxLevelCode: maxLevelText ? labelToLevelCode(maxLevelText) : null,
@@ -247,6 +272,132 @@ function buildPayload(draft: TeamDraft, sportId: string, regionId: string, joinP
     joinPolicy,
     memberGoalCount: Number(draft.capacity) || null,
   };
+}
+
+function isUnsupportedActivityFieldsError(err: unknown) {
+  if (!(err instanceof V1ApiError) || err.code !== 'VALIDATION_ERROR') return false;
+  const details = JSON.stringify(err.details ?? '');
+  return ['activityDays', 'activityFrequency', 'activityTimeSlots', 'activityTypes', 'activityMemo'].some((field) => details.includes(field));
+}
+
+function toLegacyActivityPayload<T extends V1TeamMutationPayload>(payload: T, draft: TeamDraft): T {
+  const {
+    activityDays: _activityDays,
+    activityFrequency: _activityFrequency,
+    activityTimeSlots: _activityTimeSlots,
+    activityTypes: _activityTypes,
+    activityMemo: _activityMemo,
+    ...legacyPayload
+  } = payload;
+
+  return {
+    ...legacyPayload,
+    activityAreaText: formatLegacyActivitySummary(draft),
+  } as T;
+}
+
+function formatLegacyActivitySummary(draft: TeamDraft) {
+  const parts = [
+    formatActivityDays(draft.activityDays),
+    formatActivityLabels(draft.activityTimeSlots, {
+      morning: '오전',
+      lunch: '점심',
+      afternoon: '오후',
+      evening: '저녁',
+      late_night: '심야',
+    }).join('/'),
+    draft.activityFrequency
+      ? ({
+          weekly_1: '주 1회',
+          weekly_2: '주 2회',
+          weekly_3: '주 3회',
+          weekly_4_plus: '주 4회 이상',
+          biweekly_1: '격주 1회',
+          irregular: '비정기',
+        } as Record<string, string>)[draft.activityFrequency]
+      : null,
+    formatActivityLabels(draft.activityTypes, {
+      regular_meetup: '정기 모임',
+      friendly_match: '친선 경기',
+      team_match: '팀매치',
+      tournament_prep: '대회 준비',
+      training: '훈련/레슨',
+      free_participation: '자유 참여',
+      beginner_friendly: '초보 환영',
+      competitive: '실력 중심',
+    }).join('/'),
+    draft.activityMemo.trim(),
+  ].filter(Boolean);
+
+  return parts.join(' · ').slice(0, 500) || null;
+}
+
+function normalizeHydratedActivityMemo(profile: {
+  activityAreaText?: string | null;
+  activityDays?: string[] | null;
+  activityFrequency?: string | null;
+  activityTimeSlots?: string[] | null;
+  activityTypes?: string[] | null;
+  activityMemo?: string | null;
+}) {
+  const memo = profile.activityMemo ?? profile.activityAreaText ?? '';
+  const hasStructuredValues = Boolean(
+    profile.activityDays?.length ||
+    profile.activityFrequency ||
+    profile.activityTimeSlots?.length ||
+    profile.activityTypes?.length,
+  );
+  if (hasStructuredValues) return memo;
+  return extractMemoFromLegacyActivitySummary(memo);
+}
+
+function extractMemoFromLegacyActivitySummary(value: string) {
+  const parts = value.split(' · ').map((part) => part.trim()).filter(Boolean);
+  if (parts.length <= 1) return value;
+
+  const last = parts[parts.length - 1];
+  return isKnownActivitySummaryPart(last) ? '' : last;
+}
+
+function isKnownActivitySummaryPart(value: string) {
+  const known = new Set([
+    '매일',
+    '평일',
+    '주말',
+    '오전',
+    '점심',
+    '오후',
+    '저녁',
+    '심야',
+    '주 1회',
+    '주 2회',
+    '주 3회',
+    '주 4회 이상',
+    '격주 1회',
+    '비정기',
+    '정기 모임',
+    '친선 경기',
+    '팀매치',
+    '대회 준비',
+    '훈련/레슨',
+    '자유 참여',
+    '초보 환영',
+    '실력 중심',
+  ]);
+  if (known.has(value)) return true;
+  return value.split(/[·/]/).map((part) => part.trim()).filter(Boolean).every((part) => known.has(part));
+}
+
+function formatActivityDays(days: string[]) {
+  const ordered = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter((day) => days.includes(day));
+  if (ordered.length === 7) return '매일';
+  if (ordered.join(',') === 'mon,tue,wed,thu,fri') return '평일';
+  if (ordered.join(',') === 'sat,sun') return '주말';
+  return formatActivityLabels(ordered, { mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일' }).join('·');
+}
+
+function formatActivityLabels(values: string[], labels: Record<string, string>) {
+  return values.map((value) => labels[value]).filter(Boolean);
 }
 
 function parseDraftLevelRange(value: string) {

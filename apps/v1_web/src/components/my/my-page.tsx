@@ -18,6 +18,7 @@ import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { cssUrl, publicAssetPath } from '@/lib/assets';
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
@@ -51,6 +52,8 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
+  const avatarStyle = model.user.profileImageUrl ? { backgroundImage: cssUrl(model.user.profileImageUrl) } : undefined;
+
   return (
     <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
       <div className="tm-my-shell">
@@ -60,7 +63,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           {/* LEFT sticky: profile identity */}
           <div className="tm-my-desktop-sidebar">
             <section className="tm-my-profile-head">
-              <div className="tm-my-avatar">{model.user.initials}</div>
+              <div className="tm-my-avatar" style={avatarStyle}>{model.user.profileImageUrl ? null : model.user.initials}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="tm-text-heading">{model.user.name}</div>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.user.handle} · {model.user.region}</div>
@@ -247,7 +250,7 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
           {/* LEFT: hero + info + recent matches */}
           <div className="tm-my-team-detail-left">
             <section className="tm-my-team-hero">
-              <div className="tm-team-logo tm-team-logo-large">{model.team.logo}</div>
+              <MyTeamLogo team={model.team} large />
               <div>
                 <h2 className="tm-text-heading">{model.team.name}</h2>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
@@ -357,8 +360,8 @@ export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
             <h1 className="tm-text-heading">약관 및 정책</h1>
           </div>
           <Card pad={16}>
-            <ListItem title="이용약관" sub="서비스 이용 전 꼭 확인해야 하는 약관이에요" trailing="2026.05" chev />
-            <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" chev />
+            <ListItem title="이용약관" sub="서비스 이용 전 꼭 확인해야 하는 약관이에요" trailing="2026.05" href="/terms?document=terms" chev />
+            <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" href="/terms?document=privacy" chev />
             <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" chev />
           </Card>
         </div>
@@ -421,8 +424,8 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   const isManager = team.role === 'manager' || team.role === 'admin';
   const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
-    <Link className="tm-my-team-card tm-pressable" href={`/my/teams/${team.id}`}>
-      <div className="tm-team-logo">{team.logo}</div>
+    <Link className="tm-my-team-card tm-pressable" href={`/teams/${team.id}`}>
+      <MyTeamLogo team={team} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">
           <div className="tm-text-body-lg">{team.name}</div>
@@ -440,6 +443,18 @@ function MyTeamCard({ team }: { team: MyTeam }) {
       </div>
       <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
     </Link>
+  );
+}
+
+function MyTeamLogo({ team, large }: { team: Pick<MyTeam, 'logo' | 'logoUrl'>; large?: boolean }) {
+  return (
+    <div className={`tm-team-logo ${large ? 'tm-team-logo-large' : ''}`} style={{ overflow: 'hidden' }}>
+      {team.logoUrl ? (
+        <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        team.logo
+      )}
+    </div>
   );
 }
 

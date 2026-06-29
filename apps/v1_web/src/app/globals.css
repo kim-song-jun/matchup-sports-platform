@@ -3814,6 +3814,9 @@ button:disabled {
   border-radius: 22px;
   background: var(--grey900);
   color: var(--static-white);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   display: grid;
   place-items: center;
   font-size: 24px;

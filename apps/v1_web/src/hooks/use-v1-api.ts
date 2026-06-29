@@ -543,11 +543,87 @@ export function useV1UpdateTeam(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1TeamUpdatePayload) => v1Patch<V1TeamMutationResult>(`/teams/${teamId}`, body),
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData<V1TeamDetail | undefined>(
+        [...v1Keys.team(teamId), 'detail'],
+        (current) =>
+          current
+            ? {
+                ...current,
+                version: result.version ?? current.version,
+                membersVisibilityEnabled: result.membersVisibilityEnabled ?? variables.membersVisibilityEnabled ?? current.membersVisibilityEnabled,
+                profile: {
+                  ...current.profile,
+                  logoUrl: variables.logoUrl ?? null,
+                  coverImageUrl: variables.coverImageUrl ?? null,
+                  introduction: variables.introduction ?? null,
+                  activityAreaText: variables.activityMemo ?? variables.activityAreaText ?? null,
+                  activityDays: variables.activityDays ?? [],
+                  activityFrequency: variables.activityFrequency ?? null,
+                  activityTimeSlots: variables.activityTimeSlots ?? [],
+                  activityTypes: variables.activityTypes ?? [],
+                  activityMemo: variables.activityMemo ?? variables.activityAreaText ?? null,
+                  activitySummary: formatTeamActivitySummaryFromPayload(variables),
+                  skillLevelText: variables.skillLevelText ?? null,
+                  genderRule: variables.genderRule ?? null,
+                  joinPolicy: variables.joinPolicy,
+                  memberGoalCount: variables.memberGoalCount ?? null,
+                },
+              }
+            : current,
+      );
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
     },
   });
+}
+
+function formatTeamActivitySummaryFromPayload(payload: V1TeamUpdatePayload) {
+  const parts = [
+    formatActivityDays(payload.activityDays ?? []),
+    formatActivityLabels(payload.activityTimeSlots ?? [], {
+      morning: '오전',
+      lunch: '점심',
+      afternoon: '오후',
+      evening: '저녁',
+      late_night: '심야',
+    }).join('/'),
+    payload.activityFrequency
+      ? ({
+          weekly_1: '주 1회',
+          weekly_2: '주 2회',
+          weekly_3: '주 3회',
+          weekly_4_plus: '주 4회 이상',
+          biweekly_1: '격주 1회',
+          irregular: '비정기',
+        } as Record<string, string>)[payload.activityFrequency]
+      : null,
+    formatActivityLabels(payload.activityTypes ?? [], {
+      regular_meetup: '정기 모임',
+      friendly_match: '친선 경기',
+      team_match: '팀매치',
+      tournament_prep: '대회 준비',
+      training: '훈련/레슨',
+      free_participation: '자유 참여',
+      beginner_friendly: '초보 환영',
+      competitive: '실력 중심',
+    }).join('/'),
+    payload.activityMemo?.trim(),
+  ].filter(Boolean);
+  return parts.join(' · ') || payload.activityAreaText?.trim() || null;
+}
+
+function formatActivityDays(days: string[]) {
+  const ordered = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter((day) => days.includes(day));
+  if (ordered.length === 7) return '매일';
+  if (ordered.join(',') === 'mon,tue,wed,thu,fri') return '평일';
+  if (ordered.join(',') === 'sat,sun') return '주말';
+  return formatActivityLabels(ordered, { mon: '월', tue: '화', wed: '수', thu: '목', fri: '금', sat: '토', sun: '일' }).join('·');
+}
+
+function formatActivityLabels(values: string[], labels: Record<string, string>) {
+  return values.map((value) => labels[value]).filter(Boolean);
 }
 
 export function useV1MyTeams(filters?: ListFilters) {

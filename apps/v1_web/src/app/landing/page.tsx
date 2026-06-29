@@ -278,7 +278,7 @@ export default function LandingPage() {
               </p>
             </div>
             <nav className="tm-landing-footer-links" aria-label="하단 링크">
-              <Link className="tm-landing-footer-link" href="/terms">이용약관</Link>
+              <Link className="tm-landing-footer-link" href="/terms?document=terms">이용약관</Link>
               <Link className="tm-landing-footer-link" href="/notices">공지사항</Link>
               <Link className="tm-landing-footer-link" href="/matches">매치 찾기</Link>
             </nav>

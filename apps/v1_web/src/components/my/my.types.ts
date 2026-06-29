@@ -5,6 +5,7 @@ export type MyUser = {
   sports: string[];
   intro: string;
   initials: string;
+  profileImageUrl?: string | null;
   stats: Array<{ label: string; value: number | string; unit?: string }>;
   monthly: Array<{ label: string; value: number | string; unit?: string }>;
 };
@@ -59,6 +60,8 @@ export type MyTeam = {
   id: string;
   name: string;
   logo: string;
+  logoUrl?: string | null;
+  coverImageUrl?: string | null;
   sport: string;
   region: string;
   role: MyTeamRole;

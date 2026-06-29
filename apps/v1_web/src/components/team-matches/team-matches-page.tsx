@@ -9,6 +9,7 @@ import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { publicAssetPath } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
   TeamMatchDetailViewModel,
@@ -147,7 +148,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, overflow: 'hidden', background: 'var(--grey100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {match.hostTeamLogoUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={match.hostTeamLogoUrl} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={publicAssetPath(match.hostTeamLogoUrl)} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <span className="tm-text-subhead" style={{ color: 'var(--text-caption)' }}>{match.hostTeam.slice(0, 1)}</span>
         )}

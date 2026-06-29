@@ -578,6 +578,10 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
         create: {
           description: '평일 저녁에 함께 뛰는 v1 seed 팀입니다.',
           activityNote: '주 2회 러닝',
+          activityDays: ['tue', 'thu'],
+          activityFrequency: 'weekly_2',
+          activityTimeSlots: ['evening'],
+          activityTypes: ['regular_meetup', 'training'],
           skillNote: '초보부터 중수까지',
           ...runningNoviceIntermediate,
           genderRule: '성별 무관',
@@ -645,11 +649,23 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
 
   await prisma.v1TeamProfile.upsert({
     where: { teamId: ownerTeam.id },
-    update: { skillNote: '초보부터 중수까지', ...runningNoviceIntermediate, genderRule: '성별 무관' },
+    update: {
+      activityDays: ['tue', 'thu'],
+      activityFrequency: 'weekly_2',
+      activityTimeSlots: ['evening'],
+      activityTypes: ['regular_meetup', 'training'],
+      skillNote: '초보부터 중수까지',
+      ...runningNoviceIntermediate,
+      genderRule: '성별 무관',
+    },
     create: {
       teamId: ownerTeam.id,
       description: '평일 저녁에 함께 뛰는 v1 seed 팀입니다.',
       activityNote: '주 2회 러닝',
+      activityDays: ['tue', 'thu'],
+      activityFrequency: 'weekly_2',
+      activityTimeSlots: ['evening'],
+      activityTypes: ['regular_meetup', 'training'],
       skillNote: '초보부터 중수까지',
       ...runningNoviceIntermediate,
       genderRule: '성별 무관',
@@ -657,10 +673,21 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
   });
   await prisma.v1TeamProfile.upsert({
     where: { teamId: applicantTeam.id },
-    update: { ...futsalBeginnerAdvanced, genderRule: '남' },
+    update: {
+      activityDays: ['sat', 'sun'],
+      activityFrequency: 'weekly_1',
+      activityTimeSlots: ['morning', 'afternoon'],
+      activityTypes: ['friendly_match', 'team_match'],
+      ...futsalBeginnerAdvanced,
+      genderRule: '남',
+    },
     create: {
       teamId: applicantTeam.id,
       description: '주말 풋살 상대를 찾는 v1 seed 팀입니다.',
+      activityDays: ['sat', 'sun'],
+      activityFrequency: 'weekly_1',
+      activityTimeSlots: ['morning', 'afternoon'],
+      activityTypes: ['friendly_match', 'team_match'],
       ...futsalBeginnerAdvanced,
       genderRule: '남',
     },

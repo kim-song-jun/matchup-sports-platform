@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueries } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
@@ -12,6 +13,7 @@ import {
   useV1RecordSearch,
   useV1RejectTeamJoinApplication,
   useV1RemoveTeamMembership,
+  useV1ResolveChatRoom,
   useV1SendTeamInvitation,
   useV1TeamDetail,
   useV1TeamInvitations,
@@ -23,8 +25,9 @@ import {
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { V1ApiError } from '@/lib/api-client';
+import { V1ApiError, v1Get } from '@/lib/api-client';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -72,12 +75,24 @@ export function TeamListPageClient() {
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
 
-  if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
-
   const base = getTeamListViewModel();
   const items = query.data?.items;
   const visibleItems = filterTeamsByLevels(items, selectedLevels);
-  const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
+  const activityDetailQueries = useQueries({
+    queries: visibleItems.map((item) => {
+      const teamId = item.teamId ?? item.id;
+      const needsActivityFallback = !item.activitySummary && !item.activityAreaText;
+      return {
+        queryKey: [...v1Keys.team(teamId), 'detail', 'list-activity'] as const,
+        queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
+        enabled: Boolean(teamId && needsActivityFallback),
+        staleTime: 30_000,
+      };
+    }),
+  });
+  const visibleTeams = visibleItems.map((item, index) => toTeam(withListActivityFallback(item, activityDetailQueries[index]?.data), base.teams[index] ?? base.teams[0]));
+
+  if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const countItems = selectedSportId ? (sportCounts.data?.items ?? visibleItems) : visibleItems;
   const isListLoading = query.isLoading && !items;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
@@ -167,6 +182,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
+  const resolveChat = useV1ResolveChatRoom();
   const openMatchesQuery = useV1TeamMatches(
     { teamId, status: 'recruiting', limit: 5 },
     { enabled: Boolean(query.data) },
@@ -188,7 +204,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           ...fallback.team,
           ...toTeamDetail(query.data, fallback.team),
           description: query.data.profile.introduction ?? '',
-          activity: query.data.profile.activityAreaText ?? '',
+          activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
           condition: formatTeamDetailLevel(query.data),
           genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
           schedule: '',
@@ -205,24 +221,35 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           memberAccess: {
             canView: query.data.canViewMembers,
             enabled: query.data.membersVisibilityEnabled,
-            message: query.data.canViewMembers
-              ? '멤버 목록을 볼 수 있어요.'
-              : query.data.viewer.role === 'member'
-                ? '운영진이 멤버 목록을 비공개로 설정했어요.'
-                : '팀 멤버만 멤버 목록을 볼 수 있어요.',
+            message: query.data.membersVisibilityEnabled
+              ? '멤버 목록이 팀 멤버에게 공개 중이에요.'
+              : isTeamOperatorRole(query.data.viewer.role)
+                ? '멤버 목록은 비공개예요. 운영진이라 전체 목록을 볼 수 있어요.'
+                : query.data.viewer.role === 'member'
+                  ? '운영진이 멤버 목록을 비공개로 설정했어요.'
+                  : '팀 멤버만 멤버 목록을 볼 수 있어요.',
           },
         },
         mode: toDetailMode(query.data),
-        ctaLabel: ctaLabel(query.data, eligibility.data),
-        ctaPending: join.isPending || withdraw.isPending,
-        onCta: ctaAction({
+        ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
+        ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
+        onCta: teamDetailCtaAction({
           team: query.data,
           eligibility: eligibility.data,
-          manage: () => router.push(`/teams/${teamId}/members`),
-          myTeam: () => router.push(`/my/teams/${teamId}`),
+          chat: async () => {
+            const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
+            router.push(result.route || `/chat/${result.roomId}`);
+          },
           join: () => join.mutateAsync({ message: null }),
           withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
+        ctaSuccessMessage: query.data.viewer.role === 'none'
+          ? undefined
+          : '팀 채팅으로 이동해요.',
+        ctaFailureMessage: query.data.viewer.role === 'none'
+          ? undefined
+          : '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.',
+        operations: buildTeamOperations(query.data),
         onShare: () => shareTeam(query.data),
         openMatches,
         openMatchesLoading: openMatchesQuery.isLoading,
@@ -238,7 +265,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
   const viewerRole = team.data?.viewer.role;
-  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
+  const canManageMembers = isTeamOperatorRole(viewerRole);
   const canDelegateOwner = viewerRole === 'owner';
   const canManageInvitations = canManageMembers;
   const canReviewApplications = canManageMembers;
@@ -385,6 +412,20 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   );
 }
 
+function withListActivityFallback(team: V1Team, detail?: V1TeamDetail): V1Team {
+  if (team.activitySummary || team.activityAreaText || !detail) return team;
+  return {
+    ...team,
+    activityAreaText: detail.profile.activityAreaText ?? null,
+    activityDays: detail.profile.activityDays ?? [],
+    activityFrequency: detail.profile.activityFrequency ?? null,
+    activityTimeSlots: detail.profile.activityTimeSlots ?? [],
+    activityTypes: detail.profile.activityTypes ?? [],
+    activityMemo: detail.profile.activityMemo ?? null,
+    activitySummary: detail.profile.activitySummary ?? detail.profile.activityAreaText ?? null,
+  };
+}
+
 function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
   const id = team.teamId ?? team.id;
   const sportName = team.sport?.name ?? team.sportName;
@@ -396,6 +437,8 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     id,
     name: team.name,
     logo: team.name.slice(0, 1),
+    logoUrl: team.logoUrl ?? null,
+    coverImageUrl: team.coverImageUrl ?? null,
     sport: sportName,
     sports: [sportName],
     region: regionName,
@@ -406,7 +449,7 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     tags: [levelTag, genderRule].filter(Boolean),
     genderRule,
     intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
-    next: '',
+    next: team.activitySummary ?? team.activityAreaText ?? '',
   };
 }
 
@@ -522,6 +565,8 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     id: team.teamId,
     name: team.name,
     logo: team.name.slice(0, 1),
+    logoUrl: team.profile.logoUrl ?? null,
+    coverImageUrl: team.profile.coverImageUrl ?? null,
     sport: team.sport.name,
     sports: [team.sport.name],
     region: team.region?.name ?? '지역 미정',
@@ -545,46 +590,71 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
 }
 
 function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {
-  if (team.viewer.role === 'owner' || team.viewer.role === 'manager' || team.viewer.role === 'member') return 'mine';
+  if (isTeamMemberRole(team.viewer.role)) return 'mine';
   if (team.viewer.joinState === 'requested') return 'pending';
   if (team.profile.joinPolicy === 'closed') return 'closed';
   return 'default';
 }
 
-function ctaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
-  if (team.viewer.role === 'owner' || team.viewer.role === 'manager') return '팀 관리';
-  if (team.viewer.role === 'member') return '내 팀';
+function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
+  if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
   if (eligibility?.joinState === 'requested') return '신청 취소';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
 }
 
-function ctaAction({
+function teamDetailCtaAction({
   team,
   eligibility,
-  manage,
-  myTeam,
+  chat,
   join,
   withdraw,
 }: {
   team: V1TeamDetail;
   eligibility?: { eligible: boolean; joinState: string };
-  manage: () => void;
-  myTeam: () => void;
+  chat: () => Promise<unknown>;
   join: () => Promise<unknown>;
   withdraw: () => Promise<unknown>;
 }): (() => void | Promise<unknown>) | undefined {
-  if (team.viewer.role === 'owner' || team.viewer.role === 'manager') return manage;
-  if (team.viewer.role === 'member') return myTeam;
+  if (isTeamMemberRole(team.viewer.role)) return chat;
   if (eligibility?.joinState === 'requested') return withdraw;
   if (eligibility?.eligible) return join;
   return undefined;
 }
 
+function buildTeamOperations(team: V1TeamDetail): TeamDetailViewModel['operations'] {
+  if (!isTeamOperatorRole(team.viewer.role)) return undefined;
+  return [
+    {
+      label: '팀 정보 수정',
+      sub: '소개, 조건, 로고와 공개 범위를 수정해요.',
+      href: `/teams/${team.teamId}/edit`,
+    },
+    {
+      label: '멤버 관리',
+      sub: '멤버 역할, 가입 신청, 초대를 관리해요.',
+      href: `/teams/${team.teamId}/members`,
+    },
+    {
+      label: '팀매치 만들기',
+      sub: '이 팀 명의로 새 팀매치를 모집해요.',
+      href: '/team-matches/new/team',
+    },
+  ];
+}
+
 function roleLabel(role: string) {
   if (role === 'owner') return '팀장';
-  if (role === 'manager') return '운영진';
+  if (role === 'manager' || role === 'admin') return '운영진';
   return '멤버';
+}
+
+function isTeamOperatorRole(role?: string | null) {
+  return role === 'owner' || role === 'manager' || role === 'admin';
+}
+
+function isTeamMemberRole(role?: string | null) {
+  return isTeamOperatorRole(role) || role === 'member';
 }
 
 function toMemberModel(

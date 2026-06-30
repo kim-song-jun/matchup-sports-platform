@@ -360,6 +360,7 @@ export type V1Team = {
   activityTypes?: string[];
   activityMemo?: string | null;
   activitySummary?: string | null;
+  memberGoalCount?: number | null;
   skillLevelText?: string | null;
   levelLabel?: string | null;
   minLevel?: { code: string; name: string } | null;
@@ -384,6 +385,7 @@ export type V1MyTeam = {
   activityTypes?: string[];
   activityMemo?: string | null;
   activitySummary?: string | null;
+  memberGoalCount?: number | null;
   sport: { sportId: string; name: string };
   region: { regionId: string; name: string; parentName?: string | null } | null;
   trust?: {

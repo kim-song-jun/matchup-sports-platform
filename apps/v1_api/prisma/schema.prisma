@@ -681,6 +681,7 @@ model V1TeamProfile {
   minSportLevelId String?   @map("min_sport_level_id")
   maxSportLevelId String?   @map("max_sport_level_id")
   genderRule      String?   @map("gender_rule")
+  memberGoalCount Int?      @map("member_goal_count")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")

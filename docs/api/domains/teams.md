@@ -73,8 +73,9 @@ CAUTION:
 | `maxLevelCode` | level code | No |
 | `genderRule` | string | No |
 | `joinPolicy` | string | No |
+| `memberGoalCount` | number | No |
 
-- Activity profile fields are structured on `v1_team_profiles`: `activity_days`, `activity_frequency`, `activity_time_slots`, and `activity_types`. Responses include `activitySummary`; `activityAreaText` remains as a compatibility fallback from `activity_note`.
+- Activity profile fields are structured on `v1_team_profiles`: `activity_days`, `activity_frequency`, `activity_time_slots`, `activity_types`, and `member_goal_count`. Responses include `activitySummary` and `memberGoalCount`; `activityAreaText` remains as a compatibility fallback from `activity_note`.
 - Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
 - `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
 - `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.

@@ -49,6 +49,7 @@ type TeamWithRelations = V1Team & {
     minSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
     maxSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
     genderRule: string | null;
+    memberGoalCount: number | null;
   } | null;
   memberships: Array<
     V1TeamMembership & {
@@ -144,7 +145,7 @@ export class TeamsService {
         maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
         genderRule: team.profile?.genderRule ?? '성별 무관',
         joinPolicy: team.joinPolicy,
-        memberGoalCount: null,
+        memberGoalCount: team.profile?.memberGoalCount ?? null,
       },
       owner: {
         userId: team.ownerUser.id,
@@ -218,6 +219,7 @@ export class TeamsService {
               minSportLevelId: levelRange.minSportLevelId,
               maxSportLevelId: levelRange.maxSportLevelId,
               genderRule: dto.genderRule ?? null,
+              memberGoalCount: dto.memberGoalCount ?? null,
             },
           },
         },
@@ -307,6 +309,7 @@ export class TeamsService {
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          memberGoalCount: dto.memberGoalCount ?? null,
         },
         create: {
           teamId: team.id,
@@ -322,6 +325,7 @@ export class TeamsService {
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          memberGoalCount: dto.memberGoalCount ?? null,
         },
       });
 
@@ -462,6 +466,7 @@ export class TeamsService {
                 activityTypes: true,
                 skillNote: true,
                 genderRule: true,
+                memberGoalCount: true,
               },
             },
             trustScore: { select: { trustState: true, mannerScore: true } },
@@ -488,6 +493,7 @@ export class TeamsService {
           activityTypes: membership.team.profile?.activityTypes ?? [],
           activityMemo: membership.team.profile?.activityNote ?? null,
           activitySummary: formatTeamActivitySummary(membership.team.profile),
+          memberGoalCount: membership.team.profile?.memberGoalCount ?? null,
           sport: { sportId: membership.team.sport.id, name: membership.team.sport.name },
           region: membership.team.region
             ? {
@@ -1671,6 +1677,7 @@ export class TeamsService {
           minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
           maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
           genderRule: true,
+          memberGoalCount: true,
         },
       },
       memberships: {
@@ -1726,6 +1733,7 @@ export class TeamsService {
       minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
       maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
       genderRule: team.profile?.genderRule ?? '성별 무관',
+      memberGoalCount: team.profile?.memberGoalCount ?? null,
       joinPolicy: team.joinPolicy,
       memberCount: team.memberCount,
       trustState: team.trustScore?.trustState ?? 'none',

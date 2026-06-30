@@ -53,7 +53,7 @@ Structured activity profile fields:
 - `activityTypes: string[]` — `regular_meetup|friendly_match|team_match|tournament_prep|training|free_participation|beginner_friendly|competitive`
 - `activityMemo: string | null`
 
-Team list, detail, and `/me/teams` responses include those fields plus `activitySummary`. `activityAreaText` remains as a compatibility/fallback field backed by the existing `activity_note` column.
+Team list, detail, and `/me/teams` responses include those fields plus `activitySummary` and `memberGoalCount`. `activityAreaText` remains as a compatibility/fallback field backed by the existing `activity_note` column.
 
 Team list/detail and `/me/teams` `region` includes `{ regionId, name, parentName? }`; `regionName` is the display label (`parentName + name` for district regions).
 

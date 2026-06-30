@@ -444,7 +444,7 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     sports: [sportName],
     region: regionName,
     members: team.memberCount,
-    capacity: 0,
+    capacity: team.memberGoalCount ?? team.memberCount,
     status: team.joinPolicy === 'closed' ? 'closed' : 'open',
     statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : '가입 신청 가능',
     tags: [levelTag, genderRule].filter(Boolean),

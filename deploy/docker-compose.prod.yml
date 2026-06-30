@@ -152,6 +152,8 @@ services:
     image: teameet-v1-api:latest
     container_name: teameet_v1_api
     restart: always
+    volumes:
+      - v1_uploads_data:/app/apps/v1_api/uploads
     environment:
       DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_PASSWORD:-${DB_PASSWORD}}@v1_postgres:5432/${V1_DB_NAME:-teameet_v1}
       JWT_SECRET: ${V1_JWT_SECRET:-${JWT_SECRET}}
@@ -243,3 +245,4 @@ volumes:
   postgres_data:
   v1_postgres_data:
   uploads_data:
+  v1_uploads_data:

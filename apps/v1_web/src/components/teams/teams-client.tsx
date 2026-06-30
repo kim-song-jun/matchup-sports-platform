@@ -563,6 +563,7 @@ function countTeamFilters(
 function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
   const levelLabel = formatTeamDetailLevel(team);
   const full = isTeamAtCapacity(team.memberCount, team.profile.memberGoalCount);
+  const recruitmentLabel = team.profile.joinPolicy === 'closed' ? '마감' : full ? '정원 마감' : '모집 중';
   return {
     ...fallback,
     id: team.teamId,
@@ -576,7 +577,7 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     members: team.memberCount,
     capacity: team.profile.memberGoalCount ?? 0,
     status: team.profile.joinPolicy === 'closed' || full ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
-    statusLabel: team.profile.joinPolicy === 'closed' ? '마감' : full ? '정원 마감' : team.viewer.joinState === 'requested' ? '검토 중' : team.viewer.role !== 'none' ? '내 팀' : '모집 중',
+    statusLabel: recruitmentLabel,
     genderRule: team.profile.genderRule ?? fallback.genderRule,
     intro: team.profile.introduction ?? fallback.intro,
     tags: levelLabel ? [levelLabel, team.profile.genderRule ?? fallback.genderRule] : fallback.tags,

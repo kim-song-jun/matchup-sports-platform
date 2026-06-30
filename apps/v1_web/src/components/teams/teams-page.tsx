@@ -353,7 +353,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />
-            <InfoChips label="종목" items={team.sports} />
+            <InfoRow label="종목" value={formatTeamSports(team.sports)} muted={team.sports.length === 0} />
             <InfoRow label="팀 소개" value={team.description} />
             <InfoRow label="시/도" value={team.city} />
             <InfoRow label="구/군" value={team.county} />
@@ -452,7 +452,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
         <Card pad={16}>
           <InfoRow label="팀명" value={team.name} />
-          <InfoChips label="종목" items={team.sports} />
+          <InfoRow label="종목" value={formatTeamSports(team.sports)} muted={team.sports.length === 0} />
           <InfoRow label="팀 소개" value={team.description} />
           <InfoRow label="시/도" value={team.city} />
           <InfoRow label="구/군" value={team.county} />
@@ -603,6 +603,7 @@ export function TeamFormPageView({
           </div>
           <RegionSelect value={form?.regionId ?? ''} regions={form?.regions ?? []} onChange={form?.onRegionChange} />
           <CreateField label="팀 소개" value={team.description} placeholder="예: 주 1회 꾸준히 함께 경기할 멤버를 찾아요." multiline onChange={(value) => form?.onFieldChange('description', value)} />
+          {edit ? <TeamJoinPolicyField form={form} /> : null}
           <div className="tm-create-two-col"><TeamLevelSelect value={team.level} onChange={(value) => form?.onFieldChange('level', value)} /><TeamCapacityField value={team.capacity} onChange={(value) => form?.onFieldChange('capacity', value)} /></div>
           <GenderRuleSelector value={team.genderRule} onChange={(value) => form?.onFieldChange('genderRule', value)} />
           <TeamActivityFields team={team} form={form} />
@@ -616,6 +617,47 @@ export function TeamFormPageView({
       </div>
       <div className="tm-fixed-cta tm-team-form-cta tm-hide-desktop"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}><Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>{edit ? '취소' : '이전'}</Link><button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={form?.submitting} onClick={form?.onSubmit}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button></div></div>
     </AppChrome>
+  );
+}
+
+function TeamJoinPolicyField({ form }: { form?: TeamFormViewModel['form'] }) {
+  const options = [
+    {
+      value: 'approval_required' as const,
+      label: '가입 신청 가능',
+      description: '새 멤버가 가입 신청을 보내고 운영진이 승인해요.',
+    },
+    {
+      value: 'closed' as const,
+      label: '가입 닫힘',
+      description: '신규 가입 신청을 받지 않아요.',
+    },
+  ];
+
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">가입 신청 상태</div>
+      <div className="tm-team-form-chip-row" role="group" aria-label="가입 신청 상태 선택">
+        {options.map((option) => {
+          const active = form?.joinPolicy === option.value;
+          return (
+            <button
+              key={option.value}
+              className={`tm-chip ${active ? 'tm-chip-active' : ''}`}
+              type="button"
+              aria-pressed={active}
+              disabled={!form}
+              onClick={() => form?.onJoinPolicyChange(option.value)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>
+        {form?.joinPolicy === 'closed' ? options[1].description : options[0].description}
+      </div>
+    </div>
   );
 }
 
@@ -1394,6 +1436,10 @@ function TeamLogo({ team, large }: { team: Pick<TeamModel, 'logo' | 'logoUrl'>; 
 
 function SectionTitle({ title, sub }: { title: string; sub: string }) {
   return <div className="tm-section-title"><div className="tm-text-body-lg">{title}</div><div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div></div>;
+}
+
+function formatTeamSports(items: string[]) {
+  return items.length ? items.join(' · ') : '종목 미정';
 }
 
 function InfoRow({ label, value, muted }: { label: string; value: string; muted?: boolean }) {

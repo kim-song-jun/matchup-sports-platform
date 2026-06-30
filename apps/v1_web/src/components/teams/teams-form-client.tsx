@@ -88,6 +88,8 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const cancelHref = fromMy && teamId ? `/teams/${teamId}` : '/teams';
   const successHref = fromMy && teamId ? `/teams/${teamId}` : undefined; // undefined이면 API 응답 detailRoute 사용
   const query = useV1TeamDetail(teamId);
+  const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const updateTeam = useV1UpdateTeam(teamId);
   const uploadImages = useV1UploadImages();
   const uploadImage = async (file: File) => {
@@ -103,6 +105,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const [membersVisibilityEnabled, setMembersVisibilityEnabled] = useState(false);
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
   const updateTeamWithActivityCompatibility = async (
     payload: V1TeamMutationPayload & { version: string; membersVisibilityEnabled?: boolean },
     draft: TeamDraft,
@@ -152,8 +155,8 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     regionId,
     joinPolicy,
     membersVisibilityEnabled,
-    sports: query.data ? [{ id: query.data.sport.sportId, name: query.data.sport.name }] : [],
-    regions: query.data?.region ? [{ id: query.data.region.regionId, name: query.data.region.name }] : [],
+    sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? (query.data ? [{ id: query.data.sport.sportId, name: query.data.sport.name }] : []),
+    regions: regionOptions.length ? regionOptions : query.data?.region ? [{ id: query.data.region.regionId, name: query.data.region.name }] : [],
     error: query.isError ? '팀 정보를 불러오지 못했어요.' : error,
     submitting: query.isLoading || updateTeam.isPending,
     setDraft,

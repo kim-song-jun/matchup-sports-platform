@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { TeamListPageView } from './teams-page';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { TeamFormPageView, TeamListPageView } from './teams-page';
 import { getTeamListViewModel } from './teams.view-model';
-import type { TeamListViewModel } from './teams.types';
+import type { TeamFormViewModel, TeamListViewModel } from './teams.types';
 
 describe('TeamListPageView', () => {
   it('does not render sample team cards while the live team list is loading', () => {
@@ -68,5 +68,56 @@ describe('TeamListPageView', () => {
     expect(screen.queryByText('팀 보기 ›')).not.toBeInTheDocument();
     expect(screen.queryByText('알림받기')).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 21:00 정기전')).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamFormPageView', () => {
+  it('renders and updates the team join policy control', () => {
+    const onJoinPolicyChange = vi.fn();
+    const model: TeamFormViewModel = {
+      mode: 'edit',
+      team: {
+        name: '성수 풋살 크루',
+        logoUrl: null,
+        coverImageUrl: null,
+        sport: '풋살',
+        region: '서울 성동구',
+        description: '주 1회 경기하는 팀입니다.',
+        sports: ['풋살'],
+        city: '서울',
+        county: '성동구',
+        level: '입문-중수',
+        genderRule: '성별 무관',
+        activityDays: [],
+        activityFrequency: '',
+        activityTimeSlots: [],
+        activityTypes: [],
+        activityMemo: '',
+        capacity: 12,
+      },
+      form: {
+        sportId: 'sport-1',
+        regionId: 'region-1',
+        regions: [{ id: 'region-1', name: '서울 성동구' }],
+        sports: [{ id: 'sport-1', name: '풋살' }],
+        joinPolicy: 'approval_required',
+        membersVisibilityEnabled: true,
+        onFieldChange: vi.fn(),
+        onSportChange: vi.fn(),
+        onRegionChange: vi.fn(),
+        onJoinPolicyChange,
+        onMembersVisibilityChange: vi.fn(),
+        onSubmit: vi.fn(),
+      },
+    };
+
+    render(<TeamFormPageView model={model} />);
+
+    expect(screen.getByText('가입 신청 상태')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '가입 신청 가능' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: '가입 닫힘' }));
+
+    expect(onJoinPolicyChange).toHaveBeenCalledWith('closed');
   });
 });

@@ -120,6 +120,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
 
   useEffect(() => {
     if (!query.data) return;
+    const hydratedRegionName = formatTeamRegionName(query.data.region);
     setDraft({
       ...getTeamFormViewModel('edit').team,
       name: query.data.name,
@@ -140,6 +141,12 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
       activityMemo: normalizeHydratedActivityMemo(query.data.profile),
       capacity: query.data.profile.memberGoalCount ?? query.data.memberCount,
     });
+    setDraft((current) => ({
+      ...current,
+      region: hydratedRegionName ?? current.region,
+      city: getTeamRegionCity(query.data.region),
+      county: getTeamRegionCounty(query.data.region),
+    }));
     setSportId(query.data.sport.sportId);
     setRegionId(query.data.region?.regionId ?? '');
     setJoinPolicy(query.data.profile.joinPolicy === 'closed' ? 'closed' : 'approval_required');
@@ -156,7 +163,16 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     joinPolicy,
     membersVisibilityEnabled,
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? (query.data ? [{ id: query.data.sport.sportId, name: query.data.sport.name }] : []),
-    regions: regionOptions.length ? regionOptions : query.data?.region ? [{ id: query.data.region.regionId, name: query.data.region.name }] : [],
+    regions: regionOptions.length
+      ? regionOptions
+      : query.data?.region
+        ? [{
+            id: query.data.region.regionId,
+            name: formatTeamRegionName(query.data.region) ?? query.data.region.name,
+            shortName: query.data.region.name,
+            parentName: query.data.region.parentName ?? undefined,
+          }]
+        : [],
     error: query.isError ? '팀 정보를 불러오지 못했어요.' : error,
     submitting: query.isLoading || updateTeam.isPending,
     setDraft,
@@ -238,8 +254,12 @@ function buildModel({
         const region = regions.find((item) => item.id === nextRegionId);
         setRegionId(nextRegionId);
         if (region) {
-          const [city, ...countyParts] = region.name.split(' ');
-          setDraft((current) => ({ ...current, region: region.name, city, county: countyParts.join(' ') }));
+          setDraft((current) => ({
+            ...current,
+            region: region.name,
+            city: getTeamRegionOptionCity(region),
+            county: getTeamRegionOptionCounty(region),
+          }));
         }
       },
       onJoinPolicyChange: setJoinPolicy,
@@ -250,6 +270,37 @@ function buildModel({
       error,
     },
   };
+}
+
+function formatTeamRegionName(region?: { name: string; parentName?: string | null } | null) {
+  if (!region) return null;
+  return region.parentName ? `${region.parentName} ${region.name}` : region.name;
+}
+
+function getTeamRegionCity(region?: { name: string; parentName?: string | null } | null) {
+  if (!region) return '';
+  if (region.parentName) return region.parentName;
+  const [city, ...countyParts] = region.name.trim().split(/\s+/);
+  return countyParts.length ? city : '';
+}
+
+function getTeamRegionCounty(region?: { name: string; parentName?: string | null } | null) {
+  if (!region) return '';
+  if (region.parentName) return region.name;
+  const [city, ...countyParts] = region.name.trim().split(/\s+/);
+  return countyParts.length ? countyParts.join(' ') : city;
+}
+
+function getTeamRegionOptionCity(region: { name: string; shortName?: string; parentName?: string }) {
+  if (region.parentName) return region.parentName;
+  const [city, ...countyParts] = region.name.trim().split(/\s+/);
+  return countyParts.length ? city : '';
+}
+
+function getTeamRegionOptionCounty(region: { name: string; shortName?: string; parentName?: string }) {
+  if (region.parentName) return region.shortName ?? region.name;
+  const [city, ...countyParts] = region.name.trim().split(/\s+/);
+  return countyParts.length ? countyParts.join(' ') : region.shortName ?? city;
 }
 
 function buildPayload(draft: TeamDraft, sportId: string, regionId: string, joinPolicy: 'approval_required' | 'closed'): V1TeamMutationPayload | null {

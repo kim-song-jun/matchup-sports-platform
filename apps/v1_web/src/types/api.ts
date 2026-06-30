@@ -346,7 +346,7 @@ export type V1Team = {
   sportName: string;
   sport?: { sportId: string; name: string };
   regionName: string;
-  region?: { regionId: string; name: string } | null;
+  region?: { regionId: string; name: string; parentName?: string | null } | null;
   memberCount: number;
   trustState: TrustState | 'none';
   joinPolicy: 'approval_required' | 'closed';
@@ -590,7 +590,7 @@ export type V1TeamMembersPage = {
 export type V1TeamMatch = V1Match & {
   teamMatchId?: string;
   sport?: { sportId: string; name: string };
-  region?: { regionId: string; name: string } | null;
+  region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: { name: string; addressText?: string | null };
   displayState?: V1TeamMatchApiStatus;
   costNote?: string | null;

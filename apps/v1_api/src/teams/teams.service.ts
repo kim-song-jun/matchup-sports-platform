@@ -122,7 +122,7 @@ export class TeamsService {
       visibility: 'public',
       sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
-      regionName: team.region?.name ?? null,
+      regionName: formatRegionDisplayName(team.region),
       region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       joinPolicy: team.joinPolicy,
       trustState: team.trustScore?.trustState ?? 'none',
@@ -490,7 +490,11 @@ export class TeamsService {
           activitySummary: formatTeamActivitySummary(membership.team.profile),
           sport: { sportId: membership.team.sport.id, name: membership.team.sport.name },
           region: membership.team.region
-            ? { regionId: membership.team.region.id, name: membership.team.region.name }
+            ? {
+                regionId: membership.team.region.id,
+                name: membership.team.region.name,
+                parentName: membership.team.region.parent?.name ?? null,
+              }
             : null,
           trust: {
             trustState: membership.team.trustScore?.trustState ?? 'none',
@@ -1707,7 +1711,7 @@ export class TeamsService {
       coverImageUrl: team.profile?.coverImageUrl ?? null,
       sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
-      regionName: team.region?.name ?? null,
+      regionName: formatRegionDisplayName(team.region),
       region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       introductionPreview: team.profile?.description ? team.profile.description.slice(0, 120) : null,
       activityAreaText: team.profile?.activityNote ?? null,
@@ -1866,6 +1870,11 @@ function formatActivityTimeSlots(slots: string[]) {
 
 function formatActivityTypes(types: string[]) {
   return types.map((type) => ACTIVITY_TYPE_LABELS[type]).filter(Boolean).join('/') || null;
+}
+
+function formatRegionDisplayName(region?: { name: string; parent?: { name: string } | null } | null) {
+  if (!region) return null;
+  return region.parent?.name ? `${region.parent.name} ${region.name}` : region.name;
 }
 
 function getTeamOrderBy(sort: TeamsQueryDto['sort']): Prisma.V1TeamOrderByWithRelationInput[] {

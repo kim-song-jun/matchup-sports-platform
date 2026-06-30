@@ -55,7 +55,7 @@ Structured activity profile fields:
 
 Team list, detail, and `/me/teams` responses include those fields plus `activitySummary`. `activityAreaText` remains as a compatibility/fallback field backed by the existing `activity_note` column.
 
-Team list/detail `region` includes `{ regionId, name, parentName? }`; clients should display `parentName + name` for district regions.
+Team list/detail and `/me/teams` `region` includes `{ regionId, name, parentName? }`; `regionName` is the display label (`parentName + name` for district regions).
 
 `UpdateTeamDto` adds `version: string`.
 

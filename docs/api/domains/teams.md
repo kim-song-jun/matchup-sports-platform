@@ -50,7 +50,7 @@ Query:
 CAUTION:
 
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
-- Region response fields include `region.parentName` when the selected region has a parent; clients should display `parentName + name` for district labels.
+- Team list/detail/my-teams region fields include `region.parentName` when the selected region has a parent; `regionName` is the display label (`parentName + name` for district regions).
 
 ## POST /teams (CreateTeamDto)
 

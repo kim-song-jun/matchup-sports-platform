@@ -197,6 +197,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
+  const regionParts = splitTeamRegionName(query.data?.region?.name);
   const model: TeamDetailViewModel = query.data
     ? {
         ...fallback,
@@ -208,8 +209,8 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           condition: formatTeamDetailLevel(query.data),
           genderRule: query.data.profile.genderRule ?? fallback.team.genderRule,
           schedule: '',
-          city: query.data.region?.name?.split(' ')[0] ?? '',
-          county: query.data.region?.name ?? fallback.team.county,
+          city: regionParts.city,
+          county: regionParts.county,
           level: formatTeamDetailLevel(query.data) || fallback.team.level,
           membersList: query.data.membersPreview.map((member) => ({
             name: member.displayName,
@@ -587,6 +588,14 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   const maxName = team.profile.maxLevel?.name?.trim();
   if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
   return minName ?? maxName ?? '';
+}
+
+function splitTeamRegionName(name?: string | null) {
+  const trimmed = name?.trim();
+  if (!trimmed) return { city: '', county: '지역 미정' };
+  const [city, ...countyParts] = trimmed.split(/\s+/);
+  if (countyParts.length === 0) return { city: '', county: city };
+  return { city, county: countyParts.join(' ') };
 }
 
 function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {

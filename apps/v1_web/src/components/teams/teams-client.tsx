@@ -197,7 +197,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
-  const regionParts = splitTeamRegionName(query.data?.region?.name);
+  const regionParts = splitTeamRegion(query.data?.region);
   const model: TeamDetailViewModel = query.data
     ? {
         ...fallback,
@@ -430,7 +430,7 @@ function withListActivityFallback(team: V1Team, detail?: V1TeamDetail): V1Team {
 function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
   const id = team.teamId ?? team.id;
   const sportName = team.sport?.name ?? team.sportName;
-  const regionName = team.region?.name ?? team.regionName ?? '지역 미정';
+  const regionName = formatTeamRegion(team.region, team.regionName);
   const levelTag = formatTeamLevelTag(team);
   const genderRule = team.genderRule ?? '';
 
@@ -570,7 +570,7 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     coverImageUrl: team.profile.coverImageUrl ?? null,
     sport: team.sport.name,
     sports: [team.sport.name],
-    region: team.region?.name ?? '지역 미정',
+    region: formatTeamRegion(team.region),
     members: team.memberCount,
     capacity: team.profile.memberGoalCount ?? team.memberCount,
     status: team.profile.joinPolicy === 'closed' ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
@@ -590,8 +590,14 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   return minName ?? maxName ?? '';
 }
 
-function splitTeamRegionName(name?: string | null) {
-  const trimmed = name?.trim();
+function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
+  if (region?.parentName) return `${region.parentName} ${region.name}`;
+  return region?.name ?? fallback ?? '지역 미정';
+}
+
+function splitTeamRegion(region?: { name: string; parentName?: string | null } | null) {
+  if (region?.parentName) return { city: region.parentName, county: region.name };
+  const trimmed = region?.name?.trim();
   if (!trimmed) return { city: '', county: '지역 미정' };
   const [city, ...countyParts] = trimmed.split(/\s+/);
   if (countyParts.length === 0) return { city: '', county: city };

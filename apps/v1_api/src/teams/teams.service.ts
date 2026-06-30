@@ -35,7 +35,7 @@ import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
 
 type TeamWithRelations = V1Team & {
   sport: { id: string; name: string };
-  region: { id: string; name: string } | null;
+  region: { id: string; name: string; parent: { name: string } | null } | null;
   profile: {
     logoUrl: string | null;
     coverImageUrl: string | null;
@@ -123,7 +123,7 @@ export class TeamsService {
       sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
       regionName: team.region?.name ?? null,
-      region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
+      region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       joinPolicy: team.joinPolicy,
       trustState: team.trustScore?.trustState ?? 'none',
       version: team.updatedAt.toISOString(),
@@ -449,7 +449,7 @@ export class TeamsService {
         team: {
           include: {
             sport: { select: { id: true, name: true } },
-            region: { select: { id: true, name: true } },
+            region: { select: { id: true, name: true, parent: { select: { name: true } } } },
             profile: {
               select: {
                 logoUrl: true,
@@ -1652,7 +1652,7 @@ export class TeamsService {
   private teamInclude(user: V1AuthUser | null) {
     return {
       sport: { select: { id: true, name: true } },
-      region: { select: { id: true, name: true } },
+      region: { select: { id: true, name: true, parent: { select: { name: true } } } },
       profile: {
         select: {
           logoUrl: true,
@@ -1708,7 +1708,7 @@ export class TeamsService {
       sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
       regionName: team.region?.name ?? null,
-      region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
+      region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       introductionPreview: team.profile?.description ? team.profile.description.slice(0, 120) : null,
       activityAreaText: team.profile?.activityNote ?? null,
       activityDays: team.profile?.activityDays ?? [],

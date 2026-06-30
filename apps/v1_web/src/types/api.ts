@@ -197,7 +197,7 @@ export type V1Match = {
   minLevel?: { code: string; name: string } | null;
   maxLevel?: { code: string; name: string } | null;
   regionName?: string | null;
-  region?: { regionId: string; name: string } | null;
+  region?: { regionId: string; name: string; parentName?: string | null } | null;
   placeName: string;
   place?: { name: string; addressText?: string | null };
   startsAt: string;
@@ -385,7 +385,7 @@ export type V1MyTeam = {
   activityMemo?: string | null;
   activitySummary?: string | null;
   sport: { sportId: string; name: string };
-  region: { regionId: string; name: string } | null;
+  region: { regionId: string; name: string; parentName?: string | null } | null;
   trust?: {
     trustState: TrustState | 'none';
     score: number | null;
@@ -410,7 +410,7 @@ export type V1TeamDetail = {
   sportName?: string;
   sport: { sportId: string; name: string };
   regionName?: string | null;
-  region: { regionId: string; name: string } | null;
+  region: { regionId: string; name: string; parentName?: string | null } | null;
   joinPolicy?: 'approval_required' | 'closed';
   trustState?: TrustState | 'none';
   version?: string;

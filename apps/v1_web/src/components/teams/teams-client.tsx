@@ -433,6 +433,7 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
   const regionName = formatTeamRegion(team.region, team.regionName);
   const levelTag = formatTeamLevelTag(team);
   const genderRule = team.genderRule ?? '';
+  const full = isTeamAtCapacity(team.memberCount, team.memberGoalCount);
 
   return {
     id,
@@ -444,9 +445,9 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     sports: [sportName],
     region: regionName,
     members: team.memberCount,
-    capacity: team.memberGoalCount ?? team.memberCount,
-    status: team.joinPolicy === 'closed' ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : '가입 신청 가능',
+    capacity: team.memberGoalCount ?? 0,
+    status: team.joinPolicy === 'closed' || full ? 'closed' : 'open',
+    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
     tags: [levelTag, genderRule].filter(Boolean),
     genderRule,
     intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
@@ -561,6 +562,7 @@ function countTeamFilters(
 
 function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
   const levelLabel = formatTeamDetailLevel(team);
+  const full = isTeamAtCapacity(team.memberCount, team.profile.memberGoalCount);
   return {
     ...fallback,
     id: team.teamId,
@@ -572,13 +574,17 @@ function toTeamDetail(team: V1TeamDetail, fallback: TeamModel): TeamModel {
     sports: [team.sport.name],
     region: formatTeamRegion(team.region),
     members: team.memberCount,
-    capacity: team.profile.memberGoalCount ?? team.memberCount,
-    status: team.profile.joinPolicy === 'closed' ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
-    statusLabel: team.profile.joinPolicy === 'closed' ? '마감' : team.viewer.joinState === 'requested' ? '검토 중' : team.viewer.role !== 'none' ? '내 팀' : '모집 중',
+    capacity: team.profile.memberGoalCount ?? 0,
+    status: team.profile.joinPolicy === 'closed' || full ? 'closed' : team.viewer.joinState === 'requested' ? 'reviewing' : team.viewer.role !== 'none' ? 'mine' : 'open',
+    statusLabel: team.profile.joinPolicy === 'closed' ? '마감' : full ? '정원 마감' : team.viewer.joinState === 'requested' ? '검토 중' : team.viewer.role !== 'none' ? '내 팀' : '모집 중',
     genderRule: team.profile.genderRule ?? fallback.genderRule,
     intro: team.profile.introduction ?? fallback.intro,
     tags: levelLabel ? [levelLabel, team.profile.genderRule ?? fallback.genderRule] : fallback.tags,
   };
+}
+
+function isTeamAtCapacity(memberCount: number, memberGoalCount?: number | null) {
+  return memberGoalCount != null && memberCount >= memberGoalCount;
 }
 
 function formatTeamDetailLevel(team: V1TeamDetail) {

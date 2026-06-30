@@ -298,6 +298,28 @@ describe('TeamsService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('approveJoinApplication: full team cannot approve a requested application', async () => {
+    const fullTeamApplication = applicationRow({
+      status: 'requested',
+      team: teamRow({
+        joinPolicy: 'approval_required',
+        status: 'active',
+        memberCount: 5,
+        profile: { memberGoalCount: 5 },
+      }),
+    });
+
+    prisma.v1TeamJoinApplication.findFirst.mockResolvedValueOnce(fullTeamApplication);
+    prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ id: 'manager-mem', role: 'manager' });
+
+    await expect(
+      service.approveJoinApplication(manager, 'app-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TEAM_FULL' }),
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   // ─── approveJoinApplication: 이미 처리된 신청 → 409 STATE_CONFLICT ───────────
 
   it('approveJoinApplication: 이미 approved인 신청은 다시 승인 불가 → 409 STATE_CONFLICT', async () => {
@@ -447,6 +469,28 @@ describe('TeamsService', () => {
       service.createJoinApplication(member, 'team-1', {}),
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'JOIN_CLOSED' }),
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('createJoinApplication: full team cannot receive join applications', async () => {
+    const fullTeam = {
+      ...teamRow({ joinPolicy: 'approval_required', memberCount: 5 }),
+      sport: { id: 's-1', name: 'sport' },
+      region: null,
+      profile: { memberGoalCount: 5 },
+      memberships: [],
+      joinApplications: [],
+      trustScore: null,
+      ownerUser: { id: owner.id, profile: null },
+    };
+
+    prisma.v1Team.findFirst.mockResolvedValueOnce(fullTeam);
+
+    await expect(
+      service.createJoinApplication(member, 'team-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TEAM_FULL' }),
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -688,6 +732,25 @@ describe('TeamsService', () => {
       expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
     });
 
+    it('정원이 찬 팀은 초대를 보낼 수 없다 → 409 TEAM_FULL', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValueOnce({ role: 'owner' });
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        id: 'team-1',
+        name: '팀',
+        status: 'active',
+        memberCount: 5,
+        profile: { memberGoalCount: 5 },
+      });
+
+      await expect(
+        service.createInvitation(owner, 'team-1', { invitedEmail: invitee.email }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'TEAM_FULL' }),
+      });
+      expect(prisma.v1User.findUnique).not.toHaveBeenCalled();
+      expect(prisma.v1TeamInvitation.create).not.toHaveBeenCalled();
+    });
+
     it('manager 권한으로 초대 가능 (owner 가 아니어도 성공)', async () => {
       setupCreateInvitationSuccess('manager');
       prisma.v1TeamInvitation.create.mockResolvedValueOnce({
@@ -794,6 +857,20 @@ describe('TeamsService', () => {
       prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue(null);
       prisma.v1ChatRoomParticipant.create.mockResolvedValue({ id: 'part-1' });
     }
+
+    it('full team cannot accept a pending invitation', async () => {
+      const inv = invitationRow({
+        invitedUserId: invitee.id,
+        status: 'pending',
+        team: { id: 'team-1', name: '테스트팀', status: 'active', memberCount: 5, profile: { memberGoalCount: 5 } },
+      });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+
+      await expect(service.acceptInvitation(invitee, 'inv-1')).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'TEAM_FULL' }),
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
 
     it('초대받은 본인이 수락 → membership active + memberCount increment', async () => {
       const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });

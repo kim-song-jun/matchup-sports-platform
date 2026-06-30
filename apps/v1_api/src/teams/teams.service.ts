@@ -64,6 +64,11 @@ type TeamWithRelations = V1Team & {
   };
 };
 
+type TeamCapacityLike = {
+  memberCount: number;
+  profile?: { memberGoalCount: number | null } | null;
+};
+
 @Injectable()
 export class TeamsService {
   constructor(
@@ -281,6 +286,7 @@ export class TeamsService {
     }
 
     await this.validateMasterRefs(dto.sportId, dto.regionId);
+    this.assertMemberGoalFitsCurrentMembers(dto.memberGoalCount, team.memberCount);
     const updated = await this.prisma.$transaction(async (tx) => {
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const nextTeam = await tx.v1Team.update({
@@ -929,6 +935,7 @@ export class TeamsService {
     if (application.team.status !== 'active' || application.team.joinPolicy === 'closed') {
       throw stateConflict('Team is not accepting join applications');
     }
+    this.assertTeamHasCapacity(application.team);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updatedApplication = await tx.v1TeamJoinApplication.update({
@@ -1090,7 +1097,7 @@ export class TeamsService {
 
     const team = await this.prisma.v1Team.findFirst({
       where: { id: teamId, deletedAt: null },
-      select: { id: true, name: true, status: true },
+      select: { id: true, name: true, status: true, memberCount: true, profile: { select: { memberGoalCount: true } } },
     });
     if (!team) {
       throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
@@ -1098,6 +1105,7 @@ export class TeamsService {
     if (team.status !== 'active') {
       throw stateConflict('Team is not active', 'STATE_CONFLICT');
     }
+    this.assertTeamHasCapacity(team);
 
     const invitedUser = await this.prisma.v1User.findUnique({
       where: { email: dto.invitedEmail },
@@ -1295,7 +1303,15 @@ export class TeamsService {
         invitedUserId: true,
         invitedByUserId: true,
         status: true,
-        team: { select: { id: true, name: true, status: true, memberCount: true } },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            memberCount: true,
+            profile: { select: { memberGoalCount: true } },
+          },
+        },
       },
     });
     if (!invitation) {
@@ -1324,6 +1340,10 @@ export class TeamsService {
         'STATE_CONFLICT',
       );
     }
+    if (invitation.team.status !== 'active') {
+      throw stateConflict('Team is not active', 'TEAM_NOT_ACTIVE');
+    }
+    this.assertTeamHasCapacity(invitation.team);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updatedInvitation = await tx.v1TeamInvitation.update({
@@ -1575,7 +1595,7 @@ export class TeamsService {
         id: membershipId,
         team: { deletedAt: null },
       },
-      include: { team: true },
+      include: { team: { include: { profile: { select: { memberGoalCount: true } } } } },
     });
 
     if (!membership) {
@@ -1636,6 +1656,18 @@ export class TeamsService {
         code: 'PERMISSION_DENIED',
         message: 'Account cannot mutate teams',
       });
+    }
+  }
+
+  private assertMemberGoalFitsCurrentMembers(memberGoalCount: number | null | undefined, memberCount: number) {
+    if (memberGoalCount != null && memberGoalCount < memberCount) {
+      throw validationError('memberGoalCount cannot be lower than the current member count', 'memberGoalCount');
+    }
+  }
+
+  private assertTeamHasCapacity(team: TeamCapacityLike) {
+    if (isTeamFull(team)) {
+      throw stateConflict('Team member capacity has been reached', 'TEAM_FULL');
     }
   }
 
@@ -1783,12 +1815,13 @@ export class TeamsService {
       };
     }
 
+    const full = isTeamFull(team);
     return {
       role: 'none',
       membershipId: null,
       joinState: 'none',
-      canRequestJoin: team.joinPolicy === 'approval_required',
-      disabledReason: team.joinPolicy === 'approval_required' ? null : 'JOIN_CLOSED',
+      canRequestJoin: team.joinPolicy === 'approval_required' && !full,
+      disabledReason: team.joinPolicy !== 'approval_required' ? 'JOIN_CLOSED' : full ? 'TEAM_FULL' : null,
       manageRoute: null,
     };
   }
@@ -1921,7 +1954,7 @@ function teamLevelCodeWhere(levelCodes: ReturnType<typeof parseLevelCodes>): Pri
 }
 
 function getJoinReason(
-  team: V1Team,
+  team: V1Team & TeamCapacityLike,
   viewer: ReturnType<TeamsService['getViewer']>,
   user: V1AuthUser,
 ) {
@@ -1930,10 +1963,17 @@ function getJoinReason(
   if (viewer.joinState === 'member') return 'ALREADY_MEMBER';
   if (viewer.joinState === 'requested') return 'ALREADY_REQUESTED';
   if (team.joinPolicy === 'closed') return 'JOIN_CLOSED';
+  if (isTeamFull(team)) return 'TEAM_FULL';
   return 'OK';
 }
 
+function isTeamFull(team: TeamCapacityLike) {
+  const memberGoalCount = team.profile?.memberGoalCount ?? null;
+  return memberGoalCount != null && team.memberCount >= memberGoalCount;
+}
+
 function getJoinReasonMessage(reasonCode: string) {
+  if (reasonCode === 'TEAM_FULL') return 'Team member capacity has been reached';
   const messages: Record<string, string> = {
     OK: '가입 신청할 수 있어요.',
     ALREADY_MEMBER: '이미 팀 멤버예요.',

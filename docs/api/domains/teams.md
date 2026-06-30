@@ -76,6 +76,8 @@ CAUTION:
 | `memberGoalCount` | number | No |
 
 - Activity profile fields are structured on `v1_team_profiles`: `activity_days`, `activity_frequency`, `activity_time_slots`, `activity_types`, and `member_goal_count`. Responses include `activitySummary` and `memberGoalCount`; `activityAreaText` remains as a compatibility fallback from `activity_note`.
+- `memberGoalCount` is the team capacity. When `memberCount >= memberGoalCount`, join applications, join approvals, team invitations, and invitation acceptance fail with `TEAM_FULL`.
+- Team capacity cannot be updated below the current `memberCount`.
 - Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
 - `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
 - `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.

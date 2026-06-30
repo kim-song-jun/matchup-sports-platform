@@ -69,6 +69,8 @@ Team list/detail and `/me/teams` `region` includes `{ regionId, name, parentName
 
 - V1 has no open instant join. Team join is `approval_required` or `closed`.
 - Team creator becomes owner.
+- `memberGoalCount` is the team capacity. When `memberCount >= memberGoalCount`, join applications, join approvals, team invitations, and invitation acceptance fail with `TEAM_FULL`.
+- Team capacity cannot be updated below the current `memberCount`.
 - Owner is not changed through the general role API.
 - Manager limit is enforced by service logic.
 - Approving a join application creates or restores an active member.

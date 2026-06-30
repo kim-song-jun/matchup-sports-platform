@@ -302,6 +302,8 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const locked = mode === 'pending' || mode === 'closed';
   const cta = model.ctaLabel ?? (mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
+  const memberCapacity = formatMemberCapacity(team);
+  const capacity = formatCapacity(team);
   const [heroMessage, setHeroMessage] = useState('');
 
   const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string, failureMessage = '잠시 후 다시 시도해 주세요.') => {
@@ -346,7 +348,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
               <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-              <span className="tm-badge tm-badge-grey">{team.members}명</span>
+              <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
             </div>
           </Card>
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
@@ -359,7 +361,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <InfoRow label="구/군" value={team.county} />
             <InfoRow label="레벨" value={team.level} />
             <InfoRow label="성별 조건" value={team.genderRule} />
-            <InfoRow label="정원" value={`${team.capacity}명`} />
+            <InfoRow label="정원" value={capacity} />
             <InfoRow label="모집 여부" value={team.statusLabel} />
             <InfoRow label="활동 일정" value={team.activity || '활동 일정 미정'} muted={!team.activity} />
             {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
@@ -397,7 +399,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {/* 핵심 결정단서: 정원·모집상태·정기일정 — 가입 전 즉시 판단에 필요한 3가지 */}
           <div className="tm-team-detail-sidebar-meta">
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-            <span className="tm-badge tm-badge-grey">{team.members}/{team.capacity}명</span>
+            <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
           </div>
           {team.activity ? (
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -445,7 +447,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-            <span className="tm-badge tm-badge-grey">{team.members}명</span>
+            <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
           </div>
         </Card>
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
@@ -458,7 +460,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <InfoRow label="구/군" value={team.county} />
           <InfoRow label="레벨" value={team.level} />
           <InfoRow label="성별 조건" value={team.genderRule} />
-          <InfoRow label="정원" value={`${team.capacity}명`} />
+          <InfoRow label="정원" value={capacity} />
           <InfoRow label="모집 여부" value={team.statusLabel} />
           <InfoRow label="활동 일정" value={team.activity || '활동 일정 미정'} muted={!team.activity} />
           {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
@@ -1393,12 +1395,13 @@ function formatInvitationDate(value: string) {
 function TeamCard({ team }: { team: TeamModel }) {
   const hasIntro = team.intro.trim().length > 0;
   const activity = team.next.trim();
+  const memberCapacity = formatMemberCapacity(team);
 
   return (
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <TeamLogo team={team} />
-        <div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{team.members}</span>명</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
+        <div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
       </div>
       {/* 실제 팀 소개가 있을 때만 intro-box를 렌더한다. */}
       {hasIntro ? (
@@ -1416,6 +1419,14 @@ function TeamCard({ team }: { team: TeamModel }) {
       </div>
     </Link>
   );
+}
+
+function formatMemberCapacity(team: Pick<TeamModel, 'members' | 'capacity'>) {
+  return team.capacity > 0 ? `${team.members}/${team.capacity}명` : `현재 ${team.members}명`;
+}
+
+function formatCapacity(team: Pick<TeamModel, 'capacity'>) {
+  return team.capacity > 0 ? `${team.capacity}명` : '정원 미정';
 }
 
 function dedupeTags(tags: string[]) {

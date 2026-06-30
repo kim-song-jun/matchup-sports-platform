@@ -94,8 +94,8 @@ export class MutateTeamDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  @Max(1000)
+  @Min(2)
+  @Max(50)
   memberGoalCount?: number | null;
 }
 

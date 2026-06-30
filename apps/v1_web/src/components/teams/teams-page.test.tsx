@@ -4,6 +4,11 @@ import { TeamFormPageView, TeamListPageView } from './teams-page';
 import { getTeamListViewModel } from './teams.view-model';
 import type { TeamFormViewModel, TeamListViewModel } from './teams.types';
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/teams/team-1/edit',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe('TeamListPageView', () => {
   it('does not render sample team cards while the live team list is loading', () => {
     const base = getTeamListViewModel();

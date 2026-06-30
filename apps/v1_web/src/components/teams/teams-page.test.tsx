@@ -51,7 +51,7 @@ describe('TeamListPageView', () => {
           tags: ['레벨 미설정'],
           genderRule: '성별 무관',
           intro: '짧은 소개',
-          next: '',
+          next: '수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ',
         },
       ],
     };
@@ -63,7 +63,8 @@ describe('TeamListPageView', () => {
     expect(screen.getByText('레벨 미설정')).toBeInTheDocument();
     expect(screen.getByText('짧은 소개')).toBeInTheDocument();
     expect(screen.queryByText('가입 신청은 운영진 승인 후 확정돼요.')).not.toBeInTheDocument();
-    expect(screen.getByText('자세히 보기 ›')).toBeInTheDocument();
+    expect(screen.getByText('수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ')).toBeInTheDocument();
+    expect(screen.queryByText('자세히 보기 ›')).not.toBeInTheDocument();
     expect(screen.queryByText('팀 보기 ›')).not.toBeInTheDocument();
     expect(screen.queryByText('알림받기')).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 21:00 정기전')).not.toBeInTheDocument();

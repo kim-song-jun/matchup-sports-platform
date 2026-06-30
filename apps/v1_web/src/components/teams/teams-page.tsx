@@ -768,7 +768,8 @@ function formatActivityDays(days: string[]) {
 }
 
 function labelFromOptions(options: ReadonlyArray<{ value: string; label: string }>, values: string[]) {
-  return options.filter((option) => values.includes(option.value)).map((option) => option.label);
+  const labels = new Map(options.map((option) => [option.value, option.label]));
+  return values.map((value) => labels.get(value)).filter(Boolean);
 }
 
 /**

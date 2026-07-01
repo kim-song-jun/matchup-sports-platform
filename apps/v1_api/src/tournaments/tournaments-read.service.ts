@@ -105,6 +105,14 @@ export class TournamentsReadService {
           where: { publishedAt: { not: null } },
           orderBy: { publishedAt: 'desc' },
         },
+        sponsors: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
+        registrations: {
+          where: { status: { in: ['confirmed', 'waitlisted'] } },
+          include: { team: { select: { id: true, name: true } } },
+        },
         _count: {
           select: {
             registrations: {
@@ -145,6 +153,19 @@ export class TournamentsReadService {
       prizePool: row.prizePool,
       prizeBreakdown: row.prizeBreakdown,
       confirmedCount: row._count.registrations,
+      participantTeams: [...row.registrations]
+        .sort((a, b) => {
+          const aRank = a.status === 'confirmed' ? 0 : 1;
+          const bRank = b.status === 'confirmed' ? 0 : 1;
+          return aRank - bRank;
+        })
+        .map((registration) => ({
+          registrationId: registration.id,
+          teamId: registration.team.id,
+          teamName: registration.team.name,
+          status: registration.status,
+          confirmedAt: registration.confirmedAt?.toISOString() ?? null,
+        })),
       groups: row.groups.map((g) => ({
         id: g.id,
         name: g.name,
@@ -201,9 +222,24 @@ export class TournamentsReadService {
         id: a.id,
         title: a.title,
         body: a.body,
+        category: a.category,
         audience: a.audience,
         publishedAt: a.publishedAt!.toISOString(),
         createdAt: a.createdAt.toISOString(),
+      })),
+      sponsors: row.sponsors.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        logoUrl: s.logoUrl,
+        websiteUrl: s.websiteUrl,
+        instagramUrl: s.instagramUrl,
+        benefitText: s.benefitText,
+        boothText: s.boothText,
+        eventTitle: s.eventTitle,
+        eventDescription: s.eventDescription,
+        eventResultText: s.eventResultText,
+        sortOrder: s.sortOrder,
       })),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

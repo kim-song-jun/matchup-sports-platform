@@ -15,25 +15,31 @@ import { logout } from './helpers/auth';
 
 /** 닉네임 step 입력 + 중복확인 + 다음 */
 async function fillNicknameStep(page: import('@playwright/test').Page, nickname: string) {
-  await expect(page.getByText(/어떤 이름으로/)).toBeVisible({ timeout: 10000 });
-  await page.getByPlaceholder('사용할 닉네임').fill(nickname);
-  await page.getByRole('button', { name: '중복 확인' }).click();
+  await expect(page.getByRole('heading', { name: /어떤 이름으로/ })).toBeVisible({ timeout: 10000 });
+  const nicknameInput = page.getByRole('textbox', { name: '닉네임 중복 확인' });
+  await nicknameInput.fill(nickname);
+  const duplicateButton = page.getByRole('button', { name: '중복 확인' });
+  await expect(duplicateButton).toBeEnabled({ timeout: 10000 });
+  await duplicateButton.click();
   await expect(page.getByText(/사용 가능한 닉네임|사용 가능/)).toBeVisible({ timeout: 10000 });
   await page.getByRole('button', { name: '다음' }).click();
 }
 
 /** 이메일 step 입력 + 중복확인 + 다음 */
 async function fillEmailStep(page: import('@playwright/test').Page, email: string) {
-  await expect(page.getByText(/이메일을/)).toBeVisible({ timeout: 10000 });
-  await page.getByPlaceholder('예: me@email.com').fill(email);
-  await page.getByRole('button', { name: '중복 확인' }).click();
+  await expect(page.getByRole('heading', { name: /이메일/ })).toBeVisible({ timeout: 10000 });
+  const emailInput = page.getByRole('textbox', { name: '이메일 중복 확인' });
+  await emailInput.fill(email);
+  const duplicateButton = page.getByRole('button', { name: '중복 확인' });
+  await expect(duplicateButton).toBeEnabled({ timeout: 10000 });
+  await duplicateButton.click();
   await expect(page.getByText(/사용 가능한 이메일|사용 가능/)).toBeVisible({ timeout: 10000 });
   await page.getByRole('button', { name: '다음' }).click();
 }
 
 /** 비밀번호 step 입력 + '가입하고 계속' */
 async function fillPasswordStep(page: import('@playwright/test').Page, password: string) {
-  await expect(page.getByText(/비밀번호를/)).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('heading', { name: /비밀번호/ })).toBeVisible({ timeout: 10000 });
   const pwInputs = page.locator('input[type="password"]');
   await pwInputs.nth(0).fill(password);
   await pwInputs.nth(1).fill(password);
@@ -43,11 +49,11 @@ async function fillPasswordStep(page: import('@playwright/test').Page, password:
 test.describe('[visitor] 신규 가입 온보딩 플로우', () => {
   test('signup 페이지가 렌더되고 닉네임 입력 UI가 존재한다', async ({ page }) => {
     await logout(page);
-    await page.goto('/signup');
+    await page.goto('/v1/signup', { waitUntil: 'load' });
     const main = page.locator('main, [role="main"]');
     await expect(main.first()).toBeVisible();
     // STEP_COPY.nickname.title: "어떤 이름으로\n활동할까요?"
-    await expect(page.getByText(/어떤 이름으로/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /어떤 이름으로/ })).toBeVisible();
     // 닉네임 입력 필드 존재
     await expect(page.getByPlaceholder('사용할 닉네임')).toBeVisible();
     // 중복 확인 버튼 존재
@@ -63,7 +69,7 @@ test.describe('[visitor] 신규 가입 온보딩 플로우', () => {
     const password = 'Test1234!pw';
 
     // ── 1차 /signup: 닉네임→이메일→비밀번호 → 약관 미동의 → /terms ──
-    await page.goto('/signup');
+    await page.goto('/v1/signup', { waitUntil: 'load' });
     await fillNicknameStep(page, nickname);
     await fillEmailStep(page, email);
     await fillPasswordStep(page, password);
@@ -81,6 +87,7 @@ test.describe('[visitor] 신규 가입 온보딩 플로우', () => {
 
     // ── 2차 /signup: state 리셋됨 → 다시 닉네임부터 (동일 값) ──
     await expect(page).toHaveURL(/\/signup/, { timeout: 15000 });
+    await page.waitForLoadState('load');
     // 이번엔 약관 동의됨 → register API 직접 호출 경로
     await fillNicknameStep(page, nickname);
     await fillEmailStep(page, email);

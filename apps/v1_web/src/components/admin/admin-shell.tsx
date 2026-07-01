@@ -217,7 +217,7 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageA
           'fixed inset-y-0 left-0 z-50 w-[280px] bg-white flex flex-col',
           'shadow-[4px_0_24px_rgba(20,28,45,0.12)]',
           'transition-transform motion-reduce:transition-none',
-          open ? 'translate-x-0' : '-translate-x-full',
+          open ? 'translate-x-0 visible' : '-translate-x-full invisible',
         ].join(' ')}
       >
         {/* Drawer header */}

@@ -12,6 +12,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { AdminRegistrationsService } from './admin-registrations.service';
 
 const opsAuth = { id: 'ops-user-id', email: 'ops@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -38,8 +39,8 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     rosterLockedAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
-    createdAt: new Date('2026-06-14T00:00:00.000Z'),
-    updatedAt: new Date('2026-06-14T00:00:00.000Z'),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   };
 }
@@ -58,8 +59,8 @@ function paymentRow(overrides: Record<string, unknown> = {}) {
     refundedAt: null,
     confirmedByAdminUserId: null,
     rawWebhookRef: null,
-    createdAt: new Date('2026-06-14T00:00:00.000Z'),
-    updatedAt: new Date('2026-06-14T00:00:00.000Z'),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   };
 }
@@ -71,7 +72,7 @@ describe('AdminRegistrationsService', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
-    v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock };
+    v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
@@ -83,7 +84,7 @@ describe('AdminRegistrationsService', () => {
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
-      v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn() },
+      v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0) },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
@@ -100,6 +101,7 @@ describe('AdminRegistrationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminRegistrationsService,
+        TournamentPaymentExpiryService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
@@ -163,6 +165,38 @@ describe('AdminRegistrationsService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'registration.confirm_payment' }) }),
     );
+  });
+
+  it('confirmPayment: overdue awaiting-payment is auto-cancelled and cannot be confirmed', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-14T02:01:00.000Z'));
+    const createdAt = new Date('2026-06-14T00:00:00.000Z');
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'ready', createdAt }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({
+        status: 'cancelled',
+        cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
+      }),
+    );
+    prisma.v1TournamentPayment.update.mockResolvedValue(
+      paymentRow({ status: 'cancelled', createdAt, cancelledAt: new Date('2026-06-14T02:01:00.000Z') }),
+    );
+
+    await expect(service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' })).rejects.toMatchObject({
+      response: {
+        code: 'PAYMENT_DEADLINE_EXPIRED',
+        message: '입금 안내 후 2시간이 지나 신청이 자동 취소됐어요.',
+      },
+    });
+
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+    );
+    expect(prisma.v1TournamentPayment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+    );
+    jest.useRealTimers();
   });
 
   // ─── confirm ────────────────────────────────────────────────────────────────

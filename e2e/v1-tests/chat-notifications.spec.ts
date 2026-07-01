@@ -13,7 +13,7 @@ test.describe('[member] 채팅·알림 플로우', () => {
   });
 
   test('/notifications — 알림 페이지가 렌더된다', async ({ page }) => {
-    await page.goto('/notifications');
+    await page.goto('/v1/notifications');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // NotificationsPageView: AppChrome title에 "알림" 포함
@@ -22,7 +22,7 @@ test.describe('[member] 채팅·알림 플로우', () => {
   });
 
   test('/chat — 채팅 목록 페이지가 렌더된다', async ({ page }) => {
-    await page.goto('/chat');
+    await page.goto('/v1/chat');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // ChatListPageView: AppChrome title="채팅"
@@ -31,11 +31,11 @@ test.describe('[member] 채팅·알림 플로우', () => {
   });
 
   test('/notifications → /chat 연속 도달', async ({ page }) => {
-    await page.goto('/notifications');
+    await page.goto('/v1/notifications');
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('main')).toContainText('알림');
 
-    await page.goto('/chat');
+    await page.goto('/v1/chat');
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('main')).toContainText(/채팅/);
   });

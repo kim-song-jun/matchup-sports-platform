@@ -1,11 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TeamFormPageView, TeamListPageView } from './teams-page';
+import { TeamDetailPageView, TeamFormPageView, TeamListPageView } from './teams-page';
 import { getTeamListViewModel } from './teams.view-model';
-import type { TeamFormViewModel, TeamListViewModel } from './teams.types';
+import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel } from './teams.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/edit',
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+  }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -73,6 +77,54 @@ describe('TeamListPageView', () => {
     expect(screen.queryByText('팀 보기 ›')).not.toBeInTheDocument();
     expect(screen.queryByText('알림받기')).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 21:00 정기전')).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamDetailPageView', () => {
+  it('preserves line breaks in the team introduction', () => {
+    const introduction = '첫 번째 소개\n두 번째 소개';
+    const model: TeamDetailViewModel = {
+      team: {
+        id: 'team-live-1',
+        name: '라이브 팀',
+        logo: '라',
+        logoUrl: null,
+        coverImageUrl: null,
+        sport: '풋살',
+        sports: ['풋살'],
+        region: '서울 성동구',
+        members: 7,
+        capacity: 12,
+        status: 'open',
+        statusLabel: '가입 신청 가능',
+        tags: [],
+        genderRule: '성별 무관',
+        intro: introduction,
+        next: '',
+        description: introduction,
+        activity: '',
+        condition: '',
+        schedule: '',
+        city: '서울',
+        county: '성동구',
+        level: '초보-중수',
+        membersList: [],
+        memberAccess: {
+          canView: false,
+          enabled: false,
+          message: '멤버 목록 비공개',
+        },
+      },
+      mode: 'default',
+    };
+
+    render(<TeamDetailPageView model={model} />);
+
+    const introNodes = screen.getAllByText((_, node) => node?.textContent === introduction);
+    expect(introNodes).toHaveLength(2);
+    introNodes.forEach((node) => {
+      expect(node).toHaveStyle({ whiteSpace: 'pre-line' });
+    });
   });
 });
 

@@ -19,7 +19,8 @@ export class MutateTeamDto {
   @IsUUID()
   sportId!: string;
 
-  @IsUUID()
+  @IsString()
+  @MaxLength(100)
   regionId!: string;
 
   @IsString()

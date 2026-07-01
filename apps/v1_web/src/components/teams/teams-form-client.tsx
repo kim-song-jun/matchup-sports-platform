@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { labelToLevelCode } from '@/lib/v1-levels';
-import { toDistrictRegionOptions } from '@/lib/v1-regions';
+import { toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
 import { TeamFormPageView } from './teams-page';
 import type { TeamFormViewModel } from './teams.types';
@@ -30,7 +30,7 @@ export function TeamCreatePageClient() {
   const [regionId, setRegionId] = useState('');
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
   const [error, setError] = useState<string | null>(null);
-  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+  const regionOptions = toTeamRegionOptions(regions.data ?? []);
   const createTeamWithActivityCompatibility = async (payload: V1TeamMutationPayload, draft: TeamDraft) => {
     try {
       return await createTeam.mutateAsync(payload);
@@ -105,7 +105,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const [membersVisibilityEnabled, setMembersVisibilityEnabled] = useState(false);
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const regionOptions = toDistrictRegionOptions(regions.data ?? []);
+  const regionOptions = toTeamRegionOptions(regions.data ?? []);
   const updateTeamWithActivityCompatibility = async (
     payload: V1TeamMutationPayload & { version: string; membersVisibilityEnabled?: boolean },
     draft: TeamDraft,
@@ -166,12 +166,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     regions: regionOptions.length
       ? regionOptions
       : query.data?.region
-        ? [{
-            id: query.data.region.regionId,
-            name: formatTeamRegionName(query.data.region) ?? query.data.region.name,
-            shortName: query.data.region.name,
-            parentName: query.data.region.parentName ?? undefined,
-          }]
+        ? [toTeamRegionFallbackOption(query.data.region)]
         : [],
     error: query.isError ? '팀 정보를 불러오지 못했어요.' : error,
     submitting: query.isLoading || updateTeam.isPending,
@@ -274,21 +269,38 @@ function buildModel({
 
 function formatTeamRegionName(region?: { name: string; parentName?: string | null } | null) {
   if (!region) return null;
-  return region.parentName ? `${region.parentName} ${region.name}` : region.name;
+  return region.parentName ? `${region.parentName} ${region.name}` : `${region.name} 전체`;
+}
+
+function toTeamRegionFallbackOption(region: { regionId: string; name: string; parentName?: string | null }) {
+  if (region.parentName) {
+    return {
+      id: region.regionId,
+      name: `${region.parentName} ${region.name}`,
+      shortName: region.name,
+      parentName: region.parentName,
+    };
+  }
+
+  return {
+    id: region.regionId,
+    name: `${region.name} 전체`,
+    shortName: '전체',
+    parentName: region.name,
+  };
 }
 
 function getTeamRegionCity(region?: { name: string; parentName?: string | null } | null) {
   if (!region) return '';
   if (region.parentName) return region.parentName;
-  const [city, ...countyParts] = region.name.trim().split(/\s+/);
-  return countyParts.length ? city : '';
+  return region.name;
 }
 
 function getTeamRegionCounty(region?: { name: string; parentName?: string | null } | null) {
   if (!region) return '';
   if (region.parentName) return region.name;
   const [city, ...countyParts] = region.name.trim().split(/\s+/);
-  return countyParts.length ? countyParts.join(' ') : city;
+  return countyParts.length ? countyParts.join(' ') : '전체';
 }
 
 function getTeamRegionOptionCity(region: { name: string; shortName?: string; parentName?: string }) {

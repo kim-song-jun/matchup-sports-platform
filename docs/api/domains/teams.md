@@ -27,6 +27,9 @@
 
 ## GET /teams/:id/members
 
+- Access: active team members can always view the member list. When
+  `membersVisibilityEnabled=true`, non-members can also view the member list.
+  When `false`, only active team members can view it.
 - 멤버 항목은 `displayName`, `realName`, `birthDate`, `phone`을 포함한다.
 - `realName`, `birthDate`, `phone`은 nullable이다.
 - 대회 로스터 등록 화면은 세 값 중 하나라도 없으면 해당 팀원을 목록에는 유지하되 선택 불가로 표시한다.
@@ -38,7 +41,7 @@ Query:
 | 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
 | `sportId` | uuid | No | `v1_master_sports.id` |
-| `regionId` | uuid | No | district region |
+| `regionId` | string | No | team region filter; city-level (`서울 전체`) or district-level region |
 | `query` | string | No | team name/introduction 검색 |
 | `genderRule` | string | No | `성별 무관`, `남`, `여` |
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
@@ -50,7 +53,7 @@ Query:
 CAUTION:
 
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
-- Team list/detail/my-teams region fields include `region.parentName` when the selected region has a parent; `regionName` is the display label (`parentName + name` for district regions).
+- Team list/detail/my-teams region fields include `region.parentName` when the selected region has a parent; `regionName` is the display label (`parentName + name` for district regions, `{city} 전체` for city-level regions).
 
 ## POST /teams (CreateTeamDto)
 
@@ -60,7 +63,7 @@ CAUTION:
 |---|---|---|
 | `name` | string(max 100) | Yes |
 | `sportId` | uuid | Yes |
-| `regionId` | uuid | No |
+| `regionId` | string | No |
 | `introduction` | string | No |
 | `activityAreaText` | string | No |
 | `activityDays` | string[] | No |
@@ -78,6 +81,8 @@ CAUTION:
 - Activity profile fields are structured on `v1_team_profiles`: `activity_days`, `activity_frequency`, `activity_time_slots`, `activity_types`, and `member_goal_count`. Responses include `activitySummary` and `memberGoalCount`; `activityAreaText` remains as a compatibility fallback from `activity_note`.
 - `memberGoalCount` is the team capacity. When `memberCount >= memberGoalCount`, join applications, join approvals, team invitations, and invitation acceptance fail with `TEAM_FULL`.
 - Team capacity cannot be updated below the current `memberCount`.
+- New teams default to `membersVisibilityEnabled=true` / `members_visible=true`.
+- `regionId` accepts active city-level and district-level `v1_regions` rows. City-level rows are displayed as `{city} 전체` in the team UI.
 - Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
 - `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
 - `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.

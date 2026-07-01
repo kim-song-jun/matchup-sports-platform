@@ -210,6 +210,7 @@ export class TeamsService {
           joinPolicy: dto.joinPolicy,
           memberCount: 1,
           managerCount: 0,
+          membersVisible: true,
           profile: {
             create: {
               logoUrl: dto.logoUrl ?? null,
@@ -374,12 +375,13 @@ export class TeamsService {
     };
   }
 
-  async members(user: V1AuthUser, teamId: string, query: TeamMembersQueryDto) {
-    const { team, membership: viewerMembership } = await this.getActiveTeamMembership(user, teamId);
-    if (!team.membersVisible && viewerMembership.role !== 'owner' && viewerMembership.role !== 'manager') {
+  async members(user: V1AuthUser | null, teamId: string, query: TeamMembersQueryDto) {
+    const team = await this.getPublicTeam(teamId, user);
+    const viewer = this.getViewer(team, user);
+    if (!this.canViewMembers(team, viewer)) {
       throw new ForbiddenException({
         code: 'MEMBERS_VISIBILITY_DISABLED',
-        message: 'Team member status is disabled by team managers',
+        message: 'Team member list is visible only to active team members',
       });
     }
 
@@ -406,8 +408,9 @@ export class TeamsService {
 
     const pageItems = memberships.slice(0, limit);
     const hasNext = memberships.length > limit;
-    const viewerIsOwner = viewerMembership.role === 'owner';
-    const viewerIsManager = viewerMembership.role === 'manager';
+    const viewerIsOwner = viewer.role === 'owner';
+    const viewerIsManager = viewer.role === 'manager';
+    const viewerIsTeamMember = viewer.role === 'owner' || viewer.role === 'manager' || viewer.role === 'member';
 
     return {
       items: pageItems.map((membership) => {
@@ -420,9 +423,9 @@ export class TeamsService {
           membershipId: membership.id,
           userId: membership.userId,
           displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
-          realName: membership.user.profile?.displayName ?? null,
-          phone: membership.user.phone ?? null,
-          birthDate: membership.user.profile?.birthDate ?? null,
+          realName: viewerIsTeamMember ? membership.user.profile?.displayName ?? null : null,
+          phone: viewerIsTeamMember ? membership.user.phone ?? null : null,
+          birthDate: viewerIsTeamMember ? membership.user.profile?.birthDate ?? null : null,
           profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
           role: membership.role,
           status: membership.status,
@@ -436,7 +439,7 @@ export class TeamsService {
         managerCount: team.managerCount,
         memberCount: team.memberCount,
       },
-      viewerRole: viewerMembership.role,
+      viewerRole: viewer.role,
       membersVisibilityEnabled: team.membersVisible,
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
@@ -1682,11 +1685,11 @@ export class TeamsService {
 
     if (regionId) {
       const region = await this.prisma.v1Region.findFirst({
-        where: { id: regionId, isActive: true, level: 2 },
+        where: { id: regionId, isActive: true, level: { in: [1, 2] } },
         select: { id: true },
       });
       if (!region) {
-        throw validationError('regionId must be an active district region', 'regionId');
+        throw validationError('regionId must be an active city or district region', 'regionId');
       }
     }
   }
@@ -1830,8 +1833,8 @@ export class TeamsService {
     team: TeamWithRelations,
     viewer: ReturnType<TeamsService['getViewer']>,
   ) {
-    if (viewer.role === 'owner' || viewer.role === 'manager') return true;
-    return viewer.role === 'member' && team.membersVisible;
+    if (viewer.role === 'owner' || viewer.role === 'manager' || viewer.role === 'member') return true;
+    return team.membersVisible;
   }
 }
 
@@ -1915,7 +1918,7 @@ function formatActivityTypes(types: string[]) {
 
 function formatRegionDisplayName(region?: { name: string; parent?: { name: string } | null } | null) {
   if (!region) return null;
-  return region.parent?.name ? `${region.parent.name} ${region.name}` : region.name;
+  return region.parent?.name ? `${region.parent.name} ${region.name}` : `${region.name} 전체`;
 }
 
 function getTeamOrderBy(sort: TeamsQueryDto['sort']): Prisma.V1TeamOrderByWithRelationInput[] {

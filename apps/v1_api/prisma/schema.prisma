@@ -636,7 +636,7 @@ model V1Team {
   name           String
   status         V1TeamStatus     @default(active)
   joinPolicy     V1TeamJoinPolicy @default(approval_required) @map("join_policy")
-  membersVisible Boolean          @default(false) @map("members_visible")
+  membersVisible Boolean          @default(true) @map("members_visible")
   memberCount    Int              @default(1) @map("member_count")
   managerCount   Int              @default(0) @map("manager_count")
   createdAt      DateTime         @default(now()) @map("created_at")

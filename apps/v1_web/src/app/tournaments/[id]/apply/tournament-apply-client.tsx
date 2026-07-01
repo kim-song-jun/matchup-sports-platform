@@ -605,24 +605,41 @@ function AgreementsStep({
   error: string | null;
 }) {
   const allRequired = state.agreedRules && state.agreedPrivacy && state.agreedRefund;
+  const allAgreed = allRequired && state.agreedMediaConsent;
   const bankTransferValid =
     state.paymentMethod !== 'bank_transfer' || state.depositorName.trim().length > 0;
   const canSubmit = allRequired && bankTransferValid;
+  const toggleAllAgreements = (checked: boolean) => {
+    onChange({
+      agreedRules: checked,
+      agreedPrivacy: checked,
+      agreedRefund: checked,
+      agreedMediaConsent: checked,
+    });
+  };
 
   return (
     <div style={{ padding: '0 20px 120px' }}>
-      {/* Required consents */}
+      {/* Consents */}
       <section aria-labelledby="consent-heading" style={{ marginTop: 20 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle id="consent-heading" title="필수 동의" />
+          <SectionTitle id="consent-heading" title="동의" />
         </div>
         <Card pad={0} style={{ marginTop: 8 }}>
+          <ExpandableCheckRow
+            id="agree-all"
+            label="전체 동의"
+            checked={allAgreed}
+            onChange={toggleAllAgreements}
+            bodyText={null}
+          />
           <ExpandableCheckRow
             id="agree-rules"
             label="대회 규정 동의 (필수)"
             checked={state.agreedRules}
             onChange={(v) => onChange({ agreedRules: v })}
             bodyText={tournament.rulesText}
+            divider
           />
           <ExpandableCheckRow
             id="agree-privacy"
@@ -640,21 +657,13 @@ function AgreementsStep({
             bodyText={tournament.refundPolicyText}
             divider
           />
-        </Card>
-      </section>
-
-      {/* Optional consents */}
-      <section aria-labelledby="optional-consent-heading" style={{ marginTop: 16 }}>
-        <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle id="optional-consent-heading" title="선택 동의" />
-        </div>
-        <Card pad={0} style={{ marginTop: 8 }}>
           <ExpandableCheckRow
             id="agree-media"
             label="사진·영상 촬영 및 활용 동의 (선택)"
             checked={state.agreedMediaConsent}
             onChange={(v) => onChange({ agreedMediaConsent: v })}
             bodyText={null}
+            divider
           />
         </Card>
       </section>

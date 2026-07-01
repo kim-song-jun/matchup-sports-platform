@@ -130,6 +130,17 @@ function deepLinkForTarget(
   return `${base}/${targetId}`;
 }
 
+function deepLinkForEvent(
+  type: NotificationEventType,
+  targetType: V1NotificationTargetType,
+  targetId: string | null,
+): string | null {
+  if (type === 'team_join_application_received' && targetId) {
+    return `/teams/${targetId}/members`;
+  }
+  return deepLinkForTarget(targetType, targetId);
+}
+
 const EVENT_TITLES: Record<NotificationEventType, string> = {
   match_application_received: '매치 신청이 도착했어요',
   match_application_approved: '매치 신청이 승인됐어요',
@@ -168,7 +179,7 @@ export class NotificationsService {
     body?: string,
   ): Promise<void> {
     const targetType = targetTypeForEvent(type);
-    const deepLink = deepLinkForTarget(targetType, targetId);
+    const deepLink = deepLinkForEvent(type, targetType, targetId);
     const title = EVENT_TITLES[type];
     const prefField = preferenceFieldForEvent(type);
 
@@ -192,7 +203,7 @@ export class NotificationsService {
         targetId,
         EVENT_TITLES[type],
         body ?? null,
-        deepLinkForTarget(targetTypeForEvent(type), targetId),
+        deepLinkForEvent(type, targetTypeForEvent(type), targetId),
         preferenceFieldForEvent(type),
       );
     }

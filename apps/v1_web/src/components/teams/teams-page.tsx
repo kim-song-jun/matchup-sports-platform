@@ -356,7 +356,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <Card pad={16}>
             <InfoRow label="팀명" value={team.name} />
             <InfoRow label="종목" value={formatTeamSports(team.sports)} muted={team.sports.length === 0} />
-            <InfoRow label="팀 소개" value={team.description} />
+            <InfoRow label="팀 소개" value={team.description} preserveLineBreaks />
             <InfoRow label="시/도" value={team.city} />
             <InfoRow label="구/군" value={team.county} />
             <InfoRow label="레벨" value={team.level} />
@@ -369,26 +369,27 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           <TeamOperationsSection operations={model.operations} />
           {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
           <Card pad={16} style={{ marginTop: 14 }}>
-            <div className="tm-section-row" style={{ marginTop: 0 }}>
-              <div>
+            <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
+              <div style={{ minWidth: 0, flex: '1 1 auto' }}>
                 <div className="tm-text-body-lg">주요 멤버</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                  <span className={`tm-badge ${team.memberAccess.enabled ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
-                    {team.memberAccess.enabled ? '공개' : '비공개'}
-                  </span>
-                  <span className="tm-text-caption">{team.memberAccess.message}</span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
+                  {team.memberAccess.message ? (
+                    <span className="tm-text-caption" style={{ minWidth: 0, flex: '1 1 180px', lineHeight: 1.45 }}>{team.memberAccess.message}</span>
+                  ) : null}
                 </div>
               </div>
-              {team.memberAccess.canView ? (
-                <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
+              {team.memberAccess.enabled ? (
+                <span className="tm-badge tm-badge-blue" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                  공개
+                </span>
               ) : (
-                <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, gap: 4 }}>
                   <Lock size={11} aria-hidden="true" />
                   비공개
                 </span>
               )}
             </div>
-            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
+            {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
           </Card>
         </div>
 
@@ -455,7 +456,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <Card pad={16}>
           <InfoRow label="팀명" value={team.name} />
           <InfoRow label="종목" value={formatTeamSports(team.sports)} muted={team.sports.length === 0} />
-          <InfoRow label="팀 소개" value={team.description} />
+          <InfoRow label="팀 소개" value={team.description} preserveLineBreaks />
           <InfoRow label="시/도" value={team.city} />
           <InfoRow label="구/군" value={team.county} />
           <InfoRow label="레벨" value={team.level} />
@@ -468,26 +469,27 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <TeamOperationsSection operations={model.operations} />
         {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
         <Card pad={16} style={{ marginTop: 14 }}>
-          <div className="tm-section-row" style={{ marginTop: 0 }}>
-            <div>
+          <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
+            <div style={{ minWidth: 0, flex: '1 1 auto' }}>
               <div className="tm-text-body-lg">주요 멤버</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                <span className={`tm-badge ${team.memberAccess.enabled ? 'tm-badge-blue' : 'tm-badge-grey'}`}>
-                  {team.memberAccess.enabled ? '공개' : '비공개'}
-                </span>
-                <span className="tm-text-caption">{team.memberAccess.message}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
+                {team.memberAccess.message ? (
+                  <span className="tm-text-caption" style={{ minWidth: 0, flex: '1 1 180px', lineHeight: 1.45 }}>{team.memberAccess.message}</span>
+                ) : null}
               </div>
             </div>
-            {team.memberAccess.canView ? (
-              <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`/teams/${team.id}/members`}>멤버</Link>
+            {team.memberAccess.enabled ? (
+              <span className="tm-badge tm-badge-blue" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                공개
+              </span>
             ) : (
-              <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, gap: 4 }}>
                 <Lock size={11} aria-hidden="true" />
                 비공개
               </span>
             )}
           </div>
-          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>팀 멤버이고 멤버 목록이 공개된 경우에만 볼 수 있어요.</div>}
+          {team.memberAccess.canView ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{team.membersList.map((member, index) => <ListItem key={index} title={member.name} sub={`${member.role} · ${member.meta} · ${member.status}`} trailing={member.visibility} />)}</div> : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
         </Card>
       </article>
       <div className="tm-fixed-cta tm-hide-desktop">
@@ -549,7 +551,7 @@ export function TeamFormPageView({
                 <div>
                   <div className="tm-text-body-lg">멤버 목록 공개</div>
                   <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                    켜면 팀 멤버가 멤버 목록을 볼 수 있어요. 팀에 속하지 않은 사람에게는 공개되지 않아요.
+                    켜면 팀에 속하지 않은 사람도 멤버 목록을 볼 수 있어요. 끄면 팀 내부 멤버에게만 보여요.
                   </div>
                 </div>
                 <button
@@ -1453,8 +1455,31 @@ function formatTeamSports(items: string[]) {
   return items.length ? items.join(' · ') : '종목 미정';
 }
 
-function InfoRow({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return <div className="tm-team-info-row"><div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>{label}</div><div className="tm-text-body" style={{ color: muted ? 'var(--text-muted)' : 'var(--text-strong)' }}>{value}</div></div>;
+function InfoRow({
+  label,
+  value,
+  muted,
+  preserveLineBreaks,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  preserveLineBreaks?: boolean;
+}) {
+  return (
+    <div className="tm-team-info-row">
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>{label}</div>
+      <div
+        className="tm-text-body"
+        style={{
+          color: muted ? 'var(--text-muted)' : 'var(--text-strong)',
+          whiteSpace: preserveLineBreaks ? 'pre-line' : undefined,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
 }
 
 function InfoChips({ label, items }: { label: string; items: string[] }) {

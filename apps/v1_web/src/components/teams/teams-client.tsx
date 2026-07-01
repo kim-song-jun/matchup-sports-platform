@@ -27,6 +27,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { teamSharePath } from '@/lib/team-share-route';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
@@ -217,18 +218,12 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             role: roleLabel(member.role),
             meta: member.role,
             status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
-            visibility: member.role === 'owner' || member.role === 'manager' ? '공개' : '비공개',
+            visibility: query.data.membersVisibilityEnabled ? '공개' : '비공개',
           })),
           memberAccess: {
             canView: query.data.canViewMembers,
             enabled: query.data.membersVisibilityEnabled,
-            message: query.data.membersVisibilityEnabled
-              ? '멤버 목록이 팀 멤버에게 공개 중이에요.'
-              : isTeamOperatorRole(query.data.viewer.role)
-                ? '멤버 목록은 비공개예요. 운영진이라 전체 목록을 볼 수 있어요.'
-                : query.data.viewer.role === 'member'
-                  ? '운영진이 멤버 목록을 비공개로 설정했어요.'
-                  : '팀 멤버만 멤버 목록을 볼 수 있어요.',
+            message: '',
           },
         },
         mode: toDetailMode(query.data),
@@ -599,7 +594,7 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
 
 function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
   if (region?.parentName) return `${region.parentName} ${region.name}`;
-  return region?.name ?? fallback ?? '지역 미정';
+  return region?.name ? `${region.name} 전체` : fallback ?? '지역 미정';
 }
 
 function splitTeamRegion(region?: { name: string; parentName?: string | null } | null) {
@@ -607,7 +602,7 @@ function splitTeamRegion(region?: { name: string; parentName?: string | null } |
   const trimmed = region?.name?.trim();
   if (!trimmed) return { city: '', county: '지역 미정' };
   const [city, ...countyParts] = trimmed.split(/\s+/);
-  if (countyParts.length === 0) return { city: '', county: city };
+  if (countyParts.length === 0) return { city, county: '전체' };
   return { city, county: countyParts.join(' ') };
 }
 
@@ -715,7 +710,7 @@ function toMemberModel(
 
 async function shareTeam(team: V1TeamDetail) {
   const title = team.name;
-  const path = `/teams/${team.teamId}`;
+  const path = teamSharePath(team.teamId);
   const url = typeof window === 'undefined' ? path : new URL(path, window.location.origin).toString();
 
   if (typeof navigator !== 'undefined' && navigator.share) {

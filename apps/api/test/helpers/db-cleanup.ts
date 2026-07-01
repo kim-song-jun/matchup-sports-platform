@@ -77,7 +77,7 @@ export async function truncateAll(prisma: PrismaClient): Promise<void> {
   for (let attempt = 1; attempt <= MAX_TRUNCATE_ATTEMPTS; attempt += 1) {
     try {
       await prisma.$transaction(async (tx) => {
-        await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(${CLEANUP_LOCK_KEY})`);
+        await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${CLEANUP_LOCK_KEY})`);
         await tx.$executeRawUnsafe(
           `TRUNCATE TABLE ${names} RESTART IDENTITY CASCADE`,
         );

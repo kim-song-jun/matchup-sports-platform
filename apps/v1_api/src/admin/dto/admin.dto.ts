@@ -75,8 +75,8 @@ export class AdminTeamListQueryDto {
 
 export class AdminTeamMatchListQueryDto {
   @IsOptional()
-  @IsIn(['recruiting', 'matched', 'cancelled', 'completed', 'archived'])
-  status?: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'archived';
+  @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
+  status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 
   @IsOptional()
   @IsString()
@@ -128,8 +128,8 @@ export class ChangeTeamStatusDto {
 }
 
 export class ChangeTeamMatchStatusDto {
-  @IsIn(['recruiting', 'matched', 'cancelled', 'completed', 'archived'])
-  status!: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'archived';
+  @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
+  status!: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 
   @IsString()
   @MaxLength(500)

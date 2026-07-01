@@ -798,6 +798,44 @@ export function useV1CancelTeamMatch(teamMatchId: string) {
   });
 }
 
+export function useV1CloseTeamMatch(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<{ teamMatchId: string; status: string; expiredApplications: number; detailRoute: string }>(`/team-matches/${teamMatchId}/close`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'applications'] });
+    },
+  });
+}
+
+export function useV1ReopenTeamMatch(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<{ teamMatchId: string; status: string; detailRoute: string }>(`/team-matches/${teamMatchId}/reopen`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'applications'] });
+    },
+  });
+}
+
+export function useV1CompleteTeamMatch(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { note?: string | null }) =>
+      v1Post<{ teamMatchId: string; status: string; completedAt: string | null; detailRoute: string }>(`/team-matches/${teamMatchId}/complete`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+    },
+  });
+}
+
 export function useV1ApplyTeamMatch(teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({

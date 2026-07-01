@@ -141,6 +141,7 @@ enum V1TeamInvitationStatus {
 
 enum V1TeamMatchStatus {
   recruiting
+  closed
   matched
   cancelled
   completed

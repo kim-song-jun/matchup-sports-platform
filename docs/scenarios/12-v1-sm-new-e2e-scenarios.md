@@ -215,7 +215,10 @@ Primary contracts:
 `POST /team-match-applications/:applicationId/withdraw`,
 `GET /team-matches/:teamMatchId/applications`,
 `POST /team-match-applications/:applicationId/approve`,
-`POST /team-match-applications/:applicationId/reject`.
+`POST /team-match-applications/:applicationId/reject`,
+`POST /team-matches/:teamMatchId/close`,
+`POST /team-matches/:teamMatchId/reopen`,
+`POST /team-matches/:teamMatchId/complete`.
 
 DB evidence:
 `v1_team_matches`, `v1_team_match_applications`, `v1_teams`, `v1_team_memberships`,
@@ -229,6 +232,9 @@ DB evidence:
 | V1-04-004 | Withdraw team match application | Applicant team owner/manager can withdraw; member cannot |
 | V1-04-005 | Approve applicant team | Application approved, team match becomes `matched`, only one approved team remains |
 | V1-04-006 | Reject applicant team | Application rejected, team match remains recruiting if no approved team |
+| V1-04-007 | Close and reopen recruiting | Host owner/manager closes recruiting, pending applications become `expired`, and closed match can reopen before start |
+| V1-04-008 | Complete matched team match | Host owner/manager completes a matched team match and review surfaces unlock |
+| V1-04-009 | Team match notifications | Apply, withdraw, approve, reject, close, cancel, and complete create team-match notifications for affected team managers |
 
 ## 04-1. Team Match Create And Edit
 
@@ -238,7 +244,9 @@ Design section: `teams-team-matches-sm-create-final`
 
 Primary contracts:
 `POST /team-matches`, `GET /team-matches/:teamMatchId/edit`,
-`PATCH /team-matches/:teamMatchId`, `POST /team-matches/:teamMatchId/cancel`.
+`PATCH /team-matches/:teamMatchId`, `POST /team-matches/:teamMatchId/close`,
+`POST /team-matches/:teamMatchId/reopen`, `POST /team-matches/:teamMatchId/cancel`,
+`POST /team-matches/:teamMatchId/complete`.
 
 DB evidence:
 `v1_team_matches`, `v1_teams`, `v1_team_memberships`, `v1_status_change_logs`.

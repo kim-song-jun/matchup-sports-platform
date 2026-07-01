@@ -24,7 +24,7 @@ export type CursorPage<T> = {
 
 export type V1Status = 'open' | 'pending' | 'confirmed' | 'closed' | 'cancelled';
 export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full';
-export type V1TeamMatchApiStatus = 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'expired';
+export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired';
 export type V1ViewerState = 'none' | 'guest' | 'host' | 'requested' | 'approved' | 'participant' | 'rejected' | 'withdrawn';
 export type V1TeamMatchViewerState = 'none' | 'guest' | 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
 export type TrustState = 'verified' | 'estimated' | 'sample';
@@ -1215,7 +1215,7 @@ export type V1AdminTeamMatchRow = {
   hostTeamName: string;
   sportName: string;
   startAt: string;
-  status: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'archived';
+  status: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
   createdAt: string;
 };
 

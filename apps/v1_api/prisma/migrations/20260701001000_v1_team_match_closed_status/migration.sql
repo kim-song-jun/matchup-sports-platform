@@ -1,0 +1,1 @@
+ALTER TYPE "V1TeamMatchStatus" ADD VALUE IF NOT EXISTS 'closed';

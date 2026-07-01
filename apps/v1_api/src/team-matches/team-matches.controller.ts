@@ -3,7 +3,14 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { CancelTeamMatchDto, MutateTeamMatchDto, UpdateTeamMatchDto } from './dto/mutate-team-match.dto';
+import {
+  CancelTeamMatchDto,
+  CloseTeamMatchDto,
+  CompleteTeamMatchDto,
+  MutateTeamMatchDto,
+  ReopenTeamMatchDto,
+  UpdateTeamMatchDto,
+} from './dto/mutate-team-match.dto';
 import {
   ApproveTeamMatchApplicationDto,
   CreateTeamMatchApplicationDto,
@@ -70,6 +77,36 @@ export class TeamMatchesController {
     @Body() dto: CancelTeamMatchDto,
   ) {
     return this.teamMatchesService.cancel(user, teamMatchId, dto);
+  }
+
+  @Post('team-matches/:teamMatchId/close')
+  @UseGuards(V1AuthGuard)
+  close(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamMatchId') teamMatchId: string,
+    @Body() dto: CloseTeamMatchDto,
+  ) {
+    return this.teamMatchesService.close(user, teamMatchId, dto);
+  }
+
+  @Post('team-matches/:teamMatchId/reopen')
+  @UseGuards(V1AuthGuard)
+  reopen(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamMatchId') teamMatchId: string,
+    @Body() dto: ReopenTeamMatchDto,
+  ) {
+    return this.teamMatchesService.reopen(user, teamMatchId, dto);
+  }
+
+  @Post('team-matches/:teamMatchId/complete')
+  @UseGuards(V1AuthGuard)
+  complete(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamMatchId') teamMatchId: string,
+    @Body() dto: CompleteTeamMatchDto,
+  ) {
+    return this.teamMatchesService.complete(user, teamMatchId, dto);
   }
 
   @Post('team-matches/:teamMatchId/applications')

@@ -80,3 +80,24 @@ export class CancelTeamMatchDto {
   @MaxLength(500)
   reason?: string | null;
 }
+
+export class CloseTeamMatchDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string | null;
+}
+
+export class ReopenTeamMatchDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string | null;
+}
+
+export class CompleteTeamMatchDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string | null;
+}

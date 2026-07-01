@@ -114,7 +114,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
 
-  const runHeroAction = (action: (() => void | Promise<void>) | undefined, successMessage: string) => {
+  const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string) => {
     if (!action) return;
     void Promise.resolve(action())
       .then(() => {
@@ -303,6 +303,21 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div className="tm-text-body-lg">신청팀</div>
                   {match.applicantActionError ? (
                     <div className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', marginTop: 6 }}>{match.applicantActionError}</div>
+                  ) : null}
+                  {model.hostActions?.length ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                      {model.hostActions.map((action) => (
+                        <button
+                          key={action.label}
+                          className={`tm-btn tm-btn-sm ${hostActionClass(action.tone)}`}
+                          type="button"
+                          disabled={action.pending}
+                          onClick={() => runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`)}
+                        >
+                          {action.pending ? '처리 중' : action.label}
+                        </button>
+                      ))}
+                    </div>
                   ) : null}
                   <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
                     {match.applicantTeams.map((team) => (
@@ -588,8 +603,8 @@ function DraggableFilterSheet({
 function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
-  const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : '모집 중';
-  const statusClass = match.status === 'mine' ? 'tm-badge-green' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-blue' : 'tm-badge-blue';
+  const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : match.status === 'closed' ? '마감' : '모집 중';
+  const statusClass = match.status === 'mine' ? 'tm-badge-green' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-blue' : match.status === 'closed' ? 'tm-badge-grey' : 'tm-badge-blue';
   return (
     <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}>
       <div className="tm-team-match-vs">
@@ -767,6 +782,12 @@ function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
       </div>
     </AppChrome>
   );
+}
+
+function hostActionClass(tone: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]['tone']) {
+  if (tone === 'primary') return 'tm-btn-primary';
+  if (tone === 'danger') return 'tm-btn-danger';
+  return 'tm-btn-neutral';
 }
 
 function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {

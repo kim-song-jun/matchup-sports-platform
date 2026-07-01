@@ -17,7 +17,7 @@ export type TeamMatchModel = {
   gender: string;
   manner: number;
   wins: number;
-  status: 'open' | 'pending' | 'approved' | 'mine';
+  status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
 };
 
 export type TeamMatchListViewModel = {
@@ -87,6 +87,12 @@ export type TeamMatchDetailViewModel = {
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;
+  hostActions?: Array<{
+    label: string;
+    tone?: 'neutral' | 'primary' | 'danger';
+    pending?: boolean;
+    onClick: () => void | Promise<unknown>;
+  }>;
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;

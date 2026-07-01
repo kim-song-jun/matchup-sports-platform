@@ -5,10 +5,14 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApplyTeamMatch,
   useV1ApproveTeamMatchApplication,
+  useV1CancelTeamMatch,
+  useV1CloseTeamMatch,
+  useV1CompleteTeamMatch,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
   useV1RejectTeamMatchApplication,
+  useV1ReopenTeamMatch,
   useV1ResolveChatRoom,
   useV1TeamMatch,
   useV1TeamMatchApplications,
@@ -16,6 +20,7 @@ import {
   useV1TeamMatches,
   useV1WithdrawTeamMatchApplication,
 } from '@/hooks/use-v1-api';
+import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -178,6 +183,10 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
   const approveApplication = useV1ApproveTeamMatchApplication(teamMatchId);
   const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);
+  const closeTeamMatch = useV1CloseTeamMatch(teamMatchId);
+  const reopenTeamMatch = useV1ReopenTeamMatch(teamMatchId);
+  const completeTeamMatch = useV1CompleteTeamMatch(teamMatchId);
+  const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const [actionError, setActionError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
   const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
@@ -226,13 +235,27 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
         mode: toDetailMode(viewerState, getStatus(query.data)),
         applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam),
         applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
+        hostActions: viewerState === 'host_team'
+          ? buildHostActions({
+              status: getStatus(query.data),
+              closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
+              reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
+              completeTeamMatch: () => completeTeamMatch.mutateAsync({ note: 'host_completed_from_v1_web' }),
+              cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
+              pending:
+                closeTeamMatch.isPending ||
+                reopenTeamMatch.isPending ||
+                completeTeamMatch.isPending ||
+                cancelTeamMatch.isPending,
+            })
+          : undefined,
         statusLabel: statusLabel(viewerState, getStatus(query.data)),
         chatLabel: chatLabel(viewerState, getStatus(query.data)),
         chatPending: resolveChatRoom.isPending,
         onChat: canOpenTeamMatchChat(viewerState, getStatus(query.data))
           ? () => resolveChatRoom.mutate(
               { targetType: 'team_match', targetId: teamMatchId },
-              { onSuccess: (room) => router.push(room.route.replace('/chat/rooms/', '/chat/')) },
+              { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
             )
           : undefined,
         onShare: () => shareTeamMatch(query.data),
@@ -246,6 +269,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           hasNoTeam,
           apply: (teamId) => applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }),
           withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
+          reasonCode: selectedEligibility?.reasonCode,
           redirectTo: (href) => router.push(href),
         }),
       }
@@ -435,6 +459,7 @@ function statusToCardStatus(status: V1TeamMatchApiStatus, viewerState: V1TeamMat
   if (viewerState === 'host_team') return 'mine';
   if (viewerState === 'requested') return 'pending';
   if (viewerState === 'approved' || status === 'matched') return 'approved';
+  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired') return 'closed';
   return 'open';
 }
 
@@ -480,6 +505,42 @@ function canOpenTeamMatchChat(viewerState: V1TeamMatchViewerState, _status: V1Te
   return viewerState === 'approved' || viewerState === 'host_team';
 }
 
+function buildHostActions({
+  status,
+  closeTeamMatch,
+  reopenTeamMatch,
+  completeTeamMatch,
+  cancelTeamMatch,
+  pending,
+}: {
+  status: V1TeamMatchApiStatus;
+  closeTeamMatch: () => Promise<unknown>;
+  reopenTeamMatch: () => Promise<unknown>;
+  completeTeamMatch: () => Promise<unknown>;
+  cancelTeamMatch: () => Promise<unknown>;
+  pending: boolean;
+}): TeamMatchDetailViewModel['hostActions'] {
+  if (status === 'recruiting') {
+    return [
+      { label: '모집 마감', tone: 'neutral', pending, onClick: closeTeamMatch },
+      { label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch },
+    ];
+  }
+  if (status === 'closed') {
+    return [
+      { label: '모집 재개', tone: 'primary', pending, onClick: reopenTeamMatch },
+      { label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch },
+    ];
+  }
+  if (status === 'matched') {
+    return [
+      { label: '경기 완료', tone: 'primary', pending, onClick: completeTeamMatch },
+      { label: '팀매치 취소', tone: 'danger', pending, onClick: cancelTeamMatch },
+    ];
+  }
+  return [];
+}
+
 async function shareTeamMatch(match: V1TeamMatch) {
   const title = match.title;
   const path = `/team-matches/${match.teamMatchId ?? match.id}`;
@@ -508,6 +569,7 @@ function getApplyAction({
   hasNoTeam,
   apply,
   withdraw,
+  reasonCode,
   redirectTo,
 }: {
   viewerState: V1TeamMatchViewerState;
@@ -518,9 +580,10 @@ function getApplyAction({
   hasNoTeam?: boolean;
   apply: (teamId: string) => Promise<unknown>;
   withdraw: () => Promise<unknown>;
+  reasonCode?: string;
   redirectTo: (href: string) => void;
 }): (() => Promise<unknown>) | undefined {
-  if ((viewerState === 'requested' || applicationId) && applicationId) return withdraw;
+  if ((viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') && applicationId) return withdraw;
   if (eligible && selectedTeamId) return () => apply(selectedTeamId);
   // 비인증: 로그인 페이지로 이동하되, 보던 팀매치 상세로 복귀하도록 redirect 전파 (Copilot)
   if (isGuest) return async () => { redirectTo(getLoginPathForRedirect(getCurrentRedirectPath())); };

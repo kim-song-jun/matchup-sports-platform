@@ -290,6 +290,19 @@ describe('TeamMatchesService', () => {
     );
   });
 
+  it('edit: 모집 상태여도 시작 시간이 지났으면 수정 잠금 상태로 내려준다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ status: 'recruiting', startAt: PAST }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+    const result = await service.edit(manager, 'tm-1');
+
+    expect(result.editable).toBe(false);
+    expect(result.lockedReason).toBe('expired');
+    expect(result.status).toBe('expired');
+  });
+
   // ─── withdrawApplication: 상태 머신 ───────────────────────────────────────
 
   it('withdrawApplication: requested가 아닌 신청 취소 → 409 ALREADY_PROCESSED', async () => {
@@ -382,6 +395,34 @@ describe('TeamMatchesService', () => {
 
     const result = await service.detail(null, 'tm-1');
     expect(result.status).toBe('expired');
+  });
+
+  it('detail: 호스트팀 일반 멤버는 신청 관리 권한이 없으므로 host_team 상태가 아니다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: 'owner-user',
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [{ id: 'mem-1', userId: manager.id, role: 'member', status: 'active' }],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.state).toBe('none');
+    expect(result.viewer.manageableHostTeam).toBe(false);
   });
 
   it('approveApplication: 신청자가 없을 때 404 NOT_FOUND', async () => {

@@ -279,11 +279,12 @@ export class TeamMatchesService {
 
   async edit(user: V1AuthUser, teamMatchId: string) {
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
-    const editable = teamMatch.status === 'recruiting';
+    const apiStatus = this.getApiStatus(teamMatch);
+    const editable = teamMatch.status === 'recruiting' && apiStatus !== 'expired';
     return {
       teamMatchId: teamMatch.id,
       editable,
-      lockedReason: editable ? null : 'terminal_or_matched_status',
+      lockedReason: editable ? null : apiStatus === 'expired' ? 'expired' : 'terminal_or_matched_status',
       form: {
         hostTeamId: teamMatch.hostTeamId,
         sportId: teamMatch.sportId,
@@ -302,7 +303,7 @@ export class TeamMatchesService {
         maxLevelCode: teamMatch.maxSportLevel?.code ?? null,
         genderRule: teamMatch.genderRule,
       },
-      status: this.getApiStatus(teamMatch),
+      status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
     };
   }
@@ -997,7 +998,15 @@ export class TeamMatchesService {
 
   private getViewerState(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
     if (!user) return 'none';
-    if (teamMatch.hostTeam.memberships.some((membership) => membership.userId === user.id)) return 'host_team';
+    if (
+      teamMatch.hostTeam.memberships.some(
+        (membership) =>
+          membership.userId === user.id &&
+          (membership.role === 'owner' || membership.role === 'manager'),
+      )
+    ) {
+      return 'host_team';
+    }
     const application = teamMatch.applications.find((item) => item.appliedByUserId === user.id);
     if (application?.status === 'approved') return 'approved';
     if (application?.status) return application.status;

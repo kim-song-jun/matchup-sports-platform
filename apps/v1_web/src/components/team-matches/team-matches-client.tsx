@@ -172,14 +172,16 @@ export function TeamMatchListPageClient() {
 export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string }) {
   const router = useRouter();
   const query = useV1TeamMatch(teamMatchId);
-  const viewerState = query.data ? getViewerState(query.data) : 'none';
+  const rawViewerState = query.data ? getViewerState(query.data) : 'none';
+  const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
+  const viewerState = rawViewerState === 'host_team' && !canManageHostTeam ? 'none' : rawViewerState;
   // guest = 비인증 사용자: viewerState가 'guest'이거나 query.data에 viewer.state='guest'로 내려오는 경우
   const isGuest = viewerState === 'guest';
   const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' && !isGuest });
   // Request the server max (50) so applicant teams aren't hidden behind the default
   // page size of 20. One match seeks a single opponent, so applicant teams stay well
   // within a single page — no cursor pagination needed here.
-  const applications = useV1TeamMatchApplications(teamMatchId, { limit: 50 }, { enabled: Boolean(query.data) && viewerState === 'host_team' });
+  const applications = useV1TeamMatchApplications(teamMatchId, { limit: 50 }, { enabled: Boolean(query.data) && canManageHostTeam });
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
   const approveApplication = useV1ApproveTeamMatchApplication(teamMatchId);
   const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);
@@ -209,12 +211,12 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
           hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
           applicantActionError: actionError,
-          manageHref: viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
+          manageHref: canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
           applicantTeams: toApplicantTeamsWithActions(
             query.data,
             applications.data,
             fallback.match.applicantTeams,
-            viewerState === 'host_team' ? `/team-matches/${teamMatchId}/edit` : undefined,
+            canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
             (applicationId) => {
               setActionError(null);
               approveApplication.mutate(
@@ -235,7 +237,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
         mode: toDetailMode(viewerState, getStatus(query.data)),
         applyLabel: applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam),
         applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
-        hostActions: viewerState === 'host_team'
+        hostActions: canManageHostTeam
           ? buildHostActions({
               status: getStatus(query.data),
               closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),

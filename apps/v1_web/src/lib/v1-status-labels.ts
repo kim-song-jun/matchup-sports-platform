@@ -42,6 +42,7 @@ export function teamMemberStatusLabel(status: string): string {
  * 미매핑 값은 안전한 한글 폴백으로 대체한다.
  */
 const LOCKED_REASON_LABEL: Record<string, string> = {
+  expired: '경기 시간이 지난 팀매치는 수정할 수 없어요.',
   terminal_or_matched_status: '이미 매칭이 완료됐거나 종료된 팀매치는 수정할 수 없어요.',
   terminal_status: '완료·취소·종료된 매치는 수정할 수 없어요.',
 };

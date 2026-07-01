@@ -6,6 +6,8 @@
 |---|---|---|---|---|
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations` | user, team manager+ | `CreateRegistrationDto` | registration in `draft` |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registration` | user | path ids | caller's latest registration |
+| `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registration?scope=teams` | user, team manager+ | path ids | registrations for teams the caller manages |
+| `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registrations` | user, team manager+ | path ids | registrations for teams the caller manages |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId` | user, team manager+ | path ids | registration detail |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/submit` | user, team manager+ | `SubmitRegistrationDto` | registration in `awaiting_payment` |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | user, team manager+ | `CancelRegistrationRequestDto` | `draft` becomes `cancelled`; active statuses become `cancel_requested` |
@@ -14,6 +16,8 @@
 `cancel-request` stores the status that existed before `cancel_requested`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
 
 `POST /registrations` is resumable for the same tournament/team while the existing registration is still `draft`. This covers users leaving the apply flow before final submit; the endpoint returns the existing draft instead of `ALREADY_REGISTERED`.
+
+Tournament registration ownership is team-scoped, not user-singleton. A user can manage multiple teams, so `my-registration?scope=teams` is the canonical frontend entry point for "내 신청 보기"; it returns every registration for the tournament where the caller has active owner/manager membership on the registered team. Plain `my-registration` remains for backward compatibility and only returns one caller-created registration. `my-registrations` is an equivalent explicit list route but the web client avoids depending on that new path during local dev.
 
 For bank-transfer submissions, the user-facing `/tournaments/:id/my` surface must combine the registration/payment response with `GET /tournaments/:id` account fields. A `bank_transfer` payment in `ready` status still needs the tournament `bankName`, `bankAccount`, and `bankHolder` shown in the application detail, even though the registration already has a `payment` object.
 

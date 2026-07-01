@@ -26,6 +26,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError, v1Get } from '@/lib/api-client';
+import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { teamSharePath } from '@/lib/team-share-route';
 import { v1Keys } from '@/lib/query-keys';
@@ -234,7 +235,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           eligibility: eligibility.data,
           chat: async () => {
             const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
-            router.push(result.route || `/chat/${result.roomId}`);
+            router.push(chatRoomHref(result.roomId, result.route));
           },
           join: () => join.mutateAsync({ message: null }),
           withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),

@@ -1418,6 +1418,8 @@ export function useV1CreateRegistration(tournamentId: string) {
       v1Post<V1TournamentRegistration>(`/tournaments/${tournamentId}/registrations`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.myTournamentRegistration(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.myTournamentRegistrations(tournamentId) });
     },
   });
 }
@@ -1450,6 +1452,30 @@ export function useV1MyRegistration(tournamentId: string) {
   });
 }
 
+/** 로그인 유저가 운영 권한을 가진 팀들의 대회 신청 목록을 조회한다. */
+export function useV1MyRegistrations(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.myTournamentRegistrations(tournamentId),
+    queryFn: async () => {
+      try {
+        const registrations = await v1Get<V1TournamentRegistration[] | V1TournamentRegistration>(
+          `/tournaments/${tournamentId}/registrations/my-registration`,
+          { scope: 'teams' },
+        );
+        return Array.isArray(registrations) ? registrations : [registrations];
+      } catch (error) {
+        if (error instanceof V1ApiError && error.statusCode === 404) return [];
+        throw error;
+      }
+    },
+    enabled: !!tournamentId,
+    retry: (failureCount, error) => {
+      if (error instanceof V1ApiError && error.statusCode === 404) return false;
+      return failureCount < 2;
+    },
+  });
+}
+
 export function useV1SubmitRegistration(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1466,6 +1492,9 @@ export function useV1SubmitRegistration(tournamentId: string, registrationId: st
       // /my 페이지가 myTournamentRegistration 캐시를 사용하므로 함께 무효화
       queryClient.invalidateQueries({
         queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistrations(tournamentId),
       });
     },
   });
@@ -1488,6 +1517,9 @@ export function useV1CancelRegistrationRequest(tournamentId: string, registratio
       queryClient.invalidateQueries({
         queryKey: v1Keys.myTournamentRegistration(tournamentId),
       });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistrations(tournamentId),
+      });
     },
   });
 }
@@ -1507,6 +1539,9 @@ export function useV1WithdrawCancelRegistrationRequest(tournamentId: string, reg
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       queryClient.invalidateQueries({
         queryKey: v1Keys.myTournamentRegistration(tournamentId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: v1Keys.myTournamentRegistrations(tournamentId),
       });
     },
   });

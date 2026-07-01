@@ -66,9 +66,8 @@ function formatPublishedAt(dateStr: string): string {
 
 /**
  * Renders the CTA button pair, aware of the viewer's existing registration.
- * - If a non-cancelled registration exists → "내 신청 보기" is primary (blue),
- *   and "참가 신청하기" is hidden.
- * - If no registration (or cancelled) → show only the apply/re-apply CTA.
+ * Tournament registrations are team-scoped, so an existing registration must not
+ * hide the apply entry; the viewer may manage another team that can still apply.
  */
 function ApplyCTAButtons({
   tournament,
@@ -84,13 +83,34 @@ function ApplyCTAButtons({
 
   if (hasActiveRegistration) {
     return (
-      <Link
-        href={`/tournaments/${tournament.id}/my`}
-        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-        aria-label="내 신청 내역 보기"
-      >
-        내 신청 보기
-      </Link>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <Link
+          href={`/tournaments/${tournament.id}/my`}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          aria-label="내 신청 내역 보기"
+        >
+          내 신청 보기
+        </Link>
+        {isFull ? (
+          <button
+            type="button"
+            className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
+            disabled
+            aria-disabled="true"
+            aria-label="모집이 마감되었어요"
+          >
+            모집 마감
+          </button>
+        ) : (
+          <Link
+            href={`/tournaments/${tournament.id}/apply`}
+            className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
+            aria-label="다른 팀으로 참가 신청하기"
+          >
+            다른 팀으로 신청
+          </Link>
+        )}
+      </div>
     );
   }
 
@@ -146,7 +166,8 @@ function ApplyCTA({
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
-  // 404 is expected when no registration exists — the hook suppresses retries for 404.
+  // Detail CTA only needs to know whether the viewer has any existing registration.
+  // Keep this on the stable single-registration endpoint; the multi-team list is used on /my and /apply.
   const { data: myRegistration = null } = useV1MyRegistration(tournamentId);
 
   if (isLoading) {
@@ -199,12 +220,11 @@ function TournamentDetailView({
   const isOpen = tournament.status === 'open';
   const isFull = tournament.confirmedCount >= tournament.teamCount;
   const hasPrize = tournament.prizePool != null;
-  // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
-  // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
-  const bottomPad = isOpen ? 96 : 48;
-
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
+  // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
+  // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
+  const bottomPad = isOpen ? (hasActiveRegistration ? 172 : 96) : 48;
 
   /* ── Prize card — rendered in left column just after metric strip ── */
   const prizeChips = tournament.prizeBreakdown
@@ -1235,4 +1255,3 @@ function TournamentDetailSkeleton() {
     </div>
   );
 }
-

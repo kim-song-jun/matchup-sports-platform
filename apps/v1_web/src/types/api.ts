@@ -1470,6 +1470,7 @@ export type V1TournamentRegistration = {
   id: string;
   tournamentId: string;
   teamId: string;
+  teamName?: string | null;
   appliedByUserId: string;
   status: V1TournamentRegistrationStatus;
   depositorName: string | null;

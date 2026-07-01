@@ -5,14 +5,14 @@
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/chat/rooms` | user | `roomType?`, `status?`, `cursor?`, `limit?` | linked room list |
-| `POST` | `/api/v1/chat/rooms/resolve` | user participant | `{ targetType: "match" | "team" | "team_match"; targetId: uuid }` | existing or created room |
+| `POST` | `/api/v1/chat/rooms/resolve` | user participant | `{ targetType: "match" | "team" | "team_match"; targetId: uuid }` | existing or created room with web route `/chat/:roomId` |
 | `GET` | `/api/v1/chat/rooms/:roomId` | room participant | path id | room detail |
 | `GET` | `/api/v1/chat/rooms/:roomId/messages` | room participant | `cursor?`, `limit?`, `direction?` | message list |
 | `POST` | `/api/v1/chat/rooms/:roomId/messages` | room participant | `{ content: string }` | sent message |
 | `PATCH` | `/api/v1/chat/rooms/:roomId/me` | room participant | `pinned?`, `lastReadMessageId?`, `mutedUntil?` | my room state |
 | `POST` | `/api/v1/chat/rooms/:roomId/leave` | room participant | `{ reason?: string | null }` | left room state |
 
-Chat v1 is linked-room and text-only. Team chat is created automatically when a team is created, owner/member participants are synced from team membership, and `resolve` can repair a missing team room for an active team member. DM and file attachment are deferred.
+Chat v1 is linked-room and text-only. Team chat is created automatically when a team is created, owner/member participants are synced from team membership, and `resolve` can repair a missing team room for an active team member. The public web room page is `/chat/:roomId`; `/api/v1/chat/rooms/:roomId` remains the API detail endpoint. DM and file attachment are deferred.
 
 ## Notification Endpoints
 

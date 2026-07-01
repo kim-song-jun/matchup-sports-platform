@@ -13,6 +13,7 @@ import {
   useV1ResolveChatRoom,
   useV1WithdrawMatchApplication,
 } from '@/hooks/use-v1-api';
+import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
@@ -177,7 +178,7 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
         onChat: canOpenMatchChat(viewerState)
           ? () => resolveChatRoom.mutate(
               { targetType: 'match', targetId: matchId },
-              { onSuccess: (room) => router.push(room.route.replace('/chat/rooms/', '/chat/')) },
+              { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
             )
           : undefined,
         onShare: () => shareMatch(query.data),

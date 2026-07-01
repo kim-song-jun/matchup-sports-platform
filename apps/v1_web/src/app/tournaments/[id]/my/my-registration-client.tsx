@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
@@ -10,7 +10,7 @@ import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
 import {
   useV1Tournament,
-  useV1MyRegistration,
+  useV1MyRegistrations,
   useV1TournamentPlayers,
   useV1CancelRegistrationRequest,
   useV1WithdrawCancelRegistrationRequest,
@@ -1058,18 +1058,84 @@ function NoRegistrationState({ tournamentId }: { tournamentId: string }) {
   );
 }
 
+function MyRegistrationsList({
+  tournamentId,
+  registrations,
+}: {
+  tournamentId: string;
+  registrations: V1TournamentRegistration[];
+}) {
+  const pathname = usePathname();
+
+  return (
+    <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
+      <div style={{ marginLeft: -20, marginRight: -20 }}>
+        <SectionTitle title="팀별 신청 내역" />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+        {registrations.map((registration) => {
+          const status = registrationStatusConfig(registration.status);
+          const href = appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname);
+          const teamName = registration.teamName ?? `팀 ${registration.teamId.slice(0, 8)}`;
+          const primaryAction = registration.status === 'draft' ? '이어서 작성' : '상세 보기';
+          return (
+            <Link key={registration.id} href={href} style={{ display: 'block', textDecoration: 'none' }}>
+              <Card pad={16}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span
+                        className="tm-text-label"
+                        style={{
+                          color: 'var(--text-strong)',
+                          fontWeight: 700,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {teamName}
+                      </span>
+                      <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
+                    </div>
+                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6 }}>
+                      선수 {registration.playerCount}명
+                      {registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
+                    <span className="tm-text-caption">{primaryAction}</span>
+                    <ChevronRightIcon size={16} />
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main client ── */
 
 export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
+  const searchParams = useSearchParams();
+  const selectedRegistrationId = searchParams.get('reg');
   const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
   const {
-    data: registration,
-    isLoading: loadingReg,
-    isError: regError,
-    error: regErr,
-  } = useV1MyRegistration(tournamentId);
+    data: registrations = [],
+    isLoading: loadingRegistrations,
+    isError: registrationsError,
+    error: registrationsErr,
+  } = useV1MyRegistrations(tournamentId);
 
-  const isLoading = loadingTournament || loadingReg;
+  const isLoading = loadingTournament || loadingRegistrations;
+  const selectedRegistration = selectedRegistrationId
+    ? registrations.find((item) => item.id === selectedRegistrationId)
+    : registrations.length === 1
+      ? registrations[0]
+      : null;
 
   if (isLoading) {
     return (
@@ -1087,17 +1153,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     );
   }
 
-  // 404 from useV1MyRegistration means no registration for this user yet
-  if (regError) {
-    const err = regErr as { statusCode?: number } | undefined;
-    if (err?.statusCode === 404) {
-      return (
-        <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
-          <NoRegistrationState tournamentId={tournamentId} />
-        </AppChrome>
-      );
-    }
-    const msg = extractErrorMessage(regErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  if (registrationsError) {
+    const msg = extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
       <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
         <div style={{ padding: '0 20px', marginTop: 24 }}>
@@ -1114,10 +1171,18 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     );
   }
 
-  if (!registration || !tournament) {
+  if (!tournament || registrations.length === 0) {
     return (
       <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
         <NoRegistrationState tournamentId={tournamentId} />
+      </AppChrome>
+    );
+  }
+
+  if (!selectedRegistration) {
+    return (
+      <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
+        <MyRegistrationsList tournamentId={tournamentId} registrations={registrations} />
       </AppChrome>
     );
   }
@@ -1138,7 +1203,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           bankAccount: tournament.bankAccount,
           bankHolder: tournament.bankHolder,
         }}
-        registration={registration}
+        registration={selectedRegistration}
       />
     </AppChrome>
   );

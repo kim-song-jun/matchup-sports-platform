@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -27,8 +27,20 @@ export class TournamentRegistrationsController {
   getMyRegistration(
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
+    @Query('scope') scope?: string,
   ) {
+    if (scope === 'teams') {
+      return this.registrationsService.getMyRegistrations(user, tournamentId);
+    }
     return this.registrationsService.getMyRegistration(user, tournamentId);
+  }
+
+  @Get('my-registrations')
+  getMyRegistrations(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+  ) {
+    return this.registrationsService.getMyRegistrations(user, tournamentId);
   }
 
   @Get(':registrationId')

@@ -73,10 +73,11 @@ export class TournamentRegistrationsService {
       return this.serialize(existing, null, await this.countPlayers(existing.id));
     }
     if (existing && existing.status !== 'cancelled') {
-      throw new ConflictException({
-        code: 'ALREADY_REGISTERED',
-        message: '이미 신청한 대회예요. 내 신청에서 확인해 주세요.',
-      });
+      const [payment, playerCount] = await Promise.all([
+        this.prisma.v1TournamentPayment.findUnique({ where: { registrationId: existing.id } }),
+        this.countPlayers(existing.id),
+      ]);
+      return this.serialize(existing, payment, playerCount);
     }
 
     // 취소된 신청이 남아있으면(unique 제약) draft로 재활성화, 없으면 신규 생성.
@@ -273,6 +274,61 @@ export class TournamentRegistrationsService {
     return this.serialize(registration, payment, playerCount);
   }
 
+  /**
+   * 로그인 유저가 운영 권한을 가진 팀들의 대회 신청 목록.
+   * 신청 자체는 tournamentId + teamId 단위이므로 다중 팀 운영자는 여러 신청을 볼 수 있다.
+   */
+  async getMyRegistrations(user: V1AuthUser, tournamentId: string) {
+    const registrations = await this.prisma.v1TournamentRegistration.findMany({
+      where: {
+        tournamentId,
+        OR: [
+          { appliedByUserId: user.id },
+          {
+            team: {
+              status: 'active',
+              deletedAt: null,
+              memberships: {
+                some: {
+                  userId: user.id,
+                  status: 'active',
+                  role: { in: ['owner', 'manager'] },
+                },
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        payment: true,
+        team: { select: { id: true, name: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    const playerCounts = registrations.length
+      ? await this.prisma.v1TournamentPlayer.groupBy({
+          by: ['registrationId'],
+          where: {
+            registrationId: { in: registrations.map((registration) => registration.id) },
+            removedAt: null,
+          },
+          _count: { registrationId: true },
+        })
+      : [];
+    const countByRegistrationId = new Map(
+      playerCounts.map((row) => [row.registrationId, row._count.registrationId]),
+    );
+
+    return registrations.map((registration) =>
+      this.serialize(
+        registration,
+        registration.payment,
+        countByRegistrationId.get(registration.id) ?? 0,
+      ),
+    );
+  }
+
   private async loadRegistration(tournamentId: string, registrationId: string): Promise<V1TournamentRegistration> {
     const registration = await this.prisma.v1TournamentRegistration.findFirst({
       where: { id: registrationId, tournamentId },
@@ -292,10 +348,12 @@ export class TournamentRegistrationsService {
     payment: V1TournamentPayment | null,
     playerCount: number,
   ) {
+    const rowWithTeam = row as V1TournamentRegistration & { team?: { name?: string | null } | null };
     return {
       id: row.id,
       tournamentId: row.tournamentId,
       teamId: row.teamId,
+      teamName: rowWithTeam.team?.name ?? null,
       appliedByUserId: row.appliedByUserId,
       status: row.status,
       depositorName: row.depositorName,

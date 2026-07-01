@@ -268,17 +268,33 @@ describe('ChatService', () => {
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
 
     const first = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
-    expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true });
+    expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true, route: '/chat/room-new' });
 
     // Second call: room already exists → return existing, created=false
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(newRoom);
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
 
     const second = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
-    expect(second).toMatchObject({ roomId: 'room-new', roomType: 'match', created: false });
+    expect(second).toMatchObject({ roomId: 'room-new', roomType: 'match', created: false, route: '/chat/room-new' });
 
     // Room should only be created ONCE
     expect(prisma.v1ChatRoom.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolve(team): returns the v1 web chat page route for active team members', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'team-member-1' });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoom.create.mockResolvedValueOnce({ id: 'team-room-1', teamId: 'team-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
+
+    const result = await service.resolve(userA, { targetType: 'team', targetId: 'team-1' });
+
+    expect(result).toMatchObject({
+      roomId: 'team-room-1',
+      roomType: 'team',
+      created: true,
+      route: '/chat/team-room-1',
+    });
   });
 
   // ─── 8. resolve(match): 비-참가자 → 403 PERMISSION_DENIED ──────────────────

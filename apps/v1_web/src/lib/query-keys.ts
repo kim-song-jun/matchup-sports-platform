@@ -42,6 +42,8 @@ export const v1Keys = {
     [...v1Keys.all, 'tournaments', tournamentId, 'registrations', registrationId] as const,
   myTournamentRegistration: (tournamentId: string) =>
     [...v1Keys.all, 'tournaments', tournamentId, 'my-registration'] as const,
+  myTournamentRegistrations: (tournamentId: string) =>
+    [...v1Keys.all, 'tournaments', tournamentId, 'my-registrations'] as const,
   tournamentPlayers: (tournamentId: string, registrationId: string) =>
     [...v1Keys.all, 'tournaments', tournamentId, 'registrations', registrationId, 'players'] as const,
   adminTournaments: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'tournaments', filters ?? {}] as const,

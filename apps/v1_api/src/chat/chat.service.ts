@@ -224,7 +224,7 @@ export class ChatService {
       update: { status: 'active', leftAt: null },
       create: { chatRoomId: room.id, userId, status: 'active' },
     });
-    return { roomId: room.id, roomType: 'match', created: !existing, route: `/chat/rooms/${room.id}` };
+    return { roomId: room.id, roomType: 'match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async resolveTeamRoom(userId: string, teamId: string) {
@@ -235,7 +235,7 @@ export class ChatService {
       update: { status: 'active', leftAt: null },
       create: { chatRoomId: room.id, userId, status: 'active' },
     });
-    return { roomId: room.id, roomType: 'team', created: !existing, route: `/chat/rooms/${room.id}` };
+    return { roomId: room.id, roomType: 'team', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async resolveTeamMatchRoom(userId: string, teamMatchId: string) {
@@ -246,7 +246,7 @@ export class ChatService {
       update: { status: 'active', leftAt: null },
       create: { chatRoomId: room.id, userId, status: 'active' },
     });
-    return { roomId: room.id, roomType: 'team_match', created: !existing, route: `/chat/rooms/${room.id}` };
+    return { roomId: room.id, roomType: 'team_match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async assertCanUseMatchChat(userId: string, matchId: string) {
@@ -401,4 +401,8 @@ function validationError(message: string, field: string) {
 
 function stateConflict(message: string, code = 'STATE_CONFLICT') {
   return new ConflictException({ code, message });
+}
+
+function chatRoomRoute(roomId: string) {
+  return `/chat/${roomId}`;
 }

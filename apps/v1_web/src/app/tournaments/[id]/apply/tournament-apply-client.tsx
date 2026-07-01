@@ -2,19 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import {
   useV1Tournament,
   useV1MyTeams,
-  useV1MyRegistration,
+  useV1MyRegistrations,
   useV1CreateRegistration,
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { publicAssetPath } from '@/lib/assets';
+import { appRoute } from '@/lib/app-route';
 import { formatEntryFee } from '@/lib/date-utils';
-import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod } from '@/types/api';
+import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod, V1TournamentRegistration } from '@/types/api';
 
 /* ── Helpers ── */
 
@@ -220,6 +222,7 @@ function DesktopRailSummary({
 function TeamSelectStep({
   tournament,
   teams,
+  registrations,
   isLoadingTeams,
   selectedTeamId,
   onSelectTeam,
@@ -228,6 +231,7 @@ function TeamSelectStep({
 }: {
   tournament: V1TournamentDetail;
   teams: V1MyTeam[];
+  registrations: V1TournamentRegistration[];
   isLoadingTeams: boolean;
   selectedTeamId: string;
   onSelectTeam: (teamId: string) => void;
@@ -288,6 +292,7 @@ function TeamSelectStep({
             {teams.map((team) => {
               const isManager = team.role === 'owner' || team.role === 'manager';
               const isSelected = team.teamId === selectedTeamId;
+              const registration = registrations.find((item) => item.teamId === team.teamId);
               return (
                 <button
                   key={team.teamId}
@@ -372,6 +377,8 @@ function TeamSelectStep({
                         >
                           {team.sport.name} · {team.memberCount}명
                           {team.region ? ` · ${team.region.name}` : ''}
+                          {isManager && registration?.status === 'draft' ? ' · 임시저장' : ''}
+                          {isManager && registration && registration.status !== 'draft' && registration.status !== 'cancelled' ? ' · 신청됨' : ''}
                         </div>
                       </div>
                       {isSelected && (
@@ -969,11 +976,13 @@ function LoadingSkeleton() {
 /* ── Main client ── */
 
 export function TournamentApplyPageClient({ tournamentId }: { tournamentId: string }) {
+  const pathname = usePathname();
   const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
-  const { data: myRegistration, isLoading: loadingMyRegistration } = useV1MyRegistration(tournamentId);
+  const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
 
   const myTeams = normalizeMyTeams(myTeamsData) ?? [];
+  const managerTeams = myTeams.filter((team) => team.role === 'owner' || team.role === 'manager');
 
   const [step, setStep] = useState<ApplyStep>('team');
   const [selectedTeamId, setSelectedTeamId] = useState('');
@@ -994,34 +1003,44 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   // Auto-select first manager team
   useEffect(() => {
     if (selectedTeamId) return;
-    const first = myTeams.find((t) => t.role === 'owner' || t.role === 'manager');
+    const first = managerTeams[0];
     if (first) setSelectedTeamId(first.teamId);
-  }, [myTeams, selectedTeamId]);
+  }, [managerTeams, selectedTeamId]);
 
   useEffect(() => {
-    if (!myRegistration || registrationId) return;
+    if (registrationId || myRegistrations.length !== 1) return;
+    if (managerTeams.length !== 1) return;
 
-    if (myRegistration.status === 'draft') {
-      setRegistrationId(myRegistration.id);
-      setSelectedTeamId(myRegistration.teamId);
+    const registration = myRegistrations[0];
+    if (registration.status === 'draft') {
+      setRegistrationId(registration.id);
+      setSelectedTeamId(registration.teamId);
       setStep('agreements');
       setSubmitError(null);
       return;
     }
 
     if (
-      myRegistration.status === 'awaiting_payment' &&
-      myRegistration.payment?.method === 'bank_transfer' &&
-      myRegistration.payment.status === 'ready'
+      registration.status === 'awaiting_payment' &&
+      registration.payment?.method === 'bank_transfer' &&
+      registration.payment.status === 'ready'
     ) {
-      setRegistrationId(myRegistration.id);
-      setSelectedTeamId(myRegistration.teamId);
+      setRegistrationId(registration.id);
+      setSelectedTeamId(registration.teamId);
       setStep('payment');
       setSubmitError(null);
     }
-  }, [myRegistration, registrationId]);
+  }, [managerTeams.length, myRegistrations, registrationId]);
 
   const selectedTeam = myTeams.find((t) => t.teamId === selectedTeamId);
+  const selectedRegistration = myRegistrations.find((item) => item.teamId === selectedTeamId);
+
+  function handleSelectTeam(teamId: string) {
+    const registration = myRegistrations.find((item) => item.teamId === teamId);
+    setSelectedTeamId(teamId);
+    setRegistrationId(registration?.id ?? null);
+    setSubmitError(null);
+  }
 
   const allRequiredAgreed = agreements.agreedRules && agreements.agreedPrivacy && agreements.agreedRefund;
   const bankTransferValid =
@@ -1030,7 +1049,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   const isCreating = createRegistration.isPending;
 
-  if (loadingTournament || loadingMyRegistration) {
+  if (loadingTournament || loadingMyRegistrations) {
     return (
       <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
         <LoadingSkeleton />
@@ -1077,42 +1096,21 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     );
   }
 
-  const isResumablePaymentGuide =
-    myRegistration?.status === 'awaiting_payment' &&
-    myRegistration.payment?.method === 'bank_transfer' &&
-    myRegistration.payment.status === 'ready';
-
-  if (myRegistration && myRegistration.status !== 'draft' && myRegistration.status !== 'cancelled' && !isResumablePaymentGuide) {
-    return (
-      <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
-          <AlertBanner
-            message="이미 제출된 신청이 있어요. 신청 내역에서 결제 안내와 상태를 확인해 주세요."
-            tone="info"
-          />
-          <Link
-            href={`/tournaments/${tournamentId}/my?reg=${myRegistration.id}`}
-            className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
-            style={{ marginTop: 14 }}
-          >
-            내 신청 확인하기
-          </Link>
-          <Link
-            href={`/tournaments/${tournamentId}`}
-            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 8 }}
-          >
-            대회 상세로 돌아가기
-          </Link>
-        </div>
-      </AppChrome>
-    );
-  }
-
   async function handleTeamNext() {
     if (!selectedTeamId) return;
-    // REG-02: 이미 registrationId가 있으면 create를 재호출하지 않고 바로 다음 단계로 진행
-    if (registrationId) {
+    if (selectedRegistration?.status === 'awaiting_payment' &&
+      selectedRegistration.payment?.method === 'bank_transfer' &&
+      selectedRegistration.payment.status === 'ready') {
+      setRegistrationId(selectedRegistration.id);
+      setStep('payment');
+      setSubmitError(null);
+      return;
+    }
+    if (selectedRegistration && selectedRegistration.status !== 'draft' && selectedRegistration.status !== 'cancelled') {
+      window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${selectedRegistration.id}`, pathname));
+      return;
+    }
+    if (registrationId && selectedRegistration?.id === registrationId) {
       setStep('agreements');
       return;
     }
@@ -1120,7 +1118,19 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     try {
       const reg = await createRegistration.mutateAsync({ teamId: selectedTeamId });
       setRegistrationId(reg.id);
-      setStep('agreements');
+      if (reg.status === 'draft') {
+        setStep('agreements');
+        return;
+      }
+      if (
+        reg.status === 'awaiting_payment' &&
+        reg.payment?.method === 'bank_transfer' &&
+        reg.payment.status === 'ready'
+      ) {
+        setStep('payment');
+        return;
+      }
+      window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${reg.id}`, pathname));
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '신청을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.'));
     }
@@ -1166,9 +1176,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 <TeamSelectStep
                   tournament={tournament}
                   teams={myTeams}
+                  registrations={myRegistrations}
                   isLoadingTeams={loadingTeams}
                   selectedTeamId={selectedTeamId}
-                  onSelectTeam={setSelectedTeamId}
+                  onSelectTeam={handleSelectTeam}
                   onNext={handleTeamNext}
                   isCreating={isCreating}
                 />

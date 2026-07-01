@@ -2068,6 +2068,10 @@ button:disabled {
   padding: 12px 20px 124px;
 }
 
+.tm-create-shell-edit {
+  padding-bottom: calc(168px + var(--v1-shell-safe-bottom));
+}
+
 .tm-create-progress {
   padding: 14px 0 10px;
 }

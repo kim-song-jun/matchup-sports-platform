@@ -414,7 +414,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const secondaryAction = model.form?.onBack;
   return (
     <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'}>
-      <div className="tm-create-shell">
+      <div className={`tm-create-shell ${edit ? 'tm-create-shell-edit' : ''}`}>
         <CreateProgress step={step} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 팀매치예요" body={model.form.lockedReason} /> : null}

@@ -84,6 +84,18 @@ const EMPTY_FORM: AddPlayerFormState = {
   eligibilityStatus: 'non_pro',
 };
 
+type DraftPlayerForm = {
+  id: string;
+  userId: string;
+};
+
+function createDraftPlayerForm(): DraftPlayerForm {
+  return {
+    id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    userId: '',
+  };
+}
+
 /** Loose YYYY-MM-DD validation (accepts partial input, blocks obviously wrong strings) */
 function isValidBirthDate(v: string): boolean {
   if (!v) return true; // optional field — empty is valid
@@ -121,15 +133,23 @@ function memberMissingReason(member: { realName?: unknown; birthDate?: unknown; 
 }
 
 function AddPlayerForm({
+  formId,
   teamId,
   onSubmit,
-  onCancel,
+  onRemove,
+  onUserChange,
+  registeredUserIds,
+  pendingUserIds,
   isSubmitting,
   error,
 }: {
+  formId: string;
   teamId: string;
-  onSubmit: (data: AddPlayerFormState) => void;
-  onCancel: () => void;
+  onSubmit: (formId: string, data: AddPlayerFormState) => void;
+  onRemove: (formId: string) => void;
+  onUserChange: (formId: string, userId: string) => void;
+  registeredUserIds: Set<string>;
+  pendingUserIds: Set<string>;
   isSubmitting: boolean;
   error: string | null;
 }) {
@@ -174,6 +194,7 @@ function AddPlayerForm({
   /** When a member is chosen from the dropdown, pre-fill profile snapshots returned by the API. */
   function handleMemberChange(userId: string) {
     const member = members.find((m) => m.userId === userId);
+    onUserChange(formId, userId);
     patch({
       userId,
       realName: normalizeProfileText(member?.realName) || normalizeProfileText(member?.displayName),
@@ -184,22 +205,43 @@ function AddPlayerForm({
   }
 
   const birthDateValid = isValidBirthDate(form.birthDate);
+  const selectedAlreadyRegistered = form.userId ? registeredUserIds.has(form.userId) : false;
+  const selectedAlreadyPending = form.userId ? pendingUserIds.has(form.userId) : false;
   const canSubmit =
     form.userId.trim().length > 0 &&
     isRegisterableForm(form) &&
-    birthDateValid;
+    birthDateValid &&
+    !selectedAlreadyRegistered &&
+    !selectedAlreadyPending;
   const selectedMemberMissing = form.userId && !isRegisterableForm(form);
+  const memberFieldId = `${formId}-member`;
+  const realNameFieldId = `${formId}-realname`;
+  const birthDateFieldId = `${formId}-birthdate`;
+  const phoneFieldId = `${formId}-phone`;
+  const eligibilityFieldId = `${formId}-eligibility`;
 
   /* #7a: Neutral solid card — no blue tint. Blue reserved for focus/active states only. */
   return (
     <Card pad={16} style={{ border: '1px solid var(--grey200)', background: 'var(--surface)' }}>
-      <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 14 }}>
-        선수 추가
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+        <div className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+          선수 추가
+        </div>
+        <button
+          type="button"
+          className="tm-btn tm-btn-sm tm-btn-neutral"
+          style={{ minWidth: 44, padding: '0 10px' }}
+          onClick={() => onRemove(formId)}
+          disabled={isSubmitting}
+          aria-label="선수 추가 칸 삭제"
+        >
+          X
+        </button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Team member picker — replaces raw userId text input */}
-        <FormField id="player-member" label="팀원 선택" required>
+        <FormField id={memberFieldId} label="팀원 선택" required>
           {membersLoading ? (
             <div
               className="tm-input"
@@ -225,7 +267,7 @@ function AddPlayerForm({
           ) : (
             <>
               <select
-                id="player-member"
+                id={memberFieldId}
                 value={form.userId}
                 onChange={(e) => handleMemberChange(e.target.value)}
                 className="tm-input"
@@ -235,10 +277,20 @@ function AddPlayerForm({
                 <option value="">팀원을 선택해 주세요</option>
                 {members.map((m) => {
                   const registerable = isRegisterableMember(m);
+                  const alreadyRegistered = registeredUserIds.has(m.userId);
+                  const alreadyPending = pendingUserIds.has(m.userId);
+                  const disabled = !registerable || alreadyRegistered || alreadyPending;
+                  const suffix = alreadyRegistered
+                    ? ' - 이미 등록됨'
+                    : alreadyPending
+                      ? ' - 추가 대기 중'
+                      : registerable
+                        ? ''
+                        : ` - ${memberMissingReason(m)}`;
                   return (
-                    <option key={m.userId} value={m.userId} disabled={!registerable}>
+                    <option key={m.userId} value={m.userId} disabled={disabled}>
                       {m.displayName} ({memberRoleLabel(m.role)})
-                      {registerable ? '' : ` - ${memberMissingReason(m)}`}
+                      {suffix}
                     </option>
                   );
                 })}
@@ -246,6 +298,11 @@ function AddPlayerForm({
               {selectedMemberMissing ? (
                 <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '6px 0 0' }}>
                   실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.
+                </p>
+              ) : null}
+              {selectedAlreadyRegistered || selectedAlreadyPending ? (
+                <p className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', margin: '6px 0 0' }}>
+                  {selectedAlreadyRegistered ? '이미 명단에 등록된 선수예요.' : '다른 추가 칸에서 선택한 선수예요.'}
                 </p>
               ) : null}
               {unavailableMembers.length > 0 ? (
@@ -273,9 +330,9 @@ function AddPlayerForm({
         </FormField>
 
         {/* Selected member profile fields are read-only snapshots for tournament roster registration. */}
-        <FormField id="player-realname" label="실명" required>
+        <FormField id={realNameFieldId} label="실명" required>
           <input
-            id="player-realname"
+            id={realNameFieldId}
             type="text"
             value={form.realName}
             placeholder="홍길동"
@@ -287,30 +344,30 @@ function AddPlayerForm({
         </FormField>
 
         <FormField
-          id="player-birthdate"
+          id={birthDateFieldId}
           label="생년월일"
           required
           hint="팀원 선택 시 자동으로 조회돼요."
           errorMessage={birthDateError ?? undefined}
         >
           <input
-            id="player-birthdate"
+            id={birthDateFieldId}
             type="text"
             inputMode="numeric"
             value={form.birthDate}
             placeholder="예: 1995-03-21"
             maxLength={10}
             className="tm-input"
-            aria-describedby={birthDateError ? 'player-birthdate-error' : undefined}
+            aria-describedby={birthDateError ? `${birthDateFieldId}-error` : undefined}
             aria-invalid={birthDateError ? true : undefined}
             style={{ fontFamily: 'var(--font-pretendard)' }}
             readOnly
           />
         </FormField>
 
-        <FormField id="player-phone" label="휴대폰 번호" required hint="팀원 선택 시 자동으로 조회돼요.">
+        <FormField id={phoneFieldId} label="휴대폰 번호" required hint="팀원 선택 시 자동으로 조회돼요.">
           <input
-            id="player-phone"
+            id={phoneFieldId}
             type="tel"
             value={form.phone}
             placeholder="01012345678"
@@ -321,21 +378,21 @@ function AddPlayerForm({
           />
         </FormField>
 
-        <FormField id="player-eligibility" label="선출 여부" labelId="eligibility-label">
-          <div role="radiogroup" aria-labelledby="eligibility-label" style={{ display: 'flex', gap: 10 }}>
+        <FormField id={eligibilityFieldId} label="선출 여부" labelId={`${eligibilityFieldId}-label`}>
+          <div role="radiogroup" aria-labelledby={`${eligibilityFieldId}-label`} style={{ display: 'flex', gap: 10 }}>
             {(['non_pro', 'pro'] as const).map((val) => {
               const selected = form.eligibilityStatus === val;
               return (
                 <label
                   key={val}
-                  htmlFor={`eligibility-${val}`}
+                  htmlFor={`${eligibilityFieldId}-${val}`}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minHeight: 44 }}
                 >
                   {/* sr-only native radio — keyboard + screen reader accessible */}
                   <input
-                    id={`eligibility-${val}`}
+                    id={`${eligibilityFieldId}-${val}`}
                     type="radio"
-                    name="eligibility-status"
+                    name={eligibilityFieldId}
                     value={val}
                     checked={selected}
                     onChange={() => patch({ eligibilityStatus: val })}
@@ -394,26 +451,15 @@ function AddPlayerForm({
           paddingBottom: 8,
           background: 'var(--surface)',
           borderTop: '1px solid var(--grey100)',
-          display: 'flex',
-          gap: 8,
           zIndex: 10,
         }}
       >
         <button
           type="button"
-          className="tm-btn tm-btn-md tm-btn-neutral"
-          style={{ flex: 1, minHeight: 44 }}
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          닫기
-        </button>
-        <button
-          type="button"
-          className="tm-btn tm-btn-md tm-btn-primary"
-          style={{ flex: 2, minHeight: 44 }}
+          className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
+          style={{ minHeight: 44 }}
           disabled={!canSubmit || isSubmitting}
-          onClick={() => onSubmit(form)}
+          onClick={() => onSubmit(formId, form)}
         >
           {isSubmitting ? '추가 중…' : '추가'}
         </button>
@@ -691,18 +737,24 @@ export function TournamentRosterPageClient({
   const removePlayer = useV1RemovePlayer(tournamentId, registrationId);
   const { confirm: confirmRemove, ConfirmModal: RemoveConfirmModal } = useConfirm();
 
-  const [showAddForm, setShowAddForm] = useState(false);
-  // Incremented on each successful add to remount the form (clears internal state).
-  const [addFormKey, setAddFormKey] = useState(0);
-  const [addError, setAddError] = useState<string | null>(null);
+  const [draftForms, setDraftForms] = useState<DraftPlayerForm[]>([]);
+  const [draftErrors, setDraftErrors] = useState<Record<string, string>>({});
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
   const isRosterLocked = Boolean(registration?.rosterLockedAt);
+  const isRosterEditBlockedByStatus =
+    registration?.status === 'cancel_requested' || registration?.status === 'cancelled';
+  const canEditRoster = Boolean(registration) && !isRosterLocked && !isRosterEditBlockedByStatus;
   const minPlayers = tournament?.minPlayers ?? 0;
   const maxPlayers = tournament?.maxPlayers ?? 999;
+  const registeredUserIds = useMemo(
+    () => new Set(players.map((player) => player.userId)),
+    [players],
+  );
+  const canAddDraftForm = canEditRoster && players.length + draftForms.length < maxPlayers;
 
   const backHref = `/tournaments/${tournamentId}/my`;
 
@@ -740,13 +792,53 @@ export function TournamentRosterPageClient({
     );
   }
 
-  async function handleAddPlayer(formData: {
+  function handleAddDraftForm() {
+    if (!canAddDraftForm) return;
+    setDraftForms((prev) => [...prev, createDraftPlayerForm()]);
+    setAddSuccess(null);
+    setRemoveError(null);
+  }
+
+  function handleRemoveDraftForm(formId: string) {
+    setDraftForms((prev) => prev.filter((form) => form.id !== formId));
+    setDraftErrors((prev) => {
+      const next = { ...prev };
+      delete next[formId];
+      return next;
+    });
+  }
+
+  function handleDraftUserChange(formId: string, userId: string) {
+    setDraftForms((prev) => prev.map((form) => (form.id === formId ? { ...form, userId } : form)));
+    setDraftErrors((prev) => {
+      const next = { ...prev };
+      delete next[formId];
+      return next;
+    });
+  }
+
+  async function handleAddPlayer(formId: string, formData: {
     userId: string;
     realName: string;
     birthDate: string;
     eligibilityStatus: V1PlayerEligibilityStatus;
   }) {
-    setAddError(null);
+    if (!canEditRoster) return;
+    const usedByAnotherDraft = draftForms.some((form) => form.id !== formId && form.userId === formData.userId);
+    if (registeredUserIds.has(formData.userId) || usedByAnotherDraft) {
+      setDraftErrors((prev) => ({
+        ...prev,
+        [formId]: registeredUserIds.has(formData.userId)
+          ? '이미 명단에 등록된 선수예요.'
+          : '다른 추가 칸에서 선택한 선수예요.',
+      }));
+      return;
+    }
+    setDraftErrors((prev) => {
+      const next = { ...prev };
+      delete next[formId];
+      return next;
+    });
     setAddSuccess(null);
     try {
       await addPlayer.mutateAsync({
@@ -755,16 +847,18 @@ export function TournamentRosterPageClient({
         birthDate: formData.birthDate || undefined,
         eligibilityStatus: formData.eligibilityStatus,
       });
-      // #8: Keep form open so operator can add the next player immediately.
-      // Remounting via key resets all internal form state cleanly.
-      setAddFormKey((k) => k + 1);
+      setDraftForms((prev) => prev.filter((form) => form.id !== formId));
       setAddSuccess('선수를 추가했어요.');
     } catch (err) {
-      setAddError(extractErrorMessage(err, '선수 추가에 실패했어요. 잠시 후 다시 시도해 주세요.'));
+      setDraftErrors((prev) => ({
+        ...prev,
+        [formId]: extractErrorMessage(err, '선수 추가에 실패했어요. 잠시 후 다시 시도해 주세요.'),
+      }));
     }
   }
 
   async function handleRemovePlayer(playerId: string) {
+    if (!canEditRoster) return;
     const player = players.find((p) => p.id === playerId);
     const nameLabel = player?.realName ? `"${player.realName}"` : '이 선수';
     const ok = await confirmRemove({
@@ -784,6 +878,7 @@ export function TournamentRosterPageClient({
   }
 
   async function handleUpdatePlayer(playerId: string, eligibilityStatus: V1PlayerEligibilityStatus) {
+    if (!canEditRoster) return;
     setRemoveError(null);
     setAddSuccess(null);
     await updatePlayer.mutateAsync({
@@ -792,8 +887,6 @@ export function TournamentRosterPageClient({
     });
     setAddSuccess('선수 정보를 수정했어요.');
   }
-
-  const atMax = players.length >= maxPlayers;
 
   return (
     <AppChrome title="선수 명단" backHref={backHref} bottomNav={false} activeTab="tournaments">
@@ -809,8 +902,17 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
+        {isRosterEditBlockedByStatus ? (
+          <div style={{ marginBottom: 14 }}>
+            <AlertBanner
+              message="취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요."
+              tone="info"
+            />
+          </div>
+        ) : null}
+
         {/* Below minimum warning */}
-        {!isRosterLocked && belowMinimum ? (
+        {canEditRoster && belowMinimum ? (
           <div style={{ marginBottom: 14 }}>
             <AlertBanner
               message={`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.`}
@@ -860,35 +962,48 @@ export function TournamentRosterPageClient({
               {`최소 ${minPlayers}명 · 최대 ${maxPlayers}명`}
             </div>
           </div>
-          {!isRosterLocked && !showAddForm && !atMax ? (
+          {canAddDraftForm ? (
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-primary"
               style={{ flexShrink: 0, minWidth: 64 }}
-              onClick={() => { setAddError(null); setAddSuccess(null); setShowAddForm(true); }}
+              onClick={handleAddDraftForm}
               aria-label="선수 추가하기"
             >
               + 추가
             </button>
           ) : null}
-          {atMax && !isRosterLocked ? (
+          {canEditRoster && !canAddDraftForm ? (
             <span className="tm-badge tm-badge-grey" style={{ flexShrink: 0 }}>
               최대 인원이에요
             </span>
           ) : null}
         </div>
 
-        {/* Add player form — key remounts on each successful add to reset internal state */}
-        {showAddForm && !isRosterLocked ? (
-          <div style={{ marginBottom: 14 }}>
-            <AddPlayerForm
-              key={addFormKey}
-              teamId={registration?.teamId ?? ''}
-              onSubmit={handleAddPlayer}
-              onCancel={() => { setShowAddForm(false); setAddError(null); setAddSuccess(null); }}
-              isSubmitting={addPlayer.isPending}
-              error={addError}
-            />
+        {draftForms.length > 0 && canEditRoster ? (
+          <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>
+            {draftForms.map((draftForm) => {
+              const pendingUserIds = new Set(
+                draftForms
+                  .filter((form) => form.id !== draftForm.id)
+                  .map((form) => form.userId)
+                  .filter(Boolean),
+              );
+              return (
+                <AddPlayerForm
+                  key={draftForm.id}
+                  formId={draftForm.id}
+                  teamId={registration?.teamId ?? ''}
+                  onSubmit={handleAddPlayer}
+                  onRemove={handleRemoveDraftForm}
+                  onUserChange={handleDraftUserChange}
+                  registeredUserIds={registeredUserIds}
+                  pendingUserIds={pendingUserIds}
+                  isSubmitting={addPlayer.isPending}
+                  error={draftErrors[draftForm.id] ?? null}
+                />
+              );
+            })}
           </div>
         ) : null}
 
@@ -897,16 +1012,14 @@ export function TournamentRosterPageClient({
           <Card pad={20}>
             <EmptyState
               title="등록된 선수가 없어요"
-              sub={isRosterLocked ? '명단이 잠겨 있어요.' : `최소 ${minPlayers}명 이상 등록해 주세요.`}
-              cta={!isRosterLocked ? '선수 추가하기' : undefined}
-              onCta={!isRosterLocked ? () => { setAddError(null); setAddSuccess(null); setShowAddForm(true); } : undefined}
+              sub={!canEditRoster ? '명단을 수정할 수 없는 상태예요.' : `최소 ${minPlayers}명 이상 등록해 주세요.`}
             />
           </Card>
         ) : (
           <Card pad={0}>
             <div style={{ padding: '8px 14px' }}>
               <div className="tm-text-micro tab-num" style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
-                총 {players.length}명 · {isRosterLocked ? '잠김' : '수정 가능'}
+                총 {players.length}명 · {canEditRoster ? '수정 가능' : '수정 불가'}
               </div>
             </div>
             {players.map((player) => (
@@ -917,7 +1030,7 @@ export function TournamentRosterPageClient({
                 onRemove={handleRemovePlayer}
                 isUpdating={updatePlayer.isPending}
                 isRemoving={removePlayer.isPending}
-                isLocked={isRosterLocked}
+                isLocked={!canEditRoster}
               />
             ))}
           </Card>

@@ -797,11 +797,9 @@ function AgreementsStep({
 function PaymentGuideStep({
   tournament,
   registrationId,
-  onBack,
 }: {
   tournament: V1TournamentDetail;
   registrationId: string;
-  onBack: () => void;
 }) {
   const hasBankInfo =
     Boolean(tournament.bankName) &&
@@ -941,17 +939,12 @@ function PaymentGuideStep({
 
       {/* Fixed CTA — hidden on desktop (rail takes over) */}
       <div className="tm-fixed-cta tm-hide-desktop">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          <button type="button" className="tm-btn tm-btn-lg tm-btn-neutral" onClick={onBack}>
-            이전
-          </button>
-          <Link
-            href={`/tournaments/${tournament.id}/my?reg=${registrationId}`}
-            className="tm-btn tm-btn-lg tm-btn-primary"
-          >
-            내 신청 확인하기
-          </Link>
-        </div>
+        <Link
+          href={`/tournaments/${tournament.id}/my?reg=${registrationId}`}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        >
+          내 신청 확인하기
+        </Link>
       </div>
     </div>
   );
@@ -1195,7 +1188,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               <PaymentGuideStep
                 tournament={tournament}
                 registrationId={registrationId}
-                onBack={() => setStep('agreements')}
               />
             ) : null}
           </div>

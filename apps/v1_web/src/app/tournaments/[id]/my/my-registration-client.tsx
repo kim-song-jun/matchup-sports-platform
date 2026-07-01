@@ -35,7 +35,7 @@ function registrationStatusConfig(status: V1TournamentRegistrationStatus): Statu
     case 'awaiting_payment':
       return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
     case 'payment_checking':
-      return { badgeClass: 'tm-badge-blue', label: '입금 확인 중' };
+      return { badgeClass: 'tm-badge-blue', label: '명단 확인 중' };
     case 'paid':
       return { badgeClass: 'tm-badge-blue', label: '결제 완료' };
     case 'confirmed':
@@ -601,6 +601,9 @@ function RegistrationDetailView({
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
   const isRosterLocked = Boolean(registration.rosterLockedAt);
+  const isRosterEditBlockedByStatus =
+    registration.status === 'cancel_requested' || registration.status === 'cancelled';
+  const isRosterEditable = !isRosterLocked && !isRosterEditBlockedByStatus;
   const canCancelRequest =
     registration.status === 'awaiting_payment' ||
     registration.status === 'payment_checking' ||
@@ -613,7 +616,7 @@ function RegistrationDetailView({
   const showRosterNudge =
     (registration.status === 'confirmed' || registration.status === 'paid') &&
     belowMinimum &&
-    !isRosterLocked;
+    isRosterEditable;
 
   /* Compact payment summary for the pass facts (full breakdown lives in the 신청 내역 card). */
   const paymentSummary = registration.payment
@@ -631,6 +634,14 @@ function RegistrationDetailView({
     bankAccount: tournament.bankAccount,
     bankHolder: tournament.bankHolder,
   });
+  const paymentDetailMessage =
+    registration.status === 'payment_checking'
+      ? '입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
+      : registration.status === 'awaiting_payment'
+        ? tournament.bankName
+          ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.'
+          : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 상태가 변경돼요.'
+        : null;
 
   async function handleCancelConfirm(reason: string) {
     setCancelError(null);
@@ -680,10 +691,12 @@ function RegistrationDetailView({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>선수 명단</span>
-          {belowMinimum && !isRosterLocked ? (
+          {belowMinimum && isRosterEditable ? (
             <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
               {rosterShortagebadge(registration.status).label}
             </span>
+          ) : isRosterEditBlockedByStatus ? (
+            <span className="tm-badge tm-badge-grey">수정 불가</span>
           ) : isRosterLocked ? (
             <span className="tm-badge tm-badge-grey">마감</span>
           ) : (
@@ -705,7 +718,7 @@ function RegistrationDetailView({
         >
           선수 등록하기
         </Link>
-      ) : !isRosterLocked ? (
+      ) : isRosterEditable ? (
         <Link
           href={rosterHref}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
@@ -792,6 +805,71 @@ function RegistrationDetailView({
               belowMinimum={belowMinimum}
             />
 
+            {/* Roster — surface before 신청 내역 so users notice roster registration early. */}
+            {!passShowsRoster ? (
+            <section aria-labelledby="roster-heading" style={{ marginTop: 16 }}>
+              <div style={{ marginLeft: -20, marginRight: -20 }}>
+                <SectionTitle id="roster-heading" title="선수 명단" />
+              </div>
+              <Card pad={16} style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    {/* P1 숫자:단위 2:1 + tabular-nums */}
+                  <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                      <span
+                        className="tab-num"
+                        style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}
+                      >
+                        {players.length}
+                      </span>
+                      <span style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-strong)', fontWeight: 500, lineHeight: 1.2 }}>명</span>
+                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>등록됨</span>
+                    </div>
+                    <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+                      {`최소 ${tournament.minPlayers}명 · 최대 ${tournament.maxPlayers}명`}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {belowMinimum && isRosterEditable ? (
+                      /* P0: status-aware badge — shared helper keeps rail and body in sync */
+                      <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
+                        {rosterShortagebadge(registration.status).label}
+                      </span>
+                    ) : null}
+                    {isRosterEditBlockedByStatus ? (
+                      <span className="tm-badge tm-badge-grey">수정 불가</span>
+                    ) : null}
+                    {isRosterLocked ? (
+                      <span className="tm-badge tm-badge-grey">마감</span>
+                    ) : null}
+                    {isRosterEditable ? (
+                      <Link
+                        href={rosterHref}
+                        className="tm-btn tm-btn-md tm-btn-neutral"
+                        aria-label="선수 명단 수정하기"
+                        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                      >
+                        선수 수정
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+                {belowMinimum && isRosterEditable ? (
+                  /* P0: copy branches on whether confirmation is still blocked */
+                  registration.status === 'confirmed' || registration.status === 'paid' ? (
+                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      대회 전까지 선수를 더 등록할 수 있어요.
+                    </p>
+                  ) : (
+                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      최소 인원을 채워야 참가 확정이 가능해요.
+                    </p>
+                  )
+                ) : null}
+              </Card>
+            </section>
+            ) : null}
+
             {/* Registration record — 신청 + 결제 consolidated into one "신청 내역" card */}
             <section aria-labelledby="reg-detail-heading">
               <div style={{ marginLeft: -20, marginRight: -20 }}>
@@ -841,9 +919,14 @@ function RegistrationDetailView({
                           <InfoRow label="계좌번호" value={tournament.bankAccount ?? ''} />
                           <InfoRow label="예금주" value={tournament.bankHolder ?? ''} isLast />
                           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
-                            위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.
+                            {paymentDetailMessage ?? '입금이 확인됐어요. 운영자가 신청 상태를 확인하고 있어요.'}
                           </div>
                         </>
+                      ) : null}
+                      {paymentDetailMessage && !shouldShowBankTransferAccount ? (
+                        <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
+                          {paymentDetailMessage}
+                        </div>
                       ) : null}
                     </div>
                   ) : (
@@ -869,79 +952,13 @@ function RegistrationDetailView({
                         </>
                       ) : null}
                       <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
-                        {registration.status === 'awaiting_payment'
-                          ? tournament.bankName
-                            ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 자동으로 상태가 변경돼요.'
-                            : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 자동으로 상태가 변경돼요.'
-                          : '아직 결제 정보가 없어요.'}
+                        {paymentDetailMessage ?? '아직 결제 정보가 없어요.'}
                       </div>
                     </div>
                   )}
                 </div>
               </Card>
             </section>
-
-            {/* Roster — only for states without a pass (the pass footer owns roster for confirmed/paid) */}
-            {!passShowsRoster ? (
-            <section aria-labelledby="roster-heading" style={{ marginTop: 16 }}>
-              <div style={{ marginLeft: -20, marginRight: -20 }}>
-                <SectionTitle id="roster-heading" title="선수 명단" />
-              </div>
-              <Card pad={16} style={{ marginTop: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    {/* P1 숫자:단위 2:1 + tabular-nums */}
-                  <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                      <span
-                        className="tab-num"
-                        style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}
-                      >
-                        {players.length}
-                      </span>
-                      <span style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-strong)', fontWeight: 500, lineHeight: 1.2 }}>명</span>
-                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>등록됨</span>
-                    </div>
-                    <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-                      {`최소 ${tournament.minPlayers}명 · 최대 ${tournament.maxPlayers}명`}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {belowMinimum && !isRosterLocked ? (
-                      /* P0: status-aware badge — shared helper keeps rail and body in sync */
-                      <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
-                        {rosterShortagebadge(registration.status).label}
-                      </span>
-                    ) : null}
-                    {isRosterLocked ? (
-                      <span className="tm-badge tm-badge-grey">마감</span>
-                    ) : null}
-                    {!isRosterLocked ? (
-                      <Link
-                        href={rosterHref}
-                        className="tm-btn tm-btn-md tm-btn-neutral"
-                        aria-label="선수 명단 수정하기"
-                        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-                      >
-                        선수 수정
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
-                {belowMinimum && !isRosterLocked ? (
-                  /* P0: copy branches on whether confirmation is still blocked */
-                  registration.status === 'confirmed' || registration.status === 'paid' ? (
-                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      대회 전까지 선수를 더 등록할 수 있어요.
-                    </p>
-                  ) : (
-                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      최소 인원을 채워야 참가 확정이 가능해요.
-                    </p>
-                  )
-                ) : null}
-              </Card>
-            </section>
-            ) : null}
 
             {/* Mobile-only: Cancel / Reapply actions (hidden on desktop — rail handles them) */}
             <div className="tm-hide-desktop" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>

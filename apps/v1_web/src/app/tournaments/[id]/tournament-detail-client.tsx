@@ -68,7 +68,7 @@ function formatPublishedAt(dateStr: string): string {
  * Renders the CTA button pair, aware of the viewer's existing registration.
  * - If a non-cancelled registration exists → "내 신청 보기" is primary (blue),
  *   and "참가 신청하기" is hidden.
- * - If no registration (or cancelled) → standard apply flow.
+ * - If no registration (or cancelled) → show only the apply/re-apply CTA.
  */
 function ApplyCTAButtons({
   tournament,
@@ -94,36 +94,31 @@ function ApplyCTAButtons({
     );
   }
 
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8 }}>
-      <Link
-        href={`/tournaments/${tournament.id}/my`}
-        className="tm-btn tm-btn-lg tm-btn-neutral"
-        aria-label="내 신청 상태 확인"
-        style={{ whiteSpace: 'nowrap' }}
+  const applyLabel = myRegistration?.status === 'cancelled' ? '다시 신청하기' : '참가 신청하기';
+  const applyAriaLabel = myRegistration?.status === 'cancelled' ? '대회 다시 신청하기' : '참가 신청하기';
+
+  if (isFull) {
+    return (
+      <button
+        type="button"
+        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        disabled
+        aria-disabled="true"
+        aria-label="모집이 마감되었어요"
       >
-        내 신청 보기
-      </Link>
-      {isFull ? (
-        <button
-          type="button"
-          className="tm-btn tm-btn-lg tm-btn-primary"
-          disabled
-          aria-disabled="true"
-          aria-label="모집이 마감되었어요"
-        >
-          모집 마감
-        </button>
-      ) : (
-        <Link
-          href={`/tournaments/${tournament.id}/apply`}
-          className="tm-btn tm-btn-lg tm-btn-primary"
-          aria-label="참가 신청하기"
-        >
-          참가 신청하기
-        </Link>
-      )}
-    </div>
+        모집 마감
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={`/tournaments/${tournament.id}/apply`}
+      className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+      aria-label={applyAriaLabel}
+    >
+      {applyLabel}
+    </Link>
   );
 }
 

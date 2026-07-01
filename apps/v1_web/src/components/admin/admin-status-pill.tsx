@@ -134,7 +134,7 @@ export const STATUS_META: Record<string, StatusMeta> = {
     icon: <Clock size={12} aria-hidden="true" />,
   },
   payment_checking: {
-    label: '확인 중',
+    label: '명단 확인 중',
     tone: 'amber',
     icon: <Clock size={12} aria-hidden="true" />,
   },

@@ -6,6 +6,7 @@
  * and cancel-request transitions. Asserts observable behaviour only.
  */
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
@@ -103,6 +104,39 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.create.mockResolvedValue(registrationRow());
     const result = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
     expect(result).toMatchObject({ id: 'reg-1', status: 'draft', playerCount: 0 });
+  });
+
+  it('create: P2002 after race returns the team-scoped registration when it now exists', async () => {
+    const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['tournament_id', 'team_id'] },
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(registrationRow({ id: 'race-reg-1' }));
+    prisma.v1TournamentRegistration.create.mockRejectedValue(p2002);
+    prisma.v1TournamentPlayer.count.mockResolvedValue(1);
+
+    const result = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    expect(result).toMatchObject({ id: 'race-reg-1', status: 'draft', playerCount: 1 });
+  });
+
+  it('create: P2002 without team-scoped row reports unique scope mismatch', async () => {
+    const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['tournament_id', 'applied_by_user_id'] },
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentRegistration.create.mockRejectedValue(p2002);
+
+    await expect(service.create(manager, 'tournament-1', { teamId: 'team-2' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_REGISTRATION_UNIQUE_SCOPE_MISMATCH' },
+    });
   });
 
   it('create: existing draft → resumes same draft instead of ALREADY_REGISTERED', async () => {
@@ -292,7 +326,7 @@ describe('TournamentRegistrationsService', () => {
     );
   });
 
-  it('getMyRegistrations: returns team-scoped registrations for managed teams', async () => {
+  it('getMyRegistrations: returns team-scoped registrations for joined teams', async () => {
     const rows = [
       {
         ...registrationRow({ id: 'reg-team-1', teamId: 'team-1', status: 'draft' }),
@@ -326,7 +360,7 @@ describe('TournamentRegistrationsService', () => {
             expect.objectContaining({
               team: expect.objectContaining({
                 memberships: expect.objectContaining({
-                  some: expect.objectContaining({ userId: manager.id, role: { in: ['owner', 'manager'] } }),
+                  some: expect.objectContaining({ userId: manager.id, status: 'active' }),
                 }),
               }),
             }),

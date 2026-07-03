@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import {
@@ -228,6 +228,7 @@ function TeamSelectStep({
   onSelectTeam,
   onNext,
   isCreating,
+  cancelHref,
 }: {
   tournament: V1TournamentDetail;
   teams: V1MyTeam[];
@@ -237,6 +238,7 @@ function TeamSelectStep({
   onSelectTeam: (teamId: string) => void;
   onNext: () => void;
   isCreating: boolean;
+  cancelHref: string;
 }) {
   const managerTeams = teams.filter((t) => t.role === 'owner' || t.role === 'manager');
   const hasManagerTeam = managerTeams.length > 0;
@@ -424,7 +426,7 @@ function TeamSelectStep({
       <div className="tm-fixed-cta tm-hide-desktop">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           <Link
-            href={`/tournaments/${tournament.id}`}
+            href={cancelHref}
             className="tm-btn tm-btn-lg tm-btn-neutral"
           >
             취소
@@ -947,7 +949,7 @@ function PaymentGuideStep({
       {/* Fixed CTA — hidden on desktop (rail takes over) */}
       <div className="tm-fixed-cta tm-hide-desktop">
         <Link
-          href={`/tournaments/${tournament.id}/my?reg=${registrationId}`}
+          href={`/tournaments/${tournament.id}/my`}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
         >
           내 신청 확인하기
@@ -976,7 +978,13 @@ function LoadingSkeleton() {
 /* ── Main client ── */
 
 export function TournamentApplyPageClient({ tournamentId }: { tournamentId: string }) {
+  const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requestedTeamId = searchParams.get('team') ?? '';
+  const hubHref = `/tournaments/${tournamentId}/my`;
+  const detailHref = `/tournaments/${tournamentId}`;
+  const applyBackHref = requestedTeamId ? hubHref : detailHref;
   const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
@@ -1002,12 +1010,14 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   // Auto-select first manager team
   useEffect(() => {
+    if (requestedTeamId) return;
     if (selectedTeamId) return;
     const first = managerTeams[0];
     if (first) setSelectedTeamId(first.teamId);
-  }, [managerTeams, selectedTeamId]);
+  }, [managerTeams, requestedTeamId, selectedTeamId]);
 
   useEffect(() => {
+    if (requestedTeamId) return;
     if (registrationId || myRegistrations.length !== 1) return;
     if (managerTeams.length !== 1) return;
 
@@ -1030,7 +1040,57 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       setStep('payment');
       setSubmitError(null);
     }
-  }, [managerTeams.length, myRegistrations, registrationId]);
+  }, [managerTeams.length, myRegistrations, registrationId, requestedTeamId]);
+
+  useEffect(() => {
+    if (!requestedTeamId || loadingTeams || loadingMyRegistrations) return;
+
+    const requestedTeam = managerTeams.find((team) => team.teamId === requestedTeamId);
+    if (!requestedTeam) {
+      setSelectedTeamId('');
+      setRegistrationId(null);
+      setStep('team');
+      setSubmitError('이 팀으로 대회를 신청할 권한이 없어요.');
+      return;
+    }
+
+    const registration = myRegistrations.find((item) => item.teamId === requestedTeamId);
+    setSelectedTeamId(requestedTeamId);
+    setSubmitError(null);
+
+    if (registration) {
+      if (registration.status === 'draft') {
+        setRegistrationId(registration.id);
+        setStep('agreements');
+        return;
+      }
+      if (
+        registration.status === 'awaiting_payment' &&
+        registration.payment?.method === 'bank_transfer' &&
+        registration.payment.status === 'ready'
+      ) {
+        setRegistrationId(registration.id);
+        setStep('payment');
+        return;
+      }
+      if (registration.status !== 'cancelled') {
+        setRegistrationId(registration.id);
+        window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname));
+        return;
+      }
+    }
+
+    setRegistrationId(null);
+    setStep('agreements');
+  }, [
+    loadingMyRegistrations,
+    loadingTeams,
+    managerTeams,
+    myRegistrations,
+    pathname,
+    requestedTeamId,
+    tournamentId,
+  ]);
 
   const selectedTeam = myTeams.find((t) => t.teamId === selectedTeamId);
   const selectedRegistration = myRegistrations.find((item) => item.teamId === selectedTeamId);
@@ -1048,10 +1108,11 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const canSubmitAgreements = allRequiredAgreed && bankTransferValid;
 
   const isCreating = createRegistration.isPending;
+  const isSubmittingApplication = createRegistration.isPending || submitRegistration.isPending;
 
-  if (loadingTournament || loadingMyRegistrations) {
+  if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams)) {
     return (
-      <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
         <LoadingSkeleton />
       </AppChrome>
     );
@@ -1060,7 +1121,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   if (tournamentError || !tournament) {
     const msg = extractErrorMessage(tournamentErr, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner message={msg} />
           <Link
@@ -1078,7 +1139,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   // Only allow apply when tournament is open
   if (tournament.status !== 'open') {
     return (
-      <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
             message="지금은 참가 신청을 받지 않아요."
@@ -1137,10 +1198,14 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   }
 
   async function handleAgreementsSubmit() {
-    if (!registrationId) return;
+    if (!selectedTeamId) return;
     setSubmitError(null);
     try {
+      const targetRegistrationId = registrationId
+        ?? (await createRegistration.mutateAsync({ teamId: selectedTeamId })).id;
+      setRegistrationId(targetRegistrationId);
       await submitRegistration.mutateAsync({
+        registrationIdOverride: targetRegistrationId,
         paymentMethod: agreements.paymentMethod,
         depositorName: agreements.paymentMethod === 'bank_transfer' ? agreements.depositorName : undefined,
         agreedRules: agreements.agreedRules,
@@ -1154,8 +1219,16 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     }
   }
 
+  function handleAgreementsBack() {
+    if (requestedTeamId) {
+      router.push(appRoute(hubHref, pathname));
+      return;
+    }
+    setStep('team');
+  }
+
   return (
-    <AppChrome title="참가 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false}>
+    <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
       {/* maxWidth/marginInline 인라인 스타일 제거:
           모바일은 globals.css 기본값이 처리, 데스크톱은 tournaments.css의
           .tm-tournament-apply-body { max-width:unset } + .tm-tournament-form-grid 가 담당 */}
@@ -1182,6 +1255,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                   onSelectTeam={handleSelectTeam}
                   onNext={handleTeamNext}
                   isCreating={isCreating}
+                  cancelHref={applyBackHref}
                 />
               </>
             ) : step === 'agreements' ? (
@@ -1190,9 +1264,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 selectedTeam={selectedTeam}
                 state={agreements}
                 onChange={(patch) => setAgreements((prev) => ({ ...prev, ...patch }))}
-                onBack={() => setStep('team')}
+                onBack={handleAgreementsBack}
                 onSubmit={handleAgreementsSubmit}
-                isSubmitting={submitRegistration.isPending}
+                isSubmitting={isSubmittingApplication}
                 error={submitError}
               />
             ) : registrationId ? (
@@ -1215,7 +1289,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               depositorName={agreements.depositorName}
               step={step}
               canSubmit={canSubmitAgreements}
-              isSubmitting={submitRegistration.isPending}
+              isSubmitting={isSubmittingApplication}
               onSubmitFromRail={handleAgreementsSubmit}
               selectedTeamId={selectedTeamId}
               hasManagerTeam={myTeams.some((t) => t.role === 'owner' || t.role === 'manager')}

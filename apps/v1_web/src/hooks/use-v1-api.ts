@@ -1455,12 +1455,11 @@ export function useV1MyRegistration(tournamentId: string) {
 /** 로그인 유저가 운영 권한을 가진 팀들의 대회 신청 목록을 조회한다. */
 export function useV1MyRegistrations(tournamentId: string) {
   return useQuery({
-    queryKey: v1Keys.myTournamentRegistrations(tournamentId),
+    queryKey: [...v1Keys.myTournamentRegistrations(tournamentId), 'team-member-visible'] as const,
     queryFn: async () => {
       try {
         const registrations = await v1Get<V1TournamentRegistration[] | V1TournamentRegistration>(
-          `/tournaments/${tournamentId}/registrations/my-registration`,
-          { scope: 'teams' },
+          `/tournaments/${tournamentId}/registrations/my-registrations`,
         );
         return Array.isArray(registrations) ? registrations : [registrations];
       } catch (error) {
@@ -1479,14 +1478,18 @@ export function useV1MyRegistrations(tournamentId: string) {
 export function useV1SubmitRegistration(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1SubmitRegistrationPayload) =>
-      v1Post<V1TournamentRegistration>(
-        `/tournaments/${tournamentId}/registrations/${registrationId}/submit`,
-        body,
-      ),
-    onSuccess: () => {
+    mutationFn: (body: V1SubmitRegistrationPayload & { registrationIdOverride?: string }) => {
+      const { registrationIdOverride, ...payload } = body;
+      const targetRegistrationId = registrationIdOverride ?? registrationId;
+      return v1Post<V1TournamentRegistration>(
+        `/tournaments/${tournamentId}/registrations/${targetRegistrationId}/submit`,
+        payload,
+      );
+    },
+    onSuccess: (_data, variables) => {
+      const targetRegistrationId = variables.registrationIdOverride ?? registrationId;
       queryClient.invalidateQueries({
-        queryKey: v1Keys.tournamentRegistration(tournamentId, registrationId),
+        queryKey: v1Keys.tournamentRegistration(tournamentId, targetRegistrationId),
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       // /my 페이지가 myTournamentRegistration 캐시를 사용하므로 함께 무효화

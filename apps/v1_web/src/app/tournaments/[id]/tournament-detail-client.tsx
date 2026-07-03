@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
-import { useV1Tournament, useV1MyRegistration } from '@/hooks/use-v1-api';
+import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
@@ -83,34 +83,13 @@ function ApplyCTAButtons({
 
   if (hasActiveRegistration) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Link
-          href={`/tournaments/${tournament.id}/my`}
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-          aria-label="내 신청 내역 보기"
-        >
-          내 신청 보기
-        </Link>
-        {isFull ? (
-          <button
-            type="button"
-            className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-            disabled
-            aria-disabled="true"
-            aria-label="모집이 마감되었어요"
-          >
-            모집 마감
-          </button>
-        ) : (
-          <Link
-            href={`/tournaments/${tournament.id}/apply`}
-            className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-            aria-label="다른 팀으로 참가 신청하기"
-          >
-            다른 팀으로 신청
-          </Link>
-        )}
-      </div>
+      <Link
+        href={`/tournaments/${tournament.id}/my`}
+        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        aria-label="내 신청 내역 보기"
+      >
+        내 신청 보기
+      </Link>
     );
   }
 
@@ -133,7 +112,7 @@ function ApplyCTAButtons({
 
   return (
     <Link
-      href={`/tournaments/${tournament.id}/apply`}
+      href={`/tournaments/${tournament.id}/my`}
       className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
       aria-label={applyAriaLabel}
     >
@@ -166,9 +145,11 @@ function ApplyCTA({
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
-  // Detail CTA only needs to know whether the viewer has any existing registration.
-  // Keep this on the stable single-registration endpoint; the multi-team list is used on /my and /apply.
-  const { data: myRegistration = null } = useV1MyRegistration(tournamentId);
+  const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId);
+  const myRegistration =
+    myRegistrations.find((registration) => registration.status !== 'cancelled') ??
+    myRegistrations[0] ??
+    null;
 
   if (isLoading) {
     return (
@@ -224,7 +205,7 @@ function TournamentDetailView({
     myRegistration !== null && myRegistration.status !== 'cancelled';
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
   // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
-  const bottomPad = isOpen ? (hasActiveRegistration ? 172 : 96) : 48;
+  const bottomPad = isOpen ? 96 : 48;
 
   /* ── Prize card — rendered in left column just after metric strip ── */
   const prizeChips = tournament.prizeBreakdown

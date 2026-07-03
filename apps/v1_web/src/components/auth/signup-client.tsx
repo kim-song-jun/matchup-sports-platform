@@ -201,7 +201,7 @@ export function SignupClient() {
 
     if (missingTournamentFields.length > 0) {
       const confirmed = window.confirm(
-        `대회 참여 시 ${missingTournamentFields.join(', ')}은(는) 개인 확인을 위해 필수입니다.\n지금 입력하지 않으면 대회 신청 전에 다시 입력해야 해요. 그래도 가입을 계속할까요?`,
+        `대회 참여 시 ${missingTournamentFields.join(', ')}은(는) 개인 확인을 위해 꼭 필요해요.\n지금 입력하지 않으면 대회 신청 전에 다시 입력해야 해요. 그래도 가입을 계속할까요?`,
       );
       if (!confirmed) return;
     }

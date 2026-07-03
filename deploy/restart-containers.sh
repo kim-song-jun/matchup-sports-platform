@@ -55,6 +55,9 @@ for i in $(seq 1 30); do
 done
 
 echo "[INFO] Applying v1 deploy database migrations..."
+echo "[INFO] Recovering known failed v1 tournament registration migration if present..."
+${COMPOSE} -f docker-compose.prod.yml --env-file .env \
+  run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260703000000_v1_tournament_registration_team_unique || true"
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 

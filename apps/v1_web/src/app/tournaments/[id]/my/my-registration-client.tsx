@@ -576,6 +576,7 @@ function RegistrationDetailView({
   tournamentId,
   tournament,
   registration,
+  canManageRegistration,
 }: {
   tournamentId: string;
   tournament: {
@@ -591,6 +592,7 @@ function RegistrationDetailView({
     bankHolder: string | null;
   };
   registration: V1TournamentRegistration;
+  canManageRegistration: boolean;
 }) {
   const pathname = usePathname();
   const tournamentHref = appRoute(`/tournaments/${tournamentId}`, pathname);
@@ -607,7 +609,6 @@ function RegistrationDetailView({
   const statusConfig = registrationStatusConfig(registration.status);
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
-  const canManageRegistration = teamData?.viewer.role === 'owner' || teamData?.viewer.role === 'manager';
   const isRosterLocked = Boolean(registration.rosterLockedAt);
   const isRosterEditBlockedByStatus =
     registration.status === 'cancel_requested' || registration.status === 'cancelled';
@@ -1345,6 +1346,9 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     );
   }
 
+  const selectedTeam = teams.find((team) => team.teamId === selectedRegistration.teamId);
+  const canManageSelectedRegistration = selectedTeam?.role === 'owner' || selectedTeam?.role === 'manager';
+
   return (
     <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
       <RegistrationDetailView
@@ -1362,6 +1366,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           bankHolder: tournament.bankHolder,
         }}
         registration={selectedRegistration}
+        canManageRegistration={canManageSelectedRegistration}
       />
     </AppChrome>
   );

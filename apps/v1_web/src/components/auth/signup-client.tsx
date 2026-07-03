@@ -8,6 +8,8 @@ import {
   useV1CheckEmail,
   useV1CheckNickname,
   useV1Register,
+  useV1UpdateProfile,
+  useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
@@ -35,6 +37,8 @@ const STEP_COPY: Record<WizardStep, { title: string; sub: string }> = {
 export function SignupClient() {
   const router = useRouter();
   const register = useV1Register();
+  const updateProfile = useV1UpdateProfile();
+  const uploadImages = useV1UploadImages();
   const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
 
@@ -46,6 +50,7 @@ export function SignupClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState('');
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [displayName, setDisplayName] = useState('');
@@ -76,7 +81,7 @@ export function SignupClient() {
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
   const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
-  const profileBlocked = register.isPending || uploadingProfileImage;
+  const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage;
 
   const runNicknameCheck = () => {
     setNicknameError(null);
@@ -142,6 +147,7 @@ export function SignupClient() {
     setUploadingProfileImage(true);
     reader.onload = () => {
       setProfileImageUrl(typeof reader.result === 'string' ? reader.result : '');
+      setProfileImageFile(file);
       setProfileImageName(file.name);
       setUploadingProfileImage(false);
     };
@@ -173,7 +179,7 @@ export function SignupClient() {
     setStep('profile');
   };
 
-  const submitAccount = () => {
+  const submitAccount = async () => {
     setError(null);
     setProfileError(null);
 
@@ -200,55 +206,69 @@ export function SignupClient() {
       if (!confirmed) return;
     }
 
-    register.mutate(
-      {
+    try {
+      const result = await register.mutateAsync({
         nickname: normalizedNickname,
         displayName: displayName.trim() || normalizedNickname,
         email: normalizedEmail,
         password,
         phone: phoneDigits || undefined,
         birthDate: birthDateDigits || undefined,
-        profileImageUrl: profileImageUrl || undefined,
         bio: bio.trim() || undefined,
         visibilityStatus,
         requiredTermsAccepted,
-      },
-      {
-        onSuccess: (result) => {
-          saveStoredV1Session(result.session);
-          router.replace('/onboarding/sport');
-        },
-        onError: (nextError) => {
-          if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
-            if (nextError.code === 'NICKNAME_CONFLICT') {
-              setNicknameCheck({ status: 'taken', value: normalizedNickname });
-              setStep('account');
-              setNicknameError('이미 사용 중인 닉네임이에요.');
-              return;
-            }
-            if (nextError.code === 'PHONE_CONFLICT') {
-              setProfileError('이미 가입된 휴대폰 번호예요.');
-              return;
-            }
-            setEmailCheck({ status: 'taken', value: normalizedEmail });
-            setStep('account');
-            setEmailError('이미 가입된 이메일이에요.');
-            return;
-          }
-          if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
-            setError('필수 약관 문서가 아직 준비되지 않았어요.');
-            return;
-          }
-          if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || !requiredTermsAccepted)) {
-            router.replace('/terms');
-            return;
-          }
-          setError(nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.');
-        },
-      },
-    );
-  };
+      });
 
+      saveStoredV1Session(result.session);
+
+      if (profileImageFile) {
+        const uploadResult = await uploadImages.mutateAsync([profileImageFile]);
+        const uploadedUrl = uploadResult.urls[0];
+        if (!uploadedUrl) {
+          throw new Error('프로필 사진 업로드 응답에 이미지 URL이 없어요.');
+        }
+
+        await updateProfile.mutateAsync({
+          displayName: displayName.trim() || normalizedNickname,
+          nickname: normalizedNickname,
+          email: normalizedEmail,
+          profileImageUrl: uploadedUrl,
+          phone: phoneDigits || null,
+          birthDate: birthDateDigits || null,
+          bio: bio.trim() || null,
+          visibilityStatus,
+        });
+      }
+
+      router.replace('/onboarding/sport');
+    } catch (nextError) {
+      if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
+        if (nextError.code === 'NICKNAME_CONFLICT') {
+          setNicknameCheck({ status: 'taken', value: normalizedNickname });
+          setStep('account');
+          setNicknameError('이미 사용 중인 닉네임이에요.');
+          return;
+        }
+        if (nextError.code === 'PHONE_CONFLICT') {
+          setProfileError('이미 가입된 휴대폰 번호예요.');
+          return;
+        }
+        setEmailCheck({ status: 'taken', value: normalizedEmail });
+        setStep('account');
+        setEmailError('이미 가입된 이메일이에요.');
+        return;
+      }
+      if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
+        setError('필수 약관 문서가 아직 준비되지 않았어요.');
+        return;
+      }
+      if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || !requiredTermsAccepted)) {
+        router.replace('/terms');
+        return;
+      }
+      setError(nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.');
+    }
+  };
   const primary =
     step === 'account'
       ? {
@@ -259,7 +279,7 @@ export function SignupClient() {
       : {
           label: register.isPending ? '가입하는 중...' : '가입하고 계속',
           disabled: profileBlocked,
-          onClick: submitAccount,
+          onClick: () => { void submitAccount(); },
         };
 
   const disabledHint: string | null = primary.disabled
@@ -441,13 +461,6 @@ export function SignupClient() {
 
           {step === 'profile' ? (
             <>
-              <Card pad={14} className="tm-auth-soft-card-warning">
-                <div className="tm-text-label">대회 참여 전 확인</div>
-                <div className="tm-text-caption" style={{ marginTop: 5 }}>
-                  이름, 휴대폰 번호, 생년월일은 대회 신청과 본인 확인에 필요해요. 비워두면 가입 시 한 번 더 확인합니다.
-                </div>
-              </Card>
-
               <section className="tm-auth-soft-card" style={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 14, alignItems: 'center' }}>
                 <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
                   {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName || normalizedNickname)}</span>}
@@ -460,7 +473,7 @@ export function SignupClient() {
                       <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
                     </label>
                     {profileImageUrl ? (
-                      <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageName(''); }}>
+                      <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageFile(null); setProfileImageName(''); }}>
                         제거
                       </button>
                     ) : null}
@@ -470,7 +483,7 @@ export function SignupClient() {
               </section>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">이름 <em className="tm-auth-optional">대회 참여 시 필수</em></span>
+                <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
                 <input
                   className="tm-input tm-auth-input"
                   maxLength={40}
@@ -482,7 +495,7 @@ export function SignupClient() {
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">휴대폰 번호 <em className="tm-auth-optional">대회 참여 시 필수</em></span>
+                <span className="tm-text-label">휴대폰 번호 <em className="tm-auth-optional">(선택)</em></span>
                 <input
                   className="tm-input tm-auth-input"
                   inputMode="numeric"
@@ -494,7 +507,7 @@ export function SignupClient() {
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">생년월일 <em className="tm-auth-optional">대회 참여 시 필수</em></span>
+                <span className="tm-text-label">생년월일 <em className="tm-auth-optional">(선택)</em></span>
                 <input
                   className="tm-input tm-auth-input"
                   inputMode="numeric"
@@ -506,7 +519,7 @@ export function SignupClient() {
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">소개 <em className="tm-auth-optional">선택</em></span>
+                <span className="tm-text-label">소개 <em className="tm-auth-optional">(선택)</em></span>
                 <textarea
                   className="tm-input tm-create-input-multiline"
                   maxLength={500}

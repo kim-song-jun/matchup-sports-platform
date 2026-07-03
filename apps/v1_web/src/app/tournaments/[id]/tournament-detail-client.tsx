@@ -107,7 +107,7 @@ function CapacityProgressBar({
         style={{
           width: `${pendingPct}%`,
           height: '100%',
-          background: 'var(--orange500)',
+          background: 'var(--grey300)',
         }}
       />
     </div>

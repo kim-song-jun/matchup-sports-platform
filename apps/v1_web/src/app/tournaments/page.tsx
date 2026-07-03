@@ -78,7 +78,7 @@ function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
       style={{ height: 5, background: 'var(--grey100)', borderRadius: 5, overflow: 'hidden', display: 'flex' }}
     >
       <div aria-hidden="true" style={{ width: `${confirmedPct}%`, background: 'var(--blue500)' }} />
-      <div aria-hidden="true" style={{ width: `${pendingPct}%`, background: 'var(--orange500)' }} />
+      <div aria-hidden="true" style={{ width: `${pendingPct}%`, background: 'var(--grey300)' }} />
     </div>
   );
 }

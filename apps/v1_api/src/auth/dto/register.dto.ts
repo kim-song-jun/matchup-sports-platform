@@ -36,6 +36,15 @@ export class RegisterDto {
   @IsString()
   profileImageUrl?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  bio?: string;
+
+  @IsOptional()
+  @IsIn(['public', 'members_only', 'private'])
+  visibilityStatus?: 'public' | 'members_only' | 'private';
+
   @IsBoolean()
   requiredTermsAccepted!: boolean;
 }

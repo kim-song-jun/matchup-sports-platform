@@ -35,6 +35,8 @@ export class AuthService {
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
+    const bio = dto.bio?.trim() || null;
+    const visibility = dto.visibilityStatus ?? 'public';
 
     if (birthDate && !isValidBirthDate(birthDate)) {
       throw new BadRequestException({
@@ -118,7 +120,8 @@ export class AuthService {
             gender: dto.gender ?? null,
             birthDate,
             profileImageUrl,
-            visibility: 'public',
+            bio,
+            visibility,
           },
         },
         onboardingProgress: {

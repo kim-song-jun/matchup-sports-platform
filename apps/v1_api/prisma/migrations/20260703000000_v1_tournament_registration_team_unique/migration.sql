@@ -10,7 +10,7 @@ BEGIN
       JOIN pg_class tbl ON tbl.oid = i.indrelid
       JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
       CROSS JOIN LATERAL (
-        SELECT array_agg(att.attname ORDER BY keys.ordinality) AS columns
+        SELECT array_agg(att.attname::text ORDER BY keys.ordinality) AS columns
         FROM unnest(i.indkey) WITH ORDINALITY AS keys(attnum, ordinality)
         JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = keys.attnum
       ) indexed_columns

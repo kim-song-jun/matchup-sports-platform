@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { TrophyIcon, ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { TrophyIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import { formatTournamentDateShort, formatTournamentDateLong, formatEntryFee } from '@/lib/date-utils';
@@ -60,6 +62,123 @@ function formatPublishedAt(dateStr: string): string {
   const month = d.getMonth() + 1;
   const day = d.getDate();
   return `${month}월 ${day}일`;
+}
+
+function getPendingPaymentCount(tournament: Pick<V1TournamentDetail, 'pendingPaymentCount'>): number {
+  return Math.max(0, tournament.pendingPaymentCount ?? 0);
+}
+
+function getReservedTeamCount(tournament: Pick<V1TournamentDetail, 'confirmedCount' | 'pendingPaymentCount' | 'teamCount'>): number {
+  return Math.min(tournament.teamCount, tournament.confirmedCount + getPendingPaymentCount(tournament));
+}
+
+function CapacityProgressBar({
+  confirmedCount,
+  pendingPaymentCount,
+  teamCount,
+  height = 5,
+}: {
+  confirmedCount: number;
+  pendingPaymentCount: number;
+  teamCount: number;
+  height?: number;
+}) {
+  const max = Math.max(teamCount, 1);
+  const confirmedPct = Math.min(100, (confirmedCount / max) * 100);
+  const pendingPct = Math.min(100 - confirmedPct, (pendingPaymentCount / max) * 100);
+
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={Math.min(teamCount, confirmedCount + pendingPaymentCount)}
+      aria-valuemin={0}
+      aria-valuemax={teamCount}
+      aria-label={`정원 ${confirmedCount}팀 확정, ${pendingPaymentCount}팀 입금 대기, 총 ${teamCount}팀`}
+      style={{ height, background: 'var(--grey100)', borderRadius: height, overflow: 'hidden', marginTop: 8, display: 'flex' }}
+    >
+      <div
+        style={{
+          width: `${confirmedPct}%`,
+          height: '100%',
+          background: 'var(--blue500)',
+        }}
+      />
+      <div
+        style={{
+          width: `${pendingPct}%`,
+          height: '100%',
+          background: 'var(--orange500)',
+        }}
+      />
+    </div>
+  );
+}
+
+const COLLAPSED_POLICY_LINES = 4;
+const POLICY_TOGGLE_THRESHOLD = 160;
+
+function CollapsiblePolicyText({
+  id,
+  text,
+  className,
+  color,
+  lineHeight,
+}: {
+  id: string;
+  text: string;
+  className: string;
+  color: string;
+  lineHeight: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shouldCollapse = text.length > POLICY_TOGGLE_THRESHOLD || text.includes('\n');
+
+  return (
+    <>
+      <p
+        id={id}
+        className={className}
+        style={{
+          color,
+          lineHeight,
+          margin: 0,
+          whiteSpace: 'pre-wrap',
+          ...(shouldCollapse && !expanded
+            ? {
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: COLLAPSED_POLICY_LINES,
+                overflow: 'hidden',
+              }
+            : {}),
+        }}
+      >
+        {text}
+      </p>
+      {shouldCollapse ? (
+        <button
+          type="button"
+          className="tm-btn tm-btn-sm tm-btn-ghost"
+          aria-controls={id}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((prev) => !prev)}
+          style={{ marginTop: 10, paddingInline: 0, minHeight: 36 }}
+        >
+          {expanded ? '접기' : '전체 보기'}
+          <ChevronRightIcon
+            size={14}
+            strokeWidth={2.2}
+            aria-hidden="true"
+            style={{
+              marginLeft: 2,
+              transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)',
+              transition: 'transform 0.16s ease',
+            }}
+          />
+        </button>
+      ) : null}
+    </>
+  );
 }
 
 /* ── Apply CTA ── */
@@ -129,7 +248,7 @@ function ApplyCTA({
   myRegistration: V1TournamentRegistration | null;
 }) {
   const isOpen = tournament.status === 'open';
-  const isFull = tournament.confirmedCount >= tournament.teamCount;
+  const isFull = getReservedTeamCount(tournament) >= tournament.teamCount;
 
   if (!isOpen) return null;
 
@@ -144,12 +263,19 @@ function ApplyCTA({
 /* ── Entry point ── */
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
+  const [hasSessionHint, setHasSessionHint] = useState(false);
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
-  const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId);
+  const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId, {
+    enabled: hasSessionHint,
+  });
   const myRegistration =
     myRegistrations.find((registration) => registration.status !== 'cancelled') ??
     myRegistrations[0] ??
     null;
+
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
 
   if (isLoading) {
     return (
@@ -199,7 +325,9 @@ function TournamentDetailView({
   const sportAccent = getSportAccent(tournament.sport.code);
   const hasAnnouncements = tournament.announcements.length > 0;
   const isOpen = tournament.status === 'open';
-  const isFull = tournament.confirmedCount >= tournament.teamCount;
+  const pendingPaymentCount = getPendingPaymentCount(tournament);
+  const reservedTeamCount = getReservedTeamCount(tournament);
+  const isFull = reservedTeamCount >= tournament.teamCount;
   const hasPrize = tournament.prizePool != null;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
@@ -329,34 +457,28 @@ function TournamentDetailView({
               {/* P1 숫자:단위 2:1 + tabular-nums */}
               <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
                 <span className="tab-num" style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-strong)' }}>
-                  {tournament.confirmedCount}
+                  {reservedTeamCount}
                 </span>
                 <span style={{ fontSize: 'var(--font-size-body-sm)', color: 'var(--text-muted)', fontWeight: 500 }}>/{tournament.teamCount}팀</span>
               </span>
             </div>
-            <div
-              role="progressbar"
-              aria-valuenow={tournament.confirmedCount}
-              aria-valuemin={0}
-              aria-valuemax={tournament.teamCount}
-              aria-label={`정원 ${tournament.confirmedCount} / ${tournament.teamCount}팀`}
-              style={{ height: 5, background: 'var(--grey100)', borderRadius: 3, overflow: 'hidden', marginTop: 8 }}
-            >
-              <div
-                style={{
-                  width: `${Math.min(100, Math.round((tournament.confirmedCount / Math.max(tournament.teamCount, 1)) * 100))}%`,
-                  height: '100%',
-                  background: 'var(--blue500)',
-                  borderRadius: 3,
-                }}
-              />
-            </div>
+            <CapacityProgressBar
+              confirmedCount={tournament.confirmedCount}
+              pendingPaymentCount={pendingPaymentCount}
+              teamCount={tournament.teamCount}
+            />
+            {pendingPaymentCount > 0 ? (
+              <div className="tm-text-caption" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', color: 'var(--text-muted)', marginTop: 6 }}>
+                <span><b style={{ color: 'var(--blue500)', fontWeight: 600 }}>{tournament.confirmedCount}팀</b> 확정</span>
+                <span><b style={{ color: 'var(--orange500)', fontWeight: 600 }}>{pendingPaymentCount}팀</b> 입금 대기</span>
+              </div>
+            ) : null}
             {(() => {
-              const remaining = tournament.teamCount - tournament.confirmedCount;
+              const remaining = tournament.teamCount - reservedTeamCount;
               if (remaining <= 0) {
                 return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6 }}>정원이 가득 찼어요</div>;
               }
-              const pct = Math.round((tournament.confirmedCount / Math.max(tournament.teamCount, 1)) * 100);
+              const pct = Math.round((reservedTeamCount / Math.max(tournament.teamCount, 1)) * 100);
               const almostFull = pct >= 80;
               return (
                 <div className="tm-text-caption" style={{ color: almostFull ? 'var(--orange500)' : 'var(--text-muted)', marginTop: 6 }}>
@@ -395,15 +517,15 @@ function TournamentDetailView({
       {/* ── Section 2: Rules ── */}
       {tournament.rulesText ? (
         <section aria-labelledby="rules-heading" style={{ marginTop: 24 }}>
-          <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>대회 규정</div>
+          <div id="rules-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>대회 규정</div>
           <Card pad={16} style={{ marginTop: 4 }}>
-            <p
-              id="rules-heading"
+            <CollapsiblePolicyText
+              id="rules-content"
+              text={tournament.rulesText}
               className="tm-text-body"
-              style={{ color: 'var(--text-body)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}
-            >
-              {tournament.rulesText}
-            </p>
+              color="var(--text-body)"
+              lineHeight={1.7}
+            />
           </Card>
         </section>
       ) : null}
@@ -432,15 +554,15 @@ function TournamentDetailView({
 
       {tournament.refundPolicyText ? (
         <section aria-labelledby="refund-heading">
-          <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>환불 정책</div>
+          <div id="refund-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>환불 정책</div>
           <Card pad={16} style={{ background: 'var(--grey50)' }}>
-            <p
-              id="refund-heading"
+            <CollapsiblePolicyText
+              id="refund-content"
+              text={tournament.refundPolicyText}
               className="tm-text-caption"
-              style={{ color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, whiteSpace: 'pre-wrap' }}
-            >
-              {tournament.refundPolicyText}
-            </p>
+              color="var(--text-muted)"
+              lineHeight={1.65}
+            />
           </Card>
         </section>
       ) : null}
@@ -461,7 +583,14 @@ function TournamentDetailView({
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
           {tournament.confirmedCount}/{tournament.teamCount}팀 확정
+          {pendingPaymentCount > 0 ? ` · 입금대기 ${pendingPaymentCount}팀` : ''}
         </div>
+        <CapacityProgressBar
+          confirmedCount={tournament.confirmedCount}
+          pendingPaymentCount={pendingPaymentCount}
+          teamCount={tournament.teamCount}
+          height={6}
+        />
         <ApplyCTAButtons tournament={tournament} isFull={isFull} myRegistration={myRegistration} />
       </div>
 
@@ -486,7 +615,7 @@ function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {tournament.confirmedCount}/{tournament.teamCount}팀
+            {reservedTeamCount}/{tournament.teamCount}팀
           </span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

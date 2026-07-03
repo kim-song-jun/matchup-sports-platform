@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsDefined,
   IsIn,
   IsInt,
   IsOptional,
@@ -75,7 +76,7 @@ export class CreateTournamentDto {
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
 
-  @IsOptional()
+  @IsDefined({ message: '참가 팀 수를 입력해 주세요.' })
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
   @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })

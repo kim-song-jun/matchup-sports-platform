@@ -41,6 +41,10 @@ export class TournamentsReadService {
             },
           },
         },
+        registrations: {
+          where: { status: { in: ['awaiting_payment', 'payment_checking', 'paid'] } },
+          select: { status: true },
+        },
       },
     });
 
@@ -49,7 +53,7 @@ export class TournamentsReadService {
 
     return {
       items: pageItems.map((row) =>
-        this.serializeCard(row, row._count.registrations),
+        this.serializeCard(row, row._count.registrations, row.registrations.length),
       ),
       pageInfo: {
         nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
@@ -112,6 +116,10 @@ export class TournamentsReadService {
             },
           },
         },
+        registrations: {
+          where: { status: { in: ['awaiting_payment', 'payment_checking', 'paid'] } },
+          select: { status: true },
+        },
       },
     });
 
@@ -145,6 +153,7 @@ export class TournamentsReadService {
       prizePool: row.prizePool,
       prizeBreakdown: row.prizeBreakdown,
       confirmedCount: row._count.registrations,
+      pendingPaymentCount: row.registrations.length,
       groups: row.groups.map((g) => ({
         id: g.id,
         name: g.name,
@@ -227,8 +236,10 @@ export class TournamentsReadService {
       prizeBreakdown: string | null;
       createdAt: Date;
       updatedAt: Date;
+      registrations: Array<{ status: string }>;
     },
     confirmedCount: number,
+    pendingPaymentCount: number,
   ) {
     return {
       id: row.id,
@@ -245,6 +256,7 @@ export class TournamentsReadService {
       prizePool: row.prizePool,
       prizeBreakdown: row.prizeBreakdown,
       confirmedCount,
+      pendingPaymentCount,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

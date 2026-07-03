@@ -78,6 +78,12 @@ export class TournamentsAdminService {
 
   async create(user: V1AuthUser, dto: CreateTournamentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    if (dto.teamCount === undefined) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_TEAM_COUNT_REQUIRED',
+        message: '참가 팀 수를 입력해 주세요.',
+      });
+    }
     this.assertPlayerRange(dto.minPlayers, dto.maxPlayers);
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
@@ -94,7 +100,7 @@ export class TournamentsAdminService {
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           venue: dto.venue ?? null,
-          teamCount: dto.teamCount ?? 8,
+          teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
           entryFee: dto.entryFee ?? 0,

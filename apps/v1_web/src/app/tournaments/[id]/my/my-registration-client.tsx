@@ -1340,7 +1340,10 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           tournamentId={tournamentId}
           teams={teams}
           registrations={registrations}
-          canStartNewRegistration={tournament.status === 'open' && tournament.confirmedCount < tournament.teamCount}
+          canStartNewRegistration={
+            tournament.status === 'open' &&
+            tournament.confirmedCount + (tournament.pendingPaymentCount ?? 0) < tournament.teamCount
+          }
         />
       </AppChrome>
     );

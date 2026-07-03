@@ -23,6 +23,13 @@ const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
   'waitlisted',
 ];
 
+const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
+  'awaiting_payment',
+  'payment_checking',
+  'paid',
+  'confirmed',
+];
+
 @Injectable()
 export class TournamentRegistrationsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -62,23 +69,40 @@ export class TournamentRegistrationsService {
     return tournament;
   }
 
+  private async assertCapacityAvailable(tournamentId: string, teamCount: number) {
+    const reservedCount = await this.prisma.v1TournamentRegistration.count({
+      where: {
+        tournamentId,
+        status: { in: CAPACITY_HOLD_STATUSES },
+      },
+    });
+    if (reservedCount >= teamCount) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_CAPACITY_FULL',
+        message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
+      });
+    }
+  }
+
   async create(user: V1AuthUser, tournamentId: string, dto: CreateRegistrationDto) {
-    await this.loadOpenTournament(tournamentId);
+    const tournament = await this.loadOpenTournament(tournamentId);
     await this.assertTeamManager(dto.teamId, user.id);
 
     const existing = await this.prisma.v1TournamentRegistration.findUnique({
       where: { tournamentId_teamId: { tournamentId, teamId: dto.teamId } },
     });
-    if (existing?.status === 'draft') {
-      return this.serialize(existing, null, await this.countPlayers(existing.id));
-    }
     if (existing && existing.status !== 'cancelled') {
+      if (existing.status === 'draft') {
+        await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
+        return this.serialize(existing, null, await this.countPlayers(existing.id));
+      }
       const [payment, playerCount] = await Promise.all([
         this.prisma.v1TournamentPayment.findUnique({ where: { registrationId: existing.id } }),
         this.countPlayers(existing.id),
       ]);
       return this.serialize(existing, payment, playerCount);
     }
+    await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
 
     // 취소된 신청이 남아있으면(unique 제약) draft로 재활성화, 없으면 신규 생성.
     let registration: V1TournamentRegistration;
@@ -165,6 +189,19 @@ export class TournamentRegistrationsService {
     const tournament = await this.loadOpenTournament(tournamentId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const reservedCount = await tx.v1TournamentRegistration.count({
+        where: {
+          tournamentId,
+          status: { in: CAPACITY_HOLD_STATUSES },
+        },
+      });
+      if (reservedCount >= tournament.teamCount) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_CAPACITY_FULL',
+          message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
+        });
+      }
+
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {

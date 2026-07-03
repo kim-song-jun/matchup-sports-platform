@@ -1329,6 +1329,7 @@ export type V1TournamentListItem = {
   prizePool: number | null;
   prizeBreakdown: string | null;
   confirmedCount: number;
+  pendingPaymentCount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -1450,6 +1451,7 @@ export type V1TournamentDetail = {
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
+  pendingPaymentCount: number;
   groups: V1TournamentGroup[];
   fixtures: V1TournamentFixture[];
   announcements: V1TournamentAnnouncement[];

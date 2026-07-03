@@ -37,6 +37,7 @@ function tournamentCard(overrides: Record<string, unknown> = {}) {
     updatedAt: new Date('2026-06-01T00:00:00.000Z'),
     deletedAt: null,
     _count: { registrations: 3 },
+    registrations: [{ status: 'awaiting_payment' }, { status: 'payment_checking' }],
     ...overrides,
   };
 }
@@ -63,6 +64,7 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date('2026-06-01T00:00:00.000Z'),
     updatedAt: new Date('2026-06-01T00:00:00.000Z'),
     _count: { registrations: 4 },
+    registrations: [{ status: 'awaiting_payment' }],
     groups: [],
     fixtures: [],
     announcements: [],
@@ -113,6 +115,7 @@ describe('TournamentsReadService', () => {
       sport: { code: 'futsal', name: '풋살' },
       status: 'open',
       confirmedCount: 3,
+      pendingPaymentCount: 2,
       entryFee: 60000,
     });
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
@@ -281,6 +284,7 @@ describe('TournamentsReadService', () => {
       sportId: 'sport-1',
       sport: { code: 'futsal', name: '풋살' },
       confirmedCount: 4,
+      pendingPaymentCount: 1,
     });
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0].groupTeams[0]).toMatchObject({

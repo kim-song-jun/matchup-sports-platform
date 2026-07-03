@@ -84,6 +84,28 @@ const EMPTY_FORM: AddPlayerFormState = {
   eligibilityStatus: 'non_pro',
 };
 
+const EMPTY_TEAM_MEMBERS_PAGE: V1TeamMembersPage = {
+  items: [],
+  summary: {
+    ownerCount: 0,
+    managerCount: 0,
+    memberCount: 0,
+  },
+  viewerRole: 'member',
+  membersVisibilityEnabled: false,
+  pageInfo: {
+    nextCursor: null,
+    hasNext: false,
+  },
+};
+
+function normalizeTeamMembersPage(page: V1TeamMembersPage | undefined | null): V1TeamMembersPage {
+  if (!page || !Array.isArray(page.items) || !page.pageInfo) {
+    return EMPTY_TEAM_MEMBERS_PAGE;
+  }
+  return page;
+}
+
 type DraftPlayerForm = {
   id: string;
   userId: string;
@@ -168,18 +190,18 @@ function AddPlayerForm({
   } = useInfiniteQuery({
     queryKey: [...v1Keys.team(teamId), 'members', { limit: 50 }] as const,
     queryFn: ({ pageParam }) =>
-      v1Get<V1TeamMembersPage>(`/teams/${teamId}/members`, {
+      v1Get<V1TeamMembersPage | undefined>(`/teams/${teamId}/members`, {
         limit: 50,
         ...(pageParam ? { cursor: pageParam } : {}),
-      }),
+      }).then(normalizeTeamMembersPage),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) =>
-      lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined,
+      lastPage?.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor : undefined,
     enabled: Boolean(teamId),
   });
 
   const members = useMemo(
-    () => membersPages?.pages.flatMap((p) => p.items) ?? [],
+    () => membersPages?.pages.flatMap((p) => normalizeTeamMembersPage(p).items) ?? [],
     [membersPages],
   );
   const unavailableMembers = useMemo(

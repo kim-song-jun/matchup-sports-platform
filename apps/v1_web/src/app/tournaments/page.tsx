@@ -54,6 +54,35 @@ function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
   }
 }
 
+function getPendingPaymentCount(item: Pick<V1TournamentListItem, 'pendingPaymentCount'>): number {
+  return Math.max(0, item.pendingPaymentCount ?? 0);
+}
+
+function getReservedTeamCount(item: Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount' | 'teamCount'>): number {
+  return Math.min(item.teamCount, item.confirmedCount + getPendingPaymentCount(item));
+}
+
+function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
+  const pendingPaymentCount = getPendingPaymentCount(item);
+  const max = Math.max(item.teamCount, 1);
+  const confirmedPct = Math.min(100, (item.confirmedCount / max) * 100);
+  const pendingPct = Math.min(100 - confirmedPct, (pendingPaymentCount / max) * 100);
+
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={getReservedTeamCount(item)}
+      aria-valuemin={0}
+      aria-valuemax={item.teamCount}
+      aria-label={`정원 ${item.confirmedCount}팀 확정, ${pendingPaymentCount}팀 입금 대기, 총 ${item.teamCount}팀`}
+      style={{ height: 5, background: 'var(--grey100)', borderRadius: 5, overflow: 'hidden', display: 'flex' }}
+    >
+      <div aria-hidden="true" style={{ width: `${confirmedPct}%`, background: 'var(--blue500)' }} />
+      <div aria-hidden="true" style={{ width: `${pendingPct}%`, background: 'var(--orange500)' }} />
+    </div>
+  );
+}
+
 /* ── Main content (client component for data fetching) ── */
 
 function TournamentsListContent() {
@@ -147,6 +176,7 @@ function TournamentsListContent() {
             {featured.scheduledAt ? (formatTournamentDateShort(featured.scheduledAt) ?? '날짜 미정') : '날짜 미정'}
             {' · '}
             {featured.confirmedCount}/{featured.teamCount}팀 확정
+            {getPendingPaymentCount(featured) > 0 ? ` · 입금대기 ${getPendingPaymentCount(featured)}팀` : ''}
             {featured.venue ? ` · ${featured.venue}` : ''}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
@@ -400,6 +430,8 @@ const PROCESS_STEPS: Array<{ icon: React.ReactNode; label: string; sub: string }
 function TournamentCard({ item }: { item: V1TournamentListItem }) {
   const status = getTournamentStatusConfig(item.status);
   const sportAccent = getSportAccent(item.sport.code);
+  const pendingPaymentCount = getPendingPaymentCount(item);
+  const reservedTeamCount = getReservedTeamCount(item);
 
   return (
     <div role="listitem">
@@ -503,6 +535,10 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           </div>
         ) : null}
 
+        <div style={{ marginTop: 10 }}>
+          <CapacityMiniBar item={item} />
+        </div>
+
         {/* #7: Bottom row: entry fee(강조) + team fill rate(마감 임박 배지) */}
         <div
           style={{
@@ -520,13 +556,19 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           </span>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
             {/* #7: 확정 팀 ≥80% 이상이면 '거의 마감' orange 배지 */}
-            {item.teamCount > 0 && item.confirmedCount / item.teamCount >= 0.8
-              ? <span className="tm-badge tm-badge-orange">거의 마감</span>
+            {item.teamCount > 0 && reservedTeamCount / item.teamCount >= 0.8
+              ? <span className="tm-badge tm-badge-orange">{reservedTeamCount >= item.teamCount ? '마감' : '거의 마감'}</span>
               : null}
             <span className="tab-num">{item.confirmedCount}</span>
+            {pendingPaymentCount > 0 ? (
+              <>
+                <span style={{ color: 'var(--orange500)' }}>+</span>
+                <span className="tab-num" style={{ color: 'var(--orange500)' }}>{pendingPaymentCount}</span>
+              </>
+            ) : null}
             <span>/</span>
             <span className="tab-num">{item.teamCount}</span>
-            <span>팀 확정</span>
+            <span>{pendingPaymentCount > 0 ? '팀 예약' : '팀 확정'}</span>
           </span>
         </div>
       </Link>

@@ -255,8 +255,10 @@ export default function AdminTournamentsNewPage() {
   // ── Inline validation errors ────────────────────────────────────────
   const teamCountNum = teamCount ? parseInt(teamCount, 10) : null;
   const teamCountError =
-    teamCountNum !== null && (teamCountNum < 2 || teamCountNum > 64)
-      ? '참가 팀 수는 2~64개여야 해요.'
+    teamCount.trim().length === 0
+      ? '참가 팀 수를 입력해 주세요.'
+      : teamCountNum === null || teamCountNum < 2 || teamCountNum > 64
+        ? '참가 팀 수는 2~64개여야 해요.'
       : null;
 
   const minPlayersNum = minPlayers ? parseInt(minPlayers, 10) : null;
@@ -299,7 +301,7 @@ export default function AdminTournamentsNewPage() {
           ? { registrationDeadlineAt: datetimeTextToIso(registrationDeadlineAt)! }
           : {}),
         ...(venue.trim() ? { venue: venue.trim() } : {}),
-        ...(teamCount ? { teamCount: parseInt(teamCount, 10) } : {}),
+        teamCount: parseInt(teamCount, 10),
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
         entryFee: parseInt(entryFee || '0', 10),
@@ -448,7 +450,7 @@ export default function AdminTournamentsNewPage() {
           <section id="tsec-team" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">팀 · 선수 설정</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField id="team-count" label="참가 팀 수" hint="비우면 무제한">
+              <FormField id="team-count" label="참가 팀 수" required hint="대회별 모집 정원을 입력해 주세요">
                 <input
                   id="team-count"
                   type="number"
@@ -458,6 +460,8 @@ export default function AdminTournamentsNewPage() {
                   onChange={(e) => setTeamCount(e.target.value)}
                   disabled={isPending}
                   placeholder="예: 16"
+                  required
+                  aria-required="true"
                   aria-invalid={teamCountError !== null}
                   aria-describedby={teamCountError !== null ? 'team-count-err' : undefined}
                   className={[

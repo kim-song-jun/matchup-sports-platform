@@ -7,8 +7,9 @@ import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { cssUrl, publicAssetPath } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
@@ -208,13 +209,13 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 </Link>
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
-                  <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
+                  <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림" onClick={model.onNotify} />
                 </div>
               </div>
               {/* Desktop-only share + notify actions inside hero */}
               <div className="tm-team-match-hero-actions tm-show-desktop">
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
+                <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림" onClick={model.onNotify} />
               </div>
               <div className="tm-team-vs-row">
                 <div>

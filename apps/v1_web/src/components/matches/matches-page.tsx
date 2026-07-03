@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
-import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import type {
@@ -228,7 +229,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
               <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림 목록" onClick={model.onNotify}><BellIcon size={20} /></button>
+                <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림 목록" onClick={model.onNotify} />
               </div>
             </div>
             <div>

@@ -108,14 +108,23 @@ describe('TournamentsAdminService', () => {
   it('create: minPlayers > maxPlayers → 400 PLAYER_RANGE_INVALID', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     await expect(
-      service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', minPlayers: 10, maxPlayers: 6 }),
+      service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', teamCount: 8, minPlayers: 10, maxPlayers: 6 }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_PLAYER_RANGE_INVALID' } });
+  });
+
+  it('create: missing teamCount → 400 TOURNAMENT_TEAM_COUNT_REQUIRED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_TEAM_COUNT_REQUIRED' },
+    });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
   });
 
   it('create: unknown sportId → 400 SPORT_NOT_FOUND', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Sport.findUnique.mockResolvedValue(null);
-    await expect(service.create(ownerAuthUser, { sportId: 'ghost', title: 'x' })).rejects.toMatchObject({
+    await expect(service.create(ownerAuthUser, { sportId: 'ghost', title: 'x', teamCount: 8 })).rejects.toMatchObject({
       response: { code: 'SPORT_NOT_FOUND' },
     });
   });
@@ -125,9 +134,14 @@ describe('TournamentsAdminService', () => {
     prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
     prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
 
-    const result = await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', entryFee: 120000 });
+    const result = await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 12, entryFee: 120000 });
 
     expect(result).toMatchObject({ id: 'tournament-1', status: 'draft', registrationCount: 0, entryFee: 120000 });
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ teamCount: 12 }),
+      }),
+    );
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.create', targetType: 'tournament' }) }),
     );

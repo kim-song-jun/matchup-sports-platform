@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Api, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
@@ -171,6 +171,8 @@ export function useV1Register() {
       phone?: string;
       birthDate?: string;
       profileImageUrl?: string;
+      bio?: string;
+      visibilityStatus?: 'public' | 'members_only' | 'private';
       requiredTermsAccepted: boolean;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
@@ -985,7 +987,7 @@ export function useV1SendChatMessage(roomId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
       queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.notifications() });
+      invalidateV1NotificationQueries(queryClient);
     },
   });
 }
@@ -1033,11 +1035,24 @@ export function useV1Notifications(filters?: ListFilters) {
   });
 }
 
+export function useV1NotificationUnreadSummary(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.notificationUnreadSummary(),
+    queryFn: () => v1Get<V1NotificationsPage>('/notifications', { status: 'unread', limit: 1 }),
+    select: (data) => ({
+      unreadCount: Number.isFinite(data.unreadCount) ? data.unreadCount : 0,
+    }),
+    enabled: options?.enabled ?? true,
+    retry: false,
+    staleTime: 15_000,
+  });
+}
+
 export function useV1ReadNotification() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (notificationId: string) => v1Patch<{ notificationId: string; status: 'read'; readAt: string }>(`/notifications/${notificationId}/read`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.notifications() }),
+    onSuccess: () => invalidateV1NotificationQueries(queryClient),
   });
 }
 
@@ -1046,8 +1061,12 @@ export function useV1ReadAllNotifications() {
   return useMutation({
     mutationFn: (body?: { type?: string | null }) =>
       v1Post<{ updatedCount: number; readAt: string; unreadCount: number }>('/notifications/read-all', body ?? {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.notifications() }),
+    onSuccess: () => invalidateV1NotificationQueries(queryClient),
   });
+}
+
+function invalidateV1NotificationQueries(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() });
 }
 
 export function useV1NotificationPreferences() {
@@ -1453,7 +1472,7 @@ export function useV1MyRegistration(tournamentId: string) {
 }
 
 /** 로그인 유저가 운영 권한을 가진 팀들의 대회 신청 목록을 조회한다. */
-export function useV1MyRegistrations(tournamentId: string) {
+export function useV1MyRegistrations(tournamentId: string, options?: QueryOptions) {
   return useQuery({
     queryKey: [...v1Keys.myTournamentRegistrations(tournamentId), 'team-member-visible'] as const,
     queryFn: async () => {
@@ -1467,7 +1486,7 @@ export function useV1MyRegistrations(tournamentId: string) {
         throw error;
       }
     },
-    enabled: !!tournamentId,
+    enabled: !!tournamentId && options?.enabled !== false,
     retry: (failureCount, error) => {
       if (error instanceof V1ApiError && error.statusCode === 404) return false;
       return failureCount < 2;

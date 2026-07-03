@@ -1,10 +1,10 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { V1AuthGuard } from '../auth/v1-auth.guard';
+import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { TournamentsReadService } from './tournaments-read.service';
 
 @Controller('tournaments')
-@UseGuards(V1AuthGuard)
+@UseGuards(OptionalV1AuthGuard)
 export class TournamentsReadController {
   constructor(private readonly tournamentsReadService: TournamentsReadService) {}
 

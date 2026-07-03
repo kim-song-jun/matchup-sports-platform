@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { TournamentsAdminController } from './tournaments-admin.controller';
 import { TournamentsAdminService } from './tournaments-admin.service';
@@ -45,6 +46,7 @@ import { TournamentAnnouncementsService } from './tournament-announcements.servi
     TournamentPlayersService,
     TournamentsReadService,
     TournamentAnnouncementsService,
+    OptionalV1AuthGuard,
     V1AuthGuard,
   ],
 })

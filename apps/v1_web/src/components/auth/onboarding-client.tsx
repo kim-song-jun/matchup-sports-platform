@@ -391,7 +391,7 @@ function OnboardingFixedAction({
   if (step === 'level') {
     return (
       <>
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('level', '/onboarding/region')} type="button">{pending ? '저장 중' : '지역 선택하기'}</button>
+        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={disabled} onClick={() => saveAndGo('region', '/onboarding/region')} type="button">{pending ? '저장 중' : '지역 선택하기'}</button>
         <div className="tm-auth-fixed-skip-row">
           <button className="tm-btn tm-btn-sm tm-btn-ghost" disabled={pending} onClick={defer} type="button">나중에 설정하기</button>
         </div>

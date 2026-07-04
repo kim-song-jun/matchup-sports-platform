@@ -38,6 +38,14 @@
   text-align: left;
 }
 
+.tm-onboarding-frame .tm-auth-scroll-with-cta {
+  bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+}
+
+.tm-onboarding-frame .tm-auth-fixed-cta {
+  padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
  * 1. Widen the auth frame for the onboarding wizard.
  *    The login card is 420px; the wizard has more content (sport grid, chip

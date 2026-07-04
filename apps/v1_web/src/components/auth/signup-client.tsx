@@ -34,6 +34,8 @@ const STEP_COPY: Record<WizardStep, { title: string; sub: string }> = {
   },
 };
 
+const onboardingDraftKey = 'teameet.v1.onboardingDraft';
+
 export function SignupClient() {
   const router = useRouter();
   const register = useV1Register();
@@ -240,6 +242,7 @@ export function SignupClient() {
         });
       }
 
+      window.sessionStorage.removeItem(onboardingDraftKey);
       router.replace('/onboarding/sport');
     } catch (nextError) {
       if (nextError instanceof V1ApiError && nextError.statusCode === 409) {

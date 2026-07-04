@@ -16,8 +16,7 @@ import {
   useV1ResolveLocation,
   useV1SaveOnboardingPreferences,
 } from '@/hooks/use-v1-api';
-import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1OnboardingPreferencePayload, V1OnboardingStep } from '@/types/api';
+import type { V1OnboardingPreferencePayload, V1OnboardingStep, V1Region } from '@/types/api';
 import { AuthFrame } from './auth-page';
 
 type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
@@ -38,6 +37,21 @@ type CurrentLocationDraft = {
 };
 
 type LocationStatus = 'idle' | 'requesting' | 'allowed' | 'denied' | 'unsupported' | 'unmatched';
+
+type OnboardingRegionOption = {
+  id: string;
+  name: string;
+  shortName: string;
+  parentName: string;
+  parentId: string;
+  all: boolean;
+};
+
+type OnboardingRegionGroup = {
+  id: string;
+  name: string;
+  options: OnboardingRegionOption[];
+};
 
 const draftKey = 'teameet.v1.onboardingDraft';
 
@@ -82,6 +96,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
+  const [selectedRegionGroupId, setSelectedRegionGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (hydrated || !onboarding.data) return;
@@ -108,7 +123,13 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   };
 
   const sports = sportsQuery.data ?? [];
-  const regions = toDistrictRegionOptions(regionsQuery.data ?? []);
+  const regionGroups = useMemo(() => toOnboardingRegionGroups(regionsQuery.data ?? []), [regionsQuery.data]);
+  const selectedRegionGroup =
+    regionGroups.find((group) => group.id === selectedRegionGroupId) ??
+    regionGroups.find((group) => draft.regions.some((region) => group.options.some((option) => option.id === region.regionId))) ??
+    regionGroups[0] ??
+    null;
+  const regionOptions = regionGroups.flatMap((group) => group.options);
   const selectedSportIds = new Set(draft.sports.map((sport) => sport.sportId));
   const selectedRegionIds = new Set(draft.regions.map((region) => region.regionId));
   const missingLevels = draft.sports.some((sport) => !sport.levelId);
@@ -123,18 +144,35 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
 
   const saveAndGo = (currentStep: V1OnboardingPreferencePayload['currentStep'], href: string) => {
     setError(null);
+    const payloadDraft = sanitizeDraft(draft);
+
+    if (currentStep !== 'sport' && payloadDraft.sports.length === 0) {
+      setDraft(payloadDraft);
+      setError('관심 종목을 먼저 선택해 주세요.');
+      return;
+    }
+
+    if (currentStep === 'region' && payloadDraft.sports.some((sport) => !sport.levelId)) {
+      setDraft(payloadDraft);
+      setError('종목별 실력을 선택해 주세요.');
+      return;
+    }
+
     savePreferences.mutate(
       {
-        sports: draft.sports,
-        regions: draft.regions,
+        sports: payloadDraft.sports.map((sport) => ({
+          sportId: sport.sportId,
+          ...(sport.levelId ? { levelId: sport.levelId } : {}),
+        })),
+        regions: payloadDraft.regions,
         currentStep,
-        currentLocation: draft.currentLocation
+        currentLocation: payloadDraft.currentLocation
           ? {
-              latitude: draft.currentLocation.latitude,
-              longitude: draft.currentLocation.longitude,
-              accuracy: draft.currentLocation.accuracy,
-              capturedAt: draft.currentLocation.capturedAt,
-              matchedRegionId: draft.currentLocation.matchedRegionId ?? null,
+              latitude: payloadDraft.currentLocation.latitude,
+              longitude: payloadDraft.currentLocation.longitude,
+              accuracy: payloadDraft.currentLocation.accuracy,
+              capturedAt: payloadDraft.currentLocation.capturedAt,
+              matchedRegionId: payloadDraft.currentLocation.matchedRegionId ?? null,
             }
           : null,
       },
@@ -203,6 +241,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
                   matchedRegionName,
                 },
               }));
+              setSelectedRegionGroupId(findRegionGroupId(regionGroups, matchedRegionId));
               setLocationStatus(matchedRegionId ? 'allowed' : 'unmatched');
             },
             onError: () => {
@@ -331,22 +370,43 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
               {locationStatus === 'requesting' ? '현재 위치 확인 중' : '현재 위치로 찾기'}
             </button>
             <LocationNotice location={draft.currentLocation ?? null} status={locationStatus} />
-            <div className="tm-auth-chip-wrap">
-              {regions.map((region) => (
-                <button
-                  className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}
-                  key={region.id}
-                  onClick={() => setDraft((current) => toggleRegion(current, region.id))}
-                  type="button"
-                  aria-pressed={selectedRegionIds.has(region.id)}
-                >
-                  {region.name}
-                </button>
-              ))}
-        </div>
+            <div className="tm-auth-stack">
+              <Card pad={15}>
+                <div className="tm-text-label">시/도</div>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                  {regionGroups.map((group) => (
+                    <button
+                      className={`tm-chip ${selectedRegionGroup?.id === group.id ? 'tm-chip-active' : ''}`}
+                      key={group.id}
+                      onClick={() => setSelectedRegionGroupId(group.id)}
+                      type="button"
+                      aria-pressed={selectedRegionGroup?.id === group.id}
+                    >
+                      {group.name}
+                    </button>
+                  ))}
+                </div>
+              </Card>
+              <Card pad={15}>
+                <div className="tm-text-label">{selectedRegionGroup ? `${selectedRegionGroup.name} 상세 지역` : '상세 지역'}</div>
+                <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+                  {(selectedRegionGroup?.options ?? []).map((region) => (
+                    <button
+                      className={`tm-chip ${selectedRegionIds.has(region.id) ? 'tm-chip-active' : ''}`}
+                      key={region.id}
+                      onClick={() => setDraft((current) => toggleRegion(current, region))}
+                      type="button"
+                      aria-pressed={selectedRegionIds.has(region.id)}
+                    >
+                      {region.shortName}
+                    </button>
+                  ))}
+                </div>
+              </Card>
+            </div>
           </>
         ) : null}
-        {step === 'confirm' ? <ConfirmPanel draft={draft} emptySports={emptySports} regions={regions} sports={sports} /> : null}
+        {step === 'confirm' ? <ConfirmPanel draft={draft} emptySports={emptySports} regions={regionOptions} sports={sports} /> : null}
       </div>
     </AuthFrame>
   );
@@ -425,7 +485,7 @@ function ResumePanel({ draft, onboardingStep }: { draft: OnboardingDraft; onboar
   );
 }
 
-function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: OnboardingDraft; emptySports: boolean; regions: Array<{ id: string; name: string }>; sports: Array<{ id: string; name: string; levels: Array<{ id: string; name: string }> }> }) {
+function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: OnboardingDraft; emptySports: boolean; regions: OnboardingRegionOption[]; sports: Array<{ id: string; name: string; levels: Array<{ id: string; name: string }> }> }) {
   const sportSummary = draft.sports
     .map((item) => {
       const sport = sports.find((candidate) => candidate.id === item.sportId);
@@ -528,22 +588,20 @@ function setSportLevel(draft: OnboardingDraft, sportId: string, levelId: string)
   };
 }
 
-function toggleRegion(draft: OnboardingDraft, regionId: string): OnboardingDraft {
-  const exists = draft.regions.some((region) => region.regionId === regionId);
-  const next = exists ? draft.regions.filter((region) => region.regionId !== regionId) : [...draft.regions, { regionId, primary: draft.regions.length === 0 }];
+function toggleRegion(draft: OnboardingDraft, option: OnboardingRegionOption): OnboardingDraft {
+  const exists = draft.regions.some((region) => region.regionId === option.id);
   return {
     ...draft,
-    regions: next.map((region, index) => ({ ...region, primary: index === 0 })),
+    regions: exists ? [] : [{ regionId: option.id, primary: true }],
   };
 }
 
 function upsertPrimaryRegion(draft: OnboardingDraft, regionId: string | null): OnboardingDraft {
   if (!regionId) return draft;
 
-  const existing = draft.regions.filter((region) => region.regionId !== regionId);
   return {
     ...draft,
-    regions: [{ regionId, primary: true }, ...existing.map((region) => ({ ...region, primary: false }))],
+    regions: [{ regionId, primary: true }],
   };
 }
 
@@ -563,14 +621,14 @@ function getBackHref(step: OnboardingRouteStep) {
 function readDraft(): OnboardingDraft | null {
   try {
     const raw = window.sessionStorage.getItem(draftKey);
-    return raw ? (JSON.parse(raw) as OnboardingDraft) : null;
+    return raw ? sanitizeDraft(JSON.parse(raw) as Partial<OnboardingDraft>) : null;
   } catch {
     return null;
   }
 }
 
 function writeDraft(draft: OnboardingDraft) {
-  window.sessionStorage.setItem(draftKey, JSON.stringify(draft));
+  window.sessionStorage.setItem(draftKey, JSON.stringify(sanitizeDraft(draft)));
 }
 
 function clearDraft() {
@@ -579,4 +637,84 @@ function clearDraft() {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : '요청을 처리하지 못했어요.';
+}
+
+function sanitizeDraft(raw: Partial<OnboardingDraft> | null | undefined): OnboardingDraft {
+  const sports = Array.isArray(raw?.sports)
+    ? raw.sports
+        .filter((sport) => isUuid(sport?.sportId))
+        .map((sport) => ({
+          sportId: sport.sportId,
+          levelId: isUuid(sport.levelId) ? sport.levelId : null,
+        }))
+    : [];
+
+  const regions = Array.isArray(raw?.regions)
+    ? raw.regions
+        .filter((region) => isUuid(region?.regionId))
+        .slice(0, 1)
+        .map((region) => ({
+          regionId: region.regionId,
+          primary: true,
+        }))
+    : [];
+
+  const location = raw?.currentLocation;
+  const currentLocation =
+    location &&
+    Number.isFinite(location.latitude) &&
+    Number.isFinite(location.longitude) &&
+    typeof location.capturedAt === 'string' &&
+    location.capturedAt.trim()
+      ? {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: Number.isFinite(location.accuracy) ? location.accuracy : null,
+          capturedAt: location.capturedAt,
+          matchedRegionId: isUuid(location.matchedRegionId) ? location.matchedRegionId : null,
+          matchedRegionName: location.matchedRegionName ?? null,
+        }
+      : null;
+
+  return { sports, regions, currentLocation };
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function toOnboardingRegionGroups(regions: V1Region[]): OnboardingRegionGroup[] {
+  return regions
+    .filter((region) => region.level === 1 || !region.parentId)
+    .map((parent) => {
+      const parentOption: OnboardingRegionOption = {
+        id: parent.id,
+        name: `${parent.name} 전체`,
+        shortName: '전체',
+        parentName: parent.name,
+        parentId: parent.id,
+        all: true,
+      };
+      const childOptions: OnboardingRegionOption[] = (parent.children ?? [])
+        .filter((child) => child.level === 2)
+        .map((child) => ({
+          id: child.id,
+          name: `${parent.name} ${child.name}`,
+          shortName: child.name,
+          parentName: parent.name,
+          parentId: parent.id,
+          all: false,
+        }));
+
+      return {
+        id: parent.id,
+        name: parent.name,
+        options: [parentOption, ...childOptions],
+      };
+    });
+}
+
+function findRegionGroupId(groups: OnboardingRegionGroup[], regionId: string | null | undefined) {
+  if (!regionId) return null;
+  return groups.find((group) => group.options.some((option) => option.id === regionId))?.id ?? null;
 }

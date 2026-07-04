@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView } from './teams-page';
 import { getTeamListViewModel } from './teams.view-model';
@@ -12,6 +14,17 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => new URLSearchParams(),
 }));
+
+function render(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 describe('TeamListPageView', () => {
   it('does not render sample team cards while the live team list is loading', () => {

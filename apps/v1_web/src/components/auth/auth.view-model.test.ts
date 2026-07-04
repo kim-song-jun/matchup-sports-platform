@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getEmailLoginViewModel, getLoginViewModel, getSignupCompleteViewModel, getSignupFormViewModel } from './auth.view-model';
 
 describe('auth view models', () => {
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+    delete process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
+  });
+
   afterEach(() => {
     delete process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
     delete process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;

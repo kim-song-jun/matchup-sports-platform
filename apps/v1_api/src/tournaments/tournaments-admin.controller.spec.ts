@@ -283,6 +283,7 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
     const longTitle = 'A'.repeat(121);
     const dto = plainToInstance(CreateTournamentDto, {
       sportId: '00000000-0000-4000-8000-000000000001',
+      teamCount: 8,
       title: longTitle,
     });
     const errors = await validate(dto);
@@ -361,6 +362,7 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
     const controller = app.get(TournamentsAdminController);
     const result = await controller.create(ownerAuthUser, {
       sportId: '00000000-0000-4000-8000-000000000001',
+      teamCount: 8,
       title: '새 대회',
     });
 

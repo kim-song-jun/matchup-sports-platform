@@ -41,7 +41,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   MyInvitationsPageView,
@@ -58,6 +58,19 @@ type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | '
 type DuplicateCheckState = {
   status: 'idle' | 'available' | 'taken' | 'error';
   value: string;
+};
+
+type SettingsRegionOption = {
+  id: string;
+  name: string;
+  shortName: string;
+  parentId: string;
+};
+
+type SettingsRegionGroup = {
+  id: string;
+  name: string;
+  options: SettingsRegionOption[];
 };
 
 export function MyHomePageClient() {
@@ -653,9 +666,10 @@ export function SportsSettingsPageClient() {
   const regionsQuery = useV1MasterRegions();
   const updatePreferences = useV1UpdateMyPreferences();
   const sports = sportsQuery.data ?? [];
-  const regions = toDistrictRegionOptions(regionsQuery.data ?? []);
+  const regionGroups = useMemo(() => toSettingsRegionGroups(regionsQuery.data ?? []), [regionsQuery.data]);
   const [selectedSports, setSelectedSports] = useState<Array<{ sportId: string; levelId: string | null }>>([]);
   const [selectedRegionIds, setSelectedRegionIds] = useState<[string, string]>(['', '']);
+  const [selectedRegionGroupIds, setSelectedRegionGroupIds] = useState<[string, string]>(['', '']);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -666,8 +680,20 @@ export function SportsSettingsPageClient() {
     const primaryRegion = profileRegions.find((region) => region.primary) ?? profileRegions[0];
     const secondaryRegion = profileRegions.find((region) => region.regionId !== primaryRegion?.regionId);
     setSelectedRegionIds([primaryRegion?.regionId ?? '', secondaryRegion?.regionId ?? '']);
+    setSelectedRegionGroupIds([
+      findSettingsRegionGroupId(regionGroups, primaryRegion?.regionId) ?? '',
+      findSettingsRegionGroupId(regionGroups, secondaryRegion?.regionId) ?? '',
+    ]);
     setHydratedUserId(profile.data.userId);
-  }, [hydratedUserId, profile.data]);
+  }, [hydratedUserId, profile.data, regionGroups]);
+
+  useEffect(() => {
+    if (regionGroups.length === 0) return;
+    setSelectedRegionGroupIds((current) => [
+      current[0] || findSettingsRegionGroupId(regionGroups, selectedRegionIds[0]) || '',
+      current[1] || findSettingsRegionGroupId(regionGroups, selectedRegionIds[1]) || '',
+    ]);
+  }, [regionGroups, selectedRegionIds]);
 
   const toggleSport = (sportId: string) => {
     setSelectedSports((current) => {
@@ -684,6 +710,25 @@ export function SportsSettingsPageClient() {
   const selectedRegionPayload = selectedRegionIds
     .filter((regionId, index, self) => regionId && self.indexOf(regionId) === index)
     .map((regionId, index) => ({ regionId, primary: index === 0 }));
+  const setRegionGroup = (slot: 0 | 1, groupId: string) => {
+    setSelectedRegionGroupIds((current) => {
+      const next: [string, string] = [...current];
+      next[slot] = groupId;
+      return next;
+    });
+    setSelectedRegionIds((current) => {
+      const next: [string, string] = [...current];
+      next[slot] = '';
+      return next;
+    });
+  };
+  const setRegion = (slot: 0 | 1, regionId: string) => {
+    setSelectedRegionIds((current) => {
+      const next: [string, string] = [...current];
+      next[slot] = regionId;
+      return next;
+    });
+  };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage(null);
@@ -751,35 +796,24 @@ export function SportsSettingsPageClient() {
         <Card pad={16}>
           <div className="tm-text-body-lg">기본 활동 지역</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>매치와 팀 추천에 사용할 지역을 최대 2개까지 나눠 관리해요.</div>
-          <label className="tm-create-field" style={{ marginTop: 14 }}>
-            <span className="tm-text-label">기본 활동 지역 1</span>
-            <select
-              className="tm-input"
-              value={selectedRegionIds[0]}
-              onChange={(event) => setSelectedRegionIds((current) => {
-                const nextPrimary = event.target.value;
-                return [nextPrimary, current[1] === nextPrimary ? '' : current[1]];
-              })}
-            >
-              <option value="">지역 선택 안 함</option>
-              {regions.map((region) => (
-                <option key={region.id} value={region.id} disabled={region.id === selectedRegionIds[1]}>{region.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="tm-create-field" style={{ marginTop: 14 }}>
-            <span className="tm-text-label">기본 활동 지역 2</span>
-            <select
-              className="tm-input"
-              value={selectedRegionIds[1]}
-              onChange={(event) => setSelectedRegionIds((current) => [current[0], event.target.value])}
-            >
-              <option value="">지역 선택 안 함</option>
-              {regions.map((region) => (
-                <option key={region.id} value={region.id} disabled={region.id === selectedRegionIds[0]}>{region.name}</option>
-              ))}
-            </select>
-          </label>
+          <SettingsRegionSlot
+            groupId={selectedRegionGroupIds[0]}
+            groups={regionGroups}
+            label="기본 활동 지역 1"
+            onGroupChange={(groupId) => setRegionGroup(0, groupId)}
+            onRegionChange={(regionId) => setRegion(0, regionId)}
+            regionId={selectedRegionIds[0]}
+            unavailableRegionId={selectedRegionIds[1]}
+          />
+          <SettingsRegionSlot
+            groupId={selectedRegionGroupIds[1]}
+            groups={regionGroups}
+            label="기본 활동 지역 2"
+            onGroupChange={(groupId) => setRegionGroup(1, groupId)}
+            onRegionChange={(regionId) => setRegion(1, regionId)}
+            regionId={selectedRegionIds[1]}
+            unavailableRegionId={selectedRegionIds[0]}
+          />
         </Card>
 
         <Card pad={14} style={{ marginTop: 14, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
@@ -817,6 +851,88 @@ function SportLevelPicker({
       </div>
     </div>
   );
+}
+
+function SettingsRegionSlot({
+  groupId,
+  groups,
+  label,
+  onGroupChange,
+  onRegionChange,
+  regionId,
+  unavailableRegionId,
+}: {
+  groupId: string;
+  groups: SettingsRegionGroup[];
+  label: string;
+  onGroupChange: (groupId: string) => void;
+  onRegionChange: (regionId: string) => void;
+  regionId: string;
+  unavailableRegionId: string;
+}) {
+  const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
+
+  return (
+    <div className="tm-create-field" style={{ marginTop: 14 }}>
+      <div className="tm-text-label">{label}</div>
+      <div className="tm-create-two-col" style={{ marginTop: 8 }}>
+        <label>
+          <span className="sr-only">{label} 시/도</span>
+          <select className="tm-input" value={groupId} onChange={(event) => onGroupChange(event.target.value)}>
+            <option value="">시/도 선택</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>{group.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">{label} 상세 지역</span>
+          <select className="tm-input" value={regionId} onChange={(event) => onRegionChange(event.target.value)} disabled={!selectedGroup}>
+            <option value="">상세 지역 선택</option>
+            {(selectedGroup?.options ?? []).map((region) => (
+              <option key={region.id} value={region.id} disabled={region.id === unavailableRegionId}>{region.shortName}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function toSettingsRegionGroups(regions: V1Region[]): SettingsRegionGroup[] {
+  const parents = regions.filter((region) => region.level === 1 || !region.parentId);
+  const childrenByParentId = new Map<string, V1Region[]>();
+
+  regions.forEach((region) => {
+    if (region.level !== 2 || !region.parentId) return;
+    const current = childrenByParentId.get(region.parentId) ?? [];
+    current.push(region);
+    childrenByParentId.set(region.parentId, current);
+  });
+
+  return parents.map((parent) => ({
+    id: parent.id,
+    name: parent.name,
+    options: [
+      {
+        id: parent.id,
+        name: `${parent.name} 전체`,
+        shortName: '전체',
+        parentId: parent.id,
+      },
+      ...(childrenByParentId.get(parent.id) ?? []).map((child) => ({
+        id: child.id,
+        name: `${parent.name} ${child.name}`,
+        shortName: child.name,
+        parentId: parent.id,
+      })),
+    ],
+  }));
+}
+
+function findSettingsRegionGroupId(groups: SettingsRegionGroup[], regionId: string | null | undefined) {
+  if (!regionId) return null;
+  return groups.find((group) => group.options.some((option) => option.id === regionId))?.id ?? null;
 }
 
 export function SettingsPageClient() {

@@ -19,7 +19,7 @@ import { AuthFrame } from './auth-page';
 
 type WizardStep = 'account' | 'profile';
 type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
-type VisibilityStatus = 'public' | 'members_only' | 'private';
+type VisibilityStatus = 'public' | 'private';
 
 const STEP_ORDER: WizardStep[] = ['account', 'profile'];
 
@@ -537,7 +537,6 @@ export function SignupClient() {
                 <span className="tm-text-label">공개 여부</span>
                 <select className="tm-input tm-input-select" value={visibilityStatus} onChange={(event) => setVisibilityStatus(event.target.value as VisibilityStatus)}>
                   <option value="public">전체 공개</option>
-                  <option value="members_only">멤버 공개</option>
                   <option value="private">비공개</option>
                 </select>
               </label>

@@ -117,7 +117,7 @@ export function TermsClient() {
     >
       <div className="tm-auth-body">
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
-        <p className="tm-text-body tm-auth-sub">{model.sub}</p>
+        <p className="tm-text-body tm-auth-sub" style={{ whiteSpace: 'pre-line' }}>{model.sub}</p>
         {error ? (
           <div className="tm-auth-soft-card tm-auth-soft-card-error">
             <div className="tm-text-body-lg">약관을 저장하지 못했어요</div>

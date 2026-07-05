@@ -115,7 +115,7 @@ export function getTermsViewModel(): TermsViewModel {
   return {
     backHref: '/login',
     title: '가입 전에 약관을 먼저 확인해 주세요',
-    sub: '필수 약관에 모두 동의해야 다음 단계로 넘어갈 수 있어요.',
+    sub: '가입 전에 약관을 확인해 주세요.\n필수 약관에 동의해야 다음 단계로 넘어갈 수 있어요.',
     agreements: [
       {
         title: '서비스 이용약관',

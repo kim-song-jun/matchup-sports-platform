@@ -591,7 +591,9 @@ function TournamentDetailView({
           teamCount={tournament.teamCount}
           height={6}
         />
-        <ApplyCTAButtons tournament={tournament} isFull={isFull} myRegistration={myRegistration} />
+        <div style={{ marginTop: 18 }}>
+          <ApplyCTAButtons tournament={tournament} isFull={isFull} myRegistration={myRegistration} />
+        </div>
       </div>
 
       {/* Key facts: schedule, capacity, entry fee (the canonical desktop facts panel —

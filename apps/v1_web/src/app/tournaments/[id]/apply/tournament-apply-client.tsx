@@ -1112,7 +1112,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams)) {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
         <LoadingSkeleton />
       </AppChrome>
     );
@@ -1121,7 +1121,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   if (tournamentError || !tournament) {
     const msg = extractErrorMessage(tournamentErr, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner message={msg} />
           <Link
@@ -1139,7 +1139,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   // Only allow apply when tournament is open
   if (tournament.status !== 'open') {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
             message="지금은 참가 신청을 받지 않아요."
@@ -1228,7 +1228,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   }
 
   return (
-    <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false}>
+    <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
       {/* maxWidth/marginInline 인라인 스타일 제거:
           모바일은 globals.css 기본값이 처리, 데스크톱은 tournaments.css의
           .tm-tournament-apply-body { max-width:unset } + .tm-tournament-form-grid 가 담당 */}

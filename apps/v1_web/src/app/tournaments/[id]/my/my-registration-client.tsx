@@ -656,6 +656,7 @@ function RegistrationDetailView({
           ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.'
           : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 상태가 변경돼요.'
         : null;
+  const showAwaitingPaymentNotice = registration.status === 'awaiting_payment';
 
   async function handleCancelConfirm(reason: string) {
     setCancelError(null);
@@ -973,6 +974,22 @@ function RegistrationDetailView({
                 </div>
               </Card>
             </section>
+
+            {showAwaitingPaymentNotice ? (
+              <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+                <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                  <p style={{ margin: 0 }}>아직 참가가 확정된 상태는 아닙니다.</p>
+                  <p style={{ margin: '8px 0 0' }}>
+                    안내된 계좌로 참가비를 입금해 주세요.
+                    <br />
+                    입금 확인이 완료되면 참가가 최종 확정됩니다.
+                  </p>
+                  <p style={{ margin: '8px 0 0' }}>
+                    신청 후 2시간 이내에 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
+                  </p>
+                </div>
+              </Card>
+            ) : null}
 
             {/* Mobile-only: Cancel / Reapply actions (hidden on desktop — rail handles them) */}
             <div className="tm-hide-desktop" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>

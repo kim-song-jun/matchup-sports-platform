@@ -82,6 +82,7 @@ function buildPrismaMock() {
     },
     v1UserProfile: {
       findFirst: jest.fn(),
+      upsert: jest.fn(),
     },
     v1AuthIdentity: {
       findUnique: jest.fn(),
@@ -204,24 +205,68 @@ describe('AuthService', () => {
     });
   });
 
-  it('register: 게시된 필수 약관이 없으면 → 400 TERMS_NOT_READY', async () => {
-    prisma.v1User.findUnique.mockResolvedValue(null);
-    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
-    prisma.v1TermsDocument.findMany.mockResolvedValue([]); // no published required terms
-
-    await expect(
-      service.register({
+  it('register: 게시된 필수 약관 문서가 없어도 동의값이 true면 가입을 진행한다', async () => {
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedUserRow({
+        id: 'new-user',
         email: 'new@teameet.v1',
-        password: 'Password1!',
-        nickname: '신규',
-        requiredTermsAccepted: true,
-      }),
-    ).rejects.toMatchObject({
-      status: 400,
-      response: { code: 'TERMS_NOT_READY' },
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
+
+    const result = await service.register({
+      email: 'new@teameet.v1',
+      password: 'Password1!',
+      nickname: '신규',
+      requiredTermsAccepted: true,
     });
 
-    expect(prisma.v1User.create).not.toHaveBeenCalled();
+    expect(result.session).toEqual({ userId: 'new-user', userEmail: 'new@teameet.v1' });
+    expect(result.next).toEqual({ route: '/onboarding/sport' });
+    expect(prisma.v1User.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ termsConsents: expect.anything() }),
+      }),
+    );
+  });
+
+  it('register: 게시된 필수 약관 문서가 있으면 consent row를 함께 생성한다', async () => {
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedUserRow({
+        id: 'new-user',
+        email: 'new@teameet.v1',
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+      }));
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+    prisma.v1TermsDocument.findMany.mockResolvedValue([{ id: 'terms-1' }, { id: 'privacy-1' }]);
+    prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
+
+    await service.register({
+      email: 'new@teameet.v1',
+      password: 'Password1!',
+      nickname: '신규',
+      requiredTermsAccepted: true,
+    });
+
+    expect(prisma.v1User.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          termsConsents: {
+            create: [
+              { termsDocumentId: 'terms-1' },
+              { termsDocumentId: 'privacy-1' },
+            ],
+          },
+        }),
+      }),
+    );
   });
 
   // ─── login ────────────────────────────────────────────────────────────────
@@ -350,6 +395,63 @@ describe('AuthService', () => {
 
     // expired user must be deleted before the error is thrown
     expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+  });
+
+  it('completeSocialTerms: 게시된 필수 약관 문서가 없어도 소셜 프로필 단계로 진행한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+      }))
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        onboardingStatus: 'social_profile_required',
+        onboardingProgress: { currentStep: 'signup' },
+        termsConsents: [],
+        createdAt: activeTime,
+        updatedAt: activeTime,
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+
+    const result = await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(result.next).toEqual({ route: '/signup/social' });
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { onboardingStatus: 'social_profile_required' },
+    });
+    expect(prisma.v1UserTermsConsent.createMany).not.toHaveBeenCalled();
+  });
+
+  it('completeSocialProfile: consent row가 없어도 약관 단계 완료 상태면 프로필을 저장한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        onboardingStatus: 'social_profile_required',
+        onboardingProgress: { currentStep: 'signup' },
+        termsConsents: [],
+        createdAt: activeTime,
+        updatedAt: activeTime,
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    const result = await service.completeSocialProfile('user-1', {
+      nickname: '소셜유저',
+      displayName: '소셜 유저',
+    });
+
+    expect(result.next).toEqual({ route: '/onboarding/sport' });
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'user-1' },
+        create: expect.objectContaining({ nickname: '소셜유저' }),
+      }),
+    );
   });
 
   // ─── me ──────────────────────────────────────────────────────────────────

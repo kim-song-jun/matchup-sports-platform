@@ -29,6 +29,16 @@ export type HomeNotice = {
   trailing: string;
 };
 
+export type HomeChatRoom = {
+  id: string;
+  title: string;
+  typeLabel: string;
+  lastMessage: string;
+  time: string;
+  unreadCount: number;
+  href: string;
+};
+
 export type HomeStats = {
   monthlyActivity: number | '-';
   monthlyActivitySub: string;
@@ -46,6 +56,8 @@ export type HomeViewModel = {
   hasNewNotification: boolean;
   chatUnreadCount: number;
   chatHref: string;
+  chatStatus: 'loading' | 'error' | 'ready';
+  chatRooms: HomeChatRoom[];
   retry?: () => void;
   stats: HomeStats;
   featuredMatch: HomeMatchCard;

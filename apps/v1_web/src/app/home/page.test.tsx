@@ -38,6 +38,9 @@ describe('HomePage', () => {
     // "오늘의 추천" section header must be present.
     expect(screen.getByText('오늘의 추천')).toBeInTheDocument();
 
+    // Chat must be discoverable from the home body, not only from the floating button.
+    expect(screen.getByText('최근 채팅')).toBeInTheDocument();
+
     // At least one fallback recommended match title must be in the DOM.
     // This verifies RecommendedMatchRail receives and renders model.recommendedMatches.
     const matchTitles = fallback.recommendedMatches.map((m) => m.title);

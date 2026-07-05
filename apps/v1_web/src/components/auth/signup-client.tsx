@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import {
   useV1CheckEmail,
@@ -511,11 +511,11 @@ export function SignupClient() {
 
               <label className="tm-auth-field">
                 <span className="tm-text-label">생년월일 <em className="tm-auth-optional">(선택)</em></span>
-                <input
-                  className="tm-input tm-auth-input"
-                  inputMode="numeric"
-                  maxLength={10}
-                  onChange={(event) => setBirthDateDigits(toDigits(event.target.value, 8))}
+                <DatePickerTextInput
+                  dateValue={formatBirthDate(birthDateDigits)}
+                  inputClassName="tm-auth-input"
+                  onDateChange={(value) => setBirthDateDigits(toDigits(value, 8))}
+                  onTextChange={(value) => setBirthDateDigits(toDigits(value, 8))}
                   placeholder="예: 1995-01-15"
                   value={formatBirthDate(birthDateDigits)}
                 />

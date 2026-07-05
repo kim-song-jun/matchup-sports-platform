@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
-import type { V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice } from '@/types/api';
+import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice } from '@/types/api';
 import { HomePageView } from './home-page';
-import type { HomeMatchCard, HomeNotice, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
+import type { HomeChatRoom, HomeMatchCard, HomeNotice, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
 
 export function HomePageClient() {
@@ -13,6 +13,8 @@ export function HomePageClient() {
   const { weather, refreshing: weatherRefreshing, refresh: refreshWeather } = useCurrentLocationWeather();
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
+  const chatStatus: HomeViewModel['chatStatus'] = chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
+  const chatRoomSummaries = chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
 
   if (query.isError) {
     return (
@@ -22,6 +24,8 @@ export function HomePageClient() {
           network: true,
           hasNewNotification: false,
           chatUnreadCount,
+          chatStatus,
+          chatRooms: chatRoomSummaries,
           weather: weather ?? fallback.weather,
           weatherRefreshing,
           refreshWeather,
@@ -37,10 +41,12 @@ export function HomePageClient() {
         query.data
           ? {
               ...toHomeModel(query.data, fallback, () => void query.refetch(), chatUnreadCount, weather),
+              chatStatus,
+              chatRooms: chatRoomSummaries,
               weatherRefreshing,
               refreshWeather,
             }
-          : { ...fallback, chatUnreadCount, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
+          : { ...fallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
       }
     />
   );
@@ -72,6 +78,38 @@ function toHomeModel(
     weather: weather ?? fallback.weather,
     notices: normalizeNotices(home, fallback),
   };
+}
+
+function toHomeChatRooms(rooms: V1ChatRoom[]): HomeChatRoom[] {
+  return [...rooms]
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return messageTime(b) - messageTime(a);
+    })
+    .slice(0, 3)
+    .map((room) => ({
+      id: room.roomId,
+      title: room.title,
+      typeLabel: room.roomType === 'match' ? '개인매치' : room.roomType === 'team' ? '팀' : '팀매치',
+      lastMessage: room.lastMessage?.contentPreview ?? '아직 메시지가 없어요',
+      time: formatRelative(room.lastMessage?.sentAt),
+      unreadCount: room.unreadCount,
+      href: `/chat/${room.roomId}`,
+    }));
+}
+
+function messageTime(room: V1ChatRoom) {
+  const sentAt = room.lastMessage?.sentAt;
+  if (!sentAt) return 0;
+  const date = new Date(sentAt);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function formatRelative(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {

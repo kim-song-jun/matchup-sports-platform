@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
-import { Card, ListItem } from '@/components/v1-ui/primitives';
+import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { cssUrl } from '@/lib/assets';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
@@ -608,16 +608,19 @@ export function ProfileEditPageClient() {
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">생년월일</span>
-          <input
-            className={`tm-input ${fieldErrors.birthDate ? 'tm-auth-input-error' : ''}`}
-            inputMode="numeric"
-            maxLength={10}
-            placeholder="예: 1995-01-15"
+          <DatePickerTextInput
+            dateValue={formatBirthDate(birthDateDigits)}
+            inputClassName={fieldErrors.birthDate ? 'tm-auth-input-error' : ''}
             value={formatBirthDate(birthDateDigits)}
-            onChange={(event) => {
-              setBirthDateDigits(toDigits(event.target.value, 8));
+            onTextChange={(value) => {
+              setBirthDateDigits(toDigits(value, 8));
               setFieldErrors((current) => ({ ...current, birthDate: undefined }));
             }}
+            onDateChange={(value) => {
+              setBirthDateDigits(toDigits(value, 8));
+              setFieldErrors((current) => ({ ...current, birthDate: undefined }));
+            }}
+            placeholder="예: 1995-01-15"
             aria-invalid={fieldErrors.birthDate ? true : undefined}
             aria-describedby={fieldErrors.birthDate ? 'profile-birthDate-error' : undefined}
           />

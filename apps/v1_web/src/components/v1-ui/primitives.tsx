@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { ChevronRightIcon } from './icons';
-import { InboxIcon } from 'lucide-react';
+import { CalendarIcon, InboxIcon } from 'lucide-react';
 
 /* ── TextField ── */
 /* Carbon/Ant 표준 error a11y 패턴:
@@ -99,6 +99,52 @@ export function TextField(props: TextFieldProps) {
         </span>
       ) : null}
     </div>
+  );
+}
+
+type DatePickerTextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'type' | 'value'> & {
+  value: string;
+  dateValue: string;
+  onTextChange: (value: string) => void;
+  onDateChange: (value: string) => void;
+  inputClassName?: string;
+  pickerLabel?: string;
+};
+
+export function DatePickerTextInput({
+  value,
+  dateValue,
+  onTextChange,
+  onDateChange,
+  inputClassName = '',
+  pickerLabel = '날짜 선택',
+  ...inputProps
+}: DatePickerTextInputProps) {
+  const normalizedDateValue = /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : '';
+
+  return (
+    <span className="tm-date-picker-text-input">
+      <input
+        {...inputProps}
+        className={`tm-input ${inputClassName}`.trim()}
+        inputMode={inputProps.inputMode ?? 'numeric'}
+        maxLength={inputProps.maxLength ?? 10}
+        type="text"
+        value={value}
+        onChange={(event) => onTextChange(event.target.value)}
+      />
+      <span className="tm-date-picker-trigger">
+        <CalendarIcon size={19} strokeWidth={2} aria-hidden="true" />
+        <input
+          aria-label={pickerLabel}
+          className="tm-date-picker-native"
+          lang="ko"
+          type="date"
+          value={normalizedDateValue}
+          onChange={(event) => onDateChange(event.target.value)}
+        />
+      </span>
+    </span>
   );
 }
 

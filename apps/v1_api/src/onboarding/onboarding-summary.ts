@@ -111,6 +111,11 @@ export function getMissing(input: {
   return missing;
 }
 
+export function hasAcceptedRequiredTerms(onboardingStatus: V1OnboardingStatus, termsConsentCount: number) {
+  if (termsConsentCount > 0) return true;
+  return onboardingStatus !== 'not_started' && onboardingStatus !== 'social_terms_required';
+}
+
 export function derivePreferenceStatus(input: {
   sportsCount: number;
   missingLevels: boolean;

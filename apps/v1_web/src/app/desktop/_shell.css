@@ -398,7 +398,9 @@
   .tm-desktop-footer-links {
     display: flex;
     align-items: center;
-    gap: 18px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     margin-left: auto;
   }
 

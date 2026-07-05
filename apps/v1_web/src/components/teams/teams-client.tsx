@@ -703,6 +703,7 @@ function toMemberModel(
     name: member.displayName,
     role: roleLabel(member.role),
     meta: `가입 ${formatDate(member.joinedAt)}`,
+    profileHref: `/users/${member.userId}`,
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions.actionPending,
@@ -740,6 +741,7 @@ function toRequestModel(
     name: application.applicant.displayName,
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
     status: teamJoinApplicationStatusLabel(application.status),
+    profileHref: `/users/${application.applicant.userId}`,
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },

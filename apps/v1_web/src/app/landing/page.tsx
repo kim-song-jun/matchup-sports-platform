@@ -278,9 +278,12 @@ export default function LandingPage() {
               </p>
             </div>
             <nav className="tm-landing-footer-links" aria-label="하단 링크">
-              <Link className="tm-landing-footer-link" href="/terms?document=terms">이용약관</Link>
               <Link className="tm-landing-footer-link" href="/notices">공지사항</Link>
-              <Link className="tm-landing-footer-link" href="/matches">매치 찾기</Link>
+              <Link className="tm-landing-footer-link" href="/terms?document=terms">서비스 이용약관</Link>
+              <Link className="tm-landing-footer-link" href="/terms?document=privacy">개인정보처리방침</Link>
+              <Link className="tm-landing-footer-link" href="/terms?document=location">위치기반서비스 이용약관</Link>
+              <Link className="tm-landing-footer-link" href="/terms?document=tournament-policy">대회 운영정책</Link>
+              <Link className="tm-landing-footer-link" href="/terms?document=support">고객센터</Link>
             </nav>
           </div>
           <p className="tm-text-caption tm-landing-footer-copy">

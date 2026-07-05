@@ -21,7 +21,12 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
             renders as a <div>, not a heading element, so this h1 must stay in the
             a11y tree to give mobile screen-reader users the page's main heading. */}
         <h1 className="tm-text-heading tm-hide-desktop">공지사항</h1>
-        <p className="tm-text-caption tm-notice-lead">홈 공지와 운영 안내를 한곳에서 볼 수 있어요.</p>
+        <p className="tm-text-caption tm-notice-lead">
+          팀밋의 주요 소식과 서비스 운영 안내를 확인할 수 있습니다.
+        </p>
+        <p className="tm-text-caption tm-notice-lead">
+          대회 일정, 서비스 업데이트, 점검 안내, 이벤트 및 기타 운영 관련 공지는 본 페이지를 통해 안내됩니다.
+        </p>
         <div className="tm-sport-chip-row tm-notice-filter-row">
           {model.filters.map((filter) => (
             <button

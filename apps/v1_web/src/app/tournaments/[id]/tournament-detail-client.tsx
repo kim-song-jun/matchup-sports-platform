@@ -666,8 +666,45 @@ function TournamentDetailView({
         {/* Bracket: direct grid child spanning both columns via .tm-tournament-bleed
             (grid-column 1/-1) — full-width below the 2-col on desktop; normal flow on mobile. */}
         <BracketSection tournament={tournament} />
+        <TournamentPreParticipationNotice />
       </div>
     </article>
+  );
+}
+
+function TournamentPreParticipationNotice() {
+  const items = [
+    '대회 신청 후 운영진 확인 및 참가비 입금 확인이 완료되어야 참가가 확정됩니다.',
+    '신청 후 2시간 이내 입금 확인이 되지 않으면 신청은 자동 취소됩니다.',
+    '참가비 입금 후 단순 변심, 일정 착오, 팀 사정, 선수 구성 실패로 인한 신청 취소는 원칙적으로 불가합니다.',
+    '팀밋 또는 주최 측 사정으로 대회가 취소되는 경우 참가비는 100% 환불됩니다.',
+    '대회가 연기되는 경우 기존 대회일 기준 2주 전까지 참가 취소 및 환불 요청이 가능합니다.',
+    '노쇼 시 해당 팀 또는 참가자는 실격 처리되며 참가비는 환불되지 않습니다.',
+    '선출·비선출 여부, 이름, 생년월일, 선수 경력, 소속 이력 등을 허위로 제출하거나 숨기는 행위는 팀 탈락 사유가 됩니다.',
+    '대회 당일 본인 확인을 위해 신분증 또는 본인 확인 자료 제출을 요청할 수 있습니다.',
+    '경기 중 부상 위험이 있으므로 참가자는 본인의 건강 상태를 확인한 후 참가해야 합니다.',
+    '대회 현장에서는 사진 및 영상이 촬영될 수 있습니다.',
+  ];
+
+  return (
+    <div className="tm-tournament-bleed">
+      <div className="tm-match-detail-body">
+        <section aria-labelledby="tournament-precheck-heading" style={{ marginTop: 24 }}>
+          <div id="tournament-precheck-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+            참가 전 꼭 확인해 주세요
+          </div>
+          <Card pad={16} style={{ background: 'var(--grey50)' }}>
+            <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 8 }}>
+              {items.map((item) => (
+                <li key={item} className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      </div>
+    </div>
   );
 }
 

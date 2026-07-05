@@ -187,30 +187,102 @@ export class ProfileService {
       return {
         userId: user.id,
         displayName: '탈퇴한 사용자',
+        nickname: null,
         profileImageUrl: null,
         bio: null,
         visibilityStatus: 'private',
         reputation: emptyReputation(),
+        activitySummary: emptyPublicActivitySummary(),
       };
     }
     if (user.profile?.visibility === 'private') {
       return {
         userId: user.id,
         displayName: user.profile.displayName ?? user.profile.nickname,
+        nickname: user.profile.nickname ?? null,
         profileImageUrl: null,
         bio: null,
         visibilityStatus: 'private',
         reputation: emptyReputation(),
+        activitySummary: null,
       };
     }
+
+    const activitySummary = await this.getPublicActivitySummary(user.id);
 
     return {
       userId: user.id,
       displayName: user.profile?.displayName ?? user.profile?.nickname ?? '사용자',
+      nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
       bio: user.profile?.bio ?? null,
       visibilityStatus: normalizeVisibility(user.profile?.visibility),
       reputation: toReputationPayload(user.reputationSummary),
+      activitySummary,
+    };
+  }
+
+  private async getPublicActivitySummary(userId: string) {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+    const [
+      matchCount,
+      teamCount,
+      reviewCount,
+      monthlyMatchCount,
+      monthlyTeamJoinCount,
+      monthlyReviewCount,
+    ] = await Promise.all([
+      this.prisma.v1MatchParticipant.count({
+        where: {
+          userId,
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null },
+        },
+      }),
+      this.prisma.v1TeamMembership.count({
+        where: {
+          userId,
+          status: 'active',
+          team: { status: 'active', deletedAt: null },
+        },
+      }),
+      this.prisma.v1PostEventReview.count({
+        where: { targetUserId: userId, targetType: 'user', status: 'submitted' },
+      }),
+      this.prisma.v1MatchParticipant.count({
+        where: {
+          userId,
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
+        },
+      }),
+      this.prisma.v1TeamMembership.count({
+        where: {
+          userId,
+          status: 'active',
+          joinedAt: { gte: monthStart, lt: nextMonthStart },
+          team: { status: 'active', deletedAt: null },
+        },
+      }),
+      this.prisma.v1PostEventReview.count({
+        where: { targetUserId: userId, targetType: 'user', status: 'submitted', createdAt: { gte: monthStart, lt: nextMonthStart } },
+      }),
+    ]);
+
+    return {
+      totals: {
+        matchCount,
+        teamCount,
+        reviewCount,
+      },
+      monthly: {
+        matchCount: monthlyMatchCount,
+        teamJoinCount: monthlyTeamJoinCount,
+        reviewCount: monthlyReviewCount,
+      },
     };
   }
 
@@ -597,6 +669,13 @@ function toReputationPayload(reputation: {
 
 function emptyReputation() {
   return { trustState: 'none', mannerScore: null, activityCount: 0, reviewCount: 0 };
+}
+
+function emptyPublicActivitySummary() {
+  return {
+    totals: { matchCount: 0, teamCount: 0, reviewCount: 0 },
+    monthly: { matchCount: 0, teamJoinCount: 0, reviewCount: 0 },
+  };
 }
 
 function normalizeVisibility(value?: string | null) {

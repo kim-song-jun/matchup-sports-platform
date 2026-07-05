@@ -59,6 +59,21 @@ Profile edit UI must keep the same duplicate-check behavior as signup for change
 - `monthly.mannerScore`: current manner score shown in the monthly card, or `null`
 - `monthly.winRate`: `null` until a v1 match result/win-loss source exists
 
+`GET /users/:userId/public-profile` response:
+
+- Optional auth. Public and members-only profiles are readable from user-facing surfaces such as team member lists and join request lists.
+- Private fields such as email and phone are never returned.
+- Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`, `bio`, `visibilityStatus`.
+- Returned trust field: `reputation.mannerScore`, `reputation.reviewCount`, `reputation.trustState`.
+- Returned public activity summary:
+  - `totals.matchCount`: completed match participation count
+  - `totals.teamCount`: active team membership count
+  - `totals.reviewCount`: submitted user review count
+  - `monthly.matchCount`: current-month completed match participation count
+  - `monthly.teamJoinCount`: current-month active team join count
+  - `monthly.reviewCount`: current-month submitted user review count
+- Private profiles return `visibilityStatus: "private"` and `activitySummary: null`; clients must not render hidden metrics.
+
 ## State And Copy
 
 - Logout is a server no-op in the current header-auth development model; frontend still clears local v1 session state.

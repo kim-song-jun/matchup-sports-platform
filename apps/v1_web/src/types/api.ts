@@ -1016,6 +1016,33 @@ export type V1Profile = {
   trustState?: TrustState;
 };
 
+export type V1PublicProfile = {
+  userId: string;
+  displayName: string;
+  nickname: string | null;
+  profileImageUrl: string | null;
+  bio: string | null;
+  visibilityStatus: 'public' | 'members_only' | 'private';
+  reputation: {
+    trustState: TrustState;
+    mannerScore: number | null;
+    activityCount: number;
+    reviewCount: number;
+  };
+  activitySummary: {
+    totals: {
+      matchCount: number;
+      teamCount: number;
+      reviewCount: number;
+    };
+    monthly: {
+      matchCount: number;
+      teamJoinCount: number;
+      reviewCount: number;
+    };
+  } | null;
+};
+
 export type V1MyActivitySummary = {
   totals: {
     activityCount: number;

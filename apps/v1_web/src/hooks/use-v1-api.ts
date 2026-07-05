@@ -56,6 +56,7 @@ import type {
   V1OnboardingMutationResult,
   V1OnboardingPreferencePayload,
   V1Profile,
+  V1PublicProfile,
   V1Region,
   V1ResolveLocationResponse,
   V1RecentSearch,
@@ -1080,6 +1081,15 @@ export function useV1Profile() {
   return useQuery({
     queryKey: v1Keys.profile(),
     queryFn: () => v1Get<V1Profile>('/me/profile'),
+  });
+}
+
+export function useV1PublicProfile(userId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.publicProfile(userId),
+    queryFn: () => v1Get<V1PublicProfile>(`/users/${userId}/public-profile`),
+    enabled: Boolean(userId) && (options?.enabled ?? true),
+    retry: false,
   });
 }
 

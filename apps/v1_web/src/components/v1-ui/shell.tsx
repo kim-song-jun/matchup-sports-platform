@@ -120,9 +120,11 @@ function DesktopFooter() {
         </div>
         <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
           <Link href="/notices">공지사항</Link>
-          <Link href="/terms?document=terms">이용약관</Link>
-          <Link href="/terms?document=privacy">개인정보·정책</Link>
-          <Link href="/search">탐색</Link>
+          <Link href="/terms?document=terms">서비스 이용약관</Link>
+          <Link href="/terms?document=privacy">개인정보처리방침</Link>
+          <Link href="/terms?document=location">위치기반서비스 이용약관</Link>
+          <Link href="/terms?document=tournament-policy">대회 운영정책</Link>
+          <Link href="/terms?document=support">고객센터</Link>
         </nav>
         <p className="tm-desktop-footer-copy">© 2026 Teameet</p>
       </div>

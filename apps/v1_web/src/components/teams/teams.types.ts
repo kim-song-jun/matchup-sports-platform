@@ -142,6 +142,7 @@ export type TeamMembersViewModel = {
     name: string;
     role: string;
     meta: string;
+    profileHref?: string;
     manageLabel?: string;
     locked?: boolean;
     actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
@@ -151,6 +152,7 @@ export type TeamMembersViewModel = {
     name: string;
     meta: string;
     status: string;
+    profileHref?: string;
     actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
     actionPending?: boolean;
   }>;

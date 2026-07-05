@@ -122,22 +122,22 @@ export function getTermsViewModel(): TermsViewModel {
         meta: '필수',
         required: true,
         checked: true,
-        detail: 'Teameet의 매치, 팀매치, 팀 탐색, 채팅, 알림 기능을 이용하기 위한 기본 약관이에요. 부정 이용, 허위 신청, 운영 정책 위반 시 이용이 제한될 수 있어요.',
+        detail: '팀밋 서비스 이용을 위한 기본 약관입니다.',
       },
       {
-        title: '개인정보 처리방침',
+        title: '개인정보 수집 및 이용 동의',
         meta: '필수',
         required: true,
         checked: true,
-        detail: '회원 식별, 로그인, 매치 신청, 알림 발송 등 서비스 운영을 위해 이메일, 프로필, 활동 기록 등 필요한 개인정보를 처리해요.',
+        detail: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의입니다.',
       },
       {
-        title: '위치 기반 서비스',
+        title: '위치기반서비스 이용 동의',
         meta: '선택 · 주변 매치 추천에 사용',
         required: false,
         checked: false,
         locationBased: true,
-        detail: '동의하면 가까운 매치와 팀 추천에 위치 정보를 활용해요. 위치 권한을 거부해도 지역을 직접 선택해서 계속 이용할 수 있어요.',
+        detail: '',
       },
     ],
     primary: { label: '동의하고 회원가입하기', href: '/signup' },
@@ -176,4 +176,3 @@ export function getSignupCompleteViewModel(): SignupCompleteViewModel {
     secondary: { label: '나중에 설정하기', href: '/home', tone: 'neutral' },
   };
 }
-

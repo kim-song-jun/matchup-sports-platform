@@ -1072,11 +1072,11 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         </div>
         {model.activeTab === 'members' ? (
           <MemberSection title="팀 멤버" sub="팀에 속한 멤버의 역할과 권한을 관리해요." desktopGrid>
-            {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} actions={member.actions} actionPending={member.actionPending} />)}
+            {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} profileHref={member.profileHref} actions={member.actions} actionPending={member.actionPending} />)}
           </MemberSection>
         ) : model.activeTab === 'requests' ? (
           <MemberSection title="가입 신청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
-            {model.requests.map((request, index) => <MemberCard key={index} title={request.name} sub={request.meta} role={request.status} actions={request.actions} actionPending={request.actionPending} />)}
+            {model.requests.map((request, index) => <MemberCard key={index} title={request.name} sub={request.meta} role={request.status} profileHref={request.profileHref} actions={request.actions} actionPending={request.actionPending} />)}
           </MemberSection>
         ) : model.invitations ? (
           <InvitationSection invitations={model.invitations} />
@@ -1578,12 +1578,14 @@ function MemberCard({
   title,
   sub,
   role,
+  profileHref,
   actions,
   actionPending,
 }: {
   title: string;
   sub: string;
   role: string;
+  profileHref?: string;
   actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
   actionPending?: boolean;
 }) {
@@ -1592,7 +1594,7 @@ function MemberCard({
 
   return (
     <Card pad={16}>
-      <ListItem title={title} sub={sub} trailing={role} />
+      <ListItem title={title} sub={sub} trailing={role} href={profileHref} chev={Boolean(profileHref)} />
       <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 10 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
         관리
       </button>

@@ -58,7 +58,7 @@ export function ChatListPageClient() {
     status: query.isPending ? 'loading' : query.isError ? 'error' : 'ready',
     emptyTitle: query.isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
     emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
-    emptyHref: query.isError ? undefined : '/matches',
+    emptyHref: query.isError || selectedCategory === '팀' ? undefined : '/matches',
     onRetry: query.isError ? () => query.refetch() : undefined,
     leaveConfirm: leaveTarget
       ? {

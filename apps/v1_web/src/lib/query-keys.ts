@@ -25,6 +25,7 @@ export const v1Keys = {
   notificationUnreadSummary: () => [...v1Keys.notificationsRoot(), 'unread-summary'] as const,
   notificationPreferences: () => [...v1Keys.all, 'notification-preferences'] as const,
   profile: () => [...v1Keys.all, 'me', 'profile'] as const,
+  publicProfile: (userId: string) => [...v1Keys.all, 'users', userId, 'public-profile'] as const,
   settings: () => [...v1Keys.all, 'me', 'settings'] as const,
   adminOverview: () => [...v1Keys.all, 'admin', 'overview'] as const,
   adminActionLogs: () => [...v1Keys.all, 'admin', 'action-logs'] as const,

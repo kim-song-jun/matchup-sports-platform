@@ -22,6 +22,10 @@ const violations = [];
 const HAPNIDA_ALLOW = [
   'matches-create-client.tsx:299', // oldDefaults 비교 baseline(line 299, 비-UI) — 파일 전체 아닌 해당 라인만 면제
   'community.view-model.ts', // mock 채팅 사용자 콘텐츠
+  'src/components/auth/terms-client.tsx', // 약관·개인정보·대회 규정 법무성 문서는 합니다체 유지
+  'src/app/tournaments/[id]/apply/tournament-apply-client.tsx', // 대회 신청 약관·환불·촬영 동의 법무성 문구
+  'src/app/tournaments/[id]/tournament-detail-client.tsx', // 대회 상세 규정 요약 법무성 문구
+  'src/app/tournaments/[id]/my/my-registration-client.tsx', // 신청/입금/확정 고지성 문구
   'src/test/', // 테스트 fixture
 ];
 function checkHapnida() {

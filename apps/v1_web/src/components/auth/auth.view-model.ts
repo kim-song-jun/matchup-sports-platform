@@ -122,14 +122,14 @@ export function getTermsViewModel(): TermsViewModel {
         meta: '필수',
         required: true,
         checked: true,
-        detail: '팀밋 서비스 이용을 위한 기본 약관입니다.',
+        detail: '팀밋 서비스 이용을 위한 기본 약관이에요.',
       },
       {
         title: '개인정보 수집 및 이용 동의',
         meta: '필수',
         required: true,
         checked: true,
-        detail: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의입니다.',
+        detail: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
       },
       {
         title: '위치기반서비스 이용 동의',

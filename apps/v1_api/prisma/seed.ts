@@ -46,6 +46,31 @@ const scrypt = promisify(scryptCallback);
 const passwordKeyLength = 64;
 const passwordScheme = 'scrypt';
 
+type SeedMode = 'base' | 'demo' | 'coverage' | 'all';
+
+function resolveSeedMode(): SeedMode {
+  const modeArg = process.argv.find((arg) => arg.startsWith('--mode='));
+  const mode = (modeArg?.slice('--mode='.length) || process.env.V1_SEED_MODE || 'base').toLowerCase();
+  if (mode === 'base' || mode === 'demo' || mode === 'coverage' || mode === 'all') {
+    return mode;
+  }
+  throw new Error(`Unsupported V1 seed mode: ${mode}. Use base, demo, coverage, or all.`);
+}
+
+function assertDemoSeedAllowed(mode: SeedMode) {
+  if (mode === 'base') {
+    return;
+  }
+
+  const nodeEnv = process.env.NODE_ENV?.toLowerCase();
+  const allowDemoSeed = process.env.V1_ALLOW_DEMO_SEED === 'true';
+  if (nodeEnv === 'production' && !allowDemoSeed) {
+    throw new Error(
+      `Refusing to run v1 ${mode} seed in production. Set V1_ALLOW_DEMO_SEED=true only for a reviewed non-production/demo import.`,
+    );
+  }
+}
+
 async function seedRuntimeCheck() {
   await prisma.v1RuntimeCheck.upsert({
     where: { key: 'seed' },
@@ -409,7 +434,7 @@ async function seedRegions() {
   };
 }
 
-async function seedTermsAndNotice() {
+async function seedTermsAndNotice(includePublicNotices = false) {
   for (const [kind, title, required] of [
     [V1TermsKind.terms, 'Teameet v1 서비스 이용약관', true],
     [V1TermsKind.privacy, 'Teameet v1 개인정보 처리방침', true],
@@ -434,6 +459,10 @@ async function seedTermsAndNotice() {
         publishedAt: new Date('2026-05-18T00:00:00.000Z'),
       },
     });
+  }
+
+  if (!includePublicNotices) {
+    return;
   }
 
   const publicNotices = [
@@ -2390,10 +2419,18 @@ async function seedCoverageChatNotificationsAndAdmin(userIds: Record<string, str
 }
 
 async function main() {
+  const seedMode = resolveSeedMode();
+  assertDemoSeedAllowed(seedMode);
+
   await seedRuntimeCheck();
   const sportIds = await seedSports();
   const regions = await seedRegions();
-  await seedTermsAndNotice();
+  await seedTermsAndNotice(seedMode === 'demo' || seedMode === 'all');
+
+  if (seedMode === 'base') {
+    return;
+  }
+
   const userIds = await seedUsers();
 
   const runningLevel = await prisma.v1SportLevel.findFirstOrThrow({
@@ -2420,6 +2457,10 @@ async function main() {
   await seedChatAndNotifications(userIds, match.id, teamMatch.id);
   await seedHostChatDemoData(userIds, sportIds, regions.seoulSongpa.id, match.id, teamMatch.id, ownerTeam.id);
   await seedAdmin(userIds);
+
+  if (seedMode === 'demo') {
+    return;
+  }
 
   const coverageUserIds = { ...userIds, ...(await seedCoverageUsers()) };
   await seedCoverageTermsAndNotices();

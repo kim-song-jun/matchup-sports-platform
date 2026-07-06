@@ -63,7 +63,7 @@ ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
 
 echo "[INFO] Recreating api, v1_api, web, v1_web, nginx only (keeping postgres/redis running)..."
 echo "[INFO] Syncing v1 deploy database schema..."
-${COMPOSE} -f docker-compose.prod.yml --env-file .env run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma db push --skip-generate && ./node_modules/.bin/prisma migrate deploy"
+${COMPOSE} -f docker-compose.prod.yml --env-file .env run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps api
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps v1_api
@@ -112,7 +112,7 @@ for i in $(seq 1 45); do
   sleep 2
 done
 
-if [ "${DEPLOY_SYNC_V1_SEED_DATA:-true}" != "false" ]; then
+if [ "${DEPLOY_SYNC_V1_SEED_DATA:-false}" = "true" ]; then
   echo "[INFO] Syncing v1 seed data..."
   sudo docker exec teameet_v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed.ts"
 else

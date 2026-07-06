@@ -169,8 +169,8 @@ TOSS_WEBHOOK_SECRET=
 # Deploy-safe canonical mock sync (disable only with literal "false")
 DEPLOY_SYNC_MOCK_DATA=true
 
-# V1 preview seed sync (disable only with literal "false")
-DEPLOY_SYNC_V1_SEED_DATA=true
+# V1 seed sync (disabled by default; enable only for a reviewed base reference upsert)
+DEPLOY_SYNC_V1_SEED_DATA=false
 
 # V1 host admin email login password (8+ chars).
 # If left blank, seed.ts uses 11111111 for host@teameet.v1.
@@ -181,11 +181,11 @@ V1_HOST_ADMIN_PASSWORD=
 
 `DEPLOY_SYNC_MOCK_DATA`는 기본값이 `true`다. 운영자가 이 값을 정확히 `false`로 넣지 않는 한, 배포 시마다 checksum-gated mock sync가 실행되고 catalog checksum이 바뀌었을 때만 canonical mock dataset을 다시 반영한다. catalog는 KST 날짜 anchor를 포함하므로 날짜가 넘어가면 mock 일정도 다음 배포에서 함께 앞으로 이동한다.
 
-`DEPLOY_SYNC_V1_SEED_DATA`는 기본값이 `true`다. 운영자가 이 값을 정확히 `false`로 넣지 않는 한, GitHub Actions 배포의 container restart 단계에서 `teameet_v1_api` health 확인 후 `apps/v1_api/prisma/seed.ts`를 실행해 v1 프리뷰용 seed 데이터를 동기화한다.
+`DEPLOY_SYNC_V1_SEED_DATA`는 기본값이 `false`다. 운영자가 검토된 release에서 base reference upsert가 필요하다고 판단해 이 값을 정확히 `true`로 넣은 경우에만 GitHub Actions 배포의 container restart 단계에서 `teameet_v1_api` health 확인 후 `apps/v1_api/prisma/seed.ts`를 실행한다.
 
 v1 seed는 `host@teameet.v1` 계정을 `owner` 어드민으로 활성화하고 이메일 로그인 비밀번호를 설정한다. `V1_HOST_ADMIN_PASSWORD`가 설정되어 있으면 해당 값을 사용하고, 비어 있으면 기본값 `11111111`을 사용한다. GitHub Actions 배포를 쓰는 경우 repo secret `V1_HOST_ADMIN_PASSWORD`에 값을 등록하면 EC2 `deploy/.env`로 동기화된다.
 
-v1 프리뷰 DB는 배포 전 `prisma db push --skip-generate`로 현재 schema를 먼저 맞춘 뒤 `prisma migrate deploy`를 실행한다. v1은 preview runtime이므로 기존 persistent DB가 migration history와 drift된 상태여도 현재 Prisma schema 기준으로 회복시킨 다음 seed sync가 이어진다.
+v1 운영 DB는 배포 시 `prisma migrate deploy`만 실행한다. `prisma db push --skip-generate`는 운영 배포 경로에서 사용하지 않는다. v1 schema 변경은 반드시 `apps/v1_api/prisma/migrations/`에 migration 파일을 만든 뒤 배포한다.
 
 `HOSTNAME`은 운영 compose에서 `0.0.0.0`으로 고정한다. Next standalone가 container IP에만 bind하면 앱은 떠 있어도 `localhost` healthcheck가 실패해 `web`/`nginx` dependency gate가 깨질 수 있다.
 

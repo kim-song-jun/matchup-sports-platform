@@ -302,16 +302,17 @@ function weatherCodeLabel(code: number) {
 }
 
 function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard | null): HomeMatchCard {
+  const base = fallback ?? emptyMatchCard();
   return {
-    ...(fallback ?? emptyMatchCard()),
+    ...base,
     id: match.matchId,
     sportLabel: match.sportName,
     title: match.title,
-    venue: match.regionName ?? fallback.venue,
+    venue: match.regionName ?? base.venue,
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
-    currentParticipants: match.participantCount ?? fallback.currentParticipants,
-    maxParticipants: match.capacity ?? fallback.maxParticipants,
+    currentParticipants: match.participantCount ?? base.currentParticipants,
+    maxParticipants: match.capacity ?? base.maxParticipants,
     actionLabel: '승인제 신청',
   };
 }

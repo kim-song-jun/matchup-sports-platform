@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
-import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import type { V1TournamentListItem } from '@/types/api';
 
 /** 상금 금액 컴팩트 포맷 — 1만원 이상은 'N만원', 그 미만은 'N원'. */
 function formatPrizeShort(n: number): string {
@@ -17,9 +17,30 @@ function formatPrizeShort(n: number): string {
  * 매치 히어로(FeaturedMatchCard)와 동일한 풀폭 미디어+오버레이 비중으로 모집중 대회를 노출한다.
  * 일정이 가장 가까운 open 대회 1개를 고르고, open 대회가 없으면 렌더하지 않는다(빈 히어로 방지).
  */
-export function TournamentHeroCard() {
-  const { data } = useV1Tournaments({ status: 'open', limit: 5 });
-  const items = data?.items ?? [];
+export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
+  if (loading) {
+    return (
+      <Card pad={0} style={{ overflow: 'hidden' }} aria-busy="true">
+        <div
+          className="tm-featured-media"
+          style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
+        >
+          <div className="tm-featured-overlay" />
+          <div className="tm-featured-text">
+            <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>상금 대회 · 모집 중</div>
+            <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
+              추천 대회를 가져오고 있어요
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} aria-hidden="true" />
+          <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} aria-hidden="true" />
+        </div>
+      </Card>
+    );
+  }
+
   const featured = items
     .slice()
     .sort((a, b) => (a.scheduledAt ?? '~').localeCompare(b.scheduledAt ?? '~'))[0];

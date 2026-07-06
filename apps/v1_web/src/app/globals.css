@@ -2183,6 +2183,10 @@ button:disabled {
   padding-top: 12px;
 }
 
+.tm-team-description-input {
+  min-height: 112px;
+}
+
 .tm-create-native-input {
   width: 100%;
   min-width: 0;

@@ -172,8 +172,6 @@ export function useV1Register() {
       phone?: string;
       birthDate?: string;
       profileImageUrl?: string;
-      bio?: string;
-      visibilityStatus?: 'public' | 'members_only' | 'private';
       requiredTermsAccepted: boolean;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
@@ -1110,8 +1108,6 @@ export function useV1UpdateProfile() {
       profileImageUrl?: string | null;
       phone?: string | null;
       birthDate?: string | null;
-      bio?: string | null;
-      visibilityStatus: 'public' | 'members_only' | 'private';
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
     onSuccess: () => {
@@ -1137,7 +1133,6 @@ export function useV1UpdateSettings() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: {
-      visibilityStatus?: 'public' | 'members_only' | 'private';
       notifications?: Partial<V1Settings['notifications']>;
     }) => v1Patch<{ profile: V1Settings['profile']; notifications: V1Settings['notifications']; updatedAt: string }>('/me/settings', body),
     onSuccess: () => {

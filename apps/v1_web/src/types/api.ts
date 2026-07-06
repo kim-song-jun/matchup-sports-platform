@@ -50,7 +50,6 @@ export type V1AuthMe = {
     displayName: string;
     nickname?: string | null;
     avatarUrl?: string | null;
-    profileVisibility?: string;
     regionSummary?: string | null;
   };
   onboarding?: unknown;
@@ -1002,8 +1001,6 @@ export type V1Profile = {
     nickname?: string | null;
     profileImageUrl: string | null;
     birthDate?: string | null;
-    bio: string | null;
-    visibilityStatus: 'public' | 'members_only' | 'private';
   };
   reputation: {
     trustState: TrustState;
@@ -1012,7 +1009,6 @@ export type V1Profile = {
     reviewCount: number;
   };
   displayName?: string;
-  bio?: string;
   trustState?: TrustState;
 };
 
@@ -1021,8 +1017,6 @@ export type V1PublicProfile = {
   displayName: string;
   nickname: string | null;
   profileImageUrl: string | null;
-  bio: string | null;
-  visibilityStatus: 'public' | 'members_only' | 'private';
   reputation: {
     trustState: TrustState;
     mannerScore: number | null;
@@ -1065,7 +1059,6 @@ export type V1Settings = {
   };
   profile: {
     displayName: string;
-    visibilityStatus: 'public' | 'members_only' | 'private';
   };
   notifications: {
     matchEnabled: boolean;

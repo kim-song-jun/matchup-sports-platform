@@ -99,8 +99,6 @@ describe('AuthController', () => {
       phone: '01012345678',
       birthDate: '19900102',
       profileImageUrl: 'data:image/png;base64,profile',
-      bio: '주말 대회를 선호합니다.',
-      visibilityStatus: 'members_only' as const,
       requiredTermsAccepted: true,
     };
 

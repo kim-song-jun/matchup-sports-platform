@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateProfileDto {
@@ -30,13 +30,6 @@ export class UpdateProfileDto {
   @Matches(/^\d{8}$/)
   birthDate?: string | null;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  bio?: string | null;
-
-  @IsIn(['public', 'members_only', 'private'])
-  visibilityStatus!: 'public' | 'members_only' | 'private';
 }
 
 class SettingsNotificationsDto {
@@ -66,10 +59,6 @@ class SettingsNotificationsDto {
 }
 
 export class UpdateSettingsDto {
-  @IsOptional()
-  @IsIn(['public', 'members_only', 'private'])
-  visibilityStatus?: 'public' | 'members_only' | 'private';
-
   @IsOptional()
   @ValidateNested()
   @Type(() => SettingsNotificationsDto)

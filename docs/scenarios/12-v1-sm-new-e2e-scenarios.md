@@ -336,7 +336,7 @@ DB evidence:
 | ID | Scenario | Expected E2E assertion |
 |---|---|---|
 | V1-07-001 | My page summary | Profile, reputation, activity links, and trust state render from API |
-| V1-07-002 | Edit profile | Nickname/bio/avatar visibility validation and persistence after reload |
+| V1-07-002 | Edit profile | Nickname/avatar validation and persistence after reload |
 | V1-07-003 | Public profile trust labels | verified/estimated/sample/none are visually distinct and not misleading |
 | V1-07-004 | My matches joined/created | Toggle uses correct API role and opens correct manage/detail route |
 | V1-07-005 | Created match manage from My | Applicant approval/rejection works from My route and reflects in detail |

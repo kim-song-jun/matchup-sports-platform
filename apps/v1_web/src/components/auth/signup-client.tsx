@@ -19,7 +19,6 @@ import { AuthFrame } from './auth-page';
 
 type WizardStep = 'account' | 'profile';
 type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
-type VisibilityStatus = 'public' | 'private';
 
 const STEP_ORDER: WizardStep[] = ['account', 'profile'];
 
@@ -58,8 +57,6 @@ export function SignupClient() {
   const [displayName, setDisplayName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
-  const [bio, setBio] = useState('');
-  const [visibilityStatus, setVisibilityStatus] = useState<VisibilityStatus>('public');
   const [requiredTermsAccepted, setRequiredTermsAccepted] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -216,8 +213,6 @@ export function SignupClient() {
         password,
         phone: phoneDigits || undefined,
         birthDate: birthDateDigits || undefined,
-        bio: bio.trim() || undefined,
-        visibilityStatus,
         requiredTermsAccepted,
       });
 
@@ -237,8 +232,6 @@ export function SignupClient() {
           profileImageUrl: uploadedUrl,
           phone: phoneDigits || null,
           birthDate: birthDateDigits || null,
-          bio: bio.trim() || null,
-          visibilityStatus,
         });
       }
 
@@ -521,25 +514,6 @@ export function SignupClient() {
                 />
               </label>
 
-              <label className="tm-auth-field">
-                <span className="tm-text-label">소개 <em className="tm-auth-optional">(선택)</em></span>
-                <textarea
-                  className="tm-input tm-create-input-multiline"
-                  maxLength={500}
-                  onChange={(event) => setBio(event.target.value)}
-                  placeholder="운동 스타일이나 선호하는 경기 방식을 적어주세요."
-                  rows={4}
-                  value={bio}
-                />
-              </label>
-
-              <label className="tm-auth-field">
-                <span className="tm-text-label">공개 여부</span>
-                <select className="tm-input tm-input-select" value={visibilityStatus} onChange={(event) => setVisibilityStatus(event.target.value as VisibilityStatus)}>
-                  <option value="public">전체 공개</option>
-                  <option value="private">비공개</option>
-                </select>
-              </label>
             </>
           ) : null}
         </form>

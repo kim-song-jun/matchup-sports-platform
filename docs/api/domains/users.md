@@ -27,7 +27,7 @@
 - 주요 필드:
   - `id`, `email`, `nickname`
   - `profileImageUrl`
-  - `bio`, `phone`
+  - `phone`
   - `gender`, `birthYear`
   - `locationCity`, `locationDistrict`
   - 서비스에 따라 manner/reputation 요약 필드가 포함될 수 있음
@@ -61,7 +61,6 @@
 | `phone` | string | No | No |
 | `gender` | Gender (`male`, `female`) | No | No |
 | `birthYear` | int(1950~2015) | No | No |
-| `bio` | string | No | No |
 | `locationCity` | string | No | No |
 | `locationDistrict` | string | No | No |
 
@@ -173,9 +172,10 @@ CAUTION:
 - 공개 프로필용이며 일부 private field는 제외
 - `GET /users/me`와 동일 shape를 보장하지 않는다.
 - 프론트는 public profile page에서 `email`, `phone` 같은 private 필드를 기대하지 않는다.
-- 공개 또는 팀원 공개 프로필은 `displayName`, `nickname`, `profileImageUrl`, `bio`, `reputation`, `activitySummary`를 반환한다.
+- 공개 프로필은 `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`를 반환한다.
+- 공개 프로필은 `email`, `phone`, `birthDate`, `gender`, `bio`를 반환하지 않는다.
 - `activitySummary`는 누적 경기 수, 활동 팀 수, 받은 후기 수와 이번 달 경기/팀 가입/후기 수를 포함한다.
-- 비공개 프로필은 `visibilityStatus: "private"`와 `activitySummary: null`만 신뢰하고, 상세 활동 지표를 노출하지 않는다.
+- 사용자 공개/비공개 선택 상태는 v1 공개 프로필 계약에 포함하지 않는다.
 
 ## Permission / Ownership Rules
 

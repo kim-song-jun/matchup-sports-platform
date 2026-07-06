@@ -97,7 +97,7 @@ export function getHomeViewModel(): HomeViewModel {
       trustState: '-',
       pending: '대기 없음',
     },
-    featuredMatch: sortedMatches[0],
+    featuredMatch: sortedMatches[0] ?? null,
     recommendedMatches: matches,
     quickActions: [
       { key: 'matches', label: '매치', sub: '개인 경기', href: '/matches', color: 'var(--blue500)' },

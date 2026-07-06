@@ -60,7 +60,7 @@ export type HomeViewModel = {
   chatRooms: HomeChatRoom[];
   retry?: () => void;
   stats: HomeStats;
-  featuredMatch: HomeMatchCard;
+  featuredMatch: HomeMatchCard | null;
   recommendedMatches: HomeMatchCard[];
   quickActions: HomeQuickAction[];
   weather: {

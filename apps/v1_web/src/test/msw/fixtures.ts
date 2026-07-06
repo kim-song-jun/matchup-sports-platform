@@ -123,10 +123,10 @@ export const v1NoticesFixture: V1Notice[] = [
   },
   {
     id: 'notice-4',
-    title: '프로필 공개 범위 안내',
+    title: '계정 보안 안내',
     category: '안내',
     publishedAt: '2026-05-15T00:00:00.000Z',
-    body: '닉네임, 활동 지역, 선호 종목 공개 범위 기준을 안내합니다.',
+    body: '이메일, 휴대폰 번호, 생년월일 같은 개인정보는 공개 프로필에 노출하지 않습니다.',
   },
 ];
 
@@ -584,8 +584,6 @@ export const v1ProfileFixture: V1Profile = {
   profile: {
     displayName: '송준',
     profileImageUrl: null,
-    bio: '풋살과 러닝을 중심으로 활동 중입니다.',
-    visibilityStatus: 'public',
   },
   reputation: {
     trustState: 'sample',
@@ -595,7 +593,6 @@ export const v1ProfileFixture: V1Profile = {
   },
   displayName: '송준',
   regionName: '서울 강동',
-  bio: '풋살과 러닝을 중심으로 활동 중입니다.',
   trustState: 'sample',
 };
 
@@ -608,7 +605,6 @@ export const v1SettingsFixture: V1Settings = {
   },
   profile: {
     displayName: '송준',
-    visibilityStatus: 'public',
   },
   notifications: {
     matchEnabled: true,

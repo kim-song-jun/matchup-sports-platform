@@ -15,12 +15,13 @@ export function HomePageClient() {
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
   const chatStatus: HomeViewModel['chatStatus'] = chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
   const chatRoomSummaries = chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
+  const nonDataFallback = withoutHomeContent(fallback);
 
   if (query.isError) {
     return (
       <HomePageView
         model={{
-          ...fallback,
+          ...nonDataFallback,
           network: true,
           hasNewNotification: false,
           chatUnreadCount,
@@ -46,10 +47,19 @@ export function HomePageClient() {
               weatherRefreshing,
               refreshWeather,
             }
-          : { ...fallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
+          : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
       }
     />
   );
+}
+
+function withoutHomeContent(model: HomeViewModel): HomeViewModel {
+  return {
+    ...model,
+    featuredMatch: null,
+    recommendedMatches: [],
+    notices: [],
+  };
 }
 
 function toHomeModel(
@@ -76,7 +86,7 @@ function toHomeModel(
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),
     weather: weather ?? fallback.weather,
-    notices: normalizeNotices(home, fallback),
+    notices: normalizeNotices(home),
   };
 }
 
@@ -131,13 +141,15 @@ function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {
   };
 }
 
-function normalizeFeaturedMatch(home: V1Home, recommendedMatches: HomeMatchCard[], fallback: HomeViewModel): HomeMatchCard {
+function normalizeFeaturedMatch(home: V1Home, recommendedMatches: HomeMatchCard[], fallback: HomeViewModel): HomeMatchCard | null {
+  if (!home.featuredMatch) return recommendedMatches[0] ?? null;
+
   const recommended =
     recommendedMatches.find((match) => match.id === home.featuredMatch?.matchId) ??
     recommendedMatches[0] ??
     fallback.featuredMatch;
 
-  if (!home.featuredMatch) return recommended;
+  if (!recommended) return null;
 
   return {
     ...recommended,
@@ -158,10 +170,10 @@ function normalizeMatches(home: V1Home, fallback: HomeViewModel) {
   const recommendations = Array.isArray(home.recommendations) ? home.recommendations : [];
   return recommendations.length
     ? recommendations.map((match, index) => toHomeRecommendation(match, fallback.recommendedMatches[index] ?? fallback.featuredMatch))
-    : fallback.recommendedMatches;
+    : [];
 }
 
-function normalizeNotices(home: V1Home, fallback: HomeViewModel) {
+function normalizeNotices(home: V1Home) {
   const notices = Array.isArray(home.notices) ? home.notices : [];
   if (notices.length) return notices.map(toHomeNotice);
   if (home.notice) {
@@ -175,7 +187,7 @@ function normalizeNotices(home: V1Home, fallback: HomeViewModel) {
     ];
   }
 
-  return fallback.notices;
+  return [];
 }
 
 function normalizeShortcuts(shortcuts: V1HomeShortcut[] | undefined, fallback: HomeQuickAction[]) {
@@ -289,9 +301,9 @@ function weatherCodeLabel(code: number) {
   return '날씨 정보 없음';
 }
 
-function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard): HomeMatchCard {
+function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard | null): HomeMatchCard {
   return {
-    ...fallback,
+    ...(fallback ?? emptyMatchCard()),
     id: match.matchId,
     sportLabel: match.sportName,
     title: match.title,
@@ -304,11 +316,11 @@ function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCa
   };
 }
 
-function toHomeMatch(match: V1Match, fallback: HomeMatchCard): HomeMatchCard {
+function toHomeMatch(match: V1Match, fallback: HomeMatchCard | null): HomeMatchCard {
   const capacity = parseCapacity(match.capacityText);
 
   return {
-    ...fallback,
+    ...(fallback ?? emptyMatchCard()),
     id: match.id,
     sportLabel: match.sportName,
     title: match.title,
@@ -318,6 +330,22 @@ function toHomeMatch(match: V1Match, fallback: HomeMatchCard): HomeMatchCard {
     currentParticipants: capacity.current,
     maxParticipants: capacity.capacity,
     actionLabel: '승인제 신청',
+  };
+}
+
+function emptyMatchCard(): HomeMatchCard {
+  return {
+    id: '',
+    sport: 'match',
+    sportLabel: '',
+    title: '',
+    venue: '',
+    date: '',
+    time: '',
+    currentParticipants: 0,
+    maxParticipants: 1,
+    actionLabel: '',
+    imageUrl: '/mock/generated/team-huddle.webp',
   };
 }
 

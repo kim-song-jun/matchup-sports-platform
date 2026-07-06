@@ -19,6 +19,9 @@ import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
+  const hasFeaturedContent = model.network || Boolean(model.featuredMatch);
+  const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
+  const hasNotices = model.notices.length > 0;
 
   return (
     <AppChrome
@@ -81,20 +84,25 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           </div>
 
           {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
+          {hasFeaturedContent ? (
           <div className="tm-home-featured-block">
             <div style={{ marginBottom: 10 }}>
               <div className="tm-text-label">오늘의 추천</div>
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
             </div>
             <div className="tm-home-featured-carousel">
-              <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+              {model.featuredMatch ? (
+                <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+              ) : null}
               <TournamentHeroCard />
             </div>
           </div>
+          ) : null}
 
           <HomeChatSummary model={model} />
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
+          {hasRecommendedMatches ? (
           <div className="tm-home-matches-block">
             <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '내 실력에 맞는 매치 추천'} action="전체보기" actionHref="/matches" />
             {model.network ? (
@@ -106,6 +114,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               <RecommendedMatchRail matches={model.recommendedMatches} />
             )}
           </div>
+          ) : null}
 
         </div>{/* /tm-home-main */}
 
@@ -141,6 +150,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           </div>
 
           {/* Notices */}
+          {hasNotices ? (
           <div>
             {/* .tm-home-sidebar-notices gives the panel a card surface on desktop.
                 The inner div retains the original mobile inline padding. */}
@@ -158,6 +168,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               </div>
             </div>
           </div>
+          ) : null}
 
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
           <SidebarTournamentsWidget />

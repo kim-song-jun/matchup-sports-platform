@@ -35,8 +35,6 @@ export class AuthService {
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
-    const bio = dto.bio?.trim() || null;
-    const visibility = dto.visibilityStatus ?? 'public';
 
     if (birthDate && !isValidBirthDate(birthDate)) {
       throw new BadRequestException({
@@ -113,8 +111,7 @@ export class AuthService {
             gender: dto.gender ?? null,
             birthDate,
             profileImageUrl,
-            bio,
-            visibility,
+            visibility: 'public',
           },
         },
         onboardingProgress: {
@@ -641,7 +638,6 @@ export class AuthService {
         displayName: user.profile?.displayName ?? user.profile?.nickname ?? 'Teameet user',
         nickname: user.profile?.nickname ?? null,
         avatarUrl: user.profile?.profileImageUrl ?? null,
-        profileVisibility: user.profile?.visibility ?? 'public',
         regionSummary: user.profile?.displayRegion ?? user.regions[0]?.region.name ?? null,
       },
       onboarding,

@@ -46,7 +46,7 @@ export const myHomeModel: MyHomeViewModel = {
       title: '설정',
       items: [
         { label: '운동 정보', sub: '종목, 난이도, 기본 활동 지역을 관리해요', href: '/my/settings/sports', icon: 'Dumbbell' },
-        { label: '계정 설정', sub: '프로필 공개 범위와 보안을 관리해요', href: '/my/settings', icon: 'Settings' },
+        { label: '계정 설정', sub: '계정 보안과 알림을 관리해요', href: '/my/settings', icon: 'Settings' },
       ],
     },
   ],

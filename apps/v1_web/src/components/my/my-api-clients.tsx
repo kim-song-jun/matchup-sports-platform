@@ -299,8 +299,6 @@ export function ProfileEditPageClient() {
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
-  const [bio, setBio] = useState('');
-  const [visibilityStatus, setVisibilityStatus] = useState<'public' | 'members_only' | 'private'>('public');
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
@@ -314,8 +312,6 @@ export function ProfileEditPageClient() {
     setBirthDateDigits(profile.data.profile.birthDate ?? '');
     setProfileImageUrl(profile.data.profile.profileImageUrl ?? '');
     setProfileImageName('');
-    setBio(profile.data.profile.bio ?? '');
-    setVisibilityStatus(profile.data.profile.visibilityStatus);
     setNicknameCheck({ status: 'idle', value: '' });
     setEmailCheck({ status: 'idle', value: '' });
   }, [profile.data]);
@@ -458,11 +454,9 @@ export function ProfileEditPageClient() {
         displayName: displayName.trim(),
         nickname: normalizedNickname,
         email: normalizedEmail,
-        bio,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
         birthDate: birthDateDigits || null,
-        visibilityStatus,
       });
       router.replace('/my');
     } catch (nextError) {
@@ -626,21 +620,6 @@ export function ProfileEditPageClient() {
           />
           {fieldErrors.birthDate ? <span id="profile-birthDate-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.birthDate}</span> : null}
         </label>
-        <label className="tm-create-field">
-          <span className="tm-text-label">소개</span>
-          {/* #25: rows=4 + min-height 100px — 프로필 소개는 좀 더 넓게 */}
-          <textarea className="tm-input tm-create-input-multiline" value={bio} onChange={(event) => setBio(event.target.value)} maxLength={500} rows={4} />
-        </label>
-        <label className="tm-create-field">
-          <span className="tm-text-label">공개 범위</span>
-          {/* (3) OS 기본 ▾ 대신 커스텀 SVG chevron — appearance:none + background-image */}
-          <select className="tm-input tm-input-select" value={visibilityStatus} onChange={(event) => setVisibilityStatus(event.target.value as typeof visibilityStatus)}>
-            <option value="public">전체 공개</option>
-            <option value="members_only">멤버 공개</option>
-            <option value="private">비공개</option>
-          </select>
-        </label>
-
         <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
@@ -1264,7 +1243,7 @@ function toMyHomeModel(
       region: profile.regionName ?? '지역 미정',
       initials: initials(nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
-      intro: profile.profile.bio ?? '',
+      intro: '',
       sports: (profile.sports ?? []).map((sport) =>
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,
       ),

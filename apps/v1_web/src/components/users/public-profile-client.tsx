@@ -46,17 +46,14 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 className="tm-text-heading" style={{ margin: 0 }}>{data.displayName}</h1>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>{nickname}</div>
-            {data.bio ? (
-              <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.5 }}>{data.bio}</div>
-            ) : null}
           </div>
         </section>
 
-        {data.visibilityStatus === 'private' || !activitySummary ? (
+        {!activitySummary ? (
           <Card pad={16}>
-            <div className="tm-text-body-lg">비공개 프로필</div>
+            <div className="tm-text-body-lg">활동 요약 없음</div>
             <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.5 }}>
-              이 사용자는 활동 요약을 공개하지 않았어요.
+              아직 공개할 활동 요약이 없어요.
             </div>
           </Card>
         ) : (

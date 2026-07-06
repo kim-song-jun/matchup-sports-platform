@@ -7,7 +7,7 @@
 | `GET` | `/api/v1/me/profile` | user | headers only | current user's profile |
 | `GET` | `/api/v1/me/activity-summary` | user | headers only | current user's activity/team/manner/monthly summary |
 | `PATCH` | `/api/v1/me/profile` | user | `UpdateProfileDto` | updated profile |
-| `GET` | `/api/v1/users/:userId/public-profile` | optional/user by visibility | path id | public profile |
+| `GET` | `/api/v1/users/:userId/public-profile` | optional | path id | public-safe profile |
 | `GET` | `/api/v1/me/settings` | user | headers only | settings aggregate |
 | `PATCH` | `/api/v1/me/settings` | user | `UpdateSettingsDto` | updated settings |
 | `POST` | `/api/v1/auth/logout` | user | empty body | no-op logout result |
@@ -40,14 +40,11 @@
 - Authenticated profile edit uploads selected image files through `POST /api/v1/uploads` first and saves the returned root-relative URL. The edit screen must not persist a local `data:` preview as if it were an uploaded profile image.
 - `phone?: string | null`; when present, 11 digits only; duplicate phone returns `PHONE_CONFLICT`
 - `birthDate?: string | null`; when present, 8 digit `YYYYMMDD` and a valid calendar date
-- `bio?: string | null`, max 500
-- `visibilityStatus: "public" | "members_only" | "private"`
 
 Profile edit UI must keep the same duplicate-check behavior as signup for changed `nickname` and `email`. Unchanged values do not require another duplicate check.
 
 `UpdateSettingsDto`:
 
-- `visibilityStatus?: "public" | "members_only" | "private"`
 - `notifications?: { matchEnabled?, teamEnabled?, teamMatchEnabled?, chatEnabled?, noticeEnabled?, marketingEnabled? }`
 
 `GET /me/activity-summary` response:
@@ -61,9 +58,9 @@ Profile edit UI must keep the same duplicate-check behavior as signup for change
 
 `GET /users/:userId/public-profile` response:
 
-- Optional auth. Public and members-only profiles are readable from user-facing surfaces such as team member lists and join request lists.
-- Private fields such as email and phone are never returned.
-- Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`, `bio`, `visibilityStatus`.
+- Optional auth. Public-safe profiles are readable from user-facing surfaces such as team member lists and join request lists.
+- Private fields such as email, phone, birth date, gender, and profile bio are never returned.
+- Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`.
 - Returned trust field: `reputation.mannerScore`, `reputation.reviewCount`, `reputation.trustState`.
 - Returned public activity summary:
   - `totals.matchCount`: completed match participation count
@@ -72,7 +69,7 @@ Profile edit UI must keep the same duplicate-check behavior as signup for change
   - `monthly.matchCount`: current-month completed match participation count
   - `monthly.teamJoinCount`: current-month active team join count
   - `monthly.reviewCount`: current-month submitted user review count
-- Private profiles return `visibilityStatus: "private"` and `activitySummary: null`; clients must not render hidden metrics.
+- User profile visibility controls are not part of the v1 user-facing contract; clients must treat public profile data as public-safe by field, not by a user-selected visibility state.
 
 ## State And Copy
 

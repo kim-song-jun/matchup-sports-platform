@@ -156,8 +156,6 @@ export class ProfileService {
           nickname,
           profileImageUrl,
           birthDate,
-          bio: dto.bio ?? null,
-          visibility: dto.visibilityStatus,
         },
         create: {
           userId: user.id,
@@ -165,8 +163,7 @@ export class ProfileService {
           nickname,
           profileImageUrl,
           birthDate,
-          bio: dto.bio ?? null,
-          visibility: dto.visibilityStatus,
+          visibility: 'public',
         },
       });
     });
@@ -189,22 +186,8 @@ export class ProfileService {
         displayName: '탈퇴한 사용자',
         nickname: null,
         profileImageUrl: null,
-        bio: null,
-        visibilityStatus: 'private',
         reputation: emptyReputation(),
         activitySummary: emptyPublicActivitySummary(),
-      };
-    }
-    if (user.profile?.visibility === 'private') {
-      return {
-        userId: user.id,
-        displayName: user.profile.displayName ?? user.profile.nickname,
-        nickname: user.profile.nickname ?? null,
-        profileImageUrl: null,
-        bio: null,
-        visibilityStatus: 'private',
-        reputation: emptyReputation(),
-        activitySummary: null,
       };
     }
 
@@ -215,8 +198,6 @@ export class ProfileService {
       displayName: user.profile?.displayName ?? user.profile?.nickname ?? '사용자',
       nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
-      bio: user.profile?.bio ?? null,
-      visibilityStatus: normalizeVisibility(user.profile?.visibility),
       reputation: toReputationPayload(user.reputationSummary),
       activitySummary,
     };
@@ -298,7 +279,6 @@ export class ProfileService {
       },
       profile: {
         displayName: snapshot.profile?.displayName ?? snapshot.profile?.nickname ?? '사용자',
-        visibilityStatus: normalizeVisibility(snapshot.profile?.visibility),
       },
       notifications: toSettingsNotifications(preferences),
     };
@@ -307,18 +287,7 @@ export class ProfileService {
   async updateSettings(user: V1AuthUser, dto: UpdateSettingsDto) {
     this.assertMutableAccount(user);
     const [profile, preferences] = await this.prisma.$transaction(async (tx) => {
-      const nextProfile = dto.visibilityStatus
-        ? await tx.v1UserProfile.upsert({
-            where: { userId: user.id },
-            update: { visibility: dto.visibilityStatus },
-            create: {
-              userId: user.id,
-              nickname: user.email ?? '사용자',
-              displayName: user.email ?? '사용자',
-              visibility: dto.visibilityStatus,
-            },
-          })
-        : await tx.v1UserProfile.findUnique({ where: { userId: user.id } });
+      const nextProfile = await tx.v1UserProfile.findUnique({ where: { userId: user.id } });
 
       const notificationInput = dto.notifications ?? {};
       const individualNotifications = {
@@ -354,7 +323,7 @@ export class ProfileService {
     });
 
     return {
-      profile: { visibilityStatus: normalizeVisibility(profile?.visibility) },
+      profile: { displayName: profile?.displayName ?? profile?.nickname ?? '사용자' },
       notifications: toSettingsNotifications(preferences),
       updatedAt: preferences.updatedAt,
     };
@@ -641,16 +610,12 @@ function toProfilePayload(profile: {
   displayName: string | null;
   profileImageUrl: string | null;
   birthDate: string | null;
-  bio: string | null;
-  visibility: string;
 } | null) {
   return {
     displayName: profile?.displayName ?? profile?.nickname ?? '사용자',
     nickname: profile?.nickname ?? null,
     profileImageUrl: profile?.profileImageUrl ?? null,
     birthDate: profile?.birthDate ?? null,
-    bio: profile?.bio ?? null,
-    visibilityStatus: normalizeVisibility(profile?.visibility),
   };
 }
 
@@ -676,11 +641,6 @@ function emptyPublicActivitySummary() {
     totals: { matchCount: 0, teamCount: 0, reviewCount: 0 },
     monthly: { matchCount: 0, teamJoinCount: 0, reviewCount: 0 },
   };
-}
-
-function normalizeVisibility(value?: string | null) {
-  if (value === 'members_only' || value === 'private') return value;
-  return 'public';
 }
 
 function toSettingsNotifications(preferences: {

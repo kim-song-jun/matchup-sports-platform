@@ -93,7 +93,6 @@ function OrderSummaryCard({
 }) {
   // Hide payment-related rows on step 'team' (not yet entered)
   const showPaymentRows = step !== 'team';
-  const prizeText = tournament.prizeSummary?.trim() ?? '';
 
   return (
     <Card
@@ -118,15 +117,8 @@ function OrderSummaryCard({
         <InfoRow
           label="참가비"
           value={formatEntryFee(tournament.entryFee)}
-          isLast={!showPaymentRows && !prizeText}
+          isLast={!showPaymentRows}
         />
-        {prizeText ? (
-          <InfoRow
-            label="상품 및 상금"
-            value={prizeText}
-            isLast={!showPaymentRows}
-          />
-        ) : null}
         {showPaymentRows ? (
           <>
             <InfoRow label="결제 수단" value="계좌이체" />

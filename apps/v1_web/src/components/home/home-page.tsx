@@ -14,12 +14,15 @@ import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, Weath
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
+import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
-  const hasFeaturedContent = model.network || Boolean(model.featuredMatch);
+  const tournaments = useV1Tournaments({ status: 'open', limit: 5 });
+  const tournamentItems = tournaments.data?.items ?? [];
+  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournamentItems.length > 0;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
 
   return (
@@ -93,7 +96,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               {model.featuredMatch ? (
                 <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
               ) : null}
-              <TournamentHeroCard />
+              <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
             </div>
           </div>
           ) : null}
@@ -174,7 +177,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           </div>
 
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
-          <SidebarTournamentsWidget />
+          <SidebarTournamentsWidget items={tournamentItems} loading={tournaments.isLoading} />
 
         </div>{/* /tm-home-sidebar */}
 
@@ -430,9 +433,8 @@ function FeaturedMatchCard({
  * 우측 사이드바 하단의 빈 공간(~830px)을 채워 레이아웃 균형을 맞춘다.
  * 모바일(<1024px)에서는 display:contents인 .tm-home-sidebar 덕분에 DOM 순서상 notices 아래에 자연스럽게 흐른다.
  */
-function SidebarTournamentsWidget() {
-  const { data, isLoading } = useV1Tournaments({ status: 'open', limit: 4 });
-  const items = (data?.items ?? []).slice(0, 4);
+function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListItem[]; loading: boolean }) {
+  const visibleItems = items.slice(0, 4);
 
   return (
     <div className="tm-home-sidebar-notices">
@@ -447,7 +449,7 @@ function SidebarTournamentsWidget() {
         </Link>
       </div>
 
-      {isLoading ? (
+      {loading ? (
         /* [P2 UX 라이팅] 능동형 로딩 안내 */
         <div
           className="tm-text-caption"
@@ -457,7 +459,7 @@ function SidebarTournamentsWidget() {
         >
           대회 목록을 가져오고 있어요…
         </div>
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <div
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', paddingTop: 8 }}
@@ -466,7 +468,7 @@ function SidebarTournamentsWidget() {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
-          {items.map((t) => {
+          {visibleItems.map((t) => {
             const dateLabel = formatTournamentDateShort(t.scheduledAt);
             return (
               <Link

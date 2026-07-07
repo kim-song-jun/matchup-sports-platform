@@ -28,6 +28,7 @@ function tournamentCard(overrides: Record<string, unknown> = {}) {
     status: 'open',
     registrationDeadlineAt: null,
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
+    scheduledEndAt: null,
     venue: '서울 풋살장',
     teamCount: 8,
     entryFee: 60000,
@@ -72,6 +73,7 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     status: 'open',
     registrationDeadlineAt: null,
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
+    scheduledEndAt: null,
     venue: '서울 풋살장',
     teamCount: 8,
     minPlayers: 6,
@@ -394,12 +396,14 @@ describe('TournamentsReadService', () => {
 
   it('get: DateTime fields are serialized as ISO strings', async () => {
     const scheduledDate = new Date('2026-07-01T09:00:00.000Z');
-    const row = fullTournamentRow({ scheduledAt: scheduledDate });
+    const scheduledEndDate = new Date('2026-07-02T09:00:00.000Z');
+    const row = fullTournamentRow({ scheduledAt: scheduledDate, scheduledEndAt: scheduledEndDate });
     prisma.v1Tournament.findFirst.mockResolvedValue(row);
 
     const result = await service.get('tournament-1');
 
     expect(result.scheduledAt).toBe(scheduledDate.toISOString());
+    expect(result.scheduledEndAt).toBe(scheduledEndDate.toISOString());
     expect(result.createdAt).toBe(new Date('2026-06-01T00:00:00.000Z').toISOString());
   });
 });

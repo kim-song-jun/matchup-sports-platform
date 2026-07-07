@@ -149,6 +149,14 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
+function formatDateRange(startStr: string | null, endStr: string | null): string {
+  const start = formatDate(startStr);
+  if (start === '—') return start;
+  const end = formatDate(endStr);
+  if (end === '—' || end === start) return start;
+  return `${start} ~ ${end}`;
+}
+
 function formatCurrency(n: number): string {
   if (n === 0) return '무료';
   return `${n.toLocaleString('ko-KR')}원`;
@@ -1828,6 +1836,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editScheduledAt, setEditScheduledAt] = useState('');
+  const [editScheduledEndAt, setEditScheduledEndAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editEntryFee, setEditEntryFee] = useState('');
@@ -1869,6 +1878,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     if (!tournament) return;
     setEditTitle(tournament.title);
     setEditScheduledAt(tournament.scheduledAt ? tournament.scheduledAt.slice(0, 16) : '');
+    setEditScheduledEndAt(tournament.scheduledEndAt ? tournament.scheduledEndAt.slice(0, 16) : '');
     setEditDeadlineAt(tournament.registrationDeadlineAt ? tournament.registrationDeadlineAt.slice(0, 16) : '');
     setEditVenue(tournament.venue ?? '');
     setEditEntryFee(String(tournament.entryFee));
@@ -1915,6 +1925,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     const payload: V1UpdateTournamentPayload = {};
     if (editTitle.trim()) payload.title = editTitle.trim();
     if (editScheduledAt) payload.scheduledAt = new Date(editScheduledAt).toISOString();
+    payload.scheduledEndAt = editScheduledEndAt ? new Date(editScheduledEndAt).toISOString() : null;
     if (editDeadlineAt) payload.registrationDeadlineAt = new Date(editDeadlineAt).toISOString();
     if (editVenue.trim()) payload.venue = editVenue.trim();
     const fee = Number(editEntryFee);
@@ -2073,6 +2084,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   }
 
   const nextStatuses = allowedNextStatuses(tournament.status);
+  const scheduleLabel = formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt);
 
 
   return (
@@ -2093,7 +2105,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <AdminPageHeader
         eyebrow="대회 관리"
         title={tournament.title}
-        description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${formatDate(tournament.scheduledAt)}`}
+        description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${scheduleLabel}`}
       />
 
       {/* ── Status change actions (f9: separate row, flex-wrap, h-[44px]) ── */}
@@ -2154,7 +2166,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             { label: '신청 수', value: `${tournament.registrationCount}팀` },
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
-            { label: '대회 일정', value: formatDate(tournament.scheduledAt) },
+            { label: '대회 일정', value: scheduleLabel },
             { label: '상품 및 상금', value: tournament.prizeSummary || '—' },
           ].map(({ label, value }) => (
             <div key={label}>
@@ -2381,12 +2393,23 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="edit-scheduled-at" className="text-[13px] text-gray-900">대회 일정</label>
+              <label htmlFor="edit-scheduled-at" className="text-[13px] text-gray-900">대회 시작</label>
               <input
                 id="edit-scheduled-at"
                 type="datetime-local"
                 value={editScheduledAt}
                 onChange={(e) => setEditScheduledAt(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-scheduled-end-at" className="text-[13px] text-gray-900">대회 종료</label>
+              <input
+                id="edit-scheduled-end-at"
+                type="datetime-local"
+                value={editScheduledEndAt}
+                onChange={(e) => setEditScheduledEndAt(e.target.value)}
                 disabled={updateTournament.isPending}
                 className={inputCls}
               />

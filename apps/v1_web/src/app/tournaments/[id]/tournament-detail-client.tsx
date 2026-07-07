@@ -10,7 +10,12 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
-import { formatTournamentDateShort, formatTournamentDateLong, formatEntryFee } from '@/lib/date-utils';
+import {
+  formatTournamentDateShort,
+  formatTournamentDateRangeShort,
+  formatTournamentDateLong,
+  formatEntryFee,
+} from '@/lib/date-utils';
 import type {
   V1TournamentDetail,
   V1TournamentFormat,
@@ -475,7 +480,7 @@ function TournamentDetailView({
           </div>
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
-            <InfoRow label="일정" value={formatTournamentDateShort(tournament.scheduledAt) ?? '미정'} />
+            <InfoRow label="일정" value={formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
             <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
           {/* 항상 표시 */}
@@ -596,7 +601,7 @@ function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {formatTournamentDateShort(tournament.scheduledAt) ?? '미정'}
+            {formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}
           </span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

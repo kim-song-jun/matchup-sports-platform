@@ -1,6 +1,7 @@
 import type {
   CursorPage,
   V1AdminLog,
+  V1AdminNoticeRow,
   V1AdminOverview,
   V1ChatMessage,
   V1ChatRoom,
@@ -129,6 +130,20 @@ export const v1NoticesFixture: V1Notice[] = [
     body: '이메일, 휴대폰 번호, 생년월일 같은 개인정보는 공개 프로필에 노출하지 않습니다.',
   },
 ];
+
+export const v1AdminNoticesFixture: V1AdminNoticeRow[] = v1NoticesFixture.map((notice) => ({
+  noticeId: notice.id ?? notice.noticeId ?? 'notice',
+  audience: (notice.audience ?? 'public') as V1AdminNoticeRow['audience'],
+  category: (notice.category ?? '안내') as V1AdminNoticeRow['category'],
+  pinned: notice.category === '고정',
+  title: notice.title,
+  body: notice.body ?? '',
+  status: 'published',
+  publishedAt: notice.publishedAt,
+  archivedAt: null,
+  createdAt: notice.publishedAt,
+  updatedAt: notice.publishedAt,
+}));
 
 export const v1MatchesFixture: V1Match[] = [
   {

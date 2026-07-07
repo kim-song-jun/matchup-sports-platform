@@ -73,6 +73,10 @@ export class CreateTournamentDto {
   scheduledAt?: string;
 
   @IsOptional()
+  @IsDateString()
+  scheduledEndAt?: string | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
@@ -267,6 +271,10 @@ export class UpdateTournamentDto {
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledEndAt?: string | null;
 
   @IsOptional()
   @IsString()

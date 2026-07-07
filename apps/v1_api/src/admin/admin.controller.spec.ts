@@ -27,6 +27,8 @@ describe('AdminController', () => {
     getMatch: jest.fn(),
     listTeams: jest.fn(),
     getTeam: jest.fn(),
+    listNotices: jest.fn(),
+    createNotice: jest.fn(),
     listTeamMatches: jest.fn(),
     listAdmins: jest.fn(),
     grantAdmin: jest.fn(),
@@ -260,6 +262,58 @@ describe('AdminController', () => {
     adminService.getTeam.mockResolvedValue(payload);
     await expect(controller.getTeam(user, 't-1')).resolves.toEqual(payload);
     expect(adminService.getTeam).toHaveBeenCalledWith(user, 't-1');
+  });
+
+  // ─── Notice list / create ─────────────────────────────────────────────────
+
+  it('lists notices and returns items + pageInfo', async () => {
+    const query = { status: 'published' as const, category: '고정' as const };
+    const payload = {
+      items: [
+        {
+          noticeId: 'n-1',
+          title: '이번 주 고정 공지',
+          body: '체크인 안내',
+          audience: 'public',
+          category: '고정',
+          pinned: true,
+          status: 'published',
+          publishedAt: new Date('2026-05-18T00:00:00.000Z'),
+          archivedAt: null,
+          createdAt: new Date('2026-05-18T00:00:00.000Z'),
+          updatedAt: new Date('2026-05-18T00:00:00.000Z'),
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
+    adminService.listNotices.mockResolvedValue(payload);
+    await expect(controller.listNotices(user, query)).resolves.toEqual(payload);
+    expect(adminService.listNotices).toHaveBeenCalledWith(user, query);
+  });
+
+  it('creates a notice', async () => {
+    const dto = {
+      audience: 'public' as const,
+      category: '안내' as const,
+      pinned: true,
+      title: '새 공지',
+      body: '공지 내용',
+      status: 'published' as const,
+    };
+    const payload = {
+      notice: {
+        noticeId: 'n-2',
+        title: '새 공지',
+        body: '공지 내용',
+        audience: 'public',
+        category: '고정',
+        pinned: true,
+        status: 'published',
+      },
+    };
+    adminService.createNotice.mockResolvedValue(payload);
+    await expect(controller.createNotice(user, dto)).resolves.toEqual(payload);
+    expect(adminService.createNotice).toHaveBeenCalledWith(user, dto);
   });
 
   // ─── Team-match list ───────────────────────────────────────────────────────

@@ -111,6 +111,14 @@ function formatMonthDay(dateStr: string | null): string {
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
+function formatMonthDayRange(startStr: string | null, endStr: string | null): string {
+  const start = formatMonthDay(startStr);
+  if (!start) return '';
+  const end = formatMonthDay(endStr);
+  if (!end || end === start) return start;
+  return `${start}~${end}`;
+}
+
 /* ── Inline fact icons for the registration pass (none of these exist in icons.tsx) ── */
 
 function FactIconBase({ size = 15, children }: { size?: number; children: React.ReactNode }) {
@@ -184,6 +192,7 @@ function RegistrationPass({
   title,
   teamName,
   scheduledAt,
+  scheduledEndAt,
   venue,
   paymentSummary,
   rosterCount,
@@ -198,6 +207,7 @@ function RegistrationPass({
   title: string;
   teamName: string | null;
   scheduledAt: string | null;
+  scheduledEndAt: string | null;
   venue: string | null;
   paymentSummary: string | null;
   rosterCount: number;
@@ -242,7 +252,7 @@ function RegistrationPass({
             display: 'flex', flexDirection: 'column', gap: 9,
           }}
         >
-          <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDay(scheduledAt) || '일정 미정'} />
+          <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDayRange(scheduledAt, scheduledEndAt) || '일정 미정'} />
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
         </div>
@@ -259,7 +269,7 @@ function RegistrationPass({
 
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);
-  const dateStr = formatMonthDay(scheduledAt);
+  const dateStr = formatMonthDayRange(scheduledAt, scheduledEndAt);
   /* Roster next-step applies to active registrations; waitlisted shows a status note instead. */
   const showRosterFooter = status === 'confirmed' || status === 'paid';
 
@@ -586,6 +596,7 @@ function RegistrationDetailView({
     minPlayers: number;
     maxPlayers: number;
     scheduledAt: string | null;
+    scheduledEndAt: string | null;
     venue: string | null;
     bankName: string | null;
     bankAccount: string | null;
@@ -812,6 +823,7 @@ function RegistrationDetailView({
               title={tournament.title}
               teamName={teamData?.name ?? null}
               scheduledAt={tournament.scheduledAt}
+              scheduledEndAt={tournament.scheduledEndAt}
               venue={tournament.venue}
               paymentSummary={paymentSummary}
               rosterCount={players.length}
@@ -1380,6 +1392,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           minPlayers: tournament.minPlayers,
           maxPlayers: tournament.maxPlayers,
           scheduledAt: tournament.scheduledAt,
+          scheduledEndAt: tournament.scheduledEndAt,
           venue: tournament.venue,
           bankName: tournament.bankName,
           bankAccount: tournament.bankAccount,

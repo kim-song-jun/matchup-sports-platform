@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import {
   v1AdminLogsFixture,
+  v1AdminNoticesFixture,
   v1AdminOverviewFixture,
   v1ChatMessagesByRoomFixture,
   v1ChatMessagesFixture,
@@ -284,6 +285,46 @@ export const v1MswHandlers = [
   http.get(`${api}/me/settings`, () => ok(v1SettingsFixture)),
   http.get(`${api}/admin/overview`, () => ok(v1AdminOverviewFixture)),
   http.get(`${api}/admin/action-logs`, () => ok(v1AdminLogsFixture)),
+  http.get(`${api}/admin/notices`, ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const status = params.get('status');
+    const category = params.get('category');
+    const audience = params.get('audience');
+    const q = params.get('q')?.trim().toLowerCase();
+    const rows = v1AdminNoticesFixture.filter((notice) => {
+      if (status && notice.status !== status) return false;
+      if (category && notice.category !== category) return false;
+      if (audience && notice.audience !== audience) return false;
+      if (q && !`${notice.title} ${notice.body}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    return ok(page(rows));
+  }),
+  http.post(`${api}/admin/notices`, async ({ request }) => {
+    const body = await request.json() as {
+      audience: 'public' | 'users' | 'admins';
+      category: '고정' | '업데이트' | '안내';
+      pinned: boolean;
+      title: string;
+      body: string;
+      status: 'draft' | 'published';
+    };
+    const now = '2026-05-18T10:00:00.000Z';
+    const notice = {
+      noticeId: 'notice-new',
+      audience: body.audience,
+      category: body.pinned ? '고정' : body.category === '고정' ? '안내' : body.category,
+      pinned: body.pinned,
+      title: body.title,
+      body: body.body,
+      status: body.status,
+      publishedAt: body.status === 'published' ? now : null,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return ok({ notice });
+  }),
 ];
 
 const levelOrder = ['beginner', 'novice', 'intermediate', 'advanced'];

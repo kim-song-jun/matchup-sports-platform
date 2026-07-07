@@ -236,6 +236,7 @@ export default function AdminTournamentsNewPage() {
   const [title, setTitle] = useState('');
   const [format, setFormat] = useState<V1TournamentFormat>('knockout');
   const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduledEndAt, setScheduledEndAt] = useState('');
   const [registrationDeadlineAt, setRegistrationDeadlineAt] = useState('');
   const [venue, setVenue] = useState('');
   const [teamCount, setTeamCount] = useState('');
@@ -276,15 +277,27 @@ export default function AdminTournamentsNewPage() {
     return null;
   })();
 
+  const scheduleRangeError: string | null = (() => {
+    const startIso = datetimeTextToIso(scheduledAt);
+    const endIso = datetimeTextToIso(scheduledEndAt);
+    if (scheduledEndAt.trim() && !startIso) return '종료 일시는 시작 일시와 함께 입력해 주세요.';
+    if (startIso && endIso && new Date(endIso).getTime() < new Date(startIso).getTime()) {
+      return '종료 일시는 시작 일시 이후여야 해요.';
+    }
+    return null;
+  })();
+
   // ── Validation ───────────────────────────────────────────────────────
   const canSubmit =
     !isPending &&
     sportId.trim().length > 0 &&
     title.trim().length > 0 &&
     isValidDatetimeText(scheduledAt) &&
+    isValidDatetimeText(scheduledEndAt) &&
     isValidDatetimeText(registrationDeadlineAt) &&
     teamCountError === null &&
-    playersRangeError === null;
+    playersRangeError === null &&
+    scheduleRangeError === null;
 
   // ── Submit ───────────────────────────────────────────────────────────
   const handleSubmit = (e: React.FormEvent) => {
@@ -297,6 +310,7 @@ export default function AdminTournamentsNewPage() {
         title: title.trim(),
         format,
         ...(datetimeTextToIso(scheduledAt) ? { scheduledAt: datetimeTextToIso(scheduledAt)! } : {}),
+        ...(datetimeTextToIso(scheduledEndAt) ? { scheduledEndAt: datetimeTextToIso(scheduledEndAt)! } : {}),
         ...(datetimeTextToIso(registrationDeadlineAt)
           ? { registrationDeadlineAt: datetimeTextToIso(registrationDeadlineAt)! }
           : {}),
@@ -407,7 +421,7 @@ export default function AdminTournamentsNewPage() {
                 </select>
               </FormField>
 
-              <FormField id="scheduled-at" label="대회 일정" hint="예: 2026-08-15 09:00">
+              <FormField id="scheduled-at" label="대회 시작" hint="예: 2026-08-15 09:00">
                 <DatetimeTextInput
                   id="scheduled-at"
                   value={scheduledAt}
@@ -415,6 +429,21 @@ export default function AdminTournamentsNewPage() {
                   disabled={isPending}
                   placeholder="예: 2026-08-15 09:00"
                 />
+              </FormField>
+
+              <FormField id="scheduled-end-at" label="대회 종료" hint="2일 이상 진행할 때 입력해 주세요. 예: 2026-08-16 18:00">
+                <DatetimeTextInput
+                  id="scheduled-end-at"
+                  value={scheduledEndAt}
+                  onChange={setScheduledEndAt}
+                  disabled={isPending}
+                  placeholder="예: 2026-08-16 18:00"
+                />
+                {scheduleRangeError ? (
+                  <p className="mt-1 text-[var(--font-size-caption)] text-red-600" role="alert">
+                    {scheduleRangeError}
+                  </p>
+                ) : null}
               </FormField>
 
               <div className="md:col-span-2">

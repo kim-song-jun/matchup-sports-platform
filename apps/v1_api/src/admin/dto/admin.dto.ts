@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
 
@@ -88,6 +88,58 @@ export class AdminTeamMatchListQueryDto {
   @Min(1)
   @Max(50)
   limit?: number;
+}
+
+export class AdminNoticeListQueryDto {
+  @IsOptional()
+  @IsIn(['draft', 'published', 'archived'])
+  status?: 'draft' | 'published' | 'archived';
+
+  @IsOptional()
+  @IsIn(['public', 'users', 'admins'])
+  audience?: 'public' | 'users' | 'admins';
+
+  @IsOptional()
+  @IsIn(['고정', '업데이트', '안내'])
+  category?: '고정' | '업데이트' | '안내';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class CreateAdminNoticeDto {
+  @IsIn(['public', 'users', 'admins'])
+  audience!: 'public' | 'users' | 'admins';
+
+  @IsIn(['고정', '업데이트', '안내'])
+  category!: '고정' | '업데이트' | '안내';
+
+  @IsBoolean()
+  pinned!: boolean;
+
+  @IsString()
+  @MaxLength(120)
+  title!: string;
+
+  @IsString()
+  @MaxLength(5000)
+  body!: string;
+
+  @IsIn(['draft', 'published'])
+  status!: 'draft' | 'published';
 }
 
 export class AdminOverviewQueryDto {

@@ -9,11 +9,13 @@ import {
   AdminOverviewQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
+  AdminNoticeListQueryDto,
   AdminUserListQueryDto,
   ChangeMatchStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
+  CreateAdminNoticeDto,
   GrantAdminDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
@@ -114,6 +116,18 @@ export class AdminController {
   @Get('teams/:teamId')
   getTeam(@CurrentUser() user: V1AuthUser, @Param('teamId') teamId: string) {
     return this.adminService.getTeam(user, teamId);
+  }
+
+  // ─── Notices ──────────────────────────────────────────────────────────────
+
+  @Get('notices')
+  listNotices(@CurrentUser() user: V1AuthUser, @Query() query: AdminNoticeListQueryDto) {
+    return this.adminService.listNotices(user, query);
+  }
+
+  @Post('notices')
+  createNotice(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminNoticeDto) {
+    return this.adminService.createNotice(user, dto);
   }
 
   // ─── Team Matches ─────────────────────────────────────────────────────────

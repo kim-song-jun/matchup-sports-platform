@@ -75,6 +75,5 @@ export function getNoticeListViewModel(): NoticeListViewModel {
 export function getNoticeDetailViewModel(id: string): NoticeDetailViewModel {
   return {
     notice: notices.find((notice) => notice.id === id) ?? notices[0],
-    relatedHref: '/matches',
   };
 }

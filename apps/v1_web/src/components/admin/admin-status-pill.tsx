@@ -125,6 +125,11 @@ export const STATUS_META: Record<string, StatusMeta> = {
     tone: 'gray',
     icon: <FileText size={12} aria-hidden="true" />,
   },
+  published: {
+    label: '발행',
+    tone: 'green',
+    icon: <CheckCircle2 size={12} aria-hidden="true" />,
+  },
 
   // ── Registration ─────────────────────────────────────────────────────
   // cancelled already defined above (red/XCircle — reused)

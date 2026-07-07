@@ -95,11 +95,13 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
             <div className="tm-notice-body">
               {notice.body.map((paragraph) => <p key={paragraph} className="tm-text-body">{paragraph}</p>)}
             </div>
-            <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
-              <div className="tm-text-label">관련 매치 확인</div>
-              {/* [P2 UX 라이팅] 능동형 — 시스템이 표시하는 게 아니라 사용자가 확인하는 맥락으로 전환 */}
-            <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에서도 확인할 수 있어요.</div>
-            </Link>
+            {model.relatedHref ? (
+              <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
+                <div className="tm-text-label">관련 매치 확인</div>
+                {/* [P2 UX 라이팅] 능동형 — 시스템이 표시하는 게 아니라 사용자가 확인하는 맥락으로 전환 */}
+                <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에서도 확인할 수 있어요.</div>
+              </Link>
+            ) : null}
           </>
         )}
       </article>

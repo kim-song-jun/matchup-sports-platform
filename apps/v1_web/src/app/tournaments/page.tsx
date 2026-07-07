@@ -8,7 +8,7 @@ import { TrophyIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
-import { formatTournamentDateShort, formatEntryFee } from '@/lib/date-utils';
+import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { cssUrl } from '@/lib/assets';
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
@@ -491,7 +491,7 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           {/* Date + venue */}
           {item.scheduledAt ? (
             <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              {formatTournamentDateShort(item.scheduledAt) ?? '날짜 미정'}
+              {formatTournamentDateRangeShort(item.scheduledAt, item.scheduledEndAt) ?? '날짜 미정'}
             </span>
           ) : null}
           {item.venue ? (

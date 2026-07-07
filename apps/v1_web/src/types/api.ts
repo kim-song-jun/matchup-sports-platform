@@ -1158,6 +1158,37 @@ export type V1AdminMe = {
   lastActiveAt: string | null;
 };
 
+export type V1AdminNoticeStatus = 'draft' | 'published' | 'archived';
+export type V1AdminNoticeAudience = 'public' | 'users' | 'admins';
+export type V1AdminNoticeCategory = '고정' | '업데이트' | '안내';
+
+export type V1AdminNoticeRow = {
+  noticeId: string;
+  audience: V1AdminNoticeAudience;
+  category: V1AdminNoticeCategory;
+  pinned: boolean;
+  title: string;
+  body: string;
+  status: V1AdminNoticeStatus;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminNoticeCreatePayload = {
+  audience: V1AdminNoticeAudience;
+  category: V1AdminNoticeCategory;
+  pinned: boolean;
+  title: string;
+  body: string;
+  status: Extract<V1AdminNoticeStatus, 'draft' | 'published'>;
+};
+
+export type V1AdminNoticeCreateResult = {
+  notice: V1AdminNoticeRow;
+};
+
 export type V1AdminUserRow = {
   userId: string;
   nickname: string | null;
@@ -1251,6 +1282,8 @@ export type AdminListFilters = {
   status?: string;
   q?: string;
   sportId?: string;
+  audience?: string;
+  category?: string;
   targetType?: string;
   cursor?: string;
   limit?: number;
@@ -1344,6 +1377,7 @@ export type V1TournamentListItem = {
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
+  scheduledEndAt: string | null;
   venue: string | null;
   teamCount: number;
   entryFee: number;
@@ -1385,6 +1419,7 @@ export type V1Tournament = {
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
+  scheduledEndAt: string | null;
   venue: string | null;
   teamCount: number;
   minPlayers: number;
@@ -1501,6 +1536,7 @@ export type V1TournamentDetail = {
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   scheduledAt: string | null;
+  scheduledEndAt: string | null;
   venue: string | null;
   teamCount: number;
   minPlayers: number;
@@ -1748,6 +1784,7 @@ export type V1CreateTournamentPayload = {
   format?: V1TournamentFormat;
   registrationDeadlineAt?: string;
   scheduledAt?: string;
+  scheduledEndAt?: string | null;
   venue?: string;
   teamCount?: number;
   minPlayers?: number;

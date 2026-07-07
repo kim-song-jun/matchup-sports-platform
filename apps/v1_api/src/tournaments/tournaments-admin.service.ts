@@ -91,6 +91,10 @@ export class TournamentsAdminService {
       });
     }
     this.assertPlayerRange(dto.minPlayers, dto.maxPlayers);
+    this.assertScheduleRange(
+      dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+      dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
+    );
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
     if (!sport) {
@@ -105,6 +109,7 @@ export class TournamentsAdminService {
           format: dto.format ?? 'group_knockout',
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+          scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           venue: dto.venue ?? null,
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
@@ -171,6 +176,19 @@ export class TournamentsAdminService {
     const nextMin = dto.minPlayers ?? existing.minPlayers;
     const nextMax = dto.maxPlayers ?? existing.maxPlayers;
     this.assertPlayerRange(nextMin, nextMax);
+    const nextScheduledAt =
+      dto.scheduledAt !== undefined
+        ? dto.scheduledAt
+          ? new Date(dto.scheduledAt)
+          : null
+        : existing.scheduledAt;
+    const nextScheduledEndAt =
+      dto.scheduledEndAt !== undefined
+        ? dto.scheduledEndAt
+          ? new Date(dto.scheduledEndAt)
+          : null
+        : existing.scheduledEndAt;
+    this.assertScheduleRange(nextScheduledAt, nextScheduledEndAt);
 
     const data: Prisma.V1TournamentUpdateInput = {};
     if (dto.title !== undefined) data.title = dto.title;
@@ -179,6 +197,7 @@ export class TournamentsAdminService {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
     }
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
+    if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
     if (dto.venue !== undefined) data.venue = dto.venue;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
@@ -282,6 +301,16 @@ export class TournamentsAdminService {
     }
   }
 
+  private assertScheduleRange(start: Date | null, end: Date | null) {
+    if (!end) return;
+    if (!start || end.getTime() < start.getTime()) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_SCHEDULE_RANGE_INVALID',
+        message: '대회 종료 일시는 시작 일시 이후여야 해요.',
+      });
+    }
+  }
+
   private serialize(row: V1Tournament, registrationCount: number) {
     return {
       id: row.id,
@@ -291,6 +320,7 @@ export class TournamentsAdminService {
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
+      scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,

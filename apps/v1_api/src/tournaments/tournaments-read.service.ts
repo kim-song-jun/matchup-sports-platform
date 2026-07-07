@@ -139,6 +139,7 @@ export class TournamentsReadService {
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
+      scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
@@ -250,6 +251,7 @@ export class TournamentsReadService {
       format: string;
       registrationDeadlineAt: Date | null;
       scheduledAt: Date | null;
+      scheduledEndAt: Date | null;
       venue: string | null;
       teamCount: number;
       entryFee: number;
@@ -292,6 +294,7 @@ export class TournamentsReadService {
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
+      scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
       teamCount: row.teamCount,
       entryFee: row.entryFee,

@@ -35,6 +35,14 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
+function formatDateRange(startStr: string | null, endStr: string | null): string {
+  const start = formatDate(startStr);
+  if (start === '—') return start;
+  const end = formatDate(endStr);
+  if (end === '—' || end === start) return start;
+  return `${start} ~ ${end}`;
+}
+
 function formatCurrency(n: number): string {
   if (n === 0) return '무료';
   return `${n.toLocaleString('ko-KR')}원`;
@@ -161,7 +169,7 @@ export default function AdminTournamentsPage() {
               meta: [
                 {
                   icon: <Calendar size={14} aria-hidden="true" />,
-                  label: formatDate(row.scheduledAt),
+                  label: formatDateRange(row.scheduledAt, row.scheduledEndAt),
                 },
                 {
                   icon: <Clock size={14} aria-hidden="true" />,

@@ -14,11 +14,13 @@ import {
   AdminOverviewQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
+  AdminNoticeListQueryDto,
   AdminUserListQueryDto,
   ChangeMatchStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
+  CreateAdminNoticeDto,
   GrantAdminDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
@@ -611,6 +613,96 @@ export class AdminService {
     };
   }
 
+  // ─── Notice list / create ─────────────────────────────────────────────────
+
+  async listNotices(user: V1AuthUser, query: AdminNoticeListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+
+    const searchWhere = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { body: { contains: query.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const rows = await this.prisma.v1Notice.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.audience ? { audience: query.audience } : {}),
+        ...(query.category ? { category: query.category } : {}),
+        ...searchWhere,
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        audience: true,
+        category: true,
+        title: true,
+        body: true,
+        status: true,
+        publishedAt: true,
+        archivedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => this.toAdminNoticeRow(row)),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async createNotice(user: V1AuthUser, dto: CreateAdminNoticeDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const now = new Date();
+    const category = dto.pinned ? '고정' : dto.category === '고정' ? '안내' : dto.category;
+    const publishedAt = dto.status === 'published' ? now : null;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const notice = await tx.v1Notice.create({
+        data: {
+          audience: dto.audience,
+          category,
+          title: dto.title.trim(),
+          body: dto.body.trim(),
+          status: dto.status,
+          publishedAt,
+        },
+      });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'notice.create',
+          targetType: 'notice',
+          targetId: notice.id,
+          reason: dto.status === 'published' ? '공지 작성 및 발행' : '공지 초안 작성',
+          beforeJson: Prisma.JsonNull,
+          afterJson: {
+            noticeId: notice.id,
+            audience: notice.audience,
+            category: notice.category,
+            status: notice.status,
+            pinned: notice.category === '고정',
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return notice;
+    });
+
+    return { notice: this.toAdminNoticeRow(row) };
+  }
+
   // ─── Team-match list ───────────────────────────────────────────────────────
 
   async listTeamMatches(user: V1AuthUser, query: AdminTeamMatchListQueryDto) {
@@ -923,6 +1015,33 @@ export class AdminService {
       status: input.status,
       actionLogId: actionLog.id,
       statusChangeLogId: statusChangeLog.id,
+    };
+  }
+
+  private toAdminNoticeRow(row: {
+    id: string;
+    audience: string;
+    category: string;
+    title: string;
+    body: string;
+    status: string;
+    publishedAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      noticeId: row.id,
+      audience: row.audience,
+      category: row.category,
+      pinned: row.category === '고정',
+      title: row.title,
+      body: row.body,
+      status: row.status,
+      publishedAt: row.publishedAt,
+      archivedAt: row.archivedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     };
   }
 }

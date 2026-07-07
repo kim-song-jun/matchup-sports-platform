@@ -10,6 +10,9 @@ import type {
   CursorPage,
   V1AdminGrantResult,
   V1AdminLog,
+  V1AdminNoticeCreatePayload,
+  V1AdminNoticeCreateResult,
+  V1AdminNoticeRow,
   V1AdminRow,
   V1AdminMatchDetail,
   V1AdminMatchRow,
@@ -1303,6 +1306,13 @@ export function useV1AdminTeam(teamId: string) {
   });
 }
 
+export function useV1AdminNotices(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+  });
+}
+
 export function useV1AdminTeamMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
@@ -1370,6 +1380,19 @@ export function useV1ChangeTeamMatchStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatches() });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+export function useV1CreateAdminNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminNoticeCreatePayload) =>
+      v1Post<V1AdminNoticeCreateResult>('/admin/notices', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });
 }

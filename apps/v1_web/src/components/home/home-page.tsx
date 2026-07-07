@@ -12,7 +12,7 @@ import {
 } from '@/components/v1-ui/icons';
 import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
-import { formatTournamentDateShort } from '@/lib/date-utils';
+import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
@@ -264,7 +264,7 @@ function HomeChatRoomRow({ room }: { room: HomeChatRoom }) {
       <div className="tm-home-chat-meta">
         {room.time ? <span className="tm-text-micro">{room.time}</span> : null}
         {room.unreadCount > 0 ? (
-          <span className="tm-floating-count tab-num" aria-label={`읽지 않은 메시지 ${room.unreadCount}개`}>
+          <span className="tm-home-chat-row-count tab-num" aria-label={`읽지 않은 메시지 ${room.unreadCount}개`}>
             {room.unreadCount}
           </span>
         ) : null}
@@ -278,10 +278,9 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
     <Link
       className="tm-floating-fab tm-home-chat-fab"
       href={model.chatHref}
-      aria-label={model.chatUnreadCount > 0 ? `채팅 — 읽지 않은 메시지 ${model.chatUnreadCount}개` : '채팅'}
+      aria-label="채팅"
     >
       <ChatIcon size={22} strokeWidth={2.2} />
-      {/* [P0/P1 아이콘+컬러] 미읽음: 색상(뱃지) + 숫자 텍스트 병행 — 컬러만 의존 금지 */}
       {model.chatUnreadCount > 0 ? (
         <span className="tm-floating-count tab-num" aria-hidden="true">{model.chatUnreadCount}</span>
       ) : null}
@@ -469,7 +468,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
           {visibleItems.map((t) => {
-            const dateLabel = formatTournamentDateShort(t.scheduledAt);
+            const dateLabel = formatTournamentDateRangeShort(t.scheduledAt, t.scheduledEndAt);
             return (
               <Link
                 key={t.id}

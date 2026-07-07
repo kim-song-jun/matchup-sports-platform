@@ -3,71 +3,13 @@
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
-import { Check, Pin, Send, X } from 'lucide-react';
+import { Check, Pin, Send } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BellIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
-
-/* #23: 나가기 확인 시트 — a11y 보강 (ESC 핸들러 + 취소 버튼 autoFocus + role=dialog/aria-modal) */
-function LeaveConfirmSheet({
-  title,
-  body,
-  pending,
-  onConfirm,
-  onCancel,
-}: {
-  title: string;
-  body: string;
-  pending: boolean | undefined;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !pending) onCancel();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [pending, onCancel]);
-
-  return (
-    <div className="tm-chat-leave-scrim" role="presentation" onClick={pending ? undefined : onCancel}>
-      <div
-        className="tm-chat-leave-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="tm-text-body-lg">{title}</div>
-        <div className="tm-text-caption" style={{ marginTop: 6 }}>{body}</div>
-        <button
-          className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
-          style={{ marginTop: 16 }}
-          type="button"
-          disabled={pending}
-          onClick={onConfirm}
-        >
-          {pending ? '나가는 중' : '나가기'}
-        </button>
-        {/* autoFocus: 파괴적 액션이 기본 포커스를 받지 않도록 안전 버튼(취소)으로 초기 포커스 이동 */}
-        <button
-          className="tm-btn tm-btn-lg tm-btn-ghost tm-btn-block"
-          style={{ marginTop: 8 }}
-          type="button"
-          disabled={pending}
-          onClick={onCancel}
-          autoFocus
-        >
-          취소
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
   const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
@@ -115,15 +57,6 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
           ) : null}
         </div>
       </div>
-      {model.leaveConfirm ? (
-        <LeaveConfirmSheet
-          title={model.leaveConfirm.title}
-          body={model.leaveConfirm.body}
-          pending={model.leaveConfirm.pending}
-          onConfirm={model.leaveConfirm.onConfirm}
-          onCancel={model.leaveConfirm.onCancel}
-        />
-      ) : null}
     </AppChrome>
   );
 }
@@ -313,7 +246,7 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
   const dragOffsetRef = useRef(0);
   const draggingRef = useRef(false);
   const movedRef = useRef(false);
-  const actionWidth = 144;
+  const actionWidth = 72;
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('button')) return;
@@ -390,7 +323,11 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
         </Link>
         <div className="tm-chat-row-actions" aria-label={`${room.title} 채팅방 작업`}>
           <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onTogglePin}><Pin size={18} strokeWidth={2.1} /><span>{room.pinned ? '고정 해제' : '고정'}</span></button>
-          <button className="tm-chat-row-action tm-chat-row-action-danger" type="button" disabled={room.actionPending} onClick={room.onRequestLeave}><X size={18} strokeWidth={2.2} /><span>나가기</span></button>
+          {/*
+            앱 알림 등록 전까지 채팅방별 알림 설정은 숨긴다.
+            앱 푸시 연동 후 BellOff import와 onToggleMute 버튼을 복구한다.
+          */}
+          {/* <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onToggleMute}><BellOff size={18} strokeWidth={2.2} /><span>{room.muted ? '앱 알림켜기' : '앱 알림끄기'}</span></button> */}
         </div>
       </div>
     </div>

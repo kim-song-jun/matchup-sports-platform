@@ -110,6 +110,7 @@ export class TournamentsAdminService {
           rulesText: dto.rulesText ?? null,
           refundPolicyText: dto.refundPolicyText ?? null,
           prizePool: dto.prizePool ?? null,
+          prizeSummary: dto.prizeSummary ?? null,
           prizeBreakdown: dto.prizeBreakdown ?? null,
           createdByAdminUserId: admin.id,
         },
@@ -163,6 +164,7 @@ export class TournamentsAdminService {
     if (dto.rulesText !== undefined) data.rulesText = dto.rulesText;
     if (dto.refundPolicyText !== undefined) data.refundPolicyText = dto.refundPolicyText;
     if (dto.prizePool !== undefined) data.prizePool = dto.prizePool;
+    if (dto.prizeSummary !== undefined) data.prizeSummary = dto.prizeSummary;
     if (dto.prizeBreakdown !== undefined) data.prizeBreakdown = dto.prizeBreakdown;
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -254,6 +256,7 @@ export class TournamentsAdminService {
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       prizePool: row.prizePool,
+      prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
       registrationCount,
       createdAt: row.createdAt.toISOString(),

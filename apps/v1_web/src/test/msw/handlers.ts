@@ -192,7 +192,7 @@ export const v1MswHandlers = [
         participantId: 'chat-participant-1',
         status: 'active',
         pinned: room.pinned,
-        mutedUntil: null,
+        mutedUntil: room.mutedUntil ?? null,
         lastReadMessageId: null,
       },
       participants: [
@@ -226,11 +226,15 @@ export const v1MswHandlers = [
     const body = await request.json() as { pinned?: boolean; lastReadMessageId?: string | null; mutedUntil?: string | null };
     const room = v1ChatRoomsFixture.items.find((item) => item.roomId === params.roomId);
     if (room && typeof body.pinned === 'boolean') room.pinned = body.pinned;
+    if (room && body.mutedUntil !== undefined) {
+      room.mutedUntil = body.mutedUntil;
+      room.muted = Boolean(body.mutedUntil && new Date(body.mutedUntil).getTime() > Date.now());
+    }
     if (room && body.lastReadMessageId !== undefined) room.unreadCount = 0;
     return ok({
       roomId: params.roomId,
       pinned: room?.pinned ?? Boolean(body.pinned),
-      mutedUntil: body.mutedUntil ?? null,
+      mutedUntil: room?.mutedUntil ?? body.mutedUntil ?? null,
       lastReadMessageId: body.lastReadMessageId ?? null,
       status: 'active',
     });

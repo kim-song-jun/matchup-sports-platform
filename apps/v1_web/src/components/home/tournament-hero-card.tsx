@@ -6,12 +6,6 @@ import { TrophyIcon } from '@/components/v1-ui/icons';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 
-/** 상금 금액 컴팩트 포맷 — 1만원 이상은 'N만원', 그 미만은 'N원'. */
-function formatPrizeShort(n: number): string {
-  if (n >= 10000) return `${Math.round(n / 10000).toLocaleString('ko-KR')}만원`;
-  return `${n.toLocaleString('ko-KR')}원`;
-}
-
 /**
  * 홈 "오늘의 추천"의 대회 히어로.
  * 매치 히어로(FeaturedMatchCard)와 동일한 풀폭 미디어+오버레이 비중으로 모집중 대회를 노출한다.
@@ -27,12 +21,11 @@ export function TournamentHeroCard() {
   if (!featured) return null;
 
   const dateLabel = formatTournamentDateShort(featured.scheduledAt);
+  const prizeText = featured.prizeSummary?.trim();
   const facts = [
     dateLabel,
     `${featured.confirmedCount}/${featured.teamCount}팀 확정`,
-    featured.prizePool != null && featured.prizePool > 0
-      ? `상금 ${formatPrizeShort(featured.prizePool)}`
-      : null,
+    prizeText ? `상품 및 상금 ${prizeText}` : null,
   ]
     .filter(Boolean)
     .join(' · ');

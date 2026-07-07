@@ -138,6 +138,11 @@ export class CreateTournamentDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  prizeSummary?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
   prizeBreakdown?: string;
 }
 
@@ -223,6 +228,11 @@ export class UpdateTournamentDto {
   @IsInt()
   @Min(0)
   prizePool?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  prizeSummary?: string;
 
   @IsOptional()
   @IsString()

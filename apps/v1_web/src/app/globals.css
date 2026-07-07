@@ -1541,12 +1541,42 @@ button:disabled {
   border: 1px solid var(--blue100);
 }
 
-.tm-weather-sun {
+.tm-weather-icon {
   width: 32px;
   height: 32px;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
-  background: var(--yellow500);
+  background: var(--yellow50);
+  color: var(--yellow500);
   flex-shrink: 0;
+}
+
+.tm-weather-icon-cloud-sun {
+  background: var(--blue50);
+  color: var(--blue500);
+}
+
+.tm-weather-icon-cloud,
+.tm-weather-icon-fog {
+  background: var(--grey100);
+  color: var(--grey600);
+}
+
+.tm-weather-icon-drizzle,
+.tm-weather-icon-rain {
+  background: var(--blue50);
+  color: var(--blue500);
+}
+
+.tm-weather-icon-snow {
+  background: var(--grey50);
+  color: var(--blue500);
+}
+
+.tm-weather-icon-thunderstorm {
+  background: var(--orange50);
+  color: var(--orange500);
 }
 
 .tm-section-title {
@@ -2856,7 +2886,7 @@ button:disabled {
 
 .tm-chat-row-actions {
   display: flex;
-  width: 144px;
+  width: 72px;
   align-items: stretch;
   grid-column: 2;
 }
@@ -2975,23 +3005,6 @@ button:disabled {
   color: var(--grey400);
   display: grid;
   place-items: center;
-}
-
-.tm-chat-leave-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 45;
-  background: rgba(15, 23, 42, .28);
-  display: flex;
-  align-items: flex-end;
-}
-
-.tm-chat-leave-sheet {
-  width: 100%;
-  padding: 18px 20px 24px;
-  border-radius: 20px 20px 0 0;
-  background: var(--bg);
-  box-shadow: 0 -12px 32px rgba(15, 23, 42, .14);
 }
 
 .tm-chat-room {

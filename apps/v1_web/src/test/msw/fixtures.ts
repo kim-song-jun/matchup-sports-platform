@@ -390,6 +390,7 @@ export const v1ChatRoomsFixture: CursorPage<V1ChatRoom> = {
       unreadCount: 2,
       pinned: false,
       muted: false,
+      mutedUntil: null,
     },
   ],
   nextCursor: null,
@@ -420,6 +421,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 2,
     pinned: true,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-match-2',
@@ -431,6 +433,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 0,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-1',
@@ -442,6 +445,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 4,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-2',
@@ -453,6 +457,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 0,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-match-1',
@@ -464,6 +469,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 1,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-match-2',
@@ -475,6 +481,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 0,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
 ];
 

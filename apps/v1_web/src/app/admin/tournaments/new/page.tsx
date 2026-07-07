@@ -245,7 +245,7 @@ export default function AdminTournamentsNewPage() {
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [bankHolder, setBankHolder] = useState('');
-  const [prizePool, setPrizePool] = useState('');
+  const [prizeSummary, setPrizeSummary] = useState('');
   const [prizeBreakdown, setPrizeBreakdown] = useState('');
   const [rulesText, setRulesText] = useState('');
   const [refundPolicyText, setRefundPolicyText] = useState('');
@@ -305,7 +305,7 @@ export default function AdminTournamentsNewPage() {
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
         entryFee: parseInt(entryFee || '0', 10),
-        ...(prizePool ? { prizePool: parseInt(prizePool, 10) } : {}),
+        ...(prizeSummary.trim() ? { prizeSummary: prizeSummary.trim() } : {}),
         ...(prizeBreakdown.trim() ? { prizeBreakdown: prizeBreakdown.trim() } : {}),
         ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
         ...(bankAccount.trim() ? { bankAccount: bankAccount.trim() } : {}),
@@ -537,7 +537,7 @@ export default function AdminTournamentsNewPage() {
           <section id="tsec-fee" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">참가비 · 계좌</h2>
             <div className="flex flex-col gap-4">
-              {/* 참가비 + 총 상금 — 2열 */}
+              {/* 참가비 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">
                   <input
@@ -552,37 +552,40 @@ export default function AdminTournamentsNewPage() {
                     className={inputCls}
                   />
                 </FormField>
-
-                <FormField id="prize-pool" label="총 상금 (원)" hint="비우면 상금 없음으로 표시돼요">
-                  <input
-                    id="prize-pool"
-                    type="number"
-                    min="0"
-                    step="10000"
-                    value={prizePool}
-                    onChange={(e) => setPrizePool(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 1000000"
-                    className={inputCls}
-                  />
-                </FormField>
               </div>
 
-              {/* 순위별 상금 안내 — 전체 너비 */}
+              {/* 상품 및 상금 안내 — 전체 너비 */}
+              <FormField
+                id="prize-summary"
+                label="상품 및 상금"
+                hint="상단 상품 및 상금 칸에 그대로 표시돼요"
+              >
+                <textarea
+                  id="prize-summary"
+                  value={prizeSummary}
+                  onChange={(e) => setPrizeSummary(e.target.value)}
+                  disabled={isPending}
+                  placeholder="예: 우승팀 현금 100만원 + 트로피"
+                  maxLength={200}
+                  rows={2}
+                  className={textareaCls}
+                />
+              </FormField>
+
               <FormField
                 id="prize-breakdown"
-                label="순위별 상금 안내"
-                hint="참가자에게 공개되는 상금 안내 문구예요"
+                label="상금 배분"
+                hint="콤마, 점, 줄바꿈으로 구분한 항목이 하단 박스로 표시돼요"
               >
-                <input
+                <textarea
                   id="prize-breakdown"
-                  type="text"
                   value={prizeBreakdown}
                   onChange={(e) => setPrizeBreakdown(e.target.value)}
                   disabled={isPending}
                   placeholder="예: 1위 100만원 · 2위 50만원 · 3위 30만원"
                   maxLength={200}
-                  className={inputCls}
+                  rows={3}
+                  className={textareaCls}
                 />
               </FormField>
 

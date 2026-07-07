@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
-import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice } from '@/types/api';
+import { v1Post } from '@/lib/api-client';
+import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice, V1ResolveLocationResponse } from '@/types/api';
 import { HomePageView } from './home-page';
 import type { HomeChatRoom, HomeMatchCard, HomeNotice, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
@@ -233,20 +234,28 @@ function useCurrentLocationWeather() {
             wind_speed_unit: 'ms',
             timezone: 'auto',
           });
-          const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-          if (!response.ok) throw new Error(`Weather request failed: ${response.status}`);
-          const body = (await response.json()) as OpenMeteoCurrentWeatherResponse;
+          const [weatherResult, regionResult] = await Promise.allSettled([
+            fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`),
+            v1Post<V1ResolveLocationResponse>('/master/regions/resolve-location', { latitude, longitude }),
+          ]);
+          if (weatherResult.status !== 'fulfilled' || !weatherResult.value.ok) {
+            const status = weatherResult.status === 'fulfilled' ? weatherResult.value.status : 'unknown';
+            throw new Error(`Weather request failed: ${status}`);
+          }
+          const body = (await weatherResult.value.json()) as OpenMeteoCurrentWeatherResponse;
           const current = body.current;
           if (!current) throw new Error('Weather response missing current conditions');
+          const region = regionResult.status === 'fulfilled' ? formatWeatherRegionName(regionResult.value.region) : null;
 
           if (!cancelled) {
             setWeather({
-              city: '현재 위치',
+              city: region ?? '현재 위치',
               temp: Math.round(current.temperature_2m),
               cond: weatherCodeLabel(current.weather_code),
               wind: roundOne(current.wind_speed_10m),
               feelsLike: Math.round(current.apparent_temperature),
-              status: '현재 위치 기준',
+              icon: weatherCodeIcon(current.weather_code),
+              status: region ? '현재 위치 기준' : '현재 위치 기준 · 지역 확인 전',
             });
           }
         } catch {
@@ -285,6 +294,14 @@ type OpenMeteoCurrentWeatherResponse = {
   };
 };
 
+function formatWeatherRegionName(region: V1ResolveLocationResponse['region']) {
+  if (!region) return null;
+  const parent = region.parent?.name?.trim();
+  const name = region.name?.trim();
+  if (parent && name && parent !== name) return `${parent} ${name}`;
+  return name || parent || null;
+}
+
 function roundOne(value: number) {
   return Math.round(value * 10) / 10;
 }
@@ -299,6 +316,18 @@ function weatherCodeLabel(code: number) {
   if ([71, 73, 75, 77, 85, 86].includes(code)) return '눈';
   if ([95, 96, 99].includes(code)) return '뇌우';
   return '날씨 정보 없음';
+}
+
+function weatherCodeIcon(code: number): NonNullable<HomeViewModel['weather']['icon']> {
+  if (code === 0) return 'sun';
+  if ([1, 2].includes(code)) return 'cloud-sun';
+  if (code === 3) return 'cloud';
+  if ([45, 48].includes(code)) return 'fog';
+  if ([51, 53, 55, 56, 57].includes(code)) return 'drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rain';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow';
+  if ([95, 96, 99].includes(code)) return 'thunderstorm';
+  return 'cloud';
 }
 
 function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard | null): HomeMatchCard {

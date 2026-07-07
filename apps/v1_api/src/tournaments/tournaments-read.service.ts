@@ -151,6 +151,7 @@ export class TournamentsReadService {
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       prizePool: row.prizePool,
+      prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
       confirmedCount: row._count.registrations,
       pendingPaymentCount: row.registrations.length,
@@ -233,6 +234,7 @@ export class TournamentsReadService {
       teamCount: number;
       entryFee: number;
       prizePool: number | null;
+      prizeSummary: string | null;
       prizeBreakdown: string | null;
       createdAt: Date;
       updatedAt: Date;
@@ -254,6 +256,7 @@ export class TournamentsReadService {
       teamCount: row.teamCount,
       entryFee: row.entryFee,
       prizePool: row.prizePool,
+      prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
       confirmedCount,
       pendingPaymentCount,

@@ -21,7 +21,6 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
   const hasFeaturedContent = model.network || Boolean(model.featuredMatch);
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
-  const hasNotices = model.notices.length > 0;
 
   return (
     <AppChrome
@@ -150,7 +149,6 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           </div>
 
           {/* Notices */}
-          {hasNotices ? (
           <div>
             {/* .tm-home-sidebar-notices gives the panel a card surface on desktop.
                 The inner div retains the original mobile inline padding. */}
@@ -161,14 +159,19 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   전체보기
                 </Link>
               </div>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {model.notices.map((notice) => (
-                  <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
-                ))}
-              </div>
+              {model.notices.length > 0 ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {model.notices.map((notice) => (
+                    <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
+                  ))}
+                </div>
+              ) : (
+                <div className="tm-text-caption" style={{ color: 'var(--text-muted)', paddingTop: 8 }}>
+                  새 공지사항이 없어요.
+                </div>
+              )}
             </div>
           </div>
-          ) : null}
 
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
           <SidebarTournamentsWidget />

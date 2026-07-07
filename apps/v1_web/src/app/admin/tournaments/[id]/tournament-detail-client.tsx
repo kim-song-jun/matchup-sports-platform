@@ -1817,7 +1817,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editTeamCount, setEditTeamCount] = useState('');
   const [editMinPlayers, setEditMinPlayers] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState('');
-  const [editPrizePool, setEditPrizePool] = useState('');
+  const [editPrizeSummary, setEditPrizeSummary] = useState('');
   const [editPrizeBreakdown, setEditPrizeBreakdown] = useState('');
   const [editBankName, setEditBankName] = useState('');
   const [editBankAccount, setEditBankAccount] = useState('');
@@ -1836,7 +1836,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditTeamCount(String(tournament.teamCount));
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
-    setEditPrizePool(tournament.prizePool != null ? String(tournament.prizePool) : '');
+    setEditPrizeSummary(tournament.prizeSummary ?? '');
     setEditPrizeBreakdown(tournament.prizeBreakdown ?? '');
     setEditBankName(tournament.bankName ?? '');
     setEditBankAccount(tournament.bankAccount ?? '');
@@ -1861,10 +1861,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     if (!Number.isNaN(mn) && mn > 0) payload.minPlayers = mn;
     const mx = Number(editMaxPlayers);
     if (!Number.isNaN(mx) && mx > 0) payload.maxPlayers = mx;
-    if (editPrizePool !== '') {
-      const pp = Number(editPrizePool);
-      if (!Number.isNaN(pp)) payload.prizePool = pp;
-    }
+    if (editPrizeSummary.trim()) payload.prizeSummary = editPrizeSummary.trim();
     if (editPrizeBreakdown.trim()) payload.prizeBreakdown = editPrizeBreakdown.trim();
     if (editBankName.trim()) payload.bankName = editBankName.trim();
     if (editBankAccount.trim()) payload.bankAccount = editBankAccount.trim();
@@ -2025,11 +2022,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
             { label: '대회 일정', value: formatDate(tournament.scheduledAt) },
-            { label: '상금', value: tournament.prizePool != null ? formatCurrency(tournament.prizePool) : '—' },
+            { label: '상품 및 상금', value: tournament.prizeSummary || '—' },
           ].map(({ label, value }) => (
             <div key={label}>
               <dt className="text-xs text-gray-600 font-medium mb-0.5">{label}</dt>
-              <dd className="text-[13px] text-gray-900">{value}</dd>
+              <dd className={`text-[13px] text-gray-900 ${label === '상품 및 상금' ? 'whitespace-pre-wrap leading-relaxed' : ''}`}>{value}</dd>
             </div>
           ))}
         </dl>
@@ -2248,17 +2245,15 @@ export default function TournamentDetailClient({ id }: { id: string }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="edit-prize-pool" className="text-[13px] text-gray-900">상금 (원)</label>
-            <input
-              id="edit-prize-pool"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={editPrizePool}
-              onChange={(e) => setEditPrizePool(e.target.value)}
-              placeholder="없으면 비워두세요"
+            <label htmlFor="edit-prize-summary" className="text-[13px] text-gray-900">상품 및 상금</label>
+            <textarea
+              id="edit-prize-summary"
+              value={editPrizeSummary}
+              onChange={(e) => setEditPrizeSummary(e.target.value)}
               disabled={updateTournament.isPending}
-              className={inputCls}
+              rows={2}
+              placeholder="예: 우승팀 현금 100만원 + 트로피"
+              className={textareaCls}
             />
           </div>
 

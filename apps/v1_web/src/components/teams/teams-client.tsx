@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueries } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
   useV1CancelTeamInvitation,
@@ -185,6 +185,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
   const resolveChat = useV1ResolveChatRoom();
+  const autoResolvedChatRef = useRef<string | null>(null);
   const openMatchesQuery = useV1TeamMatches(
     { teamId, status: 'recruiting', limit: 5 },
     { enabled: Boolean(query.data) },
@@ -196,6 +197,12 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     venue: match.place?.name ?? match.placeName ?? '',
   }));
   const fallback = getTeamDetailViewModel();
+
+  useEffect(() => {
+    if (!query.data || !isTeamMemberRole(query.data.viewer.role) || autoResolvedChatRef.current === teamId) return;
+    autoResolvedChatRef.current = teamId;
+    resolveChat.mutate({ targetType: 'team', targetId: teamId });
+  }, [query.data, resolveChat, teamId]);
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 

@@ -1,7 +1,18 @@
 import Link from 'next/link';
 import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { ChevronRightIcon } from './icons';
-import { CalendarIcon, InboxIcon } from 'lucide-react';
+import {
+  CalendarIcon,
+  CloudDrizzleIcon,
+  CloudFogIcon,
+  CloudIcon,
+  CloudLightningIcon,
+  CloudRainIcon,
+  CloudSnowIcon,
+  CloudSunIcon,
+  InboxIcon,
+  SunIcon,
+} from 'lucide-react';
 
 /* ── TextField ── */
 /* Carbon/Ant 표준 error a11y 패턴:
@@ -398,6 +409,7 @@ type WeatherStripProps = {
   wind: number | string;
   feelsLike?: number | string;
   status?: string;
+  icon?: 'sun' | 'cloud-sun' | 'cloud' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunderstorm';
 };
 
 type InfoRowProps = {
@@ -444,14 +456,29 @@ function isMissing(v: number | string | undefined): boolean {
   return v === undefined || v === null || String(v).trim() === '-' || String(v).trim() === '';
 }
 
-export function WeatherStrip({ city, temp, cond, wind, feelsLike, status }: WeatherStripProps) {
+const WEATHER_ICONS = {
+  sun: SunIcon,
+  'cloud-sun': CloudSunIcon,
+  cloud: CloudIcon,
+  fog: CloudFogIcon,
+  drizzle: CloudDrizzleIcon,
+  rain: CloudRainIcon,
+  snow: CloudSnowIcon,
+  thunderstorm: CloudLightningIcon,
+} satisfies Record<NonNullable<WeatherStripProps['icon']>, typeof SunIcon>;
+
+export function WeatherStrip({ city, temp, cond, wind, feelsLike, status, icon = 'sun' }: WeatherStripProps) {
   const feelsLikeVal = feelsLike ?? temp;
   const feelsLikeText = isMissing(feelsLikeVal) ? '체감 정보 없음' : `체감 ${feelsLikeVal}°`;
   const windText = isMissing(wind) ? '바람 정보 없음' : `바람 ${wind}m/s`;
 
+  const WeatherIcon = WEATHER_ICONS[icon] ?? SunIcon;
+
   return (
     <div className="tm-weather-strip">
-      <div className="tm-weather-sun" />
+      <div className={`tm-weather-icon tm-weather-icon-${icon}`} aria-hidden="true">
+        <WeatherIcon size={20} strokeWidth={2.2} />
+      </div>
       <div style={{ flex: 1 }}>
         <div className="tab-num" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
           {city} {temp}° · {cond}

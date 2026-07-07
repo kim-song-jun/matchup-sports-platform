@@ -53,10 +53,6 @@ function getFormatLabel(format: V1TournamentFormat): string {
   }
 }
 
-function formatPrize(amount: number): string {
-  return `${amount.toLocaleString('ko-KR')}원`;
-}
-
 function formatPublishedAt(dateStr: string): string {
   const d = new Date(dateStr);
   const month = d.getMonth() + 1;
@@ -328,7 +324,8 @@ function TournamentDetailView({
   const pendingPaymentCount = getPendingPaymentCount(tournament);
   const reservedTeamCount = getReservedTeamCount(tournament);
   const isFull = reservedTeamCount >= tournament.teamCount;
-  const hasPrize = tournament.prizePool != null;
+  const prizeText = tournament.prizeSummary?.trim() ?? '';
+  const hasPrize = prizeText.length > 0;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
@@ -340,7 +337,7 @@ function TournamentDetailView({
     ? tournament.prizeBreakdown.split(/[/·,\n]+/).map((s) => s.trim()).filter(Boolean)
     : [];
   const prizeCard = hasPrize ? (
-    <section aria-label="상금 안내" style={{ marginTop: 16 }}>
+    <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
       <Card pad={18} style={{ background: 'var(--orange50)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
@@ -350,21 +347,9 @@ function TournamentDetailView({
             <TrophyIcon size={24} color="var(--static-white)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상금</div>
-            {/* P1 숫자:단위 2:1 + tabular-nums — 상금 금액 */}
-            <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, lineHeight: 1.2 }}>
-              <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, alignSelf: 'center', marginRight: 2 }}>총</span>
-              <span
-                className="tab-num"
-                style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 800, color: 'var(--text-strong)' }}
-              >
-                {tournament.prizePool!.toLocaleString('ko-KR')}
-              </span>
-              <span
-                style={{ fontSize: 'var(--font-size-body)', fontWeight: 600, color: 'var(--text-strong)' }}
-              >
-                원
-              </span>
+            <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상품 및 상금</div>
+            <div className="tm-text-body-lg" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 800, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+              {prizeText}
             </div>
           </div>
         </div>

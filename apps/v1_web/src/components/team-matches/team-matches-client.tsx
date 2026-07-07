@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApplyTeamMatch,
   useV1ApproveTeamMatchApplication,
@@ -191,11 +191,18 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const [actionError, setActionError] = useState<string | null>(null);
   const resolveChatRoom = useV1ResolveChatRoom();
+  const autoResolvedChatRef = useRef<string | null>(null);
   const selectedEligibility = eligibility.data?.teams.find((team) => team.eligible) ?? eligibility.data?.teams[0] ?? null;
   // 팀이 없는 경우: eligibility 로드 완료 후 teams 배열이 비어 있으면 소속 팀 없음 (#13)
   const hasNoTeam = !isGuest && eligibility.isSuccess && eligibility.data.teams.length === 0;
   const withdrawTeamMatch = useV1WithdrawTeamMatchApplication(teamMatchId, selectedEligibility?.applicationId);
   const fallback = getTeamMatchDetailViewModel();
+
+  useEffect(() => {
+    if (!query.data || !canOpenTeamMatchChat(viewerState, getStatus(query.data)) || autoResolvedChatRef.current === teamMatchId) return;
+    autoResolvedChatRef.current = teamMatchId;
+    resolveChatRoom.mutate({ targetType: 'team_match', targetId: teamMatchId });
+  }, [query.data, resolveChatRoom, teamMatchId, viewerState]);
 
   if (query.isError) return <TeamMatchStatePageView model={getTeamMatchStateViewModel('error')} />;
 

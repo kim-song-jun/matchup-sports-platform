@@ -25,10 +25,6 @@ function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTe
   return 'items' in data ? data.items : (data as V1MyTeam[]);
 }
 
-function formatPrizePool(prize: number): string {
-  return `${prize.toLocaleString('ko-KR')}원`;
-}
-
 /* ── Step indicator ── */
 
 type ApplyStep = 'team' | 'agreements' | 'payment';
@@ -97,6 +93,7 @@ function OrderSummaryCard({
 }) {
   // Hide payment-related rows on step 'team' (not yet entered)
   const showPaymentRows = step !== 'team';
+  const prizeText = tournament.prizeSummary?.trim() ?? '';
 
   return (
     <Card
@@ -121,12 +118,12 @@ function OrderSummaryCard({
         <InfoRow
           label="참가비"
           value={formatEntryFee(tournament.entryFee)}
-          isLast={!showPaymentRows && !(tournament.prizePool != null && tournament.prizePool > 0)}
+          isLast={!showPaymentRows && !prizeText}
         />
-        {tournament.prizePool != null && tournament.prizePool > 0 ? (
+        {prizeText ? (
           <InfoRow
-            label="상금"
-            value={formatPrizePool(tournament.prizePool)}
+            label="상품 및 상금"
+            value={prizeText}
             isLast={!showPaymentRows}
           />
         ) : null}

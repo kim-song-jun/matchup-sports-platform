@@ -70,6 +70,7 @@ export type HomeViewModel = {
     wind: number | string;
     feelsLike?: number | string;
     status?: string;
+    icon?: 'sun' | 'cloud-sun' | 'cloud' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunderstorm';
   };
   weatherRefreshing?: boolean;
   refreshWeather?: () => void;

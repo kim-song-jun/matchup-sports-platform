@@ -19,17 +19,6 @@ export default function TournamentsPage() {
   );
 }
 
-/* ── Prize formatter ── */
-function formatPrize(amount: number): string {
-  if (amount >= 10000) {
-    const man = Math.floor(amount / 10000);
-    const rem = amount % 10000;
-    if (rem === 0) return `${man.toLocaleString('ko-KR')}만원`;
-    return `${man.toLocaleString('ko-KR')}만 ${rem.toLocaleString('ko-KR')}원`;
-  }
-  return `${amount.toLocaleString('ko-KR')}원`;
-}
-
 /* ── Status helpers ── */
 
 type StatusConfig = {
@@ -111,26 +100,17 @@ function TournamentsListContent() {
 
   const hasNext = data?.pageInfo?.hasNext ?? false;
 
-  // Derive featured tournament: max prizePool among open items; tie-break by closest scheduledAt
-  const openWithPrize = pageItems.filter(
-    (item) => item.status === 'open' && item.prizePool != null && item.prizePool > 0,
+  // Derive featured tournament: open item with prize text; tie-break by closest scheduledAt.
+  const openWithPrizeText = pageItems.filter(
+    (item) => item.status === 'open' && Boolean(item.prizeSummary?.trim()),
   );
-  const featured: V1TournamentListItem | null = openWithPrize.length > 0
-    ? openWithPrize.reduce((best, cur) => {
-        const bestPrize = best.prizePool ?? 0;
-        const curPrize = cur.prizePool ?? 0;
-        if (curPrize > bestPrize) return cur;
-        if (curPrize === bestPrize) {
-          // Tie-break: earlier scheduledAt wins (closer to now)
-          const bestDate = best.scheduledAt ? new Date(best.scheduledAt).getTime() : Infinity;
-          const curDate = cur.scheduledAt ? new Date(cur.scheduledAt).getTime() : Infinity;
-          return curDate < bestDate ? cur : best;
-        }
-        return best;
+  const featured: V1TournamentListItem | null = openWithPrizeText.length > 0
+    ? openWithPrizeText.reduce((best, cur) => {
+        const bestDate = best.scheduledAt ? new Date(best.scheduledAt).getTime() : Infinity;
+        const curDate = cur.scheduledAt ? new Date(cur.scheduledAt).getTime() : Infinity;
+        return curDate < bestDate ? cur : best;
       })
     : null;
-
-  const maxPrize = featured?.prizePool ?? 0;
 
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor) return;
@@ -152,7 +132,7 @@ function TournamentsListContent() {
   return (
     <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
 
-      {/* ── Compact featured banner — 최고 상금 모집중 대회 1개, 탭하면 상세로 ── */}
+      {/* ── Compact featured banner — 상품/상금 안내가 있는 모집중 대회 1개, 탭하면 상세로 ── */}
       {featured ? (
         <Link
           href={`/tournaments/${featured.id}`}
@@ -169,7 +149,7 @@ function TournamentsListContent() {
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
             <TrophyIcon size={12} strokeWidth={2} aria-hidden="true" />
-            상금 걸린 대회
+            상품 및 상금 안내
           </span>
           <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featured.title}</div>
           <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
@@ -180,11 +160,7 @@ function TournamentsListContent() {
             {featured.venue ? ` · ${featured.venue}` : ''}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-            {maxPrize > 0 ? (
-              <span style={{ fontWeight: 800, fontSize: 'var(--font-size-subhead)', letterSpacing: '-0.5px' }}>최대 {formatPrize(maxPrize)}</span>
-            ) : (
-              <span />
-            )}
+            <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featured.prizeSummary}</span>
             <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block' }}>자세히 보기 →</span>
           </div>
         </Link>
@@ -511,8 +487,8 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
           ) : null}
         </div>
 
-        {/* Prize pool line — shown only when present */}
-        {item.prizePool != null ? (
+        {/* Prize line — admin-entered text is shown as-is. */}
+        {item.prizeSummary?.trim() ? (
           <div
             style={{
               display: 'inline-flex',
@@ -522,15 +498,16 @@ function TournamentCard({ item }: { item: V1TournamentListItem }) {
               padding: '3px 8px',
               borderRadius: 999,
               background: 'var(--orange50)',
+              whiteSpace: 'normal',
             }}
-            aria-label={`총 상금 ${formatPrize(item.prizePool)}`}
+            aria-label={`상품 및 상금 ${item.prizeSummary}`}
           >
             <TrophyIcon size={12} color="var(--orange500)" aria-hidden="true" />
             <span
               className="tm-text-caption"
-              style={{ color: 'var(--text-strong)', fontWeight: 600 }}
+              style={{ color: 'var(--text-strong)', fontWeight: 600, minWidth: 0, whiteSpace: 'pre-wrap' }}
             >
-              총 상금 {formatPrize(item.prizePool)}
+              {item.prizeSummary}
             </span>
           </div>
         ) : null}

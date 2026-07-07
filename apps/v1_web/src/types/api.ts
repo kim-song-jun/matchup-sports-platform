@@ -888,6 +888,7 @@ export type V1ChatRoom = {
   unreadCount: number;
   pinned: boolean;
   muted: boolean;
+  mutedUntil?: string | null;
 };
 
 export type V1ChatMessage = {
@@ -1347,6 +1348,7 @@ export type V1TournamentListItem = {
   teamCount: number;
   entryFee: number;
   prizePool: number | null;
+  prizeSummary: string | null;
   prizeBreakdown: string | null;
   confirmedCount: number;
   pendingPaymentCount: number;
@@ -1369,6 +1371,7 @@ export type V1Tournament = {
   maxPlayers: number;
   entryFee: number;
   prizePool: number | null;
+  prizeSummary: string | null;
   prizeBreakdown: string | null;
   bankName: string | null;
   bankAccount: string | null;
@@ -1464,6 +1467,7 @@ export type V1TournamentDetail = {
   maxPlayers: number;
   entryFee: number;
   prizePool: number | null;
+  prizeSummary: string | null;
   prizeBreakdown: string | null;
   bankName: string | null;
   bankAccount: string | null;
@@ -1690,6 +1694,7 @@ export type V1CreateTournamentPayload = {
   maxPlayers?: number;
   entryFee?: number;
   prizePool?: number;
+  prizeSummary?: string;
   prizeBreakdown?: string;
   bankName?: string;
   bankAccount?: string;

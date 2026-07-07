@@ -7,11 +7,13 @@ export type ChatRoomModel = {
   time: string;
   unread: number;
   pinned?: boolean;
+  muted?: boolean;
+  mutedUntil?: string | null;
   initials: string;
   avatarUrl?: string;
   actionPending?: boolean;
   onTogglePin?: () => void;
-  onRequestLeave?: () => void;
+  onToggleMute?: () => void;
 };
 
 export type ChatListViewModel = {
@@ -23,13 +25,6 @@ export type ChatListViewModel = {
   emptyBody?: string;
   emptyHref?: string;
   onRetry?: () => void;
-  leaveConfirm?: {
-    title: string;
-    body: string;
-    pending?: boolean;
-    onCancel: () => void;
-    onConfirm: () => void;
-  };
 };
 
 export type ChatRoomViewModel = {

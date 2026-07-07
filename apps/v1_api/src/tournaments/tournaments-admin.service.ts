@@ -29,6 +29,12 @@ const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
   cancelled: [],
 };
 
+function nullableText(value: string | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 @Injectable()
 export class TournamentsAdminService {
   constructor(
@@ -112,6 +118,26 @@ export class TournamentsAdminService {
           prizePool: dto.prizePool ?? null,
           prizeSummary: dto.prizeSummary ?? null,
           prizeBreakdown: dto.prizeBreakdown ?? null,
+          promoHomeEnabled: dto.promoHomeEnabled ?? false,
+          promoHomeTitle: nullableText(dto.promoHomeTitle) ?? null,
+          promoHomeSubtitle: nullableText(dto.promoHomeSubtitle) ?? null,
+          promoHomeImageUrl: nullableText(dto.promoHomeImageUrl) ?? null,
+          promoHomeBadgeText: nullableText(dto.promoHomeBadgeText) ?? null,
+          promoHomeDateText: nullableText(dto.promoHomeDateText) ?? null,
+          promoHomeTeamsText: nullableText(dto.promoHomeTeamsText) ?? null,
+          promoHomeLocationText: nullableText(dto.promoHomeLocationText) ?? null,
+          promoHomePrizeText: nullableText(dto.promoHomePrizeText) ?? null,
+          promoHomePriority: dto.promoHomePriority ?? 0,
+          promoListEnabled: dto.promoListEnabled ?? false,
+          promoListTitle: nullableText(dto.promoListTitle) ?? null,
+          promoListSubtitle: nullableText(dto.promoListSubtitle) ?? null,
+          promoListImageUrl: nullableText(dto.promoListImageUrl) ?? null,
+          promoListBadgeText: nullableText(dto.promoListBadgeText) ?? null,
+          promoListDateText: nullableText(dto.promoListDateText) ?? null,
+          promoListTeamsText: nullableText(dto.promoListTeamsText) ?? null,
+          promoListLocationText: nullableText(dto.promoListLocationText) ?? null,
+          promoListPrizeText: nullableText(dto.promoListPrizeText) ?? null,
+          promoListPriority: dto.promoListPriority ?? 0,
           createdByAdminUserId: admin.id,
         },
       });
@@ -166,6 +192,26 @@ export class TournamentsAdminService {
     if (dto.prizePool !== undefined) data.prizePool = dto.prizePool;
     if (dto.prizeSummary !== undefined) data.prizeSummary = dto.prizeSummary;
     if (dto.prizeBreakdown !== undefined) data.prizeBreakdown = dto.prizeBreakdown;
+    if (dto.promoHomeEnabled !== undefined) data.promoHomeEnabled = dto.promoHomeEnabled;
+    if (dto.promoHomeTitle !== undefined) data.promoHomeTitle = nullableText(dto.promoHomeTitle);
+    if (dto.promoHomeSubtitle !== undefined) data.promoHomeSubtitle = nullableText(dto.promoHomeSubtitle);
+    if (dto.promoHomeImageUrl !== undefined) data.promoHomeImageUrl = nullableText(dto.promoHomeImageUrl);
+    if (dto.promoHomeBadgeText !== undefined) data.promoHomeBadgeText = nullableText(dto.promoHomeBadgeText);
+    if (dto.promoHomeDateText !== undefined) data.promoHomeDateText = nullableText(dto.promoHomeDateText);
+    if (dto.promoHomeTeamsText !== undefined) data.promoHomeTeamsText = nullableText(dto.promoHomeTeamsText);
+    if (dto.promoHomeLocationText !== undefined) data.promoHomeLocationText = nullableText(dto.promoHomeLocationText);
+    if (dto.promoHomePrizeText !== undefined) data.promoHomePrizeText = nullableText(dto.promoHomePrizeText);
+    if (dto.promoHomePriority !== undefined) data.promoHomePriority = dto.promoHomePriority;
+    if (dto.promoListEnabled !== undefined) data.promoListEnabled = dto.promoListEnabled;
+    if (dto.promoListTitle !== undefined) data.promoListTitle = nullableText(dto.promoListTitle);
+    if (dto.promoListSubtitle !== undefined) data.promoListSubtitle = nullableText(dto.promoListSubtitle);
+    if (dto.promoListImageUrl !== undefined) data.promoListImageUrl = nullableText(dto.promoListImageUrl);
+    if (dto.promoListBadgeText !== undefined) data.promoListBadgeText = nullableText(dto.promoListBadgeText);
+    if (dto.promoListDateText !== undefined) data.promoListDateText = nullableText(dto.promoListDateText);
+    if (dto.promoListTeamsText !== undefined) data.promoListTeamsText = nullableText(dto.promoListTeamsText);
+    if (dto.promoListLocationText !== undefined) data.promoListLocationText = nullableText(dto.promoListLocationText);
+    if (dto.promoListPrizeText !== undefined) data.promoListPrizeText = nullableText(dto.promoListPrizeText);
+    if (dto.promoListPriority !== undefined) data.promoListPriority = dto.promoListPriority;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.update({ where: { id: tournamentId }, data });
@@ -258,6 +304,26 @@ export class TournamentsAdminService {
       prizePool: row.prizePool,
       prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
+      promoHomeEnabled: row.promoHomeEnabled,
+      promoHomeTitle: row.promoHomeTitle,
+      promoHomeSubtitle: row.promoHomeSubtitle,
+      promoHomeImageUrl: row.promoHomeImageUrl,
+      promoHomeBadgeText: row.promoHomeBadgeText,
+      promoHomeDateText: row.promoHomeDateText,
+      promoHomeTeamsText: row.promoHomeTeamsText,
+      promoHomeLocationText: row.promoHomeLocationText,
+      promoHomePrizeText: row.promoHomePrizeText,
+      promoHomePriority: row.promoHomePriority,
+      promoListEnabled: row.promoListEnabled,
+      promoListTitle: row.promoListTitle,
+      promoListSubtitle: row.promoListSubtitle,
+      promoListImageUrl: row.promoListImageUrl,
+      promoListBadgeText: row.promoListBadgeText,
+      promoListDateText: row.promoListDateText,
+      promoListTeamsText: row.promoListTeamsText,
+      promoListLocationText: row.promoListLocationText,
+      promoListPrizeText: row.promoListPrizeText,
+      promoListPriority: row.promoListPriority,
       registrationCount,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

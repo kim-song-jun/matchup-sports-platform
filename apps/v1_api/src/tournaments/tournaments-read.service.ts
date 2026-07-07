@@ -153,6 +153,26 @@ export class TournamentsReadService {
       prizePool: row.prizePool,
       prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
+      promoHomeEnabled: row.promoHomeEnabled,
+      promoHomeTitle: row.promoHomeTitle,
+      promoHomeSubtitle: row.promoHomeSubtitle,
+      promoHomeImageUrl: row.promoHomeImageUrl,
+      promoHomeBadgeText: row.promoHomeBadgeText,
+      promoHomeDateText: row.promoHomeDateText,
+      promoHomeTeamsText: row.promoHomeTeamsText,
+      promoHomeLocationText: row.promoHomeLocationText,
+      promoHomePrizeText: row.promoHomePrizeText,
+      promoHomePriority: row.promoHomePriority,
+      promoListEnabled: row.promoListEnabled,
+      promoListTitle: row.promoListTitle,
+      promoListSubtitle: row.promoListSubtitle,
+      promoListImageUrl: row.promoListImageUrl,
+      promoListBadgeText: row.promoListBadgeText,
+      promoListDateText: row.promoListDateText,
+      promoListTeamsText: row.promoListTeamsText,
+      promoListLocationText: row.promoListLocationText,
+      promoListPrizeText: row.promoListPrizeText,
+      promoListPriority: row.promoListPriority,
       confirmedCount: row._count.registrations,
       pendingPaymentCount: row.registrations.length,
       groups: row.groups.map((g) => ({
@@ -236,6 +256,26 @@ export class TournamentsReadService {
       prizePool: number | null;
       prizeSummary: string | null;
       prizeBreakdown: string | null;
+      promoHomeEnabled: boolean;
+      promoHomeTitle: string | null;
+      promoHomeSubtitle: string | null;
+      promoHomeImageUrl: string | null;
+      promoHomeBadgeText: string | null;
+      promoHomeDateText: string | null;
+      promoHomeTeamsText: string | null;
+      promoHomeLocationText: string | null;
+      promoHomePrizeText: string | null;
+      promoHomePriority: number;
+      promoListEnabled: boolean;
+      promoListTitle: string | null;
+      promoListSubtitle: string | null;
+      promoListImageUrl: string | null;
+      promoListBadgeText: string | null;
+      promoListDateText: string | null;
+      promoListTeamsText: string | null;
+      promoListLocationText: string | null;
+      promoListPrizeText: string | null;
+      promoListPriority: number;
       createdAt: Date;
       updatedAt: Date;
       registrations: Array<{ status: string }>;
@@ -258,6 +298,26 @@ export class TournamentsReadService {
       prizePool: row.prizePool,
       prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
+      promoHomeEnabled: row.promoHomeEnabled,
+      promoHomeTitle: row.promoHomeTitle,
+      promoHomeSubtitle: row.promoHomeSubtitle,
+      promoHomeImageUrl: row.promoHomeImageUrl,
+      promoHomeBadgeText: row.promoHomeBadgeText,
+      promoHomeDateText: row.promoHomeDateText,
+      promoHomeTeamsText: row.promoHomeTeamsText,
+      promoHomeLocationText: row.promoHomeLocationText,
+      promoHomePrizeText: row.promoHomePrizeText,
+      promoHomePriority: row.promoHomePriority,
+      promoListEnabled: row.promoListEnabled,
+      promoListTitle: row.promoListTitle,
+      promoListSubtitle: row.promoListSubtitle,
+      promoListImageUrl: row.promoListImageUrl,
+      promoListBadgeText: row.promoListBadgeText,
+      promoListDateText: row.promoListDateText,
+      promoListTeamsText: row.promoListTeamsText,
+      promoListLocationText: row.promoListLocationText,
+      promoListPrizeText: row.promoListPrizeText,
+      promoListPriority: row.promoListPriority,
       confirmedCount,
       pendingPaymentCount,
       createdAt: row.createdAt.toISOString(),

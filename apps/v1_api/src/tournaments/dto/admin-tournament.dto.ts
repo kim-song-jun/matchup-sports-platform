@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsDefined,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -144,6 +145,108 @@ export class CreateTournamentDto {
   @IsString()
   @MaxLength(500)
   prizeBreakdown?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  promoHomeEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoHomeSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoHomeImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoHomeBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoHomePrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoHomePriority?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  promoListEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoListSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoListImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoListBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoListPrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoListPriority?: number;
 }
 
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
@@ -238,6 +341,108 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(500)
   prizeBreakdown?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  promoHomeEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoHomeSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoHomeImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoHomeBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoHomePrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoHomePriority?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  promoListEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoListSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoListImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoListBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoListPrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoListPriority?: number;
 }
 
 export class ChangeTournamentStatusDto {

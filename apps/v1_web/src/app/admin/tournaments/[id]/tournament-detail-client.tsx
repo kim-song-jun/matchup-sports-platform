@@ -17,6 +17,7 @@ import {
   Pencil,
   Users,
   User,
+  Clock,
 } from 'lucide-react';
 import {
   useV1AdminTournament,
@@ -41,6 +42,7 @@ import {
   useV1AdminAnnouncements,
   useV1CreateAnnouncement,
   useV1PublishAnnouncement,
+  useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import type {
   V1TournamentStatus,
@@ -519,7 +521,20 @@ function RegistrationsTab({
               icon: <User size={14} aria-hidden="true" />,
               label: r.depositorName ?? '—',
             },
+            {
+              icon: <Clock size={14} aria-hidden="true" />,
+              label: `신청 ${formatDate(r.createdAt)}`,
+              wrap: true,
+            },
+            ...(r.cancelRequestedAt
+              ? [{
+                  icon: <Clock size={14} aria-hidden="true" />,
+                  label: `취소 요청 ${formatDate(r.cancelRequestedAt)}`,
+                  wrap: true,
+                }]
+              : []),
           ],
+          description: r.cancelReason ? `취소 사유: ${r.cancelReason}` : undefined,
           tone:
             r.status === 'cancelled' || r.status === 'cancel_requested'
               ? 'danger'
@@ -532,6 +547,7 @@ function RegistrationsTab({
         onRetry={() => void refetch()}
         empty={<AdminEmpty title="신청이 없어요" description="아직 신청한 팀이 없어요." />}
         skeletonCards={8}
+        minCardWidth="360px"
         renderActions={(reg) => {
           const isLocked = !!reg.rosterLockedAt;
           return (
@@ -1803,6 +1819,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
   const { toasts, showToast } = useAdminToast();
   const updateTournament = useV1UpdateTournament(id);
+  const uploadImages = useV1UploadImages();
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
 
   const [activeTab, setActiveTab] = useState<TabId>('registrations');
@@ -1824,6 +1841,28 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editBankHolder, setEditBankHolder] = useState('');
   const [editRulesText, setEditRulesText] = useState('');
   const [editRefundPolicyText, setEditRefundPolicyText] = useState('');
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoHomeEnabled, setPromoHomeEnabled] = useState(false);
+  const [promoHomeTitle, setPromoHomeTitle] = useState('');
+  const [promoHomeSubtitle, setPromoHomeSubtitle] = useState('');
+  const [promoHomeImageUrl, setPromoHomeImageUrl] = useState('');
+  const [promoHomeBadgeText, setPromoHomeBadgeText] = useState('');
+  const [promoHomeDateText, setPromoHomeDateText] = useState('');
+  const [promoHomeTeamsText, setPromoHomeTeamsText] = useState('');
+  const [promoHomeLocationText, setPromoHomeLocationText] = useState('');
+  const [promoHomePrizeText, setPromoHomePrizeText] = useState('');
+  const [promoHomePriority, setPromoHomePriority] = useState('0');
+  const [promoListEnabled, setPromoListEnabled] = useState(false);
+  const [promoListTitle, setPromoListTitle] = useState('');
+  const [promoListSubtitle, setPromoListSubtitle] = useState('');
+  const [promoListImageUrl, setPromoListImageUrl] = useState('');
+  const [promoListBadgeText, setPromoListBadgeText] = useState('');
+  const [promoListDateText, setPromoListDateText] = useState('');
+  const [promoListTeamsText, setPromoListTeamsText] = useState('');
+  const [promoListLocationText, setPromoListLocationText] = useState('');
+  const [promoListPrizeText, setPromoListPrizeText] = useState('');
+  const [promoListPriority, setPromoListPriority] = useState('0');
+  const [promoUploadingSlot, setPromoUploadingSlot] = useState<'home' | 'list' | null>(null);
 
   /** Open edit modal prefilled with current tournament values */
   const openEdit = () => {
@@ -1844,6 +1883,31 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditRulesText(tournament.rulesText ?? '');
     setEditRefundPolicyText(tournament.refundPolicyText ?? '');
     setEditOpen(true);
+  };
+
+  const openPromoEdit = () => {
+    if (!tournament) return;
+    setPromoHomeEnabled(tournament.promoHomeEnabled ?? false);
+    setPromoHomeTitle(tournament.promoHomeTitle ?? '');
+    setPromoHomeSubtitle(tournament.promoHomeSubtitle ?? '');
+    setPromoHomeImageUrl(tournament.promoHomeImageUrl ?? '');
+    setPromoHomeBadgeText(tournament.promoHomeBadgeText ?? '');
+    setPromoHomeDateText(tournament.promoHomeDateText ?? '');
+    setPromoHomeTeamsText(tournament.promoHomeTeamsText ?? '');
+    setPromoHomeLocationText(tournament.promoHomeLocationText ?? '');
+    setPromoHomePrizeText(tournament.promoHomePrizeText ?? '');
+    setPromoHomePriority(String(tournament.promoHomePriority ?? 0));
+    setPromoListEnabled(tournament.promoListEnabled ?? false);
+    setPromoListTitle(tournament.promoListTitle ?? '');
+    setPromoListSubtitle(tournament.promoListSubtitle ?? '');
+    setPromoListImageUrl(tournament.promoListImageUrl ?? '');
+    setPromoListBadgeText(tournament.promoListBadgeText ?? '');
+    setPromoListDateText(tournament.promoListDateText ?? '');
+    setPromoListTeamsText(tournament.promoListTeamsText ?? '');
+    setPromoListLocationText(tournament.promoListLocationText ?? '');
+    setPromoListPrizeText(tournament.promoListPrizeText ?? '');
+    setPromoListPriority(String(tournament.promoListPriority ?? 0));
+    setPromoOpen(true);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -1876,6 +1940,75 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       },
       onError: (err) =>
         showToast(extractErrorMessage(err, '대회 정보 수정에 실패했어요.'), 'error'),
+    });
+  };
+
+  const handlePromoImageChange = async (slot: 'home' | 'list', file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('이미지 파일만 첨부할 수 있어요.', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('이미지는 5MB 이하로 첨부해 주세요.', 'error');
+      return;
+    }
+
+    setPromoUploadingSlot(slot);
+    try {
+      const result = await uploadImages.mutateAsync(file);
+      const url = result.urls[0];
+      if (!url) {
+        showToast('업로드된 이미지 URL을 받지 못했어요.', 'error');
+        return;
+      }
+      if (slot === 'home') {
+        setPromoHomeImageUrl(url);
+      } else {
+        setPromoListImageUrl(url);
+      }
+      showToast('이미지를 첨부했어요. 저장을 눌러 반영해 주세요.', 'success');
+    } catch (err) {
+      showToast(extractErrorMessage(err, '이미지 업로드에 실패했어요.'), 'error');
+    } finally {
+      setPromoUploadingSlot(null);
+    }
+  };
+
+  const handlePromoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const homePriority = Number(promoHomePriority);
+    const listPriority = Number(promoListPriority);
+    const payload: V1UpdateTournamentPayload = {
+      promoHomeEnabled,
+      promoHomeTitle: promoHomeTitle.trim(),
+      promoHomeSubtitle: promoHomeSubtitle.trim(),
+      promoHomeImageUrl: promoHomeImageUrl.trim(),
+      promoHomeBadgeText: promoHomeBadgeText.trim(),
+      promoHomeDateText: promoHomeDateText.trim(),
+      promoHomeTeamsText: promoHomeTeamsText.trim(),
+      promoHomeLocationText: promoHomeLocationText.trim(),
+      promoHomePrizeText: promoHomePrizeText.trim(),
+      promoHomePriority: Number.isNaN(homePriority) ? 0 : homePriority,
+      promoListEnabled,
+      promoListTitle: promoListTitle.trim(),
+      promoListSubtitle: promoListSubtitle.trim(),
+      promoListImageUrl: promoListImageUrl.trim(),
+      promoListBadgeText: promoListBadgeText.trim(),
+      promoListDateText: promoListDateText.trim(),
+      promoListTeamsText: promoListTeamsText.trim(),
+      promoListLocationText: promoListLocationText.trim(),
+      promoListPrizeText: promoListPrizeText.trim(),
+      promoListPriority: Number.isNaN(listPriority) ? 0 : listPriority,
+    };
+
+    updateTournament.mutate(payload, {
+      onSuccess: () => {
+        setPromoOpen(false);
+        showToast('홍보 카드 설정을 저장했어요.', 'success');
+      },
+      onError: (err) =>
+        showToast(extractErrorMessage(err, '홍보 카드 설정 저장에 실패했어요.'), 'error'),
     });
   };
 
@@ -2057,6 +2190,101 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         {!tournament.prizeBreakdown && !tournament.rulesText && !tournament.refundPolicyText && (
           <p className="mt-3 text-xs text-gray-400">상금 배분, 대회 규정, 환불 정책을 아직 입력하지 않았어요.</p>
         )}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <span className="text-[13px] font-bold text-gray-900">홍보 카드</span>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={openPromoEdit}
+              className="inline-flex items-center gap-1.5 h-[44px] px-3 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              <Pencil size={13} aria-hidden="true" />
+              홍보 카드 수정
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {[
+            {
+              key: 'home',
+              title: '홈 오늘의 추천',
+              enabled: tournament.promoHomeEnabled,
+              priority: tournament.promoHomePriority,
+              badge: tournament.promoHomeBadgeText,
+              cardTitle: tournament.promoHomeTitle,
+              subtitle: tournament.promoHomeSubtitle,
+              imageUrl: tournament.promoHomeImageUrl,
+              dateText: tournament.promoHomeDateText,
+              teamsText: tournament.promoHomeTeamsText,
+              locationText: tournament.promoHomeLocationText,
+              prizeText: tournament.promoHomePrizeText,
+            },
+            {
+              key: 'list',
+              title: '대회 목록 상단',
+              enabled: tournament.promoListEnabled,
+              priority: tournament.promoListPriority,
+              badge: tournament.promoListBadgeText,
+              cardTitle: tournament.promoListTitle,
+              subtitle: tournament.promoListSubtitle,
+              imageUrl: tournament.promoListImageUrl,
+              dateText: tournament.promoListDateText,
+              teamsText: tournament.promoListTeamsText,
+              locationText: tournament.promoListLocationText,
+              prizeText: tournament.promoListPrizeText,
+            },
+          ].map((promo) => (
+            <div key={promo.key} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[13px] font-semibold text-gray-900">{promo.title}</p>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${promo.enabled ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                  {promo.enabled ? '노출' : '숨김'}
+                </span>
+              </div>
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[13px]">
+                <div>
+                  <dt className="text-xs text-gray-500">우선순위</dt>
+                  <dd className="text-gray-900">{promo.priority}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">배지</dt>
+                  <dd className="text-gray-900 truncate">{promo.badge || '-'}</dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-xs text-gray-500">제목</dt>
+                  <dd className="text-gray-900 truncate">{promo.cardTitle || '대회명 사용'}</dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-xs text-gray-500">내용</dt>
+                  <dd className="text-gray-900 whitespace-pre-wrap break-words">{promo.subtitle || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">하단 날짜</dt>
+                  <dd className="text-gray-900 truncate">{promo.dateText || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">하단 팀확정</dt>
+                  <dd className="text-gray-900 truncate">{promo.teamsText || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">하단 위치</dt>
+                  <dd className="text-gray-900 truncate">{promo.locationText || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">상품 및 상금</dt>
+                  <dd className="text-gray-900 truncate">{promo.prizeText || '-'}</dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-xs text-gray-500">이미지</dt>
+                  <dd className="text-gray-900 break-all">{promo.imageUrl || '-'}</dd>
+                </div>
+              </dl>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ── Tabs (f11: min-h-[44px], no shadow — active = border-b-2 blue-500) ── */}
@@ -2349,6 +2577,154 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               disabled={!editTitle.trim() || updateTournament.isPending}
               className={'flex-1 ' + submitBtnCls}
             >
+              {updateTournament.isPending ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </form>
+      </SimpleModal>
+
+      <SimpleModal
+        open={promoOpen}
+        title="홍보 카드 수정"
+        onClose={() => setPromoOpen(false)}
+        pending={updateTournament.isPending || promoUploadingSlot !== null}
+      >
+        <form onSubmit={handlePromoSubmit} noValidate className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
+          {[
+            {
+              key: 'home' as const,
+              title: '홈 오늘의 추천',
+              enabled: promoHomeEnabled,
+              setEnabled: setPromoHomeEnabled,
+              cardTitle: promoHomeTitle,
+              setCardTitle: setPromoHomeTitle,
+              badge: promoHomeBadgeText,
+              setBadge: setPromoHomeBadgeText,
+              subtitle: promoHomeSubtitle,
+              setSubtitle: setPromoHomeSubtitle,
+              imageUrl: promoHomeImageUrl,
+              setImageUrl: setPromoHomeImageUrl,
+              dateText: promoHomeDateText,
+              setDateText: setPromoHomeDateText,
+              teamsText: promoHomeTeamsText,
+              setTeamsText: setPromoHomeTeamsText,
+              locationText: promoHomeLocationText,
+              setLocationText: setPromoHomeLocationText,
+              prizeText: promoHomePrizeText,
+              setPrizeText: setPromoHomePrizeText,
+              priority: promoHomePriority,
+              setPriority: setPromoHomePriority,
+              titleId: 'promo-home-title',
+              badgeId: 'promo-home-badge',
+              subtitleId: 'promo-home-subtitle',
+            },
+            {
+              key: 'list' as const,
+              title: '대회 목록 상단',
+              enabled: promoListEnabled,
+              setEnabled: setPromoListEnabled,
+              cardTitle: promoListTitle,
+              setCardTitle: setPromoListTitle,
+              badge: promoListBadgeText,
+              setBadge: setPromoListBadgeText,
+              subtitle: promoListSubtitle,
+              setSubtitle: setPromoListSubtitle,
+              imageUrl: promoListImageUrl,
+              setImageUrl: setPromoListImageUrl,
+              dateText: promoListDateText,
+              setDateText: setPromoListDateText,
+              teamsText: promoListTeamsText,
+              setTeamsText: setPromoListTeamsText,
+              locationText: promoListLocationText,
+              setLocationText: setPromoListLocationText,
+              prizeText: promoListPrizeText,
+              setPrizeText: setPromoListPrizeText,
+              priority: promoListPriority,
+              setPriority: setPromoListPriority,
+              titleId: 'promo-list-title',
+              badgeId: 'promo-list-badge',
+              subtitleId: 'promo-list-subtitle',
+            },
+          ].map((promo) => (
+            <div key={promo.key} className="rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[13px] font-semibold text-gray-900">{promo.title}</div>
+                <label className="flex min-h-[44px] items-center gap-2 rounded-lg bg-white px-3 text-[13px] text-gray-900">
+                  <input
+                    type="checkbox"
+                    checked={promo.enabled}
+                    onChange={(e) => promo.setEnabled(e.target.checked)}
+                    disabled={updateTournament.isPending}
+                    className="h-4 w-4"
+                  />
+                  노출
+                </label>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={promo.titleId} className="text-[13px] text-gray-900">카드 제목</label>
+                  <input id={promo.titleId} type="text" value={promo.cardTitle} onChange={(e) => promo.setCardTitle(e.target.value)} disabled={updateTournament.isPending} maxLength={120} placeholder="비우면 대회명이 표시돼요" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={promo.badgeId} className="text-[13px] text-gray-900">배지 문구</label>
+                  <input id={promo.badgeId} type="text" value={promo.badge} onChange={(e) => promo.setBadge(e.target.value)} disabled={updateTournament.isPending} maxLength={60} placeholder="예: 오늘의 추천" className={inputCls} />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-1.5">
+                <label htmlFor={promo.subtitleId} className="text-[13px] text-gray-900">카드 내용</label>
+                <textarea id={promo.subtitleId} value={promo.subtitle} onChange={(e) => promo.setSubtitle(e.target.value)} disabled={updateTournament.isPending} rows={2} maxLength={300} placeholder="카드에 보여줄 문구" className={textareaCls} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] text-gray-900">하단 날짜</label>
+                  <input type="text" value={promo.dateText} onChange={(e) => promo.setDateText(e.target.value)} disabled={updateTournament.isPending} maxLength={120} placeholder="예: 7월 20일 토요일" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] text-gray-900">하단 팀확정</label>
+                  <input type="text" value={promo.teamsText} onChange={(e) => promo.setTeamsText(e.target.value)} disabled={updateTournament.isPending} maxLength={120} placeholder="예: 6/8팀 확정" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] text-gray-900">하단 위치</label>
+                  <input type="text" value={promo.locationText} onChange={(e) => promo.setLocationText(e.target.value)} disabled={updateTournament.isPending} maxLength={120} placeholder="예: 서울 강남 풋살장" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] text-gray-900">상품 및 상금</label>
+                  <input type="text" value={promo.prizeText} onChange={(e) => promo.setPrizeText(e.target.value)} disabled={updateTournament.isPending} maxLength={160} placeholder="예: 우승팀 유니폼 + 50만원" className={inputCls} />
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[13px] text-gray-900">이미지 첨부</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex h-[44px] cursor-pointer items-center justify-center rounded-xl bg-white px-3 text-[13px] font-semibold text-gray-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50">
+                      {promoUploadingSlot === promo.key ? '업로드 중' : promo.imageUrl ? '이미지 변경' : '이미지 선택'}
+                      <input type="file" accept="image/*" className="sr-only" disabled={updateTournament.isPending || promoUploadingSlot !== null} onChange={(e) => void handlePromoImageChange(promo.key, e.target.files?.[0] ?? null)} />
+                    </label>
+                    {promo.imageUrl ? (
+                      <button type="button" onClick={() => promo.setImageUrl('')} disabled={updateTournament.isPending || promoUploadingSlot !== null} className="h-[44px] rounded-xl bg-gray-100 px-3 text-[13px] font-semibold text-gray-600 hover:bg-gray-200 disabled:opacity-50">
+                        삭제
+                      </button>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-gray-500 break-all">{promo.imageUrl || '이미지 1장, 5MB 이하'}</p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[13px] text-gray-900">우선순위</label>
+                  <input type="number" inputMode="numeric" min={0} max={9999} value={promo.priority} onChange={(e) => promo.setPriority(e.target.value)} disabled={updateTournament.isPending} className={inputCls} />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex gap-2 pt-1 sticky bottom-0 bg-white pb-1">
+            <button type="button" onClick={() => setPromoOpen(false)} disabled={updateTournament.isPending || promoUploadingSlot !== null} className="flex-1 h-[44px] rounded-xl text-[13px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50">
+              취소
+            </button>
+            <button type="submit" disabled={updateTournament.isPending || promoUploadingSlot !== null} className={'flex-1 ' + submitBtnCls}>
               {updateTournament.isPending ? '저장 중…' : '저장'}
             </button>
           </div>

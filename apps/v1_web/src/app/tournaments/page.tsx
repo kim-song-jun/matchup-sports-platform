@@ -9,6 +9,7 @@ import { useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateShort, formatEntryFee } from '@/lib/date-utils';
+import { cssUrl } from '@/lib/assets';
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 export default function TournamentsPage() {
@@ -100,17 +101,31 @@ function TournamentsListContent() {
 
   const hasNext = data?.pageInfo?.hasNext ?? false;
 
-  // Derive featured tournament: open item with prize text; tie-break by closest scheduledAt.
-  const openWithPrizeText = pageItems.filter(
-    (item) => item.status === 'open' && Boolean(item.prizeSummary?.trim()),
+  // Derive featured tournament: admin-enabled promo; priority first, then closest scheduledAt.
+  const promoItems = pageItems.filter(
+    (item) => item.status === 'open' && item.promoListEnabled,
   );
-  const featured: V1TournamentListItem | null = openWithPrizeText.length > 0
-    ? openWithPrizeText.reduce((best, cur) => {
+  const featured: V1TournamentListItem | null = promoItems.length > 0
+    ? promoItems.reduce((best, cur) => {
+        if (cur.promoListPriority > best.promoListPriority) return cur;
+        if (cur.promoListPriority < best.promoListPriority) return best;
         const bestDate = best.scheduledAt ? new Date(best.scheduledAt).getTime() : Infinity;
         const curDate = cur.scheduledAt ? new Date(cur.scheduledAt).getTime() : Infinity;
         return curDate < bestDate ? cur : best;
       })
     : null;
+  const featuredTitle = featured?.promoListTitle?.trim() || featured?.title || '';
+  const featuredSubtitle = featured?.promoListSubtitle?.trim() || '';
+  const featuredBadge = featured?.promoListBadgeText?.trim() || '추천 대회';
+  const featuredImageUrl = featured?.promoListImageUrl?.trim();
+  const featuredFacts = featured
+    ? [
+        featured.promoListDateText?.trim(),
+        featured.promoListTeamsText?.trim(),
+        featured.promoListLocationText?.trim(),
+      ].filter(Boolean).join(' · ')
+    : '';
+  const featuredPrizeText = featured?.promoListPrizeText?.trim() || '';
 
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor) return;
@@ -132,36 +147,44 @@ function TournamentsListContent() {
   return (
     <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
 
-      {/* ── Compact featured banner — 상품/상금 안내가 있는 모집중 대회 1개, 탭하면 상세로 ── */}
+      {/* ── Compact featured banner — admin-enabled promo tournament ── */}
       {featured ? (
         <Link
           href={`/tournaments/${featured.id}`}
-          aria-label={`${featured.title} 자세히 보기`}
+          aria-label={`${featuredTitle} 자세히 보기`}
           style={{
             display: 'block',
             margin: '12px 20px 0',
             padding: '16px 18px',
             borderRadius: 16,
-            background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+            background: featuredImageUrl ? `${cssUrl(featuredImageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
             color: 'var(--static-white)',
             textDecoration: 'none',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
-            <TrophyIcon size={12} strokeWidth={2} aria-hidden="true" />
-            상품 및 상금 안내
-          </span>
-          <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featured.title}</div>
-          <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-            {featured.scheduledAt ? (formatTournamentDateShort(featured.scheduledAt) ?? '날짜 미정') : '날짜 미정'}
-            {' · '}
-            {featured.confirmedCount}/{featured.teamCount}팀 확정
-            {getPendingPaymentCount(featured) > 0 ? ` · 입금대기 ${getPendingPaymentCount(featured)}팀` : ''}
-            {featured.venue ? ` · ${featured.venue}` : ''}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-            <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featured.prizeSummary}</span>
-            <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block' }}>자세히 보기 →</span>
+          {featuredImageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+              <TrophyIcon size={12} strokeWidth={2} aria-hidden="true" />
+              {featuredBadge}
+            </span>
+            <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featuredTitle}</div>
+            {featuredSubtitle ? (
+              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
+                {featuredSubtitle}
+              </div>
+            ) : null}
+            {featuredFacts ? (
+              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
+                {featuredFacts}
+              </div>
+            ) : null}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12 }}>
+              <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
+              <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
+            </div>
           </div>
         </Link>
       ) : null}

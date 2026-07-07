@@ -20,7 +20,7 @@ describe('HomePage', () => {
 
     expect(screen.getAllByText('teameet').length).toBeGreaterThan(0);
     expect(document.body.textContent).toContain(fallback.viewerName);
-    expect(screen.getByText('공지사항')).toBeInTheDocument();
+    expect(screen.getAllByText('공지사항').length).toBeGreaterThan(0);
     expect(screen.getByText('새 공지사항이 없어요.')).toBeInTheDocument();
 
     for (const match of fallback.recommendedMatches) {

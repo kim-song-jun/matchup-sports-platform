@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { V1Inquiry } from '@/types/api';
 import {
   v1AdminLogsFixture,
   v1AdminNoticesFixture,
@@ -7,6 +8,7 @@ import {
   v1ChatMessagesFixture,
   v1ChatRoomsFixture,
   v1HomeFixture,
+  v1InquiriesFixture,
   v1MatchesFixture,
   v1NoticesFixture,
   v1NotificationsFixture,
@@ -24,6 +26,8 @@ import {
   v1TeamMatchesFixture,
   v1TeamsFixture,
   v1UserFixture,
+  toAdminInquiryDetail,
+  toAdminInquiryRow,
 } from './fixtures';
 
 const api = '*/api/v1';
@@ -109,6 +113,38 @@ export const v1MswHandlers = [
     return ok({ notices, pageInfo: { hasNextPage: false, nextCursor: null } });
   }),
   http.get(`${api}/notices/:noticeId`, ({ params }) => ok({ notice: v1NoticesFixture.find((item) => item.id === params.noticeId) ?? v1NoticesFixture[0] })),
+  http.get(`${api}/inquiries`, () => ok(v1InquiriesFixture)),
+  http.post(`${api}/inquiries`, async ({ request }) => {
+    const body = await request.json() as {
+      category: string;
+      title: string;
+      body: string;
+      contact?: string;
+      relatedType?: string;
+      relatedId?: string;
+    };
+    const now = new Date().toISOString();
+    const inquiry: V1Inquiry = {
+      inquiryId: `inquiry-${v1InquiriesFixture.items.length + 1}`,
+      category: body.category as V1Inquiry['category'],
+      title: body.title,
+      body: body.body,
+      contact: body.contact ?? null,
+      relatedType: (body.relatedType as V1Inquiry['relatedType']) ?? null,
+      relatedId: body.relatedId ?? null,
+      status: 'received',
+      createdAt: now,
+      updatedAt: now,
+      closedAt: null,
+      replies: [],
+    };
+    v1InquiriesFixture.items.unshift(inquiry);
+    return ok(inquiry);
+  }),
+  http.get(`${api}/inquiries/:inquiryId`, ({ params }) => {
+    const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
+    return ok(inquiry);
+  }),
   http.get(`${api}/matches`, ({ request }) => {
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const matches = levelCodes.length
@@ -299,6 +335,57 @@ export const v1MswHandlers = [
       return true;
     });
     return ok(page(rows));
+  }),
+  http.get(`${api}/admin/inquiries`, ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const status = params.get('status');
+    const category = params.get('category');
+    const q = params.get('q')?.trim().toLowerCase();
+    const rows = v1InquiriesFixture.items.map(toAdminInquiryRow).filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
+      if (category && inquiry.category !== category) return false;
+      if (q && !`${inquiry.title} ${inquiry.requesterName ?? ''} ${inquiry.requesterEmail ?? ''}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    return ok(page(rows));
+  }),
+  http.get(`${api}/admin/inquiries/:inquiryId`, ({ params }) => {
+    const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
+    return ok(toAdminInquiryDetail(inquiry));
+  }),
+  http.post(`${api}/admin/inquiries/:inquiryId/replies`, async ({ params, request }) => {
+    const body = await request.json() as { body: string };
+    const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
+    const now = new Date().toISOString();
+    inquiry.status = 'answered';
+    inquiry.updatedAt = now;
+    inquiry.replies = [
+      ...(inquiry.replies ?? []),
+      {
+        replyId: `reply-${(inquiry.replies?.length ?? 0) + 1}`,
+        adminName: '운영팀',
+        adminRole: 'ops',
+        body: body.body,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    return ok(toAdminInquiryDetail(inquiry));
+  }),
+  http.post(`${api}/admin/inquiries/:inquiryId/status`, async ({ params, request }) => {
+    const body = await request.json() as { status: V1Inquiry['status']; reason?: string };
+    const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
+    const previousStatus = inquiry.status;
+    inquiry.status = body.status;
+    inquiry.closedAt = body.status === 'closed' ? new Date().toISOString() : null;
+    inquiry.updatedAt = new Date().toISOString();
+    return ok({
+      inquiryId: params.inquiryId,
+      previousStatus,
+      status: body.status,
+      actionLogId: 'action-inquiry',
+      statusChangeLogId: 'status-inquiry',
+    });
   }),
   http.post(`${api}/admin/notices`, async ({ request }) => {
     const body = await request.json() as {

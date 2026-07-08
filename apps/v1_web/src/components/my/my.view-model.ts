@@ -49,6 +49,12 @@ export const myHomeModel: MyHomeViewModel = {
         { label: '계정 설정', sub: '계정 보안과 알림을 관리해요', href: '/my/settings', icon: 'Settings' },
       ],
     },
+    {
+      title: '문의',
+      items: [
+        { label: '문의하기', sub: '계정, 매치, 대회, 결제 문제를 운영팀에 남겨요', href: '/my/inquiries', icon: 'Mail' },
+      ],
+    },
   ],
 };
 

@@ -216,6 +216,33 @@ enum V1StatusActorType {
   system
 }
 
+enum V1InquiryCategory {
+  account
+  match
+  team
+  tournament
+  payment_refund
+  report
+  other
+}
+
+enum V1InquiryStatus {
+  received
+  reviewing
+  answered
+  closed
+}
+
+enum V1InquiryRelatedType {
+  match
+  team
+  team_match
+  tournament
+  registration
+  payment
+  user
+}
+
 model V1RuntimeCheck {
   id        String   @id @default(uuid())
   key       String   @unique
@@ -273,6 +300,7 @@ model V1User {
   tournamentRegistrationsApplied V1TournamentRegistration[] @relation("V1TournamentRegistrationApplicant")
   tournamentPlayerEntries        V1TournamentPlayer[]
   verificationTokens             V1VerificationToken[]
+  inquiries                       V1Inquiry[]
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -1042,6 +1070,7 @@ model V1AdminUser {
   confirmedTournamentRegistrations V1TournamentRegistration[]  @relation("V1TournamentRegistrationConfirmedByAdmin")
   confirmedTournamentPayments      V1TournamentPayment[]       @relation("V1TournamentPaymentConfirmedByAdmin")
   recordedTournamentResults        V1TournamentFixtureResult[] @relation("V1TournamentFixtureResultRecordedByAdmin")
+  inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])
@@ -1085,6 +1114,45 @@ model V1StatusChangeLog {
   @@index([actorUserId])
   @@index([adminUserId])
   @@map("v1_status_change_logs")
+}
+
+model V1Inquiry {
+  id          String                @id @default(uuid())
+  userId      String                @map("user_id")
+  category    V1InquiryCategory
+  title       String
+  body        String
+  contact     String?
+  relatedType V1InquiryRelatedType? @map("related_type")
+  relatedId   String?               @map("related_id")
+  status      V1InquiryStatus       @default(received)
+  closedAt    DateTime?             @map("closed_at")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies V1InquiryReply[]
+
+  @@index([userId, status, createdAt])
+  @@index([category, status, createdAt])
+  @@index([relatedType, relatedId])
+  @@map("v1_inquiries")
+}
+
+model V1InquiryReply {
+  id          String   @id @default(uuid())
+  inquiryId   String   @map("inquiry_id")
+  adminUserId String?  @map("admin_user_id")
+  body        String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  inquiry   V1Inquiry    @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  adminUser V1AdminUser? @relation("V1InquiryReplyAdmin", fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([inquiryId, createdAt])
+  @@index([adminUserId])
+  @@map("v1_inquiry_replies")
 }
 
 // ---------------------------------------------------------------------------

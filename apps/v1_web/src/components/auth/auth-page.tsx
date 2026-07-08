@@ -139,13 +139,14 @@ function ProviderButton({ provider }: { provider: LoginProvider }) {
   // Fill 패턴: 브랜드 배경(background) + 대비 충족 전경 텍스트(foreground).
   // 이전 outline 리팩터(border/color에 브랜드색 재사용)는 카카오 1.28:1 / 네이버 2.25:1로
   // WCAG 2.1 AA(4.5:1) FAIL — 격상 전 fill 패턴으로 복원.
-  // disabled(준비 중)은 tm-auth-provider-disabled(grey100 배경, caption 텍스트)로 처리.
+  // disabled(준비 중)도 브랜드 배경은 유지하고 opacity로 비활성 상태를 구분한다.
   const activeStyle = { background: provider.background, color: provider.foreground, borderColor: 'transparent' };
 
   if (provider.disabled) {
     return (
       <button
         className="tm-btn tm-btn-md tm-auth-provider-disabled"
+        style={{ ...activeStyle, opacity: 0.58 }}
         disabled
         aria-label={`${provider.label} 로그인 (준비 중)`}
         type="button"

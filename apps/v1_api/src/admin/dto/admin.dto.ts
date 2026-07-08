@@ -120,6 +120,48 @@ export class AdminNoticeListQueryDto {
   limit?: number;
 }
 
+export class AdminInquiryListQueryDto {
+  @IsOptional()
+  @IsIn(['received', 'reviewing', 'answered', 'closed'])
+  status?: 'received' | 'reviewing' | 'answered' | 'closed';
+
+  @IsOptional()
+  @IsIn(['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'])
+  category?: 'account' | 'match' | 'team' | 'tournament' | 'payment_refund' | 'report' | 'other';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class ReplyInquiryDto {
+  @IsString()
+  @MaxLength(2000)
+  body!: string;
+}
+
+export class ChangeInquiryStatusDto {
+  @IsIn(['received', 'reviewing', 'answered', 'closed'])
+  status!: 'received' | 'reviewing' | 'answered' | 'closed';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
 export class CreateAdminNoticeDto {
   @IsIn(['public', 'users', 'admins'])
   audience!: 'public' | 'users' | 'admins';

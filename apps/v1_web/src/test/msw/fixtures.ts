@@ -1,11 +1,14 @@
 import type {
   CursorPage,
+  V1AdminInquiryDetail,
+  V1AdminInquiryRow,
   V1AdminLog,
   V1AdminNoticeRow,
   V1AdminOverview,
   V1ChatMessage,
   V1ChatRoom,
   V1Home,
+  V1Inquiry,
   V1Match,
   V1Notification,
   V1Notice,
@@ -99,6 +102,53 @@ export const v1RecentSearchesFixture: V1RecentSearch[] = [
   { id: 'recent-1', query: '풋살', searchedAt: '2026-05-18T09:00:00.000Z' },
   { id: 'recent-2', query: '마포', searchedAt: '2026-05-18T08:00:00.000Z' },
 ];
+
+export const v1InquiriesFixture: { items: V1Inquiry[]; pageInfo: { nextCursor: string | null; hasNext: boolean } } = {
+  items: [
+    {
+      inquiryId: 'inquiry-1',
+      category: 'account',
+      title: '로그인 문의',
+      body: '이메일 로그인 과정에서 도움이 필요해요.',
+      contact: null,
+      relatedType: null,
+      relatedId: null,
+      status: 'received',
+      createdAt: '2026-07-08T00:00:00.000Z',
+      updatedAt: '2026-07-08T00:00:00.000Z',
+      closedAt: null,
+      replies: [],
+    },
+  ],
+  pageInfo: { nextCursor: null, hasNext: false },
+};
+
+export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
+  return {
+    inquiryId: inquiry.inquiryId,
+    userId: 'user-1',
+    requesterName: '송준',
+    requesterEmail: 'songjun@example.com',
+    category: inquiry.category,
+    title: inquiry.title,
+    status: inquiry.status,
+    relatedType: inquiry.relatedType,
+    relatedId: inquiry.relatedId,
+    replyCount: inquiry.replies?.length ?? 0,
+    createdAt: inquiry.createdAt,
+    updatedAt: inquiry.updatedAt,
+    closedAt: inquiry.closedAt,
+  };
+}
+
+export function toAdminInquiryDetail(inquiry: V1Inquiry): V1AdminInquiryDetail {
+  return {
+    ...toAdminInquiryRow(inquiry),
+    body: inquiry.body,
+    contact: inquiry.contact,
+    replies: (inquiry.replies ?? []).map((reply) => ({ ...reply, adminUserId: 'admin-1' })),
+  };
+}
 
 export const v1NoticesFixture: V1Notice[] = [
   {

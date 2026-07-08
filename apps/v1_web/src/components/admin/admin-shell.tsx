@@ -11,6 +11,7 @@ import {
   Trophy,
   Medal,
   Megaphone,
+  MessageSquareText,
   ClipboardList,
   ShieldCheck,
   ChevronLeft,
@@ -34,6 +35,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: '팀매치', href: '/admin/team-matches', icon: <Trophy size={18} /> },
   { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
   { label: '공지사항', href: '/admin/notices', icon: <Megaphone size={18} /> },
+  { label: '문의', href: '/admin/inquiries', icon: <MessageSquareText size={18} /> },
   { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
 ];
 

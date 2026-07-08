@@ -183,6 +183,67 @@ export type V1RecentSearchesResponse = {
   items: V1RecentSearch[];
 };
 
+export type V1InquiryCategory =
+  | 'account'
+  | 'match'
+  | 'team'
+  | 'tournament'
+  | 'payment_refund'
+  | 'report'
+  | 'other';
+
+export type V1InquiryStatus = 'received' | 'reviewing' | 'answered' | 'closed';
+
+export type V1InquiryRelatedType =
+  | 'match'
+  | 'team'
+  | 'team_match'
+  | 'tournament'
+  | 'registration'
+  | 'payment'
+  | 'user';
+
+export type V1Inquiry = {
+  inquiryId: string;
+  category: V1InquiryCategory;
+  title: string;
+  body: string;
+  contact: string | null;
+  relatedType: V1InquiryRelatedType | null;
+  relatedId: string | null;
+  status: V1InquiryStatus;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  replies?: V1InquiryReply[];
+};
+
+export type V1InquiryReply = {
+  replyId: string;
+  adminName: string | null;
+  adminRole: 'owner' | 'ops' | 'support' | null;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1InquiriesPage = {
+  items: V1Inquiry[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
+};
+
+export type V1CreateInquiryPayload = {
+  category: V1InquiryCategory;
+  title: string;
+  body: string;
+  contact?: string;
+  relatedType?: V1InquiryRelatedType;
+  relatedId?: string;
+};
+
 export type V1Match = {
   id: string;
   matchId?: string;
@@ -1187,6 +1248,41 @@ export type V1AdminNoticeCreatePayload = {
 
 export type V1AdminNoticeCreateResult = {
   notice: V1AdminNoticeRow;
+};
+
+export type V1AdminInquiryRow = {
+  inquiryId: string;
+  userId: string;
+  requesterName: string | null;
+  requesterEmail: string | null;
+  category: V1InquiryCategory;
+  title: string;
+  status: V1InquiryStatus;
+  relatedType: V1InquiryRelatedType | null;
+  relatedId: string | null;
+  replyCount: number;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+};
+
+export type V1AdminInquiryReply = V1InquiryReply & {
+  adminUserId: string | null;
+};
+
+export type V1AdminInquiryDetail = V1AdminInquiryRow & {
+  body: string;
+  contact: string | null;
+  replies: V1AdminInquiryReply[];
+};
+
+export type V1AdminInquiryReplyPayload = {
+  body: string;
+};
+
+export type V1AdminInquiryStatusPayload = {
+  status: V1InquiryStatus;
+  reason?: string;
 };
 
 export type V1AdminUserRow = {

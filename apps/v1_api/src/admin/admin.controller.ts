@@ -5,6 +5,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
+  AdminInquiryListQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminTeamListQueryDto,
@@ -12,11 +13,13 @@ import {
   AdminNoticeListQueryDto,
   AdminUserListQueryDto,
   ChangeMatchStatusDto,
+  ChangeInquiryStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
   GrantAdminDto,
+  ReplyInquiryDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { AdminService } from './admin.service';
@@ -128,6 +131,36 @@ export class AdminController {
   @Post('notices')
   createNotice(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminNoticeDto) {
     return this.adminService.createNotice(user, dto);
+  }
+
+  // ─── Inquiries ─────────────────────────────────────────────────────────────
+
+  @Get('inquiries')
+  listInquiries(@CurrentUser() user: V1AuthUser, @Query() query: AdminInquiryListQueryDto) {
+    return this.adminService.listInquiries(user, query);
+  }
+
+  @Get('inquiries/:inquiryId')
+  getInquiry(@CurrentUser() user: V1AuthUser, @Param('inquiryId') inquiryId: string) {
+    return this.adminService.getInquiry(user, inquiryId);
+  }
+
+  @Post('inquiries/:inquiryId/replies')
+  replyInquiry(
+    @CurrentUser() user: V1AuthUser,
+    @Param('inquiryId') inquiryId: string,
+    @Body() dto: ReplyInquiryDto,
+  ) {
+    return this.adminService.replyInquiry(user, inquiryId, dto);
+  }
+
+  @Post('inquiries/:inquiryId/status')
+  changeInquiryStatus(
+    @CurrentUser() user: V1AuthUser,
+    @Param('inquiryId') inquiryId: string,
+    @Body() dto: ChangeInquiryStatusDto,
+  ) {
+    return this.adminService.changeInquiryStatus(user, inquiryId, dto);
   }
 
   // ─── Team Matches ─────────────────────────────────────────────────────────

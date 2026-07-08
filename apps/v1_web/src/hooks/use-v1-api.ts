@@ -9,6 +9,10 @@ import type {
   AdminListFilters,
   CursorPage,
   V1AdminGrantResult,
+  V1AdminInquiryDetail,
+  V1AdminInquiryReplyPayload,
+  V1AdminInquiryRow,
+  V1AdminInquiryStatusPayload,
   V1AdminLog,
   V1AdminNoticeCreatePayload,
   V1AdminNoticeCreateResult,
@@ -34,7 +38,10 @@ import type {
   V1ChatRoomLeaveResult,
   V1ChatRoomMeUpdate,
   V1ChatRoomResolveResult,
+  V1CreateInquiryPayload,
   V1Home,
+  V1InquiriesPage,
+  V1Inquiry,
   V1MasterRegionsResponse,
   V1MasterSportsResponse,
   V1Match,
@@ -354,6 +361,33 @@ export function useV1Notice(noticeId: string) {
     queryKey: v1Keys.notice(noticeId),
     queryFn: () => v1Get<V1NoticeResponse>(`/notices/${noticeId}`),
     enabled: Boolean(noticeId),
+  });
+}
+
+export function useV1Inquiries(filters?: ListFilters) {
+  return useQuery({
+    queryKey: v1Keys.inquiries(filters),
+    queryFn: () => v1Get<V1InquiriesPage>('/inquiries', filters),
+  });
+}
+
+export function useV1Inquiry(inquiryId: string) {
+  return useQuery({
+    queryKey: v1Keys.inquiry(inquiryId),
+    queryFn: () => v1Get<V1Inquiry>(`/inquiries/${inquiryId}`),
+    enabled: Boolean(inquiryId),
+    retry: false,
+  });
+}
+
+export function useV1CreateInquiry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateInquiryPayload) => v1Post<V1Inquiry>('/inquiries', body),
+    onSuccess: (inquiry) => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'inquiries'] });
+      queryClient.setQueryData(v1Keys.inquiry(inquiry.inquiryId), inquiry);
+    },
   });
 }
 
@@ -1310,6 +1344,47 @@ export function useV1AdminNotices(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
     queryFn: () => v1Get<CursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+  });
+}
+
+export function useV1AdminInquiries(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminInquiryRow>>('/admin/inquiries', filters),
+  });
+}
+
+export function useV1AdminInquiry(inquiryId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminInquiry(inquiryId),
+    queryFn: () => v1Get<V1AdminInquiryDetail>(`/admin/inquiries/${inquiryId}`),
+    enabled: !!inquiryId,
+  });
+}
+
+export function useV1ReplyAdminInquiry(inquiryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminInquiryReplyPayload) =>
+      v1Post<V1AdminInquiryDetail>(`/admin/inquiries/${inquiryId}/replies`, body),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminInquiry(inquiryId), data);
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'inquiries'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.inquiry(inquiryId) });
+    },
+  });
+}
+
+export function useV1ChangeAdminInquiryStatus(inquiryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminInquiryStatusPayload) =>
+      v1Post<V1AdminStatusChangeResult>(`/admin/inquiries/${inquiryId}/status`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminInquiry(inquiryId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'inquiries'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.inquiry(inquiryId) });
+    },
   });
 }
 

@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { HomeModule } from './home/home.module';
+import { InquiriesModule } from './inquiries/inquiries.module';
 import { MasterModule } from './master/master.module';
 import { MatchesModule } from './matches/matches.module';
 import { NoticesModule } from './notices/notices.module';
@@ -31,6 +32,7 @@ import { VerificationModule } from './verification/verification.module';
     HealthModule,
     AuthModule,
     HomeModule,
+    InquiriesModule,
     MatchesModule,
     OnboardingModule,
     MasterModule,

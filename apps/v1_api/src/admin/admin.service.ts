@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -10,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
+  AdminInquiryListQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminTeamListQueryDto,
@@ -17,11 +19,13 @@ import {
   AdminNoticeListQueryDto,
   AdminUserListQueryDto,
   ChangeMatchStatusDto,
+  ChangeInquiryStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
   GrantAdminDto,
+  ReplyInquiryDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 
@@ -703,6 +707,175 @@ export class AdminService {
     return { notice: this.toAdminNoticeRow(row) };
   }
 
+  // ─── Inquiry list / detail / replies ───────────────────────────────────────
+
+  async listInquiries(user: V1AuthUser, query: AdminInquiryListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const searchWhere = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { body: { contains: query.q, mode: 'insensitive' as const } },
+            { user: { email: { contains: query.q, mode: 'insensitive' as const } } },
+            { user: { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } } },
+          ],
+        }
+      : {};
+
+    const rows = await this.prisma.v1Inquiry.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.category ? { category: query.category } : {}),
+        ...searchWhere,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        category: true,
+        title: true,
+        status: true,
+        relatedType: true,
+        relatedId: true,
+        createdAt: true,
+        updatedAt: true,
+        closedAt: true,
+        userId: true,
+        user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+        _count: { select: { replies: true } },
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => this.toAdminInquiryRow(row)),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async getInquiry(user: V1AuthUser, inquiryId: string) {
+    await this.getActiveAdmin(user.id);
+    const row = await this.prisma.v1Inquiry.findUnique({
+      where: { id: inquiryId },
+      select: {
+        id: true,
+        userId: true,
+        category: true,
+        title: true,
+        body: true,
+        contact: true,
+        relatedType: true,
+        relatedId: true,
+        status: true,
+        closedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+        replies: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            body: true,
+            adminUserId: true,
+            createdAt: true,
+            updatedAt: true,
+            adminUser: {
+              select: {
+                adminRole: true,
+                user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+    return this.toAdminInquiryDetail(row);
+  }
+
+  async replyInquiry(user: V1AuthUser, inquiryId: string, dto: ReplyInquiryDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const body = dto.body.trim();
+    if (!body) {
+      throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1Inquiry.findUnique({ where: { id: inquiryId } });
+      if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+
+      await tx.v1InquiryReply.create({
+        data: { inquiryId, adminUserId: admin.id, body },
+      });
+
+      const updated = await tx.v1Inquiry.update({
+        where: { id: inquiryId },
+        data: { status: 'answered', closedAt: null },
+      });
+
+      await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'inquiry.reply',
+          targetType: 'inquiry',
+          targetId: inquiryId,
+          previousStatus: existing.status,
+          status: updated.status,
+          reason: '문의 답변 작성',
+          beforeState: { status: existing.status },
+          afterState: { status: updated.status, replied: 'true' },
+          responseIdKey: 'inquiryId',
+        },
+        tx,
+      );
+    });
+
+    return this.getInquiry(user, inquiryId);
+  }
+
+  async changeInquiryStatus(user: V1AuthUser, inquiryId: string, dto: ChangeInquiryStatusDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Inquiry.findUnique({ where: { id: inquiryId } });
+    if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.v1Inquiry.update({
+        where: { id: inquiryId },
+        data: { status: dto.status, closedAt: dto.status === 'closed' ? new Date() : null },
+      });
+
+      const logs = await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'inquiry.status.update',
+          targetType: 'inquiry',
+          targetId: inquiryId,
+          previousStatus: existing.status,
+          status: row.status,
+          reason: dto.reason?.trim() || '문의 상태 변경',
+          beforeState: { status: existing.status },
+          afterState: { status: row.status },
+          responseIdKey: 'inquiryId',
+        },
+        tx,
+      );
+
+      return { row, logs };
+    });
+
+    return {
+      inquiryId,
+      previousStatus: existing.status,
+      status: result.row.status,
+      actionLogId: result.logs.actionLogId,
+      statusChangeLogId: result.logs.statusChangeLogId,
+    };
+  }
+
   // ─── Team-match list ───────────────────────────────────────────────────────
 
   async listTeamMatches(user: V1AuthUser, query: AdminTeamMatchListQueryDto) {
@@ -1042,6 +1215,96 @@ export class AdminService {
       archivedAt: row.archivedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+    };
+  }
+
+  private toAdminInquiryRow(row: {
+    id: string;
+    userId: string;
+    category: string;
+    title: string;
+    status: string;
+    relatedType: string | null;
+    relatedId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    closedAt: Date | null;
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    _count: { replies: number };
+  }) {
+    return {
+      inquiryId: row.id,
+      userId: row.userId,
+      requesterName: row.user.profile?.nickname ?? row.user.profile?.displayName ?? null,
+      requesterEmail: row.user.email ?? null,
+      category: row.category,
+      title: row.title,
+      status: row.status,
+      relatedType: row.relatedType,
+      relatedId: row.relatedId,
+      replyCount: row._count.replies,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      closedAt: row.closedAt,
+    };
+  }
+
+  private toAdminInquiryDetail(row: {
+    id: string;
+    userId: string;
+    category: string;
+    title: string;
+    body: string;
+    contact: string | null;
+    relatedType: string | null;
+    relatedId: string | null;
+    status: string;
+    closedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    replies: Array<{
+      id: string;
+      body: string;
+      adminUserId: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      adminUser: {
+        adminRole: string;
+        user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+      } | null;
+    }>;
+  }) {
+    return {
+      ...this.toAdminInquiryRow({
+        id: row.id,
+        userId: row.userId,
+        category: row.category,
+        title: row.title,
+        status: row.status,
+        relatedType: row.relatedType,
+        relatedId: row.relatedId,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        closedAt: row.closedAt,
+        user: row.user,
+        _count: { replies: row.replies.length },
+      }),
+      body: row.body,
+      contact: row.contact,
+      replies: row.replies.map((reply) => ({
+        replyId: reply.id,
+        adminUserId: reply.adminUserId,
+        adminName:
+          reply.adminUser?.user.profile?.nickname ??
+          reply.adminUser?.user.profile?.displayName ??
+          reply.adminUser?.user.email ??
+          null,
+        adminRole: reply.adminUser?.adminRole ?? null,
+        body: reply.body,
+        createdAt: reply.createdAt,
+        updatedAt: reply.updatedAt,
+      })),
     };
   }
 }

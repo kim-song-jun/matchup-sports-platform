@@ -1266,6 +1266,19 @@ function toMyHomeModel(
       icon: 'Star',
     });
   }
+  if (!sections.some((section) => section.title === '문의')) {
+    sections.push({
+      title: '문의',
+      items: [
+        {
+          label: '문의하기',
+          sub: '계정, 매치, 대회, 결제 문제를 운영팀에 남겨요',
+          href: '/my/inquiries',
+          icon: 'Mail',
+        },
+      ],
+    });
+  }
 
   return {
     ...myHomeModel,

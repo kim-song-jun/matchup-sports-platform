@@ -162,6 +162,31 @@ function formatCurrency(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`;
 }
 
+function isoToDatetimeLocalValue(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}`;
+}
+
+function datetimeLocalValueToIso(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(`${value}:00+09:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 // ── Shared input styles ───────────────────────────────────────────────────
 
 /** h-[44px] unified submit button (f12) */
@@ -1877,9 +1902,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const openEdit = () => {
     if (!tournament) return;
     setEditTitle(tournament.title);
-    setEditScheduledAt(tournament.scheduledAt ? tournament.scheduledAt.slice(0, 16) : '');
-    setEditScheduledEndAt(tournament.scheduledEndAt ? tournament.scheduledEndAt.slice(0, 16) : '');
-    setEditDeadlineAt(tournament.registrationDeadlineAt ? tournament.registrationDeadlineAt.slice(0, 16) : '');
+    setEditScheduledAt(isoToDatetimeLocalValue(tournament.scheduledAt));
+    setEditScheduledEndAt(isoToDatetimeLocalValue(tournament.scheduledEndAt));
+    setEditDeadlineAt(isoToDatetimeLocalValue(tournament.registrationDeadlineAt));
     setEditVenue(tournament.venue ?? '');
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
@@ -1922,11 +1947,20 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tournament) return;
     const payload: V1UpdateTournamentPayload = {};
     if (editTitle.trim()) payload.title = editTitle.trim();
-    if (editScheduledAt) payload.scheduledAt = new Date(editScheduledAt).toISOString();
-    payload.scheduledEndAt = editScheduledEndAt ? new Date(editScheduledEndAt).toISOString() : null;
-    if (editDeadlineAt) payload.registrationDeadlineAt = new Date(editDeadlineAt).toISOString();
+    if (editScheduledAt !== isoToDatetimeLocalValue(tournament.scheduledAt)) {
+      const scheduledAtIso = datetimeLocalValueToIso(editScheduledAt);
+      if (scheduledAtIso) payload.scheduledAt = scheduledAtIso;
+    }
+    if (editScheduledEndAt !== isoToDatetimeLocalValue(tournament.scheduledEndAt)) {
+      payload.scheduledEndAt = datetimeLocalValueToIso(editScheduledEndAt);
+    }
+    if (editDeadlineAt !== isoToDatetimeLocalValue(tournament.registrationDeadlineAt)) {
+      const deadlineAtIso = datetimeLocalValueToIso(editDeadlineAt);
+      if (deadlineAtIso) payload.registrationDeadlineAt = deadlineAtIso;
+    }
     if (editVenue.trim()) payload.venue = editVenue.trim();
     const fee = Number(editEntryFee);
     if (!Number.isNaN(fee)) payload.entryFee = fee;

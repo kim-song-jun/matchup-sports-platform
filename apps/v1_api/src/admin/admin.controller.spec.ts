@@ -29,6 +29,7 @@ describe('AdminController', () => {
     getTeam: jest.fn(),
     listNotices: jest.fn(),
     createNotice: jest.fn(),
+    updateNotice: jest.fn(),
     listTeamMatches: jest.fn(),
     listAdmins: jest.fn(),
     grantAdmin: jest.fn(),
@@ -314,6 +315,31 @@ describe('AdminController', () => {
     adminService.createNotice.mockResolvedValue(payload);
     await expect(controller.createNotice(user, dto)).resolves.toEqual(payload);
     expect(adminService.createNotice).toHaveBeenCalledWith(user, dto);
+  });
+
+  it('updates a notice', async () => {
+    const dto = {
+      audience: 'public' as const,
+      category: '안내' as const,
+      pinned: false,
+      title: '수정 공지',
+      body: '수정 내용',
+      status: 'draft' as const,
+    };
+    const payload = {
+      notice: {
+        noticeId: 'n-2',
+        title: '수정 공지',
+        body: '수정 내용',
+        audience: 'public',
+        category: '안내',
+        pinned: false,
+        status: 'draft',
+      },
+    };
+    adminService.updateNotice.mockResolvedValue(payload);
+    await expect(controller.updateNotice(user, 'n-2', dto)).resolves.toEqual(payload);
+    expect(adminService.updateNotice).toHaveBeenCalledWith(user, 'n-2', dto);
   });
 
   // ─── Team-match list ───────────────────────────────────────────────────────

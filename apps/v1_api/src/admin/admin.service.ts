@@ -26,6 +26,7 @@ import {
   CreateAdminNoticeDto,
   GrantAdminDto,
   ReplyInquiryDto,
+  UpdateAdminNoticeDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 
@@ -691,6 +692,64 @@ export class AdminService {
           targetId: notice.id,
           reason: dto.status === 'published' ? '공지 작성 및 발행' : '공지 초안 작성',
           beforeJson: Prisma.JsonNull,
+          afterJson: {
+            noticeId: notice.id,
+            audience: notice.audience,
+            category: notice.category,
+            status: notice.status,
+            pinned: notice.category === '고정',
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return notice;
+    });
+
+    return { notice: this.toAdminNoticeRow(row) };
+  }
+
+  async updateNotice(user: V1AuthUser, noticeId: string, dto: UpdateAdminNoticeDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Notice.findUnique({ where: { id: noticeId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Notice was not found' });
+    }
+
+    const now = new Date();
+    const category = dto.pinned ? '고정' : dto.category === '고정' ? '안내' : dto.category;
+    const statusChanged = existing.status !== dto.status;
+    const publishedAt = dto.status === 'published'
+      ? existing.publishedAt ?? now
+      : null;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const notice = await tx.v1Notice.update({
+        where: { id: noticeId },
+        data: {
+          audience: dto.audience,
+          category,
+          title: dto.title.trim(),
+          body: dto.body.trim(),
+          status: dto.status,
+          publishedAt,
+          archivedAt: null,
+        },
+      });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'notice.update',
+          targetType: 'notice',
+          targetId: notice.id,
+          reason: statusChanged ? `공지 수정 및 상태 변경: ${existing.status} -> ${dto.status}` : '공지 수정',
+          beforeJson: {
+            noticeId: existing.id,
+            audience: existing.audience,
+            category: existing.category,
+            status: existing.status,
+            pinned: existing.category === '고정',
+          } as Prisma.InputJsonValue,
           afterJson: {
             noticeId: notice.id,
             audience: notice.audience,

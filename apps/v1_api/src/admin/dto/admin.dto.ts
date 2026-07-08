@@ -184,6 +184,8 @@ export class CreateAdminNoticeDto {
   status!: 'draft' | 'published';
 }
 
+export class UpdateAdminNoticeDto extends CreateAdminNoticeDto {}
+
 export class AdminOverviewQueryDto {
   @IsOptional()
   @IsDateString()

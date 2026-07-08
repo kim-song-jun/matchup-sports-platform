@@ -17,6 +17,8 @@ import type {
   V1AdminNoticeCreatePayload,
   V1AdminNoticeCreateResult,
   V1AdminNoticeRow,
+  V1AdminNoticeUpdatePayload,
+  V1AdminNoticeUpdateResult,
   V1AdminRow,
   V1AdminMatchDetail,
   V1AdminMatchRow,
@@ -1467,6 +1469,20 @@ export function useV1CreateAdminNotice() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+export function useV1UpdateAdminNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ noticeId, body }: { noticeId: string; body: V1AdminNoticeUpdatePayload }) =>
+      v1Patch<V1AdminNoticeUpdateResult>(`/admin/notices/${noticeId}`, body),
+    onSuccess: (_data, { noticeId }) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
   });

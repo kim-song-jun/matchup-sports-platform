@@ -38,6 +38,8 @@ describe('NoticeDetailPageView', () => {
     renderWithClient(<NoticeDetailPageView model={baseModel} />);
 
     expect(screen.getByRole('heading', { name: '계정 보안 안내' })).toBeInTheDocument();
+    expect(screen.queryByText('요약')).not.toBeInTheDocument();
+    expect(screen.queryByText('개인정보와 계정 보호 기준 안내')).not.toBeInTheDocument();
     expect(screen.queryByText('관련 매치 확인')).not.toBeInTheDocument();
   });
 

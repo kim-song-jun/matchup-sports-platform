@@ -49,7 +49,7 @@ describe('AdminService — notices', () => {
   let service: AdminService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
-    v1Notice: { findMany: jest.Mock; create: jest.Mock };
+    v1Notice: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -57,7 +57,7 @@ describe('AdminService — notices', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
-      v1Notice: { findMany: jest.fn(), create: jest.fn() },
+      v1Notice: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
       v1AdminActionLog: { create: jest.fn() },
       $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     };
@@ -176,5 +176,65 @@ describe('AdminService — notices', () => {
       pinned: true,
       title: '새 고정 공지',
     });
+  });
+
+  it('updateNotice updates notice content, pinned category, and writes an admin action log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+    prisma.v1Notice.findUnique.mockResolvedValue(makeNoticeRow({ category: '안내', status: 'draft', publishedAt: null }));
+    prisma.v1Notice.update.mockImplementation(async ({ data }) => makeNoticeRow({ ...data, id: 'notice-1' }));
+    prisma.v1AdminActionLog.create.mockResolvedValue({ id: 'log-2' });
+
+    const result = await service.updateNotice(adminAuthUser, 'notice-1', {
+      audience: 'public',
+      category: '안내',
+      pinned: true,
+      title: ' 수정 공지 ',
+      body: ' 첫 줄\n둘째 줄 ',
+      status: 'published',
+    });
+
+    expect(prisma.v1Notice.update).toHaveBeenCalledWith({
+      where: { id: 'notice-1' },
+      data: expect.objectContaining({
+        audience: 'public',
+        category: '고정',
+        title: '수정 공지',
+        body: '첫 줄\n둘째 줄',
+        status: 'published',
+        publishedAt: expect.any(Date),
+        archivedAt: null,
+      }),
+    });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        adminUserId: 'admin-record-id',
+        action: 'notice.update',
+        targetType: 'notice',
+        targetId: 'notice-1',
+      }),
+    });
+    expect(result.notice).toMatchObject({
+      noticeId: 'notice-1',
+      category: '고정',
+      pinned: true,
+      title: '수정 공지',
+      body: '첫 줄\n둘째 줄',
+    });
+  });
+
+  it('updateNotice throws 404 when notice is missing', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+    prisma.v1Notice.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.updateNotice(adminAuthUser, 'missing', {
+        audience: 'public',
+        category: '안내',
+        pinned: false,
+        title: '수정 공지',
+        body: '본문',
+        status: 'draft',
+      }),
+    ).rejects.toThrow('Notice was not found');
   });
 });

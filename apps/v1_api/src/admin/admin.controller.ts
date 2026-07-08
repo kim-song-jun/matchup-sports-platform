@@ -20,6 +20,7 @@ import {
   CreateAdminNoticeDto,
   GrantAdminDto,
   ReplyInquiryDto,
+  UpdateAdminNoticeDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { AdminService } from './admin.service';
@@ -131,6 +132,15 @@ export class AdminController {
   @Post('notices')
   createNotice(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminNoticeDto) {
     return this.adminService.createNotice(user, dto);
+  }
+
+  @Patch('notices/:noticeId')
+  updateNotice(
+    @CurrentUser() user: V1AuthUser,
+    @Param('noticeId') noticeId: string,
+    @Body() dto: UpdateAdminNoticeDto,
+  ) {
+    return this.adminService.updateNotice(user, noticeId, dto);
   }
 
   // ─── Inquiries ─────────────────────────────────────────────────────────────

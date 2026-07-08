@@ -2,7 +2,7 @@
 
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
-import { Clock, Megaphone, Pin, Tag, Users } from 'lucide-react';
+import { Clock, Megaphone, Pencil, Pin, Tag, Users, X } from 'lucide-react';
 import {
   AdminCardList,
   AdminEmpty,
@@ -13,7 +13,7 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import { useV1AdminMe, useV1AdminNotices, useV1CreateAdminNotice } from '@/hooks/use-v1-api';
+import { useV1AdminMe, useV1AdminNotices, useV1CreateAdminNotice, useV1UpdateAdminNotice } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import type {
@@ -25,6 +25,7 @@ import type {
   V1AdminNoticeRow,
   V1AdminNoticeStatus,
 } from '@/types/api';
+import { noticeSummary } from './notice-summary';
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
@@ -74,11 +75,6 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
-function noticeSummary(body: string) {
-  const compact = body.replace(/\s+/g, ' ').trim();
-  return compact.length > 120 ? `${compact.slice(0, 120)}...` : compact;
-}
-
 export default function AdminNoticesPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -94,6 +90,7 @@ export default function AdminNoticesPage() {
   const [category, setCategory] = useState<V1AdminNoticeCategory>('안내');
   const [pinned, setPinned] = useState(false);
   const [createStatus, setCreateStatus] = useState<Extract<V1AdminNoticeStatus, 'draft' | 'published'>>('published');
+  const [editingNotice, setEditingNotice] = useState<V1AdminNoticeRow | null>(null);
 
   const { toasts, showToast } = useAdminToast();
   const { data: adminMe } = useV1AdminMe();
@@ -118,6 +115,8 @@ export default function AdminNoticesPage() {
 
   const { data: firstPage, isPending, isError, error, refetch } = useV1AdminNotices(filters);
   const createNotice = useV1CreateAdminNotice();
+  const updateNotice = useV1UpdateAdminNotice();
+  const isSaving = createNotice.isPending || updateNotice.isPending;
 
   useEffect(() => {
     if (firstPage) {
@@ -151,6 +150,17 @@ export default function AdminNoticesPage() {
     setCategory('안내');
     setPinned(false);
     setCreateStatus('published');
+    setEditingNotice(null);
+  }
+
+  function startEdit(row: V1AdminNoticeRow) {
+    setEditingNotice(row);
+    setTitle(row.title);
+    setBody(row.body);
+    setAudience(row.audience);
+    setCategory(row.category === '고정' ? '안내' : row.category);
+    setPinned(row.pinned);
+    setCreateStatus(row.status === 'published' ? 'published' : 'draft');
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -166,6 +176,21 @@ export default function AdminNoticesPage() {
 
     if (!payload.title || !payload.body) {
       showToast('제목과 본문을 입력해 주세요.', 'error');
+      return;
+    }
+
+    if (editingNotice) {
+      updateNotice.mutate({ noticeId: editingNotice.noticeId, body: payload }, {
+        onSuccess: () => {
+          resetForm();
+          setExtraRows([]);
+          setNextCursor(null);
+          showToast(payload.status === 'published' ? '공지를 수정하고 발행 상태로 저장했어요.' : '공지 수정사항을 초안으로 저장했어요.', 'success');
+        },
+        onError: (err) => {
+          showToast(extractErrorMessage(err, '공지 수정에 실패했어요.'), 'error');
+        },
+      });
       return;
     }
 
@@ -228,6 +253,17 @@ export default function AdminNoticesPage() {
             onRetry={() => void refetch()}
             empty={<AdminEmpty title="공지사항이 없어요" description="조건에 맞는 공지가 없어요." />}
             skeletonCards={8}
+            renderActions={(row) => (
+              <button
+                type="button"
+                onClick={() => startEdit(row)}
+                disabled={!canWrite || isSaving}
+                className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-[var(--font-size-label)] font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                <Pencil size={14} aria-hidden="true" />
+                수정
+              </button>
+            )}
             card={(row) => ({
               title: row.title,
               subtitle: `${audienceLabel[row.audience]} · ${row.category}`,
@@ -268,11 +304,24 @@ export default function AdminNoticesPage() {
           {loadingMore ? <AdminTableSkeleton rows={3} /> : null}
         </section>
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-4 h-fit" aria-label="공지 작성">
+        <section className="rounded-2xl border border-gray-100 bg-white p-4 h-fit" aria-label={editingNotice ? '공지 수정' : '공지 작성'}>
           <div className="mb-4">
-            <h2 className="text-[var(--font-size-body-lg)] font-bold text-gray-900">공지 작성</h2>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-[var(--font-size-body-lg)] font-bold text-gray-900">{editingNotice ? '공지 수정' : '공지 작성'}</h2>
+              {editingNotice ? (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={isSaving}
+                  className="inline-flex min-h-[32px] items-center justify-center gap-1 rounded-lg px-2 text-[var(--font-size-label)] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  <X size={14} aria-hidden="true" />
+                  취소
+                </button>
+              ) : null}
+            </div>
             <p className="mt-1 text-[var(--font-size-caption)] text-gray-500">
-              고정으로 저장하면 공개 목록에서 고정 공지로 표시돼요.
+              {editingNotice ? '선택한 공지의 내용과 노출 상태를 수정해요.' : '고정으로 저장하면 공개 목록에서 고정 공지로 표시돼요.'}
             </p>
           </div>
 
@@ -283,7 +332,7 @@ export default function AdminNoticesPage() {
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 maxLength={120}
-                disabled={!canWrite || createNotice.isPending}
+                disabled={!canWrite || isSaving}
                 className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder="공지 제목"
               />
@@ -295,7 +344,7 @@ export default function AdminNoticesPage() {
                 <select
                   value={audience}
                   onChange={(event) => setAudience(event.target.value as V1AdminNoticeAudience)}
-                  disabled={!canWrite || createNotice.isPending}
+                  disabled={!canWrite || isSaving}
                   className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                 >
                   {AUDIENCE_OPTIONS.map((option) => (
@@ -309,7 +358,7 @@ export default function AdminNoticesPage() {
                 <select
                   value={createStatus}
                   onChange={(event) => setCreateStatus(event.target.value as Extract<V1AdminNoticeStatus, 'draft' | 'published'>)}
-                  disabled={!canWrite || createNotice.isPending}
+                  disabled={!canWrite || isSaving}
                   className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                 >
                   {CREATE_STATUS_OPTIONS.map((option) => (
@@ -324,7 +373,7 @@ export default function AdminNoticesPage() {
               <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value as V1AdminNoticeCategory)}
-                disabled={pinned || !canWrite || createNotice.isPending}
+                disabled={pinned || !canWrite || isSaving}
                 className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 {CATEGORY_OPTIONS.map((option) => (
@@ -338,7 +387,7 @@ export default function AdminNoticesPage() {
                 type="checkbox"
                 checked={pinned}
                 onChange={(event) => setPinned(event.target.checked)}
-                disabled={!canWrite || createNotice.isPending}
+                disabled={!canWrite || isSaving}
                 className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
               />
               <span className="font-medium">상단 고정 공지로 표시</span>
@@ -350,7 +399,7 @@ export default function AdminNoticesPage() {
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
                 maxLength={5000}
-                disabled={!canWrite || createNotice.isPending}
+                disabled={!canWrite || isSaving}
                 rows={8}
                 className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-relaxed text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder="공지 내용을 입력해 주세요."
@@ -365,10 +414,10 @@ export default function AdminNoticesPage() {
 
             <button
               type="submit"
-              disabled={!canWrite || createNotice.isPending}
+              disabled={!canWrite || isSaving}
               className="mt-1 inline-flex h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
-              {createNotice.isPending ? '저장 중...' : '공지 저장'}
+              {isSaving ? '저장 중...' : editingNotice ? '수정 저장' : '공지 저장'}
             </button>
           </form>
         </section>

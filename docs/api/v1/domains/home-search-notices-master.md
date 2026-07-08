@@ -13,6 +13,7 @@
 | `GET` | `/api/v1/notices/:noticeId` | public/user by notice visibility | path id | notice detail |
 | `GET` | `/api/v1/admin/notices` | active admin | `status?`, `category?`, `audience?`, `q?`, `cursor?`, `limit?` | admin notice cursor page including draft/published/archived rows |
 | `POST` | `/api/v1/admin/notices` | owner/ops admin | `{ audience, category, pinned, title, body, status }` | created notice row |
+| `PATCH` | `/api/v1/admin/notices/:noticeId` | owner/ops admin | `{ audience, category, pinned, title, body, status }` | updated notice row |
 
 ## Contract Notes
 
@@ -21,6 +22,7 @@
 - Only published notices are user-facing. Draft/archived notices stay hidden.
 - Admin notice rows expose `pinned`; v1 stores pinned notices through the existing `category === '고정'` contract, so no separate DB column is required.
 - `POST /api/v1/admin/notices` maps `pinned: true` to category `고정`; when `pinned: false`, category must be a non-fixed visible category such as `안내` or `업데이트`.
+- `PATCH /api/v1/admin/notices/:noticeId` uses the same pinned/category mapping as create, records an admin action log, and can save only `draft` or `published` status from the admin UI.
 - Master data is read-only in v1 user APIs.
 
 ## Pending From Frozen Contract

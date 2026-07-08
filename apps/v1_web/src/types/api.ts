@@ -1246,7 +1246,13 @@ export type V1AdminNoticeCreatePayload = {
   status: Extract<V1AdminNoticeStatus, 'draft' | 'published'>;
 };
 
+export type V1AdminNoticeUpdatePayload = V1AdminNoticeCreatePayload;
+
 export type V1AdminNoticeCreateResult = {
+  notice: V1AdminNoticeRow;
+};
+
+export type V1AdminNoticeUpdateResult = {
   notice: V1AdminNoticeRow;
 };
 

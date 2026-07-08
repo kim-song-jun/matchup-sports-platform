@@ -67,6 +67,18 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="tm-text-heading">{model.user.name}</div>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.user.handle} · {model.user.region}</div>
+                {model.user.loginMethod ? (
+                  <div style={{ marginTop: 6 }}>
+                    <span
+                      className="tm-badge tm-badge-grey"
+                      style={model.user.loginMethodProvider === 'kakao'
+                        ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
+                        : undefined}
+                    >
+                      {model.user.loginMethod}
+                    </span>
+                  </div>
+                ) : null}
                 <div
                   className="tm-text-caption"
                   style={{
@@ -333,6 +345,16 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
             </Link>
             <h1 className="tm-text-heading">{model.title}</h1>
           </div>
+          {model.account ? (
+            <section>
+              <div className="tm-my-section-label">계정 정보</div>
+              <Card pad={16}>
+                <InfoRow label="로그인 방식" value={model.account.loginMethod} />
+                <InfoRow label="이메일" value={model.account.email} />
+                <InfoRow label="휴대폰" value={model.account.phone} />
+              </Card>
+            </section>
+          ) : null}
           {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
           {/* 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 — 마이홈과 동일 패턴 */}
           <div className="tm-my-logout-row">

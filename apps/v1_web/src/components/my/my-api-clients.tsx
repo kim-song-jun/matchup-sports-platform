@@ -917,8 +917,43 @@ function findSettingsRegionGroupId(groups: SettingsRegionGroup[], regionId: stri
   return groups.find((group) => group.options.some((option) => option.id === regionId))?.id ?? null;
 }
 
+function formatLoginMethods(providers: string[]) {
+  if (providers.length === 0) return '확인 안 됨';
+
+  const labels = providers.map(formatLoginProvider);
+
+  return labels.join(', ');
+}
+
+function formatLoginProvider(provider: string | null | undefined) {
+  if (provider === 'kakao') return '카카오 로그인';
+  if (provider === 'email') return '이메일 로그인';
+  if (provider === 'naver') return '네이버 로그인';
+  return provider ?? null;
+}
+
+function formatAccountEmail(email: string | null, providers: string[]) {
+  if (email) return email;
+  if (providers.includes('kakao')) return '카카오 계정 이메일 미제공';
+  return '등록 안 됨';
+}
+
 export function SettingsPageClient() {
-  return <SettingsPageView model={settingsModel} />;
+  const settings = useV1Settings();
+
+  if (settings.isError) {
+    return <ErrorState message="설정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />;
+  }
+
+  const account = settings.data
+    ? {
+        loginMethod: formatLoginMethods(settings.data.account.providers),
+        email: formatAccountEmail(settings.data.account.email, settings.data.account.providers),
+        phone: settings.data.account.phone ?? '등록 안 됨',
+      }
+    : undefined;
+
+  return <SettingsPageView model={{ ...settingsModel, account }} />;
 }
 
 type LocationStatus = 'idle' | 'requesting' | 'matched' | 'denied' | 'unsupported' | 'unmatched' | 'saved';
@@ -1243,6 +1278,8 @@ function toMyHomeModel(
       region: profile.regionName ?? '지역 미정',
       initials: initials(nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
+      loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
+      loginMethodProvider: profile.authProvider,
       intro: '',
       sports: (profile.sports ?? []).map((sport) =>
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,

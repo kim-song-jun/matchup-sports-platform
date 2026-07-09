@@ -49,4 +49,27 @@ describe('HomePage', () => {
     expect(container.querySelector('.tm-home-chat-row .tm-floating-count')).not.toBeInTheDocument();
     expect(container.querySelectorAll('.tm-home-chat-row .tm-home-chat-row-count').length).toBeGreaterThan(0);
   });
+
+  it('shows only notice titles in the home notice panel', () => {
+    const model = {
+      ...getHomeViewModel(),
+      notices: [
+        {
+          id: 'notice-long-body',
+          title: '홈 노출 공지 제목',
+          summary: '홈에서는 이 긴 공지 본문이 그대로 보이면 안 됩니다.',
+          trailing: '오늘',
+        },
+      ],
+    };
+
+    render(
+      <Providers>
+        <HomePageView model={model} />
+      </Providers>,
+    );
+
+    expect(screen.getByText('홈 노출 공지 제목')).toBeInTheDocument();
+    expect(screen.queryByText('홈에서는 이 긴 공지 본문이 그대로 보이면 안 됩니다.')).not.toBeInTheDocument();
+  });
 });

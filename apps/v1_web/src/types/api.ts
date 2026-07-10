@@ -45,6 +45,9 @@ export type V1AuthMe = {
     onboardingStatus: string;
     lastLoginAt?: string | null;
     createdAt?: string;
+    authProvider?: 'email' | 'kakao' | 'naver' | null;
+    authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+    hasPassword?: boolean;
   };
   profile: {
     displayName: string;
@@ -1044,6 +1047,8 @@ export type V1Profile = {
   email: string | null;
   phone?: string | null;
   authProvider: 'email' | 'kakao' | 'naver' | null;
+  authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+  hasPassword?: boolean;
   onboardingStatus?: 'not_started' | 'terms_done' | 'social_terms_required' | 'social_profile_required' | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
   regionName: string | null;
   sports?: Array<{
@@ -1118,6 +1123,7 @@ export type V1Settings = {
     phone: string | null;
     accountStatus: string;
     providers: string[];
+    hasPassword?: boolean;
   };
   profile: {
     displayName: string;

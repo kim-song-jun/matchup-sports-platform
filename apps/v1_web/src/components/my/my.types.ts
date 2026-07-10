@@ -118,6 +118,7 @@ export type SettingsViewModel = {
     loginMethod: string;
     email: string;
     phone: string;
+    password: string;
   };
   groups: MyMenuSection[];
 };

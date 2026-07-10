@@ -352,6 +352,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
                 <InfoRow label="로그인 방식" value={model.account.loginMethod} />
                 <InfoRow label="이메일" value={model.account.email} />
                 <InfoRow label="휴대폰" value={model.account.phone} />
+                <InfoRow label="비밀번호" value={model.account.password} />
               </Card>
             </section>
           ) : null}

@@ -51,6 +51,7 @@ function completedUserRow(overrides: Record<string, unknown> = {}) {
     regions: [],
     reputationSummary: null,
     termsConsents: [{ id: 'consent-1' }],
+    authIdentities: [{ provider: V1AuthProvider.email, passwordHash: 'hash' }],
     ...overrides,
   };
 }
@@ -64,7 +65,7 @@ function pendingSocialUserRow(overrides: Record<string, unknown> = {}) {
       onboardingProgress: { currentStep: 'terms' },
       termsConsents: [],
     }),
-    authIdentities: [{ id: 'identity-1' }],
+    authIdentities: [{ id: 'identity-1', provider: V1AuthProvider.kakao, passwordHash: null }],
     ...overrides,
   };
 }
@@ -397,28 +398,49 @@ describe('AuthService', () => {
     expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
   });
 
-  it('completeSocialTerms: 게시된 필수 약관 문서가 없어도 소셜 프로필 단계로 진행한다', async () => {
+  it('completeSocialTerms: 게시된 필수 약관 문서가 없어도 기본 프로필을 만들고 운동 정보 단계로 진행한다', async () => {
     const activeTime = new Date();
     prisma.v1User.findUnique
       .mockResolvedValueOnce(pendingSocialUserRow({
         createdAt: activeTime,
         updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: '카카오러너', kakaoProfileImageUrl: 'https://img.example/kakao.png' },
+        },
       }))
-      .mockResolvedValueOnce(pendingSocialUserRow({
-        onboardingStatus: 'social_profile_required',
-        onboardingProgress: { currentStep: 'signup' },
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
         termsConsents: [],
         createdAt: activeTime,
         updatedAt: activeTime,
       }));
     prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
 
     const result = await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
 
-    expect(result.next).toEqual({ route: '/signup/social' });
+    expect(result.next).toEqual({ route: '/onboarding/sport' });
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      update: {
+        nickname: '카카오러너',
+        displayName: '카카오러너',
+        profileImageUrl: 'https://img.example/kakao.png',
+        visibility: 'public',
+      },
+      create: {
+        userId: 'user-1',
+        nickname: '카카오러너',
+        displayName: '카카오러너',
+        profileImageUrl: 'https://img.example/kakao.png',
+        visibility: 'public',
+      },
+    });
     expect(prisma.v1User.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
-      data: { onboardingStatus: 'social_profile_required' },
+      data: { onboardingStatus: 'signup_done' },
     });
     expect(prisma.v1UserTermsConsent.createMany).not.toHaveBeenCalled();
   });

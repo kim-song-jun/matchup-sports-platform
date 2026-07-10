@@ -1143,7 +1143,7 @@ export function useV1UpdateProfile() {
     mutationFn: (body: {
       displayName: string;
       nickname: string;
-      email: string;
+      email?: string | null;
       profileImageUrl?: string | null;
       phone?: string | null;
       birthDate?: string | null;

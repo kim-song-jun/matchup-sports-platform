@@ -37,6 +37,13 @@ function formatDateCompact(dateStr: string | null | undefined): string {
   }
 }
 
+function formatUserTitle(row: V1AdminUserRow): string {
+  if (row.nickname || row.displayName) return row.nickname ?? row.displayName ?? '';
+  if (row.onboardingStatus === 'social_terms_required') return '가입 진행 중 · 약관 미동의';
+  if (row.onboardingStatus === 'social_profile_required') return '가입 진행 중 · 프로필 미완료';
+  return '프로필 없음';
+}
+
 // ── Status options for moderation modal ──────────────────────────────────────
 const USER_STATUS_OPTIONS = (
   ['active', 'suspended', 'blocked', 'deleted'] as const
@@ -201,7 +208,7 @@ function AdminUsersPageContent() {
           rows={rows}
           keyExtractor={(row) => row.userId}
           card={(row) => ({
-            title: row.nickname ?? row.displayName ?? '(이름 없음)',
+            title: formatUserTitle(row),
             subtitle: row.email ?? undefined,
             status: row.accountStatus,
             meta: [

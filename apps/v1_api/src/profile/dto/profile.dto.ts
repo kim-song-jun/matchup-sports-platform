@@ -11,10 +11,11 @@ export class UpdateProfileDto {
   @MaxLength(40)
   nickname!: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(3)
   @MaxLength(320)
-  email!: string;
+  email?: string | null;
 
   @IsOptional()
   @IsString()

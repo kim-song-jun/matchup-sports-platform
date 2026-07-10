@@ -163,6 +163,7 @@ services:
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       API_PORT: 8121
       NODE_ENV: production
+      V1_ALLOW_HEADER_AUTH: ${V1_ALLOW_HEADER_AUTH:-}
     healthcheck:
       test:
         [
@@ -240,6 +241,10 @@ services:
         condition: service_healthy
       v1_api:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
 volumes:
   postgres_data:

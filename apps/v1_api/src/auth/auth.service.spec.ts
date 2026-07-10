@@ -445,6 +445,101 @@ describe('AuthService', () => {
     expect(prisma.v1UserTermsConsent.createMany).not.toHaveBeenCalled();
   });
 
+  it('completeSocialTerms: 카카오 기본 닉네임은 14자 이내로 저장한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: 'kakao_1234567890', kakaoProfileImageUrl: null },
+        },
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          nickname: 'kakao_12345678',
+          displayName: 'kakao_12345678',
+        }),
+      }),
+    );
+  });
+
+  it('completeSocialTerms: 중복 suffix가 붙어도 카카오 기본 닉네임은 14자 이내로 유지한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: 'kakao_1234567890', kakaoProfileImageUrl: null },
+        },
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst
+      .mockResolvedValueOnce({ id: 'existing-profile' })
+      .mockResolvedValueOnce(null);
+
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          nickname: 'kakao_12345_1',
+          displayName: 'kakao_12345_1',
+        }),
+      }),
+    );
+  });
+
+  it('completeSocialTerms: 카카오 ID fallback 닉네임은 k_ prefix로 14자 이내로 저장한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: 'k_123456789012345', kakaoProfileImageUrl: null },
+        },
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          nickname: 'k_123456789012',
+          displayName: 'k_123456789012',
+        }),
+      }),
+    );
+  });
+
   it('completeSocialProfile: consent row가 없어도 약관 단계 완료 상태면 프로필을 저장한다', async () => {
     const activeTime = new Date();
     prisma.v1User.findUnique

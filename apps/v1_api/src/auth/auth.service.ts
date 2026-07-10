@@ -9,6 +9,7 @@ import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { hashPassword, verifyPassword } from './password-hash';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
+const SOCIAL_AUTO_NICKNAME_MAX_LENGTH = 14;
 
 type KakaoProfile = {
   providerUserKey: string;
@@ -770,7 +771,7 @@ export class AuthService {
     const nickname =
       userData.kakao_account?.profile?.nickname ??
       userData.properties?.nickname ??
-      `kakao_${userData.id}`;
+      `k_${userData.id}`;
 
     return {
       providerUserKey: String(userData.id),
@@ -784,7 +785,7 @@ export class AuthService {
   }
 
   private async resolveUniqueNickname(base: string) {
-    const normalizedBase = base.trim().slice(0, 36) || '사용자';
+    const normalizedBase = base.trim().slice(0, SOCIAL_AUTO_NICKNAME_MAX_LENGTH) || '사용자';
     let candidate = normalizedBase;
     let attempt = 0;
 
@@ -796,7 +797,8 @@ export class AuthService {
       if (!existing) return candidate;
 
       attempt += 1;
-      candidate = `${normalizedBase}_${attempt}`.slice(0, 40);
+      const suffix = `_${attempt}`;
+      candidate = `${normalizedBase.slice(0, SOCIAL_AUTO_NICKNAME_MAX_LENGTH - suffix.length)}${suffix}`;
     }
   }
 }

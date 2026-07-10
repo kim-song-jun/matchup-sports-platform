@@ -119,6 +119,7 @@ export type SettingsViewModel = {
     email: string;
     phone: string;
     password: string;
+    canRequestPasswordChange: boolean;
   };
   groups: MyMenuSection[];
 };

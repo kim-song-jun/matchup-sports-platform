@@ -47,7 +47,8 @@ Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key
 When `POST /api/v1/auth/social-terms` succeeds, the API now creates a default profile immediately:
 
 - Uses the Kakao nickname from onboarding draft when available.
-- Falls back to an auto-generated `플레이어######` style nickname.
+- Falls back to a `k_...` ID-derived nickname when Kakao does not provide a nickname.
+- Keeps the automatically created social nickname within 14 characters, including duplicate suffixes such as `_1`.
 - Resolves nickname conflicts server-side.
 - Stores the Kakao profile image when available.
 - Sets `onboardingStatus = signup_done` and `currentStep = sport`.

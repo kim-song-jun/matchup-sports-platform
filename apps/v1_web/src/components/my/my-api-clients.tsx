@@ -963,6 +963,7 @@ export function SettingsPageClient() {
         email: formatAccountEmail(settings.data.account.email, settings.data.account.providers),
         phone: settings.data.account.phone ?? '등록 안 됨',
         password: formatPasswordAvailability(settings.data.account.hasPassword, settings.data.account.providers),
+        canRequestPasswordChange: Boolean(settings.data.account.hasPassword),
       }
     : undefined;
 
@@ -1299,10 +1300,10 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
-      name: nickname,
+      name: displayName,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
-      initials: initials(nickname),
+      initials: initials(displayName || nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
       loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
       loginMethodProvider: profile.authProvider,

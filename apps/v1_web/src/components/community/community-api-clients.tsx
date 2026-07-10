@@ -192,9 +192,19 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
 // }
 
 function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages'][number] {
+  if (message.messageType === 'system') {
+    return {
+      id: message.messageId,
+      who: 'system',
+      label: '',
+      body: message.content ?? '',
+    };
+  }
+
   return {
     id: message.messageId,
     who: message.mine ? 'me' : 'other',
+    unreadCount: message.mine && message.unreadCount ? message.unreadCount : undefined,
     label: message.mine ? '나' : message.sender.displayName,
     body: message.content ?? '삭제된 메시지예요.',
   };

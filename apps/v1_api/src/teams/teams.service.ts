@@ -1493,8 +1493,12 @@ export class TeamsService {
     });
     const participant = await tx.v1ChatRoomParticipant.upsert({
       where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
-      update: { status: 'active', leftAt: null },
-      create: { chatRoomId: room.id, userId, status: 'active' },
+      update: {
+        status: 'active',
+        leftAt: null,
+        ...(existingParticipant?.status === 'left' ? { lastReadMessageId: null, visibleFromAt: null } : {}),
+      },
+      create: { chatRoomId: room.id, userId, status: 'active', visibleFromAt: null },
       select: { id: true },
     });
 

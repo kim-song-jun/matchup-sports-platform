@@ -114,7 +114,19 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
           ) : null}
-          {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
+          {model.messages.map((message) => message.who === 'system' ? (
+            <div key={message.id} className="tm-chat-system-message">
+              <span>{message.body}</span>
+            </div>
+          ) : (
+            <div key={message.id} className={`tm-chat-message-row tm-chat-message-row-${message.who}`}>
+              {message.who === 'me' && message.unreadCount ? <span className="tm-chat-read-count">{message.unreadCount}</span> : null}
+              <div className={`tm-chat-bubble tm-chat-bubble-${message.who}`}>
+                <div className="tm-text-micro">{message.label}</div>
+                <div className="tm-text-body">{message.body}</div>
+              </div>
+            </div>
+          ))}
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
         {/* 이미지 첨부는 미구현 상태 — aria-label로 준비 중 안내, title 중복 제거 */}

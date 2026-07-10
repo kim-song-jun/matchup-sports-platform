@@ -188,6 +188,16 @@ enum V1ChatMessageStatus {
   deleted
 }
 
+enum V1ChatMessageType {
+  text
+  system
+}
+
+enum V1ChatSystemEventType {
+  joined
+  left
+}
+
 enum V1NotificationTargetType {
   match
   team
@@ -960,6 +970,7 @@ model V1ChatRoomParticipant {
   pinnedAt          DateTime?               @map("pinned_at")
   mutedUntil        DateTime?               @map("muted_until")
   lastReadMessageId String?                 @map("last_read_message_id")
+  visibleFromAt     DateTime?               @map("visible_from_at")
   leftAt            DateTime?               @map("left_at")
   createdAt         DateTime                @default(now()) @map("created_at")
   updatedAt         DateTime                @updatedAt @map("updated_at")
@@ -975,16 +986,18 @@ model V1ChatRoomParticipant {
 }
 
 model V1ChatMessage {
-  id           String              @id @default(uuid())
-  chatRoomId   String              @map("chat_room_id")
-  senderUserId String              @map("sender_user_id")
-  body         String
-  status       V1ChatMessageStatus @default(sent)
-  sentAt       DateTime            @default(now()) @map("sent_at")
-  hiddenAt     DateTime?           @map("hidden_at")
-  deletedAt    DateTime?           @map("deleted_at")
-  createdAt    DateTime            @default(now()) @map("created_at")
-  updatedAt    DateTime            @updatedAt @map("updated_at")
+  id              String                 @id @default(uuid())
+  chatRoomId      String                 @map("chat_room_id")
+  senderUserId    String                 @map("sender_user_id")
+  body            String
+  status          V1ChatMessageStatus    @default(sent)
+  messageType     V1ChatMessageType      @default(text) @map("message_type")
+  systemEventType V1ChatSystemEventType? @map("system_event_type")
+  sentAt          DateTime               @default(now()) @map("sent_at")
+  hiddenAt        DateTime?              @map("hidden_at")
+  deletedAt       DateTime?              @map("deleted_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
 
   chatRoom           V1ChatRoom              @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
   senderUser         V1User                  @relation("V1ChatMessageSender", fields: [senderUserId], references: [id], onDelete: Restrict)

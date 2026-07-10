@@ -4,7 +4,7 @@
 
 - Branch: `feature/v1-chat-room-polish`
 - Target: backend + frontend
-- Mode: CODE after this plan is approved
+- Mode: CODE in progress
 - Scope: v1 chat only
 
 ## Problem
@@ -76,13 +76,13 @@ These are not only UI concerns. Correct behavior requires API and persistence ch
 Add a participant-level visibility anchor.
 
 ```prisma
-visibleFromAt DateTime @default(now()) @map("visible_from_at")
+visibleFromAt DateTime? @map("visible_from_at")
 ```
 
 Use:
 
-- Initial participant creation: set to current time unless backfilling existing active participants.
-- Rejoin: update to current time.
+- Initial participant creation: set to `null`; first actual room entry sets the timestamp.
+- Rejoin: reset to `null`; first actual room entry after rejoin sets the timestamp.
 - Existing active participants during migration: backfill to a historical value that preserves current room history.
 
 ### `v1_chat_messages`
@@ -296,9 +296,14 @@ pnpm qa:v1-db-guardrails
 
 ## Open Implementation Notes
 
-- Need to decide exact idempotency marker for join notices:
-  - possible: detect a recent/latest `system joined` message by same sender after current `visibleFromAt`;
-  - possible: add participant `lastJoinedNoticeAt`;
-  - possible: use status transition log plus message existence.
-- Need to inspect whether API docs have a chat domain file; if not, add or update the closest `docs/api` contract document.
+- Join notice idempotency uses conditional `visibleFromAt: null` update; only the request that wins the update creates the system message.
+- V1 API contract doc updated at `docs/api/v1/domains/chat-notifications.md`.
 
+## Progress Snapshot
+
+- Added Prisma fields/enums and migration `20260710000000_v1_chat_room_polish`.
+- Backend service now initializes entry visibility, creates joined system messages, filters visible messages, validates read markers, and computes per-message unread counts.
+- Resolve/member sync now creates or reactivates participants with `visibleFromAt = null`; existing active participants are preserved through migration backfill.
+- Frontend API types, chat model conversion, and chat thread UI now support centered system notices and own-message unread counts.
+- Targeted polish service tests were added in `apps/v1_api/src/chat/chat.service.polish.spec.ts`.
+- Local validation blocker: `pnpm` scripts fail in this workspace because package binaries such as `jest`/`prisma` resolve to unavailable wrappers (`jest`/`prisma` not recognized; `sh` not recognized). `git diff --check` passed.

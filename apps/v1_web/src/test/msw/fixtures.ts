@@ -553,6 +553,17 @@ v1ChatRoomsFixture.items = [
 export const v1ChatMessagesByRoomFixture: Record<string, CursorPage<V1ChatMessage>> = {
   'chat-match-1': {
     items: [
+      {
+        messageId: 'chat-match-1-join-1',
+        sender: { userId: 'user-3', displayName: 'New member', profileImageUrl: null },
+        messageType: 'system',
+        systemEventType: 'joined',
+        content: 'New member joined the room',
+        status: 'sent',
+        sentAt: '2026-05-18T09:04:00.000Z',
+        mine: false,
+        unreadCount: 0,
+      },
       { messageId: 'chat-match-1-m3', sender: { userId: 'user-2', displayName: '상대팀장', profileImageUrl: null }, content: '오늘 경기 준비물 확인해 주세요', status: 'sent', sentAt: '2026-05-18T09:00:00.000Z', mine: false },
       { messageId: 'chat-match-1-m2', sender: { userId: 'user-1', displayName: '나', profileImageUrl: null }, content: '네, 조끼랑 물 챙겨갈게요', status: 'sent', sentAt: '2026-05-18T08:52:00.000Z', mine: true },
       { messageId: 'chat-match-1-m1', sender: { userId: 'user-2', displayName: '상대팀장', profileImageUrl: null }, content: '오늘 20시에 바로 시작합니다', status: 'sent', sentAt: '2026-05-18T08:40:00.000Z', mine: false },

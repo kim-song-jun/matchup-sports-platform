@@ -959,10 +959,13 @@ export type V1ChatMessage = {
     displayName: string;
     profileImageUrl: string | null;
   };
+  messageType?: 'text' | 'system';
+  systemEventType?: 'joined' | 'left' | null;
   content: string | null;
   status: string;
   sentAt: string;
   mine: boolean;
+  unreadCount?: number;
 };
 
 export type V1ChatRoomDetail = {
@@ -977,6 +980,7 @@ export type V1ChatRoomDetail = {
     pinned: boolean;
     mutedUntil: string | null;
     lastReadMessageId: string | null;
+    visibleFromAt?: string | null;
   };
   participants: Array<{
     userId: string;

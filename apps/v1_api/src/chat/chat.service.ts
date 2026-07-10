@@ -73,7 +73,7 @@ export class ChatService {
   }
 
   async detail(user: V1AuthUser, roomId: string) {
-    const room = await this.getActiveParticipantRoom(user.id, roomId);
+    const room = await this.ensureEntered(user.id, await this.getActiveParticipantRoom(user.id, roomId));
     return {
       roomId: room.id,
       roomType: getRoomType(room),
@@ -90,11 +90,13 @@ export class ChatService {
   }
 
   async messages(user: V1AuthUser, roomId: string, query: ChatMessagesQueryDto) {
-    await this.getActiveParticipantRoom(user.id, roomId);
+    const room = await this.ensureEntered(user.id, await this.getActiveParticipantRoom(user.id, roomId));
+    const me = room.participants[0];
+    const visibleFromAt = me.visibleFromAt ?? new Date(0);
     const limit = Math.min(Math.max(query.limit ?? 30, 1), 100);
     const direction = query.direction ?? 'before';
     const messages = await this.prisma.v1ChatMessage.findMany({
-      where: { chatRoomId: roomId },
+      where: { chatRoomId: roomId, sentAt: { gte: visibleFromAt } },
       include: {
         senderUser: {
           select: {
@@ -109,6 +111,12 @@ export class ChatService {
     });
     const pageItems = messages.slice(0, limit);
     const hasNext = messages.length > limit;
+    const participants = await this.prisma.v1ChatRoomParticipant.findMany({
+      where: { chatRoomId: roomId, status: 'active', visibleFromAt: { not: null } },
+      include: {
+        lastReadMessage: { select: { id: true, sentAt: true } },
+      },
+    });
 
     return {
       items: pageItems.map((message) => ({
@@ -118,10 +126,13 @@ export class ChatService {
           displayName: message.senderUser.profile?.displayName ?? message.senderUser.profile?.nickname ?? '사용자',
           profileImageUrl: message.senderUser.profile?.profileImageUrl ?? null,
         },
+        messageType: message.messageType,
+        systemEventType: message.systemEventType ?? null,
         content: message.status === 'sent' ? message.body : null,
         status: message.status,
         sentAt: message.sentAt,
         mine: message.senderUserId === user.id,
+        unreadCount: this.unreadCountForMessage(message, participants),
       })),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
@@ -175,7 +186,17 @@ export class ChatService {
   }
 
   async updateMe(user: V1AuthUser, roomId: string, dto: UpdateMyChatRoomDto) {
-    await this.getActiveParticipantRoom(user.id, roomId);
+    const room = await this.ensureEntered(user.id, await this.getActiveParticipantRoom(user.id, roomId));
+    if (dto.lastReadMessageId) {
+      const visibleFromAt = room.participants[0].visibleFromAt ?? new Date(0);
+      const readMessage = await this.prisma.v1ChatMessage.findUnique({
+        where: { id: dto.lastReadMessageId },
+        select: { id: true, chatRoomId: true, sentAt: true },
+      });
+      if (!readMessage || readMessage.chatRoomId !== roomId || readMessage.sentAt < visibleFromAt) {
+        throw validationError('lastReadMessageId must reference a visible message in this chat room', 'lastReadMessageId');
+      }
+    }
     const updated = await this.prisma.v1ChatRoomParticipant.update({
       where: { chatRoomId_userId: { chatRoomId: roomId, userId: user.id } },
       data: {
@@ -225,33 +246,21 @@ export class ChatService {
   private async resolveMatchRoom(userId: string, matchId: string) {
     const existing = await this.prisma.v1ChatRoom.findUnique({ where: { matchId } });
     const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { matchId, status: 'active' } }));
-    await this.prisma.v1ChatRoomParticipant.upsert({
-      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
-      update: { status: 'active', leftAt: null },
-      create: { chatRoomId: room.id, userId, status: 'active' },
-    });
+    await this.ensureResolvedParticipant(room.id, userId);
     return { roomId: room.id, roomType: 'match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async resolveTeamRoom(userId: string, teamId: string) {
     const existing = await this.prisma.v1ChatRoom.findUnique({ where: { teamId } });
     const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { teamId, status: 'active' } }));
-    await this.prisma.v1ChatRoomParticipant.upsert({
-      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
-      update: { status: 'active', leftAt: null },
-      create: { chatRoomId: room.id, userId, status: 'active' },
-    });
+    await this.ensureResolvedParticipant(room.id, userId);
     return { roomId: room.id, roomType: 'team', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async resolveTeamMatchRoom(userId: string, teamMatchId: string) {
     const existing = await this.prisma.v1ChatRoom.findUnique({ where: { teamMatchId } });
     const room = existing ?? (await this.prisma.v1ChatRoom.create({ data: { teamMatchId, status: 'active' } }));
-    await this.prisma.v1ChatRoomParticipant.upsert({
-      where: { chatRoomId_userId: { chatRoomId: room.id, userId } },
-      update: { status: 'active', leftAt: null },
-      create: { chatRoomId: room.id, userId, status: 'active' },
-    });
+    await this.ensureResolvedParticipant(room.id, userId);
     return { roomId: room.id, roomType: 'team_match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
@@ -322,6 +331,81 @@ export class ChatService {
     return room;
   }
 
+  private async ensureResolvedParticipant(roomId: string, userId: string) {
+    const existing = await this.prisma.v1ChatRoomParticipant.findUnique({
+      where: { chatRoomId_userId: { chatRoomId: roomId, userId } },
+    });
+    if (!existing) {
+      await this.prisma.v1ChatRoomParticipant.create({
+        data: { chatRoomId: roomId, userId, status: 'active', visibleFromAt: null },
+      });
+      return;
+    }
+    if (existing.status === 'left') {
+      await this.prisma.v1ChatRoomParticipant.update({
+        where: { id: existing.id },
+        data: { status: 'active', leftAt: null, lastReadMessageId: null, visibleFromAt: null },
+      });
+    }
+  }
+
+  private async ensureEntered(userId: string, room: Awaited<ReturnType<ChatService['getActiveParticipantRoom']>>) {
+    const participant = room.participants[0];
+    if (participant.visibleFromAt) return room;
+
+    const enteredAt = new Date();
+    const displayName = participant.user.profile?.displayName ?? participant.user.profile?.nickname ?? '참여자';
+    await this.prisma.$transaction(async (tx) => {
+      const entered = await tx.v1ChatRoomParticipant.updateMany({
+        where: { id: participant.id, visibleFromAt: null },
+        data: { visibleFromAt: enteredAt },
+      });
+      if (entered.count === 0) return;
+      const notice = await tx.v1ChatMessage.create({
+        data: {
+          chatRoomId: room.id,
+          senderUserId: userId,
+          body: `${displayName}님이 들어왔습니다`,
+          status: 'sent',
+          messageType: 'system',
+          systemEventType: 'joined',
+          sentAt: enteredAt,
+        },
+      });
+      await tx.v1ChatRoom.update({
+        where: { id: room.id },
+        data: { lastMessageAt: notice.sentAt },
+      });
+    });
+
+    const current = await this.prisma.v1ChatRoomParticipant.findUnique({
+      where: { id: participant.id },
+      select: { visibleFromAt: true },
+    });
+    participant.visibleFromAt = current?.visibleFromAt ?? enteredAt;
+    return room;
+  }
+
+  private unreadCountForMessage(
+    message: {
+      senderUserId: string;
+      sentAt: Date;
+      messageType: string;
+    },
+    participants: Array<{
+      userId: string;
+      visibleFromAt: Date | null;
+      lastReadMessage: { sentAt: Date } | null;
+    }>,
+  ) {
+    if (message.messageType !== 'text') return 0;
+    return participants.filter((participant) => {
+      if (participant.userId === message.senderUserId) return false;
+      if (!participant.visibleFromAt || participant.visibleFromAt > message.sentAt) return false;
+      return !participant.lastReadMessage || participant.lastReadMessage.sentAt < message.sentAt;
+    }).length;
+  }
+
   private roomInclude(_userId: string) {
     return {
       match: { select: { id: true, title: true } },
@@ -338,7 +422,10 @@ export class ChatService {
 
   private async toRoomListItem(room: RoomWithRelations, userId: string) {
     const me = room.participants.find((participant) => participant.userId === userId);
-    const lastMessage = room.messages[0] ?? null;
+    const visibleFromAt = me?.visibleFromAt ?? null;
+    const lastMessage = visibleFromAt
+      ? (room.messages.find((message) => message.sentAt >= visibleFromAt) ?? null)
+      : null;
     const lastReadMessage = me?.lastReadMessageId
       ? await this.prisma.v1ChatMessage.findUnique({ where: { id: me.lastReadMessageId }, select: { sentAt: true } })
       : null;
@@ -346,8 +433,9 @@ export class ChatService {
       where: {
         chatRoomId: room.id,
         status: 'sent',
+        messageType: 'text',
         senderUserId: { not: userId },
-        ...(lastReadMessage ? { sentAt: { gt: lastReadMessage.sentAt } } : {}),
+        ...(visibleFromAt ? { sentAt: { gte: visibleFromAt, ...(lastReadMessage ? { gt: lastReadMessage.sentAt } : {}) } } : { id: '__never__' }),
       },
     });
     return {
@@ -373,6 +461,7 @@ export class ChatService {
       pinned: Boolean(me?.pinnedAt),
       mutedUntil: me?.mutedUntil ?? null,
       lastReadMessageId: me?.lastReadMessageId ?? null,
+      visibleFromAt: me?.visibleFromAt ?? null,
     };
   }
 }

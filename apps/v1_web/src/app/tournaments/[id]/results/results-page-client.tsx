@@ -112,8 +112,8 @@ function DesktopChampionHero({
 }) {
   const rec = computeTeamRecord(champion, tournament.fixtures);
   return (
+    <div className="tm-show-desktop">
     <div
-      className="tm-show-desktop"
       style={{
         position: 'relative',
         background: 'linear-gradient(160deg, #0A0E1A 0%, #0D1B2A 40%, #1A0A2E 100%)',
@@ -185,10 +185,11 @@ function DesktopChampionHero({
         ))}
       </div>
     </div>
+    </div>
   );
 }
 
-/* 모바일 챔피언 배너 */
+/* 모바일 챔피언 히어로 (tm-res-hero CSS 기반 애니메이션) */
 function MobileChampionBanner({
   champion,
   tournament,
@@ -196,42 +197,40 @@ function MobileChampionBanner({
   champion: string;
   tournament: V1TournamentDetail;
 }) {
+  const [played, setPlayed] = useState(false);
   const rec = computeTeamRecord(champion, tournament.fixtures);
+
+  useEffect(() => {
+    const t = setTimeout(() => setPlayed(true), 80);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <div
-      className="tm-hide-desktop"
-      style={{
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-        borderRadius: 12, padding: '18px 20px',
-        display: 'flex', alignItems: 'center', gap: 14, color: '#fff',
-      }}
+      className={`tm-hide-desktop tm-res-hero${played ? ' tm-res-hero-in' : ''}`}
+      aria-label={`우승팀: ${champion}`}
     >
-      <span style={{ fontSize: 28, lineHeight: 1, flexShrink: 0 }} aria-hidden="true">🏆</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,215,0,0.7)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 2 }}>
-          {tournament.sport?.name ?? ''} &middot; CHAMPION
-        </div>
-        <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
-          {champion}
-        </div>
+      {played && <Confetti count={32} />}
+      <div className="tm-res-hero-trophy" aria-hidden="true">🏆</div>
+      <div className="tm-res-hero-label">★ CHAMPION ★</div>
+      <div className="tm-res-hero-name">{champion}</div>
+      <div className="tm-res-hero-inline-stat">
+        {tournament.sport?.name ?? ''} &middot; {rec.games}경기 &middot; {rec.w}승 &middot; {rec.gf}득점
       </div>
-      <div style={{ display: 'flex', gap: 14, flexShrink: 0, alignItems: 'center' }}>
+      {/* 스탯 3칸 */}
+      <div style={{ display: 'flex', gap: 28, marginTop: 16, alignItems: 'center' }}>
         {[
-          { n: rec.w, label: '승' },
-          { n: rec.gf, label: '득점' },
-          { n: rec.games, label: '경기' },
-        ].map(({ n, label }) => (
+          { n: rec.w, label: '승리', sub: `${rec.games}경기 중` },
+          { n: rec.gf, label: '득점', sub: `${rec.ga}실점` },
+          { n: rec.w, label: '무패', sub: '전 경기' },
+        ].map(({ n, label, sub }) => (
           <div key={label} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1, color: '#FDE68A', fontVariantNumeric: 'tabular-nums' }}>{n}</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2, fontWeight: 600 }}>{label}</div>
+            <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1, color: '#FDE68A', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{n}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginTop: 3 }}>{label}</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{sub}</div>
           </div>
         ))}
       </div>
-      <div style={{
-        background: 'rgba(255,215,0,0.15)', border: '1px solid rgba(255,215,0,0.3)',
-        borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 800,
-        color: '#FDE68A', letterSpacing: '0.04em', flexShrink: 0,
-      }}>CHAMPION</div>
     </div>
   );
 }
@@ -457,10 +456,10 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
 
 /* 순위별 스타일 */
 const POS_CFG: Record<number, { bg: string; numColor: string; label: string }> = {
-  1: { bg: 'rgba(253,230,138,0.2)',  numColor: '#B45309',              label: '우승'    },
-  2: { bg: 'rgba(209,213,219,0.15)', numColor: '#6B7280',              label: '준우승'  },
-  3: { bg: 'rgba(251,191,36,0.08)',  numColor: '#92400E',              label: '3위'     },
-  4: { bg: 'transparent',            numColor: 'var(--text-caption)', label: '4위'     },
+  1: { bg: 'var(--blue50)',    numColor: 'var(--blue500)',      label: '우승'   },
+  2: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '준우승' },
+  3: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '3위'    },
+  4: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '4위'    },
 };
 
 function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixtures: V1TournamentFixture[] }) {
@@ -487,19 +486,17 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
             alignItems: 'center',
           }}>
             <div style={{ fontWeight: 900, fontSize: 15, color: cfg.numColor, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>{row.pos}</div>
-            <div style={{ fontWeight: isChamp ? 800 : 600, fontSize: 14, color: isChamp ? 'var(--text-strong)' : 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-              {isChamp && <span aria-hidden="true" style={{ fontSize: 11 }}>🏆</span>}
+            <div style={{ fontWeight: isChamp ? 700 : 500, fontSize: 14, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {row.name}
             </div>
             <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: isChamp ? '#B45309' : 'var(--text-caption)', background: isChamp ? 'rgba(253,230,138,0.4)' : 'transparent', padding: isChamp ? '2px 7px' : '0', borderRadius: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: cfg.numColor }}>
                 {cfg.label}
               </span>
             </div>
             <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{rec.w}</div>
             <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{rec.gf}</div>
-            <div style={{ textAlign: 'center', fontSize: 12, fontVariantNumeric: 'tabular-nums', fontWeight: 600,
-              color: diff > 0 ? '#059669' : diff < 0 ? '#DC2626' : 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center', fontSize: 12, fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>
               {diff > 0 ? '+' : ''}{diff}
             </div>
           </div>

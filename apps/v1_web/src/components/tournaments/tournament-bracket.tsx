@@ -66,6 +66,8 @@ export function groupFixturesByRound(
     const existing = roundMap.get(key);
     if (existing) {
       existing.fixtures.push(fixture);
+      // sortIndex는 가장 낮은 값(우선순위 높은 값)으로 갱신한다.
+      if (sortIndex < existing.sortIndex) existing.sortIndex = sortIndex;
     } else {
       roundMap.set(key, { key, label: getRoundLabel(key), sortIndex, fixtures: [fixture] });
     }
@@ -113,6 +115,170 @@ function penaltyText(fixture: V1TournamentFixture): string {
     return `PK ${r.homePenaltyScore}:${r.awayPenaltyScore}`;
   }
   return '';
+}
+
+/* ── 2차전 합산 매치업 ── */
+
+interface AggregateMatchup {
+  id: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeAggScore: number;
+  awayAggScore: number;
+  hasPK: boolean;
+  pkInfo: string | null;
+  winner: WinnerSide;
+  status: string;
+  legs: V1TournamentFixture[];
+  fixtureNumber: number;
+}
+
+/**
+ * 2차전(legNumber > 1)이 존재하는 라운드의 픽스처를 fixtureNumber 기준으로 묶어
+ * 합산 매치업 배열로 반환한다. 단일 레그라면 그대로 1:1 변환한다.
+ */
+function aggregateByMatchup(fixtures: V1TournamentFixture[]): AggregateMatchup[] {
+  const map = new Map<number, V1TournamentFixture[]>();
+  for (const f of fixtures) {
+    const list = map.get(f.fixtureNumber) ?? [];
+    list.push(f);
+    map.set(f.fixtureNumber, list);
+  }
+
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([fixtureNumber, legs]) => {
+      legs.sort((a, b) => a.legNumber - b.legNumber);
+      const leg1 = legs[0];
+
+      if (legs.length === 1) {
+        const w = getWinner(leg1);
+        return {
+          id: leg1.id,
+          homeTeamName: leg1.homeTeamName,
+          awayTeamName: leg1.awayTeamName,
+          homeAggScore: leg1.result?.homeScore ?? 0,
+          awayAggScore: leg1.result?.awayScore ?? 0,
+          hasPK: leg1.result?.hasPenalty ?? false,
+          pkInfo: penaltyText(leg1) || null,
+          winner: w,
+          status: leg1.status,
+          legs,
+          fixtureNumber,
+        };
+      }
+
+      // 2-legged: 1차전 홈팀 기준으로 합산
+      const leg1Home = leg1.homeTeamName;
+      const leg1Away = leg1.awayTeamName;
+
+      let homeAgg = leg1.result?.homeScore ?? 0;
+      let awayAgg = leg1.result?.awayScore ?? 0;
+
+      for (let i = 1; i < legs.length; i++) {
+        const leg = legs[i];
+        const isReversed = leg.homeTeamName === leg1Away;
+        if (isReversed) {
+          homeAgg += leg.result?.awayScore ?? 0;
+          awayAgg += leg.result?.homeScore ?? 0;
+        } else {
+          homeAgg += leg.result?.homeScore ?? 0;
+          awayAgg += leg.result?.awayScore ?? 0;
+        }
+      }
+
+      // 승자 판정 (합산 점수 기준, 동점이면 PK)
+      let winner: WinnerSide = null;
+      if (homeAgg > awayAgg) winner = 'home';
+      else if (awayAgg > homeAgg) winner = 'away';
+      else {
+        const pkLeg = legs.find((l) => l.result?.hasPenalty);
+        if (pkLeg?.result?.hasPenalty) {
+          const isRevLeg = pkLeg.homeTeamName === leg1Away;
+          const homePK = isRevLeg ? pkLeg.result.awayPenaltyScore : pkLeg.result.homePenaltyScore;
+          const awayPK = isRevLeg ? pkLeg.result.homePenaltyScore : pkLeg.result.awayPenaltyScore;
+          if (homePK !== null && awayPK !== null) {
+            winner = homePK > awayPK ? 'home' : 'away';
+          }
+        }
+      }
+
+      // PK 배지용 정보 (정규화)
+      const pkLeg = legs.find((l) => l.result?.hasPenalty);
+      let pkInfo: string | null = null;
+      if (pkLeg?.result?.hasPenalty && pkLeg.result.homePenaltyScore !== null && pkLeg.result.awayPenaltyScore !== null) {
+        const isRevLeg = pkLeg.homeTeamName === leg1Away;
+        const hPK = isRevLeg ? pkLeg.result.awayPenaltyScore : pkLeg.result.homePenaltyScore;
+        const aPK = isRevLeg ? pkLeg.result.homePenaltyScore : pkLeg.result.awayPenaltyScore;
+        pkInfo = `PK ${hPK}:${aPK}`;
+      }
+
+      const allDone = legs.every((l) => l.status === 'completed');
+      const anyLive = legs.some((l) => l.status === 'in_progress');
+
+      return {
+        id: leg1.id,
+        homeTeamName: leg1Home,
+        awayTeamName: leg1Away,
+        homeAggScore: homeAgg,
+        awayAggScore: awayAgg,
+        hasPK: !!pkLeg,
+        pkInfo,
+        winner,
+        status: anyLive ? 'in_progress' : allDone ? 'completed' : 'scheduled',
+        legs,
+        fixtureNumber,
+      };
+    });
+}
+
+/** 라운드 픽스처에 2차전이 있는지 여부 */
+function isMultiLeg(fixtures: V1TournamentFixture[]): boolean {
+  return fixtures.some((f) => f.legNumber > 1);
+}
+
+/* ── 합산 매치 카드 ── */
+function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
+  const { homeTeamName, awayTeamName, homeAggScore, awayAggScore, winner, status, pkInfo, legs } = matchup;
+  const isLive = status === 'in_progress';
+  const isDone = status === 'completed';
+  const isMulti = legs.length > 1;
+
+  const homeInitial = homeTeamName?.trim().charAt(0) || '?';
+  const awayInitial = awayTeamName?.trim().charAt(0) || '?';
+
+  return (
+    <div
+      className={`tm-bk2-card${isLive ? ' tm-bk2-card-live' : ''}`}
+      role="group"
+      aria-label={`${homeTeamName} 대 ${awayTeamName}${isMulti ? ' 합산' : ''}`}
+    >
+      <div
+        className="tm-bk2-row"
+        data-winner={winner === 'home' ? 'true' : undefined}
+        data-loser={isDone && winner === 'away' ? 'true' : undefined}
+      >
+        <span className="tm-bk2-avatar" aria-hidden="true">{homeInitial}</span>
+        <span className="tm-bk2-name">{homeTeamName}</span>
+        <span className="tm-bk2-score tab-num">{homeAggScore}</span>
+      </div>
+      <div className="tm-bk2-divider" aria-hidden="true" />
+      <div
+        className="tm-bk2-row"
+        data-winner={winner === 'away' ? 'true' : undefined}
+        data-loser={isDone && winner === 'home' ? 'true' : undefined}
+      >
+        <span className="tm-bk2-avatar" aria-hidden="true">{awayInitial}</span>
+        <span className="tm-bk2-name">{awayTeamName}</span>
+        <span className="tm-bk2-score tab-num">{awayAggScore}</span>
+      </div>
+      {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
+      {isDone && pkInfo && <div className="tm-bk2-badge">{pkInfo}</div>}
+      {isDone && isMulti && !pkInfo && (
+        <div className="tm-bk2-badge" style={{ color: 'var(--text-caption)', background: 'var(--grey50)' }}>합산</div>
+      )}
+    </div>
+  );
 }
 
 function statusLabel(status: string): string {
@@ -297,34 +463,44 @@ function BracketRoundCol({
 }: {
   round: RoundGroup; headLabel: string; h: number; centered?: boolean;
 }) {
+  // multi-leg 라운드는 합산 카드로 렌더링
+  const multi = isMultiLeg(round.fixtures);
+  const matchups = multi ? aggregateByMatchup(round.fixtures) : null;
+  const slotCount = matchups ? matchups.length : round.fixtures.length;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: COL_W, flexShrink: 0 }}>
       {/* 라운드 라벨 */}
       <div style={{ height: HEAD_H, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span className="tm-bk2-pill">{headLabel}</span>
       </div>
-      {/* 카드 슬롯들 — 정확한 고정 높이 컨테이너 */}
+      {/* 카드 슬롯들 */}
       <div style={{
         height: h, position: 'relative',
         display: 'flex', flexDirection: 'column',
         justifyContent: centered ? 'center' : 'flex-start',
       }}>
-        {centered ? (
-          /* 결승/챔피언: 세로 정중앙 */
+        {centered && !matchups ? (
+          /* 결승: 세로 정중앙 — single-leg only */
           round.fixtures.map((fix) => (
             <MatchCard key={fix.id} fixture={fix} />
           ))
+        ) : matchups ? (
+          /* multi-leg: 합산 카드 */
+          matchups.map((mu, i) => (
+            <div
+              key={mu.id}
+              style={{ height: SLOT_H, marginTop: i > 0 ? SLOT_GAP : 0, display: 'flex', alignItems: 'center' }}
+            >
+              <AggregateMatchCard matchup={mu} />
+            </div>
+          ))
         ) : (
-          /* 조별 라운드: 위부터 SLOT_H 슬롯에 정렬 */
+          /* single-leg: 기존 방식 */
           round.fixtures.map((fix, i) => (
             <div
               key={fix.id}
-              style={{
-                height: SLOT_H,
-                marginTop: i > 0 ? SLOT_GAP : 0,
-                display: 'flex',
-                alignItems: 'center',
-              }}
+              style={{ height: SLOT_H, marginTop: i > 0 ? SLOT_GAP : 0, display: 'flex', alignItems: 'center' }}
             >
               <MatchCard fixture={fix} />
             </div>
@@ -376,7 +552,12 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
   const thirdPlace = rounds.find((r) => r.key === 'third_place') ?? null;
   const champion = getChampion(rounds);
 
-  const roundHeights = mainRounds.map((r) => colH(r.fixtures.length));
+  const roundHeights = mainRounds.map((r) => {
+    const slotCount = isMultiLeg(r.fixtures)
+      ? aggregateByMatchup(r.fixtures).length
+      : r.fixtures.length;
+    return colH(slotCount);
+  });
   const treeH = Math.max(...roundHeights, SLOT_H);
 
   /* ── 드래그 스크롤 ── */
@@ -431,7 +612,16 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
             {mainRounds.map((round, idx) => {
               const isFirst = idx === 0;
               const isLast = idx === mainRounds.length - 1;
-              const rH = colH(round.fixtures.length);
+              // multi-leg 라운드는 matchup 수 기준으로 높이/커넥터 계산
+              const slotCount = isMultiLeg(round.fixtures)
+                ? aggregateByMatchup(round.fixtures).length
+                : round.fixtures.length;
+              const rH = colH(slotCount);
+              const nextSlotCount = (() => {
+                const next = mainRounds[idx + 1];
+                if (!next) return 1;
+                return isMultiLeg(next.fixtures) ? aggregateByMatchup(next.fixtures).length : next.fixtures.length;
+              })();
 
               return (
                 <div key={round.key} style={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -444,9 +634,9 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
                   {!isLast && (
                     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, paddingTop: HEAD_H }}>
                       <BracketSvgConnector
-                        topCount={round.fixtures.length}
+                        topCount={slotCount}
                         totalH={rH}
-                        nextN={mainRounds[idx + 1]?.fixtures.length ?? 1}
+                        nextN={nextSlotCount}
                       />
                     </div>
                   )}

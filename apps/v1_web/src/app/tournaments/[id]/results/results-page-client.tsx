@@ -299,7 +299,6 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
     <div style={{
       padding: '10px 16px',
       background: isAccent ? 'var(--blue50)' : isAgg ? 'rgba(49,130,246,0.04)' : 'transparent',
-      borderLeft: isAccent ? '3px solid var(--blue500)' : '3px solid transparent',
     }}>
       {/* 상단: 라벨 + 날짜 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>

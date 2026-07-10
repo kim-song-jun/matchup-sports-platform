@@ -1671,8 +1671,32 @@ export type V1TournamentDetail = {
   groups: V1TournamentGroup[];
   fixtures: V1TournamentFixture[];
   announcements: V1TournamentAnnouncement[];
+  /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능) */
+  reviews: V1TournamentReview[];
+  /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
+  awards: V1TournamentAward[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type V1TournamentReview = {
+  id: string;
+  authorId: string;
+  authorNickname: string;
+  authorProfileImageUrl: string | null;
+  teamName: string | null;
+  rating: number; // 1~5
+  comment: string | null;
+  createdAt: string;
+};
+
+export type V1TournamentAward = {
+  id: string;
+  awardType: string;   // 'mvp' | 'top_scorer' | ...
+  awardLabel: string;  // 'MVP' | '득점왕' | ...
+  recipientName: string;
+  teamName: string | null;
+  note: string | null;
 };
 
 /** Shared payment summary embedded in registrations */

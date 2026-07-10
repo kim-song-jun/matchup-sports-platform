@@ -1,7 +1,7 @@
 'use client';
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { v1Api, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   ApiEnvelope,
@@ -100,6 +100,8 @@ import type {
   V1UploadImagesResult,
   V1TournamentListPage,
   V1TournamentDetail,
+  V1TournamentReview,
+  V1TournamentAward,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
   V1TournamentPlayer,
@@ -1530,6 +1532,61 @@ export function useV1Tournament(id: string) {
     queryKey: v1Keys.tournament(id),
     queryFn: () => v1Get<V1TournamentDetail>(`/tournaments/${id}`),
     enabled: !!id,
+  });
+}
+
+/** 대회 리뷰 목록 (tournaments/:id에 이미 포함되지만 독립 조회용) */
+export function useV1TournamentReviews(tournamentId: string) {
+  return useQuery({
+    queryKey: ['tournament-reviews', tournamentId],
+    queryFn: () => v1Get<V1TournamentReview[]>(`/tournaments/${tournamentId}/reviews`),
+    enabled: !!tournamentId,
+  });
+}
+
+/** 내 리뷰 조회 (이미 작성했는지 확인) */
+export function useV1MyTournamentReview(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-reviews-me', tournamentId],
+    queryFn: () => v1Get<V1TournamentReview | null>(`/tournaments/${tournamentId}/reviews/me`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 참가팀 여부 확인 */
+export function useV1TournamentParticipantCheck(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-participant-check', tournamentId],
+    queryFn: () => v1Get<{ isParticipant: boolean }>(`/tournaments/${tournamentId}/participant-check`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 리뷰 제출 */
+export function useV1SubmitTournamentReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { rating: number; comment?: string }) =>
+      v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews', tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews-me', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 어워드 설정 */
+export function useV1SetTournamentAwards(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (awards: {
+      awardType: string; awardLabel: string; recipientName: string;
+      teamName?: string; note?: string; sortOrder?: number;
+    }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
   });
 }
 

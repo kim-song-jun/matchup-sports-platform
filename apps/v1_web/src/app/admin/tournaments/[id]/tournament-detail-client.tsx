@@ -43,6 +43,7 @@ import {
   useV1CreateAnnouncement,
   useV1PublishAnnouncement,
   useV1UploadImages,
+  useV1SetTournamentAwards,
 } from '@/hooks/use-v1-api';
 import type {
   V1TournamentStatus,
@@ -53,6 +54,7 @@ import type {
   V1TournamentGroupPhase,
   V1AnnouncementAudience,
   V1UpdateTournamentPayload,
+  V1TournamentAward,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
@@ -285,12 +287,13 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'registrations' | 'bracket' | 'announcements';
+type TabId = 'registrations' | 'bracket' | 'announcements' | 'awards';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'registrations', label: '신청 관리' },
   { id: 'bracket', label: '대진 관리' },
   { id: 'announcements', label: '공지' },
+  { id: 'awards', label: '개인 어워드' },
 ];
 
 // ── Registration roster modal ─────────────────────────────────────────────
@@ -2367,6 +2370,20 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         )}
       </div>
 
+      <div
+        id="panel-awards"
+        role="tabpanel"
+        aria-labelledby="tab-awards"
+        hidden={activeTab !== 'awards'}
+      >
+        {activeTab === 'awards' && (
+          <AwardsTab
+            tournamentId={id}
+            showToast={showToast}
+          />
+        )}
+      </div>
+
       {/* ── D1: 대회 정보 수정 모달 ──────────────────────────────────── */}
       <SimpleModal
         open={editOpen}
@@ -2759,5 +2776,156 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
       <AdminToasts toasts={toasts} />
     </>
+  );
+}
+
+// ── Tab: Individual Awards ────────────────────────────────────────────────
+
+const DEFAULT_AWARD_TYPES = [
+  { awardType: 'mvp', awardLabel: 'MVP' },
+  { awardType: 'top_scorer', awardLabel: '득점왕' },
+  { awardType: 'best_defense', awardLabel: '베스트 수비수' },
+  { awardType: 'fair_play', awardLabel: '페어플레이' },
+];
+
+function AwardsTab({
+  tournamentId,
+  showToast,
+}: {
+  tournamentId: string;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const { data: tournament } = useV1AdminTournament(tournamentId);
+  const setAwards = useV1SetTournamentAwards(tournamentId);
+
+  // 기존 어워드 또는 빈 템플릿
+  type AwardForm = { awardType: string; awardLabel: string; recipientName: string; teamName: string; note: string };
+  const [rows, setRows] = useState<AwardForm[]>(() => {
+    return DEFAULT_AWARD_TYPES.map((d) => ({
+      awardType: d.awardType,
+      awardLabel: d.awardLabel,
+      recipientName: '',
+      teamName: '',
+      note: '',
+    }));
+  });
+
+  // 기존 저장된 어워드 로드
+  const [loaded, setLoaded] = useState(false);
+  if (tournament && !loaded) {
+    const existing = (tournament as { awards?: V1TournamentAward[] }).awards ?? [];
+    if (existing.length > 0) {
+      const merged = DEFAULT_AWARD_TYPES.map((d) => {
+        const found = existing.find((a) => a.awardType === d.awardType);
+        return {
+          awardType: d.awardType,
+          awardLabel: d.awardLabel,
+          recipientName: found?.recipientName ?? '',
+          teamName: found?.teamName ?? '',
+          note: found?.note ?? '',
+        };
+      });
+      // extra custom awards
+      existing.filter((a) => !DEFAULT_AWARD_TYPES.some((d) => d.awardType === a.awardType)).forEach((a) => {
+        merged.push({ awardType: a.awardType, awardLabel: a.awardLabel, recipientName: a.recipientName, teamName: a.teamName ?? '', note: a.note ?? '' });
+      });
+      setRows(merged);
+    }
+    setLoaded(true);
+  }
+
+  const update = (idx: number, field: keyof AwardForm, value: string) => {
+    setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  };
+
+  const addRow = () => {
+    setRows((prev) => [...prev, { awardType: `custom_${Date.now()}`, awardLabel: '', recipientName: '', teamName: '', note: '' }]);
+  };
+
+  const removeRow = (idx: number) => {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSave = () => {
+    const awards = rows
+      .filter((r) => r.awardLabel.trim() && r.recipientName.trim())
+      .map((r, i) => ({ ...r, awardLabel: r.awardLabel.trim(), recipientName: r.recipientName.trim(), teamName: r.teamName.trim() || undefined, note: r.note.trim() || undefined, sortOrder: i }));
+    setAwards.mutate(awards, {
+      onSuccess: () => showToast('개인 어워드가 저장됐어요.', 'success'),
+      onError: () => showToast('저장 중 오류가 발생했어요.', 'error'),
+    });
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-[15px] font-bold text-gray-900">개인 어워드</h3>
+          <p className="text-[12px] text-gray-500 mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시됩니다.</p>
+        </div>
+        <button type="button" onClick={addRow} className="text-[12px] text-blue-600 font-semibold px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50">+ 항목 추가</button>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {rows.map((row, idx) => (
+          <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-white">
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={row.awardLabel}
+                onChange={(e) => update(idx, 'awardLabel', e.target.value)}
+                placeholder="어워드명 (예: MVP)"
+                className="flex-1 text-[13px] font-semibold border-0 bg-gray-50 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button type="button" onClick={() => removeRow(idx)} className="text-gray-400 hover:text-red-500 p-1" aria-label="항목 삭제">✕</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[11px] text-gray-500 mb-1 block">수상자 이름 *</label>
+                <input
+                  type="text"
+                  value={row.recipientName}
+                  onChange={(e) => update(idx, 'recipientName', e.target.value)}
+                  placeholder="홍길동"
+                  className="w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-gray-500 mb-1 block">소속 팀 (선택)</label>
+                <input
+                  type="text"
+                  value={row.teamName}
+                  onChange={(e) => update(idx, 'teamName', e.target.value)}
+                  placeholder="팀명"
+                  className="w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+            </div>
+            {row.note !== undefined && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={row.note}
+                  onChange={(e) => update(idx, 'note', e.target.value)}
+                  placeholder="비고 (선택, 예: 3골 1어시스트)"
+                  className="w-full text-[12px] border border-gray-100 rounded-lg px-3 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={setAwards.isPending}
+          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl text-[14px] disabled:opacity-50 hover:bg-blue-700 transition-colors"
+        >
+          {setAwards.isPending ? '저장 중...' : '어워드 저장'}
+        </button>
+      </div>
+    </div>
   );
 }

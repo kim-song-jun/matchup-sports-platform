@@ -120,6 +120,16 @@ export class TournamentsReadService {
           where: { status: { in: ['awaiting_payment', 'payment_checking', 'paid'] } },
           select: { status: true },
         },
+        reviews: {
+          orderBy: { createdAt: 'desc' as const },
+          take: 30,
+          include: {
+            author: { select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } } },
+          },
+        },
+        awards: {
+          orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
+        },
       },
     });
 
@@ -238,6 +248,24 @@ export class TournamentsReadService {
       })),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+      reviews: (row.reviews ?? []).map((r) => ({
+        id: r.id,
+        authorId: r.authorUserId,
+        authorNickname: (r.author as { profile?: { nickname?: string | null } | null } | null)?.profile?.nickname ?? '익명',
+        authorProfileImageUrl: (r.author as { profile?: { profileImageUrl?: string | null } | null } | null)?.profile?.profileImageUrl ?? null,
+        teamName: r.teamName ?? null,
+        rating: r.rating,
+        comment: r.comment ?? null,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      awards: (row.awards ?? []).map((a) => ({
+        id: a.id,
+        awardType: a.awardType,
+        awardLabel: a.awardLabel,
+        recipientName: a.recipientName,
+        teamName: a.teamName ?? null,
+        note: a.note ?? null,
+      })),
     };
   }
 

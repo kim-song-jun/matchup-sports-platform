@@ -3,7 +3,14 @@
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { useV1Tournament } from '@/hooks/use-v1-api';
+import { useState } from 'react';
+import {
+  useV1Tournament,
+  useV1TournamentParticipantCheck,
+  useV1MyTournamentReview,
+  useV1SubmitTournamentReview,
+} from '@/hooks/use-v1-api';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentHubHeader } from '@/components/tournaments/tournament-hub-header';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -183,72 +190,224 @@ function PrizeSection({
     </section>
   );
 }
-function IndividualAwardsSection() {
+function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  const awards = tournament.awards ?? [];
+
+  if (awards.length === 0) {
+    return (
+      <section style={{ marginBottom: 20 }}>
+        <h3 className="tm-hub-section-title">개인 어워드</h3>
+        <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>⭐</div>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
+            MVP · 득점왕 등 개인 어워드는<br />집계 중이에요.
+          </p>
+        </Card>
+      </section>
+    );
+  }
+
+  const AWARD_ICON: Record<string, string> = {
+    mvp: '🏅', top_scorer: '⚽', best_defense: '🛡️',
+    best_keeper: '🧤', fair_play: '🤝', best_rookie: '🌟',
+  };
+
   return (
     <section style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">개인 어워드</h3>
-      <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>⭐</div>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-          MVP · 득점왕 등 개인 어워드는<br />추후 공개될 예정이에요.
-        </p>
-      </Card>
-    </section>
-  );
-}
-
-/* ── 리뷰 섹션 (현재는 placeholder — 토너먼트 리뷰 API 연동 예정) ── */
-function ReviewsSection({ tournamentId }: { tournamentId: string }) {
-  // TODO: 토너먼트 리뷰 API 연동 시 실제 리뷰 목록으로 교체
-  const sampleReviews = [
-    {
-      id: '1',
-      author: '성수 러너스',
-      avatarLetter: '성',
-      stars: 5,
-      body: '운영이 정말 매끄러웠어요. 대진표도 공정하고 경기장 컨디션도 좋았습니다. 다음 시즌에도 꼭 참가하고 싶어요!',
-      date: '5월 22일',
-    },
-    {
-      id: '2',
-      author: '한강 FC',
-      avatarLetter: '한',
-      stars: 4,
-      body: '첫 공식 대회였는데 경험이 정말 좋았습니다. 조금 더 심판이 많았으면 했지만 전반적으로 만족해요.',
-      date: '5월 22일',
-    },
-  ];
-
-  return (
-    <section style={{ marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h3 className="tm-hub-section-title" style={{ margin: 0 }}>참가팀 후기</h3>
-        <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{sampleReviews.length}개</span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {sampleReviews.map((review) => (
-          <div key={review.id} className="tm-review-card">
-            <div className="tm-review-card-header">
-              <div className="tm-review-card-avatar" aria-hidden="true">
-                {review.avatarLetter}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {awards.map((award) => (
+          <div key={award.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 16px', background: 'var(--surface)',
+            borderRadius: 10, border: '1px solid var(--grey150)',
+          }}>
+            <span style={{ fontSize: 24, flexShrink: 0 }} aria-hidden="true">
+              {AWARD_ICON[award.awardType] ?? '🏆'}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
+                {award.awardLabel}
               </div>
-              <div>
-                <div className="tm-review-card-author">{review.author}</div>
-                <div className="tm-review-card-date">{review.date}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {award.recipientName}
               </div>
-              <div className="tm-review-card-stars" aria-label={`별점 ${review.stars}점`}>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <span key={i} className="tm-review-card-star" aria-hidden="true">
-                    {i < review.stars ? '⭐' : '☆'}
-                  </span>
-                ))}
-              </div>
+              {award.teamName && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
+              )}
             </div>
-            <p className="tm-review-card-body">{review.body}</p>
+            {award.note && (
+              <div style={{ fontSize: 11, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
+            )}
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+/* ── 별점 컴포넌트 ── */
+function StarRating({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4 }} role="group" aria-label="별점 선택">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n} type="button"
+          style={{ background: 'none', border: 'none', padding: '2px', fontSize: 22, cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
+          onClick={() => onChange?.(n)}
+          aria-label={`${n}점`}
+        >
+          {n <= value ? '⭐' : '☆'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── 리뷰 작성 모달 ── */
+function ReviewFormModal({
+  tournamentId, onClose,
+}: { tournamentId: string; onClose: () => void }) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const { mutate, isPending, isError } = useV1SubmitTournamentReview(tournamentId);
+
+  const handleSubmit = () => {
+    mutate({ rating, comment: comment.trim() || undefined }, {
+      onSuccess: () => onClose(),
+    });
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="리뷰 작성" style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        width: '100%', maxWidth: 480, background: 'var(--background)',
+        borderRadius: '16px 16px 0 0', padding: '24px 20px',
+        paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>대회 후기 작성</h3>
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기">✕</button>
+        </div>
+
+        <div style={{ marginBottom: 16, textAlign: 'center' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
+          <StarRating value={rating} onChange={setRating} />
+        </div>
+
+        <textarea
+          value={comment} onChange={(e) => setComment(e.target.value)}
+          placeholder="대회 운영, 경기장, 대진표 등 솔직한 후기를 남겨주세요. (선택)"
+          maxLength={500}
+          rows={4}
+          style={{
+            width: '100%', padding: '12px', borderRadius: 8,
+            border: '1px solid var(--grey200)', fontSize: 13, lineHeight: 1.6,
+            color: 'var(--text-strong)', background: 'var(--surface)',
+            resize: 'none', boxSizing: 'border-box',
+          }}
+        />
+        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-caption)', marginBottom: 16 }}>{comment.length}/500</div>
+
+        {isError && <p style={{ color: 'var(--red500)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
+
+        <button
+          type="button" onClick={handleSubmit} disabled={isPending || rating === 0}
+          className="tm-btn tm-btn-primary"
+          style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: 14, fontWeight: 700 }}
+        >
+          {isPending ? '저장 중...' : '후기 등록'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
+function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  const [showForm, setShowForm] = useState(false);
+  const hasSession = hasStoredV1Session();
+  const isCompleted = tournament.status === 'completed';
+
+  const { data: participantData } = useV1TournamentParticipantCheck(tournament.id, hasSession && isCompleted);
+  const { data: myReview } = useV1MyTournamentReview(tournament.id, hasSession && isCompleted);
+
+  const isParticipant = participantData?.isParticipant ?? false;
+  const alreadyReviewed = !!myReview;
+  const canWrite = isCompleted && isParticipant && !alreadyReviewed;
+
+  const reviews = tournament.reviews ?? [];
+
+  return (
+    <>
+      {showForm && (
+        <ReviewFormModal tournamentId={tournament.id} onClose={() => setShowForm(false)} />
+      )}
+      <section style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h3 className="tm-hub-section-title" style={{ margin: 0 }}>참가팀 후기</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {reviews.length > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{reviews.length}개</span>
+            )}
+            {canWrite && (
+              <button
+                type="button"
+                className="tm-btn tm-btn-sm tm-btn-secondary"
+                style={{ padding: '5px 12px', fontSize: 12 }}
+                onClick={() => setShowForm(true)}
+              >
+                + 후기 쓰기
+              </button>
+            )}
+            {isCompleted && isParticipant && alreadyReviewed && (
+              <span style={{ fontSize: 11, color: 'var(--text-caption)', background: 'var(--grey100)', padding: '3px 8px', borderRadius: 6 }}>
+                ✓ 작성완료
+              </span>
+            )}
+          </div>
+        </div>
+
+        {reviews.length === 0 ? (
+          <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
+              {isCompleted && isParticipant && !alreadyReviewed
+                ? '첫 번째 후기를 남겨보세요!'
+                : '아직 등록된 후기가 없어요.'}
+            </p>
+          </Card>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {reviews.map((review) => {
+              const letter = (review.teamName ?? review.authorNickname ?? '?').charAt(0);
+              const date = new Date(review.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+              return (
+                <div key={review.id} className="tm-review-card">
+                  <div className="tm-review-card-header">
+                    <div className="tm-review-card-avatar" aria-hidden="true">{letter}</div>
+                    <div>
+                      <div className="tm-review-card-author">{review.teamName ?? review.authorNickname}</div>
+                      <div className="tm-review-card-date">{date}</div>
+                    </div>
+                    <div className="tm-review-card-stars" aria-label={`별점 ${review.rating}점`}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <span key={i} className="tm-review-card-star" aria-hidden="true">
+                          {i < review.rating ? '⭐' : '☆'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {review.comment && <p className="tm-review-card-body">{review.comment}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </>
   );
 }
 
@@ -347,10 +506,10 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             <PrizeSection tournament={tournament} top3={top3} />
 
             {/* 개인 어워드 */}
-            <IndividualAwardsSection />
+            <IndividualAwardsSection tournament={tournament} />
 
             {/* 참가팀 후기 */}
-            <ReviewsSection tournamentId={tournament.id} />
+            <ReviewsSection tournament={tournament} />
 
             {/* 리텐션 */}
             <RetentionSection tournamentId={tournament.id} />

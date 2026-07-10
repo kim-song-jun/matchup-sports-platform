@@ -339,7 +339,7 @@ function TournamentDetailView({
 
   /* ── Prize card — rendered in left column just after metric strip ── */
   const prizeChips = tournament.prizeBreakdown
-    ? tournament.prizeBreakdown.split(/[/·,\n]+/).map((s) => s.trim()).filter(Boolean)
+    ? tournament.prizeBreakdown.split(/[/·\n]+/).map((s) => s.trim()).filter(Boolean)
     : [];
   const prizeCard = hasPrize ? (
     <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
@@ -1114,11 +1114,12 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   const { knockoutFixtures, hasKnockoutFixtures, hasAnyFixtures } =
     partitionTournamentSections(format, fixtures, groups);
 
-  /* league: no bracket */
+  /* league: 브래킷 없음 */
   if (format === 'league') return null;
 
-  /* knockout: bracket for all fixtures */
+  /* knockout: 픽스처가 있을 때만 표시 (모집 중/마감 단계엔 미표시) */
   if (format === 'knockout') {
+    if (!hasAnyFixtures) return null;
     return (
       <div className="tm-tournament-bleed">
         <div className="tm-match-detail-body">
@@ -1127,11 +1128,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
               대진표
             </div>
             <div style={{ marginTop: 4 }}>
-              {hasAnyFixtures ? (
-                <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
-              ) : (
-                <FixturesPlaceholder />
-              )}
+              <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
             </div>
           </section>
         </div>
@@ -1139,7 +1136,11 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
     );
   }
 
-  /* group_knockout: knockout bracket only */
+  /* group_knockout: 결선 픽스처가 확정됐을 때만 표시
+   * - 조별 리그 진행 중(hasKnockoutFixtures=false)이면 노출 안 함
+   * - 결선 대진표 전체 보기는 /bracket 서브페이지에서 제공 */
+  if (!hasKnockoutFixtures) return null;
+
   return (
     <div className="tm-tournament-bleed">
       <div className="tm-match-detail-body">
@@ -1148,18 +1149,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
             결선 대진표
           </div>
           <div style={{ marginTop: 4 }}>
-            {hasKnockoutFixtures ? (
-              <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
-            ) : (
-              <Card pad={16} style={{ background: 'var(--grey50)' }}>
-                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                  결선 대진표
-                </div>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                  조별 리그가 끝나면 결선 대진표가 공개돼요.
-                </div>
-              </Card>
-            )}
+            <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
           </div>
         </section>
       </div>

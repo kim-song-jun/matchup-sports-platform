@@ -278,174 +278,157 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
     const isReversed = leg2 ? leg2.homeTeamName === awayTeam : false;
     const homeTotal = (leg1.result.homeScore ?? 0) + (isReversed ? (leg2?.result?.awayScore ?? 0) : (leg2?.result?.homeScore ?? 0));
     const awayTotal = (leg1.result.awayScore ?? 0) + (isReversed ? (leg2?.result?.homeScore ?? 0) : (leg2?.result?.awayScore ?? 0));
-    return { homeTeam, awayTeam, homeTotal, awayTotal, legs, leg1, leg2 };
+    return { homeTeam, awayTeam, homeTotal, awayTotal, leg1, leg2 };
   };
 
-  /* ── 경기 결과 행 (범용) ── */
-  const ScoreBox = ({ home, away, bg, hasPenalty, homePK, awayPK, size = 14 }: {
-    home: number; away: number; bg: string;
-    hasPenalty?: boolean; homePK?: number | null; awayPK?: number | null; size?: number;
+  const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : '';
+
+  /* ── 개별 경기 행 ── */
+  const MatchRow = ({
+    label, labelColor = 'var(--text-caption)',
+    home, away, homeScore, awayScore,
+    winner, hasPenalty, homePK, awayPK,
+    date, isAccent = false, isAgg = false,
+  }: {
+    label: string; labelColor?: string;
+    home: string; away: string; homeScore: number; awayScore: number;
+    winner: 'home' | 'away' | null;
+    hasPenalty?: boolean; homePK?: number | null; awayPK?: number | null;
+    date?: string; isAccent?: boolean; isAgg?: boolean;
   }) => (
-    <div style={{ textAlign: 'center', background: bg, borderRadius: 6, padding: '3px 0' }}>
-      <div style={{ fontSize: size, fontWeight: 900, color: 'var(--text-strong)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
-        {home}<span style={{ fontSize: size - 4, opacity: 0.3, margin: '0 2px' }}>:</span>{away}
+    <div style={{
+      padding: '10px 16px',
+      background: isAccent ? 'var(--blue50)' : isAgg ? 'rgba(49,130,246,0.04)' : 'transparent',
+      borderLeft: isAccent ? '3px solid var(--blue500)' : '3px solid transparent',
+    }}>
+      {/* 상단: 라벨 + 날짜 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+        <span style={{ fontSize: isAccent ? 12 : 10, fontWeight: 700, color: isAccent ? 'var(--blue500)' : isAgg ? 'var(--blue500)' : labelColor, letterSpacing: '0.02em' }}>
+          {label}
+        </span>
+        {date && <span style={{ fontSize: 10, color: 'var(--text-caption)' }}>{date}</span>}
       </div>
-      {hasPenalty && homePK != null && awayPK != null && (
-        <div style={{ fontSize: 8, color: 'var(--text-caption)', lineHeight: 1 }}>PK {homePK}:{awayPK}</div>
-      )}
+      {/* 팀 – 스코어 – 팀 (전체 팀명 노출, 잘리지 않음) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{
+          flex: 1, textAlign: 'right',
+          fontSize: isAccent ? 15 : 13, fontWeight: winner === 'home' ? 700 : 400,
+          color: winner === 'home' ? (isAccent || isAgg ? 'var(--blue500)' : 'var(--text-strong)') : 'var(--text-muted)',
+          wordBreak: 'keep-all', lineHeight: 1.35,
+        }}>
+          {home}{isAgg && winner === 'home' && <span style={{ fontSize: 10, color: 'var(--blue500)', marginLeft: 4 }}>✓</span>}
+        </span>
+        <div style={{
+          flex: '0 0 60px', textAlign: 'center',
+          background: isAccent ? 'rgba(49,130,246,0.12)' : isAgg ? 'rgba(49,130,246,0.1)' : 'var(--grey100)',
+          border: (isAgg) ? '1px solid rgba(49,130,246,0.25)' : 'none',
+          borderRadius: 8, padding: '4px 0',
+        }}>
+          <div style={{
+            fontSize: isAccent ? 16 : 14, fontWeight: 900,
+            color: isAccent || isAgg ? 'var(--blue500)' : 'var(--text-strong)',
+            fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em',
+          }}>
+            {homeScore}<span style={{ fontSize: 11, opacity: 0.35, margin: '0 2px' }}>:</span>{awayScore}
+          </div>
+          {hasPenalty && homePK != null && awayPK != null && (
+            <div style={{ fontSize: 9, color: 'var(--text-caption)', lineHeight: 1.2 }}>PK {homePK}:{awayPK}</div>
+          )}
+        </div>
+        <span style={{
+          flex: 1, textAlign: 'left',
+          fontSize: isAccent ? 15 : 13, fontWeight: winner === 'away' ? 700 : 400,
+          color: winner === 'away' ? (isAccent || isAgg ? 'var(--blue500)' : 'var(--text-strong)') : 'var(--text-muted)',
+          wordBreak: 'keep-all', lineHeight: 1.35,
+        }}>
+          {isAgg && winner === 'away' && <span style={{ fontSize: 10, color: 'var(--blue500)', marginRight: 4 }}>✓</span>}{away}
+        </span>
+      </div>
     </div>
   );
 
-  const ROW_GRID = '56px 1fr 64px 1fr 40px';
+  const divider = <div style={{ height: 1, background: 'var(--grey100)', margin: '0 16px' }} />;
+  const cardStyle: React.CSSProperties = { borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' };
 
   return (
-    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-      {/* ── 결승 ── */}
-      {finalFixtures.map((f, idx) => {
+      {/* ── 결승 카드 ── */}
+      {finalFixtures.map((f) => {
         if (!f.result) return null;
         const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = f.result;
         const winner = getWinnerSide(f.result);
         return (
-          <div key={f.id} style={{
-            display: 'grid', gridTemplateColumns: ROW_GRID,
-            padding: '13px 16px', alignItems: 'center',
-            borderTop: idx > 0 ? '1px solid var(--grey100)' : 'none',
-            background: 'var(--blue50)',
-            borderLeft: '3px solid var(--blue500)',
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--blue500)', letterSpacing: '0.02em' }}>
-              🏆 결승
-            </div>
-            <div style={{ textAlign: 'right', fontSize: 14, fontWeight: winner === 'home' ? 800 : 500,
-              color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-              {f.homeTeamName}
-            </div>
-            <ScoreBox home={homeScore} away={awayScore} bg="rgba(49,130,246,0.12)"
-              hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore} size={16} />
-            <div style={{ textAlign: 'left', fontSize: 14, fontWeight: winner === 'away' ? 800 : 500,
-              color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 8 }}>
-              {f.awayTeamName}
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text-caption)', textAlign: 'right', whiteSpace: 'nowrap' }}>
-              {f.scheduledAt ? new Date(f.scheduledAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : ''}
-            </div>
+          <div key={f.id} style={cardStyle}>
+            <MatchRow
+              label="🏆 결승"
+              home={f.homeTeamName} away={f.awayTeamName}
+              homeScore={homeScore} awayScore={awayScore}
+              winner={winner}
+              hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
+              date={fmtDate(f.scheduledAt)} isAccent
+            />
           </div>
         );
       })}
 
-      {/* ── 4강 — 1차전·2차전·합산 묶음 ── */}
+      {/* ── 4강 매치업 그룹 카드 ── */}
       {Array.from(semiByMatchup.values()).map((legs) => {
         const agg = calcAggregate(legs);
         if (!agg) return null;
         const { homeTeam, awayTeam, homeTotal, awayTotal, leg1, leg2 } = agg;
         const aggWinner = homeTotal > awayTotal ? 'home' : awayTotal > homeTotal ? 'away' : null;
 
-        const renderLeg = (f: V1TournamentFixture, legLabel: string) => {
-          if (!f.result) return null;
-          const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = f.result;
-          const w = getWinnerSide(f.result);
-          return (
-            <div key={f.id} style={{
-              display: 'grid', gridTemplateColumns: ROW_GRID,
-              padding: '9px 16px', alignItems: 'center',
-              borderTop: '1px solid var(--grey100)',
-              background: 'transparent',
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-caption)', letterSpacing: '0.02em' }}>
-                {legLabel}
-              </div>
-              <div style={{ textAlign: 'right', fontSize: 12, fontWeight: w === 'home' ? 700 : 400,
-                color: w === 'home' ? 'var(--text-strong)' : 'var(--text-muted)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-                {f.homeTeamName}
-              </div>
-              <ScoreBox home={homeScore} away={awayScore} bg="var(--grey50)"
-                hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore} size={13} />
-              <div style={{ textAlign: 'left', fontSize: 12, fontWeight: w === 'away' ? 700 : 400,
-                color: w === 'away' ? 'var(--text-strong)' : 'var(--text-muted)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 8 }}>
-                {f.awayTeamName}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-caption)', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                {f.scheduledAt ? new Date(f.scheduledAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : ''}
-              </div>
-            </div>
-          );
-        };
-
         return (
-          <div key={`semi-${homeTeam}`} style={{ borderTop: '1px solid var(--grey150)' }}>
-            {leg1 && renderLeg(leg1, '4강 1차')}
-            {leg2 && renderLeg(leg2, '4강 2차')}
-            {/* 합산 행 */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: ROW_GRID,
-              padding: '10px 16px', alignItems: 'center',
-              background: 'rgba(49,130,246,0.05)',
-              borderTop: '1px solid rgba(49,130,246,0.15)',
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--blue500)', letterSpacing: '0.02em' }}>
-                합산
-              </div>
-              <div style={{ textAlign: 'right', fontSize: 13, fontWeight: aggWinner === 'home' ? 700 : 400,
-                color: aggWinner === 'home' ? 'var(--blue500)' : 'var(--text-muted)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-                {homeTeam}{aggWinner === 'home' && <span style={{ fontSize: 9, marginLeft: 4 }}>✓ 진출</span>}
-              </div>
-              <div style={{ textAlign: 'center', background: 'rgba(49,130,246,0.1)', borderRadius: 6, padding: '3px 0', border: '1px solid rgba(49,130,246,0.25)' }}>
-                <div style={{ fontSize: 14, fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', color: 'var(--blue500)' }}>
-                  {homeTotal}<span style={{ fontSize: 10, opacity: 0.4, margin: '0 2px' }}>:</span>{awayTotal}
-                </div>
-              </div>
-              <div style={{ textAlign: 'left', fontSize: 13, fontWeight: aggWinner === 'away' ? 700 : 400,
-                color: aggWinner === 'away' ? 'var(--blue500)' : 'var(--text-muted)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 8 }}>
-                {awayTeam}{aggWinner === 'away' && <span style={{ fontSize: 9, marginLeft: 4 }}>✓ 진출</span>}
-              </div>
-              <div />
+          <div key={`semi-${homeTeam}`} style={cardStyle}>
+            {leg1?.result && (
+              <MatchRow
+                label="4강 1차" home={leg1.homeTeamName} away={leg1.awayTeamName}
+                homeScore={leg1.result.homeScore} awayScore={leg1.result.awayScore}
+                winner={getWinnerSide(leg1.result)}
+                hasPenalty={leg1.result.hasPenalty} homePK={leg1.result.homePenaltyScore} awayPK={leg1.result.awayPenaltyScore}
+                date={fmtDate(leg1.scheduledAt)}
+              />
+            )}
+            {leg2?.result && <>{divider}<MatchRow
+              label="4강 2차" home={leg2.homeTeamName} away={leg2.awayTeamName}
+              homeScore={leg2.result.homeScore} awayScore={leg2.result.awayScore}
+              winner={getWinnerSide(leg2.result)}
+              hasPenalty={leg2.result.hasPenalty} homePK={leg2.result.homePenaltyScore} awayPK={leg2.result.awayPenaltyScore}
+              date={fmtDate(leg2.scheduledAt)}
+            /></>}
+            {/* 합산 */}
+            <div style={{ borderTop: '1px solid rgba(49,130,246,0.15)' }}>
+              <MatchRow
+                label="합산" isAgg
+                home={homeTeam} away={awayTeam}
+                homeScore={homeTotal} awayScore={awayTotal}
+                winner={aggWinner}
+              />
             </div>
           </div>
         );
       })}
 
-      {/* ── 3·4위전 ── */}
-      {thirdFixtures.map((f, idx) => {
+      {/* ── 3·4위전 카드 ── */}
+      {thirdFixtures.map((f) => {
         if (!f.result) return null;
         const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = f.result;
         const winner = getWinnerSide(f.result);
         return (
-          <div key={f.id} style={{
-            display: 'grid', gridTemplateColumns: ROW_GRID,
-            padding: '10px 16px', alignItems: 'center',
-            borderTop: '1px solid var(--grey150)',
-            background: 'var(--grey50)',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.02em' }}>3·4위전</div>
-            <div style={{ textAlign: 'right', fontSize: 13, fontWeight: winner === 'home' ? 800 : 500,
-              color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>
-              {f.homeTeamName}
-            </div>
-            <div style={{ textAlign: 'center', background: 'var(--grey50)', borderRadius: 6, padding: '3px 0' }}>
-              <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--text-strong)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
-                {homeScore}<span style={{ fontSize: 10, opacity: 0.3, margin: '0 2px' }}>:</span>{awayScore}
-              </div>
-              {hasPenalty && <div style={{ fontSize: 8, color: 'var(--text-caption)', lineHeight: 1 }}>PK {homePenaltyScore}:{awayPenaltyScore}</div>}
-            </div>
-            <div style={{ textAlign: 'left', fontSize: 13, fontWeight: winner === 'away' ? 800 : 500,
-              color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingLeft: 8 }}>
-              {f.awayTeamName}
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text-caption)', textAlign: 'right', whiteSpace: 'nowrap' }}>
-              {f.scheduledAt ? new Date(f.scheduledAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : ''}
-            </div>
+          <div key={f.id} style={{ ...cardStyle, background: 'var(--grey50)' }}>
+            <MatchRow
+              label="3·4위전"
+              home={f.homeTeamName} away={f.awayTeamName}
+              homeScore={homeScore} awayScore={awayScore}
+              winner={winner}
+              hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
+              date={fmtDate(f.scheduledAt)}
+            />
           </div>
         );
       })}
+
     </div>
   );
 }

@@ -5,7 +5,6 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { TournamentHubHeader } from '@/components/tournaments/tournament-hub-header';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import {
   TournamentProgressStepper,
@@ -218,16 +217,8 @@ function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) 
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
-      {/* 컨텍스트 헤더 — 풀 너비 */}
+      {/* 진행 단계 */}
       <div className="tm-tourn-sub-header">
-        <TournamentHubHeader
-          title={tournament.title}
-          sportName={tournament.sport.name}
-          status={tournament.status}
-          format={tournament.format}
-        />
-
-        {/* 진행 단계 */}
         {stages.length > 0 && (
           <div style={{ borderBottom: '1px solid var(--grey100)' }}>
             <TournamentProgressStepper stages={stages} />

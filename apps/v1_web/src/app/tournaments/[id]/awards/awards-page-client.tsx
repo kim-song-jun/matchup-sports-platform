@@ -12,7 +12,6 @@ import {
 } from '@/hooks/use-v1-api';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { extractErrorMessage } from '@/lib/error-message';
-import { TournamentHubHeader } from '@/components/tournaments/tournament-hub-header';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
 import type {
@@ -480,13 +479,6 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
 
   return (
     <div style={{ paddingBottom: 40 }}>
-      <TournamentHubHeader
-        title={tournament.title}
-        sportName={tournament.sport.name}
-        status={tournament.status}
-        format={tournament.format}
-      />
-
       <div style={{ padding: '20px 20px 0' }}>
         {!isCompleted && <NotCompletedNotice status={tournament.status} />}
 

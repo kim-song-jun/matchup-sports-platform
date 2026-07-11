@@ -7,6 +7,7 @@
 const ACTION_LABEL_MAP: Record<string, string> = {
   // 회원 · 매치 · 팀
   'user.status.update': '회원 상태 변경',
+  'user.delete': '회원 삭제',
   'match.status.update': '매치 상태 변경',
   'team.status.update': '팀 상태 변경',
   'team_match.status.update': '팀매치 상태 변경',

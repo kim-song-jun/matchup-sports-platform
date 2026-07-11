@@ -1221,6 +1221,7 @@ enum V1TournamentFixtureStatus {
 }
 
 enum V1TournamentAnnouncementAudience {
+  public
   all_registered
   confirmed_only
   waitlist

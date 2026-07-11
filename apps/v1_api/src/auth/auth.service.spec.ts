@@ -502,8 +502,8 @@ describe('AuthService', () => {
     expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
-          nickname: 'kakao_12345_1',
-          displayName: 'kakao_12345_1',
+          nickname: 'kakao_123456_1',
+          displayName: 'kakao_123456_1',
         }),
       }),
     );

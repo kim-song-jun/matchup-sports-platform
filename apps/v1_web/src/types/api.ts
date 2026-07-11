@@ -1309,10 +1309,20 @@ export type V1AdminUserRow = {
   hostedMatchCount: number;
   ownedTeamCount: number;
   membershipCount: number;
+  teamRoleCounts?: {
+    owner: number;
+    manager: number;
+    member: number;
+  };
   adminRole: 'owner' | 'ops' | 'support' | null;
 };
 
 export type V1AdminUserDetail = V1AdminUserRow & {
+  deletedAt: string | null;
+  withdrawalRequest: {
+    reason: string | null;
+    requestedAt: string;
+  } | null;
   reputationSummary: {
     trustState: string;
     mannerScore: string | null;
@@ -1321,6 +1331,19 @@ export type V1AdminUserDetail = V1AdminUserRow & {
   } | null;
   hostedMatches: { matchId: string; title: string; status: string; startAt: string }[];
   ownedTeams: { teamId: string; name: string; status: string; memberCount: number }[];
+  teamMemberships?: {
+    membershipId: string;
+    teamId: string;
+    name: string;
+    status: string;
+    memberCount: number;
+    role: 'owner' | 'manager' | 'member';
+    joinedAt: string | null;
+  }[];
+};
+
+export type V1AdminDeleteUserPayload = {
+  reason: string;
 };
 
 export type V1AdminMatchRow = {
@@ -1470,6 +1493,7 @@ export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 export type V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
+  | 'public'
   | 'all_registered'
   | 'confirmed_only'
   | 'waitlist';
@@ -2020,6 +2044,14 @@ export type V1CreateAnnouncementPayload = {
   body: string;
   audience?: V1AnnouncementAudience;
   publish?: boolean;
+};
+
+export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
+
+export type V1DeleteAnnouncementResult = {
+  id: string;
+  tournamentId: string;
+  deleted: boolean;
 };
 
 export type V1AdminAnnouncementListResult = {

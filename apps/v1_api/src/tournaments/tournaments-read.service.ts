@@ -106,7 +106,7 @@ export class TournamentsReadService {
           },
         },
         announcements: {
-          where: { publishedAt: { not: null } },
+          where: { audience: 'public', publishedAt: { not: null } },
           orderBy: { publishedAt: 'desc' },
         },
         _count: {

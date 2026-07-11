@@ -1,7 +1,7 @@
 'use client';
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { v1Api, v1Delete, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   ApiEnvelope,
@@ -29,6 +29,7 @@ import type {
   V1AdminTeamDetail,
   V1AdminTeamMatchRow,
   V1AdminTeamRow,
+  V1AdminDeleteUserPayload,
   V1AdminUserDetail,
   V1AdminUserRow,
   V1AuthMe,
@@ -137,7 +138,9 @@ import type {
   V1CreateFixturePayload,
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
+  V1DeleteAnnouncementResult,
   V1AdminAnnouncementListResult,
+  V1UpdateAnnouncementPayload,
   V1TeamInvitationSummary,
   V1TeamInvitationsPage,
   V1ReceivedInvitation,
@@ -1423,6 +1426,19 @@ export function useV1ChangeUserStatus() {
   });
 }
 
+export function useV1DeleteAdminUser(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminDeleteUserPayload) =>
+      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, { body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminUser(userId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
 export function useV1ChangeMatchStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2091,6 +2107,28 @@ export function useV1CreateAnnouncement(tournamentId: string) {
   });
 }
 
+export function useV1UpdateAnnouncement(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      announcementId,
+      body,
+    }: {
+      announcementId: string;
+      body: V1UpdateAnnouncementPayload;
+    }) =>
+      v1Patch<V1AdminTournamentAnnouncement>(
+        `/admin/announcements/${announcementId}`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentAnnouncements(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
 export function useV1PublishAnnouncement(tournamentId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2111,6 +2149,21 @@ export function useV1PublishAnnouncement(tournamentId?: string) {
 // ── Team Invitations ──────────────────────────────────────────────────────────
 
 /** POST /teams/:teamId/invitations — 이메일로 팀원 초대 발송 */
+export function useV1DeleteAnnouncement(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (announcementId: string) =>
+      v1Delete<V1DeleteAnnouncementResult>(
+        `/admin/announcements/${announcementId}`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentAnnouncements(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
 export function useV1SendTeamInvitation(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({

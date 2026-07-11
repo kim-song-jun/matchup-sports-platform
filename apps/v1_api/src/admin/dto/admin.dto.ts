@@ -205,6 +205,12 @@ export class ChangeUserStatusDto {
   reason!: string;
 }
 
+export class DeleteAdminUserDto {
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
 export class ChangeMatchStatusDto {
   @IsIn(['recruiting', 'closed', 'cancelled', 'completed', 'archived'])
   status!: 'recruiting' | 'closed' | 'cancelled' | 'completed' | 'archived';

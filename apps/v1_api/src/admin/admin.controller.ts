@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -18,6 +18,7 @@ import {
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
+  DeleteAdminUserDto,
   GrantAdminDto,
   ReplyInquiryDto,
   UpdateAdminNoticeDto,
@@ -96,6 +97,15 @@ export class AdminController {
   @Get('users/:userId')
   getUser(@CurrentUser() user: V1AuthUser, @Param('userId') userId: string) {
     return this.adminService.getUser(user, userId);
+  }
+
+  @Delete('users/:userId')
+  deleteUser(
+    @CurrentUser() user: V1AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: DeleteAdminUserDto,
+  ) {
+    return this.adminService.deleteUser(user, userId, dto);
   }
 
   // ─── Matches ──────────────────────────────────────────────────────────────

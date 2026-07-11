@@ -33,9 +33,10 @@
 | `GET` | `/api/v1/admin/stats` | 대시보드 통계 |
 | `GET` | `/api/v1/admin/statistics` | 통계 개요(추세/분포) |
 | `GET` | `/api/v1/admin/users` | 사용자 목록(cursored) |
-| `GET` | `/api/v1/admin/users/:id` | 사용자 상세 + audit |
+| `GET` | `/api/v1/admin/users/:id` | 사용자 상세 + 탈퇴 요청 메시지 + 팀 역할 요약 |
 | `POST` | `/api/v1/admin/users/:id/warn` | 사용자 경고 |
 | `PATCH` | `/api/v1/admin/users/:id/status` | 사용자 상태 변경 |
+| `DELETE` | `/api/v1/admin/users/:id` | 사용자 삭제 처리 |
 | `GET` | `/api/v1/admin/matches` | 매치 목록(cursored) |
 | `PATCH` | `/api/v1/admin/matches/:id/status` | 매치 상태 변경 |
 | `GET` | `/api/v1/admin/reviews` | 리뷰 목록 |
@@ -82,6 +83,12 @@
   - Body: `UpdateUserStatusAdminDto`
   - `status`: `active | suspended`
   - `status=suspended`일 때 `note` 사실상 필수 (없으면 400)
+- `DELETE /admin/users/:id`
+  - Body: `{ reason: string }`
+  - v1에서는 `accountStatus=deleted`, `deletedAt` 기록, 이메일/전화번호/프로필 마스킹, auth identity unlink, provider key 마스킹, 감사 로그 기록으로 처리한다.
+  - 이메일 계정과 카카오 계정 모두 원본 unique key를 비우므로 같은 이메일/카카오 계정으로 재가입할 수 있다.
+  - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
+  - 팀 정보는 생성/소유 팀, 팀장/운영진/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다.
 
 예시:
 

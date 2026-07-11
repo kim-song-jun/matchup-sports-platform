@@ -23,6 +23,7 @@ describe('AdminController', () => {
     statusChangeLogs: jest.fn(),
     listUsers: jest.fn(),
     getUser: jest.fn(),
+    deleteUser: jest.fn(),
     listMatches: jest.fn(),
     getMatch: jest.fn(),
     listTeams: jest.fn(),
@@ -159,13 +160,27 @@ describe('AdminController', () => {
       ownedTeamCount: 1,
       membershipCount: 2,
       adminRole: null,
+      deletedAt: null,
+      withdrawalRequest: null,
+      teamRoleCounts: { owner: 1, manager: 0, member: 1 },
       reputationSummary: null,
       hostedMatches: [],
       ownedTeams: [],
+      teamMemberships: [],
     };
     adminService.getUser.mockResolvedValue(payload);
     await expect(controller.getUser(user, 'u-1')).resolves.toEqual(payload);
     expect(adminService.getUser).toHaveBeenCalledWith(user, 'u-1');
+  });
+
+  it('deletes a user', async () => {
+    const dto = { reason: '사용자 탈퇴 요청 처리' };
+    adminService.deleteUser.mockResolvedValue({ userId: 'u-1', status: 'deleted' });
+    await expect(controller.deleteUser(user, 'u-1', dto)).resolves.toEqual({
+      userId: 'u-1',
+      status: 'deleted',
+    });
+    expect(adminService.deleteUser).toHaveBeenCalledWith(user, 'u-1', dto);
   });
 
   // ─── Match list / detail ────────────────────────────────────────────────────

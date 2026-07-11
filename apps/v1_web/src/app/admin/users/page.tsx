@@ -1,8 +1,9 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Calendar, Clock, Shield } from 'lucide-react';
+import { Activity, Calendar, Clock, Eye, Shield } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminUsers,
@@ -42,6 +43,14 @@ function formatUserTitle(row: V1AdminUserRow): string {
   if (row.onboardingStatus === 'social_terms_required') return '가입 진행 중 · 약관 미동의';
   if (row.onboardingStatus === 'social_profile_required') return '가입 진행 중 · 프로필 미완료';
   return '프로필 없음';
+}
+
+function getTeamRoleCounts(row: V1AdminUserRow) {
+  return {
+    owner: row.teamRoleCounts?.owner ?? 0,
+    manager: row.teamRoleCounts?.manager ?? 0,
+    member: row.teamRoleCounts?.member ?? 0,
+  };
 }
 
 // ── Status options for moderation modal ──────────────────────────────────────
@@ -207,17 +216,27 @@ function AdminUsersPageContent() {
         <AdminCardList<V1AdminUserRow>
           rows={rows}
           keyExtractor={(row) => row.userId}
-          card={(row) => ({
-            title: formatUserTitle(row),
-            subtitle: row.email ?? undefined,
-            status: row.accountStatus,
-            meta: [
+          card={(row) => {
+            const teamRoles = getTeamRoleCounts(row);
+            return {
+              title: formatUserTitle(row),
+              subtitle: row.email ?? undefined,
+              status: row.accountStatus,
+              meta: [
               ...(row.adminRole
                 ? [{ icon: <Shield size={14} aria-hidden="true" />, label: '운영자' }]
                 : []),
               {
                 icon: <Activity size={14} aria-hidden="true" />,
-                label: `매치 ${row.hostedMatchCount} · 팀 ${row.ownedTeamCount}`,
+                label: `매치 ${row.hostedMatchCount} · 생성/소유 ${row.ownedTeamCount}`,
+              },
+              {
+                icon: <Shield size={14} aria-hidden="true" />,
+                label: `소속 ${row.membershipCount} · 팀장 ${teamRoles.owner}`,
+              },
+              {
+                icon: <Shield size={14} aria-hidden="true" />,
+                label: `운영진 ${teamRoles.manager} · 멤버 ${teamRoles.member}`,
               },
               {
                 icon: <Calendar size={14} aria-hidden="true" />,
@@ -227,17 +246,30 @@ function AdminUsersPageContent() {
                 icon: <Clock size={14} aria-hidden="true" />,
                 label: formatDateCompact(row.lastLoginAt),
               },
-            ],
-            tone:
+              ],
+              tone:
               row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
                 ? 'danger'
                 : row.accountStatus === 'suspended' || row.accountStatus === 'withdrawal_pending'
                   ? 'warning'
                   : undefined,
-          })}
-          renderActions={
-            canWrite
-              ? (row) => (
+            };
+          }}
+          renderActions={(row) => (
+            <>
+              <Link
+                href={`/admin/users/${row.userId}`}
+                className={[
+                  'inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                  'text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors whitespace-nowrap',
+                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                ].join(' ')}
+                aria-label={`${row.nickname ?? row.displayName ?? '회원'} 상세 보기`}
+              >
+                <Eye size={15} aria-hidden="true" />
+                상세
+              </Link>
+              {canWrite ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -253,9 +285,9 @@ function AdminUsersPageContent() {
                   >
                     상태 변경
                   </button>
-                )
-              : undefined
-          }
+              ) : null}
+            </>
+          )}
           loading={isPending}
           empty={
             <AdminEmpty

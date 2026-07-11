@@ -15,6 +15,7 @@ import {
   Megaphone,
   Send,
   Pencil,
+  Trash2,
   Users,
   User,
   Clock,
@@ -41,7 +42,9 @@ import {
   useV1RecalculateStandings,
   useV1AdminAnnouncements,
   useV1CreateAnnouncement,
+  useV1DeleteAnnouncement,
   useV1PublishAnnouncement,
+  useV1UpdateAnnouncement,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import type {
@@ -50,6 +53,7 @@ import type {
   V1AdminBracketGroup,
   V1AdminBracketFixture,
   V1AdminBracketStanding,
+  V1AdminTournamentAnnouncement,
   V1TournamentGroupPhase,
   V1AnnouncementAudience,
   V1UpdateTournamentPayload,
@@ -1659,16 +1663,59 @@ function AnnouncementsTab({
   const { data: annData, isPending: annPending, isError: annError, error: annErr, refetch: annRefetch } = useV1AdminAnnouncements(tournamentId);
   const announcements = annData?.items ?? [];
   const createAnnouncement = useV1CreateAnnouncement(tournamentId);
+  const updateAnnouncement = useV1UpdateAnnouncement(tournamentId);
   const publishAnnouncement = useV1PublishAnnouncement(tournamentId);
+  const deleteAnnouncement = useV1DeleteAnnouncement(tournamentId);
 
+  const [editingAnnouncement, setEditingAnnouncement] = useState<V1AdminTournamentAnnouncement | null>(null);
   const [annTitle, setAnnTitle] = useState('');
   const [annBody, setAnnBody] = useState('');
   const [annAudience, setAnnAudience] = useState<V1AnnouncementAudience>('all_registered');
   const [annPublish, setAnnPublish] = useState(false);
+  const isSavingAnnouncement = createAnnouncement.isPending || updateAnnouncement.isPending;
 
-  const handleCreate = (e: React.FormEvent) => {
+  const resetAnnouncementForm = () => {
+    setEditingAnnouncement(null);
+    setAnnTitle('');
+    setAnnBody('');
+    setAnnAudience('all_registered');
+    setAnnPublish(false);
+  };
+
+  const startEditAnnouncement = (ann: V1AdminTournamentAnnouncement) => {
+    setEditingAnnouncement(ann);
+    setAnnTitle(ann.title);
+    setAnnBody(ann.body);
+    setAnnAudience(ann.audience as V1AnnouncementAudience);
+    setAnnPublish(Boolean(ann.publishedAt));
+  };
+
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!annTitle.trim() || !annBody.trim()) return;
+    const payload = {
+      title: annTitle.trim(),
+      body: annBody.trim(),
+      audience: annAudience,
+      publish: annPublish,
+    };
+    if (editingAnnouncement) {
+      updateAnnouncement.mutate(
+        {
+          announcementId: editingAnnouncement.id,
+          body: payload,
+        },
+        {
+          onSuccess: () => {
+            resetAnnouncementForm();
+            showToast('공지를 수정했어요.', 'success');
+          },
+          onError: (err) =>
+            showToast(extractErrorMessage(err, '공지 수정에 실패했어요.'), 'error'),
+        },
+      );
+      return;
+    }
     createAnnouncement.mutate(
       {
         title: annTitle.trim(),
@@ -1678,9 +1725,7 @@ function AnnouncementsTab({
       },
       {
         onSuccess: () => {
-          setAnnTitle('');
-          setAnnBody('');
-          setAnnPublish(false);
+          resetAnnouncementForm();
           showToast('공지를 작성했어요.', 'success');
         },
         onError: (err) =>
@@ -1703,12 +1748,38 @@ function AnnouncementsTab({
     });
   };
 
+  const handleDelete = (ann: V1AdminTournamentAnnouncement) => {
+    const confirmed = window.confirm(`"${ann.title}" 공지를 삭제할까요? 삭제한 공지는 복구할 수 없어요.`);
+    if (!confirmed) return;
+    deleteAnnouncement.mutate(ann.id, {
+      onSuccess: () => {
+        if (editingAnnouncement?.id === ann.id) resetAnnouncementForm();
+        showToast('공지를 삭제했어요.', 'success');
+      },
+      onError: (err) =>
+        showToast(extractErrorMessage(err, '공지 삭제에 실패했어요.'), 'error'),
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
         <h3 className="text-[15px] font-bold text-gray-900 mb-4">공지 작성</h3>
-        <form onSubmit={handleCreate} noValidate className="flex flex-col gap-4">
+        {editingAnnouncement && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <span className="font-medium">선택한 공지를 수정 중이에요.</span>
+            <button
+              type="button"
+              onClick={resetAnnouncementForm}
+              disabled={isSavingAnnouncement}
+              className="min-h-[32px] rounded-lg bg-white px-3 font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              취소
+            </button>
+          </div>
+        )}
+        <form onSubmit={handleSave} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="ann-title" className="text-[13px] text-gray-900">
               제목 <span className="text-red-500" aria-hidden="true">*</span>
@@ -1719,7 +1790,7 @@ function AnnouncementsTab({
               type="text"
               value={annTitle}
               onChange={(e) => setAnnTitle(e.target.value)}
-              disabled={createAnnouncement.isPending}
+              disabled={isSavingAnnouncement}
               placeholder="공지 제목"
               maxLength={100}
               required
@@ -1737,7 +1808,7 @@ function AnnouncementsTab({
               id="ann-body"
               value={annBody}
               onChange={(e) => setAnnBody(e.target.value)}
-              disabled={createAnnouncement.isPending}
+              disabled={isSavingAnnouncement}
               rows={4}
               placeholder="공지 내용을 입력해 주세요."
               required
@@ -1755,9 +1826,10 @@ function AnnouncementsTab({
                 id="ann-audience"
                 value={annAudience}
                 onChange={(e) => setAnnAudience(e.target.value as V1AnnouncementAudience)}
-                disabled={createAnnouncement.isPending}
+                disabled={isSavingAnnouncement}
                 className={inputCls}
               >
+                <option value="public">전체 공개</option>
                 <option value="all_registered">모든 신청팀</option>
                 <option value="confirmed_only">확정팀만</option>
                 <option value="waitlist">대기팀만</option>
@@ -1769,7 +1841,7 @@ function AnnouncementsTab({
                 type="checkbox"
                 checked={annPublish}
                 onChange={(e) => setAnnPublish(e.target.checked)}
-                disabled={createAnnouncement.isPending}
+                disabled={isSavingAnnouncement}
                 className="w-4 h-4 rounded accent-blue-500"
               />
               즉시 발행
@@ -1778,7 +1850,7 @@ function AnnouncementsTab({
 
           <button
             type="submit"
-            disabled={!annTitle.trim() || !annBody.trim() || createAnnouncement.isPending}
+            disabled={!annTitle.trim() || !annBody.trim() || isSavingAnnouncement}
             className={submitBtnCls}
           >
             <Megaphone size={15} aria-hidden="true" />
@@ -1811,7 +1883,9 @@ function AnnouncementsTab({
                   <p className="text-xs text-gray-500">
                     {ann.publishedAt ? `발행됨 · ${formatDate(ann.publishedAt)}` : '미발행'}
                     {' '}·{' '}
-                    {ann.audience === 'all_registered'
+                    {ann.audience === 'public'
+                      ? '전체 공개'
+                      : ann.audience === 'all_registered'
                       ? '모든 신청팀'
                       : ann.audience === 'confirmed_only'
                       ? '확정팀만'
@@ -1830,6 +1904,28 @@ function AnnouncementsTab({
                     발행
                   </button>
                 )}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => startEditAnnouncement(ann)}
+                  disabled={isSavingAnnouncement || deleteAnnouncement.isPending}
+                  aria-label={`"${ann.title}" 수정`}
+                  className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  <Pencil size={12} aria-hidden="true" />
+                  수정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(ann)}
+                  disabled={deleteAnnouncement.isPending}
+                  aria-label={`"${ann.title}" 삭제`}
+                  className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2"
+                >
+                  <Trash2 size={12} aria-hidden="true" />
+                  삭제
+                </button>
               </div>
               <p className="mt-2 text-[13px] text-gray-600 whitespace-pre-wrap leading-relaxed">
                 {ann.body}

@@ -245,7 +245,7 @@ export default function AdminUserDetailPage() {
           <section className="rounded-2xl border border-gray-100 bg-white p-4">
             <h2 className="text-[17px] font-bold text-gray-900">삭제 처리</h2>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              삭제하면 계정 상태가 삭제로 바뀌고 이메일, 전화번호, 카카오 같은 로그인 식별자가 재가입 가능하도록 마스킹돼요. 처리 사유는 감사 로그에 남습니다.
+              삭제하면 계정 상태가 삭제로 바뀌고 이메일, 전화번호, 카카오 같은 로그인 식별자가 재가입 가능하도록 마스킹돼요. 처리 사유는 감사 로그에 남아요.
             </p>
             <button
               type="button"

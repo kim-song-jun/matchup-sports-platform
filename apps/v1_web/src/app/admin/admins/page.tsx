@@ -36,7 +36,11 @@ function formatDateCompact(dateStr: string | null | undefined): string {
   }
 }
 
-function formatUserTitle(row: V1AdminUserRow): string {
+function formatUserTitle(row: {
+  nickname: string | null;
+  displayName: string | null;
+  onboardingStatus?: string | null;
+}): string {
   if (row.nickname || row.displayName) return row.nickname ?? row.displayName ?? '';
   if (row.onboardingStatus === 'social_terms_required') return '가입 진행 중 · 약관 미동의';
   if (row.onboardingStatus === 'social_profile_required') return '가입 진행 중 · 프로필 미완료';

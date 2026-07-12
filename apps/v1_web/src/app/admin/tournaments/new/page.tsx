@@ -632,7 +632,7 @@ export default function AdminTournamentsNewPage() {
                   value={prizeBreakdown}
                   onChange={(e) => setPrizeBreakdown(e.target.value)}
                   disabled={isPending}
-                  placeholder="예: 1위 100만원 / 2위 50만원 / MVP 축구화"
+                  placeholder="예: 1위 1,000,000원 / 2위 500,000원 / MVP 축구화"
                   maxLength={200}
                   rows={3}
                   className={textareaCls}

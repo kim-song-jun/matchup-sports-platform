@@ -11,7 +11,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
-import { isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
+import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
   TournamentApplicationGuideSection,
@@ -52,39 +52,13 @@ function getFormatLabel(format: V1TournamentFormat): string {
 }
 
 /**
- * 칩 구분자는 "/"·줄바꿈·(비-천단위) 콤마만 사용한다. "·"(가운뎃점)는 분리하지 않고 자유 텍스트에
- * 남겨둔다 — 물품 나열용("MVP 축구화 · 상품권")으로 한 칩 안에 그대로 표시하기 위함. parsePrizeRows
- * (lib/prize-breakdown)와 동일한 구분자 규칙을 공유해 어드민 미리보기·공개 화면 표시가 어긋나지 않게 한다.
+ * 상금 칩 분리 — lib/prize-breakdown의 공용 스플리터(splitPrizeSegments)를 그대로 소비한다.
+ * 구분자 규칙("/"·줄바꿈·비-천단위 콤마, "·"는 물품 나열용으로 보존)이 시상 페이지·어드민
+ * 미리보기(parsePrizeRows)와 단일 소스로 통일되어 화면 간 항목 수가 어긋나지 않는다.
  */
 export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
   if (!prizeBreakdown) return [];
-
-  const chips: string[] = [];
-  let current = '';
-
-  for (let index = 0; index < prizeBreakdown.length; index += 1) {
-    const char = prizeBreakdown[index];
-    const previous = prizeBreakdown[index - 1] ?? '';
-    const next = prizeBreakdown[index + 1] ?? '';
-    const isNumericComma = char === ',' && isAsciiDigit(previous) && isAsciiDigit(next);
-    const isSeparator = char === '/' || char === '\n' || (char === ',' && !isNumericComma);
-
-    if (isSeparator) {
-      const segment = current.trim();
-      if (segment) chips.push(segment);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-
-  const last = current.trim();
-  if (last) chips.push(last);
-  return chips;
-}
-
-function isAsciiDigit(value: string): boolean {
-  return value >= '0' && value <= '9';
+  return splitPrizeSegments(prizeBreakdown);
 }
 
 function formatPublishedAt(dateStr: string): string {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  splitPrizeSegments,
   parsePrizeRows,
   serializePrizeRows,
   isPrizeAmountValue,
@@ -8,6 +9,28 @@ import {
   prizeRowAmountValue,
   prizeRowsTotal,
 } from './prize-breakdown';
+
+describe('splitPrizeSegments (공용 스플리터 — 공개 칩·시상/어드민 행 공유)', () => {
+  it('splits on "/" and newline', () => {
+    expect(splitPrizeSegments('1위 600,000원 / 2위 300,000원\nMVP 100,000원')).toEqual([
+      '1위 600,000원',
+      '2위 300,000원',
+      'MVP 100,000원',
+    ]);
+  });
+
+  it('keeps numeric thousands commas but splits on non-numeric commas', () => {
+    expect(splitPrizeSegments('1위 600,000원, MVP 축구화')).toEqual([
+      '1위 600,000원',
+      'MVP 축구화',
+    ]);
+  });
+
+  it('keeps "·" goods listing inside a single segment', () => {
+    expect(splitPrizeSegments('MVP 축구화 · 상품권')).toEqual(['MVP 축구화 · 상품권']);
+    expect(splitPrizeSegments('참가팀 전원 음료·간식 제공')).toEqual(['참가팀 전원 음료·간식 제공']);
+  });
+});
 
 describe('parsePrizeRows', () => {
   it('parses existing amount-only breakdown text unchanged (backward compat)', () => {
@@ -37,9 +60,10 @@ describe('parsePrizeRows', () => {
     ]);
   });
 
-  it('does not treat a comma as a row separator (only "/" and newline are)', () => {
+  it('splits mixed breakdown on a non-numeric comma — 공개 칩과 동일한 2행 (구분자 규칙 통일)', () => {
     expect(parsePrizeRows('1위 600,000원, MVP 축구화')).toEqual([
-      { label: '1위', amount: '600,000원, MVP 축구화' },
+      { label: '1위', amount: '600,000원' },
+      { label: 'MVP', amount: '축구화' },
     ]);
   });
 });
@@ -75,6 +99,11 @@ describe('isPrizeAmountValue', () => {
     expect(isPrizeAmountValue('600,000')).toBe(true);
   });
 
+  it('tolerates whitespace between digits and "원" (표기 편차)', () => {
+    expect(isPrizeAmountValue('600,000 원')).toBe(true);
+    expect(isPrizeAmountValue(' 600,000원 ')).toBe(true);
+  });
+
   it('classifies free text (goods) as non-amount', () => {
     expect(isPrizeAmountValue('우승 트로피')).toBe(false);
     expect(isPrizeAmountValue('축구화 · 상품권')).toBe(false);
@@ -88,6 +117,7 @@ describe('prizeAmountDigits / formatPrizeRowValue', () => {
   it('extracts digits from an amount value', () => {
     expect(prizeAmountDigits('600,000원')).toBe(600000);
     expect(prizeAmountDigits('600000')).toBe(600000);
+    expect(prizeAmountDigits('600,000 원')).toBe(600000);
   });
 
   it('returns null for goods values', () => {
@@ -97,6 +127,7 @@ describe('prizeAmountDigits / formatPrizeRowValue', () => {
   it('normalizes an amount value to a comma-formatted "원" string', () => {
     expect(formatPrizeRowValue('600000')).toBe('600,000원');
     expect(formatPrizeRowValue('600,000원')).toBe('600,000원');
+    expect(formatPrizeRowValue('600,000 원')).toBe('600,000원');
   });
 
   it('returns the trimmed original text for goods values', () => {

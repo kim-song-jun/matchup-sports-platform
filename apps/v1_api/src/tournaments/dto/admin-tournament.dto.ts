@@ -81,6 +81,12 @@ export class CreateTournamentDto {
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
 
+  /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  coverImageUrl?: string | null;
+
   @IsDefined({ message: '참가 팀 수를 입력해 주세요.' })
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
@@ -256,6 +262,10 @@ export class CreateTournamentDto {
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
 export class UpdateTournamentDto {
   @IsOptional()
+  @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
+  sportId?: string;
+
+  @IsOptional()
   @IsString({ message: '대회 이름을 입력해 주세요.' })
   @MaxLength(120, { message: '대회 이름은 120자를 넘을 수 없어요.' })
   title?: string;
@@ -280,6 +290,12 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
+
+  /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  coverImageUrl?: string | null;
 
   @IsOptional()
   @Type(() => Number)

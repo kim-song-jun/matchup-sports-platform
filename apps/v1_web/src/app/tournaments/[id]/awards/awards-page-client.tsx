@@ -1,24 +1,31 @@
 'use client';
 
 import Link from 'next/link';
+import { Star, ImagePlus, X, Trophy, Medal, Goal, Handshake, Shield, Hand, Sparkles, Crown } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
   useV1MyTournamentReview,
   useV1SubmitTournamentReview,
+  useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
+import { publicAssetPath } from '@/lib/assets';
+
+const REVIEW_PHOTO_MAX = 3;
+const REVIEW_EMBED_CAP = 3;
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
   V1TournamentFixtureResult,
   V1TournamentGroup,
+  V1TournamentReview,
   V1TournamentStanding,
 } from '@/types/api';
 
@@ -83,30 +90,44 @@ function AwardsPodium({
   // 2위(왼) / 1위(중) / 3위(오) 배치
   const podiumOrder = [2, 1, 3];
   const podiumSlots = podiumOrder.map((pos) => top3.find((t) => t.pos === pos) ?? null);
+  const champion = top3.find((t) => t.pos === 1)?.name;
+  // 3위 → 2위 → 1위 순으로 차오르는 등장 딜레이(챔피언 공개에 살짝 뜸을 둠)
+  const REVEAL_DELAY_MS: Record<number, number> = { 3: 0, 2: 140, 1: 300 };
 
   return (
-    <div className="tm-awards-podium" aria-label="최종 시상대">
-      {podiumSlots.map((slot, idx) => {
-        const pos = podiumOrder[idx];
-        const posClass = `tm-awards-podium-${pos}` as const;
-        return (
-          <div key={pos} className={`tm-awards-podium-slot ${posClass}`}>
+    <div>
+      {champion ? (
+        <p className="tm-awards-podium-caption">
+          <strong>{champion}</strong>, 우승을 축하드려요! 🎉
+        </p>
+      ) : null}
+      <div className="tm-awards-podium" aria-label="최종 시상대">
+        {podiumSlots.map((slot, idx) => {
+          const pos = podiumOrder[idx];
+          const posClass = `tm-awards-podium-${pos}` as const;
+          return (
+            <div
+              key={pos}
+              className={`tm-awards-podium-slot ${posClass}`}
+              style={{ '--podium-delay': `${REVEAL_DELAY_MS[pos]}ms` } as React.CSSProperties}
+            >
             {/* 팀명 (podium 위) */}
             <span className="tm-awards-podium-name">
               {slot?.name ?? '—'}
             </span>
-            <span className="tm-awards-podium-pos">
-              {pos === 1 ? '🥇' : pos === 2 ? '🥈' : '🥉'}
+            <span className={`tm-awards-podium-pos tm-medal-${pos === 1 ? 'gold' : pos === 2 ? 'silver' : 'bronze'}`} aria-hidden="true">
+              <Medal size={pos === 1 ? 26 : 22} strokeWidth={2} />
             </span>
             {/* 단상 */}
             <div className="tm-awards-podium-block" aria-hidden="true">
-              <span style={{ color: '#fff', fontWeight: 900, fontSize: pos === 1 ? 22 : 18 }}>
+              <span style={{ position: 'relative', zIndex: 1, color: '#fff', fontWeight: 900, fontSize: pos === 1 ? 28 : 20, textShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>
                 {pos}
               </span>
             </div>
           </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -123,12 +144,21 @@ function parsePrizeRows(breakdown: string): Array<{ label: string; amount: strin
     });
 }
 
-const PRIZE_RANK_ICON: Record<string, string> = {
-  '1위': '🥇', '2위': '🥈', '3위': '🥉',
-  'MVP': '⭐', '득점왕': '⚽', '도우이': '🤝',
-};
-function prizeIcon(label: string): string {
-  return PRIZE_RANK_ICON[label] ?? '🏆';
+function PrizeRankIcon({ label }: { label: string }) {
+  const size = 20;
+  switch (label) {
+    case '1위': return <Medal size={size} className="tm-medal-gold" strokeWidth={2} />;
+    case '2위': return <Medal size={size} className="tm-medal-silver" strokeWidth={2} />;
+    case '3위': return <Medal size={size} className="tm-medal-bronze" strokeWidth={2} />;
+    case 'MVP': return <Star size={size} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.6} />;
+    case '득점왕': return <Goal size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
+    case '도움왕': return <Handshake size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
+    default: return <Trophy size={size} className="tm-medal-gold" strokeWidth={2} />;
+  }
+}
+
+function hasPrizeData(tournament: V1TournamentDetail): boolean {
+  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool);
 }
 
 function PrizeSection({
@@ -137,21 +167,22 @@ function PrizeSection({
   tournament: V1TournamentDetail;
   top3?: Array<{ pos: number; name: string }>;
 }) {
-  const hasPrize = tournament.prizeSummary?.trim() || tournament.prizePool;
-  if (!hasPrize) return null;
+  if (!hasPrizeData(tournament)) return null;
 
   const rows = tournament.prizeBreakdown ? parsePrizeRows(tournament.prizeBreakdown) : [];
   const safeTop3 = Array.isArray(top3) ? top3 : [];
   const teamByPos = Object.fromEntries(safeTop3.map((t) => [t.pos, t.name]));
 
   return (
-    <section style={{ marginBottom: 20 }}>
+    <section className="tm-prize-section" style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">상금 · 시상</h3>
-      <div style={{ background: '#fff', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
+      <div className="tm-prize-card" style={{ background: '#fff', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
-            <span style={{ fontSize: 20, marginRight: 10 }}>🏆</span>
+            <span style={{ display: 'inline-flex', marginRight: 10 }} aria-hidden="true">
+              <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
+            </span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>총 상금</span>
             <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--blue500)', letterSpacing: '-0.01em' }}>{formatEntryFee(tournament.prizePool)}</span>
           </div>
@@ -163,7 +194,9 @@ function PrizeSection({
           const teamName = posNum ? teamByPos[Number(posNum)] : undefined;
           return (
             <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
-              <span style={{ fontSize: 22, marginRight: 10, flexShrink: 0 }}>{prizeIcon(row.label)}</span>
+              <span style={{ display: 'inline-flex', marginRight: 10, flexShrink: 0 }} aria-hidden="true">
+                <PrizeRankIcon label={row.label} />
+              </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>{row.label}</div>
                 {teamName && (
@@ -197,7 +230,9 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
       <section style={{ marginBottom: 20 }}>
         <h3 className="tm-hub-section-title">개인 어워드</h3>
         <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>⭐</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
+            <Star size={28} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.4} />
+          </div>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
             MVP · 득점왕 등 개인 어워드는<br />집계 중이에요.
           </p>
@@ -206,9 +241,17 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     );
   }
 
-  const AWARD_ICON: Record<string, string> = {
-    mvp: '🏅', top_scorer: '⚽', best_defense: '🛡️',
-    best_keeper: '🧤', fair_play: '🤝', best_rookie: '🌟',
+  const AwardIcon = ({ type }: { type: string }) => {
+    const size = 22;
+    switch (type) {
+      case 'mvp': return <Crown size={size} className="tm-medal-gold" strokeWidth={2} />;
+      case 'top_scorer': return <Goal size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
+      case 'best_defense': return <Shield size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
+      case 'best_keeper': return <Hand size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
+      case 'fair_play': return <Handshake size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
+      case 'best_rookie': return <Sparkles size={size} style={{ color: 'var(--orange500)' }} strokeWidth={2} />;
+      default: return <Trophy size={size} className="tm-medal-gold" strokeWidth={2} />;
+    }
   };
 
   return (
@@ -216,13 +259,13 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
       <h3 className="tm-hub-section-title">개인 어워드</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {awards.map((award) => (
-          <div key={award.id} style={{
-            display: 'flex', alignItems: 'center', gap: 12,
+          <div key={award.id} className="tm-award-card" style={{
+            alignItems: 'center', gap: 12,
             padding: '12px 16px', background: 'var(--surface)',
             borderRadius: 10, border: '1px solid var(--grey150)',
           }}>
-            <span style={{ fontSize: 24, flexShrink: 0 }} aria-hidden="true">
-              {AWARD_ICON[award.awardType] ?? '🏆'}
+            <span style={{ display: 'inline-flex', flexShrink: 0 }} aria-hidden="true">
+              <AwardIcon type={award.awardType} />
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
@@ -245,6 +288,19 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
   );
 }
 
+/* ── 별 아이콘 (채움/빈 별 공용) ── */
+export function RatingStar({ filled, size = 18 }: { filled: boolean; size?: number }) {
+  return (
+    <Star
+      size={size}
+      aria-hidden="true"
+      fill={filled ? 'var(--orange500)' : 'none'}
+      stroke={filled ? 'var(--orange500)' : 'var(--grey300)'}
+      strokeWidth={1.6}
+    />
+  );
+}
+
 /* ── 별점 컴포넌트 ── */
 function StarRating({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
   return (
@@ -252,11 +308,11 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n} type="button"
-          style={{ background: 'none', border: 'none', padding: '2px', fontSize: 22, cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
+          style={{ display: 'inline-flex', background: 'none', border: 'none', padding: '2px', cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
           onClick={() => onChange?.(n)}
           aria-label={`${n}점`}
         >
-          {n <= value ? '⭐' : '☆'}
+          <RatingStar filled={n <= value} size={26} />
         </button>
       ))}
     </div>
@@ -269,10 +325,30 @@ function ReviewFormModal({
 }: { tournamentId: string; onClose: () => void }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { mutate, isPending, isError } = useV1SubmitTournamentReview(tournamentId);
+  const uploadImages = useV1UploadImages();
+
+  const handlePickPhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setPhotoError(null);
+    const remaining = REVIEW_PHOTO_MAX - photoUrls.length;
+    if (remaining <= 0) return;
+    const toUpload = Array.from(files).slice(0, remaining);
+    try {
+      const { urls } = await uploadImages.mutateAsync(toUpload);
+      setPhotoUrls((prev) => [...prev, ...urls].slice(0, REVIEW_PHOTO_MAX));
+    } catch (err) {
+      setPhotoError(extractErrorMessage(err, '사진 업로드에 실패했어요.'));
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = () => {
-    mutate({ rating, comment: comment.trim() || undefined }, {
+    mutate({ rating, comment: comment.trim() || undefined, photoUrls: photoUrls.length > 0 ? photoUrls : undefined }, {
       onSuccess: () => onClose(),
     });
   };
@@ -289,7 +365,7 @@ function ReviewFormModal({
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>대회 후기 작성</h3>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기">✕</button>
+          <button type="button" onClick={onClose} style={{ display: 'inline-flex', background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기"><X size={20} /></button>
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
@@ -309,7 +385,56 @@ function ReviewFormModal({
             resize: 'none', boxSizing: 'border-box',
           }}
         />
-        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-caption)', marginBottom: 16 }}>{comment.length}/500</div>
+        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--text-caption)', marginBottom: 12 }}>{comment.length}/500</div>
+
+        {/* 사진 첨부 (선택, 최대 3장) */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {photoUrls.map((url) => (
+              <div key={url} style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
+                <img src={publicAssetPath(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button
+                  type="button"
+                  onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
+                  aria-label="사진 삭제"
+                  style={{
+                    position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
+                  }}
+                >
+                  <X size={12} strokeWidth={2.5} />
+                </button>
+              </div>
+            ))}
+            {photoUrls.length < REVIEW_PHOTO_MAX && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadImages.isPending}
+                aria-label="사진 추가"
+                style={{
+                  width: 64, height: 64, borderRadius: 10, flexShrink: 0,
+                  border: '1px dashed var(--grey300)', background: 'var(--grey50)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                  color: 'var(--text-muted)', cursor: uploadImages.isPending ? 'default' : 'pointer',
+                }}
+              >
+                <ImagePlus size={18} strokeWidth={1.8} aria-hidden="true" />
+                <span style={{ fontSize: 10 }}>{uploadImages.isPending ? '업로드 중' : `${photoUrls.length}/${REVIEW_PHOTO_MAX}`}</span>
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            onChange={(e) => void handlePickPhotos(e.target.files)}
+            style={{ display: 'none' }}
+          />
+          {photoError && <p style={{ color: 'var(--red500)', fontSize: 11, marginTop: 6 }}>{photoError}</p>}
+        </div>
 
         {isError && <p style={{ color: 'var(--red500)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
 
@@ -321,6 +446,40 @@ function ReviewFormModal({
           {isPending ? '저장 중...' : '후기 등록'}
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ── 후기 카드 (임베드 목록 · 전체보기 페이지 공용) ── */
+export function ReviewCard({ review }: { review: V1TournamentReview }) {
+  const letter = (review.teamName ?? review.authorNickname ?? '?').charAt(0);
+  const date = new Date(review.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+  const photoUrls = review.photoUrls ?? [];
+
+  return (
+    <div className="tm-review-card">
+      <div className="tm-review-card-header">
+        <div className="tm-review-card-avatar" aria-hidden="true">{letter}</div>
+        <div>
+          <div className="tm-review-card-author">{review.teamName ?? review.authorNickname}</div>
+          <div className="tm-review-card-date">{date}</div>
+        </div>
+        <div className="tm-review-card-stars" aria-label={`별점 ${review.rating}점`}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <RatingStar key={i} filled={i < review.rating} size={14} />
+          ))}
+        </div>
+      </div>
+      {review.comment && <p className="tm-review-card-body">{review.comment}</p>}
+      {photoUrls.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          {photoUrls.map((url) => (
+            <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+              <img src={publicAssetPath(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -380,29 +539,18 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
           </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {reviews.map((review) => {
-              const letter = (review.teamName ?? review.authorNickname ?? '?').charAt(0);
-              const date = new Date(review.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
-              return (
-                <div key={review.id} className="tm-review-card">
-                  <div className="tm-review-card-header">
-                    <div className="tm-review-card-avatar" aria-hidden="true">{letter}</div>
-                    <div>
-                      <div className="tm-review-card-author">{review.teamName ?? review.authorNickname}</div>
-                      <div className="tm-review-card-date">{date}</div>
-                    </div>
-                    <div className="tm-review-card-stars" aria-label={`별점 ${review.rating}점`}>
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <span key={i} className="tm-review-card-star" aria-hidden="true">
-                          {i < review.rating ? '⭐' : '☆'}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  {review.comment && <p className="tm-review-card-body">{review.comment}</p>}
-                </div>
-              );
-            })}
+            {reviews.slice(0, REVIEW_EMBED_CAP).map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+            {reviews.length > REVIEW_EMBED_CAP && (
+              <Link
+                href={`/tournaments/${tournament.id}/reviews`}
+                className="tm-btn tm-btn-sm tm-btn-outline"
+                style={{ justifyContent: 'center' }}
+              >
+                후기 전체보기 →
+              </Link>
+            )}
           </div>
         )}
       </section>
@@ -464,7 +612,9 @@ function NotCompletedNotice({ status }: { status: string }) {
 
   return (
     <Card pad={24} style={{ textAlign: 'center', margin: '0 0 20px' }}>
-      <div style={{ fontSize: 32, marginBottom: 8 }}>🏅</div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
+        <Medal size={32} className="tm-medal-gold" strokeWidth={1.8} />
+      </div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
         {msg}
       </p>
@@ -472,52 +622,73 @@ function NotCompletedNotice({ status }: { status: string }) {
   );
 }
 
-/* ── 메인 콘텐츠 ── */
+/* ── 메인 콘텐츠 ──
+ * 데스크탑: bracket/results 서브페이지와 동일한 tm-tourn-sub-* 2열 그리드 시스템 재사용
+ * (좌: 시상 결과·상금 / 우: 개인 어워드·후기) — 모바일은 클래스가 no-op이라 기존 스택 유지. */
 function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const isCompleted = tournament.status === 'completed';
   const top3 = isCompleted ? getTopThree(tournament) : [];
+  const showPrizeColumn = isCompleted && hasPrizeData(tournament);
 
   return (
-    <div style={{ paddingBottom: 40 }}>
-      <div style={{ padding: '20px 20px 0' }}>
-        {!isCompleted && <NotCompletedNotice status={tournament.status} />}
+    <div className="tm-tourn-sub-page">
+      {!isCompleted && (
+        <div style={{ padding: '20px 20px 0' }}>
+          <NotCompletedNotice status={tournament.status} />
+          {/* 진행 중에도 상금 정보는 표시 */}
+          {tournament.prizeSummary && <PrizeSection tournament={tournament} top3={top3} />}
+        </div>
+      )}
 
-        {isCompleted && (
-          <>
-            {/* 시상대 */}
-            {top3.length > 0 && (
-              <section style={{ marginBottom: 20 }}>
-                <h3 className="tm-hub-section-title">시상 결과</h3>
-                <Card pad={16}>
-                  <AwardsPodium top3={top3} />
-                </Card>
-              </section>
-            )}
+      {isCompleted && top3.length > 0 && (
+        /* 시상대는 그리드 밖 풀와이드 히어로로 — 좌/우 콘텐츠양 격차(포디움+상금 vs 어워드+후기)를 줄임 */
+        <div className="tm-tourn-hero-full" style={{ padding: '20px 20px 0' }}>
+          <section style={{ marginBottom: 20 }}>
+            <h3 className="tm-hub-section-title">시상 결과</h3>
+            <Card pad={16}>
+              <AwardsPodium top3={top3} />
+            </Card>
+          </section>
+        </div>
+      )}
 
+      {isCompleted && showPrizeColumn && (
+        <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-awards-grid">
+          <div className="tm-tourn-sub-col tm-awards-col-prize" style={{ padding: '0 20px' }}>
             {/* 상금 */}
             <PrizeSection tournament={tournament} top3={top3} />
+          </div>
 
+          <div className="tm-tourn-sub-col" style={{ padding: '0 20px' }}>
             {/* 개인 어워드 */}
             <IndividualAwardsSection tournament={tournament} />
 
             {/* 참가팀 후기 */}
             <ReviewsSection tournament={tournament} />
+          </div>
+        </div>
+      )}
 
-            {/* 리텐션 */}
-            <RetentionSection tournamentId={tournament.id} />
-          </>
-        )}
+      {isCompleted && !showPrizeColumn && (
+        /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
+        <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
+          <IndividualAwardsSection tournament={tournament} />
+          <ReviewsSection tournament={tournament} />
+        </div>
+      )}
 
-        {/* 진행 중에도 상금 정보는 표시 */}
-        {!isCompleted && tournament.prizeSummary && (
-          <PrizeSection tournament={tournament} top3={top3} />
-        )}
-      </div>
+      {isCompleted && (
+        <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
+          <RetentionSection tournamentId={tournament.id} />
+        </div>
+      )}
 
       {/* 이전 네비게이터 (시상리뷰는 흐름의 마지막) */}
-      <TournamentFlowNav
-        prev={{ href: `/tournaments/${tournament.id}/results`, label: '최종결과' }}
-      />
+      <div className="tm-tourn-sub-flownav">
+        <TournamentFlowNav
+          prev={{ href: `/tournaments/${tournament.id}/results`, label: '최종결과' }}
+        />
+      </div>
     </div>
   );
 }

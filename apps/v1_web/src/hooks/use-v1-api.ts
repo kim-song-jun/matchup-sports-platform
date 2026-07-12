@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Api, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
@@ -100,7 +100,9 @@ import type {
   V1UploadImagesResult,
   V1TournamentListPage,
   V1TournamentDetail,
+  V1PendingTournamentReview,
   V1TournamentReview,
+  V1TournamentReviewsPage,
   V1TournamentAward,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
@@ -1272,6 +1274,21 @@ export function useV1UploadImages() {
   });
 }
 
+/**
+ * 경기 영상 파일 업로드 mutation (1개, 최대 200MB, mp4/webm/mov).
+ * BE 계약: POST /api/v1/uploads/videos — field 'files', 응답 { urls: string[] }.
+ * 응답 url(/uploads/*.mp4)은 정적 서빙이 Range 요청을 지원해 <video>에서 바로 스트리밍된다.
+ */
+export function useV1UploadVideo() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('files', file);
+      return v1MultipartPost<V1UploadImagesResult>('/uploads/videos', formData);
+    },
+  });
+}
+
 export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
@@ -1536,11 +1553,23 @@ export function useV1Tournament(id: string) {
 }
 
 /** 대회 리뷰 목록 (tournaments/:id에 이미 포함되지만 독립 조회용) */
-export function useV1TournamentReviews(tournamentId: string) {
+export function useV1TournamentReviews(
+  tournamentId: string,
+  params?: { page?: number; pageSize?: number; search?: string },
+) {
+  const page = params?.page ?? 1;
+  const pageSize = params?.pageSize ?? 10;
+  const search = params?.search?.trim() || undefined;
   return useQuery({
-    queryKey: ['tournament-reviews', tournamentId],
-    queryFn: () => v1Get<V1TournamentReview[]>(`/tournaments/${tournamentId}/reviews`),
+    queryKey: ['tournament-reviews', tournamentId, page, pageSize, search ?? ''],
+    queryFn: () =>
+      v1Get<V1TournamentReviewsPage>(`/tournaments/${tournamentId}/reviews`, {
+        page,
+        pageSize,
+        ...(search ? { search } : {}),
+      }),
     enabled: !!tournamentId,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1550,6 +1579,15 @@ export function useV1MyTournamentReview(tournamentId: string, enabled = true) {
     queryKey: ['tournament-reviews-me', tournamentId],
     queryFn: () => v1Get<V1TournamentReview | null>(`/tournaments/${tournamentId}/reviews/me`),
     enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 참가 확정했지만 아직 리뷰를 작성하지 않은 종료 대회 목록 (최근 종료순) */
+export function useV1PendingTournamentReviews(enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-reviews-pending'],
+    queryFn: () => v1Get<V1PendingTournamentReview[]>('/tournaments/me/pending-reviews'),
+    enabled,
   });
 }
 
@@ -1566,7 +1604,7 @@ export function useV1TournamentParticipantCheck(tournamentId: string, enabled = 
 export function useV1SubmitTournamentReview(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { rating: number; comment?: string }) =>
+    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[] }) =>
       v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });

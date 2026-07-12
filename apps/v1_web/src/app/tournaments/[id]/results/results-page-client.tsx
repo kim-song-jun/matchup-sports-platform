@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Trophy } from 'lucide-react';
+import { MatchVideos, type MatchVideo } from '@/components/tournaments/match-videos';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
@@ -136,8 +138,8 @@ function DesktopChampionHero({
         pointerEvents: 'none',
       }} />
       {/* 트로피 */}
-      <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 16, filter: 'drop-shadow(0 0 24px rgba(255,215,0,0.5))' }} aria-hidden="true">
-        🏆
+      <div style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 16, filter: 'drop-shadow(0 0 24px rgba(255,215,0,0.5))' }} aria-hidden="true">
+        <Trophy size={52} className="tm-medal-gold" strokeWidth={1.6} />
       </div>
       {/* CHAMPION 배지 */}
       <div style={{
@@ -218,7 +220,7 @@ function MobileChampionBanner({
       style={{ cursor: 'pointer' }}
     >
       {played && <Confetti count={32} />}
-      <div className="tm-res-hero-trophy" aria-hidden="true">🏆</div>
+      <div className="tm-res-hero-trophy" aria-hidden="true"><Trophy size={40} className="tm-medal-gold" strokeWidth={1.6} /></div>
       <div className="tm-res-hero-label">★ CHAMPION ★</div>
       <div className="tm-res-hero-name">{champion}</div>
       <div className="tm-res-hero-inline-stat">
@@ -288,13 +290,13 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
     label, labelColor = 'var(--text-caption)',
     home, away, homeScore, awayScore,
     winner, hasPenalty, homePK, awayPK,
-    date, isAccent = false, isAgg = false,
+    date, isAccent = false, isAgg = false, videos,
   }: {
-    label: string; labelColor?: string;
+    label: React.ReactNode; labelColor?: string;
     home: string; away: string; homeScore: number; awayScore: number;
     winner: 'home' | 'away' | null;
     hasPenalty?: boolean; homePK?: number | null; awayPK?: number | null;
-    date?: string; isAccent?: boolean; isAgg?: boolean;
+    date?: string; isAccent?: boolean; isAgg?: boolean; videos?: MatchVideo[];
   }) => (
     <div style={{
       padding: '10px 16px',
@@ -343,6 +345,15 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
           {isAgg && winner === 'away' && <span style={{ fontSize: 10, color: 'var(--blue500)', marginRight: 4 }}>✓</span>}{away}
         </span>
       </div>
+      {videos && videos.length > 0 && (
+        isAccent
+          ? <MatchVideos videos={videos} matchLabel={`${home} vs ${away}`} variant="strip" />
+          : (
+            <div style={{ marginTop: 8 }}>
+              <MatchVideos videos={videos} matchLabel={`${home} vs ${away}`} variant="chips" />
+            </div>
+          )
+      )}
     </div>
   );
 
@@ -360,12 +371,13 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
         return (
           <div key={f.id} style={cardStyle}>
             <MatchRow
-              label="🏆 결승"
+              label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Trophy size={13} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />결승</span>}
               home={f.homeTeamName} away={f.awayTeamName}
               homeScore={homeScore} awayScore={awayScore}
               winner={winner}
               hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
               date={fmtDate(f.scheduledAt)} isAccent
+              videos={f.videos}
             />
           </div>
         );
@@ -387,6 +399,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
                 winner={getWinnerSide(leg1.result)}
                 hasPenalty={leg1.result.hasPenalty} homePK={leg1.result.homePenaltyScore} awayPK={leg1.result.awayPenaltyScore}
                 date={fmtDate(leg1.scheduledAt)}
+                videos={leg1.videos}
               />
             )}
             {leg2?.result && <>{divider}<MatchRow
@@ -395,6 +408,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
               winner={getWinnerSide(leg2.result)}
               hasPenalty={leg2.result.hasPenalty} homePK={leg2.result.homePenaltyScore} awayPK={leg2.result.awayPenaltyScore}
               date={fmtDate(leg2.scheduledAt)}
+              videos={leg2.videos}
             /></>}
             {/* 합산 */}
             <div style={{ borderTop: '1px solid rgba(49,130,246,0.15)' }}>
@@ -423,6 +437,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
               winner={winner}
               hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
               date={fmtDate(f.scheduledAt)}
+              videos={f.videos}
             />
           </div>
         );
@@ -502,7 +517,26 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
 
   const groupFixtures = tournament.fixtures.filter(
     (f) => f.status === 'completed' && f.result !== null && ['group', '조별리그'].includes(f.round),
-  ).sort((a, b) => a.fixtureNumber - b.fixtureNumber);
+  );
+
+  const groupSections = [...tournament.groups]
+    .filter((g) => g.phase === 'group')
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((g) => ({
+      name: g.name,
+      fixtures: groupFixtures
+        .filter((f) => f.groupId === g.id)
+        .sort((a, b) => a.fixtureNumber - b.fixtureNumber),
+    }))
+    .filter((section) => section.fixtures.length > 0);
+
+  const sectionedFixtureIds = new Set(groupSections.flatMap((s) => s.fixtures.map((f) => f.id)));
+  const unsectionedFixtures = groupFixtures
+    .filter((f) => !sectionedFixtureIds.has(f.id))
+    .sort((a, b) => a.fixtureNumber - b.fixtureNumber);
+  if (unsectionedFixtures.length > 0) {
+    groupSections.push({ name: '기타', fixtures: unsectionedFixtures });
+  }
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
@@ -550,14 +584,35 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
                   <span className="tm-res-expand-chevron" style={{ transform: showGroup ? 'rotate(180deg)' : undefined }}>▾</span>
                 </button>
                 {showGroup && (
-                  <div className="tm-res-matches-block" style={{ marginTop: 8 }}>
-                    {groupFixtures.map((f) => (
-                      <div key={f.id} className="tm-res-match-row">
-                        <div className="tm-res-match-meta"><span className="tm-res-match-round">조별</span></div>
-                        <div className="tm-res-match-teams">
-                          <span className="tm-res-match-team" style={{ fontWeight: getWinnerSide(f.result!) === 'home' ? 700 : 400 }}>{f.homeTeamName}</span>
-                          <span className="tm-res-match-score tab-num">{f.result?.homeScore}<span style={{ opacity: 0.35, margin: '0 2px' }}>:</span>{f.result?.awayScore}</span>
-                          <span className="tm-res-match-team tm-res-match-team-right" style={{ fontWeight: getWinnerSide(f.result!) === 'away' ? 700 : 400 }}>{f.awayTeamName}</span>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {groupSections.map((section) => (
+                      <div key={section.name}>
+                        <div className="tm-res-group-label">{section.name}</div>
+                        <div className="tm-res-matches-block">
+                          {section.fixtures.map((f) => {
+                            const winner = getWinnerSide(f.result!);
+                            return (
+                              <div key={f.id} className="tm-res-match-row">
+                                {f.scheduledAt && (
+                                  <div className="tm-res-match-meta">
+                                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-caption)' }}>
+                                      {new Date(f.scheduledAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="tm-res-match-teams">
+                                  <span className="tm-res-match-team" style={{ fontWeight: winner === 'home' ? 700 : 400, color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)' }}>{f.homeTeamName}</span>
+                                  <span className="tm-res-match-score tab-num">{f.result?.homeScore}<span style={{ opacity: 0.35, margin: '0 2px' }}>:</span>{f.result?.awayScore}</span>
+                                  <span className="tm-res-match-team tm-res-match-team-right" style={{ fontWeight: winner === 'away' ? 700 : 400, color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)' }}>{f.awayTeamName}</span>
+                                </div>
+                                {f.videos.length > 0 && (
+                                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}>
+                                    <MatchVideos videos={f.videos} matchLabel={`${f.homeTeamName} vs ${f.awayTeamName}`} variant="chips" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     ))}

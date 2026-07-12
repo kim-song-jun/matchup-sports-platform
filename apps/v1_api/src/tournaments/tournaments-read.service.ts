@@ -103,6 +103,7 @@ export class TournamentsReadService {
               include: { team: { select: { id: true, name: true } } },
             },
             result: true,
+            videos: { orderBy: { sortOrder: 'asc' } },
           },
         },
         announcements: {
@@ -237,6 +238,11 @@ export class TournamentsReadService {
               recordedAt: f.result.recordedAt.toISOString(),
             }
           : null,
+        videos: f.videos.map((v) => ({
+          id: v.id,
+          title: v.title,
+          url: v.url,
+        })),
       })),
       announcements: row.announcements.map((a) => ({
         id: a.id,
@@ -256,6 +262,7 @@ export class TournamentsReadService {
         teamName: r.teamName ?? null,
         rating: r.rating,
         comment: r.comment ?? null,
+        photoUrls: r.photoUrls,
         createdAt: r.createdAt.toISOString(),
       })),
       awards: (row.awards ?? []).map((a) => ({
@@ -281,6 +288,7 @@ export class TournamentsReadService {
       scheduledAt: Date | null;
       scheduledEndAt: Date | null;
       venue: string | null;
+      coverImageUrl: string | null;
       teamCount: number;
       entryFee: number;
       prizePool: number | null;
@@ -324,6 +332,7 @@ export class TournamentsReadService {
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      coverImageUrl: row.coverImageUrl,
       teamCount: row.teamCount,
       entryFee: row.entryFee,
       prizePool: row.prizePool,

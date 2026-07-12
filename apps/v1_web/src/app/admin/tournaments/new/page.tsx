@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Check } from 'lucide-react';
 import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
+import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TournamentFormat } from '@/types/api';
 import {
@@ -246,6 +247,7 @@ export default function AdminTournamentsNewPage() {
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [bankHolder, setBankHolder] = useState('');
+  const [prizePool, setPrizePool] = useState('');
   const [prizeSummary, setPrizeSummary] = useState('');
   const [prizeBreakdown, setPrizeBreakdown] = useState('');
   const [rulesText, setRulesText] = useState('');
@@ -319,6 +321,9 @@ export default function AdminTournamentsNewPage() {
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
         entryFee: parseInt(entryFee || '0', 10),
+        ...(prizePool.trim() && !Number.isNaN(parseInt(prizePool, 10))
+          ? { prizePool: parseInt(prizePool, 10) }
+          : {}),
         ...(prizeSummary.trim() ? { prizeSummary: prizeSummary.trim() } : {}),
         ...(prizeBreakdown.trim() ? { prizeBreakdown: prizeBreakdown.trim() } : {}),
         ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
@@ -344,7 +349,7 @@ export default function AdminTournamentsNewPage() {
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 min-h-[44px] text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -571,17 +576,33 @@ export default function AdminTournamentsNewPage() {
                 <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">
                   <input
                     id="entry-fee"
-                    type="number"
-                    min="0"
-                    step="1000"
-                    value={entryFee}
-                    onChange={(e) => setEntryFee(e.target.value)}
+                    type="text"
+                    value={formatWithComma(entryFee)}
+                    onChange={(e) => setEntryFee(onlyDigits(e.target.value))}
                     disabled={isPending}
                     placeholder="0"
                     className={inputCls}
                   />
                 </FormField>
               </div>
+
+              {/* 총상금 — 숫자 */}
+              <FormField
+                id="prize-pool"
+                label="총상금 (원)"
+                hint="시상·리뷰 페이지의 '총 상금' 카드에 표시돼요"
+              >
+                <input
+                  id="prize-pool"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithComma(prizePool)}
+                  onChange={(e) => setPrizePool(onlyDigits(e.target.value))}
+                  disabled={isPending}
+                  placeholder="예: 1000000"
+                  className={inputCls}
+                />
+              </FormField>
 
               {/* 상품 및 상금 안내 — 전체 너비 */}
               <FormField

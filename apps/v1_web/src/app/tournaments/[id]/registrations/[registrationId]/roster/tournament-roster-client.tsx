@@ -933,11 +933,11 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
-        {/* Below minimum warning */}
-        {canEditRoster && belowMinimum ? (
+        {/* Below minimum warning — 잠금/상태와 무관하게 미달 사실은 계속 노출 (P0: 조건 버그 수정) */}
+        {belowMinimum ? (
           <div style={{ marginBottom: 14 }}>
             <AlertBanner
-              message={`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.`}
+              message={`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.${isRosterLocked ? ' (명단이 마감된 상태예요 — 운영팀에 문의해 주세요)' : ''}`}
               tone="warning"
             />
           </div>

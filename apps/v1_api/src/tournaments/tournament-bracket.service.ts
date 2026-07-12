@@ -7,6 +7,7 @@ import {
 import {
   V1TournamentFixture,
   V1TournamentFixtureResult,
+  V1TournamentFixtureVideo,
   V1TournamentGroup,
   V1TournamentGroupTeam,
   V1TournamentStanding,
@@ -320,6 +321,22 @@ export class TournamentBracketService {
         },
       });
 
+      // 영상 목록은 replace-all — dto.videos 생략(undefined) 시 기존 목록 유지
+      if (dto.videos !== undefined) {
+        await tx.v1TournamentFixtureVideo.deleteMany({ where: { fixtureId } });
+        const videoRows = dto.videos
+          .map((v, i) => ({
+            fixtureId,
+            title: v.title?.trim() || null,
+            url: v.url.trim(),
+            sortOrder: i,
+          }))
+          .filter((v) => v.url.length > 0);
+        if (videoRows.length > 0) {
+          await tx.v1TournamentFixtureVideo.createMany({ data: videoRows });
+        }
+      }
+
       // fixture.status → completed
       await tx.v1TournamentFixture.update({
         where: { id: fixtureId },
@@ -346,7 +363,11 @@ export class TournamentBracketService {
       return fixtureResult;
     });
 
-    return this.serializeResult(result);
+    const videos = await this.prisma.v1TournamentFixtureVideo.findMany({
+      where: { fixtureId },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return { ...this.serializeResult(result), videos: videos.map((v) => this.serializeVideo(v)) };
   }
 
   // ─── standings recalculate ────────────────────────────────────────────────
@@ -537,6 +558,7 @@ export class TournamentBracketService {
         where: { tournamentId },
         include: {
           result: true,
+          videos: { orderBy: { sortOrder: 'asc' } },
           homeRegistration: {
             include: { team: { select: { name: true } } },
           },
@@ -570,6 +592,7 @@ export class TournamentBracketService {
         homeTeamName: f.homeRegistration?.team.name ?? 'TBD',
         awayTeamName: f.awayRegistration?.team.name ?? 'TBD',
         result: f.result ? this.serializeResult(f.result) : null,
+        videos: f.videos.map((v) => this.serializeVideo(v)),
       })),
       standings: standings.map((s) => ({
         ...this.serializeStanding(s),
@@ -635,6 +658,15 @@ export class TournamentBracketService {
       recordedAt: row.recordedAt.toISOString(),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private serializeVideo(row: V1TournamentFixtureVideo) {
+    return {
+      id: row.id,
+      title: row.title,
+      url: row.url,
+      sortOrder: row.sortOrder,
     };
   }
 

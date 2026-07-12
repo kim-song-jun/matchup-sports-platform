@@ -10,7 +10,7 @@
  */
 
 import { useRef, useState, useCallback } from 'react';
-import { TrophyIcon } from '@/components/v1-ui/icons';
+import { Trophy } from 'lucide-react';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -378,7 +378,7 @@ function ChampionSlot({ champion }: { champion: string | null }) {
   if (champion) {
     return (
       <div className="tm-bk2-champ tm-bk2-champ-won" aria-label={`우승 ${champion}`}>
-        <div className="tm-bk2-champ-trophy" aria-hidden="true">🏆</div>
+        <div className="tm-bk2-champ-trophy" aria-hidden="true"><Trophy size={26} className="tm-medal-gold" strokeWidth={1.8} /></div>
         <div className="tm-bk2-champ-label">우승</div>
         <div className="tm-bk2-champ-name">{champion}</div>
       </div>
@@ -386,7 +386,7 @@ function ChampionSlot({ champion }: { champion: string | null }) {
   }
   return (
     <div className="tm-bk2-champ" aria-label="우승 미정">
-      <TrophyIcon size={22} strokeWidth={1.6} style={{ color: 'var(--grey400)' }} aria-hidden="true" />
+      <Trophy size={22} strokeWidth={1.6} style={{ color: 'var(--grey400)' }} aria-hidden="true" />
       <div className="tm-bk2-champ-label" style={{ color: 'var(--text-caption)' }}>우승</div>
       <div className="tm-bk2-champ-name" style={{ color: 'var(--text-caption)', fontWeight: 500 }}>미정</div>
     </div>
@@ -530,7 +530,7 @@ function BracketEmpty() {
       padding: '28px 16px', textAlign: 'center',
       background: 'var(--grey50)', borderRadius: 14,
     }}>
-      <div style={{ fontSize: 30, marginBottom: 8 }}>🏆</div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={30} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>대진표 준비 중</div>
       <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>조별 리그가 끝나면 결선 대진표가 공개돼요.</div>
     </div>

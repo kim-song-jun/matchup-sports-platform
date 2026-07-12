@@ -19,6 +19,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { cssUrl, publicAssetPath } from '@/lib/assets';
+import { PendingTournamentReviewCard } from '@/components/tournaments/pending-review-card';
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
@@ -105,6 +106,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
           {/* RIGHT: menu sections */}
           <div className="tm-my-desktop-main">
+            <PendingTournamentReviewCard />
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>

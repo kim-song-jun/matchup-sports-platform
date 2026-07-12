@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { TrophyIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
+import { FormattedText } from '@/components/v1-ui/formatted-text';
+import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
+import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
   formatTournamentDateShort,
@@ -19,34 +21,12 @@ import {
 import type {
   V1TournamentDetail,
   V1TournamentFormat,
-  V1TournamentStatus,
   V1TournamentGroup,
   V1TournamentFixture,
   V1TournamentAnnouncement,
   V1TournamentStanding,
   V1TournamentRegistration,
 } from '@/types/api';
-
-/* ── Status helpers ── */
-
-type StatusConfig = { badgeClass: string; label: string };
-
-function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
-  switch (status) {
-    case 'open':
-      return { badgeClass: 'tm-badge-blue', label: '모집 중' };
-    case 'in_progress':
-      return { badgeClass: 'tm-badge-green', label: '진행 중' };
-    case 'completed':
-      return { badgeClass: 'tm-badge-grey', label: '종료' };
-    case 'closed':
-      return { badgeClass: 'tm-badge-grey', label: '마감' };
-    case 'cancelled':
-      return { badgeClass: 'tm-badge-red', label: '취소' };
-    default:
-      return { badgeClass: 'tm-badge-grey', label: status };
-  }
-}
 
 /* ── Format helpers ── */
 
@@ -115,7 +95,7 @@ function CapacityProgressBar({
   );
 }
 
-const COLLAPSED_POLICY_LINES = 4;
+const COLLAPSED_POLICY_MAX_HEIGHT = 96; // 대략 4줄 분량
 const POLICY_TOGGLE_THRESHOLD = 160;
 
 function CollapsiblePolicyText({
@@ -133,29 +113,26 @@ function CollapsiblePolicyText({
 }) {
   const [expanded, setExpanded] = useState(false);
   const shouldCollapse = text.length > POLICY_TOGGLE_THRESHOLD || text.includes('\n');
+  const collapsed = shouldCollapse && !expanded;
+  const fadeMask = 'linear-gradient(180deg, #000 55%, transparent 100%)';
 
   return (
     <>
-      <p
+      <div
         id={id}
-        className={className}
-        style={{
-          color,
-          lineHeight,
-          margin: 0,
-          whiteSpace: 'pre-wrap',
-          ...(shouldCollapse && !expanded
+        style={
+          collapsed
             ? {
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: COLLAPSED_POLICY_LINES,
+                maxHeight: COLLAPSED_POLICY_MAX_HEIGHT,
                 overflow: 'hidden',
+                maskImage: fadeMask,
+                WebkitMaskImage: fadeMask,
               }
-            : {}),
-        }}
+            : undefined
+        }
       >
-        {text}
-      </p>
+        <FormattedText text={text} className={className} style={{ color, lineHeight }} />
+      </div>
       {shouldCollapse ? (
         <button
           type="button"
@@ -166,7 +143,7 @@ function CollapsiblePolicyText({
           style={{ marginTop: 10, paddingInline: 0, minHeight: 36 }}
         >
           {expanded ? '접기' : '전체 보기'}
-          <ChevronRightIcon
+          <ChevronRight
             size={14}
             strokeWidth={2.2}
             aria-hidden="true"
@@ -349,7 +326,7 @@ function TournamentDetailView({
             aria-hidden="true"
             style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--orange500)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
           >
-            <TrophyIcon size={24} color="var(--static-white)" />
+            <Trophy size={24} color="var(--static-white)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상품 및 상금</div>
@@ -395,7 +372,7 @@ function TournamentDetailView({
               color: 'var(--static-white)',
             }}
           >
-            <TrophyIcon size={28} strokeWidth={1.6} />
+            <Trophy size={28} strokeWidth={1.6} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
@@ -672,7 +649,7 @@ function TournamentDetailView({
           <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
         </span>
         <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>순위표 · 대진표 보기</span>
-        <ChevronRightIcon size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
+        <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {/* Key facts */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -704,11 +681,11 @@ function TournamentDetailView({
         }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
-          <span style={{ fontSize: 12 }} aria-hidden="true">🏆</span>
+          <Trophy size={12} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />
           <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>종료</span>
         </span>
         <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>최종 결과 · 시상 보기</span>
-        <ChevronRightIcon size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
+        <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -760,7 +737,7 @@ function TournamentDetailView({
           <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
             순위표 · 대진표 보기
           </span>
-          <ChevronRightIcon size={18} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
+          <ChevronRight size={18} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
         </Link>
       </div>
     ) : tournament.status === 'completed' ? (
@@ -786,14 +763,14 @@ function TournamentDetailView({
             background: 'rgba(255,255,255,0.12)', borderRadius: 20,
             padding: '3px 9px', flexShrink: 0,
           }}>
-            <span style={{ fontSize: 12 }} aria-hidden="true">🏆</span>
+            <Trophy size={12} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />
             <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>종료</span>
           </span>
           {/* 액션 텍스트 */}
           <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
             최종 결과 · 시상 보기
           </span>
-          <ChevronRightIcon size={18} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
+          <ChevronRight size={18} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
         </Link>
       </div>
     ) : null;
@@ -807,7 +784,7 @@ function TournamentDetailView({
           href="/tournaments"
           aria-label="대회 목록으로 돌아가기"
         >
-          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+          <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>대회 상세</h1>
       </div>
@@ -856,7 +833,9 @@ function TournamentStatusEntryCard({ tournament }: { tournament: V1TournamentDet
 
   const isCompleted = tournament.status === 'completed';
 
-  const icon = isCompleted ? '🏆' : '⚽';
+  const icon = isCompleted
+    ? <Trophy size={22} className="tm-medal-gold" strokeWidth={2} aria-hidden="true" />
+    : <Goal size={22} color="var(--static-white)" strokeWidth={2} aria-hidden="true" />;
   const title = isCompleted ? '대회가 끝났어요' : '대회가 진행 중이에요';
   const desc = isCompleted
     ? '최종 순위와 시상 결과를 확인해보세요.'
@@ -908,7 +887,7 @@ function TournamentStatusEntryCard({ tournament }: { tournament: V1TournamentDet
                 {desc}
               </div>
             </div>
-            <ChevronRightIcon size={18} strokeWidth={2.2} style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} aria-hidden="true" />
+            <ChevronRight size={18} strokeWidth={2.2} style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} aria-hidden="true" />
           </Link>
         </section>
       </div>
@@ -1604,12 +1583,11 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
           {formatPublishedAt(announcement.publishedAt)}
         </span>
       </div>
-      <p
+      <FormattedText
+        text={announcement.body}
         className="tm-text-caption"
-        style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}
-      >
-        {announcement.body}
-      </p>
+        style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65 }}
+      />
     </Card>
   );
 }

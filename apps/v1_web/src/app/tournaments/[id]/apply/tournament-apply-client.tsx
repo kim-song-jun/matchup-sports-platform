@@ -9,6 +9,7 @@ import {
   useV1Tournament,
   useV1MyTeams,
   useV1MyRegistrations,
+  useV1Registration,
   useV1CreateRegistration,
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
@@ -1240,6 +1241,8 @@ function PaymentGuideStep({
   tournament: V1TournamentDetail;
   registrationId: string;
 }) {
+  // P0: 방금 제출한 입금자명을 모바일에서도 재확인할 수 있게 배선 (입금자명 불일치 = 자동취소 정책)
+  const { data: registration } = useV1Registration(tournament.id, registrationId);
   const hasBankInfo =
     Boolean(tournament.bankName) &&
     Boolean(tournament.bankAccount) &&
@@ -1338,9 +1341,10 @@ function PaymentGuideStep({
                 </div>
               </div>
               <InfoRow label="예금주" value={tournament.bankHolder!} />
+              <InfoRow label="입금액" value={formatEntryFee(tournament.entryFee)} />
               <InfoRow
-                label="입금액"
-                value={formatEntryFee(tournament.entryFee)}
+                label="입금자명"
+                value={registration?.depositorName ?? '—'}
                 isLast
               />
             </div>
@@ -1377,6 +1381,29 @@ function PaymentGuideStep({
                 신청 후 2시간 이내에 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
               </p>
             </div>
+          </div>
+        </Card>
+      </section>
+
+      {/* P0: 다음 행동 안내 — 선수 명단 등록 (입금 확정 전에도 등록 가능) */}
+      <section aria-labelledby="next-step-heading" style={{ marginTop: 16 }}>
+        <Card pad={14} style={{ border: '1px solid var(--blue100)', background: 'var(--blue50)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div id="next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+                다음 단계: 선수 명단 등록
+              </div>
+              <div className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                입금 확인을 기다리는 동안에도 등록할 수 있어요. (최소 {tournament.minPlayers}명)
+              </div>
+            </div>
+            <Link
+              href={`/tournaments/${tournament.id}/registrations/${registrationId}/roster`}
+              className="tm-btn tm-btn-sm tm-btn-primary"
+              style={{ flexShrink: 0 }}
+            >
+              명단 등록
+            </Link>
           </div>
         </Card>
       </section>
@@ -1441,8 +1468,45 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
 
+  // P0: 동의·입금자명 입력을 registration 단위로 보존 — 새로고침/이탈 후 재진입 시 복원
+  const agreementsDraftKey = registrationId ? `teameet.v1.applyDraft.${registrationId}` : null;
+  useEffect(() => {
+    if (!agreementsDraftKey) return;
+    try {
+      const raw = window.sessionStorage.getItem(agreementsDraftKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Partial<AgreementsState>;
+      setAgreements((prev) => ({ ...prev, ...saved }));
+    } catch {
+      // 저장값 손상 시 조용히 무시 — 새 입력으로 진행
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agreementsDraftKey]);
+  useEffect(() => {
+    if (!agreementsDraftKey) return;
+    const timer = setTimeout(() => {
+      try {
+        window.sessionStorage.setItem(agreementsDraftKey, JSON.stringify(agreements));
+      } catch {
+        // 스토리지 실패는 UX에 치명적이지 않음
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [agreements, agreementsDraftKey]);
+
   const createRegistration = useV1CreateRegistration(tournamentId);
   const submitRegistration = useV1SubmitRegistration(tournamentId, registrationId ?? '');
+
+  // P0: 입금자명 prefill — 정책상 팀명/신청자명 일치 요구. 비어 있을 때만 선택 팀명으로 채움
+  useEffect(() => {
+    if (step !== 'agreements') return;
+    if (agreements.depositorName.trim()) return;
+    const team = managerTeams.find((t) => t.teamId === selectedTeamId);
+    if (team?.name) {
+      setAgreements((prev) => (prev.depositorName.trim() ? prev : { ...prev, depositorName: team.name.slice(0, 20) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, selectedTeamId]);
 
   // Auto-select first manager team
   useEffect(() => {

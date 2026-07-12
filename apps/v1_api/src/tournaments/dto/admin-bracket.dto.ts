@@ -1,15 +1,19 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
@@ -144,4 +148,28 @@ export class RecordResultDto {
   @IsString()
   @MaxLength(500)
   note?: string;
+
+  /**
+   * 경기 하이라이트/중계 영상 목록 (옵션) — 전달 시 replace-all.
+   * undefined 로 생략하면 기존 영상 목록을 유지한다.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => FixtureVideoDto)
+  videos?: FixtureVideoDto[];
+}
+
+export class FixtureVideoDto {
+  /** 표시 제목 (예: "전반 하이라이트") — 없으면 "경기 영상 N"으로 표시 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  title?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(1000)
+  url!: string;
 }

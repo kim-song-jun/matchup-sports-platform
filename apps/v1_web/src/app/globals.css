@@ -21,6 +21,8 @@
   --red500: #f04452;
   --yellow50: #fff8d6;
   --yellow500: #ffc342;
+  --teal50: #e2f7f8;
+  --teal500: #0eb8c0;
   --grey50: #f9fafb;
   --grey100: #f2f4f6;
   --grey150: #eaedf0;
@@ -5532,9 +5534,9 @@ button:disabled {
   border-bottom: 1px solid var(--grey100);
 }
 .tm-res-match-row:last-child { border-bottom: none; }
-.tm-res-match-round {
-  font-size: 10px; font-weight: 700; color: var(--text-caption);
-  text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;
+.tm-res-group-label {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;
 }
 .tm-res-match-teams {
   display: flex;
@@ -5551,8 +5553,11 @@ button:disabled {
 }
 .tm-res-match-team-right { text-align: right; }
 .tm-res-match-score {
-  font-size: 16px; font-weight: 900; color: var(--text-strong);
+  font-size: 14px; font-weight: 900; color: var(--text-strong);
   flex-shrink: 0; text-align: center; min-width: 52px;
+  background: var(--grey100);
+  border-radius: 8px;
+  padding: 4px 0;
 }
 .tm-res-match-date { font-size: 10px; color: var(--text-caption); margin-top: 4px; }
 
@@ -5708,42 +5713,107 @@ button:disabled {
 }
 
 /* ── 시상/리뷰 ── */
+.tm-awards-podium-caption {
+  margin: 0 0 2px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.tm-awards-podium-caption strong {
+  color: var(--blue500);
+  font-weight: 700;
+}
 .tm-awards-podium {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 8px;
-  padding: 20px 0 8px;
+  gap: 10px;
+  padding: 28px 0 8px;
+  position: relative;
 }
+/* 1위 뒤 은은한 스포트라이트 글로우 — 살짝 숨쉬듯 pulse */
+.tm-awards-podium::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  height: 150px;
+  background: radial-gradient(ellipse at center, rgba(245, 166, 35, 0.16) 0%, rgba(245, 166, 35, 0) 72%);
+  pointer-events: none;
+  animation: tmPodiumSpotlightPulse 2.6s ease-in-out infinite;
+}
+@keyframes tmPodiumSpotlightPulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+/* 3위 → 2위 → 1위 순으로 차오르는 등장 연출 */
 .tm-awards-podium-slot {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   flex: 1;
+  position: relative;
+  opacity: 0;
+  animation: tmPodiumRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--podium-delay, 0ms);
+}
+@keyframes tmPodiumRise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-awards-podium::before { animation: none; }
+  .tm-awards-podium-slot { animation: none; opacity: 1; }
 }
 .tm-awards-podium-block {
   width: 100%;
-  border-radius: 8px 8px 0 0;
+  border-radius: 10px 10px 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
+  position: relative;
+  overflow: hidden;
 }
-.tm-awards-podium-1 .tm-awards-podium-block { height: 80px; background: linear-gradient(180deg, #FFD700 0%, #F5A623 100%); }
-.tm-awards-podium-2 .tm-awards-podium-block { height: 60px; background: linear-gradient(180deg, #C0C0C0 0%, #9E9E9E 100%); }
-.tm-awards-podium-3 .tm-awards-podium-block { height: 44px; background: linear-gradient(180deg, #CD7F32 0%, #A0522D 100%); }
+/* 유광 하이라이트 — 대각선 글로시 시트 */
+.tm-awards-podium-block::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 55%);
+}
+.tm-awards-podium-1 .tm-awards-podium-block {
+  height: 84px;
+  background: linear-gradient(180deg, #FFD700 0%, #F5A623 100%);
+  box-shadow: 0 6px 18px rgba(245, 166, 35, 0.4);
+}
+.tm-awards-podium-2 .tm-awards-podium-block {
+  height: 62px;
+  background: linear-gradient(180deg, #C0C0C0 0%, #9E9E9E 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.tm-awards-podium-3 .tm-awards-podium-block {
+  height: 46px;
+  background: linear-gradient(180deg, #CD7F32 0%, #A0522D 100%);
+  box-shadow: 0 4px 12px rgba(160, 82, 45, 0.25);
+}
 .tm-awards-podium-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-strong);
   text-align: center;
   word-break: keep-all;
   line-height: 1.3;
 }
+.tm-awards-podium-1 .tm-awards-podium-name {
+  font-size: 15px;
+}
 .tm-awards-podium-pos {
-  font-size: 11px;
-  color: var(--text-caption);
+  font-size: 22px;
+  line-height: 1;
 }
 
 .tm-awards-prize-row {
@@ -5804,9 +5874,456 @@ button:disabled {
 .tm-review-card-author { font-size: 13px; font-weight: 700; color: var(--text-strong); }
 .tm-review-card-team { font-size: 11px; color: var(--text-caption); }
 .tm-review-card-stars { display: flex; gap: 2px; }
-.tm-review-card-star { font-size: 14px; }
 .tm-review-card-body { font-size: 13px; color: var(--text); line-height: 1.55; }
 .tm-review-card-date { font-size: 11px; color: var(--text-caption); }
+
+/* 종목 필터 칩 — 대회 목록 (모바일 44px 터치 타깃 / 데스크탑 36px 컴팩트) */
+.tm-sport-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  margin-bottom: 18px;
+}
+.tm-sport-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--grey100);
+  color: var(--text-body);
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.tm-sport-chip:hover:not(.is-active) {
+  background: var(--grey150);
+}
+.tm-sport-chip:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+.tm-sport-chip.is-active {
+  background: var(--blue500);
+  color: var(--static-white);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(49, 130, 246, 0.35);
+}
+.tm-sport-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+@media (min-width: 1024px) {
+  /* 데스크탑: 마우스 포인터 전제 — 시각 밀도를 낮춘 컴팩트 칩 */
+  .tm-sport-chip {
+    min-height: 36px;
+    padding: 0 13px;
+  }
+  .tm-sport-chip-row {
+    gap: 6px;
+  }
+}
+
+/* 경기 영상 — 하이라이트 스트립/칩 + 페이지 내 모달 재생 (components/tournaments/match-videos.tsx) */
+.tm-video-strip {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.tm-video-strip-item {
+  flex: none;
+  width: 168px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 12px;
+}
+.tm-video-strip-item:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+.tm-video-strip-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--grey900, #191f28);
+}
+.tm-video-strip-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.92;
+}
+/* 업로드 파일 영상 — 썸네일이 없으므로 그라디언트 카드로 표현 */
+.tm-video-strip-thumb.is-file {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #2b3a4d 0%, #17202b 100%);
+  color: rgba(255, 255, 255, 0.85);
+}
+.tm-video-strip-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.25);
+  transition: background 0.15s;
+}
+.tm-video-strip-item:hover .tm-video-strip-overlay {
+  background: rgba(0, 0, 0, 0.4);
+}
+.tm-video-strip-play {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--blue500);
+}
+.tm-video-strip-title {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--grey700);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-video-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tm-video-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--blue50);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue600, #1b64da);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tm-video-chip:hover {
+  background: var(--blue100, #d4e5fc);
+}
+.tm-video-chip:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+.tm-video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+}
+.tm-video-modal-body {
+  width: 100%;
+  max-width: 860px;
+}
+.tm-video-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.tm-video-modal-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+.tm-video-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+.tm-video-modal-close:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+.tm-video-modal-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+.tm-video-modal-frame iframe,
+.tm-video-modal-frame video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000;
+}
+/* 영상이 여러 개일 때 모달 하단 플레이리스트 */
+.tm-video-playlist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.tm-video-playlist-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tm-video-playlist-chip:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.tm-video-playlist-chip.is-active {
+  background: var(--blue500);
+}
+.tm-video-playlist-chip:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* 메달·트로피 아이콘 컬러 (lucide 통일 — 포디움 그라디언트와 동일 톤 계열) */
+.tm-medal-gold   { color: #f0b429; }
+.tm-medal-silver { color: #98a2ae; }
+.tm-medal-bronze { color: #c07a3d; }
+
+/* 장문 텍스트 공용 포매터 (공지·규정·환불정책) — components/v1-ui/formatted-text.tsx */
+.tm-fmt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tm-fmt-p { margin: 0; }
+.tm-fmt-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tm-fmt-li { display: flex; gap: 8px; }
+.tm-fmt-marker {
+  flex-shrink: 0;
+  color: var(--blue500);
+  font-weight: 700;
+  line-height: inherit;
+}
+.tm-fmt-num {
+  flex-shrink: 0;
+  min-width: 18px;
+  color: var(--blue500);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: inherit;
+}
+
+/* 참가팀 후기 전체보기 — 검색 + 목록(모바일 카드 / 데스크탑 테이블) + 페이지네이션 */
+.tm-reviews-searchbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--grey150);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-caption);
+}
+.tm-reviews-searchbar input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+.tm-reviews-searchbar input::placeholder { color: var(--text-caption); }
+
+.tm-reviews-count {
+  font-size: 12px;
+  color: var(--text-caption);
+  margin-bottom: 10px;
+}
+
+.tm-reviews-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 0.15s;
+}
+
+.tm-reviews-table-wrap { display: none; }
+
+.tm-reviews-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 20px;
+}
+.tm-reviews-pager-btn,
+.tm-reviews-pager-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 1px solid var(--grey150);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+.tm-reviews-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tm-reviews-pager-btn:not(:disabled):hover,
+.tm-reviews-pager-num:not(.is-active):hover {
+  border-color: var(--blue500);
+  color: var(--blue500);
+}
+.tm-reviews-pager-btn:focus-visible,
+.tm-reviews-pager-num:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+.tm-reviews-pager-num.is-active {
+  border-color: var(--blue500);
+  background: var(--blue500);
+  color: #fff;
+  font-weight: 700;
+}
+.tm-reviews-pager-ellipsis {
+  color: var(--text-caption);
+  padding: 0 2px;
+  font-size: 13px;
+}
+
+@media (min-width: 1024px) {
+  /* 본문을 데스크탑 전체 폭에 늘리지 않고 좌측 라인에 고정 */
+  .tm-reviews-body {
+    max-width: 760px;
+    margin: 0;
+  }
+
+  /* 카드 목록 → 테이블로 전환 */
+  .tm-reviews-cards { display: none; }
+  .tm-reviews-table-wrap {
+    display: block;
+    overflow-x: auto;
+    border: 1px solid var(--grey150);
+    border-radius: 12px;
+  }
+  .tm-reviews-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .tm-reviews-table thead th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--grey50);
+    color: var(--text-caption);
+    font-weight: 600;
+    font-size: 12px;
+    border-bottom: 1px solid var(--grey150);
+    white-space: nowrap;
+  }
+  .tm-reviews-table tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--grey100);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  .tm-reviews-table tbody tr:last-child td { border-bottom: none; }
+  .tm-reviews-table tbody tr:hover { background: var(--grey50); }
+  .tm-reviews-table-team { color: var(--text-caption); white-space: nowrap; }
+  .tm-reviews-table-stars { display: flex; gap: 1px; white-space: nowrap; }
+  .tm-reviews-table-comment {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tm-reviews-table-empty { color: var(--text-caption); }
+  .tm-reviews-table-photos { display: flex; gap: 4px; }
+  .tm-reviews-table-photos a {
+    display: block;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .tm-reviews-table-photos img { width: 100%; height: 100%; object-fit: cover; }
+  .tm-reviews-table-photo-more {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-caption);
+    padding-left: 2px;
+  }
+  .tm-reviews-table-date {
+    color: var(--text-caption);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+}
 
 /* 섹션 공통 */
 .tm-hub-section {
@@ -5936,6 +6453,13 @@ button:disabled {
   .tm-tourn-sub-grid-6040  { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
   .tm-tourn-sub-col        { padding: 0 !important; margin: 0 !important; }
   .tm-tourn-sub-header     { padding-left: 0; padding-right: 0; }
+
+  /* 시상 페이지: 좌(상금) 컬럼이 우(어워드+후기)보다 짧아 하단에 빈 공간이 생기는 문제
+     — 좌측 카드를 컬럼 높이만큼 늘려 빈 여백이 카드 "안쪽" 여백처럼 보이게 함 */
+  .tm-awards-grid { align-items: stretch; }
+  .tm-awards-col-prize { display: flex; flex-direction: column; }
+  .tm-awards-col-prize .tm-prize-section { flex: 1; display: flex; flex-direction: column; }
+  .tm-awards-col-prize .tm-prize-card { flex: 1; display: flex; flex-direction: column; }
   /* 챔피언 카드 풀 너비 래퍼 */
   .tm-tourn-hero-full { padding-top: 16px; padding-left: 0 !important; padding-right: 0 !important; }
 

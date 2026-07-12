@@ -232,7 +232,8 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
-        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? null },
+        // 팀이 남긴 취소 요청 사유는 어드민이 별도 사유를 주지 않는 한 보존한다 (감사 추적)
+        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? registration.cancelReason ?? null },
       });
 
       // 결제가 있고 아직 cancelled 아니면 payment도 cancelled로 변경.

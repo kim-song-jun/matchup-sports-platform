@@ -18,9 +18,14 @@ import {
   Users,
   User,
   Clock,
+  ImagePlus,
+  Clapperboard,
 } from 'lucide-react';
+import { publicAssetPath } from '@/lib/assets';
+import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import {
   useV1AdminTournament,
+  useV1MasterSports,
   useV1AdminMe,
   useV1ChangeTournamentStatus,
   useV1UpdateTournament,
@@ -43,6 +48,7 @@ import {
   useV1CreateAnnouncement,
   useV1PublishAnnouncement,
   useV1UploadImages,
+  useV1UploadVideo,
   useV1SetTournamentAwards,
 } from '@/hooks/use-v1-api';
 import type {
@@ -287,9 +293,10 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'registrations' | 'bracket' | 'announcements' | 'awards';
+type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'awards';
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'info', label: '대회 정보' },
   { id: 'registrations', label: '신청 관리' },
   { id: 'bracket', label: '대진 관리' },
   { id: 'announcements', label: '공지' },
@@ -471,9 +478,13 @@ function RegistrationsTab({
 
   const handleCancel = async (reg: V1AdminTournamentRegistration) => {
     const teamLabel = reg.teamName ? `"${reg.teamName}"` : '이 팀';
+    const reasonSuffix =
+      reg.status === 'cancel_requested' && reg.cancelReason
+        ? ` 팀이 남긴 취소 사유: "${reg.cancelReason}"`
+        : '';
     const ok = await confirmCancel({
       title: '신청 취소',
-      message: `${teamLabel}의 신청을 취소할까요? 이 작업은 되돌릴 수 없어요.`,
+      message: `${teamLabel}의 신청을 취소할까요? 이 작업은 되돌릴 수 없어요.${reasonSuffix}`,
       confirmLabel: '취소 처리',
       tone: 'danger',
     });
@@ -520,7 +531,7 @@ function RegistrationsTab({
         card={(r) => ({
           title: r.teamName ?? r.teamId,
           subtitle: r.payment
-            ? `${PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · ${PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status}`
+            ? `${PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · ${PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status} · ${formatCurrency(r.payment.amount)}`
             : undefined,
           status: r.status,
           meta: [
@@ -733,6 +744,10 @@ function BracketTab({
   const [hasPenalty, setHasPenalty] = useState(false);
   const [homePenalty, setHomePenalty] = useState('0');
   const [awayPenalty, setAwayPenalty] = useState('0');
+  // 경기 영상 목록 편집 상태 — 저장 시 replace-all 로 전송한다
+  const [resultVideos, setResultVideos] = useState<{ title: string; url: string }[]>([]);
+  const uploadVideo = useV1UploadVideo();
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
 
@@ -918,6 +933,10 @@ function BracketTab({
               awayPenaltyScore: parseInt(awayPenalty, 10),
             }
           : { hasPenalty: false }),
+        // 편집기가 목록의 단일 소스 — 빈 배열이면 기존 영상 전체 삭제 (replace-all)
+        videos: resultVideos
+          .filter((v) => v.url.trim().length > 0)
+          .map((v) => ({ ...(v.title.trim() ? { title: v.title.trim() } : {}), url: v.url.trim() })),
       },
       {
         onSuccess: () => {
@@ -1485,6 +1504,7 @@ function BracketTab({
                     setHasPenalty(f.result?.hasPenalty ?? false);
                     setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
                     setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
+                    setResultVideos(f.videos.map((v) => ({ title: v.title ?? '', url: v.url })));
                     setResultOpen(true);
                   }}
                   disabled={!bothAssigned}
@@ -1600,6 +1620,87 @@ function BracketTab({
               )}
             </div>
           )}
+
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] text-gray-900">경기 영상 (선택 · 최대 10개)</span>
+            {resultVideos.map((v, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={v.title}
+                  onChange={(e) =>
+                    setResultVideos((prev) => prev.map((row, j) => (j === i ? { ...row, title: e.target.value } : row)))
+                  }
+                  disabled={recordResult.isPending}
+                  maxLength={80}
+                  placeholder={`제목 (예: 전반 하이라이트)`}
+                  aria-label={`영상 ${i + 1} 제목`}
+                  className={inputCls + ' flex-1 min-w-0'}
+                />
+                <input
+                  type="url"
+                  value={v.url}
+                  onChange={(e) =>
+                    setResultVideos((prev) => prev.map((row, j) => (j === i ? { ...row, url: e.target.value } : row)))
+                  }
+                  disabled={recordResult.isPending}
+                  maxLength={1000}
+                  placeholder="https://youtu.be/… 또는 업로드"
+                  aria-label={`영상 ${i + 1} URL`}
+                  className={inputCls + ' flex-[1.4] min-w-0'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setResultVideos((prev) => prev.filter((_, j) => j !== i))}
+                  disabled={recordResult.isPending}
+                  aria-label={`영상 ${i + 1} 삭제`}
+                  className="inline-flex items-center justify-center w-[36px] h-[36px] shrink-0 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                >
+                  <X size={15} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setResultVideos((prev) => [...prev, { title: '', url: '' }])}
+                disabled={recordResult.isPending || resultVideos.length >= 10}
+                className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              >
+                <Plus size={13} aria-hidden="true" /> 링크 추가
+              </button>
+              <button
+                type="button"
+                onClick={() => videoFileInputRef.current?.click()}
+                disabled={recordResult.isPending || uploadVideo.isPending || resultVideos.length >= 10}
+                className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              >
+                <Clapperboard size={13} aria-hidden="true" />
+                {uploadVideo.isPending ? '업로드 중…' : '영상 파일 업로드'}
+              </button>
+              <input
+                ref={videoFileInputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  try {
+                    const { urls } = await uploadVideo.mutateAsync(file);
+                    setResultVideos((prev) => [...prev, { title: '', url: urls[0] }]);
+                    showToast('영상을 업로드했어요. 제목을 입력하고 저장해 주세요.', 'success');
+                  } catch (err) {
+                    showToast(extractErrorMessage(err, '영상 업로드에 실패했어요.'), 'error');
+                  }
+                }}
+              />
+            </div>
+            <p className="text-[11px] text-gray-400">
+              유튜브 링크는 썸네일 카드로, 업로드 파일(mp4·webm·mov, 최대 200MB)은 페이지 내 플레이어로 재생돼요. 저장 시 목록 전체가 반영돼요.
+            </p>
+          </div>
 
           <div className="flex gap-2 pt-1">
             <button
@@ -1830,6 +1931,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
   const { toasts, showToast } = useAdminToast();
   const updateTournament = useV1UpdateTournament(id);
+  const { data: masterSports } = useV1MasterSports();
   const uploadImages = useV1UploadImages();
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
 
@@ -1838,6 +1940,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   // ── Edit form state ──────────────────────────────────────────────────
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
+  const [editSportId, setEditSportId] = useState('');
   const [editScheduledAt, setEditScheduledAt] = useState('');
   const [editScheduledEndAt, setEditScheduledEndAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
@@ -1846,8 +1949,6 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editTeamCount, setEditTeamCount] = useState('');
   const [editMinPlayers, setEditMinPlayers] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState('');
-  const [editPrizeSummary, setEditPrizeSummary] = useState('');
-  const [editPrizeBreakdown, setEditPrizeBreakdown] = useState('');
   const [editBankName, setEditBankName] = useState('');
   const [editBankAccount, setEditBankAccount] = useState('');
   const [editBankHolder, setEditBankHolder] = useState('');
@@ -1880,6 +1981,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const openEdit = () => {
     if (!tournament) return;
     setEditTitle(tournament.title);
+    setEditSportId(tournament.sportId);
     setEditScheduledAt(tournament.scheduledAt ? tournament.scheduledAt.slice(0, 16) : '');
     setEditScheduledEndAt(tournament.scheduledEndAt ? tournament.scheduledEndAt.slice(0, 16) : '');
     setEditDeadlineAt(tournament.registrationDeadlineAt ? tournament.registrationDeadlineAt.slice(0, 16) : '');
@@ -1888,8 +1990,6 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditTeamCount(String(tournament.teamCount));
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
-    setEditPrizeSummary(tournament.prizeSummary ?? '');
-    setEditPrizeBreakdown(tournament.prizeBreakdown ?? '');
     setEditBankName(tournament.bankName ?? '');
     setEditBankAccount(tournament.bankAccount ?? '');
     setEditBankHolder(tournament.bankHolder ?? '');
@@ -1927,6 +2027,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     e.preventDefault();
     const payload: V1UpdateTournamentPayload = {};
     if (editTitle.trim()) payload.title = editTitle.trim();
+    if (editSportId) payload.sportId = editSportId;
     if (editScheduledAt) payload.scheduledAt = new Date(editScheduledAt).toISOString();
     payload.scheduledEndAt = editScheduledEndAt ? new Date(editScheduledEndAt).toISOString() : null;
     if (editDeadlineAt) payload.registrationDeadlineAt = new Date(editDeadlineAt).toISOString();
@@ -1939,8 +2040,6 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     if (!Number.isNaN(mn) && mn > 0) payload.minPlayers = mn;
     const mx = Number(editMaxPlayers);
     if (!Number.isNaN(mx) && mx > 0) payload.maxPlayers = mx;
-    if (editPrizeSummary.trim()) payload.prizeSummary = editPrizeSummary.trim();
-    if (editPrizeBreakdown.trim()) payload.prizeBreakdown = editPrizeBreakdown.trim();
     if (editBankName.trim()) payload.bankName = editBankName.trim();
     if (editBankAccount.trim()) payload.bankAccount = editBankAccount.trim();
     if (editBankHolder.trim()) payload.bankHolder = editBankHolder.trim();
@@ -2096,7 +2195,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 text-[13px] text-gray-500 hover:text-gray-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 min-h-[44px] text-[13px] text-gray-500 hover:text-gray-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -2335,6 +2434,22 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
       {/* ── Tab panels ────────────────────────────────────────────────── */}
       <div
+        id="panel-info"
+        role="tabpanel"
+        aria-labelledby="tab-info"
+        hidden={activeTab !== 'info'}
+      >
+        {activeTab === 'info' && (
+          <InfoTab
+            tournamentId={id}
+            showToast={showToast}
+            onOpenBasicEdit={openEdit}
+            onOpenPromoEdit={openPromoEdit}
+          />
+        )}
+      </div>
+
+      <div
         id={`panel-registrations`}
         role="tabpanel"
         aria-labelledby="tab-registrations"
@@ -2392,6 +2507,22 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         pending={updateTournament.isPending}
       >
         <form onSubmit={handleEditSubmit} noValidate className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-sport-id" className="text-[13px] text-gray-900">종목</label>
+            <select
+              id="edit-sport-id"
+              value={editSportId}
+              onChange={(e) => setEditSportId(e.target.value)}
+              disabled={updateTournament.isPending}
+              className={inputCls}
+            >
+              {(masterSports ?? []).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-400">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label htmlFor="edit-title" className="text-[13px] text-gray-900">
               대회명 <span className="text-red-500" aria-hidden="true">*</span>
@@ -2462,11 +2593,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               <label htmlFor="edit-entry-fee" className="text-[13px] text-gray-900">참가비 (원)</label>
               <input
                 id="edit-entry-fee"
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={0}
-                value={editEntryFee}
-                onChange={(e) => setEditEntryFee(e.target.value)}
+                value={formatWithComma(editEntryFee)}
+                onChange={(e) => setEditEntryFee(onlyDigits(e.target.value))}
                 disabled={updateTournament.isPending}
                 className={inputCls}
               />
@@ -2512,31 +2642,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="edit-prize-summary" className="text-[13px] text-gray-900">상품 및 상금</label>
-            <textarea
-              id="edit-prize-summary"
-              value={editPrizeSummary}
-              onChange={(e) => setEditPrizeSummary(e.target.value)}
-              disabled={updateTournament.isPending}
-              rows={2}
-              placeholder="예: 우승팀 현금 100만원 + 트로피"
-              className={textareaCls}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="edit-prize-breakdown" className="text-[13px] text-gray-900">상금 배분</label>
-            <textarea
-              id="edit-prize-breakdown"
-              value={editPrizeBreakdown}
-              onChange={(e) => setEditPrizeBreakdown(e.target.value)}
-              disabled={updateTournament.isPending}
-              rows={3}
-              placeholder="예: 1위 50만원, 2위 20만원"
-              className={textareaCls}
-            />
-          </div>
+          <p className="text-[12px] text-gray-400 -mb-2">상금·시상 정보는 &quot;대회 정보&quot; 탭에서 수정할 수 있어요.</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1.5">
@@ -2779,6 +2885,235 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   );
 }
 
+// ── Tab: Tournament Info ──────────────────────────────────────────────────
+
+const TOURNAMENT_FORMAT_LABEL: Record<string, string> = {
+  league: '리그 (순위전)',
+  knockout: '토너먼트 (녹아웃)',
+  group_knockout: '조별리그 + 토너먼트',
+};
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-[11px] text-gray-500">{label}</dt>
+      <dd className="text-[13px] text-gray-900 m-0">{value}</dd>
+    </div>
+  );
+}
+
+function InfoTab({
+  tournamentId,
+  showToast,
+  onOpenBasicEdit,
+  onOpenPromoEdit,
+}: {
+  tournamentId: string;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+  onOpenBasicEdit: () => void;
+  onOpenPromoEdit: () => void;
+}) {
+  const { data: tournament } = useV1AdminTournament(tournamentId);
+  const updateTournament = useV1UpdateTournament(tournamentId);
+  const uploadImages = useV1UploadImages();
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const [prizePool, setPrizePool] = useState('');
+  const [prizeSummary, setPrizeSummary] = useState('');
+  const [prizeBreakdown, setPrizeBreakdown] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  if (tournament && !loaded) {
+    setPrizePool(tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '');
+    setPrizeSummary(tournament.prizeSummary ?? '');
+    setPrizeBreakdown(tournament.prizeBreakdown ?? '');
+    setLoaded(true);
+  }
+
+  const handleCoverUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      const { urls } = await uploadImages.mutateAsync([files[0]]);
+      updateTournament.mutate({ coverImageUrl: urls[0] }, {
+        onSuccess: () => showToast('커버 이미지를 저장했어요.', 'success'),
+        onError: (err) => showToast(extractErrorMessage(err, '커버 이미지 저장에 실패했어요.'), 'error'),
+      });
+    } catch (err) {
+      showToast(extractErrorMessage(err, '이미지 업로드에 실패했어요.'), 'error');
+    } finally {
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    }
+  };
+
+  const handleCoverRemove = () => {
+    updateTournament.mutate({ coverImageUrl: null }, {
+      onSuccess: () => showToast('커버 이미지를 제거했어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '커버 이미지 제거에 실패했어요.'), 'error'),
+    });
+  };
+
+  const handlePrizeSave = () => {
+    const payload: V1UpdateTournamentPayload = {};
+    const pool = prizePool.trim();
+    if (pool !== '') {
+      const n = Number(pool);
+      if (Number.isNaN(n) || n < 0) {
+        showToast('총상금은 0 이상의 숫자로 입력해주세요.', 'error');
+        return;
+      }
+      payload.prizePool = Math.floor(n);
+    }
+    if (prizeSummary.trim()) payload.prizeSummary = prizeSummary.trim();
+    if (prizeBreakdown.trim()) payload.prizeBreakdown = prizeBreakdown.trim();
+    if (Object.keys(payload).length === 0) {
+      showToast('변경할 상금 정보를 입력해주세요.', 'error');
+      return;
+    }
+    updateTournament.mutate(payload, {
+      onSuccess: () => showToast('상금 정보를 저장했어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '상금 정보 저장에 실패했어요.'), 'error'),
+    });
+  };
+
+  if (!tournament) {
+    return <div className="p-4 text-[13px] text-gray-500">대회 정보를 불러오는 중이에요…</div>;
+  }
+
+  const inputBoxCls = 'w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400';
+
+  return (
+    <div className="p-4 flex flex-col gap-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 className="text-[15px] font-bold text-gray-900">대회 정보</h3>
+          <p className="text-[12px] text-gray-500 mt-0.5">대회 요약을 확인하고 상금·시상 정보를 수정하세요.</p>
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={onOpenBasicEdit} className="text-[12px] text-blue-600 font-semibold px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50">기본 정보 수정</button>
+          <button type="button" onClick={onOpenPromoEdit} className="text-[12px] text-gray-600 font-semibold px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">프로모 설정</button>
+        </div>
+      </div>
+
+      {/* 요약 (읽기 전용) */}
+      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 border border-gray-200 rounded-xl p-4 bg-white m-0">
+        <InfoRow label="상태" value={TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} />
+        <InfoRow label="형식" value={TOURNAMENT_FORMAT_LABEL[tournament.format] ?? tournament.format} />
+        <InfoRow label="장소" value={tournament.venue ?? '미정'} />
+        <InfoRow label="대회 기간" value={formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt)} />
+        <InfoRow label="신청 마감" value={formatDate(tournament.registrationDeadlineAt)} />
+        <InfoRow label="참가비" value={formatCurrency(tournament.entryFee)} />
+        <InfoRow label="팀 수" value={`${tournament.teamCount}팀`} />
+        <InfoRow label="선수 구성" value={`${tournament.minPlayers}~${tournament.maxPlayers}명`} />
+        <InfoRow label="입금 계좌" value={tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount ?? ''}` : '미등록'} />
+      </dl>
+
+      {/* 커버 이미지 (목록 카드 썸네일) */}
+      <div className="border border-gray-200 rounded-xl p-4 bg-white flex flex-col gap-3">
+        <div>
+          <h4 className="text-[13px] font-bold text-gray-900 m-0">커버 이미지</h4>
+          <p className="text-[11px] text-gray-500 mt-0.5 mb-0">대회 목록 카드의 썸네일로 표시돼요. (jpeg/png/webp, 10MB 이하)</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {tournament.coverImageUrl ? (
+            <img
+              src={publicAssetPath(tournament.coverImageUrl)}
+              alt="대회 커버 이미지 미리보기"
+              className="w-[96px] h-[96px] rounded-xl object-cover border border-gray-200 flex-shrink-0"
+            />
+          ) : (
+            <div className="w-[96px] h-[96px] rounded-xl bg-gray-50 border border-dashed border-gray-300 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+              <ImagePlus size={22} className="text-gray-400" />
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => void handleCoverUpload(e.target.files)}
+            />
+            <button
+              type="button"
+              onClick={() => coverInputRef.current?.click()}
+              disabled={uploadImages.isPending || updateTournament.isPending}
+              className="text-[12px] text-blue-600 font-semibold px-3 py-2 min-h-[40px] rounded-lg border border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+            >
+              {uploadImages.isPending ? '업로드 중…' : tournament.coverImageUrl ? '이미지 변경' : '이미지 업로드'}
+            </button>
+            {tournament.coverImageUrl && (
+              <button
+                type="button"
+                onClick={handleCoverRemove}
+                disabled={updateTournament.isPending}
+                className="text-[12px] text-gray-500 font-semibold px-3 py-2 min-h-[40px] rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+              >
+                이미지 제거
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 상금·시상 (수정 가능) */}
+      <div className="border border-gray-200 rounded-xl p-4 bg-white flex flex-col gap-3">
+        <div>
+          <h4 className="text-[13px] font-bold text-gray-900 m-0">상금·시상 정보</h4>
+          <p className="text-[11px] text-gray-500 mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="info-prize-pool" className="text-[12px] text-gray-700">총상금 (원)</label>
+          <input
+            id="info-prize-pool"
+            type="text"
+            inputMode="numeric"
+            value={formatWithComma(prizePool)}
+            onChange={(e) => setPrizePool(onlyDigits(e.target.value))}
+            disabled={updateTournament.isPending}
+            placeholder="예: 1000000"
+            className={inputBoxCls}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="info-prize-summary" className="text-[12px] text-gray-700">상품 및 상금</label>
+          <textarea
+            id="info-prize-summary"
+            value={prizeSummary}
+            onChange={(e) => setPrizeSummary(e.target.value)}
+            disabled={updateTournament.isPending}
+            rows={2}
+            maxLength={500}
+            placeholder="예: 우승팀 현금 100만원 + 트로피"
+            className={inputBoxCls}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="info-prize-breakdown" className="text-[12px] text-gray-700">상금 배분</label>
+          <textarea
+            id="info-prize-breakdown"
+            value={prizeBreakdown}
+            onChange={(e) => setPrizeBreakdown(e.target.value)}
+            disabled={updateTournament.isPending}
+            rows={3}
+            maxLength={500}
+            placeholder="예: 1위 600,000원 / 2위 300,000원 / MVP 100,000원"
+            className={inputBoxCls}
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handlePrizeSave}
+            disabled={updateTournament.isPending}
+            className="text-[13px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-lg min-h-[40px]"
+          >
+            {updateTournament.isPending ? '저장 중…' : '상금 정보 저장'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Tab: Individual Awards ────────────────────────────────────────────────
 
 const DEFAULT_AWARD_TYPES = [
@@ -2861,7 +3196,7 @@ function AwardsTab({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-[15px] font-bold text-gray-900">개인 어워드</h3>
-          <p className="text-[12px] text-gray-500 mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시됩니다.</p>
+          <p className="text-[12px] text-gray-500 mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시돼요.</p>
         </div>
         <button type="button" onClick={addRow} className="text-[12px] text-blue-600 font-semibold px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50">+ 항목 추가</button>
       </div>
@@ -2877,7 +3212,7 @@ function AwardsTab({
                 placeholder="어워드명 (예: MVP)"
                 className="flex-1 text-[13px] font-semibold border-0 bg-gray-50 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
-              <button type="button" onClick={() => removeRow(idx)} className="text-gray-400 hover:text-red-500 p-1" aria-label="항목 삭제">✕</button>
+              <button type="button" onClick={() => removeRow(idx)} className="text-gray-400 hover:text-red-500 p-1 inline-flex" aria-label="항목 삭제"><X size={16} /></button>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

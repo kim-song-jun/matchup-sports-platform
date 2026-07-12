@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -15,6 +16,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   SubmitTournamentReviewDto,
   SetTournamentAwardsDto,
+  ListTournamentReviewsQueryDto,
   TournamentReviewsService,
 } from './tournament-reviews.service';
 
@@ -27,8 +29,11 @@ export class TournamentReviewsController {
   /** GET /tournaments/:tournamentId/reviews  — 공개 */
   @Get('tournaments/:tournamentId/reviews')
   @UseGuards(OptionalV1AuthGuard)
-  async list(@Param('tournamentId') tournamentId: string) {
-    return this.reviewsService.listReviews(tournamentId);
+  async list(
+    @Param('tournamentId') tournamentId: string,
+    @Query() query: ListTournamentReviewsQueryDto,
+  ) {
+    return this.reviewsService.listReviews(tournamentId, query);
   }
 
   /** POST /tournaments/:tournamentId/reviews  — 인증 + 참가팀 검증 내부 처리 */
@@ -62,6 +67,13 @@ export class TournamentReviewsController {
   ) {
     const isParticipant = await this.reviewsService.isParticipant(tournamentId, user.id);
     return { isParticipant };
+  }
+
+  /** GET /tournaments/me/pending-reviews — 리뷰 미작성 종료 대회 목록 (최근순) */
+  @Get('tournaments/me/pending-reviews')
+  @UseGuards(V1AuthGuard)
+  async listMyPendingReviews(@CurrentUser() user: V1AuthUser) {
+    return this.reviewsService.listMyPendingReviews(user.id);
   }
 
   // ─────────── 어워드 (어드민 — V1AuthGuard + 서비스 레벨 admin 체크) ───────────

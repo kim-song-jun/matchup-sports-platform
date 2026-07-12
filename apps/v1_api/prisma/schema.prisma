@@ -1237,6 +1237,7 @@ model V1Tournament {
   scheduledAt            DateTime?          @map("scheduled_at")
   scheduledEndAt         DateTime?          @map("scheduled_end_at")
   venue                  String?
+  coverImageUrl          String?            @map("cover_image_url")
   teamCount              Int                @default(8) @map("team_count")
   minPlayers             Int                @default(6) @map("min_players")
   maxPlayers             Int                @default(10) @map("max_players")
@@ -1297,6 +1298,7 @@ model V1TournamentReview {
   teamName     String?  @map("team_name")   // 작성자 팀명 (snapshot)
   rating       Int      // 1~5
   comment      String?  @db.Text
+  photoUrls    String[] @default([]) @map("photo_urls")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -1471,6 +1473,7 @@ model V1TournamentFixture {
   homeRegistration V1TournamentRegistration?  @relation("V1TournamentFixtureHome", fields: [homeRegistrationId], references: [id], onDelete: SetNull)
   awayRegistration V1TournamentRegistration?  @relation("V1TournamentFixtureAway", fields: [awayRegistrationId], references: [id], onDelete: SetNull)
   result           V1TournamentFixtureResult?
+  videos           V1TournamentFixtureVideo[]
 
   @@index([tournamentId, round, fixtureNumber])
   @@index([groupId])
@@ -1496,6 +1499,22 @@ model V1TournamentFixtureResult {
   recordedByAdmin V1AdminUser?        @relation("V1TournamentFixtureResultRecordedByAdmin", fields: [recordedByAdminUserId], references: [id], onDelete: SetNull)
 
   @@map("v1_tournament_fixture_results")
+}
+
+/// 경기 하이라이트/중계 영상 — 경기당 여러 개 (유튜브 링크 또는 업로드 파일 URL)
+model V1TournamentFixtureVideo {
+  id        String   @id @default(uuid())
+  fixtureId String   @map("fixture_id")
+  /// 표시 제목 (예: "전반 하이라이트", "결승골") — 없으면 "경기 영상 N"으로 표시
+  title     String?
+  url       String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  fixture V1TournamentFixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+
+  @@index([fixtureId, sortOrder])
+  @@map("v1_tournament_fixture_videos")
 }
 
 model V1TournamentStanding {

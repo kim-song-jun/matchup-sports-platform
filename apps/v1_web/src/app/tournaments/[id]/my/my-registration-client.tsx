@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
-import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { ChevronRight } from 'lucide-react';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
 import {
@@ -337,7 +337,9 @@ function RegistrationPass({
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>선수 명단</div>
             <div className="tm-text-micro" style={{ color: 'var(--text-body)', marginTop: 1 }}>
               {isRosterLocked
-                ? `${rosterCount}명 · 마감`
+                ? belowMinimum
+                  ? `${rosterCount}명 / 최소 ${minPlayers}명 · 마감`
+                  : `${rosterCount}명 · 마감`
                 : belowMinimum
                   ? `${rosterCount}명 / 최소 ${minPlayers}명 등록`
                   : `${rosterCount}명 등록 완료`}
@@ -355,7 +357,7 @@ function RegistrationPass({
               }}
             >
               {belowMinimum ? '선수 등록' : '선수 수정'}
-              <ChevronRightIcon size={16} />
+              <ChevronRight size={16} />
             </Link>
           ) : null}
         </div>
@@ -717,7 +719,7 @@ function RegistrationDetailView({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>선수 명단</span>
-          {belowMinimum && isRosterEditable ? (
+          {belowMinimum && !isRosterEditBlockedByStatus ? (
             <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
               {rosterShortagebadge(registration.status).label}
             </span>
@@ -857,7 +859,7 @@ function RegistrationDetailView({
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {belowMinimum && isRosterEditable ? (
+                    {belowMinimum && !isRosterEditBlockedByStatus ? (
                       /* P0: status-aware badge — shared helper keeps rail and body in sync */
                       <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
                         {rosterShortagebadge(registration.status).label}
@@ -881,7 +883,7 @@ function RegistrationDetailView({
                     ) : null}
                   </div>
                 </div>
-                {belowMinimum && isRosterEditable ? (
+                {belowMinimum && !isRosterEditBlockedByStatus ? (
                   /* P0: copy branches on whether confirmation is still blocked */
                   registration.status === 'confirmed' || registration.status === 'paid' ? (
                     <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
@@ -1148,7 +1150,7 @@ function MyRegistrationsList({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
                     <span className="tm-text-caption">{primaryAction}</span>
-                    <ChevronRightIcon size={16} />
+                    <ChevronRight size={16} />
                   </div>
                 </div>
               </Card>
@@ -1274,7 +1276,7 @@ function TeamRegistrationHub({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue500)' }}>
                     <span className="tm-text-caption" style={{ fontWeight: 700 }}>{displayActionLabel}</span>
-                    {!displayActionDisabled ? <ChevronRightIcon size={16} /> : null}
+                    {!displayActionDisabled ? <ChevronRight size={16} /> : null}
                   </div>
                 </div>
               </Card>

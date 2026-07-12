@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Trophy } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
@@ -193,7 +194,7 @@ function LeagueStandingsSection({ standings }: { standings: V1TournamentStanding
 function BracketEmpty() {
   return (
     <Card pad={24} style={{ textAlign: 'center', marginBottom: 16 }}>
-      <div style={{ fontSize: 32, marginBottom: 8 }}>🏆</div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={32} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
         대진표는 조별리그가 끝난 후<br />공개돼요.
       </p>

@@ -1475,6 +1475,7 @@ export type V1TournamentListItem = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  coverImageUrl: string | null;
   teamCount: number;
   entryFee: number;
   prizePool: number | null;
@@ -1517,6 +1518,7 @@ export type V1Tournament = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
@@ -1596,6 +1598,13 @@ export type V1TournamentFixtureResult = {
   recordedAt: string;
 };
 
+/** 경기 하이라이트/중계 영상 — 경기당 여러 개 */
+export type V1TournamentFixtureVideo = {
+  id: string;
+  title: string | null;
+  url: string;
+};
+
 export type V1TournamentFixture = {
   id: string;
   groupId: string | null;
@@ -1610,6 +1619,7 @@ export type V1TournamentFixture = {
   awayRegistrationId: string | null;
   awayTeamName: string;
   result: V1TournamentFixtureResult | null;
+  videos: V1TournamentFixtureVideo[];
 };
 
 export type V1TournamentAnnouncement = {
@@ -1687,7 +1697,21 @@ export type V1TournamentReview = {
   teamName: string | null;
   rating: number; // 1~5
   comment: string | null;
+  photoUrls: string[];
   createdAt: string;
+};
+
+export type V1TournamentReviewsPage = {
+  items: V1TournamentReview[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type V1PendingTournamentReview = {
+  tournamentId: string;
+  tournamentTitle: string;
+  completedAt: string;
 };
 
 export type V1TournamentAward = {
@@ -1800,6 +1824,7 @@ export type V1AdminBracketFixture = {
   createdAt: string;
   updatedAt: string;
   result: V1AdminBracketResult | null;
+  videos: V1TournamentFixtureVideo[];
 };
 
 export type V1AdminBracketResult = {
@@ -1906,6 +1931,7 @@ export type V1CreateTournamentPayload = {
   scheduledAt?: string;
   scheduledEndAt?: string | null;
   venue?: string;
+  coverImageUrl?: string | null;
   teamCount?: number;
   minPlayers?: number;
   maxPlayers?: number;
@@ -1940,7 +1966,7 @@ export type V1CreateTournamentPayload = {
   refundPolicyText?: string;
 };
 
-export type V1UpdateTournamentPayload = Partial<Omit<V1CreateTournamentPayload, 'sportId'>>;
+export type V1UpdateTournamentPayload = Partial<V1CreateTournamentPayload>;
 
 export type V1ChangeTournamentStatusPayload = {
   status: V1TournamentStatus;
@@ -2025,6 +2051,8 @@ export type V1RecordResultPayload = {
   homePenaltyScore?: number;
   awayPenaltyScore?: number;
   note?: string;
+  /** 전달 시 replace-all — 생략하면 기존 영상 목록 유지 */
+  videos?: { title?: string; url: string }[];
 };
 
 export type V1CreateAnnouncementPayload = {

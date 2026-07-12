@@ -96,6 +96,8 @@ Current commands:
 
 Demo and coverage modes are blocked when `NODE_ENV=production` unless `V1_ALLOW_DEMO_SEED=true` is explicitly set for a reviewed non-production/demo import. Do not set that flag for ordinary production operation.
 
+`demo`/`coverage`/`all` seed modes also require `V1_HOST_ADMIN_PASSWORD` (8+ chars) set in `apps/v1_api/.env` — it becomes the `host@teameet.v1` account password. Missing or too-short values fail the seed run immediately (fail-closed).
+
 ## Migration Policy
 
 Use migrations for schema evolution. Do not manually patch production schema.

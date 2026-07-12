@@ -127,6 +127,7 @@ describe('MatchesService', () => {
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
 
   let notifications: { emitNotification: jest.Mock; emitNotificationToMany: jest.Mock };
@@ -157,6 +158,9 @@ describe('MatchesService', () => {
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
       $transaction: jest.fn(),
+      // approveApplication은 정원 TOCTOU 방지를 위해 트랜잭션 안에서
+      // tx.$queryRaw`... FOR UPDATE`로 match 행을 잠근다 (matches.service.ts:645).
+      $queryRaw: jest.fn().mockResolvedValue(undefined),
     };
 
     // Default $transaction: execute callback with prisma itself
@@ -242,6 +246,9 @@ describe('MatchesService', () => {
       response: { code: 'FULL' },
     });
     expect(prisma.v1MatchApplication.update).not.toHaveBeenCalled();
+    // TOCTOU 방지 락이 정원 재검증보다 먼저, 올바른 matchId로 걸렸는지 확인한다.
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+    expect(prisma.$queryRaw.mock.calls[0]).toContain('match-1');
   });
 
   // ─── 5. 비-호스트 신청 승인 → 403 PERMISSION_DENIED ─────────────────────

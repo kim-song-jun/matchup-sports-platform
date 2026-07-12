@@ -26,6 +26,7 @@ export class AuthController {
   }
 
   @Post('kakao')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   kakaoLogin(@Body() dto: KakaoLoginDto) {
     return this.authService.kakaoLogin(dto);
   }

@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Trophy } from 'lucide-react';
-import { MatchVideos, type MatchVideo } from '@/components/tournaments/match-videos';
+import Link from 'next/link';
+import { ChevronRight, Trophy } from 'lucide-react';
+import { MatchVideos } from '@/components/tournaments/match-videos';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { ErrorState } from '@/components/v1-ui/primitives';
+import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
-import { formatTournamentDateShort } from '@/lib/date-utils';
+import { formatTournamentDateShort, formatTournamentDateRangeShort } from '@/lib/date-utils';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -290,13 +291,13 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
     label, labelColor = 'var(--text-caption)',
     home, away, homeScore, awayScore,
     winner, hasPenalty, homePK, awayPK,
-    date, isAccent = false, isAgg = false, videos,
+    date, isAccent = false, isAgg = false,
   }: {
     label: React.ReactNode; labelColor?: string;
     home: string; away: string; homeScore: number; awayScore: number;
     winner: 'home' | 'away' | null;
     hasPenalty?: boolean; homePK?: number | null; awayPK?: number | null;
-    date?: string; isAccent?: boolean; isAgg?: boolean; videos?: MatchVideo[];
+    date?: string; isAccent?: boolean; isAgg?: boolean;
   }) => (
     <div style={{
       padding: '10px 16px',
@@ -345,15 +346,6 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
           {isAgg && winner === 'away' && <span style={{ fontSize: 10, color: 'var(--text-strong)', marginRight: 4 }}>✓</span>}{away}
         </span>
       </div>
-      {videos && videos.length > 0 && (
-        isAccent
-          ? <MatchVideos videos={videos} matchLabel={`${home} vs ${away}`} variant="strip" />
-          : (
-            <div style={{ marginTop: 8 }}>
-              <MatchVideos videos={videos} matchLabel={`${home} vs ${away}`} variant="chips" />
-            </div>
-          )
-      )}
     </div>
   );
 
@@ -377,7 +369,6 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
               winner={winner}
               hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
               date={fmtDate(f.scheduledAt)} isAccent
-              videos={f.videos}
             />
           </div>
         );
@@ -399,7 +390,6 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
                 winner={getWinnerSide(leg1.result)}
                 hasPenalty={leg1.result.hasPenalty} homePK={leg1.result.homePenaltyScore} awayPK={leg1.result.awayPenaltyScore}
                 date={fmtDate(leg1.scheduledAt)}
-                videos={leg1.videos}
               />
             )}
             {leg2?.result && <>{divider}<MatchRow
@@ -408,7 +398,6 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
               winner={getWinnerSide(leg2.result)}
               hasPenalty={leg2.result.hasPenalty} homePK={leg2.result.homePenaltyScore} awayPK={leg2.result.awayPenaltyScore}
               date={fmtDate(leg2.scheduledAt)}
-              videos={leg2.videos}
             /></>}
             {/* 합산 */}
             <div style={{ borderTop: '1px solid var(--grey150)' }}>
@@ -437,7 +426,6 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
               winner={winner}
               hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
               date={fmtDate(f.scheduledAt)}
-              videos={f.videos}
             />
           </div>
         );
@@ -499,6 +487,81 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
   );
 }
 
+/* ── 대회 요약 카드 — 상세 페이지의 정보 카드 언어를 그대로 사용 ── */
+function TournamentSummaryCard({ tournament }: { tournament: V1TournamentDetail }) {
+  const rows: Array<{ label: string; value: string }> = [
+    { label: '종목', value: tournament.sport?.name ?? '-' },
+    { label: '일정', value: formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정' },
+    ...(tournament.venue ? [{ label: '장소', value: tournament.venue }] : []),
+    { label: '참가 팀', value: `${tournament.confirmedCount}팀` },
+  ];
+  return (
+    <Card pad={0}>
+      {rows.map((r, i) => (
+        <div key={r.label} style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 16px', borderTop: i > 0 ? '1px solid var(--grey100)' : 'none',
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--text-caption)' }}>{r.label}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)', textAlign: 'right', wordBreak: 'keep-all' }}>{r.value}</span>
+        </div>
+      ))}
+      <Link
+        href={`/tournaments/${tournament.id}`}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          minHeight: 44, borderTop: '1px solid var(--grey100)',
+          fontSize: 13, fontWeight: 600, color: 'var(--blue500)', textDecoration: 'none',
+        }}
+      >
+        대회 상세 보기 <ChevronRight size={14} aria-hidden="true" />
+      </Link>
+    </Card>
+  );
+}
+
+/* ── 경기 영상 모아보기 — 전 경기 하이라이트를 한 섹션에 (경기 행은 스코어만 유지) ── */
+function fixtureVideoLabel(f: V1TournamentFixture): string {
+  const round: Record<string, string> = { final: '결승', semi: '4강', third_place: '3·4위전', group: '조별리그' };
+  const base = round[f.round] ?? f.round;
+  const leg = f.round === 'semi' || f.round === '4강' ? ` ${f.legNumber}차` : '';
+  return `${base}${leg}`;
+}
+
+function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) {
+  const roundOrder: Record<string, number> = { final: 0, '결승': 0, semi: 1, '4강': 1, third_place: 2, '3·4위전': 2, group: 3, '조별리그': 3 };
+  const withVideos = fixtures
+    .filter((f) => f.status === 'completed' && f.videos.length > 0)
+    .sort((a, b) =>
+      (roundOrder[a.round] ?? 9) - (roundOrder[b.round] ?? 9) ||
+      a.fixtureNumber - b.fixtureNumber ||
+      a.legNumber - b.legNumber,
+    );
+  if (withVideos.length === 0) return null;
+  const total = withVideos.reduce((sum, f) => sum + f.videos.length, 0);
+  return (
+    <section style={{ padding: '20px 20px 0' }}>
+      <h3 className="tm-hub-section-title" style={{ marginBottom: 4 }}>
+        경기 영상 <span style={{ color: 'var(--text-caption)', fontWeight: 600 }}>{total}</span>
+      </h3>
+      <p style={{ fontSize: 12, color: 'var(--text-caption)', margin: '0 0 12px' }}>경기 영상은 대회 운영진이 등록해요. 눌러서 바로 재생할 수 있어요.</p>
+      <Card pad={16}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {withVideos.map((f) => (
+            <div key={f.id}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-strong)' }}>{fixtureVideoLabel(f)}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{f.homeTeamName} vs {f.awayTeamName}</span>
+              </div>
+              <MatchVideos videos={f.videos} matchLabel={`${f.homeTeamName} vs ${f.awayTeamName}`} variant="strip" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </section>
+  );
+}
+
 /* ── 메인 콘텐츠 ── */
 function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const [showGroup, setShowGroup] = useState(false);
@@ -547,6 +610,9 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
           <DesktopChampionHero champion={championName} tournament={tournament} />
           {/* 모바일: 컴팩트 배너 */}
           <MobileChampionBanner champion={championName} tournament={tournament} />
+          <div style={{ marginTop: 16 }}>
+            <TournamentSummaryCard tournament={tournament} />
+          </div>
         </div>
       )}
 
@@ -562,18 +628,13 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
       {isCompleted && (
         <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
-            <h3 style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-              최종 순위
-            </h3>
+            <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>최종 순위</h3>
             {knockoutRows.length > 0 && <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />}
           </div>
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             {knockoutFixtures.length > 0 && (
               <>
-                <h3 style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  결선 경기
-                </h3>
-                <p style={{ fontSize: 11, color: 'var(--text-caption)', margin: '0 0 10px' }}>경기 영상은 대회 운영진이 등록해요.</p>
+                <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>결선 경기</h3>
                 <KnockoutResultsTable fixtures={knockoutFixtures} />
               </>
             )}
@@ -606,11 +667,6 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
                                   <span className="tm-res-match-score tab-num">{f.result?.homeScore}<span style={{ opacity: 0.35, margin: '0 2px' }}>:</span>{f.result?.awayScore}</span>
                                   <span className="tm-res-match-team tm-res-match-team-right" style={{ fontWeight: winner === 'away' ? 700 : 400, color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)' }}>{f.awayTeamName}</span>
                                 </div>
-                                {f.videos.length > 0 && (
-                                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}>
-                                    <MatchVideos videos={f.videos} matchLabel={`${f.homeTeamName} vs ${f.awayTeamName}`} variant="chips" />
-                                  </div>
-                                )}
                               </div>
                             );
                           })}
@@ -624,6 +680,8 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
           </div>
         </div>
       )}
+
+      {isCompleted && <VideoGallerySection fixtures={tournament.fixtures} />}
 
       {!isCompleted && !isInProgress && (
         <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-caption)', fontSize: 13 }}>

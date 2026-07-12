@@ -532,9 +532,14 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
         {reviews.length === 0 ? (
           <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
+              {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다 */}
               {isCompleted && isParticipant && !alreadyReviewed
                 ? '첫 번째 후기를 남겨보세요!'
-                : '아직 등록된 후기가 없어요.'}
+                : isCompleted && !hasSession
+                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀 대표는 후기를 작성할 수 있어요.'
+                  : isCompleted && hasSession && !isParticipant
+                    ? '아직 등록된 후기가 없어요. 후기는 대회를 신청한 팀 대표만 작성할 수 있어요.'
+                    : '아직 등록된 후기가 없어요.'}
             </p>
           </Card>
         ) : (

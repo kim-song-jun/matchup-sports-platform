@@ -15,6 +15,7 @@ import {
   useV1RemovePlayer,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
+import { josa } from '@/lib/korean';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
@@ -331,7 +332,7 @@ function AddPlayerForm({
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {unavailableMembers.map((m) => (
                     <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
-                      {m.displayName}은 {memberMissingReason(m)}으로 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
+                      {josa(m.displayName, ['은', '는'])} {josa(memberMissingReason(m), ['으로', '로'])} 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
                     </div>
                   ))}
                 </div>
@@ -883,9 +884,11 @@ export function TournamentRosterPageClient({
     if (!canEditRoster) return;
     const player = players.find((p) => p.id === playerId);
     const nameLabel = player?.realName ? `"${player.realName}"` : '이 선수';
+    // 조사는 따옴표가 아니라 이름의 받침 기준으로 고른다 ("김민준"을 / "이수아"를)
+    const nameJosa = josa(player?.realName ?? '이 선수', ['을', '를']).slice((player?.realName ?? '이 선수').length);
     const ok = await confirmRemove({
       title: '선수 삭제',
-      message: `${nameLabel}를 명단에서 삭제할까요?`,
+      message: `${nameLabel}${nameJosa} 명단에서 삭제할까요?`,
       confirmLabel: '삭제',
       tone: 'danger',
     });

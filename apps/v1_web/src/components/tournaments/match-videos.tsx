@@ -129,7 +129,7 @@ export function MatchVideos({
                   className="tm-video-chip"
                   aria-label={`${title} 보기 (새 창)`}
                 >
-                  <Play size={10} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+                  <Play size={12} fill="currentColor" strokeWidth={0} aria-hidden="true" />
                   {title}
                 </a>
               );
@@ -143,7 +143,7 @@ export function MatchVideos({
                 aria-label={`${title} 재생`}
                 aria-haspopup="dialog"
               >
-                <Play size={10} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+                <Play size={12} fill="currentColor" strokeWidth={0} aria-hidden="true" />
                 {title}
               </button>
             );
@@ -211,7 +211,7 @@ export function MatchVideos({
                       className={`tm-video-playlist-chip${i === openIndex ? ' is-active' : ''}`}
                       onClick={() => setOpenIndex(i)}
                     >
-                      <Play size={10} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+                      <Play size={12} fill="currentColor" strokeWidth={0} aria-hidden="true" />
                       {displayTitle(v, i)}
                     </button>
                   ),

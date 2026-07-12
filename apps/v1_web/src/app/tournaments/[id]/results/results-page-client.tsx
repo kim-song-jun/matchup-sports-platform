@@ -300,11 +300,11 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
   }) => (
     <div style={{
       padding: '10px 16px',
-      background: isAccent ? 'var(--blue50)' : isAgg ? 'rgba(49,130,246,0.04)' : 'transparent',
+      background: 'transparent',
     }}>
       {/* 상단: 라벨 + 날짜 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
-        <span style={{ fontSize: isAccent ? 12 : 10, fontWeight: 700, color: isAccent ? 'var(--blue500)' : isAgg ? 'var(--blue500)' : labelColor, letterSpacing: '0.02em' }}>
+        <span style={{ fontSize: isAccent ? 12 : 10, fontWeight: 700, color: labelColor, letterSpacing: '0.02em' }}>
           {label}
         </span>
         {date && <span style={{ fontSize: 10, color: 'var(--text-caption)' }}>{date}</span>}
@@ -314,20 +314,20 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
         <span style={{
           flex: 1, textAlign: 'right',
           fontSize: isAccent ? 15 : 13, fontWeight: winner === 'home' ? 700 : 400,
-          color: winner === 'home' ? (isAccent || isAgg ? 'var(--blue500)' : 'var(--text-strong)') : 'var(--text-muted)',
+          color: winner === 'home' ? 'var(--text-strong)' : 'var(--text-muted)',
           wordBreak: 'keep-all', lineHeight: 1.35,
         }}>
-          {home}{isAgg && winner === 'home' && <span style={{ fontSize: 10, color: 'var(--blue500)', marginLeft: 4 }}>✓</span>}
+          {home}{isAgg && winner === 'home' && <span style={{ fontSize: 10, color: 'var(--text-strong)', marginLeft: 4 }}>✓</span>}
         </span>
         <div style={{
           flex: '0 0 60px', textAlign: 'center',
-          background: isAccent ? 'rgba(49,130,246,0.12)' : isAgg ? 'rgba(49,130,246,0.1)' : 'var(--grey100)',
-          border: (isAgg) ? '1px solid rgba(49,130,246,0.25)' : 'none',
+          background: 'var(--grey100)',
+          border: 'none',
           borderRadius: 8, padding: '4px 0',
         }}>
           <div style={{
             fontSize: isAccent ? 16 : 14, fontWeight: 900,
-            color: isAccent || isAgg ? 'var(--blue500)' : 'var(--text-strong)',
+            color: 'var(--text-strong)',
             fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em',
           }}>
             {homeScore}<span style={{ fontSize: 11, opacity: 0.35, margin: '0 2px' }}>:</span>{awayScore}
@@ -339,10 +339,10 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
         <span style={{
           flex: 1, textAlign: 'left',
           fontSize: isAccent ? 15 : 13, fontWeight: winner === 'away' ? 700 : 400,
-          color: winner === 'away' ? (isAccent || isAgg ? 'var(--blue500)' : 'var(--text-strong)') : 'var(--text-muted)',
+          color: winner === 'away' ? 'var(--text-strong)' : 'var(--text-muted)',
           wordBreak: 'keep-all', lineHeight: 1.35,
         }}>
-          {isAgg && winner === 'away' && <span style={{ fontSize: 10, color: 'var(--blue500)', marginRight: 4 }}>✓</span>}{away}
+          {isAgg && winner === 'away' && <span style={{ fontSize: 10, color: 'var(--text-strong)', marginRight: 4 }}>✓</span>}{away}
         </span>
       </div>
       {videos && videos.length > 0 && (
@@ -411,7 +411,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
               videos={leg2.videos}
             /></>}
             {/* 합산 */}
-            <div style={{ borderTop: '1px solid rgba(49,130,246,0.15)' }}>
+            <div style={{ borderTop: '1px solid var(--grey150)' }}>
               <MatchRow
                 label="합산" isAgg
                 home={homeTeam} away={awayTeam}
@@ -449,7 +449,7 @@ function KnockoutResultsTable({ fixtures }: { fixtures: V1TournamentFixture[] })
 
 /* 순위별 스타일 */
 const POS_CFG: Record<number, { bg: string; numColor: string; label: string }> = {
-  1: { bg: 'var(--blue50)',    numColor: 'var(--blue500)',      label: '우승'   },
+  1: { bg: 'var(--grey50)',    numColor: 'var(--text-strong)',  label: '우승'   },
   2: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '준우승' },
   3: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '3위'    },
   4: { bg: 'transparent',     numColor: 'var(--text-caption)', label: '4위'    },
@@ -457,7 +457,7 @@ const POS_CFG: Record<number, { bg: string; numColor: string; label: string }> =
 
 function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixtures: V1TournamentFixture[] }) {
   return (
-    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
+    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
       <div style={{
         display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
         padding: '7px 14px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
@@ -479,7 +479,7 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
             alignItems: 'center',
           }}>
             <div style={{ fontWeight: 900, fontSize: 15, color: cfg.numColor, fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>{row.pos}</div>
-            <div style={{ fontWeight: isChamp ? 700 : 500, fontSize: 14, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: isChamp ? 700 : 500, fontSize: 14, color: 'var(--text-strong)', wordBreak: 'keep-all', lineHeight: 1.35 }}>
               {row.name}
             </div>
             <div style={{ textAlign: 'center' }}>
@@ -560,7 +560,7 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
       )}
 
       {isCompleted && (
-        <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040">
+        <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             <h3 style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               최종 순위
@@ -570,9 +570,10 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             {knockoutFixtures.length > 0 && (
               <>
-                <h3 style={{ margin: '0 0 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <h3 style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-caption)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   결선 경기
                 </h3>
+                <p style={{ fontSize: 11, color: 'var(--text-caption)', margin: '0 0 10px' }}>경기 영상은 대회 운영진이 등록해요.</p>
                 <KnockoutResultsTable fixtures={knockoutFixtures} />
               </>
             )}

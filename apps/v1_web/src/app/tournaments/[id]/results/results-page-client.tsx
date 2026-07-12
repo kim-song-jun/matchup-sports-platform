@@ -538,12 +538,8 @@ function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) 
       a.legNumber - b.legNumber,
     );
   if (withVideos.length === 0) return null;
-  const total = withVideos.reduce((sum, f) => sum + f.videos.length, 0);
   return (
-    <section style={{ padding: '20px 20px 0' }}>
-      <h3 className="tm-hub-section-title" style={{ marginBottom: 4 }}>
-        경기 영상 <span style={{ color: 'var(--text-caption)', fontWeight: 600 }}>{total}</span>
-      </h3>
+    <section style={{ padding: '16px 20px 0' }}>
       <p style={{ fontSize: 12, color: 'var(--text-caption)', margin: '0 0 12px' }}>경기 영상은 대회 운영진이 등록해요. 눌러서 바로 재생할 수 있어요.</p>
       <Card pad={16}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -565,6 +561,11 @@ function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) 
 /* ── 메인 콘텐츠 ── */
 function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const [showGroup, setShowGroup] = useState(false);
+  // 결과(순위·결선·조별)와 경기 영상을 세그먼트 탭으로 분리
+  const [activeTab, setActiveTab] = useState<'results' | 'videos'>('results');
+  const videosTotal = tournament.fixtures.reduce(
+    (sum, f) => sum + (f.status === 'completed' ? f.videos.length : 0), 0,
+  );
   const isCompleted  = tournament.status === 'completed';
   const isInProgress = tournament.status === 'in_progress';
   const championName = isCompleted ? getChampionName(tournament) : null;
@@ -613,6 +614,28 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
           <div style={{ marginTop: 16 }}>
             <TournamentSummaryCard tournament={tournament} />
           </div>
+          {videosTotal > 0 && (
+            <nav className="tm-segment-row" aria-label="결과 보기 전환" style={{ marginTop: 16 }}>
+              <button
+                type="button"
+                className="tm-review-tab"
+                data-active={activeTab === 'results'}
+                aria-pressed={activeTab === 'results'}
+                onClick={() => setActiveTab('results')}
+              >
+                경기 결과
+              </button>
+              <button
+                type="button"
+                className="tm-review-tab"
+                data-active={activeTab === 'videos'}
+                aria-pressed={activeTab === 'videos'}
+                onClick={() => setActiveTab('videos')}
+              >
+                경기 영상 {videosTotal}
+              </button>
+            </nav>
+          )}
         </div>
       )}
 
@@ -625,7 +648,7 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
         </div>
       )}
 
-      {isCompleted && (
+      {isCompleted && activeTab === 'results' && (
         <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>최종 순위</h3>
@@ -681,7 +704,7 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
         </div>
       )}
 
-      {isCompleted && <VideoGallerySection fixtures={tournament.fixtures} />}
+      {isCompleted && activeTab === 'videos' && <VideoGallerySection fixtures={tournament.fixtures} />}
 
       {!isCompleted && !isInProgress && (
         <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-caption)', fontSize: 13 }}>

@@ -1,5 +1,5 @@
 # 구(legacy) 루트 스택(postgres/redis/api/web)은 2026-07 아카이빙됨.
-# nginx가 루트 경로를 전부 /v1으로 301 얼라이어스하므로 v1 스택만 기동한다.
+# nginx가 루트 경로를 전부 /v1으로 308 얼라이어스하므로 v1 스택만 기동한다.
 # 구 스택 데이터 볼륨(postgres_data, uploads_data)은 도커 호스트에 그대로 남아 있다
 # (compose 정의에서 제외했으므로 `down -v`로도 삭제되지 않음 — 복구 시 수동 재연결).
 services:

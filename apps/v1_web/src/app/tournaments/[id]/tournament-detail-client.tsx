@@ -315,8 +315,9 @@ function TournamentDetailView({
   const bottomPad = isOpen ? 96 : 48;
 
   /* ── Prize card — rendered in left column just after metric strip ── */
+  // 콤마 구분도 지원 — 단, "600,000원" 같은 금액 천단위 콤마(뒤에 숫자)는 분리하지 않는다
   const prizeChips = tournament.prizeBreakdown
-    ? tournament.prizeBreakdown.split(/[/·\n]+/).map((s) => s.trim()).filter(Boolean)
+    ? tournament.prizeBreakdown.split(/[/·\n]+|,(?!\d)/).map((s) => s.trim()).filter(Boolean)
     : [];
   const prizeCard = hasPrize ? (
     <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
@@ -337,15 +338,25 @@ function TournamentDetailView({
         </div>
         {prizeChips.length > 0 ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
-            {prizeChips.map((seg, i) => (
-              <span
-                key={i}
-                className="tm-text-micro"
-                style={{ background: 'var(--surface)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
-              >
-                {seg}
-              </span>
-            ))}
+            {prizeChips.map((seg, i) => {
+              const m = seg.match(/^(우승|준우승|공동 ?[1-9]위|[1-9]위|MVP|득점왕|도움왕|(?:참가(?:팀|자) )?전원)\s+(.+)$/);
+              return (
+                <span
+                  key={i}
+                  className="tm-text-micro"
+                  style={{ background: 'var(--surface)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
+                >
+                  {m ? (
+                    <>
+                      <strong style={{ color: 'var(--text-strong)', fontWeight: 800, marginRight: 4 }}>{m[1]}</strong>
+                      {m[2]}
+                    </>
+                  ) : (
+                    seg
+                  )}
+                </span>
+              );
+            })}
           </div>
         ) : null}
       </Card>

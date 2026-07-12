@@ -343,14 +343,17 @@ export class TournamentReviewsService {
       }
     }
 
-    // 감사 로그용 변경 전 스냅샷 (게이트·검증 통과 후에만 조회)
-    const before = await this.listAwardsInternal(tournamentId);
+    // 스냅샷 → 전체 교체 → 감사 기록을 한 트랜잭션에서 원자적으로 수행
+    // (감사 로그 실패 시 데이터 변경도 함께 롤백, before/after drift 방지 — 타 admin mutation과 동일 패턴)
+    await this.prisma.$transaction(async (tx) => {
+      const before = await tx.v1TournamentAward.findMany({
+        where: { tournamentId },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      });
 
-    // 전체 삭제 후 재생성 (simple replace)
-    await this.prisma.$transaction([
-      this.prisma.v1TournamentAward.deleteMany({ where: { tournamentId } }),
-      ...awards.map((a, idx) =>
-        this.prisma.v1TournamentAward.create({
+      await tx.v1TournamentAward.deleteMany({ where: { tournamentId } });
+      for (const [idx, a] of awards.entries()) {
+        await tx.v1TournamentAward.create({
           data: {
             tournamentId,
             awardType: a.awardType,
@@ -360,29 +363,32 @@ export class TournamentReviewsService {
             note: a.note ?? null,
             sortOrder: a.sortOrder ?? idx,
           },
-        }),
-      ),
-    ]);
+        });
+      }
 
-    // 어워드 교체 감사 기록 — 다른 admin mutation과 동일 패턴 (커밋 후 기록)
-    await this.adminContext.logAdminAction(admin, {
-      action: 'tournament.awards_replace',
-      targetType: 'tournament',
-      targetId: tournamentId,
-      beforeJson: {
-        awards: before.map((a) => ({
-          awardLabel: a.awardLabel,
-          recipientName: a.recipientName,
-          teamName: a.teamName,
-        })),
-      },
-      afterJson: {
-        awards: awards.map((a) => ({
-          awardLabel: a.awardLabel,
-          recipientName: a.recipientName,
-          teamName: a.teamName,
-        })),
-      },
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.awards_replace',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          beforeJson: {
+            awards: before.map((a) => ({
+              awardLabel: a.awardLabel,
+              recipientName: a.recipientName,
+              teamName: a.teamName ?? null,
+            })),
+          },
+          afterJson: {
+            awards: awards.map((a) => ({
+              awardLabel: a.awardLabel,
+              recipientName: a.recipientName,
+              teamName: a.teamName,
+            })),
+          },
+        },
+        tx,
+      );
     });
 
     return this.listAwardsInternal(tournamentId);

@@ -101,8 +101,10 @@ describe('TournamentReviewsService — awards admin gate', () => {
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       $transaction: jest.fn(),
     };
-    (prisma.$transaction as jest.Mock).mockImplementation(
-      async (ops: unknown[]) => Promise.all(ops as Promise<unknown>[]),
+    (prisma.$transaction as jest.Mock).mockImplementation(async (arg: unknown) =>
+      Array.isArray(arg)
+        ? Promise.all(arg as Promise<unknown>[])
+        : (arg as (tx: unknown) => Promise<unknown>)(prisma),
     );
 
     const module: TestingModule = await Test.createTestingModule({

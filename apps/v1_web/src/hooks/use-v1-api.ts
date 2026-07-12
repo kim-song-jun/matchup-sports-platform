@@ -140,6 +140,7 @@ import type {
   V1CreateGroupPayload,
   V1CreateGroupTeamPayload,
   V1CreateFixturePayload,
+  V1UpdateFixturePayload,
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
   V1DeleteAnnouncementResult,
@@ -2164,6 +2165,74 @@ export function useV1CreateFixture(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+    },
+  });
+}
+
+/** 경기 일정·장소·대진 수정 (`PATCH /admin/fixtures/:id`) — 결과 있는 경기의 팀 변경은 409 FIXTURE_HAS_RESULT */
+export function useV1UpdateFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fixtureId, ...body }: { fixtureId: string } & V1UpdateFixturePayload) =>
+      v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 경기 삭제 (`DELETE /admin/fixtures/:id`) — 결과 있으면 409 */
+export function useV1DeleteFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 결과 삭제(오입력 복구, `DELETE /admin/fixtures/:id/result`) — 경기 상태 scheduled 복귀 */
+export function useV1DeleteFixtureResult(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}/result`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 이름·진출 팀 수 수정 (`PATCH /admin/groups/:id`) */
+export function useV1UpdateGroup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, ...body }: { groupId: string; name?: string; advanceCount?: number }) =>
+      v1Patch<V1AdminBracketGroup>(`/admin/groups/${groupId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 삭제 (`DELETE /admin/groups/:id`) — 팀 배정·경기 있으면 409 */
+export function useV1DeleteGroup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (groupId: string) => v1Delete<{ deleted: boolean }>(`/admin/groups/${groupId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 팀 배정 해제 (`DELETE /admin/group-teams/:id`) — 해당 순위 행도 정리 */
+export function useV1RemoveGroupTeam(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (groupTeamId: string) => v1Delete<{ deleted: boolean }>(`/admin/group-teams/${groupTeamId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
     },
   });
 }

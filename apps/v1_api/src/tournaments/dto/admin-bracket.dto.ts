@@ -46,6 +46,20 @@ export class CreateGroupDto {
   advanceCount?: number;
 }
 
+export class UpdateGroupDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  name?: string;
+
+  /** 이 그룹에서 다음 라운드로 진출하는 팀 수. null = 진출선 없음. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  advanceCount?: number;
+}
+
 // ─── GroupTeam DTOs ───────────────────────────────────────────────────────────
 
 export class CreateGroupTeamDto {
@@ -111,6 +125,26 @@ export class CreateFixtureDto {
   @IsString()
   @MaxLength(200)
   venue?: string;
+}
+
+export class UpdateFixtureDto {
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  venue?: string;
+
+  /** 결과가 이미 기록된 경기는 팀 변경 불가 (409) — 결과를 먼저 삭제해야 한다 */
+  @IsOptional()
+  @IsUUID()
+  homeRegistrationId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  awayRegistrationId?: string;
 }
 
 // ─── Result DTOs ──────────────────────────────────────────────────────────────

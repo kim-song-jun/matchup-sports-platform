@@ -51,6 +51,12 @@ import {
   useV1CreateFixture,
   useV1RecordResult,
   useV1RecalculateStandings,
+  useV1UpdateFixture,
+  useV1DeleteFixture,
+  useV1DeleteFixtureResult,
+  useV1UpdateGroup,
+  useV1DeleteGroup,
+  useV1RemoveGroupTeam,
   useV1AdminAnnouncements,
   useV1CreateAnnouncement,
   useV1DeleteAnnouncement,
@@ -750,6 +756,24 @@ function BracketTab({
   const createFixture = useV1CreateFixture(tournamentId);
   const recordResult = useV1RecordResult(tournamentId);
   const recalculate = useV1RecalculateStandings(tournamentId);
+  const updateFixture = useV1UpdateFixture(tournamentId);
+  const deleteFixture = useV1DeleteFixture(tournamentId);
+  const deleteFixtureResult = useV1DeleteFixtureResult(tournamentId);
+  const updateGroup = useV1UpdateGroup(tournamentId);
+  const deleteGroup = useV1DeleteGroup(tournamentId);
+  const removeGroupTeam = useV1RemoveGroupTeam(tournamentId);
+
+  // ── 경기 수정 모달 상태 ─────────────────────────────────────────────
+  const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
+  const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
+  const [editFxVenue, setEditFxVenue] = useState('');
+  const [editFxHomeRegId, setEditFxHomeRegId] = useState('');
+  const [editFxAwayRegId, setEditFxAwayRegId] = useState('');
+
+  // ── 조 수정 모달 상태 ───────────────────────────────────────────────
+  const [editGroup, setEditGroup] = useState<V1AdminBracketGroup | null>(null);
+  const [editGroupName, setEditGroupName] = useState('');
+  const [editGroupAdvance, setEditGroupAdvance] = useState('');
 
   // ── Group creation form ─────────────────────────────────────────────
   const [groupName, setGroupName] = useState('');
@@ -786,6 +810,100 @@ function BracketTab({
   const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
+
+  const handleUpdateFixture = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editFixture) return;
+    const changesTeams =
+      editFxHomeRegId !== (editFixture.homeRegistrationId ?? '') ||
+      editFxAwayRegId !== (editFixture.awayRegistrationId ?? '');
+    updateFixture.mutate(
+      {
+        fixtureId: editFixture.id,
+        ...(editFxScheduledAt ? { scheduledAt: new Date(editFxScheduledAt).toISOString() } : {}),
+        venue: editFxVenue,
+        ...(changesTeams && editFxHomeRegId ? { homeRegistrationId: editFxHomeRegId } : {}),
+        ...(changesTeams && editFxAwayRegId ? { awayRegistrationId: editFxAwayRegId } : {}),
+      },
+      {
+        onSuccess: () => { setEditFixture(null); showToast('경기 정보를 수정했어요.', 'success'); },
+        onError: (err) => showToast(extractErrorMessage(err, '경기 수정에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleDeleteFixture = async (f: V1AdminBracketFixture) => {
+    const ok = await confirmModal({
+      title: '경기 삭제',
+      message: `${f.round} ${f.fixtureNumber}번 경기를 삭제할까요? 되돌릴 수 없어요.`,
+      confirmLabel: '삭제',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    deleteFixture.mutate(f.id, {
+      onSuccess: () => showToast('경기를 삭제했어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '경기 삭제에 실패했어요.'), 'error'),
+    });
+  };
+
+  const handleDeleteResult = async (f: V1AdminBracketFixture) => {
+    const ok = await confirmModal({
+      title: '결과 삭제',
+      message: `${f.homeTeamName} vs ${f.awayTeamName} 결과를 삭제할까요? 경기는 예정 상태로 돌아가요. (영상은 유지)`,
+      confirmLabel: '결과 삭제',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    deleteFixtureResult.mutate(f.id, {
+      onSuccess: () => showToast('결과를 삭제했어요. 경기가 예정 상태로 돌아갔어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '결과 삭제에 실패했어요.'), 'error'),
+    });
+  };
+
+  const handleUpdateGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editGroup || !editGroupName.trim()) return;
+    const parsed = Number.parseInt(editGroupAdvance, 10);
+    updateGroup.mutate(
+      {
+        groupId: editGroup.id,
+        name: editGroupName.trim(),
+        ...(Number.isInteger(parsed) && parsed > 0 ? { advanceCount: parsed } : {}),
+      },
+      {
+        onSuccess: () => { setEditGroup(null); showToast('조 정보를 수정했어요.', 'success'); },
+        onError: (err) => showToast(extractErrorMessage(err, '조 수정에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleDeleteGroup = async (g: V1AdminBracketGroup) => {
+    const ok = await confirmModal({
+      title: '조 삭제',
+      message: `"${g.name}"을(를) 삭제할까요? 팀 배정·경기가 남아 있으면 삭제할 수 없어요.`,
+      confirmLabel: '삭제',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    deleteGroup.mutate(g.id, {
+      onSuccess: () => showToast('조를 삭제했어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '조 삭제에 실패했어요.'), 'error'),
+    });
+  };
+
+  const handleRemoveGroupTeam = async (groupTeamId: string, teamName: string) => {
+    const ok = await confirmModal({
+      title: '팀 배정 해제',
+      message: `${teamName} 팀의 조 배정을 해제할까요? 해당 조 순위 기록도 함께 정리돼요.`,
+      confirmLabel: '해제',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    removeGroupTeam.mutate(groupTeamId, {
+      onSuccess: () => showToast('팀 배정을 해제했어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '배정 해제에 실패했어요.'), 'error'),
+    });
+  };
 
   const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1442,7 +1560,51 @@ function BracketTab({
 
             return (
               <div key={group.id} className="flex flex-col gap-2">
-                <h4 className="text-[13px] font-bold text-gray-600 px-1">{group.name}</h4>
+                <div className="flex items-center gap-1 px-1">
+                  <h4 className="text-[13px] font-bold text-gray-600 m-0">
+                    {group.name}
+                    {group.advanceCount != null && (
+                      <span className="ml-1.5 font-medium text-gray-400">상위 {group.advanceCount}팀 진출</span>
+                    )}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditGroup(group);
+                      setEditGroupName(group.name);
+                      setEditGroupAdvance(group.advanceCount != null ? String(group.advanceCount) : '');
+                    }}
+                    aria-label={`${group.name} 수정`}
+                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    <Pencil size={12} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteGroup(group)}
+                    aria-label={`${group.name} 삭제`}
+                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 size={12} aria-hidden="true" />
+                  </button>
+                </div>
+                {group.groupTeams.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 px-1">
+                    {group.groupTeams.map((gt) => (
+                      <span key={gt.id} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full bg-gray-100 text-xs text-gray-700">
+                        {gt.teamName ?? gt.registrationId}
+                        <button
+                          type="button"
+                          onClick={() => void handleRemoveGroupTeam(gt.id, gt.teamName ?? '이 팀')}
+                          aria-label={`${gt.teamName ?? '팀'} 배정 해제`}
+                          className="inline-flex items-center justify-center w-[20px] h-[20px] rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <X size={11} aria-hidden="true" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {knockoutEmpty ? (
                   // #6a: single slim inline hint instead of tall AdminEmpty box
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-dashed border-gray-200">
@@ -1530,27 +1692,62 @@ function BracketTab({
                 ? '홈·어웨이 팀이 모두 배정되어야 결과를 입력할 수 있어요'
                 : undefined;
               return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!bothAssigned) return;
-                    setResultFixture(f);
-                    setHomeScore(String(f.result?.homeScore ?? 0));
-                    setAwayScore(String(f.result?.awayScore ?? 0));
-                    setHasPenalty(f.result?.hasPenalty ?? false);
-                    setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
-                    setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
-                    setResultVideos(f.videos.map((v) => ({ title: v.title ?? '', url: v.url })));
-                    setResultOpen(true);
-                  }}
-                  disabled={!bothAssigned}
-                  aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
-                  title={disabledTitle}
-                  aria-disabled={!bothAssigned}
-                  className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  결과 입력
-                </button>
+                <span className="inline-flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditFixture(f);
+                      setEditFxScheduledAt(isoToDatetimeLocalValue(f.scheduledAt));
+                      setEditFxVenue(f.venue ?? '');
+                      setEditFxHomeRegId(f.homeRegistrationId ?? '');
+                      setEditFxAwayRegId(f.awayRegistrationId ?? '');
+                    }}
+                    aria-label={`${f.round} ${f.fixtureNumber}번 경기 수정`}
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    <Pencil size={12} aria-hidden="true" /> 수정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!bothAssigned) return;
+                      setResultFixture(f);
+                      setHomeScore(String(f.result?.homeScore ?? 0));
+                      setAwayScore(String(f.result?.awayScore ?? 0));
+                      setHasPenalty(f.result?.hasPenalty ?? false);
+                      setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
+                      setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
+                      setResultVideos(f.videos.map((v) => ({ title: v.title ?? '', url: v.url })));
+                      setResultOpen(true);
+                    }}
+                    disabled={!bothAssigned}
+                    aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
+                    title={disabledTitle}
+                    aria-disabled={!bothAssigned}
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {f.result ? '결과 수정' : '결과 입력'}
+                  </button>
+                  {f.result ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteResult(f)}
+                      aria-label={`${f.round} ${f.fixtureNumber}번 결과 삭제`}
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      결과 삭제
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteFixture(f)}
+                      aria-label={`${f.round} ${f.fixtureNumber}번 경기 삭제`}
+                      className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-xs font-medium text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
               );
             }}
           />
@@ -1558,6 +1755,138 @@ function BracketTab({
       )}
 
       </div>{/* end right column */}
+
+      {/* ── Fixture edit modal ────────────────────────────────────────── */}
+      <SimpleModal
+        open={editFixture !== null}
+        title="경기 수정"
+        onClose={() => setEditFixture(null)}
+        pending={updateFixture.isPending}
+      >
+        <form onSubmit={handleUpdateFixture} noValidate className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="edit-fx-scheduled" className="text-[13px] text-gray-900">경기 일시</label>
+            <input
+              id="edit-fx-scheduled"
+              type="datetime-local"
+              value={editFxScheduledAt}
+              onChange={(e) => setEditFxScheduledAt(e.target.value)}
+              disabled={updateFixture.isPending}
+              className={inputCls}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="edit-fx-venue" className="text-[13px] text-gray-900">장소</label>
+            <input
+              id="edit-fx-venue"
+              type="text"
+              value={editFxVenue}
+              onChange={(e) => setEditFxVenue(e.target.value)}
+              disabled={updateFixture.isPending}
+              maxLength={200}
+              placeholder="예: 성산 풋살파크 A구장"
+              className={inputCls}
+            />
+          </div>
+          <div className="flex gap-3">
+            <div className="flex flex-col gap-1 flex-1">
+              <label htmlFor="edit-fx-home" className="text-[13px] text-gray-900">홈 팀</label>
+              <select
+                id="edit-fx-home"
+                value={editFxHomeRegId}
+                onChange={(e) => setEditFxHomeRegId(e.target.value)}
+                disabled={updateFixture.isPending || !!editFixture?.result}
+                className={inputCls}
+              >
+                <option value="">미배정</option>
+                {confirmedRegistrations.map((r) => (
+                  <option key={r.id} value={r.id}>{r.teamName ?? r.id}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 flex-1">
+              <label htmlFor="edit-fx-away" className="text-[13px] text-gray-900">어웨이 팀</label>
+              <select
+                id="edit-fx-away"
+                value={editFxAwayRegId}
+                onChange={(e) => setEditFxAwayRegId(e.target.value)}
+                disabled={updateFixture.isPending || !!editFixture?.result}
+                className={inputCls}
+              >
+                <option value="">미배정</option>
+                {confirmedRegistrations.map((r) => (
+                  <option key={r.id} value={r.id}>{r.teamName ?? r.id}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {editFixture?.result && (
+            <p className="text-[11px] text-gray-400 m-0">결과가 기록된 경기는 팀을 바꿀 수 없어요. 팀을 바꾸려면 결과를 먼저 삭제해 주세요.</p>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setEditFixture(null)}
+              disabled={updateFixture.isPending}
+              className="flex-1 h-[44px] rounded-xl text-[13px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button type="submit" disabled={updateFixture.isPending} className={'flex-1 ' + submitBtnCls}>
+              {updateFixture.isPending ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </form>
+      </SimpleModal>
+
+      {/* ── Group edit modal ──────────────────────────────────────────── */}
+      <SimpleModal
+        open={editGroup !== null}
+        title="조 수정"
+        onClose={() => setEditGroup(null)}
+        pending={updateGroup.isPending}
+      >
+        <form onSubmit={handleUpdateGroup} noValidate className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="edit-group-name" className="text-[13px] text-gray-900">조 이름</label>
+            <input
+              id="edit-group-name"
+              type="text"
+              value={editGroupName}
+              onChange={(e) => setEditGroupName(e.target.value)}
+              disabled={updateGroup.isPending}
+              maxLength={60}
+              className={inputCls}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="edit-group-advance" className="text-[13px] text-gray-900">진출 팀 수 (선택)</label>
+            <input
+              id="edit-group-advance"
+              type="text"
+              inputMode="numeric"
+              value={editGroupAdvance}
+              onChange={(e) => setEditGroupAdvance(onlyDigits(e.target.value))}
+              disabled={updateGroup.isPending}
+              placeholder="예: 2"
+              className={inputCls}
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setEditGroup(null)}
+              disabled={updateGroup.isPending}
+              className="flex-1 h-[44px] rounded-xl text-[13px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button type="submit" disabled={updateGroup.isPending || !editGroupName.trim()} className={'flex-1 ' + submitBtnCls}>
+              {updateGroup.isPending ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </form>
+      </SimpleModal>
 
       {/* ── Result input modal ────────────────────────────────────────── */}
       <SimpleModal

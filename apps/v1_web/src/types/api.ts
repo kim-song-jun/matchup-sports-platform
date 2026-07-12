@@ -2068,6 +2068,13 @@ export type V1CreateGroupTeamPayload = {
   sortOrder?: number;
 };
 
+export type V1UpdateFixturePayload = {
+  scheduledAt?: string;
+  venue?: string;
+  homeRegistrationId?: string;
+  awayRegistrationId?: string;
+};
+
 export type V1CreateFixturePayload = {
   groupId?: string;
   round: string;

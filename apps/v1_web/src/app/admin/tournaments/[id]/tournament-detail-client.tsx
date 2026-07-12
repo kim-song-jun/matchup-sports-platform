@@ -22,10 +22,13 @@ import {
   ImagePlus,
   Clapperboard,
   Trophy,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows, serializePrizeRows, PRIZE_LABEL_PRESETS } from '@/lib/prize-breakdown';
+import { extractYoutubeVideoId, youtubeThumbnailUrl, videoKind } from '@/lib/video-utils';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
 import {
   useV1AdminTournament,
@@ -779,6 +782,7 @@ function BracketTab({
   // 경기 영상 목록 편집 상태 — 저장 시 replace-all 로 전송한다
   const [resultVideos, setResultVideos] = useState<{ title: string; url: string }[]>([]);
   const uploadVideo = useV1UploadVideo();
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
@@ -1657,6 +1661,15 @@ function BracketTab({
             <span className="text-[13px] text-gray-900">경기 영상 (선택 · 최대 10개)</span>
             {resultVideos.map((v, i) => (
               <div key={i} className="flex items-center gap-2">
+                {/* URL을 붙여넣는 즉시 어떤 영상인지 시각 확인 — 유튜브는 썸네일, 파일은 첫 프레임 */}
+                <span className="relative w-[56px] h-[32px] shrink-0 rounded-md overflow-hidden bg-gray-800 grid place-items-center text-gray-400" aria-hidden="true">
+                  <Clapperboard size={13} />
+                  {v.url.trim() && extractYoutubeVideoId(v.url) ? (
+                    <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : v.url.trim() && videoKind(v.url) === 'file' ? (
+                    <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+                  ) : null}
+                </span>
                 <input
                   type="text"
                   value={v.title}
@@ -1681,6 +1694,34 @@ function BracketTab({
                   aria-label={`영상 ${i + 1} URL`}
                   className={inputCls + ' flex-[1.4] min-w-0'}
                 />
+                <span className="flex flex-col shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setResultVideos((prev) => {
+                      const next = [...prev];
+                      [next[i - 1], next[i]] = [next[i], next[i - 1]];
+                      return next;
+                    })}
+                    disabled={recordResult.isPending || i === 0}
+                    aria-label={`영상 ${i + 1} 위로`}
+                    className="inline-flex items-center justify-center w-[28px] h-[18px] rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 transition-colors"
+                  >
+                    <ChevronUp size={13} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResultVideos((prev) => {
+                      const next = [...prev];
+                      [next[i], next[i + 1]] = [next[i + 1], next[i]];
+                      return next;
+                    })}
+                    disabled={recordResult.isPending || i === resultVideos.length - 1}
+                    aria-label={`영상 ${i + 1} 아래로`}
+                    className="inline-flex items-center justify-center w-[28px] h-[18px] rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-30 transition-colors"
+                  >
+                    <ChevronDown size={13} aria-hidden="true" />
+                  </button>
+                </span>
                 <button
                   type="button"
                   onClick={() => setResultVideos((prev) => prev.filter((_, j) => j !== i))}
@@ -1708,7 +1749,7 @@ function BracketTab({
                 className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
               >
                 <Clapperboard size={13} aria-hidden="true" />
-                {uploadVideo.isPending ? '업로드 중…' : '영상 파일 업로드'}
+                {uploadVideo.isPending ? `업로드 중… ${uploadPercent ?? 0}%` : '영상 파일 업로드'}
               </button>
               <input
                 ref={videoFileInputRef}
@@ -1719,12 +1760,15 @@ function BracketTab({
                   const file = e.target.files?.[0];
                   e.target.value = '';
                   if (!file) return;
+                  setUploadPercent(0);
                   try {
-                    const { urls } = await uploadVideo.mutateAsync(file);
+                    const { urls } = await uploadVideo.mutateAsync({ file, onProgress: setUploadPercent });
                     setResultVideos((prev) => [...prev, { title: '', url: urls[0] }]);
                     showToast('영상을 업로드했어요. 제목을 입력하고 저장해 주세요.', 'success');
                   } catch (err) {
                     showToast(extractErrorMessage(err, '영상 업로드에 실패했어요.'), 'error');
+                  } finally {
+                    setUploadPercent(null);
                   }
                 }}
               />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Clapperboard, ExternalLink, Play, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clapperboard, ExternalLink, Play, X } from 'lucide-react';
 import {
   extractYoutubeVideoId,
   youtubeThumbnailUrl,
@@ -103,6 +103,8 @@ export function MatchVideos({
                 ) : (
                   <span className="tm-video-strip-thumb is-file">
                     <Clapperboard size={22} aria-hidden="true" />
+                    {/* 첫 프레임을 썸네일로 — 로드 실패 시 뒤의 그라디언트+아이콘이 그대로 보인다 */}
+                    <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} aria-hidden="true" />
                     <span className="tm-video-strip-overlay" aria-hidden="true">
                       <span className="tm-video-strip-play">
                         <Play size={16} fill="currentColor" strokeWidth={0} />
@@ -166,6 +168,29 @@ export function MatchVideos({
               <span className="tm-video-modal-title">
                 {matchLabel} · {displayTitle(active, openIndex!)}
               </span>
+              {videos.length > 1 && (
+                <span className="tm-video-modal-nav" aria-label="영상 이동">
+                  <button
+                    type="button"
+                    className="tm-video-modal-close"
+                    disabled={openIndex === 0}
+                    onClick={() => setOpenIndex((i) => Math.max(0, (i ?? 0) - 1))}
+                    aria-label="이전 영상"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="tm-video-modal-count" aria-live="polite">{openIndex! + 1} / {videos.length}</span>
+                  <button
+                    type="button"
+                    className="tm-video-modal-close"
+                    disabled={openIndex === videos.length - 1}
+                    onClick={() => setOpenIndex((i) => Math.min(videos.length - 1, (i ?? 0) + 1))}
+                    aria-label="다음 영상"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => setOpenIndex(null)}

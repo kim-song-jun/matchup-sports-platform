@@ -1280,16 +1280,54 @@ export function useV1UploadImages() {
 }
 
 /**
+ * 진행률 콜백이 필요한 대용량 업로드용 XHR 멀티파트 (fetch는 업로드 진행 이벤트가 없다).
+ * 응답 파싱·에러 규약은 v1MultipartPost와 동일하게 맞춘다.
+ */
+function v1MultipartUploadWithProgress<T>(
+  path: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${getV1ApiBaseUrl()}${path}`);
+    xhr.withCredentials = true;
+    for (const [k, v] of Object.entries(getV1DevAuthHeaders())) xhr.setRequestHeader(k, v);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onerror = () =>
+      reject(new V1ApiError({ status: 'error', statusCode: 0, code: 'NETWORK_OR_PARSE_ERROR', message: '업로드에 실패했어요.', timestamp: new Date().toISOString() }));
+    xhr.onload = () => {
+      let body: ApiEnvelope<T> | ApiErrorBody | null = null;
+      try { body = JSON.parse(xhr.responseText); } catch { body = null; }
+      const isError =
+        xhr.status < 200 || xhr.status >= 300 ||
+        (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error');
+      if (isError) {
+        reject(new V1ApiError(
+          (body as ApiErrorBody) ?? { status: 'error', statusCode: xhr.status, code: 'NETWORK_OR_PARSE_ERROR', message: xhr.statusText || '업로드에 실패했어요.', timestamp: new Date().toISOString() },
+        ));
+        return;
+      }
+      resolve((body as ApiEnvelope<T>).data);
+    };
+    xhr.send(formData);
+  });
+}
+
+/**
  * 경기 영상 파일 업로드 mutation (1개, 최대 200MB, mp4/webm/mov).
  * BE 계약: POST /api/v1/uploads/videos — field 'files', 응답 { urls: string[] }.
  * 응답 url(/uploads/*.mp4)은 정적 서빙이 Range 요청을 지원해 <video>에서 바로 스트리밍된다.
+ * 200MB 대용량이라 onProgress로 업로드 진행률(%)을 노출한다.
  */
 export function useV1UploadVideo() {
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: ({ file, onProgress }: { file: File; onProgress?: (percent: number) => void }) => {
       const formData = new FormData();
       formData.append('files', file);
-      return v1MultipartPost<V1UploadImagesResult>('/uploads/videos', formData);
+      return v1MultipartUploadWithProgress<V1UploadImagesResult>('/uploads/videos', formData, onProgress);
     },
   });
 }

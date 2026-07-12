@@ -67,6 +67,7 @@ import {
   useV1UpdateAnnouncement,
   useV1UploadImages,
   useV1UploadVideo,
+  useV1AdminTournamentAwards,
   useV1SetTournamentAwards,
 } from '@/hooks/use-v1-api';
 import type {
@@ -99,6 +100,7 @@ import type { AdminTableColumn } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { TournamentSponsorsTab } from './tournament-sponsors-tab';
+import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -345,7 +347,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-white rounded-2xl shadow-[var(--shadow-2)] w-full max-w-[480px] overflow-hidden"
+        className="bg-white rounded-2xl shadow-[var(--shadow-2)] w-full max-w-[480px]"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 id={titleId} className="text-sm font-bold text-gray-900">
@@ -1039,6 +1041,15 @@ function BracketTab({
   const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
+  // EntityPicker 어댑터 — 팀 select 자리에 쓸 아이템 목록(제출 payload는 계속 registrationId 문자열)
+  const confirmedTeamItems: EntityPickerItem[] = confirmedRegistrations.map((r) => ({
+    id: r.id,
+    label: r.teamName ?? r.teamId,
+  }));
+  const editFixtureTeamItems: EntityPickerItem[] = confirmedRegistrations.map((r) => ({
+    id: r.id,
+    label: r.teamName ?? r.id,
+  }));
 
   const handleUpdateFixture = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1480,22 +1491,18 @@ function BracketTab({
                 ))}
               </select>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 sm:w-[220px]">
               <label htmlFor="assign-team" className="text-[13px] text-gray-900">
                 팀 선택
               </label>
-              <select
+              <EntityPicker
                 id="assign-team"
-                value={assignRegId}
-                onChange={(e) => setAssignRegId(e.target.value)}
+                value={confirmedTeamItems.find((it) => it.id === assignRegId) ?? null}
+                onChange={(item) => setAssignRegId(item?.id ?? '')}
+                items={confirmedTeamItems}
                 disabled={assignGroupTeam.isPending}
-                className={inputCls + ' sm:w-[200px]'}
-              >
-                <option value="">확정 팀을 선택해 주세요</option>
-                {confirmedRegistrations.map((r) => (
-                  <option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>
-                ))}
-              </select>
+                placeholder="팀 선택"
+              />
             </div>
             <button
               type="submit"
@@ -1644,18 +1651,15 @@ function BracketTab({
                     </span>
                   )}
                 </label>
-                <select
+                <EntityPicker
                   id="fixture-home"
-                  value={fixtureHomeRegId}
-                  onChange={(e) => setFixtureHomeRegId(e.target.value)}
+                  value={confirmedTeamItems.find((it) => it.id === fixtureHomeRegId) ?? null}
+                  onChange={(item) => setFixtureHomeRegId(item?.id ?? '')}
+                  items={confirmedTeamItems.filter((it) => it.id !== fixtureAwayRegId)}
                   disabled={createFixture.isPending}
-                  className={inputCls + (homeBooked ? ' border-amber-400 focus:border-amber-500 focus:ring-amber-400/20' : '')}
-                >
-                  <option value="">미정</option>
-                  {confirmedRegistrations
-                    .filter((r) => r.id !== fixtureAwayRegId)
-                    .map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
-                </select>
+                  clearLabel="미정"
+                  placeholder="홈 팀 검색"
+                />
               </div>
 
               {/* Away team — exclude home selection */}
@@ -1668,18 +1672,15 @@ function BracketTab({
                     </span>
                   )}
                 </label>
-                <select
+                <EntityPicker
                   id="fixture-away"
-                  value={fixtureAwayRegId}
-                  onChange={(e) => setFixtureAwayRegId(e.target.value)}
+                  value={confirmedTeamItems.find((it) => it.id === fixtureAwayRegId) ?? null}
+                  onChange={(item) => setFixtureAwayRegId(item?.id ?? '')}
+                  items={confirmedTeamItems.filter((it) => it.id !== fixtureHomeRegId)}
                   disabled={createFixture.isPending}
-                  className={inputCls + (awayBooked ? ' border-amber-400 focus:border-amber-500 focus:ring-amber-400/20' : '')}
-                >
-                  <option value="">미정</option>
-                  {confirmedRegistrations
-                    .filter((r) => r.id !== fixtureHomeRegId)
-                    .map((r) => (<option key={r.id} value={r.id}>{r.teamName ?? r.teamId}</option>))}
-                </select>
+                  clearLabel="미정"
+                  placeholder="어웨이 팀 검색"
+                />
               </div>
 
               <div className="flex flex-col gap-1 items-start sm:col-span-2">
@@ -2020,33 +2021,27 @@ function BracketTab({
           <div className="flex gap-3">
             <div className="flex flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-home" className="text-[13px] text-gray-900">홈 팀</label>
-              <select
+              <EntityPicker
                 id="edit-fx-home"
-                value={editFxHomeRegId}
-                onChange={(e) => setEditFxHomeRegId(e.target.value)}
+                value={editFixtureTeamItems.find((it) => it.id === editFxHomeRegId) ?? null}
+                onChange={(item) => setEditFxHomeRegId(item?.id ?? '')}
+                items={editFixtureTeamItems}
                 disabled={updateFixture.isPending || !!editFixture?.result}
-                className={inputCls}
-              >
-                <option value="">미배정</option>
-                {confirmedRegistrations.map((r) => (
-                  <option key={r.id} value={r.id}>{r.teamName ?? r.id}</option>
-                ))}
-              </select>
+                clearLabel="미정"
+                placeholder="홈 팀 검색"
+              />
             </div>
             <div className="flex flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-away" className="text-[13px] text-gray-900">어웨이 팀</label>
-              <select
+              <EntityPicker
                 id="edit-fx-away"
-                value={editFxAwayRegId}
-                onChange={(e) => setEditFxAwayRegId(e.target.value)}
+                value={editFixtureTeamItems.find((it) => it.id === editFxAwayRegId) ?? null}
+                onChange={(item) => setEditFxAwayRegId(item?.id ?? '')}
+                items={editFixtureTeamItems}
                 disabled={updateFixture.isPending || !!editFixture?.result}
-                className={inputCls}
-              >
-                <option value="">미배정</option>
-                {confirmedRegistrations.map((r) => (
-                  <option key={r.id} value={r.id}>{r.teamName ?? r.id}</option>
-                ))}
-              </select>
+                clearLabel="미정"
+                placeholder="어웨이 팀 검색"
+              />
             </div>
           </div>
           {editFixture?.result && (
@@ -2777,6 +2772,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tournament) return;
+    // 날짜 역전 가드 — datetime-local 값은 ISO 형태라 사전순 비교로 충분하다
+    if (editScheduledAt && editScheduledEndAt && editScheduledEndAt < editScheduledAt) {
+      showToast('대회 종료가 시작보다 빠를 수 없어요.', 'error');
+      return;
+    }
     const payload: V1UpdateTournamentPayload = {};
     if (editTitle.trim()) payload.title = editTitle.trim();
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
@@ -2792,8 +2792,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       if (deadlineAtIso) payload.registrationDeadlineAt = deadlineAtIso;
     }
     if (editVenue.trim()) payload.venue = editVenue.trim();
-    const fee = Number(editEntryFee);
-    if (!Number.isNaN(fee)) payload.entryFee = fee;
+    // 빈 입력은 전송하지 않는다 — Number('')===0 이라 참가비가 0원으로 덮어써진다
+    if (editEntryFee !== '') {
+      const fee = Number(editEntryFee);
+      if (!Number.isNaN(fee)) payload.entryFee = fee;
+    }
     const tc = Number(editTeamCount);
     if (!Number.isNaN(tc) && tc > 0) payload.teamCount = tc;
     const mn = Number(editMinPlayers);
@@ -3998,6 +4001,8 @@ const DEFAULT_AWARD_TYPES = [
   { awardType: 'fair_play', awardLabel: '페어플레이' },
 ];
 
+type AwardForm = { awardType: string; awardLabel: string; recipientName: string; teamName: string; note: string };
+
 function AwardsTab({
   tournamentId,
   showToast,
@@ -4005,11 +4010,15 @@ function AwardsTab({
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
-  const { data: tournament } = useV1AdminTournament(tournamentId);
   const setAwards = useV1SetTournamentAwards(tournamentId);
+  const { data: savedAwards } = useV1AdminTournamentAwards(tournamentId);
+  const { data: awardRegData } = useV1AdminTournamentRegistrations(tournamentId);
+  // EntityPicker 어댑터 — 소속 팀 선택지(제출은 계속 teamName 문자열)
+  const awardTeamItems: EntityPickerItem[] = (awardRegData?.items ?? [])
+    .filter((r) => r.status === 'confirmed')
+    .map((r) => ({ id: r.id, label: r.teamName ?? r.teamId }));
 
   // 기존 어워드 또는 빈 템플릿
-  type AwardForm = { awardType: string; awardLabel: string; recipientName: string; teamName: string; note: string };
   const [rows, setRows] = useState<AwardForm[]>(() => {
     return DEFAULT_AWARD_TYPES.map((d) => ({
       awardType: d.awardType,
@@ -4020,10 +4029,11 @@ function AwardsTab({
     }));
   });
 
-  // 기존 저장된 어워드 로드
+  // 기존 저장된 어워드 로드 — 어드민 대회 상세 응답에는 awards가 없어
+  // GET /admin/tournaments/:id/awards 로 별도 하이드레이션한다
   const [loaded, setLoaded] = useState(false);
-  if (tournament && !loaded) {
-    const existing = (tournament as { awards?: V1TournamentAward[] }).awards ?? [];
+  if (savedAwards && !loaded) {
+    const existing = savedAwards;
     if (existing.length > 0) {
       const merged = DEFAULT_AWARD_TYPES.map((d) => {
         const found = existing.find((a) => a.awardType === d.awardType);
@@ -4078,51 +4088,15 @@ function AwardsTab({
 
       <div className="flex flex-col gap-3">
         {rows.map((row, idx) => (
-          <div key={idx} className="border border-gray-200 rounded-xl p-3 bg-white">
-            <div className="flex items-center gap-2 mb-2">
-              <input
-                type="text"
-                value={row.awardLabel}
-                onChange={(e) => update(idx, 'awardLabel', e.target.value)}
-                placeholder="어워드명 (예: MVP)"
-                className="flex-1 text-[13px] font-semibold border-0 bg-gray-50 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-              <button type="button" onClick={() => removeRow(idx)} className="text-gray-400 hover:text-red-500 p-1 inline-flex" aria-label="항목 삭제"><X size={16} /></button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] text-gray-500 mb-1 block">수상자 이름 *</label>
-                <input
-                  type="text"
-                  value={row.recipientName}
-                  onChange={(e) => update(idx, 'recipientName', e.target.value)}
-                  placeholder="홍길동"
-                  className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-gray-500 mb-1 block">소속 팀 (선택)</label>
-                <input
-                  type="text"
-                  value={row.teamName}
-                  onChange={(e) => update(idx, 'teamName', e.target.value)}
-                  placeholder="팀명"
-                  className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-            </div>
-            {row.note !== undefined && (
-              <div className="mt-2">
-                <input
-                  type="text"
-                  value={row.note}
-                  onChange={(e) => update(idx, 'note', e.target.value)}
-                  placeholder="비고 (선택, 예: 3골 1어시스트)"
-                  className="w-full text-xs border border-gray-100 rounded-xl px-3 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                />
-              </div>
-            )}
-          </div>
+          <AwardRow
+            key={idx}
+            idx={idx}
+            row={row}
+            update={update}
+            removeRow={removeRow}
+            tournamentId={tournamentId}
+            teamItems={awardTeamItems}
+          />
         ))}
       </div>
 
@@ -4136,6 +4110,98 @@ function AwardsTab({
           {setAwards.isPending ? '저장 중...' : '어워드 저장'}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── AwardsTab 행 컴포넌트 ────────────────────────────────────────────────
+// 팀이 선택된 행만 useV1TournamentPlayers로 로스터를 조회해야 하므로(훅 규칙상
+// 조건/루프 내 훅 호출 금지) rows.map 내부가 아닌 별도 컴포넌트로 분리한다.
+function AwardRow({
+  idx,
+  row,
+  update,
+  removeRow,
+  tournamentId,
+  teamItems,
+}: {
+  idx: number;
+  row: AwardForm;
+  update: (idx: number, field: keyof AwardForm, value: string) => void;
+  removeRow: (idx: number) => void;
+  tournamentId: string;
+  teamItems: EntityPickerItem[];
+}) {
+  const teamNameTrimmed = row.teamName.trim();
+  const selectedTeamItem: EntityPickerItem | null = teamNameTrimmed
+    ? (teamItems.find((it) => it.label === row.teamName) ?? { id: '', label: row.teamName })
+    : null;
+  const selectedRegistrationId = selectedTeamItem?.id ?? '';
+
+  const { data: roster, isFetching: rosterFetching } = useV1TournamentPlayers(
+    tournamentId,
+    selectedRegistrationId,
+  );
+  const playerItems: EntityPickerItem[] = (roster?.players ?? []).map((p) => ({
+    id: p.id,
+    label: p.realName,
+  }));
+  const recipientValue: EntityPickerItem | null = row.recipientName
+    ? (playerItems.find((it) => it.label === row.recipientName) ?? { id: '', label: row.recipientName })
+    : null;
+
+  return (
+    <div className="border border-gray-200 rounded-xl p-3 bg-white">
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          type="text"
+          value={row.awardLabel}
+          onChange={(e) => update(idx, 'awardLabel', e.target.value)}
+          placeholder="어워드명 (예: MVP)"
+          className="flex-1 text-[13px] font-semibold border-0 bg-gray-50 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button type="button" onClick={() => removeRow(idx)} className="text-gray-400 hover:text-red-500 p-1 inline-flex" aria-label="항목 삭제"><X size={16} /></button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label htmlFor={`award-recipient-${idx}`} className="text-[11px] text-gray-500 mb-1 block">수상자 이름 *</label>
+          <EntityPicker
+            id={`award-recipient-${idx}`}
+            value={recipientValue}
+            onChange={(item) => update(idx, 'recipientName', item?.label ?? '')}
+            items={playerItems}
+            loading={!!selectedRegistrationId && rosterFetching}
+            allowFreeText
+            placeholder="홍길동"
+            emptyText={selectedRegistrationId ? '명단에 없어요. 이름을 입력해 주세요' : '검색 결과가 없어요'}
+          />
+          {!teamNameTrimmed && (
+            <p className="text-[11px] text-gray-400 mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
+          )}
+        </div>
+        <div>
+          <label htmlFor={`award-team-${idx}`} className="text-[11px] text-gray-500 mb-1 block">소속 팀 (선택)</label>
+          <EntityPicker
+            id={`award-team-${idx}`}
+            value={selectedTeamItem}
+            onChange={(item) => update(idx, 'teamName', item?.label ?? '')}
+            items={teamItems}
+            allowFreeText
+            placeholder="팀명 검색 또는 입력"
+          />
+        </div>
+      </div>
+      {row.note !== undefined && (
+        <div className="mt-2">
+          <input
+            type="text"
+            value={row.note}
+            onChange={(e) => update(idx, 'note', e.target.value)}
+            placeholder="비고 (선택, 예: 3골 1어시스트)"
+            className="w-full text-xs border border-gray-100 rounded-xl px-3 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+        </div>
+      )}
     </div>
   );
 }

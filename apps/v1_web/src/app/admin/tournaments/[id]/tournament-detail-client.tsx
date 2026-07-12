@@ -28,8 +28,8 @@ import {
   Undo2,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
-import { onlyDigits, formatWithComma } from '@/lib/number-format';
-import { parsePrizeRows, serializePrizeRows, PRIZE_LABEL_PRESETS } from '@/lib/prize-breakdown';
+import { onlyDigits, formatWithComma, formatIfNumeric } from '@/lib/number-format';
+import { parsePrizeRows, serializePrizeRows, PRIZE_LABEL_PRESETS, isPrizeAmountValue, prizeAmountDigits, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { extractYoutubeVideoId, youtubeThumbnailUrl, videoKind } from '@/lib/video-utils';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
 import {
@@ -3698,19 +3698,20 @@ function InfoTab({
 
   const [prizePool, setPrizePool] = useState('');
   const [prizeSummary, setPrizeSummary] = useState('');
-  // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환)
-  const [prizeRows, setPrizeRows] = useState<{ label: string; amountDigits: string }[]>([]);
+  // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환).
+  // 각 행 값(value)은 자유 텍스트 — 금액("600,000원")이든 물품("우승 트로피")이든 그대로 보관한다.
+  const [prizeRows, setPrizeRows] = useState<{ label: string; value: string }[]>([]);
   const [loaded, setLoaded] = useState(false);
   if (tournament && !loaded) {
     setPrizePool(tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '');
     setPrizeSummary(tournament.prizeSummary ?? '');
     setPrizeRows(
-      parsePrizeRows(tournament.prizeBreakdown ?? '').map((r) => ({ label: r.label, amountDigits: onlyDigits(r.amount) })),
+      parsePrizeRows(tournament.prizeBreakdown ?? '').map((r) => ({ label: r.label, value: r.amount })),
     );
     setLoaded(true);
   }
 
-  const breakdownTotal = prizeRows.reduce((sum, r) => sum + (r.amountDigits ? parseInt(r.amountDigits, 10) : 0), 0);
+  const breakdownTotal = prizeRows.reduce((sum, r) => sum + (prizeAmountDigits(r.value) ?? 0), 0);
   const poolValue = prizePool.trim() !== '' ? parseInt(prizePool, 10) : null;
   const poolMismatch = breakdownTotal > 0 && poolValue !== null && poolValue !== breakdownTotal;
   const previewRows = prizeRows.filter((r) => r.label.trim().length > 0);
@@ -3749,8 +3750,9 @@ function InfoTab({
       payload.prizePool = Math.floor(n);
     }
     if (prizeSummary.trim()) payload.prizeSummary = prizeSummary.trim();
+    // 금액 행은 "1,234,567원" 형태로 정규화, 물품 행은 입력한 자유 텍스트 그대로 저장한다.
     const breakdownText = serializePrizeRows(
-      prizeRows.map((r) => ({ label: r.label, amount: r.amountDigits ? `${formatWithComma(r.amountDigits)}원` : '' })),
+      prizeRows.map((r) => ({ label: r.label, amount: formatPrizeRowValue(r.value) })),
     );
     if (breakdownText) payload.prizeBreakdown = breakdownText;
     if (Object.keys(payload).length === 0) {
@@ -3881,12 +3883,15 @@ function InfoTab({
               />
               <input
                 type="text"
-                inputMode="numeric"
-                value={formatWithComma(row.amountDigits)}
-                onChange={(e) => setPrizeRows((prev) => prev.map((r, j) => (j === i ? { ...r, amountDigits: onlyDigits(e.target.value) } : r)))}
+                value={row.value}
+                onChange={(e) => {
+                  // "/"는 저장 텍스트의 행 구분자라 값 안에 둘 수 없어요 — 입력 즉시 나열 점("·")으로 치환
+                  const next = formatIfNumeric(e.target.value.replace(/\//g, '·'));
+                  setPrizeRows((prev) => prev.map((r, j) => (j === i ? { ...r, value: next } : r)));
+                }}
                 disabled={updateTournament.isPending}
-                placeholder="금액 (원)"
-                aria-label={`배분 항목 ${i + 1} 금액`}
+                placeholder="예: 600,000원 또는 우승 트로피"
+                aria-label={`배분 항목 ${i + 1} 값`}
                 className={inputBoxCls + ' flex-1 min-w-0 text-right'}
               />
               <button
@@ -3909,7 +3914,7 @@ function InfoTab({
               onClick={() => setPrizeRows((prev) => {
                 const used = new Set(prev.map((r) => r.label));
                 const next = PRIZE_LABEL_PRESETS.find((p) => !used.has(p)) ?? '';
-                return [...prev, { label: next, amountDigits: '' }];
+                return [...prev, { label: next, value: '' }];
               })}
               disabled={updateTournament.isPending || prizeRows.length >= 12}
               className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
@@ -3933,7 +3938,7 @@ function InfoTab({
               </button>
             )}
           </div>
-          <p className="text-[11px] text-gray-400 m-0">순위·개인상 금액만 입력해요. 트로피 등 비금액 상품은 아래 &quot;상품 및 상금&quot;에 적어주세요.</p>
+          <p className="text-[11px] text-gray-400 m-0">숫자만 입력하면 금액으로 자동 콤마 포맷돼요. 트로피·상품권 같은 물품도 적을 수 있고, 여러 물품 나열은 ·(가운뎃점)로 구분해요.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -3964,15 +3969,19 @@ function InfoTab({
                   <span className="text-[18px] font-black text-blue-600 tracking-tight">{formatWithComma(String(poolValue))}원</span>
                 </div>
               )}
-              {previewRows.map((row, i) => (
-                <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-                  <span className="inline-flex" aria-hidden="true"><PrizeRankIcon label={row.label.trim()} /></span>
-                  <span className="flex-1 text-[13px] font-semibold text-gray-900">{row.label.trim()}</span>
-                  <span className="text-[13px] font-bold text-gray-900 tabular-nums">
-                    {row.amountDigits ? `${formatWithComma(row.amountDigits)}원` : '—'}
-                  </span>
-                </div>
-              ))}
+              {previewRows.map((row, i) => {
+                const hasValue = row.value.trim().length > 0;
+                const isAmount = isPrizeAmountValue(row.value);
+                return (
+                  <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                    <span className="inline-flex" aria-hidden="true"><PrizeRankIcon label={row.label.trim()} /></span>
+                    <span className="flex-1 text-[13px] font-semibold text-gray-900">{row.label.trim()}</span>
+                    <span className={hasValue && isAmount ? 'text-[13px] font-bold text-gray-900 tabular-nums' : 'text-[13px] text-gray-600'}>
+                      {hasValue ? formatPrizeRowValue(row.value) : '—'}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

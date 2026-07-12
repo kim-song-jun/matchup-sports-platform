@@ -625,14 +625,14 @@ export default function AdminTournamentsNewPage() {
               <FormField
                 id="prize-breakdown"
                 label="상금 배분"
-                hint="콤마, 점, 줄바꿈으로 구분한 항목이 하단 박스로 표시돼요"
+                hint="슬래시(/) 또는 줄바꿈으로 구분한 항목이 하단 박스로 표시돼요. 금액이 아닌 물품도 그대로 적을 수 있어요"
               >
                 <textarea
                   id="prize-breakdown"
                   value={prizeBreakdown}
                   onChange={(e) => setPrizeBreakdown(e.target.value)}
                   disabled={isPending}
-                  placeholder="예: 1위 100만원 · 2위 50만원 · 3위 30만원"
+                  placeholder="예: 1위 1,000,000원 / 2위 500,000원 / MVP 축구화"
                   maxLength={200}
                   rows={3}
                   className={textareaCls}

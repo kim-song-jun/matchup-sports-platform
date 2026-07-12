@@ -16,7 +16,7 @@ import { hasStoredV1Session } from '@/lib/session-storage';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
-import { parsePrizeRows } from '@/lib/prize-breakdown';
+import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
 import { publicAssetPath } from '@/lib/assets';
 
@@ -167,10 +167,11 @@ function PrizeSection({
           </div>
         )}
 
-        {/* 순위별 상금 배분 */}
+        {/* 순위별 상금 배분 — 금액 행은 강조 스타일, 물품(goods) 행은 일반 텍스트로 우측에 표시 */}
         {rows.length > 0 && rows.map((row, idx) => {
           const posNum = row.label.match(/^(\d+)위$/)?.[1];
           const teamName = posNum ? teamByPos[Number(posNum)] : undefined;
+          const isAmount = isPrizeAmountValue(row.amount);
           return (
             <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
               <span style={{ display: 'inline-flex', marginRight: 10, flexShrink: 0 }} aria-hidden="true">
@@ -183,7 +184,11 @@ function PrizeSection({
                 )}
               </div>
               {row.amount && (
-                <span style={{ fontSize: 15, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em', flexShrink: 0 }}>{row.amount}</span>
+                isAmount ? (
+                  <span style={{ fontSize: 15, fontWeight: 800, color: '#111827', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
+                ) : (
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 10, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
+                )
               )}
             </div>
           );

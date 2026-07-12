@@ -11,6 +11,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
   TournamentApplicationGuideSection,
@@ -50,35 +51,14 @@ function getFormatLabel(format: V1TournamentFormat): string {
   }
 }
 
+/**
+ * 상금 칩 분리 — lib/prize-breakdown의 공용 스플리터(splitPrizeSegments)를 그대로 소비한다.
+ * 구분자 규칙("/"·줄바꿈·비-천단위 콤마, "·"는 물품 나열용으로 보존)이 시상 페이지·어드민
+ * 미리보기(parsePrizeRows)와 단일 소스로 통일되어 화면 간 항목 수가 어긋나지 않는다.
+ */
 export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
   if (!prizeBreakdown) return [];
-
-  const chips: string[] = [];
-  let current = '';
-
-  for (let index = 0; index < prizeBreakdown.length; index += 1) {
-    const char = prizeBreakdown[index];
-    const previous = prizeBreakdown[index - 1] ?? '';
-    const next = prizeBreakdown[index + 1] ?? '';
-    const isNumericComma = char === ',' && isAsciiDigit(previous) && isAsciiDigit(next);
-    const isSeparator = char === '/' || char === '·' || char === '\n' || (char === ',' && !isNumericComma);
-
-    if (isSeparator) {
-      const segment = current.trim();
-      if (segment) chips.push(segment);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-
-  const last = current.trim();
-  if (last) chips.push(last);
-  return chips;
-}
-
-function isAsciiDigit(value: string): boolean {
-  return value >= '0' && value <= '9';
+  return splitPrizeSegments(prizeBreakdown);
 }
 
 function formatPublishedAt(dateStr: string): string {
@@ -358,7 +338,7 @@ function TournamentDetailView({
   const bottomPad = isOpen ? 96 : 48;
 
   /* ── Prize card — rendered in left column just after metric strip ── */
-  // 상금 칩 분리: '/'·'·'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
+  // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
   // 분리하지 않는다 — dev의 콤마 구분 요구를 더 견고한 getPrizeBreakdownChips 헬퍼(테스트 보유)로 충족.
   const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
   const prizeCard = hasPrize ? (
@@ -391,7 +371,11 @@ function TournamentDetailView({
                   {m ? (
                     <>
                       <strong style={{ color: 'var(--text-strong)', fontWeight: 800, marginRight: 4 }}>{m[1]}</strong>
-                      {m[2]}
+                      {isPrizeAmountValue(m[2]) ? (
+                        formatPrizeRowValue(m[2])
+                      ) : (
+                        <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>{m[2].trim()}</span>
+                      )}
                     </>
                   ) : (
                     seg

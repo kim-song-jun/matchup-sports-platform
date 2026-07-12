@@ -318,12 +318,13 @@ export function ProfileEditPageClient() {
 
   const originalNickname = profile.data?.profile.nickname ?? profile.data?.profile.displayName ?? '';
   const originalEmail = profile.data?.email ?? '';
+  const canEditEmail = Boolean(profile.data?.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
   const nicknameChanged = normalizedNickname !== originalNickname;
-  const emailChanged = normalizedEmail !== originalEmail;
+  const emailChanged = canEditEmail && normalizedEmail !== originalEmail;
   const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
-  const emailVerified = !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
+  const emailVerified = !canEditEmail || !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
   const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified;
 
   const runNicknameCheck = () => {
@@ -352,6 +353,9 @@ export function ProfileEditPageClient() {
 
   const runEmailCheck = () => {
     setFieldErrors((current) => ({ ...current, email: undefined, form: undefined }));
+    if (!canEditEmail) {
+      return;
+    }
     if (!emailChanged) {
       setEmailCheck({ status: 'available', value: normalizedEmail });
       return;
@@ -424,7 +428,7 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    if (!normalizedEmail.includes('@')) {
+    if (canEditEmail && !normalizedEmail.includes('@')) {
       setFieldErrors({ email: '이메일 형식을 확인해 주세요.' });
       return;
     }
@@ -453,7 +457,7 @@ export function ProfileEditPageClient() {
       await update.mutateAsync({
         displayName: displayName.trim(),
         nickname: normalizedNickname,
-        email: normalizedEmail,
+        email: canEditEmail ? normalizedEmail : null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
         birthDate: birthDateDigits || null,
@@ -560,16 +564,18 @@ export function ProfileEditPageClient() {
               className={`tm-input ${fieldErrors.email ? 'tm-auth-input-error' : emailVerified && emailChanged ? 'tm-auth-input-success' : ''}`}
               value={email}
               onChange={(event) => {
+                if (!canEditEmail) return;
                 setEmail(event.target.value);
                 setEmailCheck({ status: 'idle', value: '' });
                 setFieldErrors((current) => ({ ...current, email: undefined }));
               }}
               type="email"
-              required
+              required={canEditEmail}
+              disabled={!canEditEmail}
               aria-invalid={fieldErrors.email ? true : undefined}
               aria-describedby={fieldErrors.email || (emailVerified && emailChanged) ? 'v1-profile-email-helper' : undefined}
             />
-            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={!canEditEmail || checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
               {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
@@ -938,6 +944,12 @@ function formatAccountEmail(email: string | null, providers: string[]) {
   return '등록 안 됨';
 }
 
+function formatPasswordAvailability(hasPassword: boolean | undefined, providers: string[]) {
+  if (hasPassword) return '이메일 계정에서 관리';
+  if (providers.includes('kakao')) return '카카오 계정으로 로그인 중';
+  return '비밀번호 없음';
+}
+
 export function SettingsPageClient() {
   const settings = useV1Settings();
 
@@ -950,6 +962,8 @@ export function SettingsPageClient() {
         loginMethod: formatLoginMethods(settings.data.account.providers),
         email: formatAccountEmail(settings.data.account.email, settings.data.account.providers),
         phone: settings.data.account.phone ?? '등록 안 됨',
+        password: formatPasswordAvailability(settings.data.account.hasPassword, settings.data.account.providers),
+        canRequestPasswordChange: Boolean(settings.data.account.hasPassword),
       }
     : undefined;
 
@@ -1286,10 +1300,10 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
-      name: nickname,
+      name: displayName,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
-      initials: initials(nickname),
+      initials: initials(displayName || nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
       loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
       loginMethodProvider: profile.authProvider,

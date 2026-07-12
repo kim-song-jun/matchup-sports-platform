@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   useV1AdminTeams,
   useV1AdminMe,
@@ -194,9 +195,20 @@ export default function AdminTeamsPage() {
                 ? 'warning'
                 : undefined,
           })}
-          renderActions={
-            canWrite
-              ? (row) => (
+          renderActions={(row) => (
+            <>
+              <Link
+                href={`/admin/teams/${row.teamId}`}
+                aria-label={`${row.name} 상세 보기`}
+                className={[
+                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium',
+                  'text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors whitespace-nowrap',
+                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                ].join(' ')}
+              >
+                상세 보기
+              </Link>
+              {canWrite ? (
                   <button
                     type="button"
                     onClick={() => setModalRow(row)}
@@ -209,9 +221,9 @@ export default function AdminTeamsPage() {
                   >
                     상태 변경
                   </button>
-                )
-              : undefined
-          }
+              ) : null}
+            </>
+          )}
           loading={isInitialLoad}
           empty={
             <AdminEmpty

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Pin } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
-import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
 
@@ -88,12 +88,8 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
             <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
             <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
             <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>
-            <Card pad={16} className="tm-notice-summary-card">
-              <div className="tm-text-label">요약</div>
-              <p className="tm-text-body">{notice.summary}</p>
-            </Card>
             <div className="tm-notice-body">
-              {notice.body.map((paragraph) => <p key={paragraph} className="tm-text-body">{paragraph}</p>)}
+              {notice.body.map((paragraph, index) => <p key={`${index}-${paragraph}`} className="tm-text-body">{paragraph}</p>)}
             </div>
             {model.relatedHref ? (
               <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
@@ -127,7 +123,17 @@ function NoticeRow({ notice }: { notice: NoticeModel }) {
           {notice.tag} · {notice.date}
         </span>
         <span className="tm-text-label tm-notice-row-title">{notice.title}</span>
-        <span className="tm-text-caption line-clamp-2">{notice.summary}</span>
+        <span
+          className="tm-text-caption"
+          style={{
+            display: '-webkit-box',
+            overflow: 'hidden',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 4,
+          }}
+        >
+          {notice.summary}
+        </span>
       </span>
       <ChevronRightIcon size={17} stroke="var(--grey400)" strokeWidth={2} />
     </Link>

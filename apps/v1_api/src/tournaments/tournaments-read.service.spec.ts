@@ -254,6 +254,18 @@ describe('TournamentsReadService', () => {
     expect(callArgs.where.status.in).not.toContain('cancelled');
   });
 
+  it('get: public detail only includes published public announcements', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+    await service.get('t-1').catch(() => {});
+
+    const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
+    expect(callArgs.include.announcements.where).toEqual({
+      audience: 'public',
+      publishedAt: { not: null },
+    });
+  });
+
   // ─── get — detail shape ──────────────────────────────────────────────────────
 
   it('get: returns full detail with groups, fixtures, announcements', async () => {
@@ -312,7 +324,7 @@ describe('TournamentsReadService', () => {
           id: 'ann-1',
           title: '경기 일정 공지',
           body: '7월 1일 오전 10시 시작',
-          audience: 'all_registered',
+          audience: 'public',
           publishedAt: new Date('2026-06-10T00:00:00Z'),
           createdAt: new Date('2026-06-10T00:00:00Z'),
           updatedAt: new Date('2026-06-10T00:00:00Z'),

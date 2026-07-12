@@ -19,6 +19,20 @@ Admin-facing prize entry is text-first. `prizeSummary` is the public "상품 및
 
 Tournament promo cards are separate from prize fields and from the normal tournament edit surface. Admin update/create accepts independent home promo fields (`promoHomeEnabled`, `promoHomeTitle`, `promoHomeSubtitle`, `promoHomeImageUrl`, `promoHomeBadgeText`, `promoHomeDateText`, `promoHomeTeamsText`, `promoHomeLocationText`, `promoHomePrizeText`, `promoHomePriority`) and list promo fields (`promoListEnabled`, `promoListTitle`, `promoListSubtitle`, `promoListImageUrl`, `promoListBadgeText`, `promoListDateText`, `promoListTeamsText`, `promoListLocationText`, `promoListPrizeText`, `promoListPriority`); public list/detail responses include the same fields. `promoHomeEnabled` controls the home "오늘의 추천" tournament card, `promoListEnabled` controls the top featured card on the tournament list, and clients pick the enabled open tournament with the highest priority. Promo images are uploaded through the shared upload endpoint first, then the returned URL is saved in the corresponding promo image field.
 
+## Admin Announcement Endpoints
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/announcements` | active admin, read-only support allowed | path id | `{ items: V1AdminTournamentAnnouncement[] }` |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/announcements` | mutation-capable admin | `CreateAnnouncementDto` | created announcement |
+| `PATCH` | `/api/v1/admin/announcements/:announcementId` | mutation-capable admin | `UpdateAnnouncementDto` | updated announcement |
+| `PATCH` | `/api/v1/admin/announcements/:announcementId/publish` | mutation-capable admin | empty body | updated announcement plus `alreadyPublished` |
+| `DELETE` | `/api/v1/admin/announcements/:announcementId` | mutation-capable admin | path id | `{ id, tournamentId, deleted: true }` |
+
+`UpdateAnnouncementDto` edits `title`, `body`, and `audience`. `publish=true` publishes a draft or keeps a published row published; `publish=false` clears `publishedAt` and removes the announcement from public tournament detail. Update and delete write admin action logs with `targetType=tournament_announcement`.
+
+Tournament announcement `audience` values are `public`, `all_registered`, `confirmed_only`, and `waitlist`. `public` means the announcement is visible on public tournament detail to logged-out users as soon as it is published. Public tournament detail (`GET /api/v1/tournaments/:tournamentId`) returns only announcements where `audience=public` and `publishedAt` is not null; team-scoped announcement values are retained for admin operations and targeted follow-up delivery.
+
 ## Registration Endpoints
 
 | Method | Path | Auth | Request | Response |

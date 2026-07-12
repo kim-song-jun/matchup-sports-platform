@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -18,8 +18,10 @@ import {
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
+  DeleteAdminUserDto,
   GrantAdminDto,
   ReplyInquiryDto,
+  UpdateAdminNoticeDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { AdminService } from './admin.service';
@@ -97,6 +99,15 @@ export class AdminController {
     return this.adminService.getUser(user, userId);
   }
 
+  @Delete('users/:userId')
+  deleteUser(
+    @CurrentUser() user: V1AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: DeleteAdminUserDto,
+  ) {
+    return this.adminService.deleteUser(user, userId, dto);
+  }
+
   // ─── Matches ──────────────────────────────────────────────────────────────
 
   @Get('matches')
@@ -131,6 +142,15 @@ export class AdminController {
   @Post('notices')
   createNotice(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminNoticeDto) {
     return this.adminService.createNotice(user, dto);
+  }
+
+  @Patch('notices/:noticeId')
+  updateNotice(
+    @CurrentUser() user: V1AuthUser,
+    @Param('noticeId') noticeId: string,
+    @Body() dto: UpdateAdminNoticeDto,
+  ) {
+    return this.adminService.updateNotice(user, noticeId, dto);
   }
 
   // ─── Inquiries ─────────────────────────────────────────────────────────────

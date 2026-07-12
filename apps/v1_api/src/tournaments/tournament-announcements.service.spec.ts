@@ -66,6 +66,7 @@ describe('TournamentAnnouncementsService', () => {
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentAnnouncement: {
       create: jest.Mock;
+      delete: jest.Mock;
       findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
@@ -81,6 +82,7 @@ describe('TournamentAnnouncementsService', () => {
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentAnnouncement: {
         create: jest.fn(),
+        delete: jest.fn(),
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
@@ -287,6 +289,23 @@ describe('TournamentAnnouncementsService', () => {
     expect(createArgs.data.audience).toBe('all_registered');
   });
 
+  it('create: accepts public audience for logged-out tournament detail visibility', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentAnnouncement.create.mockResolvedValue(
+      announcementRow({ audience: 'public' }),
+    );
+
+    await service.create(ownerAuthUser, 'tournament-1', {
+      title: 'public',
+      body: 'body',
+      audience: 'public',
+    });
+
+    const createArgs = prisma.v1TournamentAnnouncement.create.mock.calls[0][0];
+    expect(createArgs.data.audience).toBe('public');
+  });
+
   it('create: writes audit log with action=tournament_announcement.create', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
@@ -341,6 +360,112 @@ describe('TournamentAnnouncementsService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           action: 'tournament_announcement.publish',
+          targetType: 'tournament_announcement',
+        }),
+      }),
+    );
+  });
+  it('update: support admin cannot mutate', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+    await expect(
+      service.update(supportAuthUser, 'ann-1', { title: 'x', body: 'y' }),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+  });
+
+  it('update: unknown announcementId returns ANNOUNCEMENT_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.update(ownerAuthUser, 'ghost', { title: 'updated', body: 'body' }),
+    ).rejects.toMatchObject({ response: { code: 'ANNOUNCEMENT_NOT_FOUND' } });
+  });
+
+  it('update: edits content and can publish a draft', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(announcementRow());
+    prisma.v1TournamentAnnouncement.update.mockResolvedValue(
+      announcementRow({
+        title: 'updated',
+        body: 'updated body',
+        audience: 'confirmed_only',
+        publishedAt: new Date(),
+      }),
+    );
+
+    const result = await service.update(ownerAuthUser, 'ann-1', {
+      title: 'updated',
+      body: 'updated body',
+      audience: 'confirmed_only',
+      publish: true,
+    });
+
+    expect(result).toMatchObject({
+      id: 'ann-1',
+      title: 'updated',
+      body: 'updated body',
+      audience: 'confirmed_only',
+    });
+    const updateArgs = prisma.v1TournamentAnnouncement.update.mock.calls[0][0];
+    expect(updateArgs.data.publishedAt).toBeInstanceOf(Date);
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'tournament_announcement.update',
+          targetType: 'tournament_announcement',
+        }),
+      }),
+    );
+  });
+
+  it('update: can move a published announcement back to draft', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(
+      announcementRow({ publishedAt: new Date('2026-06-10T00:00:00Z') }),
+    );
+    prisma.v1TournamentAnnouncement.update.mockResolvedValue(
+      announcementRow({ title: 'draft again', body: 'body', publishedAt: null }),
+    );
+
+    await service.update(ownerAuthUser, 'ann-1', {
+      title: 'draft again',
+      body: 'body',
+      publish: false,
+    });
+
+    const updateArgs = prisma.v1TournamentAnnouncement.update.mock.calls[0][0];
+    expect(updateArgs.data.publishedAt).toBeNull();
+  });
+
+  it('remove: unknown announcementId returns ANNOUNCEMENT_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(null);
+
+    await expect(service.remove(ownerAuthUser, 'ghost')).rejects.toMatchObject({
+      response: { code: 'ANNOUNCEMENT_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentAnnouncement.delete).not.toHaveBeenCalled();
+  });
+
+  it('remove: deletes announcement and writes audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(announcementRow());
+    prisma.v1TournamentAnnouncement.delete.mockResolvedValue(announcementRow());
+
+    const result = await service.remove(ownerAuthUser, 'ann-1');
+
+    expect(result).toEqual({
+      id: 'ann-1',
+      tournamentId: 'tournament-1',
+      deleted: true,
+    });
+    expect(prisma.v1TournamentAnnouncement.delete).toHaveBeenCalledWith({
+      where: { id: 'ann-1' },
+    });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'tournament_announcement.delete',
           targetType: 'tournament_announcement',
         }),
       }),

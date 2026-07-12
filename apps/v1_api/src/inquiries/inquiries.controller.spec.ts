@@ -24,9 +24,11 @@ describe('InquiriesController', () => {
       controllers: [InquiriesController],
       providers: [
         { provide: InquiriesService, useValue: inquiriesService },
-        { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
       ],
-    }).compile();
+    })
+      .overrideGuard(V1AuthGuard)
+      .useValue({ canActivate: jest.fn(() => true) })
+      .compile();
     controller = moduleRef.get(InquiriesController);
   });
 

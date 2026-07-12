@@ -24,8 +24,10 @@ import {
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
+  DeleteAdminUserDto,
   GrantAdminDto,
   ReplyInquiryDto,
+  UpdateAdminNoticeDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 
@@ -130,6 +132,89 @@ export class AdminService {
         },
         tx,
       );
+    });
+  }
+
+  async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
+    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
+    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: '운영자 계정은 owner만 삭제할 수 있어요.',
+      });
+    }
+
+    const deletedAt = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1User.update({
+        where: { id: userId },
+        data: {
+          accountStatus: 'deleted',
+          deletedAt,
+          email: target.email ? buildDeletedEmail(userId) : null,
+          phone: target.phone ? buildDeletedPhone(userId) : null,
+          emailVerifiedAt: null,
+          phoneVerifiedAt: null,
+        },
+      });
+      const identities = await tx.v1AuthIdentity.findMany({
+        where: { userId },
+        select: { id: true, provider: true },
+      });
+      await Promise.all(
+        identities.map((identity) =>
+          tx.v1AuthIdentity.update({
+            where: { id: identity.id },
+            data: {
+              status: 'unlinked',
+              providerUserKey: buildDeletedProviderUserKey(userId, identity.id),
+              email: null,
+              passwordHash: null,
+              unlinkedAt: deletedAt,
+            },
+          }),
+        ),
+      );
+      await tx.v1UserProfile.updateMany({
+        where: { userId },
+        data: {
+          nickname: buildDeletedNickname(userId),
+          displayName: '탈퇴 회원',
+          bio: null,
+          profileImageUrl: null,
+          deletedAt,
+        },
+      });
+      const result = await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'user.delete',
+          targetType: 'user',
+          targetId: userId,
+          previousStatus: target.accountStatus,
+          status: updated.accountStatus,
+          reason: dto.reason,
+          beforeState: {
+            accountStatus: target.accountStatus,
+            deletedAt: target.deletedAt?.toISOString() ?? '',
+            hasEmail: target.email ? 'true' : 'false',
+            hasPhone: target.phone ? 'true' : 'false',
+          },
+          afterState: {
+            accountStatus: updated.accountStatus,
+            deletedAt: deletedAt.toISOString(),
+            personalDataMasked: 'true',
+          },
+          responseIdKey: 'userId',
+        },
+        tx,
+      );
+
+      return { ...result, deletedAt };
     });
   }
 
@@ -299,8 +384,13 @@ export class AdminService {
         onboardingStatus: true,
         lastLoginAt: true,
         createdAt: true,
+        deletedAt: true,
         profile: { select: { nickname: true, displayName: true } },
         adminUser: { select: { adminRole: true } },
+        teamMemberships: {
+          where: { status: 'active' },
+          select: { role: true },
+        },
         _count: {
           select: {
             hostedMatches: true,
@@ -327,6 +417,11 @@ export class AdminService {
         hostedMatchCount: row._count.hostedMatches,
         ownedTeamCount: row._count.ownedTeams,
         membershipCount: row._count.teamMemberships,
+        teamRoleCounts: {
+          owner: row.teamMemberships.filter((membership) => membership.role === 'owner').length,
+          manager: row.teamMemberships.filter((membership) => membership.role === 'manager').length,
+          member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
+        },
         adminRole: row.adminUser?.adminRole ?? null,
       })),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
@@ -345,6 +440,7 @@ export class AdminService {
         onboardingStatus: true,
         lastLoginAt: true,
         createdAt: true,
+        deletedAt: true,
         profile: { select: { nickname: true, displayName: true } },
         adminUser: { select: { adminRole: true } },
         reputationSummary: {
@@ -367,6 +463,34 @@ export class AdminService {
           orderBy: { createdAt: 'desc' },
           select: { id: true, name: true, status: true, memberCount: true },
         },
+        teamMemberships: {
+          where: { status: 'active' },
+          orderBy: { joinedAt: 'desc' },
+          select: {
+            id: true,
+            role: true,
+            status: true,
+            joinedAt: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                memberCount: true,
+              },
+            },
+          },
+        },
+        statusLogs: {
+          where: {
+            targetType: 'user',
+            toStatus: 'withdrawal_pending',
+            actorType: 'user',
+          },
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { reason: true, createdAt: true },
+        },
       },
     });
 
@@ -381,9 +505,15 @@ export class AdminService {
       onboardingStatus: row.onboardingStatus,
       lastLoginAt: row.lastLoginAt,
       createdAt: row.createdAt,
+      deletedAt: row.deletedAt,
       hostedMatchCount: row._count.hostedMatches,
       ownedTeamCount: row._count.ownedTeams,
       membershipCount: row._count.teamMemberships,
+      teamRoleCounts: {
+        owner: row.teamMemberships.filter((membership) => membership.role === 'owner').length,
+        manager: row.teamMemberships.filter((membership) => membership.role === 'manager').length,
+        member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
+      },
       adminRole: row.adminUser?.adminRole ?? null,
       reputationSummary: row.reputationSummary
         ? {
@@ -405,6 +535,21 @@ export class AdminService {
         status: t.status,
         memberCount: t.memberCount,
       })),
+      teamMemberships: row.teamMemberships.map((membership) => ({
+        membershipId: membership.id,
+        teamId: membership.team.id,
+        name: membership.team.name,
+        status: membership.team.status,
+        memberCount: membership.team.memberCount,
+        role: membership.role,
+        joinedAt: membership.joinedAt,
+      })),
+      withdrawalRequest: row.statusLogs[0]
+        ? {
+            reason: row.statusLogs[0].reason,
+            requestedAt: row.statusLogs[0].createdAt,
+          }
+        : null,
     };
   }
 
@@ -691,6 +836,64 @@ export class AdminService {
           targetId: notice.id,
           reason: dto.status === 'published' ? '공지 작성 및 발행' : '공지 초안 작성',
           beforeJson: Prisma.JsonNull,
+          afterJson: {
+            noticeId: notice.id,
+            audience: notice.audience,
+            category: notice.category,
+            status: notice.status,
+            pinned: notice.category === '고정',
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return notice;
+    });
+
+    return { notice: this.toAdminNoticeRow(row) };
+  }
+
+  async updateNotice(user: V1AuthUser, noticeId: string, dto: UpdateAdminNoticeDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Notice.findUnique({ where: { id: noticeId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Notice was not found' });
+    }
+
+    const now = new Date();
+    const category = dto.pinned ? '고정' : dto.category === '고정' ? '안내' : dto.category;
+    const statusChanged = existing.status !== dto.status;
+    const publishedAt = dto.status === 'published'
+      ? existing.publishedAt ?? now
+      : null;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const notice = await tx.v1Notice.update({
+        where: { id: noticeId },
+        data: {
+          audience: dto.audience,
+          category,
+          title: dto.title.trim(),
+          body: dto.body.trim(),
+          status: dto.status,
+          publishedAt,
+          archivedAt: null,
+        },
+      });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'notice.update',
+          targetType: 'notice',
+          targetId: notice.id,
+          reason: statusChanged ? `공지 수정 및 상태 변경: ${existing.status} -> ${dto.status}` : '공지 수정',
+          beforeJson: {
+            noticeId: existing.id,
+            audience: existing.audience,
+            category: existing.category,
+            status: existing.status,
+            pinned: existing.category === '고정',
+          } as Prisma.InputJsonValue,
           afterJson: {
             noticeId: notice.id,
             audience: notice.audience,
@@ -1313,4 +1516,20 @@ function getCapabilities(role: ActiveAdmin['adminRole']) {
   if (role === 'owner') return ['overview:read', 'status:write', 'logs:read', 'admin:owner'];
   if (role === 'ops') return ['overview:read', 'status:write', 'logs:read'];
   return ['overview:read', 'logs:read'];
+}
+
+function buildDeletedEmail(userId: string) {
+  return `deleted+${userId}@deleted.teameet.local`;
+}
+
+function buildDeletedPhone(userId: string) {
+  return `deleted-${userId}`;
+}
+
+function buildDeletedProviderUserKey(userId: string, identityId: string) {
+  return `deleted:${userId}:${identityId}`;
+}
+
+function buildDeletedNickname(userId: string) {
+  return `deleted_${userId.slice(0, 8)}`;
 }

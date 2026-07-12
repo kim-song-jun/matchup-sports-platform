@@ -45,6 +45,9 @@ export type V1AuthMe = {
     onboardingStatus: string;
     lastLoginAt?: string | null;
     createdAt?: string;
+    authProvider?: 'email' | 'kakao' | 'naver' | null;
+    authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+    hasPassword?: boolean;
   };
   profile: {
     displayName: string;
@@ -1044,6 +1047,8 @@ export type V1Profile = {
   email: string | null;
   phone?: string | null;
   authProvider: 'email' | 'kakao' | 'naver' | null;
+  authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+  hasPassword?: boolean;
   onboardingStatus?: 'not_started' | 'terms_done' | 'social_terms_required' | 'social_profile_required' | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
   regionName: string | null;
   sports?: Array<{
@@ -1118,6 +1123,7 @@ export type V1Settings = {
     phone: string | null;
     accountStatus: string;
     providers: string[];
+    hasPassword?: boolean;
   };
   profile: {
     displayName: string;
@@ -1246,7 +1252,13 @@ export type V1AdminNoticeCreatePayload = {
   status: Extract<V1AdminNoticeStatus, 'draft' | 'published'>;
 };
 
+export type V1AdminNoticeUpdatePayload = V1AdminNoticeCreatePayload;
+
 export type V1AdminNoticeCreateResult = {
+  notice: V1AdminNoticeRow;
+};
+
+export type V1AdminNoticeUpdateResult = {
   notice: V1AdminNoticeRow;
 };
 
@@ -1297,10 +1309,20 @@ export type V1AdminUserRow = {
   hostedMatchCount: number;
   ownedTeamCount: number;
   membershipCount: number;
+  teamRoleCounts?: {
+    owner: number;
+    manager: number;
+    member: number;
+  };
   adminRole: 'owner' | 'ops' | 'support' | null;
 };
 
 export type V1AdminUserDetail = V1AdminUserRow & {
+  deletedAt: string | null;
+  withdrawalRequest: {
+    reason: string | null;
+    requestedAt: string;
+  } | null;
   reputationSummary: {
     trustState: string;
     mannerScore: string | null;
@@ -1309,6 +1331,19 @@ export type V1AdminUserDetail = V1AdminUserRow & {
   } | null;
   hostedMatches: { matchId: string; title: string; status: string; startAt: string }[];
   ownedTeams: { teamId: string; name: string; status: string; memberCount: number }[];
+  teamMemberships?: {
+    membershipId: string;
+    teamId: string;
+    name: string;
+    status: string;
+    memberCount: number;
+    role: 'owner' | 'manager' | 'member';
+    joinedAt: string | null;
+  }[];
+};
+
+export type V1AdminDeleteUserPayload = {
+  reason: string;
 };
 
 export type V1AdminMatchRow = {
@@ -1458,6 +1493,7 @@ export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 export type V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
+  | 'public'
   | 'all_registered'
   | 'confirmed_only'
   | 'waitlist';
@@ -2060,6 +2096,14 @@ export type V1CreateAnnouncementPayload = {
   body: string;
   audience?: V1AnnouncementAudience;
   publish?: boolean;
+};
+
+export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
+
+export type V1DeleteAnnouncementResult = {
+  id: string;
+  tournamentId: string;
+  deleted: boolean;
 };
 
 export type V1AdminAnnouncementListResult = {

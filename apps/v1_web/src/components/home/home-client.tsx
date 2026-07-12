@@ -390,7 +390,7 @@ function toHomeNotice(notice: V1Notice): HomeNotice {
   return {
     id: notice.noticeId ?? notice.id ?? 'notice',
     title: notice.title,
-    summary: notice.body ?? notice.category ?? notice.audience ?? '공지',
+    summary: notice.category ?? notice.audience ?? '공지',
     trailing: formatDate(notice.publishedAt),
   };
 }

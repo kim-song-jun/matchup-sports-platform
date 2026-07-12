@@ -9,12 +9,12 @@ export class HomeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getHome(user: V1AuthUser | null, query: HomeQueryDto) {
-    const [viewer, summary, recommendations, notice, unreadCount, myTeamRoute] =
+    const [viewer, summary, recommendations, notices, unreadCount, myTeamRoute] =
       await Promise.all([
         this.getViewer(user),
         this.getSummary(user),
         this.getRecommendationItems({ ...query, limit: 5 }),
-        this.getPinnedNotice(),
+        this.getPinnedNotices(),
         this.getUnreadCount(user),
         this.getMyTeamRoute(user),
       ]);
@@ -51,7 +51,8 @@ export class HomeService {
         regionName: item.regionName,
         startsAt: item.startsAt,
       })),
-      notice,
+      notice: notices[0] ? { noticeId: notices[0].noticeId, title: notices[0].title, pinned: true } : null,
+      notices,
       notifications: { unreadCount },
     };
   }
@@ -167,17 +168,25 @@ export class HomeService {
     }));
   }
 
-  private async getPinnedNotice() {
-    const notice = await this.prisma.v1Notice.findFirst({
+  private async getPinnedNotices() {
+    const notices = await this.prisma.v1Notice.findMany({
       where: {
         status: 'published',
         audience: 'public',
+        category: '고정',
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-      select: { id: true, title: true },
+      take: 3,
+      select: { id: true, title: true, body: true, category: true, publishedAt: true },
     });
 
-    return notice ? { noticeId: notice.id, title: notice.title, pinned: true } : null;
+    return notices.map((notice) => ({
+      noticeId: notice.id,
+      title: notice.title,
+      body: notice.body,
+      category: notice.category,
+      publishedAt: notice.publishedAt,
+    }));
   }
 
   private async getUnreadCount(user: V1AuthUser | null) {

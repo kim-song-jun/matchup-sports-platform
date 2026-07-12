@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { V1AuthProvider } from '@prisma/client';
+import { Prisma, V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -79,12 +79,35 @@ export class ProfileService {
     this.assertMutableAccount(user);
     const displayName = dto.displayName.trim();
     const nickname = dto.nickname.trim();
-    const email = normalizeEmail(dto.email);
+    const requestedEmail = dto.email?.trim() ? normalizeEmail(dto.email) : null;
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
 
-    if (!displayName || !nickname || !email) {
+    const before = await this.prisma.v1User.findUnique({
+      where: { id: user.id },
+      select: {
+        email: true,
+        phone: true,
+        authIdentities: {
+          where: { status: 'active' },
+          select: { provider: true, passwordHash: true },
+        },
+        profile: {
+          select: {
+            displayName: true,
+            nickname: true,
+            profileImageUrl: true,
+            birthDate: true,
+          },
+        },
+      },
+    });
+
+    const hasPassword = before?.authIdentities.some((identity) => Boolean(identity.passwordHash)) ?? false;
+    const email = requestedEmail ?? before?.email ?? null;
+
+    if (!displayName || !nickname || (hasPassword && !email)) {
       throw validationError('displayName, nickname, and email are required', 'profile');
     }
 
@@ -93,18 +116,22 @@ export class ProfileService {
     }
 
     const [existingEmail, existingEmailIdentity, existingPhone, existingNickname] = await Promise.all([
-      this.prisma.v1User.findFirst({
-        where: { email, id: { not: user.id } },
-        select: { id: true },
-      }),
-      this.prisma.v1AuthIdentity.findFirst({
-        where: {
-          provider: V1AuthProvider.email,
-          providerUserKey: email,
-          userId: { not: user.id },
-        },
-        select: { id: true },
-      }),
+      email
+        ? this.prisma.v1User.findFirst({
+            where: { email, id: { not: user.id } },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      email
+        ? this.prisma.v1AuthIdentity.findFirst({
+            where: {
+              provider: V1AuthProvider.email,
+              providerUserKey: email,
+              userId: { not: user.id },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
       phone
         ? this.prisma.v1User.findFirst({
             where: { phone, id: { not: user.id } },
@@ -144,12 +171,14 @@ export class ProfileService {
         data: { email, phone },
       });
 
-      await tx.v1AuthIdentity.updateMany({
-        where: { userId: user.id, provider: V1AuthProvider.email, status: 'active' },
-        data: { email, providerUserKey: email },
-      });
+      if (email) {
+        await tx.v1AuthIdentity.updateMany({
+          where: { userId: user.id, provider: V1AuthProvider.email, status: 'active' },
+          data: { email, providerUserKey: email },
+        });
+      }
 
-      return tx.v1UserProfile.upsert({
+      const nextProfile = await tx.v1UserProfile.upsert({
         where: { userId: user.id },
         update: {
           displayName,
@@ -166,6 +195,28 @@ export class ProfileService {
           visibility: 'public',
         },
       });
+
+      await writeUserAuditLog(tx, {
+        userId: user.id,
+        targetType: 'user_profile',
+        reason: `profile.update:${changedFields({
+          email: before?.email ?? null,
+          phone: before?.phone ?? null,
+          displayName: before?.profile?.displayName ?? null,
+          nickname: before?.profile?.nickname ?? null,
+          profileImageUrl: before?.profile?.profileImageUrl ?? null,
+          birthDate: before?.profile?.birthDate ?? null,
+        }, {
+          email,
+          phone,
+          displayName,
+          nickname,
+          profileImageUrl,
+          birthDate,
+        }).join(',') || 'no_change'}`,
+      });
+
+      return nextProfile;
     });
 
     return {
@@ -276,6 +327,7 @@ export class ProfileService {
         phone: snapshot.phone,
         accountStatus: snapshot.accountStatus,
         providers: snapshot.authIdentities.map((identity) => identity.provider),
+        hasPassword: snapshot.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       },
       profile: {
         displayName: snapshot.profile?.displayName ?? snapshot.profile?.nickname ?? '사용자',
@@ -319,6 +371,14 @@ export class ProfileService {
         },
       });
 
+      if (dto.notifications) {
+        await writeUserAuditLog(tx, {
+          userId: user.id,
+          targetType: 'user_notification_settings',
+          reason: `settings.notifications.update:${Object.keys(dto.notifications).sort().join(',') || 'no_change'}`,
+        });
+      }
+
       return [nextProfile, nextPreferences] as const;
     });
 
@@ -349,6 +409,11 @@ export class ProfileService {
         where: { userId_regionId: { userId: user.id, regionId: region.id } },
         update: { isPrimary: true },
         create: { userId: user.id, regionId: region.id, isPrimary: true },
+      });
+      await writeUserAuditLog(tx, {
+        userId: user.id,
+        targetType: 'user_region',
+        reason: 'profile.region.update',
       });
     });
 
@@ -397,6 +462,11 @@ export class ProfileService {
           })),
         });
       }
+      await writeUserAuditLog(tx, {
+        userId: user.id,
+        targetType: 'user_preferences',
+        reason: 'profile.preferences.update',
+      });
     });
 
     const snapshot = await this.getUserSnapshot(user.id);
@@ -466,7 +536,7 @@ export class ProfileService {
           },
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         },
-        authIdentities: { where: { status: 'active' }, select: { provider: true } },
+        authIdentities: { where: { status: 'active' }, select: { provider: true, passwordHash: true } },
       },
     });
     if (!user) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
@@ -573,6 +643,8 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
     email: user.email,
     phone: user.phone,
     authProvider: user.authIdentities[0]?.provider ?? null,
+    authProviders: user.authIdentities.map((identity) => identity.provider),
+    hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
     onboardingStatus: user.onboardingStatus,
     regionName: formatPrimaryRegion(user.regions),
     sports: user.sportPreferences.map((preference) => ({
@@ -660,4 +732,28 @@ function toSettingsNotifications(preferences: {
     noticeEnabled: preferences.noticeEnabled ?? preferences.activityEnabled,
     marketingEnabled: preferences.marketingEnabled,
   };
+}
+
+async function writeUserAuditLog(
+  tx: Prisma.TransactionClient,
+  input: { userId: string; targetType: string; reason: string },
+) {
+  await tx.v1StatusChangeLog.create({
+    data: {
+      targetType: input.targetType,
+      targetId: input.userId,
+      fromStatus: null,
+      toStatus: 'updated',
+      actorType: 'user',
+      actorUserId: input.userId,
+      reason: input.reason,
+    },
+  });
+}
+
+function changedFields(
+  before: Record<string, string | null>,
+  after: Record<string, string | null>,
+) {
+  return Object.keys(after).filter((key) => (before[key] ?? null) !== (after[key] ?? null));
 }

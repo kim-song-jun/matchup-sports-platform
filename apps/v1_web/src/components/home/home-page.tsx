@@ -165,7 +165,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               {model.notices.length > 0 ? (
                 <div style={{ display: 'grid', gap: 8 }}>
                   {model.notices.map((notice) => (
-                    <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
+                    <ListItem key={notice.id} title={notice.title} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
                   ))}
                 </div>
               ) : (

@@ -27,21 +27,22 @@
 
 `SocialProfileDto`:
 
-- Required: `nickname`, `gender`
+- Required: `nickname`
 - Optional fields match `RegisterDto`: `displayName`, `phone`, `birthDate`, `profileImageUrl`
 - `phone` duplicate checks exclude the current pending social user and return `PHONE_CONFLICT` when another account already owns it.
+- Current Kakao signup normally does not call this endpoint after terms. `POST /api/v1/auth/social-terms` auto-creates a default profile and moves the user to sport onboarding. This DTO remains for compatibility with older incomplete social signup states.
 
 `UpdateProfileDto`:
 
 - `displayName: string`, max 40
 - `nickname: string`, min 2, max 40
-- `email: string`, max 320; duplicate email returns `EMAIL_CONFLICT`
+- `email?: string | null`, max 320. Email/password accounts still require an email. Social-only accounts may omit email, and clients must not force email/password controls when `hasPassword=false`.
 - `profileImageUrl?: string | null`
 - Authenticated profile edit uploads selected image files through `POST /api/v1/uploads` first and saves the returned root-relative URL. The edit screen must not persist a local `data:` preview as if it were an uploaded profile image.
 - `phone?: string | null`; when present, 11 digits only; duplicate phone returns `PHONE_CONFLICT`
 - `birthDate?: string | null`; when present, 8 digit `YYYYMMDD` and a valid calendar date
 
-Profile edit UI must keep the same duplicate-check behavior as signup for changed `nickname` and `email`. Unchanged values do not require another duplicate check.
+Profile edit UI must keep the same duplicate-check behavior as signup for changed `nickname`. Changed `email` requires duplicate check only for accounts with `hasPassword=true`; Kakao-only accounts show provider account information and do not expose password/email account controls.
 
 `UpdateSettingsDto`:
 
@@ -75,7 +76,9 @@ Profile edit UI must keep the same duplicate-check behavior as signup for change
 
 - Logout is a server no-op in the current header-auth development model; frontend still clears local v1 session state.
 - Withdrawal request moves the account toward `withdrawal_pending` and writes status evidence. It is not immediate hard delete.
-- Unsupported email/password change controls, if visible, must be disabled or explicitly deferred.
+- `GET /me/profile` returns `authProvider`, `authProviders`, and `hasPassword`. `GET /me/settings.account` returns `providers` and `hasPassword`. Clients use these fields to separate common profile editing from login-method-specific account controls.
+- Profile, notification setting, region, and sport/region preference updates write user-actor evidence to `v1_status_change_logs` with target types such as `user_profile`, `user_notification_settings`, `user_region`, and `user_preferences`. The log reason records changed field names, not raw private values.
+- Unsupported email/password change controls must not be shown as active actions. Kakao-only users see provider account status instead of password change.
 
 Primary tables:
 

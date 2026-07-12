@@ -50,6 +50,7 @@ export class TournamentListQueryDto {
  * publish=true이면 publishedAt=now()로 즉시 공개 처리.
  */
 export const ANNOUNCEMENT_AUDIENCES = [
+  'public',
   'all_registered',
   'confirmed_only',
   'waitlist',
@@ -57,6 +58,24 @@ export const ANNOUNCEMENT_AUDIENCES = [
 export type AnnouncementAudience = (typeof ANNOUNCEMENT_AUDIENCES)[number];
 
 export class CreateAnnouncementDto {
+  @IsString()
+  @MaxLength(200)
+  title!: string;
+
+  @IsString()
+  @MaxLength(10000)
+  body!: string;
+
+  @IsOptional()
+  @IsIn(ANNOUNCEMENT_AUDIENCES)
+  audience?: AnnouncementAudience;
+
+  @IsOptional()
+  @IsBoolean()
+  publish?: boolean;
+}
+
+export class UpdateAnnouncementDto {
   @IsString()
   @MaxLength(200)
   title!: string;

@@ -184,6 +184,8 @@ export class CreateAdminNoticeDto {
   status!: 'draft' | 'published';
 }
 
+export class UpdateAdminNoticeDto extends CreateAdminNoticeDto {}
+
 export class AdminOverviewQueryDto {
   @IsOptional()
   @IsDateString()
@@ -198,6 +200,12 @@ export class ChangeUserStatusDto {
   @IsIn(['active', 'suspended', 'blocked', 'deleted'])
   status!: 'active' | 'suspended' | 'blocked' | 'deleted';
 
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class DeleteAdminUserDto {
   @IsString()
   @MaxLength(500)
   reason!: string;

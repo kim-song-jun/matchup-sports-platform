@@ -236,7 +236,7 @@ export function SignupClient() {
       }
 
       window.sessionStorage.removeItem(onboardingDraftKey);
-      router.replace('/onboarding/sport');
+      router.replace('/signup/complete');
     } catch (nextError) {
       if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
         if (nextError.code === 'NICKNAME_CONFLICT') {

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { V1Inquiry } from '@/types/api';
+import type { V1AdminNoticeCategory, V1Inquiry } from '@/types/api';
 import {
   v1AdminLogsFixture,
   v1AdminNoticesFixture,
@@ -410,6 +410,34 @@ export const v1MswHandlers = [
       createdAt: now,
       updatedAt: now,
     };
+    return ok({ notice });
+  }),
+  http.patch(`${api}/admin/notices/:noticeId`, async ({ params, request }) => {
+    const body = await request.json() as {
+      audience: 'public' | 'users' | 'admins';
+      category: '고정' | '업데이트' | '안내';
+      pinned: boolean;
+      title: string;
+      body: string;
+      status: 'draft' | 'published';
+    };
+    const now = '2026-05-18T11:00:00.000Z';
+    const index = v1AdminNoticesFixture.findIndex((notice) => notice.noticeId === params.noticeId);
+    const previous = index >= 0 ? v1AdminNoticesFixture[index] : v1AdminNoticesFixture[0];
+    const category: V1AdminNoticeCategory = body.pinned ? '고정' : body.category === '고정' ? '안내' : body.category;
+    const notice = {
+      ...previous,
+      audience: body.audience,
+      category,
+      pinned: body.pinned,
+      title: body.title,
+      body: body.body,
+      status: body.status,
+      publishedAt: body.status === 'published' ? previous.publishedAt ?? now : null,
+      archivedAt: null,
+      updatedAt: now,
+    };
+    if (index >= 0) v1AdminNoticesFixture[index] = notice;
     return ok({ notice });
   }),
 ];

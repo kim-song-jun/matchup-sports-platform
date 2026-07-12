@@ -16,6 +16,8 @@ import { hasStoredV1Session } from '@/lib/session-storage';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
+import { parsePrizeRows } from '@/lib/prize-breakdown';
+import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
 import { publicAssetPath } from '@/lib/assets';
 
 const REVIEW_PHOTO_MAX = 3;
@@ -132,30 +134,7 @@ function AwardsPodium({
   );
 }
 
-/* ── 상금 상세 ── */
-function parsePrizeRows(breakdown: string): Array<{ label: string; amount: string }> {
-  return breakdown
-    .split(/[\/·\n]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((s) => {
-      const m = s.match(/^(\S+)\s+(.+)$/);
-      return m ? { label: m[1], amount: m[2] } : { label: s, amount: '' };
-    });
-}
-
-function PrizeRankIcon({ label }: { label: string }) {
-  const size = 20;
-  switch (label) {
-    case '1위': return <Medal size={size} className="tm-medal-gold" strokeWidth={2} />;
-    case '2위': return <Medal size={size} className="tm-medal-silver" strokeWidth={2} />;
-    case '3위': return <Medal size={size} className="tm-medal-bronze" strokeWidth={2} />;
-    case 'MVP': return <Star size={size} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.6} />;
-    case '득점왕': return <Goal size={size} style={{ color: 'var(--blue500)' }} strokeWidth={2} />;
-    case '도움왕': return <Handshake size={size} style={{ color: 'var(--green500)' }} strokeWidth={2} />;
-    default: return <Trophy size={size} className="tm-medal-gold" strokeWidth={2} />;
-  }
-}
+/* ── 상금 상세 — 파서·아이콘은 어드민 미리보기와 공유 (lib/prize-breakdown, prize-rank-icon) ── */
 
 function hasPrizeData(tournament: V1TournamentDetail): boolean {
   return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool);

@@ -21,9 +21,12 @@ import {
   Clock,
   ImagePlus,
   Clapperboard,
+  Trophy,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
+import { parsePrizeRows, serializePrizeRows, PRIZE_LABEL_PRESETS } from '@/lib/prize-breakdown';
+import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
 import {
   useV1AdminTournament,
   useV1MasterSports,
@@ -3050,14 +3053,22 @@ function InfoTab({
 
   const [prizePool, setPrizePool] = useState('');
   const [prizeSummary, setPrizeSummary] = useState('');
-  const [prizeBreakdown, setPrizeBreakdown] = useState('');
+  // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환)
+  const [prizeRows, setPrizeRows] = useState<{ label: string; amountDigits: string }[]>([]);
   const [loaded, setLoaded] = useState(false);
   if (tournament && !loaded) {
     setPrizePool(tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '');
     setPrizeSummary(tournament.prizeSummary ?? '');
-    setPrizeBreakdown(tournament.prizeBreakdown ?? '');
+    setPrizeRows(
+      parsePrizeRows(tournament.prizeBreakdown ?? '').map((r) => ({ label: r.label, amountDigits: onlyDigits(r.amount) })),
+    );
     setLoaded(true);
   }
+
+  const breakdownTotal = prizeRows.reduce((sum, r) => sum + (r.amountDigits ? parseInt(r.amountDigits, 10) : 0), 0);
+  const poolValue = prizePool.trim() !== '' ? parseInt(prizePool, 10) : null;
+  const poolMismatch = breakdownTotal > 0 && poolValue !== null && poolValue !== breakdownTotal;
+  const previewRows = prizeRows.filter((r) => r.label.trim().length > 0);
 
   const handleCoverUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -3093,7 +3104,10 @@ function InfoTab({
       payload.prizePool = Math.floor(n);
     }
     if (prizeSummary.trim()) payload.prizeSummary = prizeSummary.trim();
-    if (prizeBreakdown.trim()) payload.prizeBreakdown = prizeBreakdown.trim();
+    const breakdownText = serializePrizeRows(
+      prizeRows.map((r) => ({ label: r.label, amount: r.amountDigits ? `${formatWithComma(r.amountDigits)}원` : '' })),
+    );
+    if (breakdownText) payload.prizeBreakdown = breakdownText;
     if (Object.keys(payload).length === 0) {
       showToast('변경할 상금 정보를 입력해주세요.', 'error');
       return;
@@ -3203,6 +3217,80 @@ function InfoTab({
             className={inputBoxCls}
           />
         </div>
+
+        {/* 배분 행 편집기 — 저장 시 "1위 600,000원 / …" 텍스트로 직렬화 (공개 파서 호환) */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[12px] text-gray-700">상금 배분</span>
+          {prizeRows.map((row, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="text"
+                list="prize-label-presets"
+                value={row.label}
+                onChange={(e) => setPrizeRows((prev) => prev.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))}
+                disabled={updateTournament.isPending}
+                maxLength={20}
+                placeholder="항목 (예: 1위)"
+                aria-label={`배분 항목 ${i + 1} 이름`}
+                className={inputBoxCls + ' flex-1 min-w-0'}
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatWithComma(row.amountDigits)}
+                onChange={(e) => setPrizeRows((prev) => prev.map((r, j) => (j === i ? { ...r, amountDigits: onlyDigits(e.target.value) } : r)))}
+                disabled={updateTournament.isPending}
+                placeholder="금액 (원)"
+                aria-label={`배분 항목 ${i + 1} 금액`}
+                className={inputBoxCls + ' flex-1 min-w-0 text-right'}
+              />
+              <button
+                type="button"
+                onClick={() => setPrizeRows((prev) => prev.filter((_, j) => j !== i))}
+                disabled={updateTournament.isPending}
+                aria-label={`배분 항목 ${i + 1} 삭제`}
+                className="inline-flex items-center justify-center w-[36px] h-[36px] shrink-0 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                <X size={15} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          <datalist id="prize-label-presets">
+            {PRIZE_LABEL_PRESETS.map((p) => <option key={p} value={p} />)}
+          </datalist>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setPrizeRows((prev) => {
+                const used = new Set(prev.map((r) => r.label));
+                const next = PRIZE_LABEL_PRESETS.find((p) => !used.has(p)) ?? '';
+                return [...prev, { label: next, amountDigits: '' }];
+              })}
+              disabled={updateTournament.isPending || prizeRows.length >= 12}
+              className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              <Plus size={13} aria-hidden="true" /> 항목 추가
+            </button>
+            {breakdownTotal > 0 && (
+              <span className={`text-[12px] ${poolMismatch ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>
+                배분 합계 {formatWithComma(String(breakdownTotal))}원
+                {poolMismatch && ' — 총상금과 달라요'}
+              </span>
+            )}
+            {poolMismatch && (
+              <button
+                type="button"
+                onClick={() => setPrizePool(String(breakdownTotal))}
+                disabled={updateTournament.isPending}
+                className="inline-flex items-center min-h-[36px] px-3 rounded-lg text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                합계를 총상금으로
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-gray-400 m-0">순위·개인상 금액만 입력해요. 트로피 등 비금액 상품은 아래 &quot;상품 및 상금&quot;에 적어주세요.</p>
+        </div>
+
         <div className="flex flex-col gap-1.5">
           <label htmlFor="info-prize-summary" className="text-[12px] text-gray-700">상품 및 상금</label>
           <textarea
@@ -3216,19 +3304,34 @@ function InfoTab({
             className={inputBoxCls}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="info-prize-breakdown" className="text-[12px] text-gray-700">상금 배분</label>
-          <textarea
-            id="info-prize-breakdown"
-            value={prizeBreakdown}
-            onChange={(e) => setPrizeBreakdown(e.target.value)}
-            disabled={updateTournament.isPending}
-            rows={3}
-            maxLength={500}
-            placeholder="예: 1위 600,000원 / 2위 300,000원 / MVP 100,000원"
-            className={inputBoxCls}
-          />
-        </div>
+
+        {/* 공개 "시상·리뷰" 상금 카드와 동일한 렌더의 미리보기 */}
+        {(previewRows.length > 0 || (poolValue !== null && poolValue > 0)) && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] text-gray-700">공개 페이지 미리보기</span>
+            <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
+              {poolValue !== null && poolValue > 0 && (
+                <div className="flex items-center px-4 py-3 bg-blue-50 border-b border-gray-100">
+                  <span className="inline-flex mr-2.5" aria-hidden="true">
+                    <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
+                  </span>
+                  <span className="flex-1 text-[14px] font-bold text-gray-900">총 상금</span>
+                  <span className="text-[18px] font-black text-blue-600 tracking-tight">{formatWithComma(String(poolValue))}원</span>
+                </div>
+              )}
+              {previewRows.map((row, i) => (
+                <div key={i} className={`flex items-center gap-3 px-4 py-2.5 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                  <span className="inline-flex" aria-hidden="true"><PrizeRankIcon label={row.label.trim()} /></span>
+                  <span className="flex-1 text-[13px] font-semibold text-gray-900">{row.label.trim()}</span>
+                  <span className="text-[13px] font-bold text-gray-900 tabular-nums">
+                    {row.amountDigits ? `${formatWithComma(row.amountDigits)}원` : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end">
           <button
             type="button"

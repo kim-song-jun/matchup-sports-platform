@@ -321,13 +321,13 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 12); do
-            if ssh ec2 'curl -fsS http://localhost:8121/api/v1/health | \
+            if ssh ec2 'curl -fsS --connect-timeout 5 --max-time 15 http://localhost:8121/api/v1/health | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        curl -fsS --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/v1/landing 2>/dev/null | \
+                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/v1/landing 2>/dev/null | \
                         grep -qx 200 && \
-                        curl -sSI --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/ 2>/dev/null | \
+                        curl -sSI --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/ 2>/dev/null | \
                         grep -qx 308 && \
-                        curl -sSI --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/api/v1/health 2>/dev/null | \
+                        curl -sSI --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/api/v1/health 2>/dev/null | \
                         grep -qx 308'; then
               echo "Deploy OK"
               exit 0

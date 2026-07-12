@@ -111,12 +111,36 @@ jobs:
       - name: Generate V1 Prisma client
         run: cd apps/v1_api && pnpm prisma generate
 
+      # 마이그레이션 게이트: 빈 DB에 전체 체인 재생 + schema.prisma 드리프트 0 검증.
+      # db push로만 스키마를 바꾸면 여기서 CI가 깨진다 — 반드시 migration 파일 동반.
+      # (2026-07-12 프로덕션 장애 재발 방지: 리뷰 테이블 migration 누락 → deploy 중단)
+      - name: V1 migration replay + drift gate
+        env:
+          PGPASSWORD: teameet_test
+          MIGRATE_URL: postgresql://teameet_test:teameet_test@localhost:5432/v1_migrate_check
+        run: |
+          psql -h localhost -U teameet_test -d teameet_test -c "CREATE DATABASE v1_migrate_check;"
+          cd apps/v1_api
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/prisma migrate deploy
+          ./node_modules/.bin/prisma migrate diff \
+            --from-url "$MIGRATE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+          echo "migration chain OK — empty-DB replay clean, zero schema drift"
+
       - name: V1 unit tests (parallel)
         run: |
           pnpm --filter v1_api test & pid1=$!
           pnpm --filter v1_web test & pid2=$!
           wait $pid1 || exit 1
           wait $pid2 || exit 1
+
+      # Next.js 빌드 캐시 — build check를 가볍게 (incremental compile 재사용)
+      - name: Cache Next.js build cache (v1_web)
+        uses: actions/cache@v4
+        with:
+          path: apps/v1_web/.next/cache
+          key: nextjs-v1web-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            nextjs-v1web-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: V1 build checks (parallel)
         run: |

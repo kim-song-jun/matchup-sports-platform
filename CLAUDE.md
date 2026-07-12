@@ -7,6 +7,13 @@
 - **main 직접 push·머지 절대 금지.** 사용자의 명시적 승인 없이는 main에 어떤 커밋도 넣지 않는다 — PR 머지 버튼(gh pr merge 포함)도 동일하게 금지.
 - **통합 브랜치는 `dev`.** 모든 작업 브랜치와 PR의 base는 `dev`다. 기능의 "완료"는 dev 머지까지를 뜻한다.
 - **dev → main 승격은 사용자 게이트.** main push는 프로덕션 배포(CI deploy)를 트리거하므로, 승격 시점은 항상 사용자가 결정한다.
+- **배포는 사람 승인 게이트.** deploy job은 `environment: production`(required reviewer)로 보호 — main push 후에도 GitHub UI에서 승인해야 빌드·배포가 시작된다.
+
+## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
+
+- **스키마 변경은 반드시 migration 파일 동반.** `prisma db push`로만 dev에 반영하고 migration을 빠뜨리면 prod `migrate deploy`가 깨진다 (실사례: 리뷰 테이블 migration 누락 → 배포 중단·서비스 장애).
+- **CI가 강제한다**: test job의 "V1 migration replay + drift gate"가 ① 빈 DB에 마이그레이션 전체 체인 재생 ② `schema.prisma` 드리프트 0을 검증 — 어느 쪽이 깨져도 CI red.
+- 수동 SQL로 dev에 먼저 적용한 경우: 같은 내용을 **idempotent migration**(IF NOT EXISTS/가드)으로 작성하고 dev에는 `prisma migrate resolve --applied`로 박제한다.
 
 ## Core Engineering Principles
 

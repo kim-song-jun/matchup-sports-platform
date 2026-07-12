@@ -58,6 +58,11 @@ echo "[INFO] Applying v1 deploy database migrations..."
 echo "[INFO] Recovering known failed v1 tournament registration migration if present..."
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260703000000_v1_tournament_registration_team_unique || true"
+echo "[INFO] Recovering known failed v1 review photos migration if present..."
+# 2026-07-12 장애: 리뷰 테이블 생성 마이그레이션 누락으로 20260711180000이 42P01로 실패 기록됨.
+# 누락분은 20260711170000_v1_tournament_reviews_awards로 보충 — 실패 레코드를 롤백 처리해 재적용 가능하게 한다.
+${COMPOSE} -f docker-compose.prod.yml --env-file .env \
+  run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260711180000_v1_tournament_review_photos || true"
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 

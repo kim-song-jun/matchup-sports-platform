@@ -17,7 +17,13 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { publicAssetPath } from '@/lib/assets';
 import { appRoute } from '@/lib/app-route';
 import { formatEntryFee } from '@/lib/date-utils';
-import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod, V1TournamentRegistration } from '@/types/api';
+import type {
+  V1MyTeam,
+  V1TournamentDetail,
+  V1TournamentPaymentMethod,
+  V1TournamentRegistration,
+  V1TournamentRegistrationStatus,
+} from '@/types/api';
 
 /* ── Helpers ── */
 
@@ -35,6 +41,24 @@ const STEPS: Array<{ id: ApplyStep; label: string }> = [
   { id: 'agreements', label: '동의 · 결제 수단' },
   { id: 'payment', label: '결제 안내' },
 ];
+
+/** 위저드로 복원 가능한 단계 (팀 선택은 registration 없이 시작하는 최초 진입점이라 제외). */
+type ResumableApplyStep = Extract<ApplyStep, 'agreements' | 'payment'>;
+
+/**
+ * P1-5: registration.status → 위저드 재진입 시 복원 동작 일반화.
+ * draft → 2단계(동의), awaiting_payment/payment_checking/paid → 3단계(입금 안내) 복원,
+ * confirmed/waitlisted/cancel_requested → 위저드 대신 내 신청 현황으로 리다이렉트,
+ * cancelled → 복원 대상 아님(새로 신청 가능).
+ */
+function resolveRegistrationResumeAction(
+  status: V1TournamentRegistrationStatus,
+): ResumableApplyStep | 'redirect' | null {
+  if (status === 'draft') return 'agreements';
+  if (status === 'awaiting_payment' || status === 'payment_checking' || status === 'paid') return 'payment';
+  if (status === 'confirmed' || status === 'waitlisted' || status === 'cancel_requested') return 'redirect';
+  return null;
+}
 
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
@@ -1467,6 +1491,8 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  // P1-5: 위저드로 되돌릴 수 없는 상태(confirmed 등)를 감지해 /my 로 리다이렉트하는 동안 1단계가 잠깐 보이는 깜빡임 방지
+  const [isRedirectingAway, setIsRedirectingAway] = useState(false);
 
   // P0: 동의·입금자명 입력을 registration 단위로 보존 — 새로고침/이탈 후 재진입 시 복원
   const agreementsDraftKey = registrationId ? `teameet.v1.applyDraft.${registrationId}` : null;
@@ -1516,31 +1542,51 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     if (first) setSelectedTeamId(first.teamId);
   }, [managerTeams, requestedTeamId, selectedTeamId]);
 
+  // P1-5: 위저드 재진입 자동 스킵 일반화 — 매니저 팀이 여럿이어도 진행 중 registration을 우선 복원한다.
+  // 여러 팀에 진행 중 registration이 있으면 가장 최근에 갱신된 것을 복원 대상으로 삼는다.
   useEffect(() => {
     if (requestedTeamId) return;
-    if (registrationId || myRegistrations.length !== 1) return;
-    if (managerTeams.length !== 1) return;
+    if (registrationId) return;
+    if (loadingTeams || loadingMyRegistrations) return;
 
-    const registration = myRegistrations[0];
-    if (registration.status === 'draft') {
-      setRegistrationId(registration.id);
-      setSelectedTeamId(registration.teamId);
-      setStep('agreements');
+    const managerTeamIds = new Set(managerTeams.map((team) => team.teamId));
+    const myManagedRegistrations = myRegistrations
+      .filter((reg) => managerTeamIds.has(reg.teamId))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    const inProgress = myManagedRegistrations.find((reg) => {
+      const action = resolveRegistrationResumeAction(reg.status);
+      return action === 'agreements' || action === 'payment';
+    });
+
+    if (inProgress) {
+      const action = resolveRegistrationResumeAction(inProgress.status) as ResumableApplyStep;
+      setSelectedTeamId(inProgress.teamId);
+      setRegistrationId(inProgress.id);
+      setStep(action);
       setSubmitError(null);
       return;
     }
 
-    if (
-      registration.status === 'awaiting_payment' &&
-      registration.payment?.method === 'bank_transfer' &&
-      registration.payment.status === 'ready'
-    ) {
-      setRegistrationId(registration.id);
-      setSelectedTeamId(registration.teamId);
-      setStep('payment');
-      setSubmitError(null);
+    const needsRedirect = myManagedRegistrations.find(
+      (reg) => resolveRegistrationResumeAction(reg.status) === 'redirect',
+    );
+
+    if (needsRedirect) {
+      setIsRedirectingAway(true);
+      router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${needsRedirect.id}`, pathname));
     }
-  }, [managerTeams.length, myRegistrations, registrationId, requestedTeamId]);
+  }, [
+    loadingMyRegistrations,
+    loadingTeams,
+    managerTeams,
+    myRegistrations,
+    pathname,
+    registrationId,
+    requestedTeamId,
+    router,
+    tournamentId,
+  ]);
 
   useEffect(() => {
     if (!requestedTeamId || loadingTeams || loadingMyRegistrations) return;
@@ -1559,25 +1605,19 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     setSubmitError(null);
 
     if (registration) {
-      if (registration.status === 'draft') {
+      const action = resolveRegistrationResumeAction(registration.status);
+      if (action === 'agreements' || action === 'payment') {
         setRegistrationId(registration.id);
-        setStep('agreements');
+        setStep(action);
         return;
       }
-      if (
-        registration.status === 'awaiting_payment' &&
-        registration.payment?.method === 'bank_transfer' &&
-        registration.payment.status === 'ready'
-      ) {
+      if (action === 'redirect') {
         setRegistrationId(registration.id);
-        setStep('payment');
+        setIsRedirectingAway(true);
+        router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname));
         return;
       }
-      if (registration.status !== 'cancelled') {
-        setRegistrationId(registration.id);
-        window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname));
-        return;
-      }
+      // action === null (cancelled) → 새 신청으로 진행
     }
 
     setRegistrationId(null);
@@ -1589,6 +1629,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     myRegistrations,
     pathname,
     requestedTeamId,
+    router,
     tournamentId,
   ]);
 
@@ -1610,7 +1651,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const isCreating = createRegistration.isPending;
   const isSubmittingApplication = createRegistration.isPending || submitRegistration.isPending;
 
-  if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams)) {
+  if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams) || isRedirectingAway) {
     return (
       <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
         <LoadingSkeleton />
@@ -1659,17 +1700,21 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   async function handleTeamNext() {
     if (!selectedTeamId) return;
-    if (selectedRegistration?.status === 'awaiting_payment' &&
-      selectedRegistration.payment?.method === 'bank_transfer' &&
-      selectedRegistration.payment.status === 'ready') {
-      setRegistrationId(selectedRegistration.id);
-      setStep('payment');
-      setSubmitError(null);
-      return;
-    }
-    if (selectedRegistration && selectedRegistration.status !== 'draft' && selectedRegistration.status !== 'cancelled') {
-      window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${selectedRegistration.id}`, pathname));
-      return;
+    if (selectedRegistration) {
+      const action = resolveRegistrationResumeAction(selectedRegistration.status);
+      if (action === 'agreements' || action === 'payment') {
+        setRegistrationId(selectedRegistration.id);
+        setStep(action);
+        setSubmitError(null);
+        return;
+      }
+      if (action === 'redirect') {
+        setRegistrationId(selectedRegistration.id);
+        setIsRedirectingAway(true);
+        router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${selectedRegistration.id}`, pathname));
+        return;
+      }
+      // action === null (cancelled) → 새 신청으로 진행
     }
     if (registrationId && selectedRegistration?.id === registrationId) {
       setStep('agreements');
@@ -1679,16 +1724,14 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     try {
       const reg = await createRegistration.mutateAsync({ teamId: selectedTeamId });
       setRegistrationId(reg.id);
-      if (reg.status === 'draft') {
-        setStep('agreements');
+      const action = resolveRegistrationResumeAction(reg.status);
+      if (action === 'agreements' || action === 'payment') {
+        setStep(action);
         return;
       }
-      if (
-        reg.status === 'awaiting_payment' &&
-        reg.payment?.method === 'bank_transfer' &&
-        reg.payment.status === 'ready'
-      ) {
-        setStep('payment');
+      if (action === 'redirect') {
+        setIsRedirectingAway(true);
+        router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${reg.id}`, pathname));
         return;
       }
       window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${reg.id}`, pathname));

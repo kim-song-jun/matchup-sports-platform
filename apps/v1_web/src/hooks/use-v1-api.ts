@@ -2059,6 +2059,23 @@ export function useV1CancelRegistrationAdmin() {
   });
 }
 
+/** 취소 요청 거부(잔류) — cancel_requested 상태만 허용, cancelPreviousStatus(없으면 confirmed)로 복원 */
+export function useV1RejectCancelRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ registrationId }: { registrationId: string }) =>
+      v1Patch<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/reject-cancel`,
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
 export function useV1RosterLock() {
   const queryClient = useQueryClient();
   return useMutation({

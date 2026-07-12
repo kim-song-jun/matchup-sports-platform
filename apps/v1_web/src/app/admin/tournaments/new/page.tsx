@@ -146,14 +146,14 @@ function FormField({
 // ── Input class ───────────────────────────────────────────────────────────
 
 const inputCls = [
-  'h-[44px] px-3 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
+  'h-[44px] px-3 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
   'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
 
 const textareaCls = [
-  'px-3 py-2.5 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+  'px-3 py-2.5 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
   'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
@@ -718,7 +718,7 @@ export default function AdminTournamentsNewPage() {
         <div className="max-w-3xl mx-auto flex items-center gap-3 mt-5">
           <Link
             href="/admin/tournaments"
-            className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             취소
           </Link>
@@ -726,7 +726,7 @@ export default function AdminTournamentsNewPage() {
             type="submit"
             disabled={!canSubmit}
             className={[
-              'inline-flex items-center justify-center h-[48px] px-8 rounded-xl text-[var(--font-size-body)] font-semibold transition-colors',
+              'inline-flex items-center justify-center h-[44px] px-8 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed',
             ].join(' ')}

@@ -24,6 +24,8 @@ import {
   Trophy,
   ChevronUp,
   ChevronDown,
+  AlertCircle,
+  Undo2,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
@@ -40,6 +42,7 @@ import {
   useV1ConfirmPayment,
   useV1ConfirmRegistration,
   useV1CancelRegistrationAdmin,
+  useV1RejectCancelRequest,
   useV1RosterLock,
   useV1RosterUnlock,
   useV1ExportRosterCsv,
@@ -134,6 +137,17 @@ const ADMIN_CANCELLABLE = new Set<string>([
   'confirmed',
   'waitlisted',
 ]);
+
+// P1-2: 신청 관리 탭 상태 필터 칩 (기존 STATUS_META 라벨 매핑 재사용)
+const REGISTRATION_STATUS_FILTERS: { value: string; label: string }[] = [
+  { value: 'all', label: '전체' },
+  { value: 'awaiting_payment', label: '입금 대기' },
+  { value: 'payment_checking', label: '입금 확인 중' },
+  { value: 'confirmed', label: '확정' },
+  { value: 'waitlisted', label: '대기' },
+  { value: 'cancel_requested', label: '취소 요청' },
+  { value: 'cancelled', label: '취소' },
+];
 
 // ── Status transition guards ────────────────────────────────────────────────
 
@@ -473,21 +487,39 @@ function ExportCsvButton({
 function RegistrationsTab({
   tournamentId,
   showToast,
+  tournamentTeamCount,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
+  /** 정원(팀 수) — 참가 확정 시 정원 초과 경고에 사용. 로딩 중이면 undefined */
+  tournamentTeamCount?: number;
 }) {
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentRegistrations(tournamentId);
   const confirmPayment = useV1ConfirmPayment();
   const confirmRegistration = useV1ConfirmRegistration();
   const cancelRegistration = useV1CancelRegistrationAdmin();
+  const rejectCancelRequest = useV1RejectCancelRequest();
   const rosterLock = useV1RosterLock();
   const rosterUnlock = useV1RosterUnlock();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
-  const { confirm: confirmCancel, ConfirmModal: CancelConfirmModal } = useConfirm();
+  const { confirm: confirmDialog, ConfirmModal } = useConfirm();
+
+  // P1-2: 상태 필터
+  const [statusFilter, setStatusFilter] = useState('all');
+  // P2-7: 일괄 입금 확인 선택
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
 
   const registrations = data?.items ?? [];
+  const filteredRegistrations =
+    statusFilter === 'all' ? registrations : registrations.filter((r) => r.status === statusFilter);
+  const statusCounts: Record<string, number> = { all: registrations.length };
+  for (const r of registrations) {
+    statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
+  }
+  // 처리 대기 = 입금 확인 중(payment_checking) + 취소 요청(cancel_requested)
+  const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);
 
   const handleConfirmPayment = (reg: V1AdminTournamentRegistration) => {
     confirmPayment.mutate(
@@ -517,13 +549,35 @@ function RegistrationsTab({
     );
   };
 
+  // P1-1: 참가 확정은 정원 정보를 포함한 확인 모달을 경유한다
+  const handleConfirmClick = async (reg: V1AdminTournamentRegistration) => {
+    const confirmedCount = registrations.filter((r) => r.status === 'confirmed').length;
+    const nextCount = confirmedCount + 1;
+    const capacityLine =
+      tournamentTeamCount != null
+        ? `현재 ${confirmedCount}/${tournamentTeamCount}팀 확정 — 이 팀을 확정하면 ${nextCount}/${tournamentTeamCount}팀이 돼요.`
+        : `현재 ${confirmedCount}팀이 확정됐어요.`;
+    const overCapacity = tournamentTeamCount != null && nextCount > tournamentTeamCount;
+    const message = overCapacity
+      ? `${capacityLine} 정원을 초과해요 — 대기 명단(waitlist) 처리될 수 있어요.`
+      : capacityLine;
+    const ok = await confirmDialog({
+      title: '참가 확정',
+      message,
+      confirmLabel: '확정',
+      tone: overCapacity ? 'danger' : 'default',
+    });
+    if (!ok) return;
+    handleConfirm(reg, 'confirm');
+  };
+
   const handleCancel = async (reg: V1AdminTournamentRegistration) => {
     const teamLabel = reg.teamName ? `"${reg.teamName}"` : '이 팀';
     const reasonSuffix =
       reg.status === 'cancel_requested' && reg.cancelReason
         ? ` 팀이 남긴 취소 사유: "${reg.cancelReason}"`
         : '';
-    const ok = await confirmCancel({
+    const ok = await confirmDialog({
       title: '신청 취소',
       message: `${teamLabel}의 신청을 취소할까요? 이 작업은 되돌릴 수 없어요.${reasonSuffix}`,
       confirmLabel: '취소 처리',
@@ -536,6 +590,24 @@ function RegistrationsTab({
         onSuccess: () => showToast('취소했어요.', 'success'),
         onError: (err) =>
           showToast(extractErrorMessage(err, '취소에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  // P1-6: 취소 요청 거부(잔류)
+  const handleRejectCancel = async (reg: V1AdminTournamentRegistration) => {
+    const ok = await confirmDialog({
+      title: '취소 요청 거부',
+      message: '취소 요청을 거부하고 이전 상태로 되돌릴까요? 팀이 남긴 취소 사유는 기록에 남아요.',
+      confirmLabel: '거부하고 되돌리기',
+    });
+    if (!ok) return;
+    rejectCancelRequest.mutate(
+      { registrationId: reg.id },
+      {
+        onSuccess: () => showToast('취소 요청을 거부했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '취소 요청 거부에 실패했어요.'), 'error'),
       },
     );
   };
@@ -562,15 +634,135 @@ function RegistrationsTab({
     );
   };
 
+  // P2-7: payment_checking으로 넘어가기 전(awaiting_payment) 신청만 일괄 입금 확인 대상 —
+  // confirmPayment 훅의 BE 가드가 status=awaiting_payment만 허용한다.
+  const toggleSelected = (registrationId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(registrationId)) next.delete(registrationId);
+      else next.add(registrationId);
+      return next;
+    });
+  };
+
+  const handleBatchConfirmPayment = async () => {
+    const targets = registrations.filter((r) => selectedIds.has(r.id) && r.status === 'awaiting_payment');
+    if (targets.length === 0) return;
+    const ok = await confirmDialog({
+      title: '일괄 입금 확인',
+      message: `선택한 ${targets.length}건을 입금 확인 처리할까요?`,
+      confirmLabel: '입금 확인',
+    });
+    if (!ok) return;
+    setIsBatchProcessing(true);
+    let successCount = 0;
+    try {
+      for (const reg of targets) {
+        try {
+          await confirmPayment.mutateAsync({ registrationId: reg.id });
+          successCount += 1;
+        } catch (err) {
+          const teamLabel = reg.teamName ?? reg.teamId;
+          showToast(extractErrorMessage(err, `${teamLabel} 입금 확인에 실패했어요.`), 'error');
+        }
+      }
+    } finally {
+      setIsBatchProcessing(false);
+      setSelectedIds(new Set());
+    }
+    if (successCount > 0) {
+      showToast(`${successCount}건 입금 확인 완료`, 'success');
+    }
+  };
 
   return (
     <>
+      {/* P1-2: 상태 필터 칩 */}
+      <div className="flex items-center gap-1.5 flex-wrap mb-3" role="group" aria-label="신청 상태 필터">
+        {REGISTRATION_STATUS_FILTERS.map((opt) => {
+          const active = statusFilter === opt.value;
+          const count = statusCounts[opt.value] ?? 0;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setStatusFilter(opt.value)}
+              aria-pressed={active}
+              className={[
+                'inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-full text-[13px] font-medium transition-colors',
+                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                active
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
+              ].join(' ')}
+            >
+              {opt.label}
+              {opt.value !== 'all' && count > 0 && (
+                <span
+                  className={[
+                    'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[11px] font-semibold tabular-nums',
+                    active ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-600',
+                  ].join(' ')}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* P1-2: 처리 대기 주의 배너 */}
+      {pendingReviewCount > 0 && (
+        <div className="mb-3 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5 text-[13px] text-amber-700">
+          <AlertCircle size={14} aria-hidden="true" className="shrink-0" />
+          <span>처리 대기 중인 신청이 {pendingReviewCount}건 있어요.</span>
+        </div>
+      )}
+
+      {/* P2-7: 일괄 처리 바 */}
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
+          <span className="text-[13px] text-blue-700">{selectedIds.size}건 선택됨</span>
+          <button
+            type="button"
+            onClick={() => void handleBatchConfirmPayment()}
+            disabled={isBatchProcessing}
+            className={submitBtnCls}
+          >
+            <Check size={14} aria-hidden="true" />
+            선택 {selectedIds.size}건 입금 확인
+          </button>
+        </div>
+      )}
+
       {/* f8: AdminCardList — registrations as card grid */}
       <AdminCardList<V1AdminTournamentRegistration>
-        rows={registrations}
+        rows={filteredRegistrations}
         keyExtractor={(r) => r.id}
         card={(r) => ({
-          title: r.teamName ?? r.teamId,
+          title: (
+            <span className="inline-flex items-center gap-2 min-w-0">
+              <label
+                className={[
+                  // 시각 크기는 체크박스(18px)만 차지하되 히트 영역은 padding + 상쇄 margin으로 36px+ 확보
+                  'inline-flex items-center justify-center p-2.5 -m-2.5 shrink-0 rounded',
+                  r.status === 'awaiting_payment' ? 'cursor-pointer' : 'invisible pointer-events-none',
+                ].join(' ')}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(r.id)}
+                  onChange={() => toggleSelected(r.id)}
+                  disabled={r.status !== 'awaiting_payment'}
+                  aria-label={`${r.teamName ?? r.teamId} 일괄 선택`}
+                  className="w-[18px] h-[18px] rounded border-gray-300 text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </label>
+              <span className="truncate">{r.teamName ?? r.teamId}</span>
+            </span>
+          ),
           subtitle: r.payment
             ? `${PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · ${PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status} · ${formatCurrency(r.payment.amount)}`
             : undefined,
@@ -627,7 +819,7 @@ function RegistrationsTab({
               {(reg.status === 'payment_checking' || reg.status === 'paid') && (
                 <>
                   <ActionButton
-                    onClick={() => handleConfirm(reg, 'confirm')}
+                    onClick={() => void handleConfirmClick(reg)}
                     disabled={confirmRegistration.isPending}
                     icon={<Check size={13} />}
                     label="확정"
@@ -660,6 +852,15 @@ function RegistrationsTab({
                     tone="gray"
                   />
                 ))}
+              {reg.status === 'cancel_requested' && (
+                <ActionButton
+                  onClick={() => void handleRejectCancel(reg)}
+                  disabled={rejectCancelRequest.isPending}
+                  icon={<Undo2 size={13} />}
+                  label="취소 거부(잔류)"
+                  tone="gray"
+                />
+              )}
               <ActionButton
                 onClick={() => {
                   setRosterRegistration(reg);
@@ -672,7 +873,7 @@ function RegistrationsTab({
               <ExportCsvButton registrationId={reg.id} showToast={showToast} />
               {ADMIN_CANCELLABLE.has(reg.status) && (
                 <ActionButton
-                  onClick={() => handleCancel(reg)}
+                  onClick={() => void handleCancel(reg)}
                   disabled={cancelRegistration.isPending}
                   icon={<X size={13} />}
                   label="취소"
@@ -693,8 +894,8 @@ function RegistrationsTab({
         showToast={showToast}
       />
 
-      {/* 신청 취소 confirm modal */}
-      {CancelConfirmModal}
+      {/* 신청 관리 confirm modal (취소·취소거부·참가확정·일괄처리 공용) */}
+      {ConfirmModal}
     </>
   );
 }
@@ -2253,7 +2454,7 @@ function AnnouncementsTab({
               type="button"
               onClick={resetAnnouncementForm}
               disabled={isSavingAnnouncement}
-              className="min-h-[32px] rounded-lg bg-white px-3 font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center min-h-[36px] rounded-lg bg-white px-3 font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               취소
             </button>
@@ -2962,7 +3163,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         hidden={activeTab !== 'registrations'}
       >
         {activeTab === 'registrations' && (
-          <RegistrationsTab tournamentId={id} showToast={showToast} />
+          <RegistrationsTab
+            tournamentId={id}
+            showToast={showToast}
+            tournamentTeamCount={tournament?.teamCount}
+          />
         )}
       </div>
 
@@ -3495,7 +3700,7 @@ function InfoTab({
     return <div className="p-4 text-[13px] text-gray-500">대회 정보를 불러오는 중이에요…</div>;
   }
 
-  const inputBoxCls = 'w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400';
+  const inputBoxCls = 'w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400';
 
   return (
     <div className="p-4 flex flex-col gap-4">
@@ -3505,8 +3710,8 @@ function InfoTab({
           <p className="text-[12px] text-gray-500 mt-0.5">대회 요약을 확인하고 상금·시상 정보를 수정하세요.</p>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={onOpenBasicEdit} className="text-[12px] text-blue-600 font-semibold px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50">기본 정보 수정</button>
-          <button type="button" onClick={onOpenPromoEdit} className="text-[12px] text-gray-600 font-semibold px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">프로모 설정</button>
+          <button type="button" onClick={onOpenBasicEdit} className="inline-flex items-center text-xs text-blue-600 font-semibold px-3 min-h-[36px] rounded-lg border border-blue-200 hover:bg-blue-50">기본 정보 수정</button>
+          <button type="button" onClick={onOpenPromoEdit} className="inline-flex items-center text-xs text-gray-600 font-semibold px-3 min-h-[36px] rounded-lg border border-gray-200 hover:bg-gray-50">프로모 설정</button>
         </div>
       </div>
 
@@ -3553,7 +3758,7 @@ function InfoTab({
               type="button"
               onClick={() => coverInputRef.current?.click()}
               disabled={uploadImages.isPending || updateTournament.isPending}
-              className="text-[12px] text-blue-600 font-semibold px-3 py-2 min-h-[40px] rounded-lg border border-blue-200 hover:bg-blue-50 disabled:opacity-50"
+              className="text-xs text-blue-600 font-semibold px-3 py-2 min-h-[40px] rounded-lg border border-blue-200 hover:bg-blue-50 disabled:opacity-50"
             >
               {uploadImages.isPending ? '업로드 중…' : tournament.coverImageUrl ? '이미지 변경' : '이미지 업로드'}
             </button>
@@ -3562,7 +3767,7 @@ function InfoTab({
                 type="button"
                 onClick={handleCoverRemove}
                 disabled={updateTournament.isPending}
-                className="text-[12px] text-gray-500 font-semibold px-3 py-2 min-h-[40px] rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+                className="text-xs text-gray-500 font-semibold px-3 py-2 min-h-[40px] rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
               >
                 이미지 제거
               </button>
@@ -3710,7 +3915,7 @@ function InfoTab({
             type="button"
             onClick={handlePrizeSave}
             disabled={updateTournament.isPending}
-            className="text-[13px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded-lg min-h-[40px]"
+            className="inline-flex items-center justify-center text-[13px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 h-[44px] rounded-xl"
           >
             {updateTournament.isPending ? '저장 중…' : '상금 정보 저장'}
           </button>
@@ -3804,7 +4009,7 @@ function AwardsTab({
           <h3 className="text-[15px] font-bold text-gray-900">개인 어워드</h3>
           <p className="text-[12px] text-gray-500 mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시돼요.</p>
         </div>
-        <button type="button" onClick={addRow} className="text-[12px] text-blue-600 font-semibold px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50">+ 항목 추가</button>
+        <button type="button" onClick={addRow} className="inline-flex items-center text-xs text-blue-600 font-semibold px-3 min-h-[36px] rounded-lg border border-blue-200 hover:bg-blue-50">+ 항목 추가</button>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -3816,7 +4021,7 @@ function AwardsTab({
                 value={row.awardLabel}
                 onChange={(e) => update(idx, 'awardLabel', e.target.value)}
                 placeholder="어워드명 (예: MVP)"
-                className="flex-1 text-[13px] font-semibold border-0 bg-gray-50 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="flex-1 text-[13px] font-semibold border-0 bg-gray-50 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
               <button type="button" onClick={() => removeRow(idx)} className="text-gray-400 hover:text-red-500 p-1 inline-flex" aria-label="항목 삭제"><X size={16} /></button>
             </div>
@@ -3828,7 +4033,7 @@ function AwardsTab({
                   value={row.recipientName}
                   onChange={(e) => update(idx, 'recipientName', e.target.value)}
                   placeholder="홍길동"
-                  className="w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
               <div>
@@ -3838,7 +4043,7 @@ function AwardsTab({
                   value={row.teamName}
                   onChange={(e) => update(idx, 'teamName', e.target.value)}
                   placeholder="팀명"
-                  className="w-full text-[13px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
             </div>
@@ -3849,7 +4054,7 @@ function AwardsTab({
                   value={row.note}
                   onChange={(e) => update(idx, 'note', e.target.value)}
                   placeholder="비고 (선택, 예: 3골 1어시스트)"
-                  className="w-full text-[12px] border border-gray-100 rounded-lg px-3 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full text-xs border border-gray-100 rounded-xl px-3 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
               </div>
             )}
@@ -3862,7 +4067,7 @@ function AwardsTab({
           type="button"
           onClick={handleSave}
           disabled={setAwards.isPending}
-          className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl text-[14px] disabled:opacity-50 hover:bg-blue-700 transition-colors"
+          className="w-full h-[44px] inline-flex items-center justify-center bg-blue-600 text-white font-semibold rounded-xl text-[13px] disabled:opacity-50 hover:bg-blue-700 transition-colors"
         >
           {setAwards.isPending ? '저장 중...' : '어워드 저장'}
         </button>

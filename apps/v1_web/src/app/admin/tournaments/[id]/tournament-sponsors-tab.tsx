@@ -149,7 +149,7 @@ export function TournamentSponsorsTab({
                   type="button"
                   onClick={() => startEdit(sponsor)}
                   className={[
-                    'min-h-[36px] rounded-lg bg-gray-100 px-3 text-xs font-semibold text-gray-700',
+                    'min-h-[44px] rounded-lg bg-gray-100 px-3 text-xs font-semibold text-gray-700',
                     'transition-colors hover:bg-gray-200',
                   ].join(' ')}
                 >
@@ -161,7 +161,7 @@ export function TournamentSponsorsTab({
                     onClick={() => handleDeactivate(sponsor)}
                     disabled={deactivateSponsor.isPending}
                     className={[
-                      'min-h-[36px] rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-600',
+                      'min-h-[44px] rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-600',
                       'transition-colors hover:bg-red-100 disabled:opacity-50',
                     ].join(' ')}
                   >

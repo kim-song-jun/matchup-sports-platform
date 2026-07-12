@@ -46,7 +46,7 @@ type PrismaTx = Omit<
 export class ReviewsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tournamentFixtureReviews: TournamentFixtureReviewsService = new TournamentFixtureReviewsService(prisma),
+    private readonly tournamentFixtureReviews: TournamentFixtureReviewsService,
   ) {}
 
   async list(user: V1AuthUser, query: ListReviewsQueryDto) {

@@ -51,7 +51,13 @@ describe('ReviewsService', () => {
         },
       })),
     };
-    const service = new ReviewsService(prisma as never);
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
 
     await expect(service.submit(user, {
       sourceType: 'match',

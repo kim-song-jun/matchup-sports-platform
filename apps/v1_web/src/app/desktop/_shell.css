@@ -405,6 +405,9 @@
   }
 
   .tm-desktop-footer-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px; /* WCAG 터치 타깃 — 시각 밀도는 gap으로 유지 */
     font-size: 13px;
     color: var(--grey600);
     text-decoration: none;

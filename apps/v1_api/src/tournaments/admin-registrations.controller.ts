@@ -18,6 +18,7 @@ import { AdminRegistrationsService } from './admin-registrations.service';
  * PATCH /admin/registrations/:registrationId/confirm-payment  입금 확인 시작
  * PATCH /admin/registrations/:registrationId/confirm          참가 확정/대기
  * PATCH /admin/registrations/:registrationId/cancel           취소 처리
+ * PATCH /admin/registrations/:registrationId/reject-cancel    취소 요청 거부(잔류)
  * POST  /admin/registrations/:registrationId/roster-lock      명단 잠금
  * DELETE /admin/registrations/:registrationId/roster-lock     명단 잠금 해제
  */
@@ -83,6 +84,20 @@ export class AdminRegistrationsController {
     @Body() dto: AdminCancelRegistrationDto,
   ) {
     return this.adminRegistrationsService.cancel(user, registrationId, dto);
+  }
+
+  /**
+   * PATCH /admin/registrations/:registrationId/reject-cancel
+   * 취소 요청 거부(잔류). 팀이 취소 요청 상태(cancel_requested)로 남긴 신청을
+   * cancelPreviousStatus(없으면 confirmed)로 되돌린다. cancelReason은 감사 추적을 위해 유지.
+   * 가드: registration.status === 'cancel_requested'.
+   */
+  @Patch('admin/registrations/:registrationId/reject-cancel')
+  rejectCancelRequest(
+    @CurrentUser() user: V1AuthUser,
+    @Param('registrationId') registrationId: string,
+  ) {
+    return this.adminRegistrationsService.rejectCancelRequest(user, registrationId);
   }
 
   /**

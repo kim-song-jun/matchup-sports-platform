@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { v1Post } from '@/lib/api-client';
 import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice, V1ResolveLocationResponse } from '@/types/api';
+import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
 import type { HomeChatRoom, HomeMatchCard, HomeNotice, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
@@ -20,37 +21,43 @@ export function HomePageClient() {
 
   if (query.isError) {
     return (
-      <HomePageView
-        model={{
-          ...nonDataFallback,
-          network: true,
-          hasNewNotification: false,
-          chatUnreadCount,
-          chatStatus,
-          chatRooms: chatRoomSummaries,
-          weather: weather ?? fallback.weather,
-          weatherRefreshing,
-          refreshWeather,
-          retry: () => void query.refetch(),
-        }}
-      />
+      <>
+        <PendingTournamentReviewModal />
+        <HomePageView
+          model={{
+            ...nonDataFallback,
+            network: true,
+            hasNewNotification: false,
+            chatUnreadCount,
+            chatStatus,
+            chatRooms: chatRoomSummaries,
+            weather: weather ?? fallback.weather,
+            weatherRefreshing,
+            refreshWeather,
+            retry: () => void query.refetch(),
+          }}
+        />
+      </>
     );
   }
 
   return (
-    <HomePageView
-      model={
-        query.data
-          ? {
-              ...toHomeModel(query.data, fallback, () => void query.refetch(), chatUnreadCount, weather),
-              chatStatus,
-              chatRooms: chatRoomSummaries,
-              weatherRefreshing,
-              refreshWeather,
-            }
-          : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
-      }
-    />
+    <>
+      <PendingTournamentReviewModal />
+      <HomePageView
+        model={
+          query.data
+            ? {
+                ...toHomeModel(query.data, fallback, () => void query.refetch(), chatUnreadCount, weather),
+                chatStatus,
+                chatRooms: chatRoomSummaries,
+                weatherRefreshing,
+                refreshWeather,
+              }
+            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
+        }
+      />
+    </>
   );
 }
 

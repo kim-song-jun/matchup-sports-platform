@@ -1,7 +1,7 @@
 'use client';
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Delete, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   ApiEnvelope,
@@ -103,6 +103,10 @@ import type {
   V1UploadImagesResult,
   V1TournamentListPage,
   V1TournamentDetail,
+  V1PendingTournamentReview,
+  V1TournamentReview,
+  V1TournamentReviewsPage,
+  V1TournamentAward,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
   V1TournamentPlayer,
@@ -136,6 +140,7 @@ import type {
   V1CreateGroupPayload,
   V1CreateGroupTeamPayload,
   V1CreateFixturePayload,
+  V1UpdateFixturePayload,
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
   V1DeleteAnnouncementResult,
@@ -1275,6 +1280,59 @@ export function useV1UploadImages() {
   });
 }
 
+/**
+ * 진행률 콜백이 필요한 대용량 업로드용 XHR 멀티파트 (fetch는 업로드 진행 이벤트가 없다).
+ * 응답 파싱·에러 규약은 v1MultipartPost와 동일하게 맞춘다.
+ */
+function v1MultipartUploadWithProgress<T>(
+  path: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${getV1ApiBaseUrl()}${path}`);
+    xhr.withCredentials = true;
+    for (const [k, v] of Object.entries(getV1DevAuthHeaders())) xhr.setRequestHeader(k, v);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onerror = () =>
+      reject(new V1ApiError({ status: 'error', statusCode: 0, code: 'NETWORK_OR_PARSE_ERROR', message: '업로드에 실패했어요.', timestamp: new Date().toISOString() }));
+    xhr.onload = () => {
+      let body: ApiEnvelope<T> | ApiErrorBody | null = null;
+      try { body = JSON.parse(xhr.responseText); } catch { body = null; }
+      const isError =
+        xhr.status < 200 || xhr.status >= 300 ||
+        (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error');
+      if (isError) {
+        reject(new V1ApiError(
+          (body as ApiErrorBody) ?? { status: 'error', statusCode: xhr.status, code: 'NETWORK_OR_PARSE_ERROR', message: xhr.statusText || '업로드에 실패했어요.', timestamp: new Date().toISOString() },
+        ));
+        return;
+      }
+      resolve((body as ApiEnvelope<T>).data);
+    };
+    xhr.send(formData);
+  });
+}
+
+/**
+ * 경기 영상 파일 업로드 mutation (1개, 최대 200MB, mp4/webm/mov).
+ * BE 계약: POST /api/v1/uploads/videos — field 'files', 응답 { urls: string[] }.
+ * 응답 url(/uploads/*.mp4)은 정적 서빙이 Range 요청을 지원해 <video>에서 바로 스트리밍된다.
+ * 200MB 대용량이라 onProgress로 업로드 진행률(%)을 노출한다.
+ */
+export function useV1UploadVideo() {
+  return useMutation({
+    mutationFn: ({ file, onProgress }: { file: File; onProgress?: (percent: number) => void }) => {
+      const formData = new FormData();
+      formData.append('files', file);
+      return v1MultipartUploadWithProgress<V1UploadImagesResult>('/uploads/videos', formData, onProgress);
+    },
+  });
+}
+
 export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
@@ -1562,6 +1620,82 @@ export function useV1Tournament(id: string) {
     queryKey: v1Keys.tournament(id),
     queryFn: () => v1Get<V1TournamentDetail>(`/tournaments/${id}`),
     enabled: !!id,
+  });
+}
+
+/** 대회 리뷰 목록 (tournaments/:id에 이미 포함되지만 독립 조회용) */
+export function useV1TournamentReviews(
+  tournamentId: string,
+  params?: { page?: number; pageSize?: number; search?: string },
+) {
+  const page = params?.page ?? 1;
+  const pageSize = params?.pageSize ?? 10;
+  const search = params?.search?.trim() || undefined;
+  return useQuery({
+    queryKey: ['tournament-reviews', tournamentId, page, pageSize, search ?? ''],
+    queryFn: () =>
+      v1Get<V1TournamentReviewsPage>(`/tournaments/${tournamentId}/reviews`, {
+        page,
+        pageSize,
+        ...(search ? { search } : {}),
+      }),
+    enabled: !!tournamentId,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** 내 리뷰 조회 (이미 작성했는지 확인) */
+export function useV1MyTournamentReview(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-reviews-me', tournamentId],
+    queryFn: () => v1Get<V1TournamentReview | null>(`/tournaments/${tournamentId}/reviews/me`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 참가 확정했지만 아직 리뷰를 작성하지 않은 종료 대회 목록 (최근 종료순) */
+export function useV1PendingTournamentReviews(enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-reviews-pending'],
+    queryFn: () => v1Get<V1PendingTournamentReview[]>('/tournaments/me/pending-reviews'),
+    enabled,
+  });
+}
+
+/** 참가팀 여부 확인 */
+export function useV1TournamentParticipantCheck(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-participant-check', tournamentId],
+    queryFn: () => v1Get<{ isParticipant: boolean }>(`/tournaments/${tournamentId}/participant-check`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 리뷰 제출 */
+export function useV1SubmitTournamentReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[] }) =>
+      v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews', tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews-me', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 어워드 설정 */
+export function useV1SetTournamentAwards(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (awards: {
+      awardType: string; awardLabel: string; recipientName: string;
+      teamName?: string; note?: string; sortOrder?: number;
+    }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
   });
 }
 
@@ -1925,6 +2059,23 @@ export function useV1CancelRegistrationAdmin() {
   });
 }
 
+/** 취소 요청 거부(잔류) — cancel_requested 상태만 허용, cancelPreviousStatus(없으면 confirmed)로 복원 */
+export function useV1RejectCancelRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ registrationId }: { registrationId: string }) =>
+      v1Patch<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/reject-cancel`,
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
 export function useV1RosterLock() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2031,6 +2182,74 @@ export function useV1CreateFixture(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+    },
+  });
+}
+
+/** 경기 일정·장소·대진 수정 (`PATCH /admin/fixtures/:id`) — 결과 있는 경기의 팀 변경은 409 FIXTURE_HAS_RESULT */
+export function useV1UpdateFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fixtureId, ...body }: { fixtureId: string } & V1UpdateFixturePayload) =>
+      v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 경기 삭제 (`DELETE /admin/fixtures/:id`) — 결과 있으면 409 */
+export function useV1DeleteFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 결과 삭제(오입력 복구, `DELETE /admin/fixtures/:id/result`) — 경기 상태 scheduled 복귀 */
+export function useV1DeleteFixtureResult(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}/result`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 이름·진출 팀 수 수정 (`PATCH /admin/groups/:id`) */
+export function useV1UpdateGroup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, ...body }: { groupId: string; name?: string; advanceCount?: number }) =>
+      v1Patch<V1AdminBracketGroup>(`/admin/groups/${groupId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 삭제 (`DELETE /admin/groups/:id`) — 팀 배정·경기 있으면 409 */
+export function useV1DeleteGroup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (groupId: string) => v1Delete<{ deleted: boolean }>(`/admin/groups/${groupId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 팀 배정 해제 (`DELETE /admin/group-teams/:id`) — 해당 순위 행도 정리 */
+export function useV1RemoveGroupTeam(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (groupTeamId: string) => v1Delete<{ deleted: boolean }>(`/admin/group-teams/${groupTeamId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
     },
   });
 }

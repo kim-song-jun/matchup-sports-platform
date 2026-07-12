@@ -114,6 +114,7 @@ function fixtureRow(overrides: Record<string, unknown> = {}) {
     parentFixtureId: null,
     homeRegistrationId: 'reg-1',
     awayRegistrationId: 'reg-2',
+    videos: [],
     scheduledAt: null,
     venue: null,
     status: 'scheduled',
@@ -158,6 +159,7 @@ describe('TournamentBracketService', () => {
       update: jest.Mock;
     };
     v1TournamentFixtureResult: { upsert: jest.Mock };
+    v1TournamentFixtureVideo: { findMany: jest.Mock; deleteMany: jest.Mock; createMany: jest.Mock };
     v1TournamentStanding: { upsert: jest.Mock; findMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
@@ -178,6 +180,11 @@ describe('TournamentBracketService', () => {
         update: jest.fn(),
       },
       v1TournamentFixtureResult: { upsert: jest.fn() },
+      v1TournamentFixtureVideo: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       v1TournamentStanding: { upsert: jest.fn(), findMany: jest.fn() },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Check } from 'lucide-react';
 import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
+import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TournamentFormat } from '@/types/api';
 import {
@@ -145,14 +146,14 @@ function FormField({
 // ── Input class ───────────────────────────────────────────────────────────
 
 const inputCls = [
-  'h-[44px] px-3 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
+  'h-[44px] px-3 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
   'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
 
 const textareaCls = [
-  'px-3 py-2.5 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+  'px-3 py-2.5 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
   'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
@@ -246,6 +247,7 @@ export default function AdminTournamentsNewPage() {
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
   const [bankHolder, setBankHolder] = useState('');
+  const [prizePool, setPrizePool] = useState('');
   const [prizeSummary, setPrizeSummary] = useState('');
   const [prizeBreakdown, setPrizeBreakdown] = useState('');
   const [rulesText, setRulesText] = useState('');
@@ -319,6 +321,9 @@ export default function AdminTournamentsNewPage() {
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
         entryFee: parseInt(entryFee || '0', 10),
+        ...(prizePool.trim() && !Number.isNaN(parseInt(prizePool, 10))
+          ? { prizePool: parseInt(prizePool, 10) }
+          : {}),
         ...(prizeSummary.trim() ? { prizeSummary: prizeSummary.trim() } : {}),
         ...(prizeBreakdown.trim() ? { prizeBreakdown: prizeBreakdown.trim() } : {}),
         ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
@@ -344,7 +349,7 @@ export default function AdminTournamentsNewPage() {
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 min-h-[44px] text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -571,17 +576,33 @@ export default function AdminTournamentsNewPage() {
                 <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">
                   <input
                     id="entry-fee"
-                    type="number"
-                    min="0"
-                    step="1000"
-                    value={entryFee}
-                    onChange={(e) => setEntryFee(e.target.value)}
+                    type="text"
+                    value={formatWithComma(entryFee)}
+                    onChange={(e) => setEntryFee(onlyDigits(e.target.value))}
                     disabled={isPending}
                     placeholder="0"
                     className={inputCls}
                   />
                 </FormField>
               </div>
+
+              {/* 총상금 — 숫자 */}
+              <FormField
+                id="prize-pool"
+                label="총상금 (원)"
+                hint="시상·리뷰 페이지의 '총 상금' 카드에 표시돼요"
+              >
+                <input
+                  id="prize-pool"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatWithComma(prizePool)}
+                  onChange={(e) => setPrizePool(onlyDigits(e.target.value))}
+                  disabled={isPending}
+                  placeholder="예: 1000000"
+                  className={inputCls}
+                />
+              </FormField>
 
               {/* 상품 및 상금 안내 — 전체 너비 */}
               <FormField
@@ -697,7 +718,7 @@ export default function AdminTournamentsNewPage() {
         <div className="max-w-3xl mx-auto flex items-center gap-3 mt-5">
           <Link
             href="/admin/tournaments"
-            className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             취소
           </Link>
@@ -705,7 +726,7 @@ export default function AdminTournamentsNewPage() {
             type="submit"
             disabled={!canSubmit}
             className={[
-              'inline-flex items-center justify-center h-[48px] px-8 rounded-xl text-[var(--font-size-body)] font-semibold transition-colors',
+              'inline-flex items-center justify-center h-[44px] px-8 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed',
             ].join(' ')}

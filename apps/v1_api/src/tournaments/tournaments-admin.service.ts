@@ -111,6 +111,7 @@ export class TournamentsAdminService {
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           venue: dto.venue ?? null,
+          coverImageUrl: dto.coverImageUrl ?? null,
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
@@ -190,7 +191,16 @@ export class TournamentsAdminService {
         : existing.scheduledEndAt;
     this.assertScheduleRange(nextScheduledAt, nextScheduledEndAt);
 
+    // 종목 변경: 존재하는 종목인지 검증 후 relation 연결
+    if (dto.sportId !== undefined && dto.sportId !== existing.sportId) {
+      const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
+      if (!sport) {
+        throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
+      }
+    }
+
     const data: Prisma.V1TournamentUpdateInput = {};
+    if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.format !== undefined) data.format = dto.format;
     if (dto.registrationDeadlineAt !== undefined) {
@@ -199,6 +209,7 @@ export class TournamentsAdminService {
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
     if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
     if (dto.venue !== undefined) data.venue = dto.venue;
+    if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
     if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
@@ -322,6 +333,7 @@ export class TournamentsAdminService {
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      coverImageUrl: row.coverImageUrl,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,

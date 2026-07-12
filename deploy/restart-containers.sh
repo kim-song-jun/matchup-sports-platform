@@ -50,8 +50,6 @@ echo "[INFO] Recovering known failed v1 review photos migration if present..."
 # 누락분은 20260711170000_v1_tournament_reviews_awards로 보충 — 실패 레코드를 롤백 처리해 재적용 가능하게 한다.
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260711180000_v1_tournament_review_photos || true"
-${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-  run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
 echo "[INFO] Recreating v1_api, v1_web, nginx only (keeping v1_postgres running)..."
 echo "[INFO] Syncing v1 deploy database schema..."

@@ -2,9 +2,9 @@ name: CI / Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
     inputs:
       reset_db:
@@ -18,9 +18,13 @@ on:
         default: false
         type: boolean
 
+# PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
+# - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
+# - main push · workflow_dispatch: 취소 없이 직렬 큐
+# 프로덕션 배포 직렬화는 deploy job의 job-level concurrency가 담당
 concurrency:
-  group: deploy-production
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ── Test job: runs on every push and PR ─────────────────────────────────────
@@ -129,6 +133,13 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # 수동 승인 게이트: production environment의 required reviewer가
+    # GitHub UI에서 승인해야 배포가 시작된다 (main push 자동 배포 제거)
+    environment: production
+    # 프로덕션 배포 직렬화: 진행 중 배포는 취소하지 않고 뒤에 큐잉
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4

@@ -65,11 +65,15 @@ function awardRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** confirmed 등록 1건 — 팀 '레알마드리드', 로스터: 김철수·이영희 */
+/** confirmed 등록 2건 — '레알마드리드'(김철수·이영희), '바르셀로나'(박지성) */
 const confirmedRegistrationRows = [
   {
     team: { name: '레알마드리드' },
     players: [{ realName: '김철수' }, { realName: '이영희' }],
+  },
+  {
+    team: { name: '바르셀로나' },
+    players: [{ realName: '박지성' }],
   },
 ];
 
@@ -205,6 +209,26 @@ describe('TournamentReviewsService — awards admin gate', () => {
         }),
       }),
     );
+  });
+
+  it('setAwards: 다른 팀 소속 수상자 + 팀명 조합 → 400, DB 무변경 (교차 검증)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+
+    await expect(
+      service.setAwards(ownerAuthUser, 'tournament-1', {
+        awards: [
+          {
+            awardType: 'mvp',
+            awardLabel: 'MVP',
+            recipientName: '김철수', // 레알마드리드 소속
+            teamName: '바르셀로나', // 다른 참가 팀
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'AWARD_RECIPIENT_NOT_IN_ROSTER' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('setAwards: 공백 섞인 수상자·팀명은 trim된 값으로 검증·저장된다', async () => {

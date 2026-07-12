@@ -325,7 +325,14 @@ export class TournamentReviewsService {
       const rosterNames = new Set(
         registrations.flatMap((r) => r.players.map((p) => p.realName.trim())),
       );
-      const registeredTeamNames = new Set(registrations.map((r) => r.team.name.trim()));
+      // 팀명 → 그 팀의 선수 집합 (팀명 지정 시 수상자-팀 소속 교차 검증용)
+      const teamRosters = new Map<string, Set<string>>();
+      for (const r of registrations) {
+        const teamName = r.team.name.trim();
+        const roster = teamRosters.get(teamName) ?? new Set<string>();
+        for (const p of r.players) roster.add(p.realName.trim());
+        teamRosters.set(teamName, roster);
+      }
 
       for (const a of awards) {
         if (!rosterNames.has(a.recipientName)) {
@@ -334,11 +341,20 @@ export class TournamentReviewsService {
             message: `'${a.recipientName}'은(는) 대회 참가 명단에 없어요. 명단에서 수상자를 선택해 주세요.`,
           });
         }
-        if (a.teamName && !registeredTeamNames.has(a.teamName)) {
-          throw new BadRequestException({
-            code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-            message: `'${a.teamName}'은(는) 대회에 참가 확정된 팀이 아니에요. 참가 팀에서 선택해 주세요.`,
-          });
+        if (a.teamName) {
+          const teamRoster = teamRosters.get(a.teamName);
+          if (!teamRoster) {
+            throw new BadRequestException({
+              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
+              message: `'${a.teamName}'은(는) 대회에 참가 확정된 팀이 아니에요. 참가 팀에서 선택해 주세요.`,
+            });
+          }
+          if (!teamRoster.has(a.recipientName)) {
+            throw new BadRequestException({
+              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
+              message: `'${a.recipientName}'은(는) '${a.teamName}' 팀 명단에 없어요. 수상자와 팀을 다시 확인해 주세요.`,
+            });
+          }
         }
       }
     }

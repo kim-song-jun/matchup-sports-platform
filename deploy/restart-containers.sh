@@ -62,7 +62,7 @@ if [ -d "${V1_UPLOADS_BACKUP_DIR}/uploads" ]; then
   sudo docker cp "${V1_UPLOADS_BACKUP_DIR}/uploads/." teameet_v1_api:/app/apps/v1_api/uploads/
 fi
 sudo rm -rf "${V1_UPLOADS_BACKUP_DIR}" 2>/dev/null || true
-echo "[INFO] Waiting for APIs to be ready before starting web..."
+echo "[INFO] Starting v1_web/nginx first, then verifying v1_api health..."
 sleep 5
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps v1_web nginx
 

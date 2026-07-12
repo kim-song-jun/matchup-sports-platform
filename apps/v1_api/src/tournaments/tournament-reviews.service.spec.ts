@@ -1,13 +1,16 @@
 /**
  * tournament-reviews.service.spec.ts
  *
- * Contract tests for the tournament awards admin gate (security fix).
+ * Contract tests for the tournament awards admin gate (security fix)
+ * and the roster-only recipient enforcement.
  * Verifies: non-admin authenticated users get 403 on both listAwards (GET)
  * and setAwards (PUT), support-role admins cannot mutate via setAwards,
- * and a legitimate admin can still read/write awards end-to-end.
+ * a legitimate admin can still read/write awards end-to-end, and setAwards
+ * rejects recipients/teams that are not in the tournament roster
+ * (400 AWARD_RECIPIENT_NOT_IN_ROSTER, no mutation executed).
  * Asserts observable behaviour only — no mock-for-mock assertions.
  */
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
@@ -60,6 +63,14 @@ function awardRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** confirmed 등록 1건 — 팀 '레알마드리드', 로스터: 김철수·이영희 */
+const confirmedRegistrationRows = [
+  {
+    team: { name: '레알마드리드' },
+    players: [{ realName: '김철수' }, { realName: '이영희' }],
+  },
+];
+
 describe('TournamentReviewsService — awards admin gate', () => {
   let service: TournamentReviewsService;
   let prisma: {
@@ -70,6 +81,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
       deleteMany: jest.Mock;
       create: jest.Mock;
     };
+    v1TournamentRegistration: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -82,6 +94,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
         deleteMany: jest.fn(),
         create: jest.fn(),
       },
+      v1TournamentRegistration: { findMany: jest.fn() },
       $transaction: jest.fn(),
     };
     (prisma.$transaction as jest.Mock).mockImplementation(
@@ -155,6 +168,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
   it('setAwards: owner admin replaces awards and returns the updated list', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
     prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 1 });
     prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
     prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
@@ -185,5 +199,85 @@ describe('TournamentReviewsService — awards admin gate', () => {
       service.setAwards(ownerAuthUser, 'ghost', { awards: [] }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  // ─── setAwards 로스터 전용 강제 ─────────────────────────────────────────
+
+  it('setAwards: recipient not in tournament roster → 400 AWARD_RECIPIENT_NOT_IN_ROSTER, no mutation', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+
+    const attempt = service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        { awardType: 'mvp', awardLabel: 'MVP', recipientName: '외부인' },
+      ],
+    });
+
+    await expect(attempt).rejects.toThrow(BadRequestException);
+    await expect(attempt).rejects.toMatchObject({
+      response: { code: 'AWARD_RECIPIENT_NOT_IN_ROSTER' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('setAwards: teamName not among confirmed registrations → 400 AWARD_RECIPIENT_NOT_IN_ROSTER, no mutation', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+
+    await expect(
+      service.setAwards(ownerAuthUser, 'tournament-1', {
+        awards: [
+          {
+            awardType: 'mvp',
+            awardLabel: 'MVP',
+            recipientName: '김철수',
+            teamName: '미참가팀',
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'AWARD_RECIPIENT_NOT_IN_ROSTER' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('setAwards: roster recipient without teamName passes validation', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(
+      awardRow({ recipientName: '이영희', teamName: null }),
+    );
+    prisma.v1TournamentAward.findMany.mockResolvedValue([
+      awardRow({ recipientName: '이영희', teamName: null }),
+    ]);
+
+    const result = await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '이영희' }],
+    });
+
+    expect(result[0]).toMatchObject({ recipientName: '이영희', teamName: null });
+  });
+
+  it('setAwards: roster is scoped to confirmed registrations of the tournament', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '김철수' }],
+    });
+
+    expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tournamentId: 'tournament-1', status: 'confirmed' },
+      }),
+    );
   });
 });

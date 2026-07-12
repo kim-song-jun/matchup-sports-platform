@@ -4171,9 +4171,8 @@ function AwardRow({
             onChange={(item) => update(idx, 'recipientName', item?.label ?? '')}
             items={playerItems}
             loading={!!selectedRegistrationId && rosterFetching}
-            allowFreeText
-            placeholder="홍길동"
-            emptyText={selectedRegistrationId ? '명단에 없어요. 이름을 입력해 주세요' : '검색 결과가 없어요'}
+            placeholder="명단에서 선택"
+            emptyText={selectedRegistrationId ? '명단에 없는 선수예요' : '검색 결과가 없어요'}
           />
           {!teamNameTrimmed && (
             <p className="text-[11px] text-gray-400 mt-1">소속 팀을 먼저 선택하면 명단에서 고를 수 있어요</p>
@@ -4186,8 +4185,7 @@ function AwardRow({
             value={selectedTeamItem}
             onChange={(item) => update(idx, 'teamName', item?.label ?? '')}
             items={teamItems}
-            allowFreeText
-            placeholder="팀명 검색 또는 입력"
+            placeholder="참가 팀에서 선택"
           />
         </div>
       </div>

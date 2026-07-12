@@ -305,6 +305,37 @@ export class TournamentReviewsService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
+    // 로스터 전용 강제 — 수상자는 해당 대회 확정(confirmed) 등록 팀 명단의 선수여야 하고,
+    // 팀명이 지정된 경우 확정 등록 팀명과 일치해야 한다 (자유 입력 차단).
+    if (dto.awards.length > 0) {
+      const registrations = await this.prisma.v1TournamentRegistration.findMany({
+        where: { tournamentId, status: 'confirmed' },
+        select: {
+          team: { select: { name: true } },
+          players: { where: { removedAt: null }, select: { realName: true } },
+        },
+      });
+      const rosterNames = new Set(
+        registrations.flatMap((r) => r.players.map((p) => p.realName.trim())),
+      );
+      const registeredTeamNames = new Set(registrations.map((r) => r.team.name.trim()));
+
+      for (const a of dto.awards) {
+        if (!rosterNames.has(a.recipientName.trim())) {
+          throw new BadRequestException({
+            code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
+            message: `'${a.recipientName}'은(는) 대회 참가 명단에 없어요. 명단에서 수상자를 선택해 주세요.`,
+          });
+        }
+        if (a.teamName && !registeredTeamNames.has(a.teamName.trim())) {
+          throw new BadRequestException({
+            code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
+            message: `'${a.teamName}'은(는) 대회에 참가 확정된 팀이 아니에요. 참가 팀에서 선택해 주세요.`,
+          });
+        }
+      }
+    }
+
     // 전체 삭제 후 재생성 (simple replace)
     await this.prisma.$transaction([
       this.prisma.v1TournamentAward.deleteMany({ where: { tournamentId } }),

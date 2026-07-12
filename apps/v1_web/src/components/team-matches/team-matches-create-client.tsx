@@ -10,6 +10,7 @@ import {
   useV1MyTeams,
   useV1TeamMatchEdit,
   useV1UpdateTeamMatch,
+  useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { labelToLevelCode } from '@/lib/v1-levels';
@@ -20,7 +21,7 @@ import { TeamMatchCreatePageView } from './team-matches-page';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
-const storageKey = 'teameet:v1:team-match-draft';
+const storageKey = 'teameet:v1:team-match-draft:v3';
 const selectionKey = 'teameet:v1:team-match-selection';
 const defaultGenderRule = '성별 무관';
 
@@ -33,6 +34,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const createTeamMatch = useV1CreateTeamMatch();
+  const uploadImages = useV1UploadImages();
   const [draft, setDraft] = usePersistedDraft();
   // 위저드 step이 각각 별도 라우트라 step 이동 시 재마운트된다. 팀/종목/지역 선택을 로컬
   // useState에만 두면 매 step 첫 항목으로 리셋돼(팀 B·풋살 선택→첫 creatable팀·축구로 소실)
@@ -119,6 +121,12 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     regions: regionOptions,
     error,
     submitting: createTeamMatch.isPending,
+    uploadImage: async (file) => {
+      const result = await uploadImages.mutateAsync([file]);
+      const url = result.urls[0];
+      if (!url) throw new Error('이미지를 업로드하지 못했어요.');
+      return url;
+    },
     onSelectTeam: (teamName) => {
       const team = myTeams?.find((item) => item.name === teamName);
       if (team) updateSelection((current) => ({ ...current, teamId: team.teamId }));
@@ -135,7 +143,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       setError(null);
       const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload) {
-        setError('팀, 종목, 지역, 제목, 장소, 날짜와 시간을 확인해 주세요.');
+        setError('팀, 종목, 지역, 제목, 상세주소, 날짜와 시간을 확인해 주세요.');
         return;
       }
       createTeamMatch.mutate(payload, {
@@ -157,6 +165,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const editQuery = useV1TeamMatchEdit(teamMatchId);
   const updateTeamMatch = useV1UpdateTeamMatch(teamMatchId);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
+  const uploadImages = useV1UploadImages();
   const [draft, setDraft] = useState<TeamMatchDraft>(() => buildDefaultDraft());
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [selectedSportId, setSelectedSportId] = useState('');
@@ -187,6 +196,12 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       ? lockedReasonLabel(editQuery.data.lockedReason ?? '')
       : null,
     submitting: editQuery.isLoading || updateTeamMatch.isPending || cancelTeamMatch.isPending,
+    uploadImage: async (file) => {
+      const result = await uploadImages.mutateAsync([file]);
+      const url = result.urls[0];
+      if (!url) throw new Error('이미지를 업로드하지 못했어요.');
+      return url;
+    },
     onSelectTeam: () => undefined,
     onSelectSport: () => undefined,
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
@@ -237,6 +252,7 @@ function buildCreateModel({
   error,
   lockedReason,
   submitting,
+  uploadImage,
   onSelectTeam,
   onSelectSport,
   onFieldChange,
@@ -256,10 +272,11 @@ function buildCreateModel({
   isLoadingTeams?: boolean;
   teams: Array<{ id: string; name: string; sport: string; members: number; role: string; disabled?: boolean }>;
   sports: Array<{ id: string; name: string }>;
-  regions: Array<{ id: string; name: string }>;
+  regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
   error?: string | null;
   lockedReason?: string | null;
   submitting?: boolean;
+  uploadImage?: (file: File) => Promise<string>;
   onSelectTeam: (teamName: string) => void;
   onSelectSport: (sportName: string) => void;
   onFieldChange: (field: keyof TeamMatchDraft, value: string | number) => void;
@@ -299,6 +316,7 @@ function buildCreateModel({
       onCancel,
       submitLabel,
       submitting,
+      uploadImage,
       error,
       lockedReason,
     },
@@ -312,7 +330,7 @@ function usePersistedDraft() {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return;
     try {
-      setDraft({ ...buildDefaultDraft(), ...JSON.parse(stored) });
+      setDraft(normalizeDraftDate({ ...buildDefaultDraft(), ...JSON.parse(stored) }));
     } catch {
       window.localStorage.removeItem(storageKey);
     }
@@ -333,8 +351,21 @@ function buildDefaultDraft(): TeamMatchDraft {
   return {
     ...getTeamMatchCreateViewModel('team').draft,
     date: start.toISOString().slice(0, 10),
-    startTime: '18:00',
-    endTime: '20:00',
+    startTime: '',
+    endTime: '',
+  };
+}
+
+function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
+  const startsAt = new Date(`${draft.date}T${draft.startTime || '18:00'}:00`);
+  if (!Number.isNaN(startsAt.getTime()) && startsAt > new Date()) return draft;
+
+  const fallback = buildDefaultDraft();
+  return {
+    ...draft,
+    date: fallback.date,
+    startTime: fallback.startTime,
+    endTime: fallback.endTime,
   };
 }
 
@@ -352,10 +383,11 @@ function draftFromEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     style: parsed.style,
     uniform: parsed.uniform,
     gender: normalizeGenderRule(edit.form.genderRule),
+    imageUrl: edit.form.imageUrl ?? '',
     cost: parsed.cost,
     opponentCost: parsed.opponentCost,
-    venue: edit.form.manualPlaceName,
-    address: edit.form.addressText ?? '',
+    venue: edit.form.addressText ?? edit.form.manualPlaceName,
+    address: '',
     date: start.toISOString().slice(0, 10),
     startTime: start.toTimeString().slice(0, 5),
     endTime: end ? end.toTimeString().slice(0, 5) : start.toTimeString().slice(0, 5),
@@ -385,12 +417,13 @@ function buildPayload(draft: TeamMatchDraft, hostTeamId: string, sportId: string
     startsAt: startsAt.toISOString(),
     endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
     deadlineAt: null,
+    imageUrl: draft.imageUrl.trim() || null,
     manualPlaceName: draft.venue.trim(),
-    addressText: draft.address.trim() || null,
-    costNote: `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원`,
+    addressText: draft.venue.trim() || null,
+    costNote: draft.cost || draft.opponentCost ? `총 ${draft.cost.toLocaleString('ko-KR')}원 · 상대팀 ${draft.opponentCost.toLocaleString('ko-KR')}원` : null,
     rulesText: [draft.grade, draft.format, draft.style, draft.uniform].filter(Boolean).join(' · ') || null,
-    minLevelCode: labelToLevelCode(draft.grade),
-    maxLevelCode: labelToLevelCode(draft.grade),
+    minLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
+    maxLevelCode: draft.grade.trim() ? labelToLevelCode(draft.grade) : null,
     genderRule: normalizeGenderRule(draft.gender),
   };
 }

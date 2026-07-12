@@ -57,20 +57,21 @@ const detailCopy: Record<TeamMatchDetailViewModel['mode'], Pick<TeamMatchDetailV
 };
 
 const draft = {
-  title: '주말 풋살 초보 환영 팀매치',
-  description: '상대 팀과 즐겁게 경기하는 친선 팀매치예요.',
-  grade: 'A+',
-  format: '5:5',
-  style: '친선 · 매너 중시',
-  uniform: '빨강 상의 + 검정 하의',
+  title: '',
+  description: '',
+  grade: '',
+  format: '',
+  style: '',
+  uniform: '',
   gender: '성별 무관',
-  cost: 200000,
+  imageUrl: '',
+  cost: 0,
   opponentCost: 0,
-  venue: '안양천 풋살장',
-  address: '서울 양천구 안양천로 939',
-  date: '2026-05-16',
-  startTime: '18:00',
-  endTime: '20:00',
+  venue: '',
+  address: '',
+  date: '',
+  startTime: '',
+  endTime: '',
 };
 
 export function getTeamMatchListViewModel(): TeamMatchListViewModel {

@@ -10,7 +10,10 @@
 | `GET` | `/api/v1/team-matches/:teamMatchId` | optional user | path id | detail and CTA state |
 | `GET` | `/api/v1/team-matches/:teamMatchId/application-eligibility` | user | `teamId?` | eligibility by managed team |
 | `PATCH` | `/api/v1/team-matches/:teamMatchId` | owner/manager of host team | `UpdateTeamMatchDto` | updated team match |
+| `POST` | `/api/v1/team-matches/:teamMatchId/close` | owner/manager of host team | `{ reason?: string | null }` | closed team match and expired pending applications |
+| `POST` | `/api/v1/team-matches/:teamMatchId/reopen` | owner/manager of host team | `{ reason?: string | null }` | reopened recruiting team match |
 | `POST` | `/api/v1/team-matches/:teamMatchId/cancel` | owner/manager of host team | `{ reason?: string | null }` | cancelled team match |
+| `POST` | `/api/v1/team-matches/:teamMatchId/complete` | owner/manager of host team | `{ note?: string | null }` | completed team match |
 | `POST` | `/api/v1/team-matches/:teamMatchId/applications` | owner/manager of applicant team | `{ applicantTeamId: uuid; message?: string | null }` | requested application |
 | `GET` | `/api/v1/team-matches/:teamMatchId/applications` | host team owner/manager | `status?`, `cursor?`, `limit?` | applications |
 | `POST` | `/api/v1/team-match-applications/:applicationId/withdraw` | applicant team owner/manager | `{ reason?: string | null }` | withdrawn application |
@@ -38,13 +41,18 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 ## State And Permissions
 
 - Team match create immediately publishes `recruiting`.
+- Host owner/manager can close recruiting. Closing moves the team match to `closed`, rejects new applications, and marks pending applications `expired`.
+- Host owner/manager can reopen `closed` team matches before `startAt`; expired applications are not auto-restored.
 - Create UI must source host team choices from the current user's active owner/manager teams. Member-only teams are not valid host team options.
 - Applicant is a team, not a user.
 - Applicant team must be managed by the acting user.
 - Host team cannot apply to itself.
 - Approval moves the selected application to `approved` and the team match to `matched`; only one applicant team can be approved.
+- Applicant team owner/manager can withdraw only `requested` applications.
+- Host owner/manager can complete only `matched` team matches with an approved applicant team. Completion records `completedAt` and unlocks review surfaces.
 - Team match chat is available only after an applicant team has been approved/matched.
 - `costNote` is text-only. No payment API is called.
+- Notifications are emitted for application received, application withdrawn, approved, rejected, recruiting closed, match cancelled, and match completed events.
 
 Primary tables:
 

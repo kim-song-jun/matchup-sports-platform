@@ -6,6 +6,7 @@
 
 - `reviews`
 - `reports`
+- `inquiries`
 - `badges`
 - `users/blocks`
 - `tournaments`
@@ -18,6 +19,7 @@
 |---|---|
 | `reviews` | `/api/v1/reviews`, `/api/v1/reviews/pending` |
 | `reports` | `/api/v1/reports`, `/api/v1/reports/me`, `/api/v1/admin/reports`, `/api/v1/admin/reports/:id` |
+| `inquiries` | `/api/v1/inquiries`, `/api/v1/inquiries/:id`, `/api/v1/admin/inquiries`, `/api/v1/admin/inquiries/:id`, `/api/v1/admin/inquiries/:id/replies`, `/api/v1/admin/inquiries/:id/status` |
 | `badges` | `/api/v1/badges`, `/api/v1/badges/team/:teamId` |
 | `users/blocks` | `/api/v1/users/blocks`, `/api/v1/users/blocks/:blockedId` |
 | `tournaments` | `/api/v1/tournaments`, `/api/v1/tournaments/:id`, `/api/v1/tournaments/:tournamentId/registrations`, `/api/v1/admin/tournaments/:tournamentId/sponsors` |
@@ -82,7 +84,51 @@
 - `createReport`는 target 존재 여부를 서버에서 검증한다.
 - 존재하지 않는 target은 `404 REPORT_TARGET_NOT_FOUND`.
 
-## 3) Badges (`/badges`)
+## 3) Inquiries (`/inquiries`)
+
+### Endpoint Matrix
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/inquiries` | Required | Current user's inquiry list |
+| `POST` | `/api/v1/inquiries` | Required | Create an inquiry |
+| `GET` | `/api/v1/inquiries/:id` | Required | Current user's inquiry detail |
+| `GET` | `/api/v1/admin/inquiries` | Required + Admin | Admin inquiry list |
+| `GET` | `/api/v1/admin/inquiries/:id` | Required + Admin | Admin inquiry detail |
+| `POST` | `/api/v1/admin/inquiries/:id/replies` | Required + Admin ops/owner | Register an answer |
+| `POST` | `/api/v1/admin/inquiries/:id/status` | Required + Admin ops/owner | Change inquiry status |
+
+### DTO Contract
+
+- `CreateInquiryDto`
+  - `category`: `account | match | team | tournament | payment_refund | report | other`
+  - `title`: string, max 80
+  - `body`: string, max 2000
+  - `contact?`: string, max 120
+  - `relatedType?`: `match | team | team_match | tournament | registration | payment | user`
+  - `relatedId?`: string, max 80
+- If `relatedType` is provided, `relatedId` is required. If `relatedId` is provided, `relatedType` is required.
+
+### Response Contract
+
+- Inquiry item fields: `inquiryId`, `category`, `title`, `body`, `contact`, `relatedType`, `relatedId`, `status`, `createdAt`, `updatedAt`, `closedAt`.
+- `contact` may be `null`; logged-in user identity is the primary contact context.
+- `status`: `received | reviewing | answered | closed`.
+- List response is cursor-shaped: `{ items, pageInfo: { nextCursor, hasNext } }`.
+- Detail response may include `replies`: `{ replyId, adminName, adminRole, body, createdAt, updatedAt }[]`.
+- Admin list item fields: `inquiryId`, `userId`, `requesterName`, `requesterEmail`, `category`, `title`, `status`, `relatedType`, `relatedId`, `replyCount`, `createdAt`, `updatedAt`, `closedAt`.
+- `ReplyInquiryDto`: `body` string, max 2000.
+- `ChangeInquiryStatusDto`: `status` plus optional `reason` string, max 500.
+
+### Permission Gate
+
+- `JwtAuthGuard` is required for every endpoint.
+- Users can only list and read their own inquiries.
+- Cross-user detail access returns `403 PERMISSION_DENIED`; missing inquiry returns `404 NOT_FOUND`.
+- Admin `support` can read only; reply and status mutation require `ops` or `owner`.
+- Creating a reply automatically sets the inquiry status to `answered` and records admin action/status logs.
+
+## 4) Badges (`/badges`)
 
 ### 엔드포인트
 

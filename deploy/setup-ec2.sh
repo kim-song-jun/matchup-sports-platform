@@ -169,7 +169,7 @@ for i in $(seq 1 30); do
 done
 
 $COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts
-$COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma db push --skip-generate && ./node_modules/.bin/prisma migrate deploy"
+$COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
 # 10. 전체 스택 시작
 echo "🚀 애플리케이션 스택 시작..."
@@ -211,7 +211,7 @@ else
   echo "🧩 DEPLOY_SYNC_MOCK_DATA=false 이므로 mock sync를 건너뜁니다."
 fi
 
-if [ "${DEPLOY_SYNC_V1_SEED_DATA:-true}" != "false" ]; then
+if [ "${DEPLOY_SYNC_V1_SEED_DATA:-false}" = "true" ]; then
   echo "🧩 v1 seed sync 실행..."
   sudo docker exec teameet_v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed.ts"
 else

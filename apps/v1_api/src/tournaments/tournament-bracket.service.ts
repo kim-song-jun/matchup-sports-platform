@@ -7,6 +7,7 @@ import {
 import {
   V1TournamentFixture,
   V1TournamentFixtureResult,
+  V1TournamentFixtureVideo,
   V1TournamentGroup,
   V1TournamentGroupTeam,
   V1TournamentStanding,
@@ -19,6 +20,8 @@ import {
   CreateGroupDto,
   CreateGroupTeamDto,
   RecordResultDto,
+  UpdateFixtureDto,
+  UpdateGroupDto,
 } from './dto/admin-bracket.dto';
 
 @Injectable()
@@ -241,6 +244,241 @@ export class TournamentBracketService {
     return this.serializeFixture(created);
   }
 
+  /** 경기 일정·장소·대진(홈/어웨이) 수정. 결과가 기록된 경기는 팀 변경 불가(409). */
+  async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { id: fixtureId },
+      include: { result: true },
+    });
+    if (!fixture) {
+      throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
+    }
+
+    const changesTeams = dto.homeRegistrationId !== undefined || dto.awayRegistrationId !== undefined;
+    if (changesTeams && fixture.result) {
+      throw new ConflictException({
+        code: 'FIXTURE_HAS_RESULT',
+        message: '결과가 기록된 경기는 팀을 바꿀 수 없어요. 결과를 먼저 삭제해 주세요.',
+      });
+    }
+    const nextHome = dto.homeRegistrationId ?? fixture.homeRegistrationId;
+    const nextAway = dto.awayRegistrationId ?? fixture.awayRegistrationId;
+    if (nextHome && nextAway && nextHome === nextAway) {
+      throw new BadRequestException({ code: 'FIXTURE_SAME_TEAM', message: '같은 팀끼리 경기를 만들 수 없어요.' });
+    }
+    for (const [side, regId] of [['홈', dto.homeRegistrationId], ['어웨이', dto.awayRegistrationId]] as const) {
+      if (regId === undefined) continue;
+      const reg = await this.prisma.v1TournamentRegistration.findFirst({
+        where: { id: regId, tournamentId: fixture.tournamentId, status: 'confirmed' },
+      });
+      if (!reg) {
+        throw new BadRequestException({
+          code: side === '홈' ? 'HOME_REGISTRATION_INVALID' : 'AWAY_REGISTRATION_INVALID',
+          message: `${side} 팀 신청이 해당 대회에 존재하지 않거나 확정되지 않았어요.`,
+        });
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.v1TournamentFixture.update({
+        where: { id: fixtureId },
+        data: {
+          ...(dto.scheduledAt !== undefined ? { scheduledAt: new Date(dto.scheduledAt) } : {}),
+          ...(dto.venue !== undefined ? { venue: dto.venue.trim() || null } : {}),
+          ...(dto.homeRegistrationId !== undefined ? { homeRegistrationId: dto.homeRegistrationId } : {}),
+          ...(dto.awayRegistrationId !== undefined ? { awayRegistrationId: dto.awayRegistrationId } : {}),
+        },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket.fixture.update',
+          targetType: 'tournament_fixture',
+          targetId: fixtureId,
+          beforeJson: {
+            scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
+            venue: fixture.venue,
+            homeRegistrationId: fixture.homeRegistrationId,
+            awayRegistrationId: fixture.awayRegistrationId,
+          },
+          afterJson: {
+            scheduledAt: row.scheduledAt?.toISOString() ?? null,
+            venue: row.venue,
+            homeRegistrationId: row.homeRegistrationId,
+            awayRegistrationId: row.awayRegistrationId,
+          },
+        },
+        tx,
+      );
+      return row;
+    });
+    return this.serializeFixture(updated);
+  }
+
+  /** 경기 삭제. 결과가 있으면 먼저 결과 삭제를 요구한다(409). 영상은 경기와 함께 삭제(cascade). */
+  async deleteFixture(user: V1AuthUser, fixtureId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { id: fixtureId },
+      include: { result: true },
+    });
+    if (!fixture) {
+      throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
+    }
+    if (fixture.result) {
+      throw new ConflictException({
+        code: 'FIXTURE_HAS_RESULT',
+        message: '결과가 기록된 경기예요. 결과를 먼저 삭제해 주세요.',
+      });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1TournamentFixture.delete({ where: { id: fixtureId } });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket.fixture.delete',
+          targetType: 'tournament_fixture',
+          targetId: fixtureId,
+          beforeJson: { round: fixture.round, fixtureNumber: fixture.fixtureNumber, legNumber: fixture.legNumber },
+        },
+        tx,
+      );
+    });
+    return { deleted: true };
+  }
+
+  /** 결과 삭제(오입력 복구) — 경기 상태를 scheduled로 되돌린다. 영상은 경기 소속이라 유지. */
+  async deleteFixtureResult(user: V1AuthUser, fixtureId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+      where: { id: fixtureId },
+      include: { result: true },
+    });
+    if (!fixture) {
+      throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
+    }
+    if (!fixture.result) {
+      throw new NotFoundException({ code: 'RESULT_NOT_FOUND', message: '기록된 결과가 없어요.' });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1TournamentFixtureResult.delete({ where: { fixtureId } });
+      await tx.v1TournamentFixture.update({ where: { id: fixtureId }, data: { status: 'scheduled' } });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket.result.delete',
+          targetType: 'tournament_fixture',
+          targetId: fixtureId,
+          beforeJson: {
+            homeScore: fixture.result!.homeScore,
+            awayScore: fixture.result!.awayScore,
+            hasPenalty: fixture.result!.hasPenalty,
+          },
+          fromStatus: fixture.status,
+          toStatus: 'scheduled',
+        },
+        tx,
+      );
+    });
+    return { deleted: true };
+  }
+
+  /** 조 이름·진출 팀 수 수정. */
+  async updateGroup(user: V1AuthUser, groupId: string, dto: UpdateGroupDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const group = await this.prisma.v1TournamentGroup.findUnique({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.v1TournamentGroup.update({
+        where: { id: groupId },
+        data: {
+          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.advanceCount !== undefined ? { advanceCount: dto.advanceCount } : {}),
+        },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket.group.update',
+          targetType: 'tournament_group',
+          targetId: groupId,
+          beforeJson: { name: group.name, advanceCount: group.advanceCount },
+          afterJson: { name: row.name, advanceCount: row.advanceCount },
+        },
+        tx,
+      );
+      return row;
+    });
+    return this.serializeGroup(updated);
+  }
+
+  /** 조 삭제. 팀 배정·경기가 남아 있으면 실수 방지를 위해 409로 막는다. */
+  async deleteGroup(user: V1AuthUser, groupId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const group = await this.prisma.v1TournamentGroup.findUnique({
+      where: { id: groupId },
+      include: { _count: { select: { groupTeams: true, fixtures: true } } },
+    });
+    if (!group) {
+      throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
+    }
+    if (group._count.groupTeams > 0) {
+      throw new ConflictException({
+        code: 'GROUP_HAS_TEAMS',
+        message: '조에 배정된 팀이 있어요. 팀 배정을 먼저 해제해 주세요.',
+      });
+    }
+    if (group._count.fixtures > 0) {
+      throw new ConflictException({
+        code: 'GROUP_HAS_FIXTURES',
+        message: '조에 연결된 경기가 있어요. 경기를 먼저 삭제해 주세요.',
+      });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1TournamentGroup.delete({ where: { id: groupId } });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket.group.delete',
+          targetType: 'tournament_group',
+          targetId: groupId,
+          beforeJson: { name: group.name, phase: group.phase },
+        },
+        tx,
+      );
+    });
+    return { deleted: true };
+  }
+
+  /** 조 팀 배정 해제 — 해당 팀의 조 순위 행도 함께 정리한다. */
+  async removeGroupTeam(user: V1AuthUser, groupTeamId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const groupTeam = await this.prisma.v1TournamentGroupTeam.findUnique({ where: { id: groupTeamId } });
+    if (!groupTeam) {
+      throw new NotFoundException({ code: 'GROUP_TEAM_NOT_FOUND', message: '조 팀 배정을 찾을 수 없어요.' });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1TournamentGroupTeam.delete({ where: { id: groupTeamId } });
+      await tx.v1TournamentStanding.deleteMany({
+        where: { groupId: groupTeam.groupId, registrationId: groupTeam.registrationId },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket.group_team.remove',
+          targetType: 'tournament_group_team',
+          targetId: groupTeamId,
+          beforeJson: { groupId: groupTeam.groupId, registrationId: groupTeam.registrationId },
+        },
+        tx,
+      );
+    });
+    return { deleted: true };
+  }
+
   // ─── result ───────────────────────────────────────────────────────────────
 
   async recordResult(user: V1AuthUser, fixtureId: string, dto: RecordResultDto) {
@@ -320,6 +558,22 @@ export class TournamentBracketService {
         },
       });
 
+      // 영상 목록은 replace-all — dto.videos 생략(undefined) 시 기존 목록 유지
+      if (dto.videos !== undefined) {
+        await tx.v1TournamentFixtureVideo.deleteMany({ where: { fixtureId } });
+        const videoRows = dto.videos
+          .map((v, i) => ({
+            fixtureId,
+            title: v.title?.trim() || null,
+            url: v.url.trim(),
+            sortOrder: i,
+          }))
+          .filter((v) => v.url.length > 0);
+        if (videoRows.length > 0) {
+          await tx.v1TournamentFixtureVideo.createMany({ data: videoRows });
+        }
+      }
+
       // fixture.status → completed
       await tx.v1TournamentFixture.update({
         where: { id: fixtureId },
@@ -346,7 +600,11 @@ export class TournamentBracketService {
       return fixtureResult;
     });
 
-    return this.serializeResult(result);
+    const videos = await this.prisma.v1TournamentFixtureVideo.findMany({
+      where: { fixtureId },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return { ...this.serializeResult(result), videos: videos.map((v) => this.serializeVideo(v)) };
   }
 
   // ─── standings recalculate ────────────────────────────────────────────────
@@ -537,6 +795,7 @@ export class TournamentBracketService {
         where: { tournamentId },
         include: {
           result: true,
+          videos: { orderBy: { sortOrder: 'asc' } },
           homeRegistration: {
             include: { team: { select: { name: true } } },
           },
@@ -570,6 +829,7 @@ export class TournamentBracketService {
         homeTeamName: f.homeRegistration?.team.name ?? 'TBD',
         awayTeamName: f.awayRegistration?.team.name ?? 'TBD',
         result: f.result ? this.serializeResult(f.result) : null,
+        videos: f.videos.map((v) => this.serializeVideo(v)),
       })),
       standings: standings.map((s) => ({
         ...this.serializeStanding(s),
@@ -635,6 +895,15 @@ export class TournamentBracketService {
       recordedAt: row.recordedAt.toISOString(),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private serializeVideo(row: V1TournamentFixtureVideo) {
+    return {
+      id: row.id,
+      title: row.title,
+      url: row.url,
+      sortOrder: row.sortOrder,
     };
   }
 

@@ -7,10 +7,17 @@ import {
 } from '@nestjs/common';
 import { Prisma, V1TeamMatch, V1TeamMatchApplication } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
-import { CancelTeamMatchDto, MutateTeamMatchDto, UpdateTeamMatchDto } from './dto/mutate-team-match.dto';
+import {
+  CancelTeamMatchDto,
+  CloseTeamMatchDto,
+  CompleteTeamMatchDto,
+  MutateTeamMatchDto,
+  ReopenTeamMatchDto,
+  UpdateTeamMatchDto,
+} from './dto/mutate-team-match.dto';
 import {
   ApproveTeamMatchApplicationDto,
   CreateTeamMatchApplicationDto,
@@ -272,11 +279,12 @@ export class TeamMatchesService {
 
   async edit(user: V1AuthUser, teamMatchId: string) {
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
-    const editable = teamMatch.status === 'recruiting';
+    const apiStatus = this.getApiStatus(teamMatch);
+    const editable = teamMatch.status === 'recruiting' && apiStatus !== 'expired';
     return {
       teamMatchId: teamMatch.id,
       editable,
-      lockedReason: editable ? null : 'terminal_or_matched_status',
+      lockedReason: editable ? null : apiStatus === 'expired' ? 'expired' : 'terminal_or_matched_status',
       form: {
         hostTeamId: teamMatch.hostTeamId,
         sportId: teamMatch.sportId,
@@ -295,7 +303,7 @@ export class TeamMatchesService {
         maxLevelCode: teamMatch.maxSportLevel?.code ?? null,
         genderRule: teamMatch.genderRule,
       },
-      status: this.getApiStatus(teamMatch),
+      status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
     };
   }
@@ -392,6 +400,131 @@ export class TeamMatchesService {
       teamMatchId: teamMatch.id,
       status: 'cancelled',
       cancelledApplications: result.applications.count,
+      detailRoute: `/team-matches/${teamMatch.id}`,
+    };
+  }
+
+  async close(user: V1AuthUser, teamMatchId: string, dto: CloseTeamMatchDto) {
+    this.assertActiveAccount(user);
+    const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
+    if (teamMatch.status === 'closed') {
+      throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already closed' });
+    }
+    if (teamMatch.status !== 'recruiting' || this.getApiStatus(teamMatch) === 'expired') {
+      throw stateConflict('Only active recruiting team matches can be closed');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TeamMatch.update({
+        where: { id: teamMatch.id },
+        data: { status: 'closed' },
+      });
+      const applications = await tx.v1TeamMatchApplication.updateMany({
+        where: { teamMatchId: teamMatch.id, status: 'requested' },
+        data: { status: 'expired', reviewedByUserId: user.id, reviewedAt: new Date() },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'team_match',
+          targetId: teamMatch.id,
+          fromStatus: teamMatch.status,
+          toStatus: 'closed',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.reason ?? 'team_match_closed',
+        },
+      });
+      return { updated, applications };
+    });
+
+    this.emitTeamMatchNotificationToApplicantManagers(
+      teamMatch.id,
+      'team_match_closed',
+      '모집이 마감되어 대기 중인 신청이 종료됐어요.',
+    );
+
+    return {
+      teamMatchId: result.updated.id,
+      status: result.updated.status,
+      expiredApplications: result.applications.count,
+      detailRoute: `/team-matches/${teamMatch.id}`,
+    };
+  }
+
+  async reopen(user: V1AuthUser, teamMatchId: string, dto: ReopenTeamMatchDto) {
+    this.assertActiveAccount(user);
+    const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
+    if (teamMatch.status !== 'closed') {
+      throw stateConflict('Only closed team matches can be reopened');
+    }
+    if (teamMatch.startAt < new Date()) {
+      throw stateConflict('Expired team matches cannot be reopened');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const nextTeamMatch = await tx.v1TeamMatch.update({
+        where: { id: teamMatch.id },
+        data: { status: 'recruiting' },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'team_match',
+          targetId: teamMatch.id,
+          fromStatus: teamMatch.status,
+          toStatus: 'recruiting',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.reason ?? 'team_match_reopened',
+        },
+      });
+      return nextTeamMatch;
+    });
+
+    return {
+      teamMatchId: updated.id,
+      status: updated.status,
+      detailRoute: `/team-matches/${teamMatch.id}`,
+    };
+  }
+
+  async complete(user: V1AuthUser, teamMatchId: string, dto: CompleteTeamMatchDto) {
+    this.assertActiveAccount(user);
+    const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
+    if (teamMatch.status === 'completed') {
+      throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already completed' });
+    }
+    if (teamMatch.status !== 'matched' || !teamMatch.approvedApplicantTeamId) {
+      throw stateConflict('Only matched team matches can be completed');
+    }
+    if (teamMatch.startAt > new Date()) {
+      throw stateConflict('Team match cannot be completed before it starts');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const nextTeamMatch = await tx.v1TeamMatch.update({
+        where: { id: teamMatch.id },
+        data: { status: 'completed', completedAt: new Date() },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'team_match',
+          targetId: teamMatch.id,
+          fromStatus: teamMatch.status,
+          toStatus: 'completed',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.note ?? 'team_match_completed',
+        },
+      });
+      return nextTeamMatch;
+    });
+
+    this.emitNotificationToTeamManagers([teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId], 'team_match_completed', teamMatch.id);
+
+    return {
+      teamMatchId: updated.id,
+      status: updated.status,
+      completedAt: updated.completedAt,
       detailRoute: `/team-matches/${teamMatch.id}`,
     };
   }
@@ -575,6 +708,13 @@ export class TeamMatchesService {
       return nextApplication;
     });
 
+    this.emitNotificationToTeamManagers(
+      [application.teamMatch.hostTeamId],
+      'team_match_application_withdrawn',
+      application.teamMatchId,
+      '상대팀 신청이 취소됐어요.',
+    );
+
     return {
       applicationId: updated.id,
       teamMatchId: updated.teamMatchId,
@@ -644,9 +784,9 @@ export class TeamMatchesService {
       return { updatedApplication, updatedTeamMatch };
     });
 
-    // 알림: 신청팀 대표(신청자)에게 승인 안내 (fire-and-forget)
-    void this.notifications.emitNotification(
-      application.appliedByUserId,
+    // 알림: 신청팀 owner/manager에게 승인 안내 (fire-and-forget)
+    this.emitNotificationToTeamManagers(
+      [application.applicantTeamId],
       'team_match_application_approved',
       application.teamMatchId,
     );
@@ -693,9 +833,9 @@ export class TeamMatchesService {
       return nextApplication;
     });
 
-    // 알림: 신청팀 대표(신청자)에게 거절 안내 (fire-and-forget)
-    void this.notifications.emitNotification(
-      application.appliedByUserId,
+    // 알림: 신청팀 owner/manager에게 거절 안내 (fire-and-forget)
+    this.emitNotificationToTeamManagers(
+      [application.applicantTeamId],
       'team_match_application_rejected',
       application.teamMatchId,
     );
@@ -706,6 +846,68 @@ export class TeamMatchesService {
       applicantTeamId: updated.applicantTeamId,
       status: updated.status,
     };
+  }
+
+  private emitNotificationToTeamManagers(
+    teamIds: Array<string | null | undefined>,
+    type: NotificationEventType,
+    targetId: string | null,
+    body?: string,
+  ) {
+    const uniqueTeamIds = [...new Set(teamIds.filter((teamId): teamId is string => Boolean(teamId)))];
+    if (uniqueTeamIds.length === 0) return;
+
+    this.notifications.emitToManyDeferred(
+      async () =>
+        [
+          ...new Set(
+            (
+              await this.prisma.v1TeamMembership.findMany({
+                where: { teamId: { in: uniqueTeamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
+                select: { userId: true },
+              })
+            ).map((membership) => membership.userId),
+          ),
+        ],
+      type,
+      targetId,
+      body,
+    );
+  }
+
+  private emitTeamMatchNotificationToApplicantManagers(
+    teamMatchId: string,
+    type: NotificationEventType,
+    body?: string,
+  ) {
+    this.notifications.emitToManyDeferred(
+      async () =>
+        [
+          ...new Set(
+            (
+              await this.prisma.v1TeamMatchApplication.findMany({
+                where: {
+                  teamMatchId,
+                  status: { in: ['requested', 'approved', 'expired'] },
+                },
+                select: {
+                  applicantTeam: {
+                    select: {
+                      memberships: {
+                        where: { status: 'active', role: { in: ['owner', 'manager'] } },
+                        select: { userId: true },
+                      },
+                    },
+                  },
+                },
+              })
+            ).flatMap((application) => application.applicantTeam.memberships.map((membership) => membership.userId)),
+          ),
+        ],
+      type,
+      teamMatchId,
+      body,
+    );
   }
 
   private teamMatchInclude(user: V1AuthUser | null) {
@@ -796,7 +998,15 @@ export class TeamMatchesService {
 
   private getViewerState(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
     if (!user) return 'none';
-    if (teamMatch.hostTeam.memberships.some((membership) => membership.userId === user.id)) return 'host_team';
+    if (
+      teamMatch.hostTeam.memberships.some(
+        (membership) =>
+          membership.userId === user.id &&
+          (membership.role === 'owner' || membership.role === 'manager'),
+      )
+    ) {
+      return 'host_team';
+    }
     const application = teamMatch.applications.find((item) => item.appliedByUserId === user.id);
     if (application?.status === 'approved') return 'approved';
     if (application?.status) return application.status;

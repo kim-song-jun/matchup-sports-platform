@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { V1ThrottlerGuard } from './common/guards/v1-throttler.guard';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { HomeModule } from './home/home.module';
+import { InquiriesModule } from './inquiries/inquiries.module';
 import { MasterModule } from './master/master.module';
 import { MatchesModule } from './matches/matches.module';
 import { NoticesModule } from './notices/notices.module';
@@ -31,6 +34,7 @@ import { VerificationModule } from './verification/verification.module';
     HealthModule,
     AuthModule,
     HomeModule,
+    InquiriesModule,
     MatchesModule,
     OnboardingModule,
     MasterModule,
@@ -47,5 +51,6 @@ import { VerificationModule } from './verification/verification.module';
     TournamentsModule,
     VerificationModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: V1ThrottlerGuard }],
 })
 export class AppModule {}

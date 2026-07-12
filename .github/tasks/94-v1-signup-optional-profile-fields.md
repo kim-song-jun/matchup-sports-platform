@@ -30,5 +30,6 @@ Add optional first-profile fields to email signup:
 - Extended v1 auth register/social-profile DTOs and service persistence.
 - Added `v1_user_profiles.birth_date` Prisma field and migration.
 - Extended profile edit to update profile image, display name, nickname, email, bio, phone, and birth date with duplicate checks for changed nickname/email.
+- Updated signup and profile edit birth date inputs to support both direct text entry and native date selection while preserving the existing `YYYYMMDD` API payload.
 - Synced v1 profile/settings API docs.
-- Verification blocked by current Windows pnpm/node_modules shim state: package bins resolve through shell shims or broken pnpm links, so Prisma generate, Jest/Vitest, Next build, and direct tsc cannot resolve installed packages.
+- Latest verification: `pnpm --filter v1_web exec tsc --noEmit` passes; `pnpm --filter v1_web build` is blocked in the current shell because Node.js is `v18.19.1` and Next.js requires `>=20.9.0`.

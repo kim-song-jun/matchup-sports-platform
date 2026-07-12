@@ -18,7 +18,7 @@
 | GET | `/users/me/matches` | Yes | 내 매치 히스토리 |
 | GET | `/users/me/invitations` | Yes | 내 팀 초대 목록 |
 | GET | `/users/search?q=` | Yes | 닉네임 검색 |
-| GET | `/users/:id` | No | 공개 프로필 |
+| GET | `/users/:userId/public-profile` | Optional | 공개 프로필 |
 
 ## GET /users/me
 
@@ -27,7 +27,7 @@
 - 주요 필드:
   - `id`, `email`, `nickname`
   - `profileImageUrl`
-  - `bio`, `phone`
+  - `phone`
   - `gender`, `birthYear`
   - `locationCity`, `locationDistrict`
   - 서비스에 따라 manner/reputation 요약 필드가 포함될 수 있음
@@ -61,7 +61,6 @@
 | `phone` | string | No | No |
 | `gender` | Gender (`male`, `female`) | No | No |
 | `birthYear` | int(1950~2015) | No | No |
-| `bio` | string | No | No |
 | `locationCity` | string | No | No |
 | `locationDistrict` | string | No | No |
 
@@ -168,24 +167,28 @@ CAUTION:
 }
 ```
 
-## GET /users/:id
+## GET /users/:userId/public-profile
 
 - 공개 프로필용이며 일부 private field는 제외
 - `GET /users/me`와 동일 shape를 보장하지 않는다.
 - 프론트는 public profile page에서 `email`, `phone` 같은 private 필드를 기대하지 않는다.
+- 공개 프로필은 `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`를 반환한다.
+- 공개 프로필은 `email`, `phone`, `birthDate`, `gender`, `bio`를 반환하지 않는다.
+- `activitySummary`는 누적 경기 수, 활동 팀 수, 받은 후기 수와 이번 달 경기/팀 가입/후기 수를 포함한다.
+- 사용자 공개/비공개 선택 상태는 v1 공개 프로필 계약에 포함하지 않는다.
 
 ## Permission / Ownership Rules
 
 - `/users/me*`는 본인 토큰 필수
-- `/users/:id`는 공개 조회
+- `/users/:userId/public-profile`은 선택 인증으로 공개 조회
 
 ## Frontend Mapping Notes
 
 - `useMyMatches`는 `/users/me/matches`를 `PaginatedResponse<Match>`로 사용
 - `useUpdateMySportProfiles`는 `/users/me/sport-profiles` 성공 응답으로 auth store와 `queryKeys.me`를 갱신
 - `useUserSearch`는 `/users/search` 결과를 사용자 선택 UI에 바로 사용
-- `useUserProfile(id)`는 `/users/:id`를 public profile로 소비
-- `useMe`와 `useUserProfile`의 응답 shape를 하나의 완전 동일 타입으로 가정하면 private/public 필드 드리프트가 생길 수 있다.
+- `useV1PublicProfile(id)`는 `/users/:userId/public-profile`을 public profile로 소비
+- `useMe`와 `useV1PublicProfile`의 응답 shape를 하나의 완전 동일 타입으로 가정하면 private/public 필드 드리프트가 생길 수 있다.
 
 ## Edge Cases
 

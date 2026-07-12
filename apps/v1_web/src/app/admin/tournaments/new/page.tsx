@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Check } from 'lucide-react';
 import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
+import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TournamentFormat } from '@/types/api';
 import {
@@ -145,14 +146,14 @@ function FormField({
 // ── Input class ───────────────────────────────────────────────────────────
 
 const inputCls = [
-  'h-[44px] px-3 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
+  'h-[44px] px-3 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
   'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
 
 const textareaCls = [
-  'px-3 py-2.5 text-sm bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+  'px-3 py-2.5 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
   'placeholder:text-[var(--text-caption)]',
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
@@ -236,6 +237,7 @@ export default function AdminTournamentsNewPage() {
   const [title, setTitle] = useState('');
   const [format, setFormat] = useState<V1TournamentFormat>('knockout');
   const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduledEndAt, setScheduledEndAt] = useState('');
   const [registrationDeadlineAt, setRegistrationDeadlineAt] = useState('');
   const [venue, setVenue] = useState('');
   const [teamCount, setTeamCount] = useState('');
@@ -246,6 +248,7 @@ export default function AdminTournamentsNewPage() {
   const [bankAccount, setBankAccount] = useState('');
   const [bankHolder, setBankHolder] = useState('');
   const [prizePool, setPrizePool] = useState('');
+  const [prizeSummary, setPrizeSummary] = useState('');
   const [prizeBreakdown, setPrizeBreakdown] = useState('');
   const [rulesText, setRulesText] = useState('');
   const [refundPolicyText, setRefundPolicyText] = useState('');
@@ -255,8 +258,10 @@ export default function AdminTournamentsNewPage() {
   // ── Inline validation errors ────────────────────────────────────────
   const teamCountNum = teamCount ? parseInt(teamCount, 10) : null;
   const teamCountError =
-    teamCountNum !== null && (teamCountNum < 2 || teamCountNum > 64)
-      ? '참가 팀 수는 2~64개여야 해요.'
+    teamCount.trim().length === 0
+      ? '참가 팀 수를 입력해 주세요.'
+      : teamCountNum === null || teamCountNum < 2 || teamCountNum > 64
+        ? '참가 팀 수는 2~64개여야 해요.'
       : null;
 
   const minPlayersNum = minPlayers ? parseInt(minPlayers, 10) : null;
@@ -274,15 +279,27 @@ export default function AdminTournamentsNewPage() {
     return null;
   })();
 
+  const scheduleRangeError: string | null = (() => {
+    const startIso = datetimeTextToIso(scheduledAt);
+    const endIso = datetimeTextToIso(scheduledEndAt);
+    if (scheduledEndAt.trim() && !startIso) return '종료 일시는 시작 일시와 함께 입력해 주세요.';
+    if (startIso && endIso && new Date(endIso).getTime() < new Date(startIso).getTime()) {
+      return '종료 일시는 시작 일시 이후여야 해요.';
+    }
+    return null;
+  })();
+
   // ── Validation ───────────────────────────────────────────────────────
   const canSubmit =
     !isPending &&
     sportId.trim().length > 0 &&
     title.trim().length > 0 &&
     isValidDatetimeText(scheduledAt) &&
+    isValidDatetimeText(scheduledEndAt) &&
     isValidDatetimeText(registrationDeadlineAt) &&
     teamCountError === null &&
-    playersRangeError === null;
+    playersRangeError === null &&
+    scheduleRangeError === null;
 
   // ── Submit ───────────────────────────────────────────────────────────
   const handleSubmit = (e: React.FormEvent) => {
@@ -295,15 +312,19 @@ export default function AdminTournamentsNewPage() {
         title: title.trim(),
         format,
         ...(datetimeTextToIso(scheduledAt) ? { scheduledAt: datetimeTextToIso(scheduledAt)! } : {}),
+        ...(datetimeTextToIso(scheduledEndAt) ? { scheduledEndAt: datetimeTextToIso(scheduledEndAt)! } : {}),
         ...(datetimeTextToIso(registrationDeadlineAt)
           ? { registrationDeadlineAt: datetimeTextToIso(registrationDeadlineAt)! }
           : {}),
         ...(venue.trim() ? { venue: venue.trim() } : {}),
-        ...(teamCount ? { teamCount: parseInt(teamCount, 10) } : {}),
+        teamCount: parseInt(teamCount, 10),
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
         entryFee: parseInt(entryFee || '0', 10),
-        ...(prizePool ? { prizePool: parseInt(prizePool, 10) } : {}),
+        ...(prizePool.trim() && !Number.isNaN(parseInt(prizePool, 10))
+          ? { prizePool: parseInt(prizePool, 10) }
+          : {}),
+        ...(prizeSummary.trim() ? { prizeSummary: prizeSummary.trim() } : {}),
         ...(prizeBreakdown.trim() ? { prizeBreakdown: prizeBreakdown.trim() } : {}),
         ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
         ...(bankAccount.trim() ? { bankAccount: bankAccount.trim() } : {}),
@@ -328,7 +349,7 @@ export default function AdminTournamentsNewPage() {
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 min-h-[44px] text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -405,7 +426,7 @@ export default function AdminTournamentsNewPage() {
                 </select>
               </FormField>
 
-              <FormField id="scheduled-at" label="대회 일정" hint="예: 2026-08-15 09:00">
+              <FormField id="scheduled-at" label="대회 시작" hint="예: 2026-08-15 09:00">
                 <DatetimeTextInput
                   id="scheduled-at"
                   value={scheduledAt}
@@ -413,6 +434,21 @@ export default function AdminTournamentsNewPage() {
                   disabled={isPending}
                   placeholder="예: 2026-08-15 09:00"
                 />
+              </FormField>
+
+              <FormField id="scheduled-end-at" label="대회 종료" hint="2일 이상 진행할 때 입력해 주세요. 예: 2026-08-16 18:00">
+                <DatetimeTextInput
+                  id="scheduled-end-at"
+                  value={scheduledEndAt}
+                  onChange={setScheduledEndAt}
+                  disabled={isPending}
+                  placeholder="예: 2026-08-16 18:00"
+                />
+                {scheduleRangeError ? (
+                  <p className="mt-1 text-[var(--font-size-caption)] text-red-600" role="alert">
+                    {scheduleRangeError}
+                  </p>
+                ) : null}
               </FormField>
 
               <div className="md:col-span-2">
@@ -448,7 +484,7 @@ export default function AdminTournamentsNewPage() {
           <section id="tsec-team" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">팀 · 선수 설정</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField id="team-count" label="참가 팀 수" hint="비우면 무제한">
+              <FormField id="team-count" label="참가 팀 수" required hint="대회별 모집 정원을 입력해 주세요">
                 <input
                   id="team-count"
                   type="number"
@@ -458,6 +494,8 @@ export default function AdminTournamentsNewPage() {
                   onChange={(e) => setTeamCount(e.target.value)}
                   disabled={isPending}
                   placeholder="예: 16"
+                  required
+                  aria-required="true"
                   aria-invalid={teamCountError !== null}
                   aria-describedby={teamCountError !== null ? 'team-count-err' : undefined}
                   className={[
@@ -533,52 +571,71 @@ export default function AdminTournamentsNewPage() {
           <section id="tsec-fee" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
             <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">참가비 · 계좌</h2>
             <div className="flex flex-col gap-4">
-              {/* 참가비 + 총 상금 — 2열 */}
+              {/* 참가비 */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">
                   <input
                     id="entry-fee"
-                    type="number"
-                    min="0"
-                    step="1000"
-                    value={entryFee}
-                    onChange={(e) => setEntryFee(e.target.value)}
+                    type="text"
+                    value={formatWithComma(entryFee)}
+                    onChange={(e) => setEntryFee(onlyDigits(e.target.value))}
                     disabled={isPending}
                     placeholder="0"
                     className={inputCls}
                   />
                 </FormField>
-
-                <FormField id="prize-pool" label="총 상금 (원)" hint="비우면 상금 없음으로 표시돼요">
-                  <input
-                    id="prize-pool"
-                    type="number"
-                    min="0"
-                    step="10000"
-                    value={prizePool}
-                    onChange={(e) => setPrizePool(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 1000000"
-                    className={inputCls}
-                  />
-                </FormField>
               </div>
 
-              {/* 순위별 상금 안내 — 전체 너비 */}
+              {/* 총상금 — 숫자 */}
               <FormField
-                id="prize-breakdown"
-                label="순위별 상금 안내"
-                hint="참가자에게 공개되는 상금 안내 문구예요"
+                id="prize-pool"
+                label="총상금 (원)"
+                hint="시상·리뷰 페이지의 '총 상금' 카드에 표시돼요"
               >
                 <input
-                  id="prize-breakdown"
+                  id="prize-pool"
                   type="text"
+                  inputMode="numeric"
+                  value={formatWithComma(prizePool)}
+                  onChange={(e) => setPrizePool(onlyDigits(e.target.value))}
+                  disabled={isPending}
+                  placeholder="예: 1000000"
+                  className={inputCls}
+                />
+              </FormField>
+
+              {/* 상품 및 상금 안내 — 전체 너비 */}
+              <FormField
+                id="prize-summary"
+                label="상품 및 상금"
+                hint="상단 상품 및 상금 칸에 그대로 표시돼요"
+              >
+                <textarea
+                  id="prize-summary"
+                  value={prizeSummary}
+                  onChange={(e) => setPrizeSummary(e.target.value)}
+                  disabled={isPending}
+                  placeholder="예: 우승팀 현금 100만원 + 트로피"
+                  maxLength={200}
+                  rows={2}
+                  className={textareaCls}
+                />
+              </FormField>
+
+              <FormField
+                id="prize-breakdown"
+                label="상금 배분"
+                hint="콤마, 점, 줄바꿈으로 구분한 항목이 하단 박스로 표시돼요"
+              >
+                <textarea
+                  id="prize-breakdown"
                   value={prizeBreakdown}
                   onChange={(e) => setPrizeBreakdown(e.target.value)}
                   disabled={isPending}
                   placeholder="예: 1위 100만원 · 2위 50만원 · 3위 30만원"
                   maxLength={200}
-                  className={inputCls}
+                  rows={3}
+                  className={textareaCls}
                 />
               </FormField>
 
@@ -661,7 +718,7 @@ export default function AdminTournamentsNewPage() {
         <div className="max-w-3xl mx-auto flex items-center gap-3 mt-5">
           <Link
             href="/admin/tournaments"
-            className="inline-flex items-center justify-center h-[48px] px-6 rounded-xl text-[var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             취소
           </Link>
@@ -669,7 +726,7 @@ export default function AdminTournamentsNewPage() {
             type="submit"
             disabled={!canSubmit}
             className={[
-              'inline-flex items-center justify-center h-[48px] px-8 rounded-xl text-[var(--font-size-body)] font-semibold transition-colors',
+              'inline-flex items-center justify-center h-[44px] px-8 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed',
             ].join(' ')}

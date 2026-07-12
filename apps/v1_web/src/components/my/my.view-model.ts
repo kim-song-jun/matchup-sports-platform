@@ -4,20 +4,21 @@ import type {
 } from './my.types';
 
 export const myUser = {
-  name: '김정민',
-  handle: '@jungmin',
-  region: '서울 강남구',
-  sports: ['축구', '풋살', '러닝'],
-  intro: '퇴근 후에도 꾸준히 움직이는 팀 스포츠 유저',
-  initials: '김',
+  name: '—',
+  handle: '—',
+  region: '지역 미정',
+  sports: [],
+  intro: '',
+  initials: '—',
+  profileImageUrl: null,
   stats: [
-    { label: '활동', value: 0, unit: '회' },
-    { label: '소속 팀', value: 0, unit: '팀' },
+    { label: '활동', value: '—' },
+    { label: '소속 팀', value: '—' },
     { label: '매너 점수', value: '-' },
   ],
   // '매너 점수'는 상단 활동 요약(stats)에만 표시. monthly는 이번 달 경기 수·승률만 보여 이중 표기를 해소함.
   monthly: [
-    { label: '이번 달 경기', value: 0, unit: '경기' },
+    { label: '이번 달 경기', value: '—' },
     { label: '승률', value: '-' },
   ],
 };
@@ -45,7 +46,13 @@ export const myHomeModel: MyHomeViewModel = {
       title: '설정',
       items: [
         { label: '운동 정보', sub: '종목, 난이도, 기본 활동 지역을 관리해요', href: '/my/settings/sports', icon: 'Dumbbell' },
-        { label: '계정 설정', sub: '프로필 공개 범위와 보안을 관리해요', href: '/my/settings', icon: 'Settings' },
+        { label: '계정 설정', sub: '계정 보안과 알림을 관리해요', href: '/my/settings', icon: 'Settings' },
+      ],
+    },
+    {
+      title: '문의',
+      items: [
+        { label: '문의하기', sub: '계정, 매치, 대회, 결제 문제를 운영팀에 남겨요', href: '/my/inquiries', icon: 'Mail' },
       ],
     },
   ],

@@ -35,6 +35,14 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
+function formatDateRange(startStr: string | null, endStr: string | null): string {
+  const start = formatDate(startStr);
+  if (start === '—') return start;
+  const end = formatDate(endStr);
+  if (end === '—' || end === start) return start;
+  return `${start} ~ ${end}`;
+}
+
 function formatCurrency(n: number): string {
   if (n === 0) return '무료';
   return `${n.toLocaleString('ko-KR')}원`;
@@ -126,7 +134,7 @@ export default function AdminTournamentsPage() {
           canWrite ? (
             <Link
               href="/admin/tournaments/new"
-              className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[14px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               aria-label="새 대회 만들기"
             >
               <Plus size={16} aria-hidden="true" />
@@ -161,7 +169,7 @@ export default function AdminTournamentsPage() {
               meta: [
                 {
                   icon: <Calendar size={14} aria-hidden="true" />,
-                  label: formatDate(row.scheduledAt),
+                  label: formatDateRange(row.scheduledAt, row.scheduledEndAt),
                 },
                 {
                   icon: <Clock size={14} aria-hidden="true" />,
@@ -223,7 +231,7 @@ export default function AdminTournamentsPage() {
               onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
               disabled={isFetching}
               className={[
-                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
+                'h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
                 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
                 'disabled:opacity-50',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',

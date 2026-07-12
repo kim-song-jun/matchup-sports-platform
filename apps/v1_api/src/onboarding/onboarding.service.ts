@@ -7,7 +7,7 @@ import {
 import { Prisma, V1OnboardingStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingPreferencesDto } from './dto/update-onboarding-preferences.dto';
-import { V1OnboardingStep, derivePreferenceStatus, getMissing, getOnboardingDetail } from './onboarding-summary';
+import { V1OnboardingStep, derivePreferenceStatus, getMissing, getOnboardingDetail, hasAcceptedRequiredTerms } from './onboarding-summary';
 
 @Injectable()
 export class OnboardingService {
@@ -219,7 +219,7 @@ export class OnboardingService {
       currentStep: user.onboardingProgress?.currentStep ?? null,
       sportPreferences: user.sportPreferences,
       regions: user.regions,
-      hasRequiredTerms: user.termsConsents.length > 0,
+      hasRequiredTerms: hasAcceptedRequiredTerms(user.onboardingStatus, user.termsConsents.length),
       hasProfile: Boolean(user.profile?.nickname),
     };
   }

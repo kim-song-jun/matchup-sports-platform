@@ -27,6 +27,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     status: 'draft',
     registrationDeadlineAt: null,
     scheduledAt: null,
+    scheduledEndAt: null,
     venue: null,
     teamCount: 8,
     minPlayers: 6,
@@ -38,7 +39,28 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     rulesText: null,
     refundPolicyText: null,
     prizePool: null,
+    prizeSummary: null,
     prizeBreakdown: null,
+    promoHomeEnabled: false,
+    promoHomeTitle: null,
+    promoHomeSubtitle: null,
+    promoHomeImageUrl: null,
+    promoHomeBadgeText: null,
+    promoHomeDateText: null,
+    promoHomeTeamsText: null,
+    promoHomeLocationText: null,
+    promoHomePrizeText: null,
+    promoHomePriority: 0,
+    promoListEnabled: false,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    promoListPriority: 0,
     createdByAdminUserId: 'owner-admin-id',
     createdAt: new Date('2026-06-14T00:00:00.000Z'),
     updatedAt: new Date('2026-06-14T00:00:00.000Z'),
@@ -108,16 +130,40 @@ describe('TournamentsAdminService', () => {
   it('create: minPlayers > maxPlayers → 400 PLAYER_RANGE_INVALID', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     await expect(
-      service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', minPlayers: 10, maxPlayers: 6 }),
+      service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', teamCount: 8, minPlayers: 10, maxPlayers: 6 }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_PLAYER_RANGE_INVALID' } });
+  });
+
+  it('create: missing teamCount → 400 TOURNAMENT_TEAM_COUNT_REQUIRED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_TEAM_COUNT_REQUIRED' },
+    });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
   });
 
   it('create: unknown sportId → 400 SPORT_NOT_FOUND', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Sport.findUnique.mockResolvedValue(null);
-    await expect(service.create(ownerAuthUser, { sportId: 'ghost', title: 'x' })).rejects.toMatchObject({
+    await expect(service.create(ownerAuthUser, { sportId: 'ghost', title: 'x', teamCount: 8 })).rejects.toMatchObject({
       response: { code: 'SPORT_NOT_FOUND' },
     });
+  });
+
+  it('create: scheduledEndAt before scheduledAt → 400 TOURNAMENT_SCHEDULE_RANGE_INVALID', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: 'x',
+        teamCount: 8,
+        scheduledAt: '2026-08-15T09:00:00.000Z',
+        scheduledEndAt: '2026-08-14T18:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_SCHEDULE_RANGE_INVALID' } });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
   });
 
   it('create: owner with valid input → returns draft tournament + writes audit log', async () => {
@@ -125,9 +171,31 @@ describe('TournamentsAdminService', () => {
     prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
     prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
 
-    const result = await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', entryFee: 120000 });
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '테스트 대회',
+      teamCount: 12,
+      entryFee: 120000,
+      scheduledAt: '2026-08-15T09:00:00.000Z',
+      scheduledEndAt: '2026-08-16T18:00:00.000Z',
+    });
 
-    expect(result).toMatchObject({ id: 'tournament-1', status: 'draft', registrationCount: 0, entryFee: 120000 });
+    expect(result).toMatchObject({
+      id: 'tournament-1',
+      status: 'draft',
+      registrationCount: 0,
+      entryFee: 120000,
+      scheduledEndAt: null,
+    });
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          teamCount: 12,
+          scheduledAt: new Date('2026-08-15T09:00:00.000Z'),
+          scheduledEndAt: new Date('2026-08-16T18:00:00.000Z'),
+        }),
+      }),
+    );
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.create', targetType: 'tournament' }) }),
     );
@@ -212,6 +280,20 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ title: '새 제목' }) }),
     );
+  });
+
+  it('update: rejects scheduledEndAt earlier than final scheduledAt', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({ scheduledAt: new Date('2026-08-15T09:00:00.000Z') }),
+    );
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', {
+        scheduledEndAt: '2026-08-14T18:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_SCHEDULE_RANGE_INVALID' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
   });
 
   it('update: minPlayers > maxPlayers (merged with existing) → 400 TOURNAMENT_PLAYER_RANGE_INVALID', async () => {

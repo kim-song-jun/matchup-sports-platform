@@ -39,8 +39,29 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
   if (!value) return null;
   if (!value.startsWith('/') || value.startsWith('//')) return null;
   if (value.includes('://')) return null;
-  if (value.startsWith('/login')) return null;
-  return value;
+
+  const path = stripConfiguredBasePath(value);
+  if (path.startsWith('//')) return null;
+  if (path.startsWith('/login')) return null;
+  return path;
+}
+
+export function getConfiguredBasePath() {
+  const raw = process.env.NEXT_PUBLIC_BASE_PATH?.trim().replace(/\/+$/, '') ?? '';
+  if (!raw || raw === '/') return '';
+  return raw.startsWith('/') ? raw : `/${raw}`;
+}
+
+export function stripConfiguredBasePath(path: string) {
+  const basePath = getConfiguredBasePath();
+  if (!basePath) return path;
+
+  let nextPath = path;
+  while (nextPath === basePath || nextPath.startsWith(`${basePath}/`)) {
+    nextPath = nextPath.slice(basePath.length) || '/';
+  }
+
+  return nextPath.startsWith('/') ? nextPath : `/${nextPath}`;
 }
 
 export function getCurrentRedirectPath() {

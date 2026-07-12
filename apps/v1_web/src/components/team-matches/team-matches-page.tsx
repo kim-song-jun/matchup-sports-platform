@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import type { ChangeEvent, KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { BellIcon, ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
+import { cssUrl, publicAssetPath } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
   TeamMatchDetailViewModel,
@@ -113,7 +115,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
 
-  const runHeroAction = (action: (() => void | Promise<void>) | undefined, successMessage: string) => {
+  const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string) => {
     if (!action) return;
     void Promise.resolve(action())
       .then(() => {
@@ -147,7 +149,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, overflow: 'hidden', background: 'var(--grey100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {match.hostTeamLogoUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={match.hostTeamLogoUrl} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={publicAssetPath(match.hostTeamLogoUrl)} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <span className="tm-text-subhead" style={{ color: 'var(--text-caption)' }}>{match.hostTeam.slice(0, 1)}</span>
         )}
@@ -207,13 +209,13 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 </Link>
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
-                  <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
+                  <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림" onClick={model.onNotify} />
                 </div>
               </div>
               {/* Desktop-only share + notify actions inside hero */}
               <div className="tm-team-match-hero-actions tm-show-desktop">
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
-                <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="알림" onClick={model.onNotify}><BellIcon size={20} /></button>
+                <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림" onClick={model.onNotify} />
               </div>
               <div className="tm-team-vs-row">
                 <div>
@@ -302,6 +304,21 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <div className="tm-text-body-lg">신청팀</div>
                   {match.applicantActionError ? (
                     <div className="tm-text-micro" role="alert" style={{ color: 'var(--red500)', marginTop: 6 }}>{match.applicantActionError}</div>
+                  ) : null}
+                  {model.hostActions?.length ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                      {model.hostActions.map((action) => (
+                        <button
+                          key={action.label}
+                          className={`tm-btn tm-btn-sm ${hostActionClass(action.tone)}`}
+                          type="button"
+                          disabled={action.pending}
+                          onClick={() => runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`)}
+                        >
+                          {action.pending ? '처리 중' : action.label}
+                        </button>
+                      ))}
+                    </div>
                   ) : null}
                   <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
                     {match.applicantTeams.map((team) => (
@@ -398,7 +415,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const secondaryAction = model.form?.onBack;
   return (
     <AppChrome title={edit ? '팀매치 수정' : '팀매치 만들기'} activeTab="matches" bottomNav={false} backHref={model.backHref ?? '/team-matches'}>
-      <div className="tm-create-shell">
+      <div className={`tm-create-shell ${edit ? 'tm-create-shell-edit' : ''}`}>
         <CreateProgress step={step} edit={edit} />
         {model.form?.error ? <StateCard tone="orange" title="저장할 수 없어요" body={model.form.error} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 팀매치예요" body={model.form.lockedReason} /> : null}
@@ -587,8 +604,8 @@ function DraggableFilterSheet({
 function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
-  const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : '모집 중';
-  const statusClass = match.status === 'mine' ? 'tm-badge-green' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-blue' : 'tm-badge-blue';
+  const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : match.status === 'closed' ? '마감' : '모집 중';
+  const statusClass = match.status === 'mine' ? 'tm-badge-green' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-blue' : match.status === 'closed' ? 'tm-badge-grey' : 'tm-badge-blue';
   return (
     <Link className="tm-team-match-card tm-pressable" href={`/team-matches/${match.id}`}>
       <div className="tm-team-match-vs">
@@ -696,21 +713,63 @@ function SportStep({ model }: { model: TeamMatchCreateViewModel }) {
 
 function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: boolean }) {
   const d = model.draft;
-  return <div><h1 className="tm-text-heading">매치 정보</h1><CreateField label="매치 제목" value={d.title} onChange={(value) => model.form?.onFieldChange('title', value)} /><CreateField label="설명" value={d.description} multiline onChange={(value) => model.form?.onFieldChange('description', value)} /><div className="tm-team-create-preview"><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>우리 팀 vs 상대팀</div></div>{edit ? <><CreateField label="실력등급" value={d.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><CreateField label="경기방식" value={d.format} onChange={(value) => model.form?.onFieldChange('format', value)} /><CreateField label="경기 스타일" value={d.style} onChange={(value) => model.form?.onFieldChange('style', value)} /><CreateField label="유니폼 색상" value={d.uniform} onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div><StateCard tone="orange" title="수정 중" body="팀장 또는 관리자만 저장할 수 있어요. 저장에 실패해도 입력한 내용은 유지돼요." /></> : null}</div>;
+  return <div><h1 className="tm-text-heading">매치 정보</h1><CreateField label="매치 제목" value={d.title} placeholder="예: 토요일 저녁 풋살 상대팀 구합니다" onChange={(value) => model.form?.onFieldChange('title', value)} /><CreateField label="설명" value={d.description} placeholder="예: 친선 위주로 즐겁게 경기할 팀을 찾고 있어요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} /><ImageUploadField image={d.imageUrl} onChange={(value) => model.form?.onFieldChange('imageUrl', value)} onUpload={model.form?.uploadImage} />{edit ? <><CreateField label="실력등급" value={d.grade} placeholder="예: B, 중급, 생활체육" onChange={(value) => model.form?.onFieldChange('grade', value)} /><CreateField label="경기방식" value={d.format} placeholder="예: 5:5 풋살, 11:11 축구" onChange={(value) => model.form?.onFieldChange('format', value)} /><CreateField label="경기 스타일" value={d.style} placeholder="예: 친선 · 매너 중시" onChange={(value) => model.form?.onFieldChange('style', value)} /><CreateField label="유니폼 색상" value={d.uniform} placeholder="예: 흰색 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div><StateCard tone="orange" title="수정 중" body="팀장 또는 관리자만 저장할 수 있어요. 저장에 실패해도 입력한 내용은 유지돼요." /></> : null}</div>;
 }
 
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
-  return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><CreateField label="실력등급" value={d.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><CreateField label="경기방식" value={d.format} onChange={(value) => model.form?.onFieldChange('format', value)} /><CreateField label="경기 스타일" value={d.style} onChange={(value) => model.form?.onFieldChange('style', value)} /><CreateField label="유니폼 색상" value={d.uniform} onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div><Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 5 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
+  return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><CreateField label="실력등급" value={d.grade} placeholder="예: B, 중급, 생활체육" onChange={(value) => model.form?.onFieldChange('grade', value)} /><CreateField label="경기방식" value={d.format} placeholder="예: 5:5 풋살, 11:11 축구" onChange={(value) => model.form?.onFieldChange('format', value)} /><CreateField label="경기 스타일" value={d.style} placeholder="예: 친선 · 매너 중시" onChange={(value) => model.form?.onFieldChange('style', value)} /><CreateField label="유니폼 색상" value={d.uniform} placeholder="예: 흰색 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div><Card pad={14} style={{ marginTop: 14, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 5 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
 }
 
 function PlaceTimeStep({ model }: { model: TeamMatchCreateViewModel }) {
   const d = model.draft;
-  return <div><h1 className="tm-text-heading">장소와 시간</h1><RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} /><Card pad={16} className="tm-create-selected" style={{ marginTop: 16 }}><div className="tm-text-body-lg">{d.venue}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{d.address}</div></Card><CreateField label="장소" value={d.venue} onChange={(value) => model.form?.onFieldChange('venue', value)} /><CreateField label="상세 주소" value={d.address} onChange={(value) => model.form?.onFieldChange('address', value)} /><CreateField label="날짜" value={d.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} /><div className="tm-create-two-col"><CreateField label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} /><CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} /></div></div>;
+  return <div><h1 className="tm-text-heading">장소와 시간</h1><RegionSelect value={model.form?.regionId ?? ''} regions={model.form?.regions ?? []} onChange={model.form?.onRegionChange} /><CreateField label="상세 주소" value={d.venue} placeholder="예: 잠실 풋살파크 A구장, 3층 2번 코트" onChange={(value) => model.form?.onFieldChange('venue', value)} /><CreateField label="날짜" value={d.date} type="date" onChange={(value) => model.form?.onFieldChange('date', value)} /><div className="tm-create-two-col"><CreateField label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} /><CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} /></div></div>;
 }
 
-function RegionSelect({ value, regions, onChange }: { value: string; regions: Array<{ id: string; name: string }>; onChange?: (regionId: string) => void }) {
-  return <label className="tm-create-field"><div className="tm-text-label">지역</div><select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세 장소는 아래에 직접 입력해 주세요.</div></label>;
+function RegionSelect({ value, regions, onChange }: { value: string; regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>; onChange?: (regionId: string) => void }) {
+  const selectedRegion = regions.find((region) => region.id === value);
+  const [selectedParent, setSelectedParent] = useState(selectedRegion?.parentName ?? '');
+  const parentNames = Array.from(new Set(regions.map((region) => region.parentName).filter((name): name is string => Boolean(name))));
+  const districts = selectedParent ? regions.filter((region) => region.parentName === selectedParent) : [];
+
+  useEffect(() => {
+    if (selectedRegion?.parentName) setSelectedParent(selectedRegion.parentName);
+  }, [selectedRegion?.parentName]);
+
+  if (parentNames.length === 0) {
+    return <label className="tm-create-field"><div className="tm-text-label">지역</div><select className="tm-create-input tm-create-select-control" value={value} onChange={(event) => onChange?.(event.target.value)}><option value="">시/군/구 선택</option>{regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}</select><div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div></label>;
+  }
+
+  return (
+    <div className="tm-create-field">
+      <div className="tm-text-label">지역</div>
+      <div className="tm-create-two-col">
+        <select
+          className="tm-create-input tm-create-select-control"
+          value={selectedParent}
+          aria-label="시/도 선택"
+          onChange={(event) => {
+            setSelectedParent(event.target.value);
+            onChange?.('');
+          }}
+        >
+          <option value="">시/도 선택</option>
+          {parentNames.map((parentName) => <option key={parentName} value={parentName}>{parentName}</option>)}
+        </select>
+        <select
+          className="tm-create-input tm-create-select-control"
+          value={value}
+          aria-label="시/군/구 선택"
+          disabled={!selectedParent}
+          onChange={(event) => onChange?.(event.target.value)}
+        >
+          <option value="">시/군/구 선택</option>
+          {districts.map((region) => <option key={region.id} value={region.id}>{region.shortName ?? region.name}</option>)}
+        </select>
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 6 }}>지역은 검색·추천 기준으로 사용돼요. 상세주소는 아래에 직접 입력해 주세요.</div>
+    </div>
+  );
 }
 
 function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
@@ -718,7 +777,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   // 상대팀 부담금 0원일 때만 '무료초청' 뱃지 표시 (목록·상세와 동일 조건 #20)
   const isFreeInvite = d.opponentCost === 0;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview"><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format} · ${d.style}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={`${d.date} ${d.startTime}-${d.endTime}`} /><InfoRow label="장소" value={d.venue} sub={d.address} /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 10 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 6 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format} · ${d.style}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={`${d.date} ${d.startTime}-${d.endTime}`} /><InfoRow label="상세 주소" value={d.venue} /></Card></div>;
 }
 
 function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
@@ -768,6 +827,12 @@ function TeamMatchComplete({ model }: { model: TeamMatchCreateViewModel }) {
   );
 }
 
+function hostActionClass(tone: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]['tone']) {
+  if (tone === 'primary') return 'tm-btn-primary';
+  if (tone === 'danger') return 'tm-btn-danger';
+  return 'tm-btn-neutral';
+}
+
 function InfoRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}><div className="tm-text-label">{value}</div>{sub ? <div className="tm-text-micro" style={{ marginTop: 3, color: 'var(--text-caption)' }}>{sub}</div> : null}</div></div>;
 }
@@ -775,6 +840,56 @@ function InfoRow({ label, value, sub }: { label: string; value: string; sub?: st
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
   /* 배경색은 디자인 토큰 사용 — raw rgba 금지(v1-coding-patterns §2) */
   return <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange500)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div></Card>;
+}
+
+function ImageUploadField({ image, onChange, onUpload }: { image: string; onChange?: (value: string) => void; onUpload?: (file: File) => Promise<string> }) {
+  const [fileName, setFileName] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setFileName(file.name);
+    setUploadError(null);
+
+    if (!onUpload) return;
+
+    setUploading(true);
+    try {
+      const url = await onUpload(file);
+      onChange?.(url);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '이미지 업로드에 실패했어요. 다시 시도해 주세요.';
+      setUploadError(msg);
+      setFileName('');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Card pad={0} style={{ marginTop: 14, overflow: 'hidden' }}>
+      <div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(image) }}>
+        <span className="tm-badge tm-badge-grey">배경 이미지</span>
+      </div>
+      <div style={{ padding: 14 }}>
+        <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ opacity: uploading ? 0.6 : 1 }}>
+          {uploading ? '업로드 중...' : fileName || image ? '이미지 변경' : '배경 이미지 선택'}
+          <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
+        </label>
+        <div className="tm-text-caption" style={{ marginTop: 8 }}>목록과 상세 화면의 상단 배경으로 보여요.</div>
+        {uploadError ? <div className="tm-text-caption" role="alert" style={{ marginTop: 8, color: 'var(--orange500)' }}>{uploadError}</div> : null}
+        {(fileName || image) && !uploading ? (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 }}>
+            <span className="tm-text-caption" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fileName || '선택한 이미지'}</span>
+            <button className="tm-btn tm-btn-sm tm-btn-ghost" type="button" onClick={() => { setFileName(''); onChange?.(''); }}>제거</button>
+          </div>
+        ) : null}
+      </div>
+    </Card>
+  );
 }
 
 function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
@@ -804,8 +919,8 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
   );
 }
 
-function CreateField({ label, value, suffix, multiline, type = 'text', onChange }: { label: string; value?: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
-  return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" value={value ?? ''} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value ?? ''} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || '입력'}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
+function CreateField({ label, value, placeholder, suffix, multiline, type = 'text', onChange }: { label: string; value?: string; placeholder?: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
+  return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder || '입력'}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
 }
 
 function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (value: string) => void }) {

@@ -9,6 +9,7 @@ export interface AdminCardMeta {
   /** Optional leading lucide icon (16px 권장, color는 컴포넌트가 muted 처리) */
   icon?: ReactNode;
   label: ReactNode;
+  wrap?: boolean;
 }
 
 export interface AdminCardModel {
@@ -21,6 +22,7 @@ export interface AdminCardModel {
   /** 우상단 status 영역 커스텀(상태 enum 이 아닌 경우). status 보다 우선 */
   statusNode?: ReactNode;
   meta?: AdminCardMeta[];
+  description?: ReactNode;
   /** 위험/경고 상태 좌측 accent + 배경 tint (AdminDataTable rowTone 과 동일 시각언어) */
   tone?: 'danger' | 'warning';
 }
@@ -38,6 +40,7 @@ interface AdminCardListProps<T> {
   onRetry?: () => void;
   /** 로딩 중 스켈레톤 카드 수 (default: 6) */
   skeletonCards?: number;
+  minCardWidth?: string;
 }
 
 // ── tone → class (AdminDataTable 과 동일 매핑) ──────────────────────────────
@@ -46,9 +49,8 @@ const TONE_CARD: Record<'danger' | 'warning', string> = {
   warning: 'bg-amber-50/40 border-l-2 border-l-amber-400',
 };
 
-// 모바일 1열 → 좁은 화면부터 채워지는 반응형 그리드. 카드 최소 280px.
-const GRID_CLASS =
-  'grid gap-3 grid-cols-[repeat(auto-fill,minmax(280px,1fr))]';
+// 모바일 1열 → 좁은 화면부터 채워지는 반응형 그리드.
+const GRID_CLASS = 'grid gap-3';
 
 export function AdminCardList<T>({
   rows,
@@ -60,7 +62,10 @@ export function AdminCardList<T>({
   error,
   onRetry,
   skeletonCards = 6,
+  minCardWidth = '280px',
 }: AdminCardListProps<T>) {
+  const gridStyle = { gridTemplateColumns: `repeat(auto-fill,minmax(${minCardWidth},1fr))` };
+
   // Error state
   if (error) {
     return (
@@ -82,7 +87,7 @@ export function AdminCardList<T>({
   // Loading state — 카드형 스켈레톤
   if (loading) {
     return (
-      <div className={GRID_CLASS} aria-busy="true" aria-live="polite">
+      <div className={GRID_CLASS} style={gridStyle} aria-busy="true" aria-live="polite">
         {Array.from({ length: skeletonCards }).map((_, i) => (
           <div
             key={i}
@@ -120,7 +125,7 @@ export function AdminCardList<T>({
   const hasActions = !!renderActions;
 
   return (
-    <ul className={GRID_CLASS} role="list">
+    <ul className={GRID_CLASS} style={gridStyle} role="list">
       {rows.map((row) => {
         const model = card(row);
         const tone = model.tone;
@@ -168,15 +173,21 @@ export function AdminCardList<T>({
                         {m.icon}
                       </span>
                     )}
-                    <span className="truncate">{m.label}</span>
+                    <span className={m.wrap ? 'min-w-0 break-words leading-snug' : 'truncate'}>{m.label}</span>
                   </dd>
                 ))}
               </dl>
             )}
 
+            {model.description ? (
+              <div className="mt-2.5 rounded-lg bg-gray-50 px-3 py-2 text-[var(--font-size-caption)] text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+                {model.description}
+              </div>
+            ) : null}
+
             {/* 액션 (full-width stretch) */}
             {hasActions && (
-              <div className="mt-3 flex items-center gap-2 [&>*]:flex-1">
+              <div className="mt-3 flex flex-wrap items-center gap-2 [&>*]:min-w-[88px] [&>*]:flex-1">
                 {renderActions!(row)}
               </div>
             )}

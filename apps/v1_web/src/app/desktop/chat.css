@@ -129,20 +129,6 @@
     display: none;
   }
 
-  /* Leave confirm sheet: a centered dialog (not a bottom sheet) on desktop. */
-  .tm-chat-leave-scrim {
-    position: fixed;
-    top: 0;
-    align-items: center;
-    justify-content: center;
-    background: rgba(15, 23, 42, 0.32);
-  }
-
-  .tm-chat-leave-sheet {
-    width: min(100%, 400px);
-    border-radius: 20px;
-    box-shadow: var(--shadow-2);
-  }
 }
 
 /* ─── 태블릿 (768–1023): 스와이프 액션 숨김 ──────────────────────────────────

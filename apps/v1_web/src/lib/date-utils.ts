@@ -6,7 +6,9 @@
  *
  * 대회(Tournament) 날짜 표기 기준:
  *   - compact 슬롯 (홈 티저 · 목록 카드): formatTournamentDateShort  → 'M/D (요일)'
+ *   - compact 범위 슬롯:                 formatTournamentDateRangeShort → 'M/D (요일)~M/D (요일)'
  *   - 상세 슬롯 (대회 상세 페이지):        formatTournamentDateLong   → 'YYYY년 M월 D일 (요일)'
+ *   - 상세 범위 슬롯:                    formatTournamentDateRangeLong
  *
  * 금액 포맷터:
  *   - formatEntryFee(fee)   → 0이면 '무료', 그 외 'N원' (ko-KR 천 단위 구분)
@@ -26,6 +28,17 @@ export function formatTournamentDateShort(dateStr: string | null | undefined): s
   return `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
 }
 
+export function formatTournamentDateRangeShort(
+  startStr: string | null | undefined,
+  endStr: string | null | undefined,
+): string | null {
+  const start = formatTournamentDateShort(startStr);
+  if (!start) return null;
+  const end = formatTournamentDateShort(endStr);
+  if (!end || end === start) return start;
+  return `${start}~${end}`;
+}
+
 /**
  * 상세 슬롯용 긴 형식: 'YYYY년 M월 D일 (요일)'
  * 대회 상세 페이지에서 사용해요.
@@ -36,6 +49,17 @@ export function formatTournamentDateLong(dateStr: string | null | undefined): st
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '날짜 미정';
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
+}
+
+export function formatTournamentDateRangeLong(
+  startStr: string | null | undefined,
+  endStr: string | null | undefined,
+): string {
+  const start = formatTournamentDateLong(startStr);
+  if (start === '날짜 미정') return start;
+  const end = formatTournamentDateLong(endStr);
+  if (end === '날짜 미정' || end === start) return start;
+  return `${start} ~ ${end}`;
 }
 
 /**

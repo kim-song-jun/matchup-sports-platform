@@ -1,52 +1,66 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import {
   useV1CheckEmail,
   useV1CheckNickname,
   useV1Register,
   useV1UpdateProfile,
+  useV1UploadImages,
 } from '@/hooks/use-v1-api';
+import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { readSignupTermsAccepted } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
 
-// sport step은 onboarding 위저드(/onboarding/sport)가 담당.
-// 인라인 wizard는 계정 생성(nickname→email→password) + 생년월일(birthdate)까지만.
-type WizardStep = 'nickname' | 'email' | 'password' | 'birthdate';
-const STEP_ORDER: WizardStep[] = ['nickname', 'email', 'password', 'birthdate'];
+type WizardStep = 'account' | 'profile';
+type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
+
+const STEP_ORDER: WizardStep[] = ['account', 'profile'];
 
 const STEP_COPY: Record<WizardStep, { title: string; sub: string }> = {
-  nickname: { title: '어떤 이름으로\n활동할까요?', sub: '경기와 팀에서 보일 이름이에요. 나중에 바꿀 수 있어요.' },
-  email: { title: '이메일을\n알려주세요', sub: '로그인과 알림에 사용해요.' },
-  password: { title: '비밀번호를\n설정해 주세요', sub: '8자 이상으로 안전하게 만들어 주세요.' },
-  birthdate: { title: '생년월일을\n알려주세요', sub: '연령대에 맞는 매칭에 쓰여요. 건너뛰어도 괜찮아요.' },
+  account: {
+    title: '가입 정보를\n확인해 주세요',
+    sub: '닉네임과 이메일은 먼저 중복 확인이 필요해요. 비밀번호까지 입력하면 프로필 단계로 넘어가요.',
+  },
+  profile: {
+    title: '프로필을\n완성해 주세요',
+    sub: '대회 참여 시 이름, 휴대폰 번호, 생년월일은 본인 확인에 필요해요.',
+  },
 };
 
-type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
+const onboardingDraftKey = 'teameet.v1.onboardingDraft';
 
 export function SignupClient() {
   const router = useRouter();
   const register = useV1Register();
   const updateProfile = useV1UpdateProfile();
+  const uploadImages = useV1UploadImages();
   const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
 
-  const [step, setStep] = useState<WizardStep>('nickname');
+  const [step, setStep] = useState<WizardStep>('account');
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
-  const [birthDate, setBirthDate] = useState(''); // ISO YYYY-MM-DD from the native date picker
+  const [profileImageUrl, setProfileImageUrl] = useState('');
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImageName, setProfileImageName] = useState('');
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [displayName, setDisplayName] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [birthDateDigits, setBirthDateDigits] = useState('');
   const [requiredTermsAccepted, setRequiredTermsAccepted] = useState(false);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
@@ -57,181 +71,225 @@ export function SignupClient() {
 
   const stepIndex = STEP_ORDER.indexOf(step);
   const copy = STEP_COPY[step];
-  const today = new Date().toISOString().slice(0, 10);
-
-  const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
-  const emailVerified = emailCheck.status === 'available' && emailCheck.value === email.trim().toLowerCase();
+  const normalizedNickname = nickname.trim();
+  const normalizedEmail = email.trim().toLowerCase();
+  const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname;
+  const emailVerified = emailCheck.status === 'available' && emailCheck.value === normalizedEmail;
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
-  // saving은 생년월일 저장 진행 중 표시에 사용
-  const saving = updateProfile.isPending;
+  const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
+  const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage;
 
   const runNicknameCheck = () => {
-    const next = nickname.trim();
-    setFieldError(null);
-    if (next.length < 2) {
-      setFieldError('닉네임은 2자 이상 입력해 주세요.');
+    setNicknameError(null);
+    setError(null);
+    if (normalizedNickname.length < 2) {
+      setNicknameError('닉네임은 2자 이상 입력해 주세요.');
       setNicknameCheck({ status: 'idle', value: '' });
       return;
     }
-    checkNickname.mutate(next, {
+
+    checkNickname.mutate(normalizedNickname, {
       onSuccess: (result) => {
-        setNicknameCheck({ status: result.available ? 'available' : 'taken', value: next });
-        setFieldError(result.available ? null : '이미 사용 중인 닉네임이에요.');
+        setNicknameCheck({ status: result.available ? 'available' : 'taken', value: normalizedNickname });
+        setNicknameError(result.available ? null : '이미 사용 중인 닉네임이에요.');
       },
       onError: () => {
-        setNicknameCheck({ status: 'error', value: next });
-        setFieldError('중복 확인에 실패했어요. 다시 시도해 주세요.');
+        setNicknameCheck({ status: 'error', value: normalizedNickname });
+        setNicknameError('중복 확인에 실패했어요. 다시 시도해 주세요.');
       },
     });
   };
 
   const runEmailCheck = () => {
-    const next = email.trim().toLowerCase();
-    setFieldError(null);
-    if (!next.includes('@')) {
-      setFieldError('이메일 형식을 확인해 주세요.');
+    setEmailError(null);
+    setError(null);
+    if (!normalizedEmail.includes('@')) {
+      setEmailError('이메일 형식을 확인해 주세요.');
       setEmailCheck({ status: 'idle', value: '' });
       return;
     }
-    checkEmail.mutate(next, {
+
+    checkEmail.mutate(normalizedEmail, {
       onSuccess: (result) => {
-        setEmailCheck({ status: result.available ? 'available' : 'taken', value: next });
-        setFieldError(result.available ? null : '이미 가입된 이메일이에요.');
+        setEmailCheck({ status: result.available ? 'available' : 'taken', value: normalizedEmail });
+        setEmailError(result.available ? null : '이미 가입된 이메일이에요.');
       },
       onError: () => {
-        setEmailCheck({ status: 'error', value: next });
-        setFieldError('중복 확인에 실패했어요. 다시 시도해 주세요.');
+        setEmailCheck({ status: 'error', value: normalizedEmail });
+        setEmailError('중복 확인에 실패했어요. 다시 시도해 주세요.');
       },
     });
   };
 
-  const goBack = () => {
-    setFieldError(null);
+  const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setProfileError(null);
     setError(null);
-    if (step === 'nickname') {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setProfileError('이미지 파일만 선택할 수 있어요.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileError('프로필 사진은 2MB 이하 이미지로 선택해 주세요.');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    setUploadingProfileImage(true);
+    reader.onload = () => {
+      setProfileImageUrl(typeof reader.result === 'string' ? reader.result : '');
+      setProfileImageFile(file);
+      setProfileImageName(file.name);
+      setUploadingProfileImage(false);
+    };
+    reader.onerror = () => {
+      setProfileError('이미지를 읽지 못했어요. 다시 선택해 주세요.');
+      event.target.value = '';
+      setUploadingProfileImage(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const goBack = () => {
+    setError(null);
+    setProfileError(null);
+    if (step === 'account') {
       router.push('/terms');
       return;
     }
-    if (step === 'email') return setStep('nickname');
-    if (step === 'password') return setStep('email');
-    // birthdate: 계정이 이미 생성된 이후라 계정 단계로 돌아가지 않는다.
+    setStep('account');
   };
 
-  const submitAccount = () => {
+  const goProfile = () => {
+    if (!accountReady) return;
     setError(null);
-    register.mutate(
-      { nickname: nickname.trim(), email: email.trim().toLowerCase(), password, requiredTermsAccepted },
-      {
-        onSuccess: (result) => {
-          saveStoredV1Session(result.session);
-          setStep('birthdate');
-        },
-        onError: (nextError) => {
-          if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
-            if (nextError.code === 'NICKNAME_CONFLICT') {
-              setNicknameCheck({ status: 'taken', value: nickname.trim() });
-              setStep('nickname');
-              setFieldError('이미 사용 중인 닉네임이에요.');
-              return;
-            }
-            setEmailCheck({ status: 'taken', value: email.trim().toLowerCase() });
-            setStep('email');
-            setFieldError('이미 가입된 이메일이에요.');
-            return;
-          }
-          if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
-            setError('필수 약관 문서가 아직 준비되지 않았어요.');
-            return;
-          }
-          if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || !requiredTermsAccepted)) {
-            router.replace('/terms');
-            return;
-          }
-          setError(nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.');
-        },
-      },
-    );
+    setProfileError(null);
+    if (!displayName.trim()) {
+      setDisplayName(normalizedNickname);
+    }
+    setStep('profile');
   };
 
-  // 생년월일(선택)을 저장한 뒤 onboarding 위저드로 이동.
-  // 종목·실력·지역 수집과 onboardingStatus 'completed' 확정은 위저드(/onboarding/sport)가 담당한다.
-  const goToOnboarding = async () => {
+  const submitAccount = async () => {
     setError(null);
+    setProfileError(null);
+
+    if (phoneDigits && phoneDigits.length !== 11) {
+      setProfileError('휴대폰 번호는 숫자 11자리로 입력해 주세요.');
+      return;
+    }
+
+    if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
+      setProfileError('생년월일은 올바른 날짜로 입력해 주세요. 예: 1995-01-15');
+      return;
+    }
+
+    const missingTournamentFields = [
+      !displayName.trim() ? '이름' : null,
+      !phoneDigits ? '휴대폰 번호' : null,
+      !birthDateDigits ? '생년월일' : null,
+    ].filter(Boolean);
+
+    if (missingTournamentFields.length > 0) {
+      const confirmed = window.confirm(
+        `대회 참여 시 ${missingTournamentFields.join(', ')}은(는) 개인 확인을 위해 꼭 필요해요.\n지금 입력하지 않으면 대회 신청 전에 다시 입력해야 해요. 그래도 가입을 계속할까요?`,
+      );
+      if (!confirmed) return;
+    }
+
     try {
-      if (birthDate) {
+      const result = await register.mutateAsync({
+        nickname: normalizedNickname,
+        displayName: displayName.trim() || normalizedNickname,
+        email: normalizedEmail,
+        password,
+        phone: phoneDigits || undefined,
+        birthDate: birthDateDigits || undefined,
+        requiredTermsAccepted,
+      });
+
+      saveStoredV1Session(result.session);
+
+      if (profileImageFile) {
+        const uploadResult = await uploadImages.mutateAsync([profileImageFile]);
+        const uploadedUrl = uploadResult.urls[0];
+        if (!uploadedUrl) {
+          throw new Error('프로필 사진 업로드 응답에 이미지 URL이 없어요.');
+        }
+
         await updateProfile.mutateAsync({
-          displayName: nickname.trim(),
-          nickname: nickname.trim(),
-          email: email.trim().toLowerCase(),
-          visibilityStatus: 'public',
-          birthDate: birthDate.replace(/-/g, ''),
+          displayName: displayName.trim() || normalizedNickname,
+          nickname: normalizedNickname,
+          email: normalizedEmail,
+          profileImageUrl: uploadedUrl,
+          phone: phoneDigits || null,
+          birthDate: birthDateDigits || null,
         });
       }
-      router.replace('/onboarding/sport');
+
+      window.sessionStorage.removeItem(onboardingDraftKey);
+      router.replace('/signup/complete');
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : '저장에 실패했어요. 다시 시도해 주세요.');
+      if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
+        if (nextError.code === 'NICKNAME_CONFLICT') {
+          setNicknameCheck({ status: 'taken', value: normalizedNickname });
+          setStep('account');
+          setNicknameError('이미 사용 중인 닉네임이에요.');
+          return;
+        }
+        if (nextError.code === 'PHONE_CONFLICT') {
+          setProfileError('이미 가입된 휴대폰 번호예요.');
+          return;
+        }
+        setEmailCheck({ status: 'taken', value: normalizedEmail });
+        setStep('account');
+        setEmailError('이미 가입된 이메일이에요.');
+        return;
+      }
+      if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
+        setError('필수 약관 문서가 아직 준비되지 않았어요.');
+        return;
+      }
+      if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || !requiredTermsAccepted)) {
+        router.replace('/terms');
+        return;
+      }
+      setError(nextError instanceof Error ? nextError.message : '회원가입에 실패했어요.');
     }
   };
+  const primary =
+    step === 'account'
+      ? {
+          label: '프로필 입력하기',
+          disabled: checkNickname.isPending || checkEmail.isPending || !accountReady,
+          onClick: goProfile,
+        }
+      : {
+          label: register.isPending ? '가입하는 중...' : '가입하고 계속',
+          disabled: profileBlocked,
+          onClick: () => { void submitAccount(); },
+        };
 
-  const handleNicknameInput = (event: FormEvent<HTMLInputElement>) => {
-    setNickname(event.currentTarget.value);
-    setNicknameCheck({ status: 'idle', value: '' });
-    setFieldError(null);
-  };
-
-  const handleEmailInput = (event: FormEvent<HTMLInputElement>) => {
-    setEmail(event.currentTarget.value);
-    setEmailCheck({ status: 'idle', value: '' });
-    setFieldError(null);
-  };
-
-  const handlePasswordInput = (event: FormEvent<HTMLInputElement>) => {
-    setPassword(event.currentTarget.value);
-  };
-
-  const handlePasswordConfirmInput = (event: FormEvent<HTMLInputElement>) => {
-    setPasswordConfirm(event.currentTarget.value);
-  };
-
-  const handleBirthDateInput = (event: FormEvent<HTMLInputElement>) => {
-    setBirthDate(event.currentTarget.value);
-  };
-
-  const primary: { label: string; disabled: boolean; onClick: () => void } =
-    step === 'nickname'
-      ? { label: '다음', disabled: checkNickname.isPending || !nicknameVerified, onClick: () => setStep('email') }
-      : step === 'email'
-        ? { label: '다음', disabled: checkEmail.isPending || !emailVerified, onClick: () => setStep('password') }
-        : step === 'password'
-          ? {
-              label: register.isPending ? '가입하는 중…' : '가입하고 계속',
-              disabled: register.isPending || !passwordLongEnough || !passwordMatch,
-              onClick: submitAccount,
-            }
-          : {
-              // birthdate
-              label: saving ? '저장 중…' : '다음',
-              disabled: saving,
-              onClick: goToOnboarding,
-            };
-
-  const skip =
-    step === 'birthdate'
-      ? { label: '건너뛰기', onClick: () => { setBirthDate(''); void goToOnboarding(); } }
-      : null;
-
-  /* #18: disabled 이유 힌트 — tm-text-caption(12px)으로 CTA 하단에 표시 */
   const disabledHint: string | null = primary.disabled
-    ? step === 'nickname'
-      ? '닉네임 중복 확인 후 다음으로 넘어갈 수 있어요.'
-      : step === 'email'
-        ? '이메일 중복 확인 후 다음으로 넘어갈 수 있어요.'
-        : step === 'password'
-          ? !passwordLongEnough ? '비밀번호는 8자 이상이어야 해요.' : '비밀번호 확인이 일치해야 해요.'
-          : null
+    ? step === 'account'
+      ? !nicknameVerified
+        ? '닉네임 중복 확인 후 다음으로 넘어갈 수 있어요.'
+        : !emailVerified
+          ? '이메일 중복 확인 후 다음으로 넘어갈 수 있어요.'
+          : !passwordLongEnough
+            ? '비밀번호는 8자 이상이어야 해요.'
+            : '비밀번호 확인이 일치해야 해요.'
+      : uploadingProfileImage
+        ? '프로필 사진을 업로드하는 중이에요.'
+        : null
     : null;
 
   return (
@@ -251,21 +309,11 @@ export function SignupClient() {
               {disabledHint}
             </p>
           ) : null}
-          {skip ? (
-            <button className="tm-btn tm-btn-md tm-btn-ghost tm-signup-skip" type="button" onClick={skip.onClick} disabled={saving}>
-              {skip.label}
-            </button>
-          ) : null}
         </>
       }
     >
       <div className="tm-auth-body">
-        {/* sr-only aria-live: 단계 전환 시 스크린리더에 공지 */}
-        <p
-          className="sr-only"
-          aria-live="polite"
-          aria-atomic="true"
-        >
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
           {`${STEP_ORDER.length}단계 중 ${stepIndex + 1}단계: ${copy.title.replace(/\n/g, ' ')}`}
         </p>
         <div
@@ -281,92 +329,96 @@ export function SignupClient() {
             <span key={value} data-on={index <= stepIndex} aria-hidden="true" />
           ))}
         </div>
-        {step !== 'birthdate' ? (
-          <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계"><ChevronLeftIcon size={18} strokeWidth={2.2} />이전</button>
-        ) : null}
+        <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계">
+          <ChevronLeftIcon size={18} strokeWidth={2.2} />이전
+        </button>
         <div className="tm-signup-hero">
           <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
           <p className="tm-text-body tm-auth-sub">{copy.sub}</p>
         </div>
 
         <form className="tm-auth-form tm-auth-signup-form" onSubmit={(event: FormEvent) => event.preventDefault()}>
-          {step === 'nickname' ? (
-            <label className="tm-auth-field">
-              <span className="tm-text-label">닉네임</span>
-              <span className="tm-auth-field-with-action">
-                <input
-                  className={`tm-input tm-auth-input ${fieldError ? 'tm-auth-input-error' : nicknameVerified ? 'tm-auth-input-success' : ''}`}
-                  minLength={2}
-                  autoFocus
-                  onInput={handleNicknameInput}
-                  onChange={handleNicknameInput}
-                  placeholder="사용할 닉네임"
-                  type="text"
-                  value={nickname}
-                  aria-invalid={fieldError ? true : undefined}
-                  aria-describedby={fieldError ? 'signup-nickname-helper' : nicknameVerified ? 'signup-nickname-helper' : undefined}
-                />
-                <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || nickname.trim().length < 2} onClick={runNicknameCheck} type="button">{checkNickname.isPending ? '확인 중' : '중복 확인'}</button>
-              </span>
-              {fieldError || nicknameVerified ? (
-                <span
-                  id="signup-nickname-helper"
-                  role={fieldError ? 'alert' : undefined}
-                  className={`tm-text-caption tm-auth-field-helper ${fieldError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
-                >
-                  {fieldError ?? '사용 가능한 닉네임이에요.'}
-                </span>
-              ) : null}
-            </label>
-          ) : null}
-
-          {step === 'email' ? (
-            <label className="tm-auth-field">
-              <span className="tm-text-label">이메일</span>
-              <span className="tm-auth-field-with-action">
-                <input
-                  className={`tm-input tm-auth-input ${fieldError ? 'tm-auth-input-error' : emailVerified ? 'tm-auth-input-success' : ''}`}
-                  autoFocus
-                  onInput={handleEmailInput}
-                  onChange={handleEmailInput}
-                  placeholder="예: 이름@이메일.com"
-                  type="email"
-                  value={email}
-                  aria-invalid={fieldError ? true : undefined}
-                  aria-describedby={fieldError || emailVerified ? 'signup-email-helper' : undefined}
-                />
-                <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !email.includes('@')} onClick={runEmailCheck} type="button">{checkEmail.isPending ? '확인 중' : '중복 확인'}</button>
-              </span>
-              {fieldError || emailVerified ? (
-                <span
-                  id="signup-email-helper"
-                  role={fieldError ? 'alert' : undefined}
-                  className={`tm-text-caption tm-auth-field-helper ${fieldError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
-                >
-                  {fieldError ?? '사용 가능한 이메일이에요.'}
-                </span>
-              ) : null}
-            </label>
-          ) : null}
-
-          {step === 'password' ? (
+          {step === 'account' ? (
             <>
+              <label className="tm-auth-field">
+                <span className="tm-text-label">닉네임</span>
+                <span className="tm-auth-field-with-action">
+                  <input
+                    className={`tm-input tm-auth-input ${nicknameError ? 'tm-auth-input-error' : nicknameVerified ? 'tm-auth-input-success' : ''}`}
+                    minLength={2}
+                    maxLength={40}
+                    autoFocus
+                    onChange={(event) => {
+                      setNickname(event.target.value);
+                      setNicknameCheck({ status: 'idle', value: '' });
+                      setNicknameError(null);
+                    }}
+                    placeholder="활동 닉네임"
+                    type="text"
+                    value={nickname}
+                    aria-invalid={nicknameError ? true : undefined}
+                    aria-describedby={nicknameError || nicknameVerified ? 'signup-nickname-helper' : undefined}
+                  />
+                  <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkNickname.isPending || normalizedNickname.length < 2} onClick={runNicknameCheck} type="button">
+                    {checkNickname.isPending ? '확인 중' : '중복 확인'}
+                  </button>
+                </span>
+                {nicknameError || nicknameVerified ? (
+                  <span
+                    id="signup-nickname-helper"
+                    role={nicknameError ? 'alert' : undefined}
+                    className={`tm-text-caption tm-auth-field-helper ${nicknameError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
+                  >
+                    {nicknameError ?? '사용 가능한 닉네임이에요.'}
+                  </span>
+                ) : null}
+              </label>
+
+              <label className="tm-auth-field">
+                <span className="tm-text-label">이메일</span>
+                <span className="tm-auth-field-with-action">
+                  <input
+                    className={`tm-input tm-auth-input ${emailError ? 'tm-auth-input-error' : emailVerified ? 'tm-auth-input-success' : ''}`}
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      setEmailCheck({ status: 'idle', value: '' });
+                      setEmailError(null);
+                    }}
+                    placeholder="예: name@email.com"
+                    type="email"
+                    value={email}
+                    aria-invalid={emailError ? true : undefined}
+                    aria-describedby={emailError || emailVerified ? 'signup-email-helper' : undefined}
+                  />
+                  <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button">
+                    {checkEmail.isPending ? '확인 중' : '중복 확인'}
+                  </button>
+                </span>
+                {emailError || emailVerified ? (
+                  <span
+                    id="signup-email-helper"
+                    role={emailError ? 'alert' : undefined}
+                    className={`tm-text-caption tm-auth-field-helper ${emailError ? 'tm-auth-field-helper-error' : 'tm-auth-field-helper-success'}`}
+                  >
+                    {emailError ?? '사용 가능한 이메일이에요.'}
+                  </span>
+                ) : null}
+              </label>
+
               <label className="tm-auth-field">
                 <span className="tm-text-label">비밀번호</span>
                 <span className="tm-auth-password-field">
                   <input
                     className={`tm-input tm-auth-input ${passwordTooShort ? 'tm-auth-input-error' : passwordLongEnough ? 'tm-auth-input-success' : ''}`}
                     minLength={8}
-                    autoFocus
-                    onInput={handlePasswordInput}
-                    onChange={handlePasswordInput}
+                    onChange={(event) => setPassword(event.target.value)}
                     placeholder="8자 이상"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     aria-invalid={passwordTooShort ? true : undefined}
                     aria-describedby={passwordTooShort || passwordLongEnough ? 'signup-password-helper' : undefined}
                   />
-                  <button className="tm-auth-password-toggle" type="button" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPassword} onClick={() => setShowPassword((v) => !v)}>
+                  <button className="tm-auth-password-toggle" type="button" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>
                     {showPassword ? <EyeOffIcon size={20} strokeWidth={1.8} /> : <EyeIcon size={20} strokeWidth={1.8} />}
                   </button>
                 </span>
@@ -376,21 +428,21 @@ export function SignupClient() {
                   <span id="signup-password-helper" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">사용할 수 있는 비밀번호예요.</span>
                 ) : null}
               </label>
+
               <label className="tm-auth-field">
                 <span className="tm-text-label">비밀번호 확인</span>
                 <span className="tm-auth-password-field">
                   <input
                     className={`tm-input tm-auth-input ${passwordMismatch ? 'tm-auth-input-error' : passwordMatch ? 'tm-auth-input-success' : ''}`}
                     minLength={8}
-                    onInput={handlePasswordConfirmInput}
-                    onChange={handlePasswordConfirmInput}
+                    onChange={(event) => setPasswordConfirm(event.target.value)}
                     placeholder="비밀번호 다시 입력"
                     type={showPasswordConfirm ? 'text' : 'password'}
                     value={passwordConfirm}
                     aria-invalid={passwordMismatch ? true : undefined}
                     aria-describedby={passwordMismatch || passwordMatch ? 'signup-password-confirm-helper' : undefined}
                   />
-                  <button className="tm-auth-password-toggle" type="button" aria-label={showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPasswordConfirm} onClick={() => setShowPasswordConfirm((v) => !v)}>
+                  <button className="tm-auth-password-toggle" type="button" aria-label={showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPasswordConfirm} onClick={() => setShowPasswordConfirm((value) => !value)}>
                     {showPasswordConfirm ? <EyeOffIcon size={20} strokeWidth={1.8} /> : <EyeIcon size={20} strokeWidth={1.8} />}
                   </button>
                 </span>
@@ -403,20 +455,75 @@ export function SignupClient() {
             </>
           ) : null}
 
-          {step === 'birthdate' ? (
-            <label className="tm-auth-field">
-              <span className="tm-text-label">생년월일 <em className="tm-auth-optional">선택</em></span>
-              <input
-                className="tm-input tm-auth-input"
-                type="date"
-                max={today}
-                value={birthDate}
-                onInput={handleBirthDateInput}
-                onChange={handleBirthDateInput}
-              />
-            </label>
+          {step === 'profile' ? (
+            <>
+              <section className="tm-auth-soft-card" style={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 14, alignItems: 'center' }}>
+                <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
+                  {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName || normalizedNickname)}</span>}
+                </div>
+                <div>
+                  <div className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택</em></div>
+                  <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
+                    <label className="tm-btn tm-btn-md tm-btn-neutral">
+                      {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
+                      <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
+                    </label>
+                    {profileImageUrl ? (
+                      <button className="tm-btn tm-btn-md tm-btn-ghost" type="button" disabled={uploadingProfileImage} onClick={() => { setProfileImageUrl(''); setProfileImageFile(null); setProfileImageName(''); }}>
+                        제거
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="tm-text-caption" style={{ marginTop: 6 }}>{profileImageName || '이미지 1장, 2MB 이하'}</div>
+                </div>
+              </section>
+
+              <label className="tm-auth-field">
+                <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
+                <input
+                  className="tm-input tm-auth-input"
+                  maxLength={40}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="실명 또는 확인 가능한 이름"
+                  type="text"
+                  value={displayName}
+                />
+              </label>
+
+              <label className="tm-auth-field">
+                <span className="tm-text-label">휴대폰 번호 <em className="tm-auth-optional">(선택)</em></span>
+                <input
+                  className="tm-input tm-auth-input"
+                  inputMode="numeric"
+                  maxLength={13}
+                  onChange={(event) => setPhoneDigits(toDigits(event.target.value, 11))}
+                  placeholder="010-0000-0000"
+                  value={formatPhone(phoneDigits)}
+                />
+              </label>
+
+              <label className="tm-auth-field">
+                <span className="tm-text-label">생년월일 <em className="tm-auth-optional">(선택)</em></span>
+                <DatePickerTextInput
+                  dateValue={formatBirthDate(birthDateDigits)}
+                  inputClassName="tm-auth-input"
+                  onDateChange={(value) => setBirthDateDigits(toDigits(value, 8))}
+                  onTextChange={(value) => setBirthDateDigits(toDigits(value, 8))}
+                  placeholder="예: 1995-01-15"
+                  value={formatBirthDate(birthDateDigits)}
+                />
+              </label>
+
+            </>
           ) : null}
         </form>
+
+        {profileError ? (
+          <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
+            <div className="tm-text-body-lg">프로필 정보를 확인해 주세요</div>
+            <div className="tm-text-caption">{profileError}</div>
+          </Card>
+        ) : null}
 
         {error ? (
           <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
@@ -427,4 +534,34 @@ export function SignupClient() {
       </div>
     </AuthFrame>
   );
+}
+
+function toDigits(value: string, maxLength: number) {
+  return value.replace(/\D/g, '').slice(0, maxLength);
+}
+
+function formatPhone(value: string) {
+  if (value.length <= 3) return value;
+  if (value.length <= 7) return `${value.slice(0, 3)}-${value.slice(3)}`;
+  return `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7)}`;
+}
+
+function formatBirthDate(value: string) {
+  if (value.length <= 4) return value;
+  if (value.length <= 6) return `${value.slice(0, 4)}-${value.slice(4)}`;
+  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
+}
+
+function isValidBirthDateDigits(value: string) {
+  if (value.length !== 8) return false;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function initials(value: string) {
+  return value.trim().slice(0, 1) || 'T';
 }

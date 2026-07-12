@@ -23,10 +23,14 @@ describe('AdminController', () => {
     statusChangeLogs: jest.fn(),
     listUsers: jest.fn(),
     getUser: jest.fn(),
+    deleteUser: jest.fn(),
     listMatches: jest.fn(),
     getMatch: jest.fn(),
     listTeams: jest.fn(),
     getTeam: jest.fn(),
+    listNotices: jest.fn(),
+    createNotice: jest.fn(),
+    updateNotice: jest.fn(),
     listTeamMatches: jest.fn(),
     listAdmins: jest.fn(),
     grantAdmin: jest.fn(),
@@ -156,13 +160,27 @@ describe('AdminController', () => {
       ownedTeamCount: 1,
       membershipCount: 2,
       adminRole: null,
+      deletedAt: null,
+      withdrawalRequest: null,
+      teamRoleCounts: { owner: 1, manager: 0, member: 1 },
       reputationSummary: null,
       hostedMatches: [],
       ownedTeams: [],
+      teamMemberships: [],
     };
     adminService.getUser.mockResolvedValue(payload);
     await expect(controller.getUser(user, 'u-1')).resolves.toEqual(payload);
     expect(adminService.getUser).toHaveBeenCalledWith(user, 'u-1');
+  });
+
+  it('deletes a user', async () => {
+    const dto = { reason: '사용자 탈퇴 요청 처리' };
+    adminService.deleteUser.mockResolvedValue({ userId: 'u-1', status: 'deleted' });
+    await expect(controller.deleteUser(user, 'u-1', dto)).resolves.toEqual({
+      userId: 'u-1',
+      status: 'deleted',
+    });
+    expect(adminService.deleteUser).toHaveBeenCalledWith(user, 'u-1', dto);
   });
 
   // ─── Match list / detail ────────────────────────────────────────────────────
@@ -260,6 +278,83 @@ describe('AdminController', () => {
     adminService.getTeam.mockResolvedValue(payload);
     await expect(controller.getTeam(user, 't-1')).resolves.toEqual(payload);
     expect(adminService.getTeam).toHaveBeenCalledWith(user, 't-1');
+  });
+
+  // ─── Notice list / create ─────────────────────────────────────────────────
+
+  it('lists notices and returns items + pageInfo', async () => {
+    const query = { status: 'published' as const, category: '고정' as const };
+    const payload = {
+      items: [
+        {
+          noticeId: 'n-1',
+          title: '이번 주 고정 공지',
+          body: '체크인 안내',
+          audience: 'public',
+          category: '고정',
+          pinned: true,
+          status: 'published',
+          publishedAt: new Date('2026-05-18T00:00:00.000Z'),
+          archivedAt: null,
+          createdAt: new Date('2026-05-18T00:00:00.000Z'),
+          updatedAt: new Date('2026-05-18T00:00:00.000Z'),
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
+    adminService.listNotices.mockResolvedValue(payload);
+    await expect(controller.listNotices(user, query)).resolves.toEqual(payload);
+    expect(adminService.listNotices).toHaveBeenCalledWith(user, query);
+  });
+
+  it('creates a notice', async () => {
+    const dto = {
+      audience: 'public' as const,
+      category: '안내' as const,
+      pinned: true,
+      title: '새 공지',
+      body: '공지 내용',
+      status: 'published' as const,
+    };
+    const payload = {
+      notice: {
+        noticeId: 'n-2',
+        title: '새 공지',
+        body: '공지 내용',
+        audience: 'public',
+        category: '고정',
+        pinned: true,
+        status: 'published',
+      },
+    };
+    adminService.createNotice.mockResolvedValue(payload);
+    await expect(controller.createNotice(user, dto)).resolves.toEqual(payload);
+    expect(adminService.createNotice).toHaveBeenCalledWith(user, dto);
+  });
+
+  it('updates a notice', async () => {
+    const dto = {
+      audience: 'public' as const,
+      category: '안내' as const,
+      pinned: false,
+      title: '수정 공지',
+      body: '수정 내용',
+      status: 'draft' as const,
+    };
+    const payload = {
+      notice: {
+        noticeId: 'n-2',
+        title: '수정 공지',
+        body: '수정 내용',
+        audience: 'public',
+        category: '안내',
+        pinned: false,
+        status: 'draft',
+      },
+    };
+    adminService.updateNotice.mockResolvedValue(payload);
+    await expect(controller.updateNotice(user, 'n-2', dto)).resolves.toEqual(payload);
+    expect(adminService.updateNotice).toHaveBeenCalledWith(user, 'n-2', dto);
   });
 
   // ─── Team-match list ───────────────────────────────────────────────────────

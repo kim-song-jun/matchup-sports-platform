@@ -17,7 +17,7 @@ export type TeamMatchModel = {
   gender: string;
   manner: number;
   wins: number;
-  status: 'open' | 'pending' | 'approved' | 'mine';
+  status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
 };
 
 export type TeamMatchListViewModel = {
@@ -87,6 +87,12 @@ export type TeamMatchDetailViewModel = {
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;
+  hostActions?: Array<{
+    label: string;
+    tone?: 'neutral' | 'primary' | 'danger';
+    pending?: boolean;
+    onClick: () => void | Promise<unknown>;
+  }>;
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;
@@ -114,6 +120,7 @@ export type TeamMatchCreateViewModel = {
     style: string;
     uniform: string;
     gender: string;
+    imageUrl: string;
     cost: number;
     opponentCost: number;
     venue: string;
@@ -126,11 +133,12 @@ export type TeamMatchCreateViewModel = {
     selectedTeamId: string;
     selectedSportId: string;
     regionId: string;
-    regions: Array<{ id: string; name: string }>;
+    regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
     onSelectTeam: (teamName: string) => void;
     onSelectSport: (sportName: string) => void;
     onFieldChange: (field: keyof TeamMatchCreateViewModel['draft'], value: string | number) => void;
     onRegionChange: (regionId: string) => void;
+    uploadImage?: (file: File) => Promise<string>;
     onBack: () => void;
     onNext: () => void;
     onSubmit: () => void;

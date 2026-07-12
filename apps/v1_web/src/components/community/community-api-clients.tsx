@@ -6,7 +6,6 @@ import {
   useV1ChatMessages,
   useV1ChatRoom,
   useV1ChatRooms,
-  useV1LeaveChatRoom,
   useV1Notifications,
   useV1ReadAllNotifications,
   useV1ReadNotification,
@@ -29,19 +28,17 @@ const CHAT_AVATARS = {
 
 export function ChatListPageClient() {
   const [selectedCategory, setSelectedCategory] = useState<ChatCategory>('전체');
-  const [leaveTarget, setLeaveTarget] = useState<ChatRoomModel | null>(null);
   const query = useV1ChatRooms();
   const updateMe = useV1UpdateChatRoomMe();
-  const leaveRoom = useV1LeaveChatRoom();
   const fallback = getChatListViewModel();
   const baseRooms = query.data?.items.map(toChatRoomModel) ?? fallback.pinnedRooms.concat(fallback.rooms);
   const rooms = baseRooms.map((room) => ({
     ...room,
-    actionPending:
-      (updateMe.isPending && updateMe.variables?.roomId === room.id) ||
-      (leaveRoom.isPending && leaveRoom.variables?.roomId === room.id),
+    actionPending: updateMe.isPending && updateMe.variables?.roomId === room.id,
     onTogglePin: () => updateMe.mutate({ roomId: room.id, pinned: !room.pinned }),
-    onRequestLeave: () => setLeaveTarget(room),
+    // 앱 알림 등록 전까지 채팅방별 알림 설정은 비활성화한다.
+    // 앱 푸시 연동 후 아래 콜백과 community-page.tsx의 버튼을 함께 복구한다.
+    // onToggleMute: () => updateMe.mutate({ roomId: room.id, mutedUntil: room.muted ? null : mutedUntilIndefinite() }),
   }));
   const visibleRooms = selectedCategory === '전체' ? rooms : rooms.filter((room) => room.type === selectedCategory);
   const categories: ChatCategory[] = ['전체', '개인매치', '팀매치', '팀'];
@@ -58,21 +55,8 @@ export function ChatListPageClient() {
     status: query.isPending ? 'loading' : query.isError ? 'error' : 'ready',
     emptyTitle: query.isError ? '채팅방을 불러오지 못했어요' : isEmpty ? `${selectedCategory} 채팅방이 없어요` : undefined,
     emptyBody: query.isError ? '잠시 후 다시 시도해 주세요.' : isEmpty ? '매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.' : undefined,
-    emptyHref: query.isError ? undefined : '/matches',
+    emptyHref: query.isError || selectedCategory === '팀' ? undefined : '/matches',
     onRetry: query.isError ? () => query.refetch() : undefined,
-    leaveConfirm: leaveTarget
-      ? {
-          title: '채팅방을 나갈까요?',
-          body: '나가면 목록에서 사라지고, 호스트가 다시 초대할 때까지 메시지를 받을 수 없어요.',
-          pending: leaveRoom.isPending,
-          onCancel: () => setLeaveTarget(null),
-          onConfirm: () =>
-            leaveRoom.mutate(
-              { roomId: leaveTarget.id, reason: 'user_leave' },
-              { onSuccess: () => setLeaveTarget(null) },
-            ),
-        }
-      : undefined,
   };
 
   return <ChatListPageView model={model} />;
@@ -195,10 +179,17 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
     time: formatRelative(room.lastMessage?.sentAt),
     unread: room.unreadCount,
     pinned: room.pinned,
+    muted: room.muted,
+    mutedUntil: room.mutedUntil ?? null,
     initials: room.title.slice(0, 1) || '채',
     avatarUrl: CHAT_AVATARS[type],
   };
 }
+
+// 앱 푸시 연동 후 채팅방별 알림 끄기 기능을 복구할 때 다시 사용한다.
+// function mutedUntilIndefinite() {
+//   return '9999-12-31T23:59:59.999Z';
+// }
 
 function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages'][number] {
   return {

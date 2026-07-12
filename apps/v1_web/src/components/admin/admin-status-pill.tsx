@@ -125,6 +125,11 @@ export const STATUS_META: Record<string, StatusMeta> = {
     tone: 'gray',
     icon: <FileText size={12} aria-hidden="true" />,
   },
+  published: {
+    label: '발행',
+    tone: 'green',
+    icon: <CheckCircle2 size={12} aria-hidden="true" />,
+  },
 
   // ── Registration ─────────────────────────────────────────────────────
   // cancelled already defined above (red/XCircle — reused)
@@ -139,7 +144,7 @@ export const STATUS_META: Record<string, StatusMeta> = {
     icon: <Clock size={12} aria-hidden="true" />,
   },
   payment_checking: {
-    label: '확인 중',
+    label: '명단 확인 중',
     tone: 'amber',
     icon: <Clock size={12} aria-hidden="true" />,
   },

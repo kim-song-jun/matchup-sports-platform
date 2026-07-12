@@ -366,7 +366,7 @@ describe('TournamentPlayersService', () => {
 
   it('listPlayers: returns players list and belowMinimum flag', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'owner' });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'member' });
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 6 }));
     prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow(), playerRow({ id: 'p2', userId: 'u2' })]);
 

@@ -45,12 +45,32 @@ Tournament roster clients must keep members with missing `realName`, `birthDate`
 
 Optional fields include `logoUrl`, `coverImageUrl`, `introduction`, `activityAreaText`, `skillLevelText`, and `memberGoalCount`.
 
+Structured activity profile fields:
+
+- `activityDays: string[]` — `mon|tue|wed|thu|fri|sat|sun`
+- `activityFrequency: string | null` — `weekly_1|weekly_2|weekly_3|weekly_4_plus|biweekly_1|irregular`
+- `activityTimeSlots: string[]` — `morning|lunch|afternoon|evening|late_night`
+- `activityTypes: string[]` — `regular_meetup|friendly_match|team_match|tournament_prep|training|free_participation|beginner_friendly|competitive`
+- `activityMemo: string | null`
+
+Team list, detail, and `/me/teams` responses include those fields plus `activitySummary` and `memberGoalCount`. `activityAreaText` remains as a compatibility/fallback field backed by the existing `activity_note` column.
+
+Team list/detail and `/me/teams` `region` includes `{ regionId, name, parentName? }`; `regionName` is the display label (`parentName + name` for district regions).
+
 `UpdateTeamDto` adds `version: string`.
+
+## Route Fields
+
+- `detailRoute` for create/my-team/team detail responses points to `/teams/:teamId`.
+- `manageRoute` is only present for owner/manager viewers and points to `/teams/:teamId/members`; full team operations are exposed from the canonical `/teams/:teamId` detail UI.
+- There is no v1 `/teams/:teamId/manage` route.
 
 ## State And Permissions
 
 - V1 has no open instant join. Team join is `approval_required` or `closed`.
 - Team creator becomes owner.
+- `memberGoalCount` is the team capacity. When `memberCount >= memberGoalCount`, join applications, join approvals, team invitations, and invitation acceptance fail with `TEAM_FULL`.
+- Team capacity cannot be updated below the current `memberCount`.
 - Owner is not changed through the general role API.
 - Manager limit is enforced by service logic.
 - Approving a join application creates or restores an active member.

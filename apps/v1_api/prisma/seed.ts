@@ -41,10 +41,35 @@ const futureEnd = new Date('2026-06-20T11:00:00.000Z');
 const pastStart = new Date('2026-05-01T10:00:00.000Z');
 const pastEnd = new Date('2026-05-01T11:00:00.000Z');
 const hostAdminEmail = 'host@teameet.v1';
-const hostAdminPassword = process.env.V1_HOST_ADMIN_PASSWORD?.trim() || '11111111';
+const hostAdminPassword = process.env.V1_HOST_ADMIN_PASSWORD?.trim();
 const scrypt = promisify(scryptCallback);
 const passwordKeyLength = 64;
 const passwordScheme = 'scrypt';
+
+type SeedMode = 'base' | 'demo' | 'coverage' | 'all';
+
+function resolveSeedMode(): SeedMode {
+  const modeArg = process.argv.find((arg) => arg.startsWith('--mode='));
+  const mode = (modeArg?.slice('--mode='.length) || process.env.V1_SEED_MODE || 'base').toLowerCase();
+  if (mode === 'base' || mode === 'demo' || mode === 'coverage' || mode === 'all') {
+    return mode;
+  }
+  throw new Error(`Unsupported V1 seed mode: ${mode}. Use base, demo, coverage, or all.`);
+}
+
+function assertDemoSeedAllowed(mode: SeedMode) {
+  if (mode === 'base') {
+    return;
+  }
+
+  const nodeEnv = process.env.NODE_ENV?.toLowerCase();
+  const allowDemoSeed = process.env.V1_ALLOW_DEMO_SEED === 'true';
+  if (nodeEnv === 'production' && !allowDemoSeed) {
+    throw new Error(
+      `Refusing to run v1 ${mode} seed in production. Set V1_ALLOW_DEMO_SEED=true only for a reviewed non-production/demo import.`,
+    );
+  }
+}
 
 async function seedRuntimeCheck() {
   await prisma.v1RuntimeCheck.upsert({
@@ -409,7 +434,7 @@ async function seedRegions() {
   };
 }
 
-async function seedTermsAndNotice() {
+async function seedTermsAndNotice(includePublicNotices = false) {
   for (const [kind, title, required] of [
     [V1TermsKind.terms, 'Teameet v1 서비스 이용약관', true],
     [V1TermsKind.privacy, 'Teameet v1 개인정보 처리방침', true],
@@ -436,11 +461,15 @@ async function seedTermsAndNotice() {
     });
   }
 
+  if (!includePublicNotices) {
+    return;
+  }
+
   const publicNotices = [
     ['00000000-0000-4000-8000-000000000001', '고정', '이번 주 고정 공지', '주말 경기장 입장 시간과 체크인 안내', '2026-05-18T00:00:00.000Z'],
     ['00000000-0000-4000-8000-000000000002', '업데이트', '매너 점수 업데이트', '경기 후 리뷰 반영 기준 안내', '2026-05-17T00:00:00.000Z'],
     ['00000000-0000-4000-8000-000000000003', '안내', '비 예보 경기 안내', '우천 시 취소와 환불 기준 확인', '2026-05-16T00:00:00.000Z'],
-    ['00000000-0000-4000-8000-000000000004', '안내', '프로필 공개 범위 안내', '닉네임, 활동 지역, 선호 종목 공개 범위 기준을 안내합니다.', '2026-05-15T00:00:00.000Z'],
+    ['00000000-0000-4000-8000-000000000004', '안내', '계정 보안 안내', '이메일, 휴대폰 번호, 생년월일 같은 개인정보는 공개 프로필에 노출하지 않습니다.', '2026-05-15T00:00:00.000Z'],
   ] as const;
 
   for (const [id, category, title, body, publishedAt] of publicNotices) {
@@ -578,6 +607,10 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
         create: {
           description: '평일 저녁에 함께 뛰는 v1 seed 팀입니다.',
           activityNote: '주 2회 러닝',
+          activityDays: ['tue', 'thu'],
+          activityFrequency: 'weekly_2',
+          activityTimeSlots: ['evening'],
+          activityTypes: ['regular_meetup', 'training'],
           skillNote: '초보부터 중수까지',
           ...runningNoviceIntermediate,
           genderRule: '성별 무관',
@@ -645,11 +678,23 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
 
   await prisma.v1TeamProfile.upsert({
     where: { teamId: ownerTeam.id },
-    update: { skillNote: '초보부터 중수까지', ...runningNoviceIntermediate, genderRule: '성별 무관' },
+    update: {
+      activityDays: ['tue', 'thu'],
+      activityFrequency: 'weekly_2',
+      activityTimeSlots: ['evening'],
+      activityTypes: ['regular_meetup', 'training'],
+      skillNote: '초보부터 중수까지',
+      ...runningNoviceIntermediate,
+      genderRule: '성별 무관',
+    },
     create: {
       teamId: ownerTeam.id,
       description: '평일 저녁에 함께 뛰는 v1 seed 팀입니다.',
       activityNote: '주 2회 러닝',
+      activityDays: ['tue', 'thu'],
+      activityFrequency: 'weekly_2',
+      activityTimeSlots: ['evening'],
+      activityTypes: ['regular_meetup', 'training'],
       skillNote: '초보부터 중수까지',
       ...runningNoviceIntermediate,
       genderRule: '성별 무관',
@@ -657,10 +702,21 @@ async function seedTeams(userIds: Record<string, string>, sportIds: Record<strin
   });
   await prisma.v1TeamProfile.upsert({
     where: { teamId: applicantTeam.id },
-    update: { ...futsalBeginnerAdvanced, genderRule: '남' },
+    update: {
+      activityDays: ['sat', 'sun'],
+      activityFrequency: 'weekly_1',
+      activityTimeSlots: ['morning', 'afternoon'],
+      activityTypes: ['friendly_match', 'team_match'],
+      ...futsalBeginnerAdvanced,
+      genderRule: '남',
+    },
     create: {
       teamId: applicantTeam.id,
       description: '주말 풋살 상대를 찾는 v1 seed 팀입니다.',
+      activityDays: ['sat', 'sun'],
+      activityFrequency: 'weekly_1',
+      activityTimeSlots: ['morning', 'afternoon'],
+      activityTypes: ['friendly_match', 'team_match'],
       ...futsalBeginnerAdvanced,
       genderRule: '남',
     },
@@ -1395,12 +1451,10 @@ async function seedAdmin(userIds: Record<string, string>) {
 }
 
 async function seedHostAdminPassword(userId: string) {
-  if (!hostAdminPassword) {
-    return;
-  }
-
-  if (hostAdminPassword.length < 8) {
-    throw new Error('V1_HOST_ADMIN_PASSWORD must be at least 8 characters.');
+  if (!hostAdminPassword || hostAdminPassword.length < 8) {
+    throw new Error(
+      'V1_HOST_ADMIN_PASSWORD 환경변수를 8자 이상으로 설정해주세요. (demo/coverage/all seed 모드에서 host@teameet.v1 계정 비밀번호로 사용됩니다.)',
+    );
   }
 
   const passwordHash = await hashSeedPassword(hostAdminPassword);
@@ -2363,10 +2417,18 @@ async function seedCoverageChatNotificationsAndAdmin(userIds: Record<string, str
 }
 
 async function main() {
+  const seedMode = resolveSeedMode();
+  assertDemoSeedAllowed(seedMode);
+
   await seedRuntimeCheck();
   const sportIds = await seedSports();
   const regions = await seedRegions();
-  await seedTermsAndNotice();
+  await seedTermsAndNotice(seedMode === 'demo' || seedMode === 'all');
+
+  if (seedMode === 'base') {
+    return;
+  }
+
   const userIds = await seedUsers();
 
   const runningLevel = await prisma.v1SportLevel.findFirstOrThrow({
@@ -2393,6 +2455,10 @@ async function main() {
   await seedChatAndNotifications(userIds, match.id, teamMatch.id);
   await seedHostChatDemoData(userIds, sportIds, regions.seoulSongpa.id, match.id, teamMatch.id, ownerTeam.id);
   await seedAdmin(userIds);
+
+  if (seedMode === 'demo') {
+    return;
+  }
 
   const coverageUserIds = { ...userIds, ...(await seedCoverageUsers()) };
   await seedCoverageTermsAndNotices();

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Pin } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
-import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
 
@@ -21,7 +21,12 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
             renders as a <div>, not a heading element, so this h1 must stay in the
             a11y tree to give mobile screen-reader users the page's main heading. */}
         <h1 className="tm-text-heading tm-hide-desktop">공지사항</h1>
-        <p className="tm-text-caption tm-notice-lead">홈 공지와 운영 안내를 한곳에서 볼 수 있어요.</p>
+        <p className="tm-text-caption tm-notice-lead">
+          팀밋의 주요 소식과 서비스 운영 안내를 확인할 수 있어요.
+        </p>
+        <p className="tm-text-caption tm-notice-lead">
+          대회 일정, 서비스 업데이트, 점검 안내, 이벤트 및 기타 운영 관련 공지는 여기서 안내해요.
+        </p>
         <div className="tm-sport-chip-row tm-notice-filter-row">
           {model.filters.map((filter) => (
             <button
@@ -83,18 +88,16 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
             <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
             <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
             <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>
-            <Card pad={16} className="tm-notice-summary-card">
-              <div className="tm-text-label">요약</div>
-              <p className="tm-text-body">{notice.summary}</p>
-            </Card>
             <div className="tm-notice-body">
-              {notice.body.map((paragraph) => <p key={paragraph} className="tm-text-body">{paragraph}</p>)}
+              {notice.body.map((paragraph, index) => <p key={`${index}-${paragraph}`} className="tm-text-body">{paragraph}</p>)}
             </div>
-            <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
-              <div className="tm-text-label">관련 매치 확인</div>
-              {/* [P2 UX 라이팅] 능동형 — 시스템이 표시하는 게 아니라 사용자가 확인하는 맥락으로 전환 */}
-            <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에서도 확인할 수 있어요.</div>
-            </Link>
+            {model.relatedHref ? (
+              <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>
+                <div className="tm-text-label">관련 매치 확인</div>
+                {/* [P2 UX 라이팅] 능동형 — 시스템이 표시하는 게 아니라 사용자가 확인하는 맥락으로 전환 */}
+                <div className="tm-text-caption">체크인 시간이 바뀐 경기는 매치 상세와 채팅방 공지에서도 확인할 수 있어요.</div>
+              </Link>
+            ) : null}
           </>
         )}
       </article>
@@ -120,7 +123,17 @@ function NoticeRow({ notice }: { notice: NoticeModel }) {
           {notice.tag} · {notice.date}
         </span>
         <span className="tm-text-label tm-notice-row-title">{notice.title}</span>
-        <span className="tm-text-caption line-clamp-2">{notice.summary}</span>
+        <span
+          className="tm-text-caption"
+          style={{
+            display: '-webkit-box',
+            overflow: 'hidden',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 4,
+          }}
+        >
+          {notice.summary}
+        </span>
       </span>
       <ChevronRightIcon size={17} stroke="var(--grey400)" strokeWidth={2} />
     </Link>

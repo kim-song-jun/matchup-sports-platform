@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -10,16 +11,23 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
+  AdminInquiryListQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
+  AdminNoticeListQueryDto,
   AdminUserListQueryDto,
   ChangeMatchStatusDto,
+  ChangeInquiryStatusDto,
   ChangeTeamMatchStatusDto,
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
+  CreateAdminNoticeDto,
+  DeleteAdminUserDto,
   GrantAdminDto,
+  ReplyInquiryDto,
+  UpdateAdminNoticeDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 
@@ -124,6 +132,89 @@ export class AdminService {
         },
         tx,
       );
+    });
+  }
+
+  async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
+    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
+    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: '운영자 계정은 owner만 삭제할 수 있어요.',
+      });
+    }
+
+    const deletedAt = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1User.update({
+        where: { id: userId },
+        data: {
+          accountStatus: 'deleted',
+          deletedAt,
+          email: target.email ? buildDeletedEmail(userId) : null,
+          phone: target.phone ? buildDeletedPhone(userId) : null,
+          emailVerifiedAt: null,
+          phoneVerifiedAt: null,
+        },
+      });
+      const identities = await tx.v1AuthIdentity.findMany({
+        where: { userId },
+        select: { id: true, provider: true },
+      });
+      await Promise.all(
+        identities.map((identity) =>
+          tx.v1AuthIdentity.update({
+            where: { id: identity.id },
+            data: {
+              status: 'unlinked',
+              providerUserKey: buildDeletedProviderUserKey(userId, identity.id),
+              email: null,
+              passwordHash: null,
+              unlinkedAt: deletedAt,
+            },
+          }),
+        ),
+      );
+      await tx.v1UserProfile.updateMany({
+        where: { userId },
+        data: {
+          nickname: buildDeletedNickname(userId),
+          displayName: '탈퇴 회원',
+          bio: null,
+          profileImageUrl: null,
+          deletedAt,
+        },
+      });
+      const result = await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'user.delete',
+          targetType: 'user',
+          targetId: userId,
+          previousStatus: target.accountStatus,
+          status: updated.accountStatus,
+          reason: dto.reason,
+          beforeState: {
+            accountStatus: target.accountStatus,
+            deletedAt: target.deletedAt?.toISOString() ?? '',
+            hasEmail: target.email ? 'true' : 'false',
+            hasPhone: target.phone ? 'true' : 'false',
+          },
+          afterState: {
+            accountStatus: updated.accountStatus,
+            deletedAt: deletedAt.toISOString(),
+            personalDataMasked: 'true',
+          },
+          responseIdKey: 'userId',
+        },
+        tx,
+      );
+
+      return { ...result, deletedAt };
     });
   }
 
@@ -293,8 +384,13 @@ export class AdminService {
         onboardingStatus: true,
         lastLoginAt: true,
         createdAt: true,
+        deletedAt: true,
         profile: { select: { nickname: true, displayName: true } },
         adminUser: { select: { adminRole: true } },
+        teamMemberships: {
+          where: { status: 'active' },
+          select: { role: true },
+        },
         _count: {
           select: {
             hostedMatches: true,
@@ -321,6 +417,11 @@ export class AdminService {
         hostedMatchCount: row._count.hostedMatches,
         ownedTeamCount: row._count.ownedTeams,
         membershipCount: row._count.teamMemberships,
+        teamRoleCounts: {
+          owner: row.teamMemberships.filter((membership) => membership.role === 'owner').length,
+          manager: row.teamMemberships.filter((membership) => membership.role === 'manager').length,
+          member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
+        },
         adminRole: row.adminUser?.adminRole ?? null,
       })),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
@@ -339,6 +440,7 @@ export class AdminService {
         onboardingStatus: true,
         lastLoginAt: true,
         createdAt: true,
+        deletedAt: true,
         profile: { select: { nickname: true, displayName: true } },
         adminUser: { select: { adminRole: true } },
         reputationSummary: {
@@ -361,6 +463,34 @@ export class AdminService {
           orderBy: { createdAt: 'desc' },
           select: { id: true, name: true, status: true, memberCount: true },
         },
+        teamMemberships: {
+          where: { status: 'active' },
+          orderBy: { joinedAt: 'desc' },
+          select: {
+            id: true,
+            role: true,
+            status: true,
+            joinedAt: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                memberCount: true,
+              },
+            },
+          },
+        },
+        statusLogs: {
+          where: {
+            targetType: 'user',
+            toStatus: 'withdrawal_pending',
+            actorType: 'user',
+          },
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { reason: true, createdAt: true },
+        },
       },
     });
 
@@ -375,9 +505,15 @@ export class AdminService {
       onboardingStatus: row.onboardingStatus,
       lastLoginAt: row.lastLoginAt,
       createdAt: row.createdAt,
+      deletedAt: row.deletedAt,
       hostedMatchCount: row._count.hostedMatches,
       ownedTeamCount: row._count.ownedTeams,
       membershipCount: row._count.teamMemberships,
+      teamRoleCounts: {
+        owner: row.teamMemberships.filter((membership) => membership.role === 'owner').length,
+        manager: row.teamMemberships.filter((membership) => membership.role === 'manager').length,
+        member: row.teamMemberships.filter((membership) => membership.role === 'member').length,
+      },
       adminRole: row.adminUser?.adminRole ?? null,
       reputationSummary: row.reputationSummary
         ? {
@@ -399,6 +535,21 @@ export class AdminService {
         status: t.status,
         memberCount: t.memberCount,
       })),
+      teamMemberships: row.teamMemberships.map((membership) => ({
+        membershipId: membership.id,
+        teamId: membership.team.id,
+        name: membership.team.name,
+        status: membership.team.status,
+        memberCount: membership.team.memberCount,
+        role: membership.role,
+        joinedAt: membership.joinedAt,
+      })),
+      withdrawalRequest: row.statusLogs[0]
+        ? {
+            reason: row.statusLogs[0].reason,
+            requestedAt: row.statusLogs[0].createdAt,
+          }
+        : null,
     };
   }
 
@@ -608,6 +759,323 @@ export class AdminService {
         status: tm.status,
         startAt: tm.startAt,
       })),
+    };
+  }
+
+  // ─── Notice list / create ─────────────────────────────────────────────────
+
+  async listNotices(user: V1AuthUser, query: AdminNoticeListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+
+    const searchWhere = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { body: { contains: query.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const rows = await this.prisma.v1Notice.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.audience ? { audience: query.audience } : {}),
+        ...(query.category ? { category: query.category } : {}),
+        ...searchWhere,
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        audience: true,
+        category: true,
+        title: true,
+        body: true,
+        status: true,
+        publishedAt: true,
+        archivedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => this.toAdminNoticeRow(row)),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async createNotice(user: V1AuthUser, dto: CreateAdminNoticeDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const now = new Date();
+    const category = dto.pinned ? '고정' : dto.category === '고정' ? '안내' : dto.category;
+    const publishedAt = dto.status === 'published' ? now : null;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const notice = await tx.v1Notice.create({
+        data: {
+          audience: dto.audience,
+          category,
+          title: dto.title.trim(),
+          body: dto.body.trim(),
+          status: dto.status,
+          publishedAt,
+        },
+      });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'notice.create',
+          targetType: 'notice',
+          targetId: notice.id,
+          reason: dto.status === 'published' ? '공지 작성 및 발행' : '공지 초안 작성',
+          beforeJson: Prisma.JsonNull,
+          afterJson: {
+            noticeId: notice.id,
+            audience: notice.audience,
+            category: notice.category,
+            status: notice.status,
+            pinned: notice.category === '고정',
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return notice;
+    });
+
+    return { notice: this.toAdminNoticeRow(row) };
+  }
+
+  async updateNotice(user: V1AuthUser, noticeId: string, dto: UpdateAdminNoticeDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Notice.findUnique({ where: { id: noticeId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Notice was not found' });
+    }
+
+    const now = new Date();
+    const category = dto.pinned ? '고정' : dto.category === '고정' ? '안내' : dto.category;
+    const statusChanged = existing.status !== dto.status;
+    const publishedAt = dto.status === 'published'
+      ? existing.publishedAt ?? now
+      : null;
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const notice = await tx.v1Notice.update({
+        where: { id: noticeId },
+        data: {
+          audience: dto.audience,
+          category,
+          title: dto.title.trim(),
+          body: dto.body.trim(),
+          status: dto.status,
+          publishedAt,
+          archivedAt: null,
+        },
+      });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'notice.update',
+          targetType: 'notice',
+          targetId: notice.id,
+          reason: statusChanged ? `공지 수정 및 상태 변경: ${existing.status} -> ${dto.status}` : '공지 수정',
+          beforeJson: {
+            noticeId: existing.id,
+            audience: existing.audience,
+            category: existing.category,
+            status: existing.status,
+            pinned: existing.category === '고정',
+          } as Prisma.InputJsonValue,
+          afterJson: {
+            noticeId: notice.id,
+            audience: notice.audience,
+            category: notice.category,
+            status: notice.status,
+            pinned: notice.category === '고정',
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return notice;
+    });
+
+    return { notice: this.toAdminNoticeRow(row) };
+  }
+
+  // ─── Inquiry list / detail / replies ───────────────────────────────────────
+
+  async listInquiries(user: V1AuthUser, query: AdminInquiryListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const searchWhere = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { body: { contains: query.q, mode: 'insensitive' as const } },
+            { user: { email: { contains: query.q, mode: 'insensitive' as const } } },
+            { user: { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } } },
+          ],
+        }
+      : {};
+
+    const rows = await this.prisma.v1Inquiry.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.category ? { category: query.category } : {}),
+        ...searchWhere,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        category: true,
+        title: true,
+        status: true,
+        relatedType: true,
+        relatedId: true,
+        createdAt: true,
+        updatedAt: true,
+        closedAt: true,
+        userId: true,
+        user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+        _count: { select: { replies: true } },
+      },
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+
+    return {
+      items: pageItems.map((row) => this.toAdminInquiryRow(row)),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async getInquiry(user: V1AuthUser, inquiryId: string) {
+    await this.getActiveAdmin(user.id);
+    const row = await this.prisma.v1Inquiry.findUnique({
+      where: { id: inquiryId },
+      select: {
+        id: true,
+        userId: true,
+        category: true,
+        title: true,
+        body: true,
+        contact: true,
+        relatedType: true,
+        relatedId: true,
+        status: true,
+        closedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+        replies: {
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            body: true,
+            adminUserId: true,
+            createdAt: true,
+            updatedAt: true,
+            adminUser: {
+              select: {
+                adminRole: true,
+                user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+    return this.toAdminInquiryDetail(row);
+  }
+
+  async replyInquiry(user: V1AuthUser, inquiryId: string, dto: ReplyInquiryDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const body = dto.body.trim();
+    if (!body) {
+      throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1Inquiry.findUnique({ where: { id: inquiryId } });
+      if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+
+      await tx.v1InquiryReply.create({
+        data: { inquiryId, adminUserId: admin.id, body },
+      });
+
+      const updated = await tx.v1Inquiry.update({
+        where: { id: inquiryId },
+        data: { status: 'answered', closedAt: null },
+      });
+
+      await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'inquiry.reply',
+          targetType: 'inquiry',
+          targetId: inquiryId,
+          previousStatus: existing.status,
+          status: updated.status,
+          reason: '문의 답변 작성',
+          beforeState: { status: existing.status },
+          afterState: { status: updated.status, replied: 'true' },
+          responseIdKey: 'inquiryId',
+        },
+        tx,
+      );
+    });
+
+    return this.getInquiry(user, inquiryId);
+  }
+
+  async changeInquiryStatus(user: V1AuthUser, inquiryId: string, dto: ChangeInquiryStatusDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Inquiry.findUnique({ where: { id: inquiryId } });
+    if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.v1Inquiry.update({
+        where: { id: inquiryId },
+        data: { status: dto.status, closedAt: dto.status === 'closed' ? new Date() : null },
+      });
+
+      const logs = await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'inquiry.status.update',
+          targetType: 'inquiry',
+          targetId: inquiryId,
+          previousStatus: existing.status,
+          status: row.status,
+          reason: dto.reason?.trim() || '문의 상태 변경',
+          beforeState: { status: existing.status },
+          afterState: { status: row.status },
+          responseIdKey: 'inquiryId',
+        },
+        tx,
+      );
+
+      return { row, logs };
+    });
+
+    return {
+      inquiryId,
+      previousStatus: existing.status,
+      status: result.row.status,
+      actionLogId: result.logs.actionLogId,
+      statusChangeLogId: result.logs.statusChangeLogId,
     };
   }
 
@@ -925,10 +1393,143 @@ export class AdminService {
       statusChangeLogId: statusChangeLog.id,
     };
   }
+
+  private toAdminNoticeRow(row: {
+    id: string;
+    audience: string;
+    category: string;
+    title: string;
+    body: string;
+    status: string;
+    publishedAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      noticeId: row.id,
+      audience: row.audience,
+      category: row.category,
+      pinned: row.category === '고정',
+      title: row.title,
+      body: row.body,
+      status: row.status,
+      publishedAt: row.publishedAt,
+      archivedAt: row.archivedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  private toAdminInquiryRow(row: {
+    id: string;
+    userId: string;
+    category: string;
+    title: string;
+    status: string;
+    relatedType: string | null;
+    relatedId: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    closedAt: Date | null;
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    _count: { replies: number };
+  }) {
+    return {
+      inquiryId: row.id,
+      userId: row.userId,
+      requesterName: row.user.profile?.nickname ?? row.user.profile?.displayName ?? null,
+      requesterEmail: row.user.email ?? null,
+      category: row.category,
+      title: row.title,
+      status: row.status,
+      relatedType: row.relatedType,
+      relatedId: row.relatedId,
+      replyCount: row._count.replies,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      closedAt: row.closedAt,
+    };
+  }
+
+  private toAdminInquiryDetail(row: {
+    id: string;
+    userId: string;
+    category: string;
+    title: string;
+    body: string;
+    contact: string | null;
+    relatedType: string | null;
+    relatedId: string | null;
+    status: string;
+    closedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    replies: Array<{
+      id: string;
+      body: string;
+      adminUserId: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      adminUser: {
+        adminRole: string;
+        user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+      } | null;
+    }>;
+  }) {
+    return {
+      ...this.toAdminInquiryRow({
+        id: row.id,
+        userId: row.userId,
+        category: row.category,
+        title: row.title,
+        status: row.status,
+        relatedType: row.relatedType,
+        relatedId: row.relatedId,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        closedAt: row.closedAt,
+        user: row.user,
+        _count: { replies: row.replies.length },
+      }),
+      body: row.body,
+      contact: row.contact,
+      replies: row.replies.map((reply) => ({
+        replyId: reply.id,
+        adminUserId: reply.adminUserId,
+        adminName:
+          reply.adminUser?.user.profile?.nickname ??
+          reply.adminUser?.user.profile?.displayName ??
+          reply.adminUser?.user.email ??
+          null,
+        adminRole: reply.adminUser?.adminRole ?? null,
+        body: reply.body,
+        createdAt: reply.createdAt,
+        updatedAt: reply.updatedAt,
+      })),
+    };
+  }
 }
 
 function getCapabilities(role: ActiveAdmin['adminRole']) {
   if (role === 'owner') return ['overview:read', 'status:write', 'logs:read', 'admin:owner'];
   if (role === 'ops') return ['overview:read', 'status:write', 'logs:read'];
   return ['overview:read', 'logs:read'];
+}
+
+function buildDeletedEmail(userId: string) {
+  return `deleted+${userId}@deleted.teameet.local`;
+}
+
+function buildDeletedPhone(userId: string) {
+  return `deleted-${userId}`;
+}
+
+function buildDeletedProviderUserKey(userId: string, identityId: string) {
+  return `deleted:${userId}:${identityId}`;
+}
+
+function buildDeletedNickname(userId: string) {
+  return `deleted_${userId.slice(0, 8)}`;
 }

@@ -8,15 +8,26 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 
-/** MIME type → file extension mapping for allowed types */
-const MIME_TO_EXT: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
+/** 업로드 종류별 허용 MIME → 확장자, 크기 한도 */
+export type UploadKind = 'image' | 'video';
 
-const ALLOWED_MIMETYPES = new Set(Object.keys(MIME_TO_EXT));
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
+const KIND_RULES: Record<
+  UploadKind,
+  { mimeToExt: Record<string, string>; maxBytes: number; limitLabel: string; typeLabel: string }
+> = {
+  image: {
+    mimeToExt: { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' },
+    maxBytes: 5 * 1024 * 1024,
+    limitLabel: '5MB',
+    typeLabel: 'jpeg, png, webp',
+  },
+  video: {
+    mimeToExt: { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' },
+    maxBytes: 200 * 1024 * 1024,
+    limitLabel: '200MB',
+    typeLabel: 'mp4, webm, mov',
+  },
+};
 
 /** Discriminated-union subset of Express.Multer.File we rely on */
 interface UploadedFile {
@@ -42,24 +53,27 @@ export class UploadsService {
   async storeFiles(
     files: UploadedFile[],
     baseUrl = '',
+    kind: UploadKind = 'image',
   ): Promise<{ urls: string[] }> {
     if (!files || files.length === 0) {
       throw new BadRequestException('업로드할 파일을 선택해주세요.');
     }
 
+    const rules = KIND_RULES[kind];
+
     // 1. Validate ALL files before moving any, so a later validation failure never
     //    leaves earlier files orphaned on disk. On failure, unlink every temp file.
     for (const file of files) {
-      if (!ALLOWED_MIMETYPES.has(file.mimetype)) {
+      if (!(file.mimetype in rules.mimeToExt)) {
         await this.unlinkTemps(files);
         throw new BadRequestException(
-          `허용되지 않는 파일 형식이에요. (${file.mimetype}). jpeg, png, webp만 허용돼요.`,
+          `허용되지 않는 파일 형식이에요. (${file.mimetype}). ${rules.typeLabel}만 허용돼요.`,
         );
       }
-      if (file.size > MAX_FILE_SIZE) {
+      if (file.size > rules.maxBytes) {
         await this.unlinkTemps(files);
         throw new BadRequestException(
-          `파일 크기가 5MB를 초과했어요. (${file.originalname})`,
+          `파일 크기가 ${rules.limitLabel}를 초과했어요. (${file.originalname})`,
         );
       }
     }
@@ -70,7 +84,7 @@ export class UploadsService {
     const movedPaths: string[] = [];
     try {
       for (const file of files) {
-        const ext = MIME_TO_EXT[file.mimetype] ?? 'bin';
+        const ext = rules.mimeToExt[file.mimetype] ?? 'bin';
         const now = new Date();
         const year = now.getFullYear().toString();
         const month = String(now.getMonth() + 1).padStart(2, '0');

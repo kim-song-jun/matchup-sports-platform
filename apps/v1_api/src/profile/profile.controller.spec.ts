@@ -56,8 +56,6 @@ describe('ProfileController', () => {
       profileImageUrl: null,
       phone: '01012345678',
       birthDate: '19900102',
-      bio: '풋살을 좋아합니다.',
-      visibilityStatus: 'public' as const,
     };
     profileService.updateMe.mockResolvedValue({ profile: dto });
     await expect(controller.updateMe(user, dto)).resolves.toEqual({ profile: dto });
@@ -88,9 +86,9 @@ describe('ProfileController', () => {
   });
 
   it('updates settings', async () => {
-    profileService.updateSettings.mockResolvedValue({ profile: { visibilityStatus: 'private' } });
-    await expect(controller.updateSettings(user, { visibilityStatus: 'private' })).resolves.toEqual({
-      profile: { visibilityStatus: 'private' },
+    profileService.updateSettings.mockResolvedValue({ profile: { displayName: '민수' } });
+    await expect(controller.updateSettings(user, { notifications: { chatEnabled: false } })).resolves.toEqual({
+      profile: { displayName: '민수' },
     });
   });
 

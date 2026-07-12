@@ -13,6 +13,14 @@ else
   COMPOSE="sudo docker-compose"
 fi
 
+V1_UPLOADS_BACKUP_DIR="$(mktemp -d)"
+if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
+  echo "[INFO] Backing up existing v1 uploads before recreating v1_api..."
+  sudo docker cp teameet_v1_api:/app/apps/v1_api/uploads "${V1_UPLOADS_BACKUP_DIR}/" 2>/dev/null || {
+    echo "[INFO] No existing v1 uploads directory found to back up."
+  }
+fi
+
 echo "[INFO] Stopping api, web, v1_api, v1_web, nginx containers..."
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env stop api web v1_api v1_web nginx 2>/dev/null || true
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env rm -f api web v1_api v1_web nginx 2>/dev/null || true
@@ -47,15 +55,24 @@ for i in $(seq 1 30); do
 done
 
 echo "[INFO] Applying v1 deploy database migrations..."
+echo "[INFO] Recovering known failed v1 tournament registration migration if present..."
+${COMPOSE} -f docker-compose.prod.yml --env-file .env \
+  run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260703000000_v1_tournament_registration_team_unique || true"
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
 echo "[INFO] Recreating api, v1_api, web, v1_web, nginx only (keeping postgres/redis running)..."
 echo "[INFO] Syncing v1 deploy database schema..."
-${COMPOSE} -f docker-compose.prod.yml --env-file .env run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma db push --skip-generate && ./node_modules/.bin/prisma migrate deploy"
+${COMPOSE} -f docker-compose.prod.yml --env-file .env run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps api
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps v1_api
+if [ -d "${V1_UPLOADS_BACKUP_DIR}/uploads" ]; then
+  echo "[INFO] Restoring v1 uploads into the persistent volume..."
+  sudo docker exec teameet_v1_api mkdir -p /app/apps/v1_api/uploads
+  sudo docker cp "${V1_UPLOADS_BACKUP_DIR}/uploads/." teameet_v1_api:/app/apps/v1_api/uploads/
+fi
+sudo rm -rf "${V1_UPLOADS_BACKUP_DIR}" 2>/dev/null || true
 echo "[INFO] Waiting for APIs to be ready before starting web..."
 sleep 5
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps web v1_web nginx
@@ -95,7 +112,7 @@ for i in $(seq 1 45); do
   sleep 2
 done
 
-if [ "${DEPLOY_SYNC_V1_SEED_DATA:-true}" != "false" ]; then
+if [ "${DEPLOY_SYNC_V1_SEED_DATA:-false}" = "true" ]; then
   echo "[INFO] Syncing v1 seed data..."
   sudo docker exec teameet_v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed.ts"
 else

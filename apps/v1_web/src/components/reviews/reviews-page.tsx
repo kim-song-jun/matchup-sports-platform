@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { cssUrl } from '@/lib/assets';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import type { V1ReviewDetail, V1ReviewTargetType } from '@/types/api';
@@ -358,7 +359,7 @@ function ReceivedReviewRow({ review }: { review: V1ReviewDetail }) {
 
 function Avatar({ imageUrl, initials, size = 42 }: { imageUrl: string | null | undefined; initials: string; size?: number }) {
   return imageUrl ? (
-    <div className="tm-review-avatar" style={{ width: size, height: size, backgroundImage: `url(${imageUrl})` }} />
+    <div className="tm-review-avatar" style={{ width: size, height: size, backgroundImage: cssUrl(imageUrl) }} />
   ) : (
     <div className="tm-review-avatar" style={{ width: size, height: size }}>{initials}</div>
   );

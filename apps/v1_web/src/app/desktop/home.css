@@ -18,6 +18,91 @@
   margin: 0 20px 28px;
 }
 
+.tm-home-chat-block {
+  margin: 0 20px 28px;
+}
+
+.tm-home-chat-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tm-home-chat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.tm-home-chat-row-unread {
+  border-color: var(--blue100);
+  background: var(--blue50);
+}
+
+.tm-home-chat-icon {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--grey50);
+  color: var(--blue500);
+}
+
+.tm-home-chat-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.tm-home-chat-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tm-home-chat-title-line > .tm-text-label {
+  min-width: 0;
+}
+
+.tm-home-chat-last-unread {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.tm-home-chat-meta {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.tm-home-chat-row-count {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 6px;
+  background: var(--red500);
+  color: var(--static-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.tm-home-chat-empty {
+  border: 1px solid var(--border);
+}
+
 /* ─── Mobile-default spacing for sidebar anonymous wrappers ───────────────── */
 /*
  * The QuickGrid and Weather sections previously had their padding on anonymous
@@ -135,6 +220,10 @@
 
   /* The featured wrapper removes its inline margin — grid gap handles spacing */
   .tm-home-featured-block {
+    margin: 0;
+  }
+
+  .tm-home-chat-block {
     margin: 0;
   }
 }
@@ -267,6 +356,7 @@
 @media (min-width: 1024px) {
   .tm-home-greeting-block,
   .tm-home-featured-block,
+  .tm-home-chat-block,
   .tm-home-matches-block {
     /* No extra margin/padding — grid gap is the only spacing */
     margin: 0;

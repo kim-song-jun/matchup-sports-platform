@@ -142,7 +142,12 @@ export class ChatService {
         data: { lastMessageAt: created.sentAt },
       });
       const recipients = await tx.v1ChatRoomParticipant.findMany({
-        where: { chatRoomId: room.id, status: 'active', userId: { not: user.id } },
+        where: {
+          chatRoomId: room.id,
+          status: 'active',
+          userId: { not: user.id },
+          OR: [{ mutedUntil: null }, { mutedUntil: { lte: new Date() } }],
+        },
         select: { userId: true },
       });
       if (recipients.length > 0) {
@@ -176,13 +181,14 @@ export class ChatService {
       data: {
         ...(dto.pinned === undefined ? {} : { pinnedAt: dto.pinned ? new Date() : null }),
         ...(dto.lastReadMessageId === undefined ? {} : { lastReadMessageId: dto.lastReadMessageId }),
+        ...(dto.mutedUntil === undefined ? {} : { mutedUntil: dto.mutedUntil ? new Date(dto.mutedUntil) : null }),
       },
     });
 
     return {
       roomId,
       pinned: Boolean(updated.pinnedAt),
-      mutedUntil: null,
+      mutedUntil: updated.mutedUntil,
       lastReadMessageId: updated.lastReadMessageId,
       status: updated.status,
     };
@@ -224,7 +230,7 @@ export class ChatService {
       update: { status: 'active', leftAt: null },
       create: { chatRoomId: room.id, userId, status: 'active' },
     });
-    return { roomId: room.id, roomType: 'match', created: !existing, route: `/chat/rooms/${room.id}` };
+    return { roomId: room.id, roomType: 'match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async resolveTeamRoom(userId: string, teamId: string) {
@@ -235,7 +241,7 @@ export class ChatService {
       update: { status: 'active', leftAt: null },
       create: { chatRoomId: room.id, userId, status: 'active' },
     });
-    return { roomId: room.id, roomType: 'team', created: !existing, route: `/chat/rooms/${room.id}` };
+    return { roomId: room.id, roomType: 'team', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async resolveTeamMatchRoom(userId: string, teamMatchId: string) {
@@ -246,7 +252,7 @@ export class ChatService {
       update: { status: 'active', leftAt: null },
       create: { chatRoomId: room.id, userId, status: 'active' },
     });
-    return { roomId: room.id, roomType: 'team_match', created: !existing, route: `/chat/rooms/${room.id}` };
+    return { roomId: room.id, roomType: 'team_match', created: !existing, route: chatRoomRoute(room.id) };
   }
 
   private async assertCanUseMatchChat(userId: string, matchId: string) {
@@ -355,7 +361,7 @@ export class ChatService {
         : null,
       unreadCount,
       pinned: Boolean(me?.pinnedAt),
-      muted: false,
+      muted: Boolean(me?.mutedUntil && me.mutedUntil.getTime() > Date.now()),
     };
   }
 
@@ -365,7 +371,7 @@ export class ChatService {
       participantId: me?.id ?? null,
       status: me?.status ?? 'left',
       pinned: Boolean(me?.pinnedAt),
-      mutedUntil: null,
+      mutedUntil: me?.mutedUntil ?? null,
       lastReadMessageId: me?.lastReadMessageId ?? null,
     };
   }
@@ -401,4 +407,8 @@ function validationError(message: string, field: string) {
 
 function stateConflict(message: string, code = 'STATE_CONFLICT') {
   return new ConflictException({ code, message });
+}
+
+function chatRoomRoute(roomId: string) {
+  return `/chat/${roomId}`;
 }

@@ -67,6 +67,27 @@ export function getHomeViewModel(): HomeViewModel {
     hasNewNotification: true,
     chatUnreadCount: 4,
     chatHref: '/chat',
+    chatStatus: 'ready',
+    chatRooms: [
+      {
+        id: 'chat-match-1',
+        title: '성수 풋살 5:5',
+        typeLabel: '개인매치',
+        lastMessage: '오늘 경기 준비물 확인해 주세요',
+        time: '오늘 18:00',
+        unreadCount: 2,
+        href: '/chat/chat-match-1',
+      },
+      {
+        id: 'chat-team-1',
+        title: '성수 러너스 FC',
+        typeLabel: '팀',
+        lastMessage: '새 멤버 신청이 들어왔어요',
+        time: '오늘 17:20',
+        unreadCount: 2,
+        href: '/chat/chat-team-1',
+      },
+    ],
     stats: {
       monthlyActivity: 12,
       monthlyActivitySub: '지난달보다 +3',
@@ -76,7 +97,7 @@ export function getHomeViewModel(): HomeViewModel {
       trustState: '-',
       pending: '대기 없음',
     },
-    featuredMatch: sortedMatches[0],
+    featuredMatch: sortedMatches[0] ?? null,
     recommendedMatches: matches,
     quickActions: [
       { key: 'matches', label: '매치', sub: '개인 경기', href: '/matches', color: 'var(--blue500)' },

@@ -19,9 +19,12 @@ export type NotificationEventType =
   | 'team_join_application_accepted'
   | 'team_join_application_rejected'
   | 'team_match_application_received'
+  | 'team_match_application_withdrawn'
   | 'team_match_application_approved'
   | 'team_match_application_rejected'
+  | 'team_match_closed'
   | 'team_match_cancelled'
+  | 'team_match_completed'
   | 'tournament_registration_confirmed'
   | 'tournament_registration_waitlisted'
   | 'tournament_registration_cancelled'
@@ -64,9 +67,12 @@ function preferenceFieldForEvent(
   }
   if (
     type === 'team_match_application_received' ||
+    type === 'team_match_application_withdrawn' ||
     type === 'team_match_application_approved' ||
     type === 'team_match_application_rejected' ||
-    type === 'team_match_cancelled'
+    type === 'team_match_closed' ||
+    type === 'team_match_cancelled' ||
+    type === 'team_match_completed'
   ) {
     return 'teamMatchEnabled';
   }
@@ -130,6 +136,17 @@ function deepLinkForTarget(
   return `${base}/${targetId}`;
 }
 
+function deepLinkForEvent(
+  type: NotificationEventType,
+  targetType: V1NotificationTargetType,
+  targetId: string | null,
+): string | null {
+  if (type === 'team_join_application_received' && targetId) {
+    return `/teams/${targetId}/members`;
+  }
+  return deepLinkForTarget(targetType, targetId);
+}
+
 const EVENT_TITLES: Record<NotificationEventType, string> = {
   match_application_received: '매치 신청이 도착했어요',
   match_application_approved: '매치 신청이 승인됐어요',
@@ -140,9 +157,12 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_join_application_accepted: '팀 가입 신청이 수락됐어요',
   team_join_application_rejected: '팀 가입 신청이 거절됐어요',
   team_match_application_received: '팀매치 신청이 도착했어요',
+  team_match_application_withdrawn: '팀매치 신청이 취소됐어요',
   team_match_application_approved: '팀매치 신청이 승인됐어요',
   team_match_application_rejected: '팀매치 신청이 거절됐어요',
+  team_match_closed: '팀매치 모집이 마감됐어요',
   team_match_cancelled: '팀매치가 취소됐어요',
+  team_match_completed: '팀매치가 완료됐어요. 리뷰를 남겨보세요!',
   tournament_registration_confirmed: '대회 참가가 확정됐어요',
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요',
   tournament_registration_cancelled: '대회 참가가 취소됐어요',
@@ -168,7 +188,7 @@ export class NotificationsService {
     body?: string,
   ): Promise<void> {
     const targetType = targetTypeForEvent(type);
-    const deepLink = deepLinkForTarget(targetType, targetId);
+    const deepLink = deepLinkForEvent(type, targetType, targetId);
     const title = EVENT_TITLES[type];
     const prefField = preferenceFieldForEvent(type);
 
@@ -192,7 +212,7 @@ export class NotificationsService {
         targetId,
         EVENT_TITLES[type],
         body ?? null,
-        deepLinkForTarget(targetTypeForEvent(type), targetId),
+        deepLinkForEvent(type, targetTypeForEvent(type), targetId),
         preferenceFieldForEvent(type),
       );
     }

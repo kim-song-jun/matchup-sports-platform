@@ -57,11 +57,40 @@ export class TournamentPlayersService {
     return registration;
   }
 
+  private async assertTeamMember(teamId: string, userId: string) {
+    const membership = await this.prisma.v1TeamMembership.findFirst({
+      where: {
+        teamId,
+        userId,
+        status: 'active',
+        team: { status: 'active', deletedAt: null },
+      },
+    });
+    if (!membership) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: '팀에 속한 멤버만 선수 명단을 볼 수 있어요.',
+      });
+    }
+  }
+
+  private assertRosterMutable(registration: V1TournamentRegistration) {
+    if (registration.rosterLockedAt) {
+      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
+    }
+    if (registration.status === 'cancel_requested' || registration.status === 'cancelled') {
+      throw new ConflictException({
+        code: 'REGISTRATION_ROSTER_NOT_MUTABLE',
+        message: '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.',
+      });
+    }
+  }
+
   // ─── 명단 조회 ────────────────────────────────────────────────────────────────
 
   async listPlayers(user: V1AuthUser, tournamentId: string, registrationId: string) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
-    await this.assertTeamManager(registration.teamId, user.id);
+    await this.assertTeamMember(registration.teamId, user.id);
 
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
@@ -93,10 +122,7 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    // 잠금 가드
-    if (registration.rosterLockedAt) {
-      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
-    }
+    this.assertRosterMutable(registration);
 
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
@@ -196,10 +222,7 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    // 잠금 가드
-    if (registration.rosterLockedAt) {
-      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
-    }
+    this.assertRosterMutable(registration);
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, registrationId, removedAt: null },
@@ -228,9 +251,7 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    if (registration.rosterLockedAt) {
-      throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
-    }
+    this.assertRosterMutable(registration);
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, registrationId, removedAt: null },

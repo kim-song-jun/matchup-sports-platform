@@ -41,6 +41,10 @@ export class TournamentsReadService {
             },
           },
         },
+        registrations: {
+          where: { status: { in: ['awaiting_payment', 'payment_checking', 'paid'] } },
+          select: { status: true },
+        },
       },
     });
 
@@ -49,7 +53,7 @@ export class TournamentsReadService {
 
     return {
       items: pageItems.map((row) =>
-        this.serializeCard(row, row._count.registrations),
+        this.serializeCard(row, row._count.registrations, row.registrations.length),
       ),
       pageInfo: {
         nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
@@ -99,10 +103,11 @@ export class TournamentsReadService {
               include: { team: { select: { id: true, name: true } } },
             },
             result: true,
+            videos: { orderBy: { sortOrder: 'asc' } },
           },
         },
         announcements: {
-          where: { publishedAt: { not: null } },
+          where: { audience: 'public', publishedAt: { not: null } },
           orderBy: { publishedAt: 'desc' },
         },
         sponsors: {
@@ -110,7 +115,9 @@ export class TournamentsReadService {
           orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         },
         registrations: {
-          where: { status: { in: ['confirmed', 'waitlisted'] } },
+          where: {
+            status: { in: ['confirmed', 'waitlisted', 'awaiting_payment', 'payment_checking', 'paid'] },
+          },
           include: { team: { select: { id: true, name: true } } },
         },
         _count: {
@@ -119,6 +126,16 @@ export class TournamentsReadService {
               where: { status: 'confirmed' },
             },
           },
+        },
+        reviews: {
+          orderBy: { createdAt: 'desc' as const },
+          take: 30,
+          include: {
+            author: { select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } } },
+          },
+        },
+        awards: {
+          orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
         },
       },
     });
@@ -139,6 +156,7 @@ export class TournamentsReadService {
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
+      scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
@@ -151,9 +169,31 @@ export class TournamentsReadService {
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       prizePool: row.prizePool,
+      prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
+      promoHomeEnabled: row.promoHomeEnabled,
+      promoHomeTitle: row.promoHomeTitle,
+      promoHomeSubtitle: row.promoHomeSubtitle,
+      promoHomeImageUrl: row.promoHomeImageUrl,
+      promoHomeBadgeText: row.promoHomeBadgeText,
+      promoHomeDateText: row.promoHomeDateText,
+      promoHomeTeamsText: row.promoHomeTeamsText,
+      promoHomeLocationText: row.promoHomeLocationText,
+      promoHomePrizeText: row.promoHomePrizeText,
+      promoHomePriority: row.promoHomePriority,
+      promoListEnabled: row.promoListEnabled,
+      promoListTitle: row.promoListTitle,
+      promoListSubtitle: row.promoListSubtitle,
+      promoListImageUrl: row.promoListImageUrl,
+      promoListBadgeText: row.promoListBadgeText,
+      promoListDateText: row.promoListDateText,
+      promoListTeamsText: row.promoListTeamsText,
+      promoListLocationText: row.promoListLocationText,
+      promoListPrizeText: row.promoListPrizeText,
+      promoListPriority: row.promoListPriority,
       confirmedCount: row._count.registrations,
-      participantTeams: [...row.registrations]
+      participantTeams: row.registrations
+        .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
         .sort((a, b) => {
           const aRank = a.status === 'confirmed' ? 0 : 1;
           const bRank = b.status === 'confirmed' ? 0 : 1;
@@ -166,6 +206,9 @@ export class TournamentsReadService {
           status: registration.status,
           confirmedAt: registration.confirmedAt?.toISOString() ?? null,
         })),
+      pendingPaymentCount: row.registrations.filter((registration) =>
+        ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),
+      ).length,
       groups: row.groups.map((g) => ({
         id: g.id,
         name: g.name,
@@ -217,6 +260,11 @@ export class TournamentsReadService {
               recordedAt: f.result.recordedAt.toISOString(),
             }
           : null,
+        videos: f.videos.map((v) => ({
+          id: v.id,
+          title: v.title,
+          url: v.url,
+        })),
       })),
       announcements: row.announcements.map((a) => ({
         id: a.id,
@@ -243,6 +291,25 @@ export class TournamentsReadService {
       })),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+      reviews: (row.reviews ?? []).map((r) => ({
+        id: r.id,
+        authorId: r.authorUserId,
+        authorNickname: (r.author as { profile?: { nickname?: string | null } | null } | null)?.profile?.nickname ?? '익명',
+        authorProfileImageUrl: (r.author as { profile?: { profileImageUrl?: string | null } | null } | null)?.profile?.profileImageUrl ?? null,
+        teamName: r.teamName ?? null,
+        rating: r.rating,
+        comment: r.comment ?? null,
+        photoUrls: r.photoUrls,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      awards: (row.awards ?? []).map((a) => ({
+        id: a.id,
+        awardType: a.awardType,
+        awardLabel: a.awardLabel,
+        recipientName: a.recipientName,
+        teamName: a.teamName ?? null,
+        note: a.note ?? null,
+      })),
     };
   }
 
@@ -256,15 +323,40 @@ export class TournamentsReadService {
       format: string;
       registrationDeadlineAt: Date | null;
       scheduledAt: Date | null;
+      scheduledEndAt: Date | null;
       venue: string | null;
+      coverImageUrl: string | null;
       teamCount: number;
       entryFee: number;
       prizePool: number | null;
+      prizeSummary: string | null;
       prizeBreakdown: string | null;
+      promoHomeEnabled: boolean;
+      promoHomeTitle: string | null;
+      promoHomeSubtitle: string | null;
+      promoHomeImageUrl: string | null;
+      promoHomeBadgeText: string | null;
+      promoHomeDateText: string | null;
+      promoHomeTeamsText: string | null;
+      promoHomeLocationText: string | null;
+      promoHomePrizeText: string | null;
+      promoHomePriority: number;
+      promoListEnabled: boolean;
+      promoListTitle: string | null;
+      promoListSubtitle: string | null;
+      promoListImageUrl: string | null;
+      promoListBadgeText: string | null;
+      promoListDateText: string | null;
+      promoListTeamsText: string | null;
+      promoListLocationText: string | null;
+      promoListPrizeText: string | null;
+      promoListPriority: number;
       createdAt: Date;
       updatedAt: Date;
+      registrations: Array<{ status: string }>;
     },
     confirmedCount: number,
+    pendingPaymentCount: number,
   ) {
     return {
       id: row.id,
@@ -275,12 +367,36 @@ export class TournamentsReadService {
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
+      scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      coverImageUrl: row.coverImageUrl,
       teamCount: row.teamCount,
       entryFee: row.entryFee,
       prizePool: row.prizePool,
+      prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
+      promoHomeEnabled: row.promoHomeEnabled,
+      promoHomeTitle: row.promoHomeTitle,
+      promoHomeSubtitle: row.promoHomeSubtitle,
+      promoHomeImageUrl: row.promoHomeImageUrl,
+      promoHomeBadgeText: row.promoHomeBadgeText,
+      promoHomeDateText: row.promoHomeDateText,
+      promoHomeTeamsText: row.promoHomeTeamsText,
+      promoHomeLocationText: row.promoHomeLocationText,
+      promoHomePrizeText: row.promoHomePrizeText,
+      promoHomePriority: row.promoHomePriority,
+      promoListEnabled: row.promoListEnabled,
+      promoListTitle: row.promoListTitle,
+      promoListSubtitle: row.promoListSubtitle,
+      promoListImageUrl: row.promoListImageUrl,
+      promoListBadgeText: row.promoListBadgeText,
+      promoListDateText: row.promoListDateText,
+      promoListTeamsText: row.promoListTeamsText,
+      promoListLocationText: row.promoListLocationText,
+      promoListPrizeText: row.promoListPrizeText,
+      promoListPriority: row.promoListPriority,
       confirmedCount,
+      pendingPaymentCount,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

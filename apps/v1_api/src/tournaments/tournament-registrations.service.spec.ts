@@ -6,6 +6,7 @@
  * and cancel-request transitions. Asserts observable behaviour only.
  */
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
@@ -14,7 +15,7 @@ import { TournamentRegistrationsService } from './tournament-registrations.servi
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
 function openTournament(overrides: Record<string, unknown> = {}) {
-  return { id: 'tournament-1', status: 'open', entryFee: 120000, registrationDeadlineAt: null, deletedAt: null, ...overrides };
+  return { id: 'tournament-1', status: 'open', entryFee: 120000, teamCount: 8, registrationDeadlineAt: null, deletedAt: null, ...overrides };
 }
 function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -40,9 +41,9 @@ describe('TournamentRegistrationsService', () => {
   let prisma: {
     v1TeamMembership: { findFirst: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
-    v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
-    v1TournamentPlayer: { count: jest.Mock };
+    v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -50,9 +51,9 @@ describe('TournamentRegistrationsService', () => {
     prisma = {
       v1TeamMembership: { findFirst: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
-      v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
     };
     const p = prisma;
@@ -90,11 +91,19 @@ describe('TournamentRegistrationsService', () => {
     });
   });
 
-  it('create: already registered (active) → 409 ALREADY_REGISTERED', async () => {
+  it('create: already registered (active) → returns existing registration for managed team', async () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
-    await expect(service.create(manager, 'tournament-1', { teamId: 'team-1' })).rejects.toMatchObject({
-      response: { code: 'ALREADY_REGISTERED' },
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue({
+      method: 'bank_transfer', status: 'paid', amount: 120000, paidAt: new Date('2026-06-14T01:00:00Z'),
+    });
+    prisma.v1TournamentPlayer.count.mockResolvedValue(4);
+
+    await expect(service.create(manager, 'tournament-1', { teamId: 'team-1' })).resolves.toMatchObject({
+      id: 'reg-1',
+      status: 'confirmed',
+      playerCount: 4,
+      payment: { method: 'bank_transfer', status: 'paid', amount: 120000 },
     });
   });
 
@@ -104,6 +113,50 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.create.mockResolvedValue(registrationRow());
     const result = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
     expect(result).toMatchObject({ id: 'reg-1', status: 'draft', playerCount: 0 });
+  });
+
+  it('create: capacity full from confirmed plus payment-stage registrations → 409 TOURNAMENT_CAPACITY_FULL', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ teamCount: 8 }));
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentRegistration.count.mockResolvedValue(8);
+
+    await expect(service.create(manager, 'tournament-1', { teamId: 'team-1' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+    });
+    expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
+  });
+
+  it('create: P2002 after race returns the team-scoped registration when it now exists', async () => {
+    const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['tournament_id', 'team_id'] },
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(registrationRow({ id: 'race-reg-1' }));
+    prisma.v1TournamentRegistration.create.mockRejectedValue(p2002);
+    prisma.v1TournamentPlayer.count.mockResolvedValue(1);
+
+    const result = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    expect(result).toMatchObject({ id: 'race-reg-1', status: 'draft', playerCount: 1 });
+  });
+
+  it('create: P2002 without team-scoped row reports unique scope mismatch', async () => {
+    const p2002 = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'test',
+      meta: { target: ['tournament_id', 'applied_by_user_id'] },
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentRegistration.create.mockRejectedValue(p2002);
+
+    await expect(service.create(manager, 'tournament-1', { teamId: 'team-2' })).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_REGISTRATION_UNIQUE_SCOPE_MISMATCH' },
+    });
   });
 
   it('create: existing draft → resumes same draft instead of ALREADY_REGISTERED', async () => {
@@ -170,6 +223,26 @@ describe('TournamentRegistrationsService', () => {
     expect(prisma.v1TournamentPayment.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ create: expect.objectContaining({ method: 'bank_transfer', amount: 120000, status: 'ready' }) }),
     );
+  });
+
+  it('submit: confirmed plus payment-stage registrations fill capacity → 409 TOURNAMENT_CAPACITY_FULL', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ teamCount: 8 }));
+    prisma.v1TournamentRegistration.count.mockResolvedValue(8);
+
+    await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+    });
+    expect(prisma.v1TournamentRegistration.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tournamentId: 'tournament-1',
+          status: { in: ['awaiting_payment', 'payment_checking', 'paid', 'confirmed'] },
+        }),
+      }),
+    );
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
   });
 
   it('submit: pg method does not require depositorName', async () => {
@@ -342,5 +415,56 @@ describe('TournamentRegistrationsService', () => {
         where: expect.objectContaining({ appliedByUserId: otherUser.id }),
       }),
     );
+  });
+
+  it('getMyRegistrations: returns team-scoped registrations for joined teams', async () => {
+    const rows = [
+      {
+        ...registrationRow({ id: 'reg-team-1', teamId: 'team-1', status: 'draft' }),
+        payment: null,
+        team: { id: 'team-1', name: '1번 팀' },
+      },
+      {
+        ...registrationRow({ id: 'reg-team-2', teamId: 'team-2', status: 'awaiting_payment' }),
+        payment: { method: 'bank_transfer', status: 'ready', amount: 120000, paidAt: null },
+        team: { id: 'team-2', name: '2번 팀' },
+      },
+    ];
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(rows);
+    prisma.v1TournamentPlayer.groupBy.mockResolvedValue([
+      { registrationId: 'reg-team-1', _count: { registrationId: 1 } },
+      { registrationId: 'reg-team-2', _count: { registrationId: 3 } },
+    ]);
+
+    const result = await service.getMyRegistrations(manager, 'tournament-1');
+
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'reg-team-1', teamId: 'team-1', teamName: '1번 팀', playerCount: 1 }),
+      expect.objectContaining({ id: 'reg-team-2', teamId: 'team-2', teamName: '2번 팀', playerCount: 3 }),
+    ]);
+    expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tournamentId: 'tournament-1',
+          OR: expect.arrayContaining([
+            expect.objectContaining({ appliedByUserId: manager.id }),
+            expect.objectContaining({
+              team: expect.objectContaining({
+                memberships: expect.objectContaining({
+                  some: expect.objectContaining({ userId: manager.id, status: 'active' }),
+                }),
+              }),
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('getMyRegistrations: returns an empty list when no managed team registration exists', async () => {
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+
+    await expect(service.getMyRegistrations(manager, 'tournament-1')).resolves.toEqual([]);
+    expect(prisma.v1TournamentPlayer.groupBy).not.toHaveBeenCalled();
   });
 });

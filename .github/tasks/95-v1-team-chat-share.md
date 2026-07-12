@@ -31,6 +31,7 @@
 - Extended chat API DTOs/service/types for `team` rooms.
 - Added team detail share action with Web Share API fallback.
 - Synced v1 chat/deferred API docs.
+- 2026-07-01: Fixed team detail chat CTA 404 caused by using API-style `/chat/rooms/:roomId` as a web route; resolve now returns `/chat/:roomId`, and web clients normalize stale API-style routes before navigation.
 
 ## Validation Notes
 

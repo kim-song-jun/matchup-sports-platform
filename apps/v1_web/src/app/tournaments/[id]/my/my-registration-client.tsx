@@ -2,20 +2,21 @@
 
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
-import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { ChevronRight } from 'lucide-react';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
 import {
   useV1Tournament,
-  useV1MyRegistration,
+  useV1MyRegistrations,
   useV1TournamentPlayers,
   useV1CancelRegistrationRequest,
   useV1WithdrawCancelRegistrationRequest,
   useV1Team,
+  useV1MyTeams,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatEntryFee } from '@/lib/date-utils';
@@ -23,7 +24,13 @@ import type {
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
   V1TournamentPaymentMethod,
+  V1MyTeam,
 } from '@/types/api';
+
+function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
+  if (!data) return [];
+  return 'items' in data ? data.items : (data as V1MyTeam[]);
+}
 
 /* ── Status helpers ── */
 
@@ -38,7 +45,7 @@ function registrationStatusConfig(status: V1TournamentRegistrationStatus): Statu
     case 'awaiting_payment':
       return { badgeClass: 'tm-badge-orange', label: '입금 대기' };
     case 'payment_checking':
-      return { badgeClass: 'tm-badge-blue', label: '입금 확인 중' };
+      return { badgeClass: 'tm-badge-blue', label: '명단 확인 중' };
     case 'paid':
       return { badgeClass: 'tm-badge-blue', label: '결제 완료' };
     case 'confirmed':
@@ -105,6 +112,14 @@ function formatMonthDay(dateStr: string | null): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function formatMonthDayRange(startStr: string | null, endStr: string | null): string {
+  const start = formatMonthDay(startStr);
+  if (!start) return '';
+  const end = formatMonthDay(endStr);
+  if (!end || end === start) return start;
+  return `${start}~${end}`;
 }
 
 /* ── Inline fact icons for the registration pass (none of these exist in icons.tsx) ── */
@@ -180,6 +195,7 @@ function RegistrationPass({
   title,
   teamName,
   scheduledAt,
+  scheduledEndAt,
   venue,
   paymentSummary,
   paymentDueAt,
@@ -195,6 +211,7 @@ function RegistrationPass({
   title: string;
   teamName: string | null;
   scheduledAt: string | null;
+  scheduledEndAt: string | null;
   venue: string | null;
   paymentSummary: string | null;
   paymentDueAt: string | null;
@@ -241,7 +258,7 @@ function RegistrationPass({
             display: 'flex', flexDirection: 'column', gap: 9,
           }}
         >
-          <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDay(scheduledAt) || '일정 미정'} />
+          <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDayRange(scheduledAt, scheduledEndAt) || '일정 미정'} />
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
           {paymentDeadline ? <PassFact icon={<ReceiptIcon />} label="기한" value={paymentDeadline.label} /> : null}
@@ -259,7 +276,7 @@ function RegistrationPass({
 
   const accent = getSportAccent(sportCode);
   const statusCfg = registrationStatusConfig(status);
-  const dateStr = formatMonthDay(scheduledAt);
+  const dateStr = formatMonthDayRange(scheduledAt, scheduledEndAt);
   /* Roster next-step applies to active registrations; waitlisted shows a status note instead. */
   const showRosterFooter = status === 'confirmed' || status === 'paid';
 
@@ -327,7 +344,9 @@ function RegistrationPass({
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>선수 명단</div>
             <div className="tm-text-micro" style={{ color: 'var(--text-body)', marginTop: 1 }}>
               {isRosterLocked
-                ? `${rosterCount}명 · 마감`
+                ? belowMinimum
+                  ? `${rosterCount}명 / 최소 ${minPlayers}명 · 마감`
+                  : `${rosterCount}명 · 마감`
                 : belowMinimum
                   ? `${rosterCount}명 / 최소 ${minPlayers}명 등록`
                   : `${rosterCount}명 등록 완료`}
@@ -345,7 +364,7 @@ function RegistrationPass({
               }}
             >
               {belowMinimum ? '선수 등록' : '선수 수정'}
-              <ChevronRightIcon size={16} />
+              <ChevronRight size={16} />
             </Link>
           ) : null}
         </div>
@@ -576,6 +595,7 @@ function RegistrationDetailView({
   tournamentId,
   tournament,
   registration,
+  canManageRegistration,
 }: {
   tournamentId: string;
   tournament: {
@@ -585,12 +605,14 @@ function RegistrationDetailView({
     minPlayers: number;
     maxPlayers: number;
     scheduledAt: string | null;
+    scheduledEndAt: string | null;
     venue: string | null;
     bankName: string | null;
     bankAccount: string | null;
     bankHolder: string | null;
   };
   registration: V1TournamentRegistration;
+  canManageRegistration: boolean;
 }) {
   const pathname = usePathname();
   const tournamentHref = appRoute(`/tournaments/${tournamentId}`, pathname);
@@ -608,19 +630,27 @@ function RegistrationDetailView({
   const players = rosterData?.players ?? [];
   const belowMinimum = rosterData?.belowMinimum ?? false;
   const isRosterLocked = Boolean(registration.rosterLockedAt);
+  const isRosterEditBlockedByStatus =
+    registration.status === 'cancel_requested' || registration.status === 'cancelled';
+  const isRosterEditable = canManageRegistration && !isRosterLocked && !isRosterEditBlockedByStatus;
   const canCancelRequest =
-    registration.status === 'awaiting_payment' ||
-    registration.status === 'payment_checking' ||
-    registration.status === 'paid' ||
-    registration.status === 'confirmed' ||
-    registration.status === 'waitlisted';
-  const canWithdrawCancelRequest = registration.status === 'cancel_requested';
+    canManageRegistration &&
+    (
+      registration.status === 'awaiting_payment' ||
+      registration.status === 'payment_checking' ||
+      registration.status === 'paid' ||
+      registration.status === 'confirmed' ||
+      registration.status === 'waitlisted'
+    );
+  const canWithdrawCancelRequest =
+    canManageRegistration &&
+    registration.status === 'cancel_requested';
 
   /* #8: prominent nudge triggers when confirmed/paid AND roster is below minimum */
   const showRosterNudge =
     (registration.status === 'confirmed' || registration.status === 'paid') &&
     belowMinimum &&
-    !isRosterLocked;
+    isRosterEditable;
 
   /* Compact payment summary for the pass facts (full breakdown lives in the 신청 내역 card). */
   const paymentSummary = registration.payment
@@ -640,6 +670,15 @@ function RegistrationDetailView({
     bankAccount: tournament.bankAccount,
     bankHolder: tournament.bankHolder,
   });
+  const paymentDetailMessage =
+    registration.status === 'payment_checking'
+      ? '입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
+      : registration.status === 'awaiting_payment'
+        ? tournament.bankName
+          ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.'
+          : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 상태가 변경돼요.'
+        : null;
+  const showAwaitingPaymentNotice = registration.status === 'awaiting_payment';
 
   async function handleCancelConfirm(reason: string) {
     setCancelError(null);
@@ -689,10 +728,12 @@ function RegistrationDetailView({
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>선수 명단</span>
-          {belowMinimum && !isRosterLocked ? (
+          {belowMinimum && !isRosterEditBlockedByStatus ? (
             <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
               {rosterShortagebadge(registration.status).label}
             </span>
+          ) : isRosterEditBlockedByStatus ? (
+            <span className="tm-badge tm-badge-grey">수정 불가</span>
           ) : isRosterLocked ? (
             <span className="tm-badge tm-badge-grey">마감</span>
           ) : (
@@ -714,7 +755,7 @@ function RegistrationDetailView({
         >
           선수 등록하기
         </Link>
-      ) : !isRosterLocked ? (
+      ) : isRosterEditable ? (
         <Link
           href={rosterHref}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
@@ -734,7 +775,7 @@ function RegistrationDetailView({
         대회 상세 보기
       </Link>
 
-      {registration.status === 'cancelled' || registration.status === 'draft' ? (
+      {canManageRegistration && (registration.status === 'cancelled' || registration.status === 'draft') ? (
         <Link
           href={`/tournaments/${tournamentId}/apply`}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
@@ -793,6 +834,7 @@ function RegistrationDetailView({
               title={tournament.title}
               teamName={teamData?.name ?? null}
               scheduledAt={tournament.scheduledAt}
+              scheduledEndAt={tournament.scheduledEndAt}
               venue={tournament.venue}
               paymentSummary={paymentSummary}
               paymentDueAt={registration.payment?.paymentDueAt ?? null}
@@ -801,6 +843,71 @@ function RegistrationDetailView({
               isRosterLocked={isRosterLocked}
               belowMinimum={belowMinimum}
             />
+
+            {/* Roster — surface before 신청 내역 so users notice roster registration early. */}
+            {!passShowsRoster ? (
+            <section aria-labelledby="roster-heading" style={{ marginTop: 16 }}>
+              <div style={{ marginLeft: -20, marginRight: -20 }}>
+                <SectionTitle id="roster-heading" title="선수 명단" />
+              </div>
+              <Card pad={16} style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    {/* P1 숫자:단위 2:1 + tabular-nums */}
+                  <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                      <span
+                        className="tab-num"
+                        style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}
+                      >
+                        {players.length}
+                      </span>
+                      <span style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-strong)', fontWeight: 500, lineHeight: 1.2 }}>명</span>
+                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>등록됨</span>
+                    </div>
+                    <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
+                      {`최소 ${tournament.minPlayers}명 · 최대 ${tournament.maxPlayers}명`}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {belowMinimum && !isRosterEditBlockedByStatus ? (
+                      /* P0: status-aware badge — shared helper keeps rail and body in sync */
+                      <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
+                        {rosterShortagebadge(registration.status).label}
+                      </span>
+                    ) : null}
+                    {isRosterEditBlockedByStatus ? (
+                      <span className="tm-badge tm-badge-grey">수정 불가</span>
+                    ) : null}
+                    {isRosterLocked ? (
+                      <span className="tm-badge tm-badge-grey">마감</span>
+                    ) : null}
+                    {isRosterEditable ? (
+                      <Link
+                        href={rosterHref}
+                        className="tm-btn tm-btn-md tm-btn-neutral"
+                        aria-label="선수 명단 수정하기"
+                        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                      >
+                        선수 수정
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+                {belowMinimum && !isRosterEditBlockedByStatus ? (
+                  /* P0: copy branches on whether confirmation is still blocked */
+                  registration.status === 'confirmed' || registration.status === 'paid' ? (
+                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      대회 전까지 선수를 더 등록할 수 있어요.
+                    </p>
+                  ) : (
+                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                      최소 인원을 채워야 참가 확정이 가능해요.
+                    </p>
+                  )
+                ) : null}
+              </Card>
+            </section>
+            ) : null}
 
             {/* Registration record — 신청 + 결제 consolidated into one "신청 내역" card */}
             <section aria-labelledby="reg-detail-heading">
@@ -865,9 +972,14 @@ function RegistrationDetailView({
                           <InfoRow label="계좌번호" value={tournament.bankAccount ?? ''} />
                           <InfoRow label="예금주" value={tournament.bankHolder ?? ''} isLast />
                           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
-                            위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.
+                            {paymentDetailMessage ?? '입금이 확인됐어요. 운영자가 신청 상태를 확인하고 있어요.'}
                           </div>
                         </>
+                      ) : null}
+                      {paymentDetailMessage && !shouldShowBankTransferAccount ? (
+                        <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
+                          {paymentDetailMessage}
+                        </div>
                       ) : null}
                     </div>
                   ) : (
@@ -893,11 +1005,7 @@ function RegistrationDetailView({
                         </>
                       ) : null}
                       <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
-                        {registration.status === 'awaiting_payment'
-                          ? tournament.bankName
-                            ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 자동으로 상태가 변경돼요.'
-                            : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 자동으로 상태가 변경돼요.'
-                          : '아직 결제 정보가 없어요.'}
+                        {paymentDetailMessage ?? '아직 결제 정보가 없어요.'}
                       </div>
                     </div>
                   )}
@@ -905,71 +1013,25 @@ function RegistrationDetailView({
               </Card>
             </section>
 
-            {/* Roster — only for states without a pass (the pass footer owns roster for confirmed/paid) */}
-            {!passShowsRoster ? (
-            <section aria-labelledby="roster-heading" style={{ marginTop: 16 }}>
-              <div style={{ marginLeft: -20, marginRight: -20 }}>
-                <SectionTitle id="roster-heading" title="선수 명단" />
-              </div>
-              <Card pad={16} style={{ marginTop: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    {/* P1 숫자:단위 2:1 + tabular-nums */}
-                  <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                      <span
-                        className="tab-num"
-                        style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', lineHeight: 1.2 }}
-                      >
-                        {players.length}
-                      </span>
-                      <span style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-strong)', fontWeight: 500, lineHeight: 1.2 }}>명</span>
-                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>등록됨</span>
-                    </div>
-                    <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-                      {`최소 ${tournament.minPlayers}명 · 최대 ${tournament.maxPlayers}명`}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {belowMinimum && !isRosterLocked ? (
-                      /* P0: status-aware badge — shared helper keeps rail and body in sync */
-                      <span className={`tm-badge ${rosterShortagebadge(registration.status).badgeClass}`}>
-                        {rosterShortagebadge(registration.status).label}
-                      </span>
-                    ) : null}
-                    {isRosterLocked ? (
-                      <span className="tm-badge tm-badge-grey">마감</span>
-                    ) : null}
-                    {!isRosterLocked ? (
-                      <Link
-                        href={rosterHref}
-                        className="tm-btn tm-btn-md tm-btn-neutral"
-                        aria-label="선수 명단 수정하기"
-                        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-                      >
-                        선수 수정
-                      </Link>
-                    ) : null}
-                  </div>
+            {showAwaitingPaymentNotice ? (
+              <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+                <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+                  <p style={{ margin: 0 }}>아직 참가가 확정된 상태는 아닙니다.</p>
+                  <p style={{ margin: '8px 0 0' }}>
+                    안내된 계좌로 참가비를 입금해 주세요.
+                    <br />
+                    입금 확인이 완료되면 참가가 최종 확정됩니다.
+                  </p>
+                  <p style={{ margin: '8px 0 0' }}>
+                    신청 후 2시간 이내에 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
+                  </p>
                 </div>
-                {belowMinimum && !isRosterLocked ? (
-                  /* P0: copy branches on whether confirmation is still blocked */
-                  registration.status === 'confirmed' || registration.status === 'paid' ? (
-                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      대회 전까지 선수를 더 등록할 수 있어요.
-                    </p>
-                  ) : (
-                    <p className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                      최소 인원을 채워야 참가 확정이 가능해요.
-                    </p>
-                  )
-                ) : null}
               </Card>
-            </section>
             ) : null}
 
             {/* Mobile-only: Cancel / Reapply actions (hidden on desktop — rail handles them) */}
             <div className="tm-hide-desktop" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {registration.status === 'cancelled' || registration.status === 'draft' ? (
+              {canManageRegistration && (registration.status === 'cancelled' || registration.status === 'draft') ? (
                 <Link
                   href={`/tournaments/${tournamentId}/apply`}
                   className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
@@ -1065,22 +1127,223 @@ function NoRegistrationState({ tournamentId }: { tournamentId: string }) {
   );
 }
 
+function MyRegistrationsList({
+  tournamentId,
+  registrations,
+}: {
+  tournamentId: string;
+  registrations: V1TournamentRegistration[];
+}) {
+  const pathname = usePathname();
+
+  return (
+    <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
+      <div style={{ marginLeft: -20, marginRight: -20 }}>
+        <SectionTitle title="팀별 신청 내역" />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+        {registrations.map((registration) => {
+          const status = registrationStatusConfig(registration.status);
+          const href = appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname);
+          const teamName = registration.teamName ?? `팀 ${registration.teamId.slice(0, 8)}`;
+          const primaryAction = registration.status === 'draft' ? '이어서 작성' : '상세 보기';
+          return (
+            <Link key={registration.id} href={href} style={{ display: 'block', textDecoration: 'none' }}>
+              <Card pad={16}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span
+                        className="tm-text-label"
+                        style={{
+                          color: 'var(--text-strong)',
+                          fontWeight: 700,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {teamName}
+                      </span>
+                      <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
+                    </div>
+                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6 }}>
+                      선수 {registration.playerCount}명
+                      {registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-muted)' }}>
+                    <span className="tm-text-caption">{primaryAction}</span>
+                    <ChevronRight size={16} />
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main client ── */
 
-export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
-  const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
-  const {
-    data: registration,
-    isLoading: loadingReg,
-    isError: regError,
-    error: regErr,
-  } = useV1MyRegistration(tournamentId);
+function TeamRegistrationHub({
+  tournamentId,
+  teams,
+  registrations,
+  canStartNewRegistration,
+}: {
+  tournamentId: string;
+  teams: V1MyTeam[];
+  registrations: V1TournamentRegistration[];
+  canStartNewRegistration: boolean;
+}) {
+  const pathname = usePathname();
+  const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
 
-  const isLoading = loadingTournament || loadingReg;
+  return (
+    <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
+      <div style={{ marginLeft: -20, marginRight: -20 }}>
+        <SectionTitle title="팀별 대회 신청" />
+      </div>
+      <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
+        팀마다 별도로 신청할 수 있어요. 신청한 팀은 상세를 관리하고, 미신청 팀은 바로 신청을 시작하세요.
+      </p>
+
+      {teams.length === 0 ? (
+        <Card pad={24} style={{ marginTop: 14, textAlign: 'center' }}>
+          <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+            소속된 팀이 없어요
+          </div>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 8 }}>
+            팀을 만든 뒤 대회에 참가 신청할 수 있어요.
+          </p>
+          <Link href="/teams/new" className="tm-btn tm-btn-lg tm-btn-primary" style={{ marginTop: 18, display: 'inline-flex' }}>
+            팀 만들기
+          </Link>
+        </Card>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+          {teams.map((team) => {
+            const registration = registrationByTeamId.get(team.teamId);
+            const canManageTeam = team.role === 'owner' || team.role === 'manager';
+            const canResumeRegistration =
+              canManageTeam &&
+              Boolean(registration) &&
+              (registration?.status === 'draft' || registration?.status === 'cancelled') &&
+              canStartNewRegistration;
+            const status = registration
+              ? registrationStatusConfig(registration.status)
+              : { badgeClass: 'tm-badge-grey', label: '미신청' };
+            const actionLabel = !canManageTeam
+              ? '권한 필요'
+              : registration?.status === 'draft'
+                ? '이어서 작성'
+                : registration?.status === 'cancelled'
+                  ? '다시 신청'
+                  : registration
+                    ? '상세 관리'
+                    : '신청 시작';
+            const href = registration && registration.status !== 'draft' && registration.status !== 'cancelled'
+              ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname)
+              : appRoute(`/tournaments/${tournamentId}/apply?team=${team.teamId}`, pathname);
+            const actionDisabled =
+              !canManageTeam ||
+              ((!registration || registration.status === 'cancelled') && !canStartNewRegistration);
+            const displayActionLabel = registration
+              ? canResumeRegistration
+                ? actionLabel
+                : canManageTeam
+                  ? '\uC0C1\uC138 \uAD00\uB9AC'
+                  : '\uC0C1\uC138 \uBCF4\uAE30'
+              : actionLabel;
+            const displayHref = registration && !canResumeRegistration
+              ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname)
+              : href;
+            const displayActionDisabled = registration ? false : actionDisabled;
+            const meta = registration
+              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}`
+              : canStartNewRegistration
+                ? '아직 이 팀으로 신청하지 않았어요'
+                : '현재 새 신청을 받을 수 없어요';
+
+            const content = (
+              <Card pad={16}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span
+                        className="tm-text-label"
+                        style={{
+                          color: 'var(--text-strong)',
+                          fontWeight: 700,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {team.name}
+                      </span>
+                      <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
+                      {canManageTeam ? (
+                        <span className="tm-badge tm-badge-blue">{team.role === 'owner' ? '대표' : '관리자'}</span>
+                      ) : (
+                        <span className="tm-badge tm-badge-grey">멤버</span>
+                      )}
+                    </div>
+                    <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                      {team.sport.name}
+                      {team.region ? ` · ${team.region.name}` : ''}
+                      {` · ${meta}`}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: displayActionDisabled ? 'var(--text-caption)' : 'var(--blue500)' }}>
+                    <span className="tm-text-caption" style={{ fontWeight: 700 }}>{displayActionLabel}</span>
+                    {!displayActionDisabled ? <ChevronRight size={16} /> : null}
+                  </div>
+                </div>
+              </Card>
+            );
+
+            return displayActionDisabled ? (
+              <div key={team.teamId} aria-disabled="true">
+                {content}
+              </div>
+            ) : (
+              <Link key={team.teamId} href={displayHref} style={{ display: 'block', textDecoration: 'none' }}>
+                {content}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
+  const searchParams = useSearchParams();
+  const selectedRegistrationId = searchParams.get('reg');
+  const pageBackHref = selectedRegistrationId ? `/tournaments/${tournamentId}/my` : `/tournaments/${tournamentId}`;
+  const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
+  const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
+  const {
+    data: registrations = [],
+    isLoading: loadingRegistrations,
+    isError: registrationsError,
+    error: registrationsErr,
+  } = useV1MyRegistrations(tournamentId);
+
+  const teams = normalizeMyTeams(myTeamsData);
+  const isLoading = loadingTournament || loadingRegistrations || loadingTeams;
+  const selectedRegistration = selectedRegistrationId
+    ? registrations.find((item) => item.id === selectedRegistrationId)
+    : null;
 
   if (isLoading) {
     return (
-      <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
         <div aria-busy="true" aria-label="신청 정보 불러오는 중" style={{ padding: '0 20px', marginTop: 24 }}>
           {[1, 2, 3].map((i) => (
             <div
@@ -1094,19 +1357,10 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     );
   }
 
-  // 404 from useV1MyRegistration means no registration for this user yet
-  if (regError) {
-    const err = regErr as { statusCode?: number } | undefined;
-    if (err?.statusCode === 404) {
-      return (
-        <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
-          <NoRegistrationState tournamentId={tournamentId} />
-        </AppChrome>
-      );
-    }
-    const msg = extractErrorMessage(regErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+  if (registrationsError) {
+    const msg = extractErrorMessage(registrationsErr, '신청 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
         <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner message={msg} />
           <Link
@@ -1121,16 +1375,40 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
     );
   }
 
-  if (!registration || !tournament) {
+  if (!tournament) {
     return (
-      <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
-        <NoRegistrationState tournamentId={tournamentId} />
+      <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
+        <TeamRegistrationHub
+          tournamentId={tournamentId}
+          teams={teams}
+          registrations={registrations}
+          canStartNewRegistration={false}
+        />
       </AppChrome>
     );
   }
 
+  if (!selectedRegistration) {
+    return (
+      <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
+        <TeamRegistrationHub
+          tournamentId={tournamentId}
+          teams={teams}
+          registrations={registrations}
+          canStartNewRegistration={
+            tournament.status === 'open' &&
+            tournament.confirmedCount + (tournament.pendingPaymentCount ?? 0) < tournament.teamCount
+          }
+        />
+      </AppChrome>
+    );
+  }
+
+  const selectedTeam = teams.find((team) => team.teamId === selectedRegistration.teamId);
+  const canManageSelectedRegistration = selectedTeam?.role === 'owner' || selectedTeam?.role === 'manager';
+
   return (
-    <AppChrome title="내 신청" backHref={`/tournaments/${tournamentId}`} bottomNav={false} activeTab="tournaments">
+    <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
       <RegistrationDetailView
         tournamentId={tournamentId}
         tournament={{
@@ -1140,12 +1418,14 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           minPlayers: tournament.minPlayers,
           maxPlayers: tournament.maxPlayers,
           scheduledAt: tournament.scheduledAt,
+          scheduledEndAt: tournament.scheduledEndAt,
           venue: tournament.venue,
           bankName: tournament.bankName,
           bankAccount: tournament.bankAccount,
           bankHolder: tournament.bankHolder,
         }}
-        registration={registration}
+        registration={selectedRegistration}
+        canManageRegistration={canManageSelectedRegistration}
       />
     </AppChrome>
   );

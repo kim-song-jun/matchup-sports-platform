@@ -137,6 +137,25 @@ describe('NotificationsService', () => {
     expect(prisma.v1Notification.create).not.toHaveBeenCalled();
   });
 
+  it('team join application received notifications deep-link to team member management', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('manager-1', 'team_join_application_received', 'team-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          recipientUserId: 'manager-1',
+          targetType: 'team',
+          targetId: 'team-1',
+          deepLink: '/teams/team-1/members',
+        }),
+      }),
+    );
+  });
+
   // ─── read ──────────────────────────────────────────────────────────────────
 
   it('read: 존재하지 않는 알림 → 404', async () => {

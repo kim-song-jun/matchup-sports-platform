@@ -35,16 +35,21 @@ import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
 
 type TeamWithRelations = V1Team & {
   sport: { id: string; name: string };
-  region: { id: string; name: string } | null;
+  region: { id: string; name: string; parent: { name: string } | null } | null;
   profile: {
     logoUrl: string | null;
     coverImageUrl: string | null;
     description: string | null;
     activityNote: string | null;
+    activityDays: string[];
+    activityFrequency: string | null;
+    activityTimeSlots: string[];
+    activityTypes: string[];
     skillNote: string | null;
     minSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
     maxSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
     genderRule: string | null;
+    memberGoalCount: number | null;
   } | null;
   memberships: Array<
     V1TeamMembership & {
@@ -57,6 +62,11 @@ type TeamWithRelations = V1Team & {
     id: string;
     profile: { nickname: string; displayName: string | null; profileImageUrl: string | null } | null;
   };
+};
+
+type TeamCapacityLike = {
+  memberCount: number;
+  profile?: { memberGoalCount: number | null } | null;
 };
 
 @Injectable()
@@ -118,8 +128,8 @@ export class TeamsService {
       visibility: 'public',
       sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
-      regionName: team.region?.name ?? null,
-      region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
+      regionName: formatRegionDisplayName(team.region),
+      region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       joinPolicy: team.joinPolicy,
       trustState: team.trustScore?.trustState ?? 'none',
       version: team.updatedAt.toISOString(),
@@ -128,13 +138,19 @@ export class TeamsService {
         coverImageUrl: team.profile?.coverImageUrl ?? null,
         introduction: team.profile?.description ?? null,
         activityAreaText: team.profile?.activityNote ?? null,
+        activityDays: team.profile?.activityDays ?? [],
+        activityFrequency: team.profile?.activityFrequency ?? null,
+        activityTimeSlots: team.profile?.activityTimeSlots ?? [],
+        activityTypes: team.profile?.activityTypes ?? [],
+        activityMemo: team.profile?.activityNote ?? null,
+        activitySummary: formatTeamActivitySummary(team.profile),
         skillLevelText: team.profile?.skillNote ?? null,
         levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
         minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
         maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
         genderRule: team.profile?.genderRule ?? '성별 무관',
         joinPolicy: team.joinPolicy,
-        memberGoalCount: null,
+        memberGoalCount: team.profile?.memberGoalCount ?? null,
       },
       owner: {
         userId: team.ownerUser.id,
@@ -194,16 +210,22 @@ export class TeamsService {
           joinPolicy: dto.joinPolicy,
           memberCount: 1,
           managerCount: 0,
+          membersVisible: true,
           profile: {
             create: {
               logoUrl: dto.logoUrl ?? null,
               coverImageUrl: dto.coverImageUrl ?? null,
               description: dto.introduction ?? null,
-              activityNote: dto.activityAreaText ?? null,
+              activityNote: dto.activityMemo ?? dto.activityAreaText ?? null,
+              activityDays: dto.activityDays ?? [],
+              activityFrequency: dto.activityFrequency ?? null,
+              activityTimeSlots: dto.activityTimeSlots ?? [],
+              activityTypes: dto.activityTypes ?? [],
               skillNote: dto.skillLevelText ?? null,
               minSportLevelId: levelRange.minSportLevelId,
               maxSportLevelId: levelRange.maxSportLevelId,
               genderRule: dto.genderRule ?? null,
+              memberGoalCount: dto.memberGoalCount ?? null,
             },
           },
         },
@@ -252,7 +274,7 @@ export class TeamsService {
       role: result.membership.role,
       status: result.team.status,
       detailRoute: `/teams/${result.team.id}`,
-      manageRoute: `/teams/${result.team.id}/manage`,
+      manageRoute: `/teams/${result.team.id}/members`,
     };
   }
 
@@ -265,6 +287,7 @@ export class TeamsService {
     }
 
     await this.validateMasterRefs(dto.sportId, dto.regionId);
+    this.assertMemberGoalFitsCurrentMembers(dto.memberGoalCount, team.memberCount);
     const updated = await this.prisma.$transaction(async (tx) => {
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const nextTeam = await tx.v1Team.update({
@@ -284,22 +307,32 @@ export class TeamsService {
           logoUrl: dto.logoUrl ?? null,
           coverImageUrl: dto.coverImageUrl ?? null,
           description: dto.introduction ?? null,
-          activityNote: dto.activityAreaText ?? null,
+          activityNote: dto.activityMemo ?? dto.activityAreaText ?? null,
+          activityDays: dto.activityDays ?? [],
+          activityFrequency: dto.activityFrequency ?? null,
+          activityTimeSlots: dto.activityTimeSlots ?? [],
+          activityTypes: dto.activityTypes ?? [],
           skillNote: dto.skillLevelText ?? null,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          memberGoalCount: dto.memberGoalCount ?? null,
         },
         create: {
           teamId: team.id,
           logoUrl: dto.logoUrl ?? null,
           coverImageUrl: dto.coverImageUrl ?? null,
           description: dto.introduction ?? null,
-          activityNote: dto.activityAreaText ?? null,
+          activityNote: dto.activityMemo ?? dto.activityAreaText ?? null,
+          activityDays: dto.activityDays ?? [],
+          activityFrequency: dto.activityFrequency ?? null,
+          activityTimeSlots: dto.activityTimeSlots ?? [],
+          activityTypes: dto.activityTypes ?? [],
           skillNote: dto.skillLevelText ?? null,
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          memberGoalCount: dto.memberGoalCount ?? null,
         },
       });
 
@@ -342,12 +375,13 @@ export class TeamsService {
     };
   }
 
-  async members(user: V1AuthUser, teamId: string, query: TeamMembersQueryDto) {
-    const { team, membership: viewerMembership } = await this.getActiveTeamMembership(user, teamId);
-    if (!team.membersVisible && viewerMembership.role !== 'owner' && viewerMembership.role !== 'manager') {
+  async members(user: V1AuthUser | null, teamId: string, query: TeamMembersQueryDto) {
+    const team = await this.getPublicTeam(teamId, user);
+    const viewer = this.getViewer(team, user);
+    if (!this.canViewMembers(team, viewer)) {
       throw new ForbiddenException({
         code: 'MEMBERS_VISIBILITY_DISABLED',
-        message: 'Team member status is disabled by team managers',
+        message: 'Team member list is visible only to active team members',
       });
     }
 
@@ -374,8 +408,9 @@ export class TeamsService {
 
     const pageItems = memberships.slice(0, limit);
     const hasNext = memberships.length > limit;
-    const viewerIsOwner = viewerMembership.role === 'owner';
-    const viewerIsManager = viewerMembership.role === 'manager';
+    const viewerIsOwner = viewer.role === 'owner';
+    const viewerIsManager = viewer.role === 'manager';
+    const viewerIsTeamMember = viewer.role === 'owner' || viewer.role === 'manager' || viewer.role === 'member';
 
     return {
       items: pageItems.map((membership) => {
@@ -388,9 +423,9 @@ export class TeamsService {
           membershipId: membership.id,
           userId: membership.userId,
           displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
-          realName: membership.user.profile?.displayName ?? null,
-          phone: membership.user.phone ?? null,
-          birthDate: membership.user.profile?.birthDate ?? null,
+          realName: viewerIsTeamMember ? membership.user.profile?.displayName ?? null : null,
+          phone: viewerIsTeamMember ? membership.user.phone ?? null : null,
+          birthDate: viewerIsTeamMember ? membership.user.profile?.birthDate ?? null : null,
           profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
           role: membership.role,
           status: membership.status,
@@ -404,7 +439,7 @@ export class TeamsService {
         managerCount: team.managerCount,
         memberCount: team.memberCount,
       },
-      viewerRole: viewerMembership.role,
+      viewerRole: viewer.role,
       membersVisibilityEnabled: team.membersVisible,
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
@@ -427,15 +462,20 @@ export class TeamsService {
         team: {
           include: {
             sport: { select: { id: true, name: true } },
-            region: { select: { id: true, name: true } },
+            region: { select: { id: true, name: true, parent: { select: { name: true } } } },
             profile: {
               select: {
                 logoUrl: true,
                 coverImageUrl: true,
                 description: true,
                 activityNote: true,
+                activityDays: true,
+                activityFrequency: true,
+                activityTimeSlots: true,
+                activityTypes: true,
                 skillNote: true,
                 genderRule: true,
+                memberGoalCount: true,
               },
             },
             trustScore: { select: { trustState: true, mannerScore: true } },
@@ -454,9 +494,22 @@ export class TeamsService {
           role: membership.role,
           status: membership.status,
           logoUrl: membership.team.profile?.logoUrl ?? null,
+          coverImageUrl: membership.team.profile?.coverImageUrl ?? null,
+          activityAreaText: membership.team.profile?.activityNote ?? null,
+          activityDays: membership.team.profile?.activityDays ?? [],
+          activityFrequency: membership.team.profile?.activityFrequency ?? null,
+          activityTimeSlots: membership.team.profile?.activityTimeSlots ?? [],
+          activityTypes: membership.team.profile?.activityTypes ?? [],
+          activityMemo: membership.team.profile?.activityNote ?? null,
+          activitySummary: formatTeamActivitySummary(membership.team.profile),
+          memberGoalCount: membership.team.profile?.memberGoalCount ?? null,
           sport: { sportId: membership.team.sport.id, name: membership.team.sport.name },
           region: membership.team.region
-            ? { regionId: membership.team.region.id, name: membership.team.region.name }
+            ? {
+                regionId: membership.team.region.id,
+                name: membership.team.region.name,
+                parentName: membership.team.region.parent?.name ?? null,
+              }
             : null,
           trust: {
             trustState: membership.team.trustScore?.trustState ?? 'none',
@@ -468,7 +521,7 @@ export class TeamsService {
           detailRoute: `/teams/${membership.teamId}`,
           manageRoute:
             membership.role === 'owner' || membership.role === 'manager'
-              ? `/teams/${membership.teamId}/manage`
+              ? `/teams/${membership.teamId}/members`
               : null,
         })),
     };
@@ -885,6 +938,7 @@ export class TeamsService {
     if (application.team.status !== 'active' || application.team.joinPolicy === 'closed') {
       throw stateConflict('Team is not accepting join applications');
     }
+    this.assertTeamHasCapacity(application.team);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updatedApplication = await tx.v1TeamJoinApplication.update({
@@ -1046,7 +1100,7 @@ export class TeamsService {
 
     const team = await this.prisma.v1Team.findFirst({
       where: { id: teamId, deletedAt: null },
-      select: { id: true, name: true, status: true },
+      select: { id: true, name: true, status: true, memberCount: true, profile: { select: { memberGoalCount: true } } },
     });
     if (!team) {
       throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team was not found' });
@@ -1054,6 +1108,7 @@ export class TeamsService {
     if (team.status !== 'active') {
       throw stateConflict('Team is not active', 'STATE_CONFLICT');
     }
+    this.assertTeamHasCapacity(team);
 
     const invitedUser = await this.prisma.v1User.findUnique({
       where: { email: dto.invitedEmail },
@@ -1251,7 +1306,15 @@ export class TeamsService {
         invitedUserId: true,
         invitedByUserId: true,
         status: true,
-        team: { select: { id: true, name: true, status: true, memberCount: true } },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            memberCount: true,
+            profile: { select: { memberGoalCount: true } },
+          },
+        },
       },
     });
     if (!invitation) {
@@ -1280,6 +1343,10 @@ export class TeamsService {
         'STATE_CONFLICT',
       );
     }
+    if (invitation.team.status !== 'active') {
+      throw stateConflict('Team is not active', 'TEAM_NOT_ACTIVE');
+    }
+    this.assertTeamHasCapacity(invitation.team);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updatedInvitation = await tx.v1TeamInvitation.update({
@@ -1531,7 +1598,7 @@ export class TeamsService {
         id: membershipId,
         team: { deletedAt: null },
       },
-      include: { team: true },
+      include: { team: { include: { profile: { select: { memberGoalCount: true } } } } },
     });
 
     if (!membership) {
@@ -1595,6 +1662,18 @@ export class TeamsService {
     }
   }
 
+  private assertMemberGoalFitsCurrentMembers(memberGoalCount: number | null | undefined, memberCount: number) {
+    if (memberGoalCount != null && memberGoalCount < memberCount) {
+      throw validationError('memberGoalCount cannot be lower than the current member count', 'memberGoalCount');
+    }
+  }
+
+  private assertTeamHasCapacity(team: TeamCapacityLike) {
+    if (isTeamFull(team)) {
+      throw stateConflict('Team member capacity has been reached', 'TEAM_FULL');
+    }
+  }
+
   private async validateMasterRefs(sportId: string, regionId: string | null) {
     const sport = await this.prisma.v1Sport.findFirst({
       where: { id: sportId, isActive: true },
@@ -1606,11 +1685,11 @@ export class TeamsService {
 
     if (regionId) {
       const region = await this.prisma.v1Region.findFirst({
-        where: { id: regionId, isActive: true, level: 2 },
+        where: { id: regionId, isActive: true, level: { in: [1, 2] } },
         select: { id: true },
       });
       if (!region) {
-        throw validationError('regionId must be an active district region', 'regionId');
+        throw validationError('regionId must be an active city or district region', 'regionId');
       }
     }
   }
@@ -1618,17 +1697,22 @@ export class TeamsService {
   private teamInclude(user: V1AuthUser | null) {
     return {
       sport: { select: { id: true, name: true } },
-      region: { select: { id: true, name: true } },
+      region: { select: { id: true, name: true, parent: { select: { name: true } } } },
       profile: {
         select: {
           logoUrl: true,
           coverImageUrl: true,
           description: true,
           activityNote: true,
+          activityDays: true,
+          activityFrequency: true,
+          activityTimeSlots: true,
+          activityTypes: true,
           skillNote: true,
           minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
           maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
           genderRule: true,
+          memberGoalCount: true,
         },
       },
       memberships: {
@@ -1669,14 +1753,22 @@ export class TeamsService {
       coverImageUrl: team.profile?.coverImageUrl ?? null,
       sportName: team.sport.name,
       sport: { sportId: team.sport.id, name: team.sport.name },
-      regionName: team.region?.name ?? null,
-      region: team.region ? { regionId: team.region.id, name: team.region.name } : null,
+      regionName: formatRegionDisplayName(team.region),
+      region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       introductionPreview: team.profile?.description ? team.profile.description.slice(0, 120) : null,
+      activityAreaText: team.profile?.activityNote ?? null,
+      activityDays: team.profile?.activityDays ?? [],
+      activityFrequency: team.profile?.activityFrequency ?? null,
+      activityTimeSlots: team.profile?.activityTimeSlots ?? [],
+      activityTypes: team.profile?.activityTypes ?? [],
+      activityMemo: team.profile?.activityNote ?? null,
+      activitySummary: formatTeamActivitySummary(team.profile),
       skillLevelText: team.profile?.skillNote ?? null,
       levelLabel: formatLevelRange(team.profile?.minSportLevel, team.profile?.maxSportLevel, team.profile?.skillNote),
       minLevel: team.profile?.minSportLevel ? { code: team.profile.minSportLevel.code, name: team.profile.minSportLevel.name } : null,
       maxLevel: team.profile?.maxSportLevel ? { code: team.profile.maxSportLevel.code, name: team.profile.maxSportLevel.name } : null,
       genderRule: team.profile?.genderRule ?? '성별 무관',
+      memberGoalCount: team.profile?.memberGoalCount ?? null,
       joinPolicy: team.joinPolicy,
       memberCount: team.memberCount,
       trustState: team.trustScore?.trustState ?? 'none',
@@ -1709,7 +1801,7 @@ export class TeamsService {
         disabledReason: 'ALREADY_MEMBER',
         manageRoute:
           membership.role === 'owner' || membership.role === 'manager'
-            ? `/teams/${team.id}/manage`
+            ? `/teams/${team.id}/members`
             : null,
       };
     }
@@ -1726,12 +1818,13 @@ export class TeamsService {
       };
     }
 
+    const full = isTeamFull(team);
     return {
       role: 'none',
       membershipId: null,
       joinState: 'none',
-      canRequestJoin: team.joinPolicy === 'approval_required',
-      disabledReason: team.joinPolicy === 'approval_required' ? null : 'JOIN_CLOSED',
+      canRequestJoin: team.joinPolicy === 'approval_required' && !full,
+      disabledReason: team.joinPolicy !== 'approval_required' ? 'JOIN_CLOSED' : full ? 'TEAM_FULL' : null,
       manageRoute: null,
     };
   }
@@ -1740,9 +1833,92 @@ export class TeamsService {
     team: TeamWithRelations,
     viewer: ReturnType<TeamsService['getViewer']>,
   ) {
-    if (viewer.role === 'owner' || viewer.role === 'manager') return true;
-    return viewer.role === 'member' && team.membersVisible;
+    if (viewer.role === 'owner' || viewer.role === 'manager' || viewer.role === 'member') return true;
+    return team.membersVisible;
   }
+}
+
+type ActivityProfileLike = {
+  activityNote?: string | null;
+  activityDays?: string[] | null;
+  activityFrequency?: string | null;
+  activityTimeSlots?: string[] | null;
+  activityTypes?: string[] | null;
+} | null | undefined;
+
+const ACTIVITY_DAY_LABELS: Record<string, string> = {
+  mon: '월',
+  tue: '화',
+  wed: '수',
+  thu: '목',
+  fri: '금',
+  sat: '토',
+  sun: '일',
+};
+
+const ACTIVITY_FREQUENCY_LABELS: Record<string, string> = {
+  weekly_1: '주 1회',
+  weekly_2: '주 2회',
+  weekly_3: '주 3회',
+  weekly_4_plus: '주 4회 이상',
+  biweekly_1: '격주 1회',
+  irregular: '비정기',
+};
+
+const ACTIVITY_TIME_SLOT_LABELS: Record<string, string> = {
+  morning: '오전',
+  lunch: '점심',
+  afternoon: '오후',
+  evening: '저녁',
+  late_night: '심야',
+};
+
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  regular_meetup: '정기 모임',
+  friendly_match: '친선 경기',
+  team_match: '팀매치',
+  tournament_prep: '대회 준비',
+  training: '훈련/레슨',
+  free_participation: '자유 참여',
+  beginner_friendly: '초보 환영',
+  competitive: '실력 중심',
+};
+
+function formatTeamActivitySummary(profile: ActivityProfileLike) {
+  if (!profile) return null;
+
+  const parts = [
+    formatActivityDays(profile.activityDays ?? []),
+    formatActivityTimeSlots(profile.activityTimeSlots ?? []),
+    profile.activityFrequency ? ACTIVITY_FREQUENCY_LABELS[profile.activityFrequency] : null,
+    formatActivityTypes(profile.activityTypes ?? []),
+    profile.activityNote?.trim() || null,
+  ].filter(Boolean) as string[];
+
+  if (parts.length > 0) return parts.join(' · ');
+  return null;
+}
+
+function formatActivityDays(days: string[]) {
+  if (days.length === 0) return null;
+  const normalized = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].filter((day) => days.includes(day));
+  if (normalized.length === 7) return '매일';
+  if (normalized.join(',') === 'mon,tue,wed,thu,fri') return '평일';
+  if (normalized.join(',') === 'sat,sun') return '주말';
+  return normalized.map((day) => ACTIVITY_DAY_LABELS[day]).filter(Boolean).join('·') || null;
+}
+
+function formatActivityTimeSlots(slots: string[]) {
+  return slots.map((slot) => ACTIVITY_TIME_SLOT_LABELS[slot]).filter(Boolean).join('/') || null;
+}
+
+function formatActivityTypes(types: string[]) {
+  return types.map((type) => ACTIVITY_TYPE_LABELS[type]).filter(Boolean).join('/') || null;
+}
+
+function formatRegionDisplayName(region?: { name: string; parent?: { name: string } | null } | null) {
+  if (!region) return null;
+  return region.parent?.name ? `${region.parent.name} ${region.name}` : `${region.name} 전체`;
 }
 
 function getTeamOrderBy(sort: TeamsQueryDto['sort']): Prisma.V1TeamOrderByWithRelationInput[] {
@@ -1781,7 +1957,7 @@ function teamLevelCodeWhere(levelCodes: ReturnType<typeof parseLevelCodes>): Pri
 }
 
 function getJoinReason(
-  team: V1Team,
+  team: V1Team & TeamCapacityLike,
   viewer: ReturnType<TeamsService['getViewer']>,
   user: V1AuthUser,
 ) {
@@ -1790,10 +1966,17 @@ function getJoinReason(
   if (viewer.joinState === 'member') return 'ALREADY_MEMBER';
   if (viewer.joinState === 'requested') return 'ALREADY_REQUESTED';
   if (team.joinPolicy === 'closed') return 'JOIN_CLOSED';
+  if (isTeamFull(team)) return 'TEAM_FULL';
   return 'OK';
 }
 
+function isTeamFull(team: TeamCapacityLike) {
+  const memberGoalCount = team.profile?.memberGoalCount ?? null;
+  return memberGoalCount != null && team.memberCount >= memberGoalCount;
+}
+
 function getJoinReasonMessage(reasonCode: string) {
+  if (reasonCode === 'TEAM_FULL') return 'Team member capacity has been reached';
   const messages: Record<string, string> = {
     OK: '가입 신청할 수 있어요.',
     ALREADY_MEMBER: '이미 팀 멤버예요.',

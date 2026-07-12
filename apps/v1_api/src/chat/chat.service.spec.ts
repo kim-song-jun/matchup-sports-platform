@@ -45,6 +45,7 @@ function makeRoom(overrides: Record<string, unknown> = {}) {
         userId: userA.id,
         status: 'active',
         pinnedAt: null,
+        mutedUntil: null,
         leftAt: null,
         lastReadMessageId: null,
         createdAt: new Date(),
@@ -68,6 +69,7 @@ function makeRoomForParticipant(userId: string, participantStatus = 'active', ro
         userId,
         status: participantStatus,
         pinnedAt: null,
+        mutedUntil: null,
         leftAt: null,
         lastReadMessageId: null,
         createdAt: new Date(),
@@ -211,8 +213,8 @@ describe('ChatService', () => {
     const roomWithTwoParticipants = {
       ...makeRoom(),
       participants: [
-        { id: 'part-a', chatRoomId: 'room-1', userId: userA.id, status: 'active', pinnedAt: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userA.id, profile: { nickname: 'A', displayName: null, profileImageUrl: null } } },
-        { id: 'part-b', chatRoomId: 'room-1', userId: userB.id, status: 'active', pinnedAt: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userB.id, profile: { nickname: 'B', displayName: null, profileImageUrl: null } } },
+        { id: 'part-a', chatRoomId: 'room-1', userId: userA.id, status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userA.id, profile: { nickname: 'A', displayName: null, profileImageUrl: null } } },
+        { id: 'part-b', chatRoomId: 'room-1', userId: userB.id, status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userB.id, profile: { nickname: 'B', displayName: null, profileImageUrl: null } } },
       ],
     };
     prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoParticipants);
@@ -239,6 +241,52 @@ describe('ChatService', () => {
         ]),
       }),
     );
+  });
+
+  it('sendMessage: muted active participants are excluded from chat notifications', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-muted', chatRoomId: 'room-1', senderUserId: userA.id, body: 'ping', status: 'sent', sentAt };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoom());
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([]);
+
+    await service.sendMessage(userA, 'room-1', { content: 'ping' });
+
+    expect(prisma.v1ChatRoomParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          chatRoomId: 'room-1',
+          status: 'active',
+          userId: { not: userA.id },
+          OR: [{ mutedUntil: null }, { mutedUntil: { lte: expect.any(Date) } }],
+        }),
+      }),
+    );
+    expect(prisma.v1Notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('updateMe: stores mutedUntil for app notification mute', async () => {
+    const mutedUntil = '2026-07-08T00:00:00.000Z';
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoomForParticipant(userA.id));
+    prisma.v1ChatRoomParticipant.update.mockResolvedValue({
+      id: 'participant-user-a',
+      chatRoomId: 'room-1',
+      userId: userA.id,
+      status: 'active',
+      pinnedAt: null,
+      mutedUntil: new Date(mutedUntil),
+      lastReadMessageId: null,
+    });
+
+    const result = await service.updateMe(userA, 'room-1', { mutedUntil });
+
+    expect(prisma.v1ChatRoomParticipant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ mutedUntil: new Date(mutedUntil) }),
+      }),
+    );
+    expect(result).toMatchObject({ roomId: 'room-1', mutedUntil: new Date(mutedUntil), status: 'active' });
   });
 
   // ─── 6. leave 멱등성: 이미 나간 참가자 재퇴장 → 409 ALREADY_PROCESSED ────────
@@ -268,17 +316,33 @@ describe('ChatService', () => {
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
 
     const first = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
-    expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true });
+    expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true, route: '/chat/room-new' });
 
     // Second call: room already exists → return existing, created=false
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(newRoom);
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
 
     const second = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
-    expect(second).toMatchObject({ roomId: 'room-new', roomType: 'match', created: false });
+    expect(second).toMatchObject({ roomId: 'room-new', roomType: 'match', created: false, route: '/chat/room-new' });
 
     // Room should only be created ONCE
     expect(prisma.v1ChatRoom.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolve(team): returns the v1 web chat page route for active team members', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'team-member-1' });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoom.create.mockResolvedValueOnce({ id: 'team-room-1', teamId: 'team-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
+
+    const result = await service.resolve(userA, { targetType: 'team', targetId: 'team-1' });
+
+    expect(result).toMatchObject({
+      roomId: 'team-room-1',
+      roomType: 'team',
+      created: true,
+      route: '/chat/team-room-1',
+    });
   });
 
   // ─── 8. resolve(match): 비-참가자 → 403 PERMISSION_DENIED ──────────────────

@@ -176,3 +176,4 @@
 - 2026-04-10: `04-team-and-membership` 범위에서는 `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B`가 통과했고 `TEAM-004-B`, `TEAM-005-C`는 follow-up contract로 남아 있다.
 - 2026-04-10: 같은 Playwright 실행 파일 묶음에는 다른 도메인 smoke인 `TM-SMOKE-001 /team-matches/new`도 포함되어 있어 전체 터미널 결과는 `10 passed / 1 skipped`로 기록됐다.
 - 2026-06-06: Task 92 validation completed. apps/v1_web tsc --noEmit passed; responsive smoke included /teams/team-1 and /teams/new across 320/390/430 with 0 issues. Report: output/playwright/v1-responsive-smoke/task92-team-polish-smoke/report.md.
+- 2026-06-29: Team detail/my-team detail was unified around `/teams/:id`. `/my/teams` cards now open the canonical detail, direct `/my/teams/:id` visits redirect to `/teams/:id`, and owner/manager operations for edit + member management are exposed from the canonical detail.

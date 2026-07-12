@@ -51,8 +51,10 @@ function makeUserRow(overrides: Record<string, unknown> = {}) {
     onboardingStatus: 'completed',
     lastLoginAt: null,
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
+    deletedAt: null,
     profile: { nickname: '호스트민', displayName: '호스트민' },
     adminUser: null,
+    teamMemberships: [{ role: 'owner' }, { role: 'member' }],
     _count: { hostedMatches: 3, ownedTeams: 1, teamMemberships: 2 },
     ...overrides,
   };
@@ -196,6 +198,7 @@ describe('AdminService — list/detail endpoints', () => {
         hostedMatchCount: 3,
         ownedTeamCount: 1,
         membershipCount: 2,
+        teamRoleCounts: { owner: 1, manager: 0, member: 1 },
         adminRole: null,
       });
       expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
@@ -266,6 +269,28 @@ describe('AdminService — list/detail endpoints', () => {
         },
         hostedMatches: [{ id: 'm-1', title: '강남 러닝', status: 'recruiting', startAt: new Date() }],
         ownedTeams: [{ id: 't-1', name: '강남 크루', status: 'active', memberCount: 3 }],
+        teamMemberships: [
+          {
+            id: 'tm-1',
+            role: 'owner',
+            status: 'active',
+            joinedAt: new Date('2026-05-18T00:00:00.000Z'),
+            team: { id: 't-1', name: '강남 크루', status: 'active', memberCount: 3 },
+          },
+          {
+            id: 'tm-2',
+            role: 'member',
+            status: 'active',
+            joinedAt: new Date('2026-05-19T00:00:00.000Z'),
+            team: { id: 't-2', name: '서초 풋살', status: 'active', memberCount: 8 },
+          },
+        ],
+        statusLogs: [
+          {
+            reason: '잠시 쉬고 싶어요',
+            createdAt: new Date('2026-05-20T00:00:00.000Z'),
+          },
+        ],
       });
 
       const result = await service.getUser(adminAuthUser, 'u-1');
@@ -276,6 +301,9 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.hostedMatches[0]).toMatchObject({ matchId: 'm-1', title: '강남 러닝' });
       expect(result.ownedTeams).toHaveLength(1);
       expect(result.ownedTeams[0]).toMatchObject({ teamId: 't-1', name: '강남 크루' });
+      expect(result.teamRoleCounts).toEqual({ owner: 1, manager: 0, member: 1 });
+      expect(result.teamMemberships).toHaveLength(2);
+      expect(result.withdrawalRequest).toMatchObject({ reason: '잠시 쉬고 싶어요' });
     });
 
     it('returns reputationSummary=null when absent', async () => {
@@ -284,6 +312,8 @@ describe('AdminService — list/detail endpoints', () => {
         reputationSummary: null,
         hostedMatches: [],
         ownedTeams: [],
+        teamMemberships: [],
+        statusLogs: [],
       });
 
       const result = await service.getUser(adminAuthUser, 'u-1');

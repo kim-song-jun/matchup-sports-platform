@@ -1,10 +1,14 @@
 import type {
   CursorPage,
+  V1AdminInquiryDetail,
+  V1AdminInquiryRow,
   V1AdminLog,
+  V1AdminNoticeRow,
   V1AdminOverview,
   V1ChatMessage,
   V1ChatRoom,
   V1Home,
+  V1Inquiry,
   V1Match,
   V1Notification,
   V1Notice,
@@ -99,6 +103,53 @@ export const v1RecentSearchesFixture: V1RecentSearch[] = [
   { id: 'recent-2', query: '마포', searchedAt: '2026-05-18T08:00:00.000Z' },
 ];
 
+export const v1InquiriesFixture: { items: V1Inquiry[]; pageInfo: { nextCursor: string | null; hasNext: boolean } } = {
+  items: [
+    {
+      inquiryId: 'inquiry-1',
+      category: 'account',
+      title: '로그인 문의',
+      body: '이메일 로그인 과정에서 도움이 필요해요.',
+      contact: null,
+      relatedType: null,
+      relatedId: null,
+      status: 'received',
+      createdAt: '2026-07-08T00:00:00.000Z',
+      updatedAt: '2026-07-08T00:00:00.000Z',
+      closedAt: null,
+      replies: [],
+    },
+  ],
+  pageInfo: { nextCursor: null, hasNext: false },
+};
+
+export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
+  return {
+    inquiryId: inquiry.inquiryId,
+    userId: 'user-1',
+    requesterName: '송준',
+    requesterEmail: 'songjun@example.com',
+    category: inquiry.category,
+    title: inquiry.title,
+    status: inquiry.status,
+    relatedType: inquiry.relatedType,
+    relatedId: inquiry.relatedId,
+    replyCount: inquiry.replies?.length ?? 0,
+    createdAt: inquiry.createdAt,
+    updatedAt: inquiry.updatedAt,
+    closedAt: inquiry.closedAt,
+  };
+}
+
+export function toAdminInquiryDetail(inquiry: V1Inquiry): V1AdminInquiryDetail {
+  return {
+    ...toAdminInquiryRow(inquiry),
+    body: inquiry.body,
+    contact: inquiry.contact,
+    replies: (inquiry.replies ?? []).map((reply) => ({ ...reply, adminUserId: 'admin-1' })),
+  };
+}
+
 export const v1NoticesFixture: V1Notice[] = [
   {
     id: 'notice-1',
@@ -123,12 +174,26 @@ export const v1NoticesFixture: V1Notice[] = [
   },
   {
     id: 'notice-4',
-    title: '프로필 공개 범위 안내',
+    title: '계정 보안 안내',
     category: '안내',
     publishedAt: '2026-05-15T00:00:00.000Z',
-    body: '닉네임, 활동 지역, 선호 종목 공개 범위 기준을 안내합니다.',
+    body: '이메일, 휴대폰 번호, 생년월일 같은 개인정보는 공개 프로필에 노출하지 않습니다.',
   },
 ];
+
+export const v1AdminNoticesFixture: V1AdminNoticeRow[] = v1NoticesFixture.map((notice) => ({
+  noticeId: notice.id ?? notice.noticeId ?? 'notice',
+  audience: (notice.audience ?? 'public') as V1AdminNoticeRow['audience'],
+  category: (notice.category ?? '안내') as V1AdminNoticeRow['category'],
+  pinned: notice.category === '고정',
+  title: notice.title,
+  body: notice.body ?? '',
+  status: 'published',
+  publishedAt: notice.publishedAt,
+  archivedAt: null,
+  createdAt: notice.publishedAt,
+  updatedAt: notice.publishedAt,
+}));
 
 export const v1MatchesFixture: V1Match[] = [
   {
@@ -390,6 +455,7 @@ export const v1ChatRoomsFixture: CursorPage<V1ChatRoom> = {
       unreadCount: 2,
       pinned: false,
       muted: false,
+      mutedUntil: null,
     },
   ],
   nextCursor: null,
@@ -420,6 +486,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 2,
     pinned: true,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-match-2',
@@ -431,6 +498,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 0,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-1',
@@ -442,6 +510,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 4,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-2',
@@ -453,6 +522,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 0,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-match-1',
@@ -464,6 +534,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 1,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
   {
     roomId: 'chat-team-match-2',
@@ -475,6 +546,7 @@ v1ChatRoomsFixture.items = [
     unreadCount: 0,
     pinned: false,
     muted: false,
+    mutedUntil: null,
   },
 ];
 
@@ -584,8 +656,6 @@ export const v1ProfileFixture: V1Profile = {
   profile: {
     displayName: '송준',
     profileImageUrl: null,
-    bio: '풋살과 러닝을 중심으로 활동 중입니다.',
-    visibilityStatus: 'public',
   },
   reputation: {
     trustState: 'sample',
@@ -595,7 +665,6 @@ export const v1ProfileFixture: V1Profile = {
   },
   displayName: '송준',
   regionName: '서울 강동',
-  bio: '풋살과 러닝을 중심으로 활동 중입니다.',
   trustState: 'sample',
 };
 
@@ -608,7 +677,6 @@ export const v1SettingsFixture: V1Settings = {
   },
   profile: {
     displayName: '송준',
-    visibilityStatus: 'public',
   },
   notifications: {
     matchEnabled: true,

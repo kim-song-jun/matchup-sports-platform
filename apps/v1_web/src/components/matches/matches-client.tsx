@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApplyMatch,
   useV1Match,
@@ -13,6 +13,7 @@ import {
   useV1ResolveChatRoom,
   useV1WithdrawMatchApplication,
 } from '@/hooks/use-v1-api';
+import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
@@ -153,7 +154,14 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
   const applyMatch = useV1ApplyMatch(matchId);
   const withdrawMatch = useV1WithdrawMatchApplication(matchId, eligibility.data?.applicationId ?? query.data?.viewer?.applicationId);
   const resolveChatRoom = useV1ResolveChatRoom();
+  const autoResolvedChatRef = useRef<string | null>(null);
   const fallback = getMatchDetailViewModel();
+
+  useEffect(() => {
+    if (!query.data || !canOpenMatchChat(viewerState) || autoResolvedChatRef.current === matchId) return;
+    autoResolvedChatRef.current = matchId;
+    resolveChatRoom.mutate({ targetType: 'match', targetId: matchId });
+  }, [matchId, query.data, resolveChatRoom, viewerState]);
 
   if (query.isError) {
     return <MatchStatePageView model={getMatchStateViewModel('error')} />;
@@ -184,7 +192,7 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
         onChat: canOpenMatchChat(viewerState)
           ? () => resolveChatRoom.mutate(
               { targetType: 'match', targetId: matchId },
-              { onSuccess: (room) => router.push(room.route.replace('/chat/rooms/', '/chat/')) },
+              { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
             )
           : undefined,
         onShare: () => shareMatch(query.data),
@@ -414,11 +422,11 @@ function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {
 }
 
 function chatLabel(viewerState: V1ViewerState) {
-  return viewerState === 'approved' || viewerState === 'participant' ? '채팅' : '승인 후 채팅';
+  return viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant' ? '채팅' : '승인 후 채팅';
 }
 
 function canOpenMatchChat(viewerState: V1ViewerState) {
-  return viewerState === 'approved' || viewerState === 'participant';
+  return viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant';
 }
 
 function actionLabel(status: MatchCardModel['status']) {

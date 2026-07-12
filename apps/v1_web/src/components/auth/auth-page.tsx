@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
+import { KakaoLoginButton } from './kakao-login-button';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
 
 export function LoginPageView({ model }: { model: LoginViewModel }) {
@@ -139,13 +140,14 @@ function ProviderButton({ provider }: { provider: LoginProvider }) {
   // Fill 패턴: 브랜드 배경(background) + 대비 충족 전경 텍스트(foreground).
   // 이전 outline 리팩터(border/color에 브랜드색 재사용)는 카카오 1.28:1 / 네이버 2.25:1로
   // WCAG 2.1 AA(4.5:1) FAIL — 격상 전 fill 패턴으로 복원.
-  // disabled(준비 중)은 tm-auth-provider-disabled(grey100 배경, caption 텍스트)로 처리.
+  // disabled(준비 중)도 브랜드 배경은 유지하고 opacity로 비활성 상태를 구분한다.
   const activeStyle = { background: provider.background, color: provider.foreground, borderColor: 'transparent' };
 
   if (provider.disabled) {
     return (
       <button
         className="tm-btn tm-btn-md tm-auth-provider-disabled"
+        style={{ ...activeStyle, opacity: 0.58 }}
         disabled
         aria-label={`${provider.label} 로그인 (준비 중)`}
         type="button"
@@ -156,10 +158,14 @@ function ProviderButton({ provider }: { provider: LoginProvider }) {
   }
 
   if (provider.href?.startsWith('http')) {
+    // OAuth(카카오): 클릭 시점에 CSRF 방지 state를 생성·저장해야 하므로 클라이언트 버튼 사용.
     return (
-      <a className="tm-btn tm-btn-md tm-btn-outline tm-pressable" href={provider.href} style={activeStyle}>
-        {provider.label}
-      </a>
+      <KakaoLoginButton
+        className="tm-btn tm-btn-md tm-btn-outline tm-pressable"
+        href={provider.href}
+        style={activeStyle}
+        label={provider.label}
+      />
     );
   }
 

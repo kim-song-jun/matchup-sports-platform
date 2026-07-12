@@ -1,6 +1,8 @@
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsDefined,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -71,11 +73,21 @@ export class CreateTournamentDto {
   scheduledAt?: string;
 
   @IsOptional()
+  @IsDateString()
+  scheduledEndAt?: string | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
 
+  /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
   @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  coverImageUrl?: string | null;
+
+  @IsDefined({ message: '참가 팀 수를 입력해 주세요.' })
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
   @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })
@@ -137,11 +149,122 @@ export class CreateTournamentDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  prizeSummary?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
   prizeBreakdown?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  promoHomeEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoHomeSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoHomeImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoHomeBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoHomePrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoHomePriority?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  promoListEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoListSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoListImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoListBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoListPrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoListPriority?: number;
 }
 
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
 export class UpdateTournamentDto {
+  @IsOptional()
+  @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
+  sportId?: string;
+
   @IsOptional()
   @IsString({ message: '대회 이름을 입력해 주세요.' })
   @MaxLength(120, { message: '대회 이름은 120자를 넘을 수 없어요.' })
@@ -160,9 +283,19 @@ export class UpdateTournamentDto {
   scheduledAt?: string;
 
   @IsOptional()
+  @IsDateString()
+  scheduledEndAt?: string | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
+
+  /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  coverImageUrl?: string | null;
 
   @IsOptional()
   @Type(() => Number)
@@ -226,7 +359,114 @@ export class UpdateTournamentDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  prizeSummary?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
   prizeBreakdown?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  promoHomeEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoHomeSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoHomeImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoHomeBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoHomeLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoHomePrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoHomePriority?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  promoListEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  promoListSubtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  promoListImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  promoListBadgeText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListDateText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListTeamsText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  promoListLocationText?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  promoListPrizeText?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  promoListPriority?: number;
 }
 
 export class ChangeTournamentStatusDto {

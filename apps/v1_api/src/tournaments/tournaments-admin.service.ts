@@ -29,6 +29,12 @@ const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
   cancelled: [],
 };
 
+function nullableText(value: string | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 @Injectable()
 export class TournamentsAdminService {
   constructor(
@@ -78,7 +84,17 @@ export class TournamentsAdminService {
 
   async create(user: V1AuthUser, dto: CreateTournamentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    if (dto.teamCount === undefined) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_TEAM_COUNT_REQUIRED',
+        message: '참가 팀 수를 입력해 주세요.',
+      });
+    }
     this.assertPlayerRange(dto.minPlayers, dto.maxPlayers);
+    this.assertScheduleRange(
+      dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+      dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
+    );
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
     if (!sport) {
@@ -93,8 +109,10 @@ export class TournamentsAdminService {
           format: dto.format ?? 'group_knockout',
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
+          scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           venue: dto.venue ?? null,
-          teamCount: dto.teamCount ?? 8,
+          coverImageUrl: dto.coverImageUrl ?? null,
+          teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
           entryFee: dto.entryFee ?? 0,
@@ -104,7 +122,28 @@ export class TournamentsAdminService {
           rulesText: dto.rulesText ?? null,
           refundPolicyText: dto.refundPolicyText ?? null,
           prizePool: dto.prizePool ?? null,
+          prizeSummary: dto.prizeSummary ?? null,
           prizeBreakdown: dto.prizeBreakdown ?? null,
+          promoHomeEnabled: dto.promoHomeEnabled ?? false,
+          promoHomeTitle: nullableText(dto.promoHomeTitle) ?? null,
+          promoHomeSubtitle: nullableText(dto.promoHomeSubtitle) ?? null,
+          promoHomeImageUrl: nullableText(dto.promoHomeImageUrl) ?? null,
+          promoHomeBadgeText: nullableText(dto.promoHomeBadgeText) ?? null,
+          promoHomeDateText: nullableText(dto.promoHomeDateText) ?? null,
+          promoHomeTeamsText: nullableText(dto.promoHomeTeamsText) ?? null,
+          promoHomeLocationText: nullableText(dto.promoHomeLocationText) ?? null,
+          promoHomePrizeText: nullableText(dto.promoHomePrizeText) ?? null,
+          promoHomePriority: dto.promoHomePriority ?? 0,
+          promoListEnabled: dto.promoListEnabled ?? false,
+          promoListTitle: nullableText(dto.promoListTitle) ?? null,
+          promoListSubtitle: nullableText(dto.promoListSubtitle) ?? null,
+          promoListImageUrl: nullableText(dto.promoListImageUrl) ?? null,
+          promoListBadgeText: nullableText(dto.promoListBadgeText) ?? null,
+          promoListDateText: nullableText(dto.promoListDateText) ?? null,
+          promoListTeamsText: nullableText(dto.promoListTeamsText) ?? null,
+          promoListLocationText: nullableText(dto.promoListLocationText) ?? null,
+          promoListPrizeText: nullableText(dto.promoListPrizeText) ?? null,
+          promoListPriority: dto.promoListPriority ?? 0,
           createdByAdminUserId: admin.id,
         },
       });
@@ -138,15 +177,39 @@ export class TournamentsAdminService {
     const nextMin = dto.minPlayers ?? existing.minPlayers;
     const nextMax = dto.maxPlayers ?? existing.maxPlayers;
     this.assertPlayerRange(nextMin, nextMax);
+    const nextScheduledAt =
+      dto.scheduledAt !== undefined
+        ? dto.scheduledAt
+          ? new Date(dto.scheduledAt)
+          : null
+        : existing.scheduledAt;
+    const nextScheduledEndAt =
+      dto.scheduledEndAt !== undefined
+        ? dto.scheduledEndAt
+          ? new Date(dto.scheduledEndAt)
+          : null
+        : existing.scheduledEndAt;
+    this.assertScheduleRange(nextScheduledAt, nextScheduledEndAt);
+
+    // 종목 변경: 존재하는 종목인지 검증 후 relation 연결
+    if (dto.sportId !== undefined && dto.sportId !== existing.sportId) {
+      const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
+      if (!sport) {
+        throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
+      }
+    }
 
     const data: Prisma.V1TournamentUpdateInput = {};
+    if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.format !== undefined) data.format = dto.format;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
     }
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
+    if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
     if (dto.venue !== undefined) data.venue = dto.venue;
+    if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
     if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
@@ -157,7 +220,28 @@ export class TournamentsAdminService {
     if (dto.rulesText !== undefined) data.rulesText = dto.rulesText;
     if (dto.refundPolicyText !== undefined) data.refundPolicyText = dto.refundPolicyText;
     if (dto.prizePool !== undefined) data.prizePool = dto.prizePool;
+    if (dto.prizeSummary !== undefined) data.prizeSummary = dto.prizeSummary;
     if (dto.prizeBreakdown !== undefined) data.prizeBreakdown = dto.prizeBreakdown;
+    if (dto.promoHomeEnabled !== undefined) data.promoHomeEnabled = dto.promoHomeEnabled;
+    if (dto.promoHomeTitle !== undefined) data.promoHomeTitle = nullableText(dto.promoHomeTitle);
+    if (dto.promoHomeSubtitle !== undefined) data.promoHomeSubtitle = nullableText(dto.promoHomeSubtitle);
+    if (dto.promoHomeImageUrl !== undefined) data.promoHomeImageUrl = nullableText(dto.promoHomeImageUrl);
+    if (dto.promoHomeBadgeText !== undefined) data.promoHomeBadgeText = nullableText(dto.promoHomeBadgeText);
+    if (dto.promoHomeDateText !== undefined) data.promoHomeDateText = nullableText(dto.promoHomeDateText);
+    if (dto.promoHomeTeamsText !== undefined) data.promoHomeTeamsText = nullableText(dto.promoHomeTeamsText);
+    if (dto.promoHomeLocationText !== undefined) data.promoHomeLocationText = nullableText(dto.promoHomeLocationText);
+    if (dto.promoHomePrizeText !== undefined) data.promoHomePrizeText = nullableText(dto.promoHomePrizeText);
+    if (dto.promoHomePriority !== undefined) data.promoHomePriority = dto.promoHomePriority;
+    if (dto.promoListEnabled !== undefined) data.promoListEnabled = dto.promoListEnabled;
+    if (dto.promoListTitle !== undefined) data.promoListTitle = nullableText(dto.promoListTitle);
+    if (dto.promoListSubtitle !== undefined) data.promoListSubtitle = nullableText(dto.promoListSubtitle);
+    if (dto.promoListImageUrl !== undefined) data.promoListImageUrl = nullableText(dto.promoListImageUrl);
+    if (dto.promoListBadgeText !== undefined) data.promoListBadgeText = nullableText(dto.promoListBadgeText);
+    if (dto.promoListDateText !== undefined) data.promoListDateText = nullableText(dto.promoListDateText);
+    if (dto.promoListTeamsText !== undefined) data.promoListTeamsText = nullableText(dto.promoListTeamsText);
+    if (dto.promoListLocationText !== undefined) data.promoListLocationText = nullableText(dto.promoListLocationText);
+    if (dto.promoListPrizeText !== undefined) data.promoListPrizeText = nullableText(dto.promoListPrizeText);
+    if (dto.promoListPriority !== undefined) data.promoListPriority = dto.promoListPriority;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.update({ where: { id: tournamentId }, data });
@@ -228,6 +312,16 @@ export class TournamentsAdminService {
     }
   }
 
+  private assertScheduleRange(start: Date | null, end: Date | null) {
+    if (!end) return;
+    if (!start || end.getTime() < start.getTime()) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_SCHEDULE_RANGE_INVALID',
+        message: '대회 종료 일시는 시작 일시 이후여야 해요.',
+      });
+    }
+  }
+
   private serialize(row: V1Tournament, registrationCount: number) {
     return {
       id: row.id,
@@ -237,7 +331,9 @@ export class TournamentsAdminService {
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
+      scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      coverImageUrl: row.coverImageUrl,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
@@ -248,7 +344,28 @@ export class TournamentsAdminService {
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       prizePool: row.prizePool,
+      prizeSummary: row.prizeSummary,
       prizeBreakdown: row.prizeBreakdown,
+      promoHomeEnabled: row.promoHomeEnabled,
+      promoHomeTitle: row.promoHomeTitle,
+      promoHomeSubtitle: row.promoHomeSubtitle,
+      promoHomeImageUrl: row.promoHomeImageUrl,
+      promoHomeBadgeText: row.promoHomeBadgeText,
+      promoHomeDateText: row.promoHomeDateText,
+      promoHomeTeamsText: row.promoHomeTeamsText,
+      promoHomeLocationText: row.promoHomeLocationText,
+      promoHomePrizeText: row.promoHomePrizeText,
+      promoHomePriority: row.promoHomePriority,
+      promoListEnabled: row.promoListEnabled,
+      promoListTitle: row.promoListTitle,
+      promoListSubtitle: row.promoListSubtitle,
+      promoListImageUrl: row.promoListImageUrl,
+      promoListBadgeText: row.promoListBadgeText,
+      promoListDateText: row.promoListDateText,
+      promoListTeamsText: row.promoListTeamsText,
+      promoListLocationText: row.promoListLocationText,
+      promoListPrizeText: row.promoListPrizeText,
+      promoListPriority: row.promoListPriority,
       registrationCount,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

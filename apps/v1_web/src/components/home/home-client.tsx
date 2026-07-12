@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
-import type { V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice } from '@/types/api';
+import { v1Post } from '@/lib/api-client';
+import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice, V1ResolveLocationResponse } from '@/types/api';
+import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
-import type { HomeMatchCard, HomeNotice, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
+import type { HomeChatRoom, HomeMatchCard, HomeNotice, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
 
 export function HomePageClient() {
@@ -13,37 +15,59 @@ export function HomePageClient() {
   const { weather, refreshing: weatherRefreshing, refresh: refreshWeather } = useCurrentLocationWeather();
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
+  const chatStatus: HomeViewModel['chatStatus'] = chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
+  const chatRoomSummaries = chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
+  const nonDataFallback = withoutHomeContent(fallback);
 
   if (query.isError) {
     return (
-      <HomePageView
-        model={{
-          ...fallback,
-          network: true,
-          hasNewNotification: false,
-          chatUnreadCount,
-          weather: weather ?? fallback.weather,
-          weatherRefreshing,
-          refreshWeather,
-          retry: () => void query.refetch(),
-        }}
-      />
+      <>
+        <PendingTournamentReviewModal />
+        <HomePageView
+          model={{
+            ...nonDataFallback,
+            network: true,
+            hasNewNotification: false,
+            chatUnreadCount,
+            chatStatus,
+            chatRooms: chatRoomSummaries,
+            weather: weather ?? fallback.weather,
+            weatherRefreshing,
+            refreshWeather,
+            retry: () => void query.refetch(),
+          }}
+        />
+      </>
     );
   }
 
   return (
-    <HomePageView
-      model={
-        query.data
-          ? {
-              ...toHomeModel(query.data, fallback, () => void query.refetch(), chatUnreadCount, weather),
-              weatherRefreshing,
-              refreshWeather,
-            }
-          : { ...fallback, chatUnreadCount, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
-      }
-    />
+    <>
+      <PendingTournamentReviewModal />
+      <HomePageView
+        model={
+          query.data
+            ? {
+                ...toHomeModel(query.data, fallback, () => void query.refetch(), chatUnreadCount, weather),
+                chatStatus,
+                chatRooms: chatRoomSummaries,
+                weatherRefreshing,
+                refreshWeather,
+              }
+            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
+        }
+      />
+    </>
   );
+}
+
+function withoutHomeContent(model: HomeViewModel): HomeViewModel {
+  return {
+    ...model,
+    featuredMatch: null,
+    recommendedMatches: [],
+    notices: [],
+  };
 }
 
 function toHomeModel(
@@ -70,8 +94,40 @@ function toHomeModel(
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),
     weather: weather ?? fallback.weather,
-    notices: normalizeNotices(home, fallback),
+    notices: normalizeNotices(home),
   };
+}
+
+function toHomeChatRooms(rooms: V1ChatRoom[]): HomeChatRoom[] {
+  return [...rooms]
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return messageTime(b) - messageTime(a);
+    })
+    .slice(0, 3)
+    .map((room) => ({
+      id: room.roomId,
+      title: room.title,
+      typeLabel: room.roomType === 'match' ? '개인매치' : room.roomType === 'team' ? '팀' : '팀매치',
+      lastMessage: room.lastMessage?.contentPreview ?? '아직 메시지가 없어요',
+      time: formatRelative(room.lastMessage?.sentAt),
+      unreadCount: room.unreadCount,
+      href: `/chat/${room.roomId}`,
+    }));
+}
+
+function messageTime(room: V1ChatRoom) {
+  const sentAt = room.lastMessage?.sentAt;
+  if (!sentAt) return 0;
+  const date = new Date(sentAt);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+}
+
+function formatRelative(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {
@@ -93,13 +149,15 @@ function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {
   };
 }
 
-function normalizeFeaturedMatch(home: V1Home, recommendedMatches: HomeMatchCard[], fallback: HomeViewModel): HomeMatchCard {
+function normalizeFeaturedMatch(home: V1Home, recommendedMatches: HomeMatchCard[], fallback: HomeViewModel): HomeMatchCard | null {
+  if (!home.featuredMatch) return recommendedMatches[0] ?? null;
+
   const recommended =
     recommendedMatches.find((match) => match.id === home.featuredMatch?.matchId) ??
     recommendedMatches[0] ??
     fallback.featuredMatch;
 
-  if (!home.featuredMatch) return recommended;
+  if (!recommended) return null;
 
   return {
     ...recommended,
@@ -120,10 +178,10 @@ function normalizeMatches(home: V1Home, fallback: HomeViewModel) {
   const recommendations = Array.isArray(home.recommendations) ? home.recommendations : [];
   return recommendations.length
     ? recommendations.map((match, index) => toHomeRecommendation(match, fallback.recommendedMatches[index] ?? fallback.featuredMatch))
-    : fallback.recommendedMatches;
+    : [];
 }
 
-function normalizeNotices(home: V1Home, fallback: HomeViewModel) {
+function normalizeNotices(home: V1Home) {
   const notices = Array.isArray(home.notices) ? home.notices : [];
   if (notices.length) return notices.map(toHomeNotice);
   if (home.notice) {
@@ -137,7 +195,7 @@ function normalizeNotices(home: V1Home, fallback: HomeViewModel) {
     ];
   }
 
-  return fallback.notices;
+  return [];
 }
 
 function normalizeShortcuts(shortcuts: V1HomeShortcut[] | undefined, fallback: HomeQuickAction[]) {
@@ -183,20 +241,28 @@ function useCurrentLocationWeather() {
             wind_speed_unit: 'ms',
             timezone: 'auto',
           });
-          const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
-          if (!response.ok) throw new Error(`Weather request failed: ${response.status}`);
-          const body = (await response.json()) as OpenMeteoCurrentWeatherResponse;
+          const [weatherResult, regionResult] = await Promise.allSettled([
+            fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`),
+            v1Post<V1ResolveLocationResponse>('/master/regions/resolve-location', { latitude, longitude }),
+          ]);
+          if (weatherResult.status !== 'fulfilled' || !weatherResult.value.ok) {
+            const status = weatherResult.status === 'fulfilled' ? weatherResult.value.status : 'unknown';
+            throw new Error(`Weather request failed: ${status}`);
+          }
+          const body = (await weatherResult.value.json()) as OpenMeteoCurrentWeatherResponse;
           const current = body.current;
           if (!current) throw new Error('Weather response missing current conditions');
+          const region = regionResult.status === 'fulfilled' ? formatWeatherRegionName(regionResult.value.region) : null;
 
           if (!cancelled) {
             setWeather({
-              city: '현재 위치',
+              city: region ?? '현재 위치',
               temp: Math.round(current.temperature_2m),
               cond: weatherCodeLabel(current.weather_code),
               wind: roundOne(current.wind_speed_10m),
               feelsLike: Math.round(current.apparent_temperature),
-              status: '현재 위치 기준',
+              icon: weatherCodeIcon(current.weather_code),
+              status: region ? '현재 위치 기준' : '현재 위치 기준 · 지역 확인 전',
             });
           }
         } catch {
@@ -235,6 +301,14 @@ type OpenMeteoCurrentWeatherResponse = {
   };
 };
 
+function formatWeatherRegionName(region: V1ResolveLocationResponse['region']) {
+  if (!region) return null;
+  const parent = region.parent?.name?.trim();
+  const name = region.name?.trim();
+  if (parent && name && parent !== name) return `${parent} ${name}`;
+  return name || parent || null;
+}
+
 function roundOne(value: number) {
   return Math.round(value * 10) / 10;
 }
@@ -251,26 +325,39 @@ function weatherCodeLabel(code: number) {
   return '날씨 정보 없음';
 }
 
-function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard): HomeMatchCard {
+function weatherCodeIcon(code: number): NonNullable<HomeViewModel['weather']['icon']> {
+  if (code === 0) return 'sun';
+  if ([1, 2].includes(code)) return 'cloud-sun';
+  if (code === 3) return 'cloud';
+  if ([45, 48].includes(code)) return 'fog';
+  if ([51, 53, 55, 56, 57].includes(code)) return 'drizzle';
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return 'rain';
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return 'snow';
+  if ([95, 96, 99].includes(code)) return 'thunderstorm';
+  return 'cloud';
+}
+
+function toHomeRecommendation(match: V1HomeRecommendation, fallback: HomeMatchCard | null): HomeMatchCard {
+  const base = fallback ?? emptyMatchCard();
   return {
-    ...fallback,
+    ...base,
     id: match.matchId,
     sportLabel: match.sportName,
     title: match.title,
-    venue: match.regionName ?? fallback.venue,
+    venue: match.regionName ?? base.venue,
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
-    currentParticipants: match.participantCount ?? fallback.currentParticipants,
-    maxParticipants: match.capacity ?? fallback.maxParticipants,
+    currentParticipants: match.participantCount ?? base.currentParticipants,
+    maxParticipants: match.capacity ?? base.maxParticipants,
     actionLabel: '승인제 신청',
   };
 }
 
-function toHomeMatch(match: V1Match, fallback: HomeMatchCard): HomeMatchCard {
+function toHomeMatch(match: V1Match, fallback: HomeMatchCard | null): HomeMatchCard {
   const capacity = parseCapacity(match.capacityText);
 
   return {
-    ...fallback,
+    ...(fallback ?? emptyMatchCard()),
     id: match.id,
     sportLabel: match.sportName,
     title: match.title,
@@ -283,11 +370,27 @@ function toHomeMatch(match: V1Match, fallback: HomeMatchCard): HomeMatchCard {
   };
 }
 
+function emptyMatchCard(): HomeMatchCard {
+  return {
+    id: '',
+    sport: 'match',
+    sportLabel: '',
+    title: '',
+    venue: '',
+    date: '',
+    time: '',
+    currentParticipants: 0,
+    maxParticipants: 1,
+    actionLabel: '',
+    imageUrl: '/mock/generated/team-huddle.webp',
+  };
+}
+
 function toHomeNotice(notice: V1Notice): HomeNotice {
   return {
     id: notice.noticeId ?? notice.id ?? 'notice',
     title: notice.title,
-    summary: notice.body ?? notice.category ?? notice.audience ?? '공지',
+    summary: notice.category ?? notice.audience ?? '공지',
     trailing: formatDate(notice.publishedAt),
   };
 }

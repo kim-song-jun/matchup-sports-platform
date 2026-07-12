@@ -28,15 +28,38 @@ function tournamentCard(overrides: Record<string, unknown> = {}) {
     status: 'open',
     registrationDeadlineAt: null,
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
+    scheduledEndAt: null,
     venue: '서울 풋살장',
     teamCount: 8,
     entryFee: 60000,
     prizePool: null,
+    prizeSummary: null,
     prizeBreakdown: null,
+    promoHomeEnabled: false,
+    promoHomeTitle: null,
+    promoHomeSubtitle: null,
+    promoHomeImageUrl: null,
+    promoHomeBadgeText: null,
+    promoHomeDateText: null,
+    promoHomeTeamsText: null,
+    promoHomeLocationText: null,
+    promoHomePrizeText: null,
+    promoHomePriority: 0,
+    promoListEnabled: false,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    promoListPriority: 0,
     createdAt: new Date('2026-06-01T00:00:00.000Z'),
     updatedAt: new Date('2026-06-01T00:00:00.000Z'),
     deletedAt: null,
     _count: { registrations: 3 },
+    registrations: [{ status: 'awaiting_payment' }, { status: 'payment_checking' }],
     ...overrides,
   };
 }
@@ -50,6 +73,7 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     status: 'open',
     registrationDeadlineAt: null,
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
+    scheduledEndAt: null,
     venue: '서울 풋살장',
     teamCount: 8,
     minPlayers: 6,
@@ -58,16 +82,37 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     rulesText: null,
     refundPolicyText: null,
     prizePool: null,
+    prizeSummary: null,
     prizeBreakdown: null,
+    promoHomeEnabled: false,
+    promoHomeTitle: null,
+    promoHomeSubtitle: null,
+    promoHomeImageUrl: null,
+    promoHomeBadgeText: null,
+    promoHomeDateText: null,
+    promoHomeTeamsText: null,
+    promoHomeLocationText: null,
+    promoHomePrizeText: null,
+    promoHomePriority: 0,
+    promoListEnabled: false,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    promoListPriority: 0,
     deletedAt: null,
     createdAt: new Date('2026-06-01T00:00:00.000Z'),
     updatedAt: new Date('2026-06-01T00:00:00.000Z'),
     _count: { registrations: 4 },
+    registrations: [{ status: 'awaiting_payment' }],
     groups: [],
     fixtures: [],
     announcements: [],
     sponsors: [],
-    registrations: [],
     ...overrides,
   };
 }
@@ -115,6 +160,7 @@ describe('TournamentsReadService', () => {
       sport: { code: 'futsal', name: '풋살' },
       status: 'open',
       confirmedCount: 3,
+      pendingPaymentCount: 2,
       entryFee: 60000,
     });
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
@@ -209,6 +255,18 @@ describe('TournamentsReadService', () => {
     expect(callArgs.where.status.in).not.toContain('cancelled');
   });
 
+  it('get: public detail only includes published public announcements', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+
+    await service.get('t-1').catch(() => {});
+
+    const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
+    expect(callArgs.include.announcements.where).toEqual({
+      audience: 'public',
+      publishedAt: { not: null },
+    });
+  });
+
   // ─── get — detail shape ──────────────────────────────────────────────────────
 
   it('get: returns full detail with groups, fixtures, announcements', async () => {
@@ -259,6 +317,7 @@ describe('TournamentsReadService', () => {
           awayRegistrationId: null,
           homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
           awayRegistration: null,
+          videos: [],
           result: null,
         },
       ],
@@ -268,7 +327,7 @@ describe('TournamentsReadService', () => {
           title: '경기 일정 공지',
           body: '7월 1일 오전 10시 시작',
           category: 'venue',
-          audience: 'all_registered',
+          audience: 'public',
           publishedAt: new Date('2026-06-10T00:00:00Z'),
           createdAt: new Date('2026-06-10T00:00:00Z'),
           updatedAt: new Date('2026-06-10T00:00:00Z'),
@@ -284,6 +343,7 @@ describe('TournamentsReadService', () => {
       sportId: 'sport-1',
       sport: { code: 'futsal', name: '풋살' },
       confirmedCount: 4,
+      pendingPaymentCount: 1,
     });
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0].groupTeams[0]).toMatchObject({
@@ -415,6 +475,7 @@ describe('TournamentsReadService', () => {
           awayRegistrationId: 'reg-2',
           homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
           awayRegistration: { team: { id: 'team-2', name: '부산 아이파크' } },
+          videos: [],
           result: {
             homeScore: 3,
             awayScore: 2,
@@ -445,12 +506,14 @@ describe('TournamentsReadService', () => {
 
   it('get: DateTime fields are serialized as ISO strings', async () => {
     const scheduledDate = new Date('2026-07-01T09:00:00.000Z');
-    const row = fullTournamentRow({ scheduledAt: scheduledDate });
+    const scheduledEndDate = new Date('2026-07-02T09:00:00.000Z');
+    const row = fullTournamentRow({ scheduledAt: scheduledDate, scheduledEndAt: scheduledEndDate });
     prisma.v1Tournament.findFirst.mockResolvedValue(row);
 
     const result = await service.get('tournament-1');
 
     expect(result.scheduledAt).toBe(scheduledDate.toISOString());
+    expect(result.scheduledEndAt).toBe(scheduledEndDate.toISOString());
     expect(result.createdAt).toBe(new Date('2026-06-01T00:00:00.000Z').toISOString());
   });
 });

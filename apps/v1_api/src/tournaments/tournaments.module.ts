@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { TournamentsAdminController } from './tournaments-admin.controller';
 import { TournamentsAdminService } from './tournaments-admin.service';
@@ -19,6 +20,8 @@ import { TournamentAnnouncementsService } from './tournament-announcements.servi
 import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
+import { TournamentReviewsController } from './tournament-reviews.controller';
+import { TournamentReviewsService } from './tournament-reviews.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -39,6 +42,7 @@ import { TournamentSponsorsService } from './tournament-sponsors.service';
     TournamentRegistrationsController,
     TournamentAnnouncementsController,
     TournamentSponsorsController,
+    TournamentReviewsController,
     TournamentsReadController,
   ],
   providers: [
@@ -51,6 +55,8 @@ import { TournamentSponsorsService } from './tournament-sponsors.service';
     TournamentAnnouncementsService,
     TournamentSponsorsService,
     TournamentPaymentExpiryService,
+    TournamentReviewsService,
+    OptionalV1AuthGuard,
     V1AuthGuard,
   ],
 })

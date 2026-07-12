@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { CreateAnnouncementDto } from './dto/tournament-read.dto';
+import { CreateAnnouncementDto, UpdateAnnouncementDto } from './dto/tournament-read.dto';
 
 @Injectable()
 export class TournamentAnnouncementsService {
@@ -99,6 +99,71 @@ export class TournamentAnnouncementsService {
   }
 
   /**
+   * Admin announcement edit.
+   * `publish=true` publishes a draft or keeps a published row published.
+   * `publish=false` moves the row back to draft by clearing publishedAt.
+   */
+  async update(
+    user: V1AuthUser,
+    announcementId: string,
+    dto: UpdateAnnouncementDto,
+  ) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+
+    const announcement = await this.prisma.v1TournamentAnnouncement.findUnique({
+      where: { id: announcementId },
+    });
+    if (!announcement) {
+      throw new NotFoundException({
+        code: 'ANNOUNCEMENT_NOT_FOUND',
+        message: '공지를 찾을 수 없어요.',
+      });
+    }
+
+    const publishRequested = dto.publish ?? announcement.publishedAt !== null;
+    const publishedAt = publishRequested
+      ? announcement.publishedAt ?? new Date()
+      : null;
+    const audience = dto.audience ?? announcement.audience;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.v1TournamentAnnouncement.update({
+        where: { id: announcementId },
+        data: {
+          title: dto.title,
+          body: dto.body,
+          audience,
+          publishedAt,
+        },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament_announcement.update',
+          targetType: 'tournament_announcement',
+          targetId: announcementId,
+          beforeJson: {
+            tournamentId: announcement.tournamentId,
+            title: announcement.title,
+            audience: announcement.audience,
+            publishedAt: announcement.publishedAt?.toISOString() ?? null,
+          },
+          afterJson: {
+            tournamentId: result.tournamentId,
+            title: result.title,
+            audience: result.audience,
+            publishedAt: result.publishedAt?.toISOString() ?? null,
+          },
+        },
+        tx,
+      );
+      return result;
+    });
+
+    return this.serialize(updated);
+  }
+
+  /**
    * 어드민 공지 즉시 공개.
    * 이미 publishedAt이 설정된 경우 멱등 응답(alreadyPublished:true).
    * logAdminAction으로 감사 기록.
@@ -143,6 +208,47 @@ export class TournamentAnnouncementsService {
     });
 
     return { ...this.serialize(updated), alreadyPublished: false };
+  }
+
+  async remove(user: V1AuthUser, announcementId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+
+    const announcement = await this.prisma.v1TournamentAnnouncement.findUnique({
+      where: { id: announcementId },
+    });
+    if (!announcement) {
+      throw new NotFoundException({
+        code: 'ANNOUNCEMENT_NOT_FOUND',
+        message: '공지를 찾을 수 없어요.',
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1TournamentAnnouncement.delete({
+        where: { id: announcementId },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament_announcement.delete',
+          targetType: 'tournament_announcement',
+          targetId: announcementId,
+          beforeJson: {
+            tournamentId: announcement.tournamentId,
+            title: announcement.title,
+            audience: announcement.audience,
+            publishedAt: announcement.publishedAt?.toISOString() ?? null,
+          },
+        },
+        tx,
+      );
+    });
+
+    return {
+      id: announcement.id,
+      tournamentId: announcement.tournamentId,
+      deleted: true,
+    };
   }
 
   private serialize(row: {

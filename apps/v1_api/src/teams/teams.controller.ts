@@ -60,13 +60,13 @@ export class TeamsController {
   }
 
   @Get('teams/:teamId/members')
-  @UseGuards(V1AuthGuard)
+  @UseGuards(OptionalV1AuthGuard)
   members(
-    @CurrentUser() user: V1AuthUser,
+    @CurrentUser() user: V1AuthUser | undefined,
     @Param('teamId') teamId: string,
     @Query() query: TeamMembersQueryDto,
   ) {
-    return this.teamsService.members(user, teamId, query);
+    return this.teamsService.members(user ?? null, teamId, query);
   }
 
   @Post('teams/:teamId/join-applications')

@@ -51,6 +51,7 @@ function completedUserRow(overrides: Record<string, unknown> = {}) {
     regions: [],
     reputationSummary: null,
     termsConsents: [{ id: 'consent-1' }],
+    authIdentities: [{ provider: V1AuthProvider.email, passwordHash: 'hash' }],
     ...overrides,
   };
 }
@@ -64,7 +65,7 @@ function pendingSocialUserRow(overrides: Record<string, unknown> = {}) {
       onboardingProgress: { currentStep: 'terms' },
       termsConsents: [],
     }),
-    authIdentities: [{ id: 'identity-1' }],
+    authIdentities: [{ id: 'identity-1', provider: V1AuthProvider.kakao, passwordHash: null }],
     ...overrides,
   };
 }
@@ -82,6 +83,7 @@ function buildPrismaMock() {
     },
     v1UserProfile: {
       findFirst: jest.fn(),
+      upsert: jest.fn(),
     },
     v1AuthIdentity: {
       findUnique: jest.fn(),
@@ -204,24 +206,68 @@ describe('AuthService', () => {
     });
   });
 
-  it('register: 게시된 필수 약관이 없으면 → 400 TERMS_NOT_READY', async () => {
-    prisma.v1User.findUnique.mockResolvedValue(null);
-    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
-    prisma.v1TermsDocument.findMany.mockResolvedValue([]); // no published required terms
-
-    await expect(
-      service.register({
+  it('register: 게시된 필수 약관 문서가 없어도 동의값이 true면 가입을 진행한다', async () => {
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedUserRow({
+        id: 'new-user',
         email: 'new@teameet.v1',
-        password: 'Password1!',
-        nickname: '신규',
-        requiredTermsAccepted: true,
-      }),
-    ).rejects.toMatchObject({
-      status: 400,
-      response: { code: 'TERMS_NOT_READY' },
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
+
+    const result = await service.register({
+      email: 'new@teameet.v1',
+      password: 'Password1!',
+      nickname: '신규',
+      requiredTermsAccepted: true,
     });
 
-    expect(prisma.v1User.create).not.toHaveBeenCalled();
+    expect(result.session).toEqual({ userId: 'new-user', userEmail: 'new@teameet.v1' });
+    expect(result.next).toEqual({ route: '/onboarding/sport' });
+    expect(prisma.v1User.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ termsConsents: expect.anything() }),
+      }),
+    );
+  });
+
+  it('register: 게시된 필수 약관 문서가 있으면 consent row를 함께 생성한다', async () => {
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedUserRow({
+        id: 'new-user',
+        email: 'new@teameet.v1',
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+      }));
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+    prisma.v1TermsDocument.findMany.mockResolvedValue([{ id: 'terms-1' }, { id: 'privacy-1' }]);
+    prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
+
+    await service.register({
+      email: 'new@teameet.v1',
+      password: 'Password1!',
+      nickname: '신규',
+      requiredTermsAccepted: true,
+    });
+
+    expect(prisma.v1User.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          termsConsents: {
+            create: [
+              { termsDocumentId: 'terms-1' },
+              { termsDocumentId: 'privacy-1' },
+            ],
+          },
+        }),
+      }),
+    );
   });
 
   // ─── login ────────────────────────────────────────────────────────────────
@@ -350,6 +396,179 @@ describe('AuthService', () => {
 
     // expired user must be deleted before the error is thrown
     expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+  });
+
+  it('completeSocialTerms: 게시된 필수 약관 문서가 없어도 기본 프로필을 만들고 운동 정보 단계로 진행한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: '카카오러너', kakaoProfileImageUrl: 'https://img.example/kakao.png' },
+        },
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+        createdAt: activeTime,
+        updatedAt: activeTime,
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    const result = await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(result.next).toEqual({ route: '/onboarding/sport' });
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      update: {
+        nickname: '카카오러너',
+        displayName: '카카오러너',
+        profileImageUrl: 'https://img.example/kakao.png',
+        visibility: 'public',
+      },
+      create: {
+        userId: 'user-1',
+        nickname: '카카오러너',
+        displayName: '카카오러너',
+        profileImageUrl: 'https://img.example/kakao.png',
+        visibility: 'public',
+      },
+    });
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { onboardingStatus: 'signup_done' },
+    });
+    expect(prisma.v1UserTermsConsent.createMany).not.toHaveBeenCalled();
+  });
+
+  it('completeSocialTerms: 카카오 기본 닉네임은 14자 이내로 저장한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: 'kakao_1234567890', kakaoProfileImageUrl: null },
+        },
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          nickname: 'kakao_12345678',
+          displayName: 'kakao_12345678',
+        }),
+      }),
+    );
+  });
+
+  it('completeSocialTerms: 중복 suffix가 붙어도 카카오 기본 닉네임은 14자 이내로 유지한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: 'kakao_1234567890', kakaoProfileImageUrl: null },
+        },
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst
+      .mockResolvedValueOnce({ id: 'existing-profile' })
+      .mockResolvedValueOnce(null);
+
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          nickname: 'kakao_123456_1',
+          displayName: 'kakao_123456_1',
+        }),
+      }),
+    );
+  });
+
+  it('completeSocialTerms: 카카오 ID fallback 닉네임은 k_ prefix로 14자 이내로 저장한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        createdAt: activeTime,
+        updatedAt: activeTime,
+        onboardingProgress: {
+          currentStep: 'terms',
+          draftJson: { kakaoNickname: 'k_123456789012345', kakaoProfileImageUrl: null },
+        },
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
+
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          nickname: 'k_123456789012',
+          displayName: 'k_123456789012',
+        }),
+      }),
+    );
+  });
+
+  it('completeSocialProfile: consent row가 없어도 약관 단계 완료 상태면 프로필을 저장한다', async () => {
+    const activeTime = new Date();
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(pendingSocialUserRow({
+        onboardingStatus: 'social_profile_required',
+        onboardingProgress: { currentStep: 'signup' },
+        termsConsents: [],
+        createdAt: activeTime,
+        updatedAt: activeTime,
+      }))
+      .mockResolvedValueOnce(completedUserRow({
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+        termsConsents: [],
+      }));
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    const result = await service.completeSocialProfile('user-1', {
+      nickname: '소셜유저',
+      displayName: '소셜 유저',
+    });
+
+    expect(result.next).toEqual({ route: '/onboarding/sport' });
+    expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'user-1' },
+        create: expect.objectContaining({ nickname: '소셜유저' }),
+      }),
+    );
   });
 
   // ─── me ──────────────────────────────────────────────────────────────────

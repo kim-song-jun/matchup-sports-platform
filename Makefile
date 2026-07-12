@@ -252,8 +252,16 @@ v1-db-push: ## Run prisma db push inside the v1_api container
 	@$(DOCKER_DEV) run --rm v1_api sh -c "cd /app/apps/v1_api && pnpm db:push"
 
 .PHONY: v1-db-seed
-v1-db-seed: ## Insert v1 seed data inside the v1_api container
+v1-db-seed: ## Insert v1 base reference seed data inside the v1_api container
 	@$(DOCKER_DEV) run --rm v1_api sh -c "cd /app/apps/v1_api && pnpm db:generate && pnpm db:seed"
+
+.PHONY: v1-db-seed-demo
+v1-db-seed-demo: ## Insert v1 demo seed data inside the v1_api container
+	@$(DOCKER_DEV) run --rm v1_api sh -c "cd /app/apps/v1_api && pnpm db:generate && pnpm db:seed:demo"
+
+.PHONY: v1-db-cleanup-demo
+v1-db-cleanup-demo: ## Dry-run v1 demo data cleanup inside the v1_api container
+	@$(DOCKER_DEV) run --rm v1_api sh -c "cd /app/apps/v1_api && pnpm db:cleanup:demo"
 
 .PHONY: v1-db-studio
 v1-db-studio: ## Open v1 Prisma Studio (exposes port 5556 only while running)

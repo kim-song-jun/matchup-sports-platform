@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
-import { Card, ListItem } from '@/components/v1-ui/primitives';
+import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { cssUrl } from '@/lib/assets';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
@@ -40,7 +41,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   MyInvitationsPageView,
@@ -57,6 +58,19 @@ type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | '
 type DuplicateCheckState = {
   status: 'idle' | 'available' | 'taken' | 'error';
   value: string;
+};
+
+type SettingsRegionOption = {
+  id: string;
+  name: string;
+  shortName: string;
+  parentId: string;
+};
+
+type SettingsRegionGroup = {
+  id: string;
+  name: string;
+  options: SettingsRegionOption[];
 };
 
 export function MyHomePageClient() {
@@ -77,10 +91,11 @@ export function MyHomePageClient() {
           handle: '—',
           region: '—',
           initials: '—',
+          profileImageUrl: null,
           intro: '',
           sports: [],
-          stats: myHomeModel.user.stats.map((stat) => ({ ...stat, value: '—' })),
-          monthly: myHomeModel.user.monthly.map((stat) => ({ ...stat, value: '—' })),
+          stats: myHomeModel.user.stats.map((stat) => ({ label: stat.label, value: '—' })),
+          monthly: myHomeModel.user.monthly.map((stat) => ({ label: stat.label, value: '—' })),
         },
       };
     }
@@ -92,6 +107,10 @@ export function MyHomePageClient() {
       hasPendingReview(pendingReviews.data),
     );
   }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data]);
+
+  if (profile.isError) {
+    return <ErrorState message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void profile.refetch()} />;
+  }
 
   return <MyHomePageView model={model} />;
 }
@@ -127,7 +146,7 @@ export function MyInvitationsPageClient() {
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
-          router.push(`/my/teams/${result.teamId}`);
+          router.push(`/teams/${result.teamId}`);
         } else {
           void query.refetch();
         }
@@ -184,13 +203,13 @@ export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
 
   const viewerRole = team.viewer.role;
   // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
-  const canManage = viewerRole === 'owner' || viewerRole === 'manager';
+  const canManage = isTeamOperatorRole(viewerRole);
   const actions: MyTeamDetailViewModel['actions'] = [
     { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'ClipboardList' },
     ...(canManage
       ? [
-          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/my/teams/${team.teamId}/members`, icon: 'Users' },
-          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /my/teams/[id] 복귀 유도
+          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/teams/${team.teamId}/members`, icon: 'Users' },
+          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /teams/[id] 복귀 유도
           { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'Settings' },
         ]
       : []),
@@ -211,7 +230,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
-  const canReviewApplications = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
+  const canReviewApplications = isTeamOperatorRole(team.data?.viewer.role);
   const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
   const changeRole = useV1ChangeTeamMembershipRole(teamId);
   const removeMember = useV1RemoveTeamMembership(teamId);
@@ -222,7 +241,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
   const requests = applications.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
   const viewerRole = team.data?.viewer.role;
-  const canManageMembers = viewerRole === 'owner' || viewerRole === 'manager';
+  const canManageMembers = isTeamOperatorRole(viewerRole);
   const canDelegateOwner = viewerRole === 'owner';
   const model = {
     teamName: team.data?.name ?? '팀',
@@ -260,7 +279,7 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
     <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
-      <MyTeamMembersPageView model={model} backHref={`/my/teams/${teamId}`} />
+      <MyTeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
     </>
   );
 }
@@ -280,8 +299,6 @@ export function ProfileEditPageClient() {
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
-  const [bio, setBio] = useState('');
-  const [visibilityStatus, setVisibilityStatus] = useState<'public' | 'members_only' | 'private'>('public');
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
@@ -295,20 +312,19 @@ export function ProfileEditPageClient() {
     setBirthDateDigits(profile.data.profile.birthDate ?? '');
     setProfileImageUrl(profile.data.profile.profileImageUrl ?? '');
     setProfileImageName('');
-    setBio(profile.data.profile.bio ?? '');
-    setVisibilityStatus(profile.data.profile.visibilityStatus);
     setNicknameCheck({ status: 'idle', value: '' });
     setEmailCheck({ status: 'idle', value: '' });
   }, [profile.data]);
 
   const originalNickname = profile.data?.profile.nickname ?? profile.data?.profile.displayName ?? '';
   const originalEmail = profile.data?.email ?? '';
+  const canEditEmail = Boolean(profile.data?.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
   const nicknameChanged = normalizedNickname !== originalNickname;
-  const emailChanged = normalizedEmail !== originalEmail;
+  const emailChanged = canEditEmail && normalizedEmail !== originalEmail;
   const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
-  const emailVerified = !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
+  const emailVerified = !canEditEmail || !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
   const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified;
 
   const runNicknameCheck = () => {
@@ -337,6 +353,9 @@ export function ProfileEditPageClient() {
 
   const runEmailCheck = () => {
     setFieldErrors((current) => ({ ...current, email: undefined, form: undefined }));
+    if (!canEditEmail) {
+      return;
+    }
     if (!emailChanged) {
       setEmailCheck({ status: 'available', value: normalizedEmail });
       return;
@@ -409,7 +428,7 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    if (!normalizedEmail.includes('@')) {
+    if (canEditEmail && !normalizedEmail.includes('@')) {
       setFieldErrors({ email: '이메일 형식을 확인해 주세요.' });
       return;
     }
@@ -438,12 +457,10 @@ export function ProfileEditPageClient() {
       await update.mutateAsync({
         displayName: displayName.trim(),
         nickname: normalizedNickname,
-        email: normalizedEmail,
-        bio,
+        email: canEditEmail ? normalizedEmail : null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
         birthDate: birthDateDigits || null,
-        visibilityStatus,
       });
       router.replace('/my');
     } catch (nextError) {
@@ -474,7 +491,7 @@ export function ProfileEditPageClient() {
           <h1 className="tm-text-heading">프로필 수정</h1>
         </div>
         <section className="tm-my-profile-head">
-          <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: `url(${profileImageUrl})` } : undefined}>
+          <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
             {profileImageUrl ? null : <span className="tm-text-caption">{initials(normalizedNickname || nickname || displayName)}</span>}
           </div>
           <div>
@@ -547,16 +564,18 @@ export function ProfileEditPageClient() {
               className={`tm-input ${fieldErrors.email ? 'tm-auth-input-error' : emailVerified && emailChanged ? 'tm-auth-input-success' : ''}`}
               value={email}
               onChange={(event) => {
+                if (!canEditEmail) return;
                 setEmail(event.target.value);
                 setEmailCheck({ status: 'idle', value: '' });
                 setFieldErrors((current) => ({ ...current, email: undefined }));
               }}
               type="email"
-              required
+              required={canEditEmail}
+              disabled={!canEditEmail}
               aria-invalid={fieldErrors.email ? true : undefined}
               aria-describedby={fieldErrors.email || (emailVerified && emailChanged) ? 'v1-profile-email-helper' : undefined}
             />
-            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={!canEditEmail || checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
               {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
@@ -589,36 +608,24 @@ export function ProfileEditPageClient() {
         </label>
         <label className="tm-create-field">
           <span className="tm-text-label">생년월일</span>
-          <input
-            className={`tm-input ${fieldErrors.birthDate ? 'tm-auth-input-error' : ''}`}
-            inputMode="numeric"
-            maxLength={10}
-            placeholder="예: 1995-01-15"
+          <DatePickerTextInput
+            dateValue={formatBirthDate(birthDateDigits)}
+            inputClassName={fieldErrors.birthDate ? 'tm-auth-input-error' : ''}
             value={formatBirthDate(birthDateDigits)}
-            onChange={(event) => {
-              setBirthDateDigits(toDigits(event.target.value, 8));
+            onTextChange={(value) => {
+              setBirthDateDigits(toDigits(value, 8));
               setFieldErrors((current) => ({ ...current, birthDate: undefined }));
             }}
+            onDateChange={(value) => {
+              setBirthDateDigits(toDigits(value, 8));
+              setFieldErrors((current) => ({ ...current, birthDate: undefined }));
+            }}
+            placeholder="예: 1995-01-15"
             aria-invalid={fieldErrors.birthDate ? true : undefined}
             aria-describedby={fieldErrors.birthDate ? 'profile-birthDate-error' : undefined}
           />
           {fieldErrors.birthDate ? <span id="profile-birthDate-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.birthDate}</span> : null}
         </label>
-        <label className="tm-create-field">
-          <span className="tm-text-label">소개</span>
-          {/* #25: rows=4 + min-height 100px — 프로필 소개는 좀 더 넓게 */}
-          <textarea className="tm-input tm-create-input-multiline" value={bio} onChange={(event) => setBio(event.target.value)} maxLength={500} rows={4} />
-        </label>
-        <label className="tm-create-field">
-          <span className="tm-text-label">공개 범위</span>
-          {/* (3) OS 기본 ▾ 대신 커스텀 SVG chevron — appearance:none + background-image */}
-          <select className="tm-input tm-input-select" value={visibilityStatus} onChange={(event) => setVisibilityStatus(event.target.value as typeof visibilityStatus)}>
-            <option value="public">전체 공개</option>
-            <option value="members_only">멤버 공개</option>
-            <option value="private">비공개</option>
-          </select>
-        </label>
-
         <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
@@ -647,18 +654,34 @@ export function SportsSettingsPageClient() {
   const regionsQuery = useV1MasterRegions();
   const updatePreferences = useV1UpdateMyPreferences();
   const sports = sportsQuery.data ?? [];
-  const regions = toDistrictRegionOptions(regionsQuery.data ?? []);
+  const regionGroups = useMemo(() => toSettingsRegionGroups(regionsQuery.data ?? []), [regionsQuery.data]);
   const [selectedSports, setSelectedSports] = useState<Array<{ sportId: string; levelId: string | null }>>([]);
-  const [selectedRegionId, setSelectedRegionId] = useState('');
+  const [selectedRegionIds, setSelectedRegionIds] = useState<[string, string]>(['', '']);
+  const [selectedRegionGroupIds, setSelectedRegionGroupIds] = useState<[string, string]>(['', '']);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile.data || hydratedUserId === profile.data.userId) return;
     setSelectedSports((profile.data.sports ?? []).map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })));
-    setSelectedRegionId(profile.data.regions?.find((region) => region.primary)?.regionId ?? profile.data.regions?.[0]?.regionId ?? '');
+    const profileRegions = profile.data.regions ?? [];
+    const primaryRegion = profileRegions.find((region) => region.primary) ?? profileRegions[0];
+    const secondaryRegion = profileRegions.find((region) => region.regionId !== primaryRegion?.regionId);
+    setSelectedRegionIds([primaryRegion?.regionId ?? '', secondaryRegion?.regionId ?? '']);
+    setSelectedRegionGroupIds([
+      findSettingsRegionGroupId(regionGroups, primaryRegion?.regionId) ?? '',
+      findSettingsRegionGroupId(regionGroups, secondaryRegion?.regionId) ?? '',
+    ]);
     setHydratedUserId(profile.data.userId);
-  }, [hydratedUserId, profile.data]);
+  }, [hydratedUserId, profile.data, regionGroups]);
+
+  useEffect(() => {
+    if (regionGroups.length === 0) return;
+    setSelectedRegionGroupIds((current) => [
+      current[0] || findSettingsRegionGroupId(regionGroups, selectedRegionIds[0]) || '',
+      current[1] || findSettingsRegionGroupId(regionGroups, selectedRegionIds[1]) || '',
+    ]);
+  }, [regionGroups, selectedRegionIds]);
 
   const toggleSport = (sportId: string) => {
     setSelectedSports((current) => {
@@ -672,6 +695,28 @@ export function SportsSettingsPageClient() {
   };
 
   const missingLevels = selectedSports.some((sport) => !sport.levelId);
+  const selectedRegionPayload = selectedRegionIds
+    .filter((regionId, index, self) => regionId && self.indexOf(regionId) === index)
+    .map((regionId, index) => ({ regionId, primary: index === 0 }));
+  const setRegionGroup = (slot: 0 | 1, groupId: string) => {
+    setSelectedRegionGroupIds((current) => {
+      const next: [string, string] = [...current];
+      next[slot] = groupId;
+      return next;
+    });
+    setSelectedRegionIds((current) => {
+      const next: [string, string] = [...current];
+      next[slot] = '';
+      return next;
+    });
+  };
+  const setRegion = (slot: 0 | 1, regionId: string) => {
+    setSelectedRegionIds((current) => {
+      const next: [string, string] = [...current];
+      next[slot] = regionId;
+      return next;
+    });
+  };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage(null);
@@ -683,7 +728,7 @@ export function SportsSettingsPageClient() {
     try {
       await updatePreferences.mutateAsync({
         sports: selectedSports,
-        regions: selectedRegionId ? [{ regionId: selectedRegionId, primary: true }] : [],
+        regions: selectedRegionPayload,
       });
       router.replace('/my');
     } catch (error) {
@@ -738,16 +783,25 @@ export function SportsSettingsPageClient() {
 
         <Card pad={16}>
           <div className="tm-text-body-lg">기본 활동 지역</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치와 팀 추천에 사용할 기본 지역이에요.</div>
-          <label className="tm-create-field" style={{ marginTop: 14 }}>
-            <span className="tm-text-label">지역</span>
-            <select className="tm-input" value={selectedRegionId} onChange={(event) => setSelectedRegionId(event.target.value)}>
-              <option value="">지역 선택 안 함</option>
-              {regions.map((region) => (
-                <option key={region.id} value={region.id}>{region.name}</option>
-              ))}
-            </select>
-          </label>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치와 팀 추천에 사용할 지역을 최대 2개까지 나눠 관리해요.</div>
+          <SettingsRegionSlot
+            groupId={selectedRegionGroupIds[0]}
+            groups={regionGroups}
+            label="기본 활동 지역 1"
+            onGroupChange={(groupId) => setRegionGroup(0, groupId)}
+            onRegionChange={(regionId) => setRegion(0, regionId)}
+            regionId={selectedRegionIds[0]}
+            unavailableRegionId={selectedRegionIds[1]}
+          />
+          <SettingsRegionSlot
+            groupId={selectedRegionGroupIds[1]}
+            groups={regionGroups}
+            label="기본 활동 지역 2"
+            onGroupChange={(groupId) => setRegionGroup(1, groupId)}
+            onRegionChange={(regionId) => setRegion(1, regionId)}
+            regionId={selectedRegionIds[1]}
+            unavailableRegionId={selectedRegionIds[0]}
+          />
         </Card>
 
         <Card pad={14} style={{ marginTop: 14, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
@@ -787,8 +841,133 @@ function SportLevelPicker({
   );
 }
 
+function SettingsRegionSlot({
+  groupId,
+  groups,
+  label,
+  onGroupChange,
+  onRegionChange,
+  regionId,
+  unavailableRegionId,
+}: {
+  groupId: string;
+  groups: SettingsRegionGroup[];
+  label: string;
+  onGroupChange: (groupId: string) => void;
+  onRegionChange: (regionId: string) => void;
+  regionId: string;
+  unavailableRegionId: string;
+}) {
+  const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
+
+  return (
+    <div className="tm-create-field" style={{ marginTop: 14 }}>
+      <div className="tm-text-label">{label}</div>
+      <div className="tm-create-two-col" style={{ marginTop: 8 }}>
+        <label>
+          <span className="sr-only">{label} 시/도</span>
+          <select className="tm-input" value={groupId} onChange={(event) => onGroupChange(event.target.value)}>
+            <option value="">시/도 선택</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>{group.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">{label} 상세 지역</span>
+          <select className="tm-input" value={regionId} onChange={(event) => onRegionChange(event.target.value)} disabled={!selectedGroup}>
+            <option value="">상세 지역 선택</option>
+            {(selectedGroup?.options ?? []).map((region) => (
+              <option key={region.id} value={region.id} disabled={region.id === unavailableRegionId}>{region.shortName}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function toSettingsRegionGroups(regions: V1Region[]): SettingsRegionGroup[] {
+  const parents = regions.filter((region) => region.level === 1 || !region.parentId);
+  const childrenByParentId = new Map<string, V1Region[]>();
+
+  regions.forEach((region) => {
+    if (region.level !== 2 || !region.parentId) return;
+    const current = childrenByParentId.get(region.parentId) ?? [];
+    current.push(region);
+    childrenByParentId.set(region.parentId, current);
+  });
+
+  return parents.map((parent) => ({
+    id: parent.id,
+    name: parent.name,
+    options: [
+      {
+        id: parent.id,
+        name: `${parent.name} 전체`,
+        shortName: '전체',
+        parentId: parent.id,
+      },
+      ...(childrenByParentId.get(parent.id) ?? []).map((child) => ({
+        id: child.id,
+        name: `${parent.name} ${child.name}`,
+        shortName: child.name,
+        parentId: parent.id,
+      })),
+    ],
+  }));
+}
+
+function findSettingsRegionGroupId(groups: SettingsRegionGroup[], regionId: string | null | undefined) {
+  if (!regionId) return null;
+  return groups.find((group) => group.options.some((option) => option.id === regionId))?.id ?? null;
+}
+
+function formatLoginMethods(providers: string[]) {
+  if (providers.length === 0) return '확인 안 됨';
+
+  const labels = providers.map(formatLoginProvider);
+
+  return labels.join(', ');
+}
+
+function formatLoginProvider(provider: string | null | undefined) {
+  if (provider === 'kakao') return '카카오 로그인';
+  if (provider === 'email') return '이메일 로그인';
+  if (provider === 'naver') return '네이버 로그인';
+  return provider ?? null;
+}
+
+function formatAccountEmail(email: string | null, providers: string[]) {
+  if (email) return email;
+  if (providers.includes('kakao')) return '카카오 계정 이메일 미제공';
+  return '등록 안 됨';
+}
+
+function formatPasswordAvailability(hasPassword: boolean | undefined, providers: string[]) {
+  if (hasPassword) return '이메일 계정에서 관리';
+  if (providers.includes('kakao')) return '카카오 계정으로 로그인 중';
+  return '비밀번호 없음';
+}
+
 export function SettingsPageClient() {
-  return <SettingsPageView model={settingsModel} />;
+  const settings = useV1Settings();
+
+  if (settings.isError) {
+    return <ErrorState message="설정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />;
+  }
+
+  const account = settings.data
+    ? {
+        loginMethod: formatLoginMethods(settings.data.account.providers),
+        email: formatAccountEmail(settings.data.account.email, settings.data.account.providers),
+        phone: settings.data.account.phone ?? '등록 안 됨',
+        password: formatPasswordAvailability(settings.data.account.hasPassword, settings.data.account.providers),
+        canRequestPasswordChange: Boolean(settings.data.account.hasPassword),
+      }
+    : undefined;
+
+  return <SettingsPageView model={{ ...settingsModel, account }} />;
 }
 
 type LocationStatus = 'idle' | 'requesting' | 'matched' | 'denied' | 'unsupported' | 'unmatched' | 'saved';
@@ -1101,6 +1280,19 @@ function toMyHomeModel(
       icon: 'Star',
     });
   }
+  if (!sections.some((section) => section.title === '문의')) {
+    sections.push({
+      title: '문의',
+      items: [
+        {
+          label: '문의하기',
+          sub: '계정, 매치, 대회, 결제 문제를 운영팀에 남겨요',
+          href: '/my/inquiries',
+          icon: 'Mail',
+        },
+      ],
+    });
+  }
 
   return {
     ...myHomeModel,
@@ -1108,11 +1300,14 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
-      name: nickname,
+      name: displayName,
       handle: `@${nickname}`,
-      region: profile.regionName ?? myHomeModel.user.region,
-      initials: initials(nickname),
-      intro: profile.profile.bio ?? '',
+      region: profile.regionName ?? '지역 미정',
+      initials: initials(displayName || nickname),
+      profileImageUrl: profile.profile.profileImageUrl ?? null,
+      loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
+      loginMethodProvider: profile.authProvider,
+      intro: '',
       sports: (profile.sports ?? []).map((sport) =>
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,
       ),
@@ -1135,6 +1330,8 @@ function toMyTeam(item: V1MyTeam): MyTeam {
     id: item.teamId,
     name: item.name,
     logo: item.name.slice(0, 1),
+    logoUrl: item.logoUrl ?? null,
+    coverImageUrl: item.coverImageUrl ?? null,
     sport: item.sport.name,
     region: item.region?.name ?? '지역 미정',
     role: item.role,
@@ -1151,13 +1348,15 @@ function toTeamDetailModel(team: V1TeamDetail): MyTeam {
     id: team.teamId,
     name: team.name,
     logo: team.name.slice(0, 1),
+    logoUrl: team.profile.logoUrl ?? null,
+    coverImageUrl: team.profile.coverImageUrl ?? null,
     sport: team.sport.name,
     region: team.region?.name ?? '지역 미정',
     role: team.viewer.role as MyTeam['role'],
     roleLabel: roleLabel(team.viewer.role),
     members: team.memberCount,
     manner: team.trust.score && hasTrustValue(team.trust.trustState) ? String(team.trust.score) : '-',
-    next: team.profile.activityAreaText ?? '팀매치에서 일정을 확인해 보세요',
+    next: team.profile.activitySummary ?? team.profile.activityAreaText ?? '팀매치에서 일정을 확인해 보세요',
     description: team.profile.introduction ?? '아직 팀 소개가 없어요.',
   };
 }
@@ -1261,7 +1460,7 @@ function toMyInvitationItem(invitation: V1ReceivedInvitation): MyInvitationItem 
 function buildTeamSummary(teams: MyTeam[]) {
   return [
     { label: '소속 팀', value: teams.length, unit: '팀' },
-    { label: '운영 중인 팀', value: teams.filter((team) => team.role === 'owner' || team.role === 'manager' || team.role === 'admin').length, unit: '팀' },
+    { label: '운영 중인 팀', value: teams.filter((team) => isTeamOperatorRole(team.role)).length, unit: '팀' },
     { label: '평균 매너', value: '-' },
   ];
 }
@@ -1287,6 +1486,10 @@ function roleLabel(role: string) {
   if (role === 'manager' || role === 'admin') return '운영진';
   if (role === 'member') return '멤버';
   return '비회원';
+}
+
+function isTeamOperatorRole(role?: string | null) {
+  return role === 'owner' || role === 'manager' || role === 'admin';
 }
 
 

@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import {
-  BellIcon,
   ChevronLeftIcon,
   HomeIcon,
   MatchIcon,
@@ -13,6 +12,7 @@ import {
 import { DesktopScrollTop } from './desktop-scroll-top';
 import { BrandMark } from './brand-logo';
 import { AppBackLink } from './app-back-link';
+import { NotificationBellLink } from './notification-bell';
 
 export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
 
@@ -86,10 +86,7 @@ export function AppChrome({
                   </Link>
                 ) : null}
                 {showNotifications ? (
-                  <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/notifications" aria-label="알림">
-                    <BellIcon size={21} strokeWidth={2} />
-                    {hasNewNotification ? <span className="tm-unread-dot" /> : null}
-                  </Link>
+                  <NotificationBellLink className="tm-btn tm-btn-icon tm-btn-ghost" forceUnread={hasNewNotification} />
                 ) : null}
               </>
             )}
@@ -123,9 +120,11 @@ function DesktopFooter() {
         </div>
         <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
           <Link href="/notices">공지사항</Link>
-          <Link href="/terms">이용약관</Link>
-          <Link href="/my/settings/legal">개인정보·정책</Link>
-          <Link href="/search">탐색</Link>
+          <Link href="/terms?document=terms">서비스 이용약관</Link>
+          <Link href="/terms?document=privacy">개인정보처리방침</Link>
+          <Link href="/terms?document=location">위치기반서비스 이용약관</Link>
+          <Link href="/terms?document=tournament-policy">대회 운영정책</Link>
+          <Link href="/terms?document=support">고객센터</Link>
         </nav>
         <p className="tm-desktop-footer-copy">© 2026 Teameet</p>
       </div>
@@ -190,14 +189,12 @@ function DesktopNav({
         <Link className="tm-desktop-nav-action" href="/search" aria-label="검색">
           <SearchIcon size={20} strokeWidth={2} />
         </Link>
-        <Link
+        <NotificationBellLink
           className="tm-desktop-nav-action"
-          href="/notifications"
-          aria-label={hasNewNotification ? '알림 (새 알림 있음)' : '알림'}
-        >
-          <BellIcon size={20} strokeWidth={2} />
-          {hasNewNotification ? <span className="tm-desktop-nav-dot" aria-hidden="true" /> : null}
-        </Link>
+          dotClassName="tm-desktop-nav-dot"
+          forceUnread={hasNewNotification}
+          iconSize={20}
+        />
         {/* Desktop-only account affordance — top-right avatar entry to My page. */}
         <Link
           className={`tm-desktop-nav-avatar ${activeTab === 'my' ? 'is-active' : ''}`}

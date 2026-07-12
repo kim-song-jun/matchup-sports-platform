@@ -19,6 +19,20 @@ export function getLoginViewModel(redirectPath?: string | null): LoginViewModel 
   };
 }
 
+// 로그인 CSRF(세션 고정) 방지용 state 값을 저장하는 sessionStorage 키.
+// kakao-login-button.tsx가 클릭 시점(브라우저)에 state를 생성·저장하고,
+// kakao-callback-client.tsx가 콜백에서 동일 키로 대조 검증한다.
+export const KAKAO_OAUTH_STATE_STORAGE_KEY = 'teameet.v1.kakao_oauth_state';
+
+// CSPRNG 기반 state 생성. 저장은 반드시 브라우저 클릭 시점(kakao-login-button)에서 수행한다 —
+// buildKakaoAuthUrl은 SSR(Server Component)로 실행돼 window가 없어 sessionStorage에 저장할 수 없다.
+export function generateKakaoOAuthState(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// authorize 기본 URL(state 제외)만 만든다. CSRF 방지 state는 클라이언트 버튼이 클릭 시점에 붙인다.
 function buildKakaoAuthUrl() {
   const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
   const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
@@ -115,29 +129,29 @@ export function getTermsViewModel(): TermsViewModel {
   return {
     backHref: '/login',
     title: '가입 전에 약관을 먼저 확인해 주세요',
-    sub: '필수 약관에 모두 동의해야 다음 단계로 넘어갈 수 있어요.',
+    sub: '가입 전에 약관을 확인해 주세요.\n필수 약관에 동의해야 다음 단계로 넘어갈 수 있어요.',
     agreements: [
       {
         title: '서비스 이용약관',
         meta: '필수',
         required: true,
         checked: true,
-        detail: 'Teameet의 매치, 팀매치, 팀 탐색, 채팅, 알림 기능을 이용하기 위한 기본 약관이에요. 부정 이용, 허위 신청, 운영 정책 위반 시 이용이 제한될 수 있어요.',
+        detail: '팀밋 서비스 이용을 위한 기본 약관이에요.',
       },
       {
-        title: '개인정보 처리방침',
+        title: '개인정보 수집 및 이용 동의',
         meta: '필수',
         required: true,
         checked: true,
-        detail: '회원 식별, 로그인, 매치 신청, 알림 발송 등 서비스 운영을 위해 이메일, 프로필, 활동 기록 등 필요한 개인정보를 처리해요.',
+        detail: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
       },
       {
-        title: '위치 기반 서비스',
+        title: '위치기반서비스 이용 동의',
         meta: '선택 · 주변 매치 추천에 사용',
         required: false,
         checked: false,
         locationBased: true,
-        detail: '동의하면 가까운 매치와 팀 추천에 위치 정보를 활용해요. 위치 권한을 거부해도 지역을 직접 선택해서 계속 이용할 수 있어요.',
+        detail: '',
       },
     ],
     primary: { label: '동의하고 회원가입하기', href: '/signup' },
@@ -176,4 +190,3 @@ export function getSignupCompleteViewModel(): SignupCompleteViewModel {
     secondary: { label: '나중에 설정하기', href: '/home', tone: 'neutral' },
   };
 }
-

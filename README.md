@@ -355,6 +355,27 @@ pnpm db:seed:mocks   # 루트에서 api mock sync 실행
 pnpm db:seed:mocks:deploy # 루트에서 deploy checksum gate mock sync 실행
 ```
 
+### V1 database operations
+
+Use these commands for `apps/v1_api`; do not use legacy `apps/api` DB commands for v1 production data.
+
+```bash
+pnpm v1:db:generate
+pnpm v1:db:migrate
+pnpm v1:db:seed          # base reference data only
+pnpm v1:db:seed:demo     # explicit demo personas/data
+pnpm v1:db:seed:all      # demo plus coverage data
+pnpm v1:db:cleanup:demo  # dry-run counts for 00000000/@teameet.v1 demo cleanup
+```
+
+`demo`/`coverage`/`all` seed modes require `V1_HOST_ADMIN_PASSWORD` (8+ chars) set in `apps/v1_api/.env` — used as the `host@teameet.v1` account password. Seeding fails fast without it.
+
+Actual v1 demo cleanup requires a backup, count review, and explicit execution:
+
+```bash
+pnpm --filter v1_api db:cleanup:demo -- --execute --confirm=delete-v1-demo-data
+```
+
 ### 개별 앱
 
 ```bash

@@ -12,13 +12,18 @@ import {
 } from '@/components/v1-ui/icons';
 import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
-import { formatTournamentDateShort } from '@/lib/date-utils';
+import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { useV1Tournaments } from '@/hooks/use-v1-api';
+import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
-import type { HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
+import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
+  const tournaments = useV1Tournaments({ status: 'open', limit: 5 });
+  const tournamentItems = tournaments.data?.items ?? [];
+  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournamentItems.length > 0;
+  const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
 
   return (
     <AppChrome
@@ -81,18 +86,25 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           </div>
 
           {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
+          {hasFeaturedContent ? (
           <div className="tm-home-featured-block">
             <div style={{ marginBottom: 10 }}>
               <div className="tm-text-label">오늘의 추천</div>
               <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
             </div>
             <div className="tm-home-featured-carousel">
-              <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
-              <TournamentHeroCard />
+              {model.featuredMatch ? (
+                <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+              ) : null}
+              <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
             </div>
           </div>
+          ) : null}
+
+          <HomeChatSummary model={model} />
 
           {/* Recommended matches — horizontal rail on mobile, wrapped grid on desktop */}
+          {hasRecommendedMatches ? (
           <div className="tm-home-matches-block">
             <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '내 실력에 맞는 매치 추천'} action="전체보기" actionHref="/matches" />
             {model.network ? (
@@ -104,6 +116,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               <RecommendedMatchRail matches={model.recommendedMatches} />
             )}
           </div>
+          ) : null}
 
         </div>{/* /tm-home-main */}
 
@@ -149,16 +162,22 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   전체보기
                 </Link>
               </div>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {model.notices.map((notice) => (
-                  <ListItem key={notice.id} title={notice.title} sub={notice.summary} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
-                ))}
-              </div>
+              {model.notices.length > 0 ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {model.notices.map((notice) => (
+                    <ListItem key={notice.id} title={notice.title} trailing={notice.trailing} href={`/notices/${notice.id}`} chev />
+                  ))}
+                </div>
+              ) : (
+                <div className="tm-text-caption" style={{ color: 'var(--text-muted)', paddingTop: 8 }}>
+                  새 공지사항이 없어요.
+                </div>
+              )}
             </div>
           </div>
 
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
-          <SidebarTournamentsWidget />
+          <SidebarTournamentsWidget items={tournamentItems} loading={tournaments.isLoading} />
 
         </div>{/* /tm-home-sidebar */}
 
@@ -167,15 +186,101 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   );
 }
 
+function HomeChatSummary({ model }: { model: HomeViewModel }) {
+  const unreadLabel = model.chatUnreadCount > 0 ? `읽지 않은 메시지 ${model.chatUnreadCount}개` : '새 메시지 없음';
+  const body = (() => {
+    if (model.signedOut) {
+      return (
+        <Card pad={16} className="tm-home-chat-empty">
+          <div className="tm-text-body-lg">로그인하면 매치와 팀 채팅을 이어볼 수 있어요.</div>
+          <Link className="tm-btn tm-btn-sm tm-btn-primary" href="/login" style={{ marginTop: 12 }}>
+            로그인하기
+          </Link>
+        </Card>
+      );
+    }
+
+    if (model.chatStatus === 'loading') {
+      return (
+        <Card pad={16} className="tm-home-chat-empty" aria-busy="true">
+          <div className="tm-text-body-lg">채팅방을 불러오고 있어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>최근 대화를 확인하는 중이에요.</div>
+        </Card>
+      );
+    }
+
+    if (model.chatStatus === 'error') {
+      return (
+        <Card pad={16} className="tm-home-chat-empty">
+          <div className="tm-text-body-lg">채팅방을 불러오지 못했어요</div>
+          <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={model.chatHref} style={{ marginTop: 12 }}>
+            채팅으로 이동
+          </Link>
+        </Card>
+      );
+    }
+
+    if (model.chatRooms.length === 0) {
+      return (
+        <Card pad={16} className="tm-home-chat-empty">
+          <div className="tm-text-body-lg">아직 열려 있는 채팅방이 없어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.</div>
+        </Card>
+      );
+    }
+
+    return (
+      <div className="tm-home-chat-list">
+        {model.chatRooms.map((room) => (
+          <HomeChatRoomRow key={room.id} room={room} />
+        ))}
+      </div>
+    );
+  })();
+
+  return (
+    <section className="tm-home-chat-block" aria-labelledby="home-chat-title">
+      <SectionTitle id="home-chat-title" title="최근 채팅" sub={unreadLabel} action="전체보기" actionHref={model.chatHref} />
+      {body}
+    </section>
+  );
+}
+
+function HomeChatRoomRow({ room }: { room: HomeChatRoom }) {
+  return (
+    <Link className={`tm-pressable tm-home-chat-row ${room.unreadCount > 0 ? 'tm-home-chat-row-unread' : ''}`} href={room.href}>
+      <div className="tm-home-chat-icon" aria-hidden="true">
+        <ChatIcon size={18} strokeWidth={2.1} />
+      </div>
+      <div className="tm-home-chat-copy">
+        <div className="tm-home-chat-title-line">
+          <span className="tm-text-label line-clamp-1">{room.title}</span>
+          <span className="tm-badge tm-badge-grey tm-badge-sm">{room.typeLabel}</span>
+        </div>
+        <div className={`tm-text-caption line-clamp-1 ${room.unreadCount > 0 ? 'tm-home-chat-last-unread' : ''}`}>
+          {room.lastMessage}
+        </div>
+      </div>
+      <div className="tm-home-chat-meta">
+        {room.time ? <span className="tm-text-micro">{room.time}</span> : null}
+        {room.unreadCount > 0 ? (
+          <span className="tm-home-chat-row-count tab-num" aria-label={`읽지 않은 메시지 ${room.unreadCount}개`}>
+            {room.unreadCount}
+          </span>
+        ) : null}
+      </div>
+    </Link>
+  );
+}
+
 function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   return (
     <Link
       className="tm-floating-fab tm-home-chat-fab"
       href={model.chatHref}
-      aria-label={model.chatUnreadCount > 0 ? `채팅 — 읽지 않은 메시지 ${model.chatUnreadCount}개` : '채팅'}
+      aria-label="채팅"
     >
       <ChatIcon size={22} strokeWidth={2.2} />
-      {/* [P0/P1 아이콘+컬러] 미읽음: 색상(뱃지) + 숫자 텍스트 병행 — 컬러만 의존 금지 */}
       {model.chatUnreadCount > 0 ? (
         <span className="tm-floating-count tab-num" aria-hidden="true">{model.chatUnreadCount}</span>
       ) : null}
@@ -327,9 +432,8 @@ function FeaturedMatchCard({
  * 우측 사이드바 하단의 빈 공간(~830px)을 채워 레이아웃 균형을 맞춘다.
  * 모바일(<1024px)에서는 display:contents인 .tm-home-sidebar 덕분에 DOM 순서상 notices 아래에 자연스럽게 흐른다.
  */
-function SidebarTournamentsWidget() {
-  const { data, isLoading } = useV1Tournaments({ status: 'open', limit: 4 });
-  const items = (data?.items ?? []).slice(0, 4);
+function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListItem[]; loading: boolean }) {
+  const visibleItems = items.slice(0, 4);
 
   return (
     <div className="tm-home-sidebar-notices">
@@ -344,7 +448,7 @@ function SidebarTournamentsWidget() {
         </Link>
       </div>
 
-      {isLoading ? (
+      {loading ? (
         /* [P2 UX 라이팅] 능동형 로딩 안내 */
         <div
           className="tm-text-caption"
@@ -354,7 +458,7 @@ function SidebarTournamentsWidget() {
         >
           대회 목록을 가져오고 있어요…
         </div>
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <div
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', paddingTop: 8 }}
@@ -363,8 +467,8 @@ function SidebarTournamentsWidget() {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
-          {items.map((t) => {
-            const dateLabel = formatTournamentDateShort(t.scheduledAt);
+          {visibleItems.map((t) => {
+            const dateLabel = formatTournamentDateRangeShort(t.scheduledAt, t.scheduledEndAt);
             return (
               <Link
                 key={t.id}

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { V1AuthProvider } from '@prisma/client';
+import { Prisma, V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -32,29 +32,11 @@ export class ProfileService {
       select: { teamId: true },
     });
     const teamIds = activeMemberships.map((membership) => membership.teamId);
-    const teamMatchWhere = teamIds.length
-      ? {
-          deletedAt: null,
-          OR: [
-            { hostTeamId: { in: teamIds } },
-            {
-              applications: {
-                some: {
-                  applicantTeamId: { in: teamIds },
-                  status: { in: ['requested' as const, 'approved' as const] },
-                },
-              },
-            },
-          ],
-        }
-      : null;
 
     const [
       receivedReviewAggregate,
       personalActivityCount,
       monthlyPersonalMatchCount,
-      teamActivityCount,
-      monthlyTeamMatchCount,
     ] = await Promise.all([
       this.prisma.v1PostEventReview.aggregate({
         where: { targetUserId: user.id, targetType: 'user', status: 'submitted' },
@@ -63,26 +45,17 @@ export class ProfileService {
       this.prisma.v1MatchParticipant.count({
         where: {
           userId: user.id,
-          status: { in: ['active', 'completed'] },
-          match: { deletedAt: null },
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null },
         },
       }),
       this.prisma.v1MatchParticipant.count({
         where: {
           userId: user.id,
-          status: { in: ['active', 'completed'] },
-          match: { deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
         },
       }),
-      teamMatchWhere ? this.prisma.v1TeamMatch.count({ where: teamMatchWhere }) : 0,
-      teamMatchWhere
-        ? this.prisma.v1TeamMatch.count({
-            where: {
-              ...teamMatchWhere,
-              startAt: { gte: monthStart, lt: nextMonthStart },
-            },
-          })
-        : 0,
     ]);
     const mannerScore = receivedReviewAggregate._avg.rating === null
       ? null
@@ -90,12 +63,12 @@ export class ProfileService {
 
     return {
       totals: {
-        activityCount: personalActivityCount + teamActivityCount,
+        activityCount: personalActivityCount,
         teamCount: teamIds.length,
         mannerScore,
       },
       monthly: {
-        matchCount: monthlyPersonalMatchCount + monthlyTeamMatchCount,
+        matchCount: monthlyPersonalMatchCount,
         mannerScore,
         winRate: null,
       },
@@ -106,12 +79,35 @@ export class ProfileService {
     this.assertMutableAccount(user);
     const displayName = dto.displayName.trim();
     const nickname = dto.nickname.trim();
-    const email = normalizeEmail(dto.email);
+    const requestedEmail = dto.email?.trim() ? normalizeEmail(dto.email) : null;
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
 
-    if (!displayName || !nickname || !email) {
+    const before = await this.prisma.v1User.findUnique({
+      where: { id: user.id },
+      select: {
+        email: true,
+        phone: true,
+        authIdentities: {
+          where: { status: 'active' },
+          select: { provider: true, passwordHash: true },
+        },
+        profile: {
+          select: {
+            displayName: true,
+            nickname: true,
+            profileImageUrl: true,
+            birthDate: true,
+          },
+        },
+      },
+    });
+
+    const hasPassword = before?.authIdentities.some((identity) => Boolean(identity.passwordHash)) ?? false;
+    const email = requestedEmail ?? before?.email ?? null;
+
+    if (!displayName || !nickname || (hasPassword && !email)) {
       throw validationError('displayName, nickname, and email are required', 'profile');
     }
 
@@ -120,18 +116,22 @@ export class ProfileService {
     }
 
     const [existingEmail, existingEmailIdentity, existingPhone, existingNickname] = await Promise.all([
-      this.prisma.v1User.findFirst({
-        where: { email, id: { not: user.id } },
-        select: { id: true },
-      }),
-      this.prisma.v1AuthIdentity.findFirst({
-        where: {
-          provider: V1AuthProvider.email,
-          providerUserKey: email,
-          userId: { not: user.id },
-        },
-        select: { id: true },
-      }),
+      email
+        ? this.prisma.v1User.findFirst({
+            where: { email, id: { not: user.id } },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      email
+        ? this.prisma.v1AuthIdentity.findFirst({
+            where: {
+              provider: V1AuthProvider.email,
+              providerUserKey: email,
+              userId: { not: user.id },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
       phone
         ? this.prisma.v1User.findFirst({
             where: { phone, id: { not: user.id } },
@@ -171,20 +171,20 @@ export class ProfileService {
         data: { email, phone },
       });
 
-      await tx.v1AuthIdentity.updateMany({
-        where: { userId: user.id, provider: V1AuthProvider.email, status: 'active' },
-        data: { email, providerUserKey: email },
-      });
+      if (email) {
+        await tx.v1AuthIdentity.updateMany({
+          where: { userId: user.id, provider: V1AuthProvider.email, status: 'active' },
+          data: { email, providerUserKey: email },
+        });
+      }
 
-      return tx.v1UserProfile.upsert({
+      const nextProfile = await tx.v1UserProfile.upsert({
         where: { userId: user.id },
         update: {
           displayName,
           nickname,
           profileImageUrl,
           birthDate,
-          bio: dto.bio ?? null,
-          visibility: dto.visibilityStatus,
         },
         create: {
           userId: user.id,
@@ -192,10 +192,31 @@ export class ProfileService {
           nickname,
           profileImageUrl,
           birthDate,
-          bio: dto.bio ?? null,
-          visibility: dto.visibilityStatus,
+          visibility: 'public',
         },
       });
+
+      await writeUserAuditLog(tx, {
+        userId: user.id,
+        targetType: 'user_profile',
+        reason: `profile.update:${changedFields({
+          email: before?.email ?? null,
+          phone: before?.phone ?? null,
+          displayName: before?.profile?.displayName ?? null,
+          nickname: before?.profile?.nickname ?? null,
+          profileImageUrl: before?.profile?.profileImageUrl ?? null,
+          birthDate: before?.profile?.birthDate ?? null,
+        }, {
+          email,
+          phone,
+          displayName,
+          nickname,
+          profileImageUrl,
+          birthDate,
+        }).join(',') || 'no_change'}`,
+      });
+
+      return nextProfile;
     });
 
     return {
@@ -214,30 +235,86 @@ export class ProfileService {
       return {
         userId: user.id,
         displayName: '탈퇴한 사용자',
+        nickname: null,
         profileImageUrl: null,
-        bio: null,
-        visibilityStatus: 'private',
         reputation: emptyReputation(),
+        activitySummary: emptyPublicActivitySummary(),
       };
     }
-    if (user.profile?.visibility === 'private') {
-      return {
-        userId: user.id,
-        displayName: user.profile.displayName ?? user.profile.nickname,
-        profileImageUrl: null,
-        bio: null,
-        visibilityStatus: 'private',
-        reputation: emptyReputation(),
-      };
-    }
+
+    const activitySummary = await this.getPublicActivitySummary(user.id);
 
     return {
       userId: user.id,
       displayName: user.profile?.displayName ?? user.profile?.nickname ?? '사용자',
+      nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
-      bio: user.profile?.bio ?? null,
-      visibilityStatus: normalizeVisibility(user.profile?.visibility),
       reputation: toReputationPayload(user.reputationSummary),
+      activitySummary,
+    };
+  }
+
+  private async getPublicActivitySummary(userId: string) {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+    const [
+      matchCount,
+      teamCount,
+      reviewCount,
+      monthlyMatchCount,
+      monthlyTeamJoinCount,
+      monthlyReviewCount,
+    ] = await Promise.all([
+      this.prisma.v1MatchParticipant.count({
+        where: {
+          userId,
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null },
+        },
+      }),
+      this.prisma.v1TeamMembership.count({
+        where: {
+          userId,
+          status: 'active',
+          team: { status: 'active', deletedAt: null },
+        },
+      }),
+      this.prisma.v1PostEventReview.count({
+        where: { targetUserId: userId, targetType: 'user', status: 'submitted' },
+      }),
+      this.prisma.v1MatchParticipant.count({
+        where: {
+          userId,
+          status: 'completed',
+          match: { status: 'completed', deletedAt: null, startAt: { gte: monthStart, lt: nextMonthStart } },
+        },
+      }),
+      this.prisma.v1TeamMembership.count({
+        where: {
+          userId,
+          status: 'active',
+          joinedAt: { gte: monthStart, lt: nextMonthStart },
+          team: { status: 'active', deletedAt: null },
+        },
+      }),
+      this.prisma.v1PostEventReview.count({
+        where: { targetUserId: userId, targetType: 'user', status: 'submitted', createdAt: { gte: monthStart, lt: nextMonthStart } },
+      }),
+    ]);
+
+    return {
+      totals: {
+        matchCount,
+        teamCount,
+        reviewCount,
+      },
+      monthly: {
+        matchCount: monthlyMatchCount,
+        teamJoinCount: monthlyTeamJoinCount,
+        reviewCount: monthlyReviewCount,
+      },
     };
   }
 
@@ -250,10 +327,10 @@ export class ProfileService {
         phone: snapshot.phone,
         accountStatus: snapshot.accountStatus,
         providers: snapshot.authIdentities.map((identity) => identity.provider),
+        hasPassword: snapshot.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       },
       profile: {
         displayName: snapshot.profile?.displayName ?? snapshot.profile?.nickname ?? '사용자',
-        visibilityStatus: normalizeVisibility(snapshot.profile?.visibility),
       },
       notifications: toSettingsNotifications(preferences),
     };
@@ -262,18 +339,7 @@ export class ProfileService {
   async updateSettings(user: V1AuthUser, dto: UpdateSettingsDto) {
     this.assertMutableAccount(user);
     const [profile, preferences] = await this.prisma.$transaction(async (tx) => {
-      const nextProfile = dto.visibilityStatus
-        ? await tx.v1UserProfile.upsert({
-            where: { userId: user.id },
-            update: { visibility: dto.visibilityStatus },
-            create: {
-              userId: user.id,
-              nickname: user.email ?? '사용자',
-              displayName: user.email ?? '사용자',
-              visibility: dto.visibilityStatus,
-            },
-          })
-        : await tx.v1UserProfile.findUnique({ where: { userId: user.id } });
+      const nextProfile = await tx.v1UserProfile.findUnique({ where: { userId: user.id } });
 
       const notificationInput = dto.notifications ?? {};
       const individualNotifications = {
@@ -305,11 +371,19 @@ export class ProfileService {
         },
       });
 
+      if (dto.notifications) {
+        await writeUserAuditLog(tx, {
+          userId: user.id,
+          targetType: 'user_notification_settings',
+          reason: `settings.notifications.update:${Object.keys(dto.notifications).sort().join(',') || 'no_change'}`,
+        });
+      }
+
       return [nextProfile, nextPreferences] as const;
     });
 
     return {
-      profile: { visibilityStatus: normalizeVisibility(profile?.visibility) },
+      profile: { displayName: profile?.displayName ?? profile?.nickname ?? '사용자' },
       notifications: toSettingsNotifications(preferences),
       updatedAt: preferences.updatedAt,
     };
@@ -335,6 +409,11 @@ export class ProfileService {
         where: { userId_regionId: { userId: user.id, regionId: region.id } },
         update: { isPrimary: true },
         create: { userId: user.id, regionId: region.id, isPrimary: true },
+      });
+      await writeUserAuditLog(tx, {
+        userId: user.id,
+        targetType: 'user_region',
+        reason: 'profile.region.update',
       });
     });
 
@@ -383,6 +462,11 @@ export class ProfileService {
           })),
         });
       }
+      await writeUserAuditLog(tx, {
+        userId: user.id,
+        targetType: 'user_preferences',
+        reason: 'profile.preferences.update',
+      });
     });
 
     const snapshot = await this.getUserSnapshot(user.id);
@@ -452,7 +536,7 @@ export class ProfileService {
           },
           orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         },
-        authIdentities: { where: { status: 'active' }, select: { provider: true } },
+        authIdentities: { where: { status: 'active' }, select: { provider: true, passwordHash: true } },
       },
     });
     if (!user) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
@@ -559,6 +643,8 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
     email: user.email,
     phone: user.phone,
     authProvider: user.authIdentities[0]?.provider ?? null,
+    authProviders: user.authIdentities.map((identity) => identity.provider),
+    hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
     onboardingStatus: user.onboardingStatus,
     regionName: formatPrimaryRegion(user.regions),
     sports: user.sportPreferences.map((preference) => ({
@@ -596,16 +682,12 @@ function toProfilePayload(profile: {
   displayName: string | null;
   profileImageUrl: string | null;
   birthDate: string | null;
-  bio: string | null;
-  visibility: string;
 } | null) {
   return {
     displayName: profile?.displayName ?? profile?.nickname ?? '사용자',
     nickname: profile?.nickname ?? null,
     profileImageUrl: profile?.profileImageUrl ?? null,
     birthDate: profile?.birthDate ?? null,
-    bio: profile?.bio ?? null,
-    visibilityStatus: normalizeVisibility(profile?.visibility),
   };
 }
 
@@ -626,9 +708,11 @@ function emptyReputation() {
   return { trustState: 'none', mannerScore: null, activityCount: 0, reviewCount: 0 };
 }
 
-function normalizeVisibility(value?: string | null) {
-  if (value === 'members_only' || value === 'private') return value;
-  return 'public';
+function emptyPublicActivitySummary() {
+  return {
+    totals: { matchCount: 0, teamCount: 0, reviewCount: 0 },
+    monthly: { matchCount: 0, teamJoinCount: 0, reviewCount: 0 },
+  };
 }
 
 function toSettingsNotifications(preferences: {
@@ -648,4 +732,28 @@ function toSettingsNotifications(preferences: {
     noticeEnabled: preferences.noticeEnabled ?? preferences.activityEnabled,
     marketingEnabled: preferences.marketingEnabled,
   };
+}
+
+async function writeUserAuditLog(
+  tx: Prisma.TransactionClient,
+  input: { userId: string; targetType: string; reason: string },
+) {
+  await tx.v1StatusChangeLog.create({
+    data: {
+      targetType: input.targetType,
+      targetId: input.userId,
+      fromStatus: null,
+      toStatus: 'updated',
+      actorType: 'user',
+      actorUserId: input.userId,
+      reason: input.reason,
+    },
+  });
+}
+
+function changedFields(
+  before: Record<string, string | null>,
+  after: Record<string, string | null>,
+) {
+  return Object.keys(after).filter((key) => (before[key] ?? null) !== (after[key] ?? null));
 }

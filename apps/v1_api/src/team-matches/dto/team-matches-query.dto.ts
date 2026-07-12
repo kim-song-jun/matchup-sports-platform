@@ -41,8 +41,8 @@ export class TeamMatchesQueryDto {
   genderRule?: '성별 무관' | '남' | '여' | '무관';
 
   @IsOptional()
-  @IsIn(['recruiting', 'matched', 'cancelled', 'completed', 'expired'])
-  status?: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'expired';
+  @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'expired'])
+  status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired';
 
   @IsOptional()
   @IsIn(['recommended', 'latest', 'starts_at', 'deadline'])
@@ -69,8 +69,8 @@ export class MyTeamMatchesQueryDto {
   teamId?: string;
 
   @IsOptional()
-  @IsIn(['recruiting', 'matched', 'cancelled', 'completed', 'expired', 'requested', 'approved', 'rejected', 'withdrawn'])
-  status?: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'expired' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
+  @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'expired', 'requested', 'approved', 'rejected', 'withdrawn'])
+  status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
 
   @IsOptional()
   @IsString()

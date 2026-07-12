@@ -98,7 +98,7 @@ describe('TeamMatchesService', () => {
   let prisma: {
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
-    v1TeamMatchApplication: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+    v1TeamMatchApplication: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     v1Team: { findMany: jest.Mock };
@@ -113,6 +113,7 @@ describe('TeamMatchesService', () => {
       v1TeamMatch: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
       v1TeamMatchApplication: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
@@ -224,6 +225,84 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
   });
 
+  it('close: 모집 중 팀매치를 closed로 전환하고 pending 신청을 expired 처리한다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ status: 'recruiting', startAt: FUTURE }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'closed' }));
+    prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 2 });
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+
+    const result = await service.close(manager, 'tm-1', { reason: '모집 완료' });
+
+    expect(result.status).toBe('closed');
+    expect(result.expiredApplications).toBe(2);
+    expect(prisma.v1TeamMatchApplication.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ teamMatchId: 'tm-1', status: 'requested' }),
+        data: expect.objectContaining({ status: 'expired' }),
+      }),
+    );
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_closed',
+      'tm-1',
+      expect.any(String),
+    );
+  });
+
+  it('reopen: closed 팀매치를 recruiting으로 되돌린다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ status: 'closed', startAt: FUTURE }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'recruiting' }));
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+
+    const result = await service.reopen(manager, 'tm-1', { reason: '추가 모집' });
+
+    expect(result.status).toBe('recruiting');
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'recruiting' }) }),
+    );
+  });
+
+  it('complete: matched 팀매치를 completed로 전환하고 양 팀 운영자에게 알림을 보낸다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ status: 'matched', startAt: PAST, approvedApplicantTeamId: 'team-applicant' }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+
+    const result = await service.complete(manager, 'tm-1', { note: '경기 완료' });
+
+    expect(result.status).toBe('completed');
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }) }),
+    );
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_completed',
+      'tm-1',
+      undefined,
+    );
+  });
+
+  it('edit: 모집 상태여도 시작 시간이 지났으면 수정 잠금 상태로 내려준다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ status: 'recruiting', startAt: PAST }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+    const result = await service.edit(manager, 'tm-1');
+
+    expect(result.editable).toBe(false);
+    expect(result.lockedReason).toBe('expired');
+    expect(result.status).toBe('expired');
+  });
+
   // ─── withdrawApplication: 상태 머신 ───────────────────────────────────────
 
   it('withdrawApplication: requested가 아닌 신청 취소 → 409 ALREADY_PROCESSED', async () => {
@@ -316,6 +395,34 @@ describe('TeamMatchesService', () => {
 
     const result = await service.detail(null, 'tm-1');
     expect(result.status).toBe('expired');
+  });
+
+  it('detail: 호스트팀 일반 멤버는 신청 관리 권한이 없으므로 host_team 상태가 아니다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: 'owner-user',
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [{ id: 'mem-1', userId: manager.id, role: 'member', status: 'active' }],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer.state).toBe('none');
+    expect(result.viewer.manageableHostTeam).toBe(false);
   });
 
   it('approveApplication: 신청자가 없을 때 404 NOT_FOUND', async () => {

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
 
@@ -75,8 +75,8 @@ export class AdminTeamListQueryDto {
 
 export class AdminTeamMatchListQueryDto {
   @IsOptional()
-  @IsIn(['recruiting', 'matched', 'cancelled', 'completed', 'archived'])
-  status?: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'archived';
+  @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
+  status?: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 
   @IsOptional()
   @IsString()
@@ -89,6 +89,102 @@ export class AdminTeamMatchListQueryDto {
   @Max(50)
   limit?: number;
 }
+
+export class AdminNoticeListQueryDto {
+  @IsOptional()
+  @IsIn(['draft', 'published', 'archived'])
+  status?: 'draft' | 'published' | 'archived';
+
+  @IsOptional()
+  @IsIn(['public', 'users', 'admins'])
+  audience?: 'public' | 'users' | 'admins';
+
+  @IsOptional()
+  @IsIn(['고정', '업데이트', '안내'])
+  category?: '고정' | '업데이트' | '안내';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class AdminInquiryListQueryDto {
+  @IsOptional()
+  @IsIn(['received', 'reviewing', 'answered', 'closed'])
+  status?: 'received' | 'reviewing' | 'answered' | 'closed';
+
+  @IsOptional()
+  @IsIn(['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'])
+  category?: 'account' | 'match' | 'team' | 'tournament' | 'payment_refund' | 'report' | 'other';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class ReplyInquiryDto {
+  @IsString()
+  @MaxLength(2000)
+  body!: string;
+}
+
+export class ChangeInquiryStatusDto {
+  @IsIn(['received', 'reviewing', 'answered', 'closed'])
+  status!: 'received' | 'reviewing' | 'answered' | 'closed';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+export class CreateAdminNoticeDto {
+  @IsIn(['public', 'users', 'admins'])
+  audience!: 'public' | 'users' | 'admins';
+
+  @IsIn(['고정', '업데이트', '안내'])
+  category!: '고정' | '업데이트' | '안내';
+
+  @IsBoolean()
+  pinned!: boolean;
+
+  @IsString()
+  @MaxLength(120)
+  title!: string;
+
+  @IsString()
+  @MaxLength(5000)
+  body!: string;
+
+  @IsIn(['draft', 'published'])
+  status!: 'draft' | 'published';
+}
+
+export class UpdateAdminNoticeDto extends CreateAdminNoticeDto {}
 
 export class AdminOverviewQueryDto {
   @IsOptional()
@@ -104,6 +200,12 @@ export class ChangeUserStatusDto {
   @IsIn(['active', 'suspended', 'blocked', 'deleted'])
   status!: 'active' | 'suspended' | 'blocked' | 'deleted';
 
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class DeleteAdminUserDto {
   @IsString()
   @MaxLength(500)
   reason!: string;
@@ -128,8 +230,8 @@ export class ChangeTeamStatusDto {
 }
 
 export class ChangeTeamMatchStatusDto {
-  @IsIn(['recruiting', 'matched', 'cancelled', 'completed', 'archived'])
-  status!: 'recruiting' | 'matched' | 'cancelled' | 'completed' | 'archived';
+  @IsIn(['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'])
+  status!: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
 
   @IsString()
   @MaxLength(500)

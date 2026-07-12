@@ -86,8 +86,16 @@ export function v1Post<T>(path: string, body?: unknown, init?: RequestInit) {
   return v1Api<T>(path, { ...init, method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
+export function v1Put<T>(path: string, body?: unknown, init?: RequestInit) {
+  return v1Api<T>(path, { ...init, method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) });
+}
+
 export function v1Patch<T>(path: string, body?: unknown, init?: RequestInit) {
   return v1Api<T>(path, { ...init, method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) });
+}
+
+export function v1Delete<T>(path: string, init?: RequestInit) {
+  return v1Api<T>(path, { ...init, method: 'DELETE' });
 }
 
 function withQuery(path: string, query?: QueryParams) {

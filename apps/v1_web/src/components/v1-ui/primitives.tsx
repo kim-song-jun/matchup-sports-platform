@@ -1,7 +1,21 @@
+'use client';
+
 import Link from 'next/link';
 import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import { useRef } from 'react';
 import { ChevronRightIcon } from './icons';
-import { InboxIcon } from 'lucide-react';
+import {
+  CalendarIcon,
+  CloudDrizzleIcon,
+  CloudFogIcon,
+  CloudIcon,
+  CloudLightningIcon,
+  CloudRainIcon,
+  CloudSnowIcon,
+  CloudSunIcon,
+  InboxIcon,
+  SunIcon,
+} from 'lucide-react';
 
 /* ── TextField ── */
 /* Carbon/Ant 표준 error a11y 패턴:
@@ -99,6 +113,71 @@ export function TextField(props: TextFieldProps) {
         </span>
       ) : null}
     </div>
+  );
+}
+
+type DatePickerTextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'type' | 'value'> & {
+  value: string;
+  dateValue: string;
+  onTextChange: (value: string) => void;
+  onDateChange: (value: string) => void;
+  inputClassName?: string;
+  pickerLabel?: string;
+};
+
+export function DatePickerTextInput({
+  value,
+  dateValue,
+  onTextChange,
+  onDateChange,
+  inputClassName = '',
+  pickerLabel = '날짜 선택',
+  ...inputProps
+}: DatePickerTextInputProps) {
+  const normalizedDateValue = /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : '';
+  const nativeRef = useRef<HTMLInputElement>(null);
+
+  function openPicker() {
+    const input = nativeRef.current;
+    if (!input) return;
+    // showPicker()는 Chromium 99+, Safari 16+ 지원. 미지원 브라우저는 fallback으로 focus.
+    if (typeof input.showPicker === 'function') {
+      try { input.showPicker(); } catch { input.focus(); }
+    } else {
+      input.focus();
+    }
+  }
+
+  return (
+    <span className="tm-date-picker-text-input">
+      <input
+        {...inputProps}
+        className={`tm-input ${inputClassName}`.trim()}
+        inputMode={inputProps.inputMode ?? 'numeric'}
+        maxLength={inputProps.maxLength ?? 10}
+        type="text"
+        value={value}
+        onChange={(event) => onTextChange(event.target.value)}
+      />
+      <button
+        type="button"
+        className="tm-date-picker-trigger"
+        aria-label={pickerLabel}
+        onClick={openPicker}
+      >
+        <CalendarIcon size={19} strokeWidth={2} aria-hidden="true" />
+        <input
+          ref={nativeRef}
+          aria-hidden="true"
+          tabIndex={-1}
+          className="tm-date-picker-native"
+          lang="ko"
+          type="date"
+          value={normalizedDateValue}
+          onChange={(event) => onDateChange(event.target.value)}
+        />
+      </button>
+    </span>
   );
 }
 
@@ -352,6 +431,7 @@ type WeatherStripProps = {
   wind: number | string;
   feelsLike?: number | string;
   status?: string;
+  icon?: 'sun' | 'cloud-sun' | 'cloud' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunderstorm';
 };
 
 type InfoRowProps = {
@@ -398,14 +478,29 @@ function isMissing(v: number | string | undefined): boolean {
   return v === undefined || v === null || String(v).trim() === '-' || String(v).trim() === '';
 }
 
-export function WeatherStrip({ city, temp, cond, wind, feelsLike, status }: WeatherStripProps) {
+const WEATHER_ICONS = {
+  sun: SunIcon,
+  'cloud-sun': CloudSunIcon,
+  cloud: CloudIcon,
+  fog: CloudFogIcon,
+  drizzle: CloudDrizzleIcon,
+  rain: CloudRainIcon,
+  snow: CloudSnowIcon,
+  thunderstorm: CloudLightningIcon,
+} satisfies Record<NonNullable<WeatherStripProps['icon']>, typeof SunIcon>;
+
+export function WeatherStrip({ city, temp, cond, wind, feelsLike, status, icon = 'sun' }: WeatherStripProps) {
   const feelsLikeVal = feelsLike ?? temp;
   const feelsLikeText = isMissing(feelsLikeVal) ? '체감 정보 없음' : `체감 ${feelsLikeVal}°`;
   const windText = isMissing(wind) ? '바람 정보 없음' : `바람 ${wind}m/s`;
 
+  const WeatherIcon = WEATHER_ICONS[icon] ?? SunIcon;
+
   return (
     <div className="tm-weather-strip">
-      <div className="tm-weather-sun" />
+      <div className={`tm-weather-icon tm-weather-icon-${icon}`} aria-hidden="true">
+        <WeatherIcon size={20} strokeWidth={2.2} />
+      </div>
       <div style={{ flex: 1 }}>
         <div className="tab-num" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
           {city} {temp}° · {cond}

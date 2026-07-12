@@ -194,31 +194,17 @@ jobs:
         env:
           RESET_DB: ${{ inputs.reset_db }}
           RUN_SEED: ${{ inputs.run_seed }}
-          TOSS_CLIENT_KEY_SECRET: ${{ secrets.TOSS_CLIENT_KEY }}
-          TOSS_SECRET_KEY_SECRET: ${{ secrets.TOSS_SECRET_KEY }}
-          TOSS_WEBHOOK_SECRET_SECRET: ${{ secrets.TOSS_WEBHOOK_SECRET }}
-          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
-          OPS_ALERT_WEBHOOK_URL_SECRET: ${{ secrets.OPS_ALERT_WEBHOOK_URL }}
           KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
           V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
         run: |
-          TOSS_CLIENT_KEY_B64="$(printf '%s' "${TOSS_CLIENT_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          TOSS_SECRET_KEY_B64="$(printf '%s' "${TOSS_SECRET_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          TOSS_WEBHOOK_SECRET_B64="$(printf '%s' "${TOSS_WEBHOOK_SECRET_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
-          OPS_ALERT_WEBHOOK_URL_B64="$(printf '%s' "${OPS_ALERT_WEBHOOK_URL_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
           V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
 
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' TOSS_CLIENT_KEY_B64='${TOSS_CLIENT_KEY_B64}' TOSS_SECRET_KEY_B64='${TOSS_SECRET_KEY_B64}' TOSS_WEBHOOK_SECRET_B64='${TOSS_WEBHOOK_SECRET_B64}' VAPID_PUBLIC_KEY_B64='${VAPID_PUBLIC_KEY_B64}' VAPID_PRIVATE_KEY_B64='${VAPID_PRIVATE_KEY_B64}' VAPID_SUBJECT_B64='${VAPID_SUBJECT_B64}' OPS_ALERT_WEBHOOK_URL_B64='${OPS_ALERT_WEBHOOK_URL_B64}' KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' V1_HOST_ADMIN_PASSWORD_B64='${V1_HOST_ADMIN_PASSWORD_B64}' bash -se" <<'EOF'
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' V1_HOST_ADMIN_PASSWORD_B64='${V1_HOST_ADMIN_PASSWORD_B64}' bash -se" <<'EOF'
           set -euo pipefail
 
           RESET_DB="${RESET_DB:-false}"
@@ -266,32 +252,13 @@ jobs:
             exit 1
           fi
 
-          sync_env_from_github_secret "TOSS_CLIENT_KEY" "${TOSS_CLIENT_KEY_B64:-}"
-          sync_env_from_github_secret "TOSS_SECRET_KEY" "${TOSS_SECRET_KEY_B64:-}"
-          sync_env_from_github_secret "TOSS_WEBHOOK_SECRET" "${TOSS_WEBHOOK_SECRET_B64:-}"
-          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
-          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
-          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
-          sync_env_from_github_secret "OPS_ALERT_WEBHOOK_URL" "${OPS_ALERT_WEBHOOK_URL_B64:-}"
           sync_env_from_github_secret "KAKAO_CLIENT_ID" "${KAKAO_CLIENT_ID_B64:-}"
           sync_env_from_github_secret "KAKAO_CLIENT_SECRET" "${KAKAO_CLIENT_SECRET_B64:-}"
           sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
           sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
 
-          # Harden deploy/.env perms against EC2 umask 022 — contains VAPID_PRIVATE_KEY and other secrets
+          # Harden deploy/.env perms against EC2 umask 022 — contains DB_PASSWORD/JWT_SECRET and other secrets
           chmod 600 deploy/.env
-
-          # Auto-set REALTIME_ALLOWED_ORIGINS if not already configured
-          if ! grep -q '^REALTIME_ALLOWED_ORIGINS=.' deploy/.env 2>/dev/null; then
-            _DEPLOY_PUBLIC_IP=$(curl -s --connect-timeout 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
-            if [ -n "$_DEPLOY_PUBLIC_IP" ]; then
-              tmp_env=$(mktemp)
-              awk 'index($0, "REALTIME_ALLOWED_ORIGINS=") != 1' deploy/.env > "$tmp_env"
-              printf 'REALTIME_ALLOWED_ORIGINS=http://%s,https://%s\n' "$_DEPLOY_PUBLIC_IP" "$_DEPLOY_PUBLIC_IP" >> "$tmp_env"
-              mv "$tmp_env" deploy/.env
-              echo "[INFO] Auto-set REALTIME_ALLOWED_ORIGINS for $_DEPLOY_PUBLIC_IP"
-            fi
-          fi
 
           set -a
           . deploy/.env
@@ -305,13 +272,12 @@ jobs:
             fi
           done
 
-          WEB_INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}"
           V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}"
 
           # ── Pre-build disk cleanup ────────────────────────────────────────
           # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
           # dangling images, stopped containers, and unused build cache.
-          # Volumes are NOT touched (postgres/redis data must persist).
+          # Volumes are NOT touched (v1_postgres data must persist).
           echo "[cleanup] Disk usage before prune:"
           df -h / | tail -1
           # Use `docker image prune -f` (without -a) to remove only dangling images.
@@ -324,13 +290,6 @@ jobs:
           echo "[cleanup] Disk usage after prune:"
           df -h / | tail -1
 
-          sudo docker build --no-cache -f deploy/Dockerfile.api -t teameet-api .
-          sudo docker build --no-cache \
-            -f deploy/Dockerfile.web \
-            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-            --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
-            --build-arg INTERNAL_API_ORIGIN="${WEB_INTERNAL_API_ORIGIN}" \
-            -t teameet-web .
           sudo docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
           sudo docker build --no-cache \
             -f deploy/Dockerfile.v1-web \
@@ -343,33 +302,12 @@ jobs:
 
           cd deploy
 
-          # ── Ensure postgres and redis are running before migrations ───────
+          # ── Ensure v1_postgres is running before migrations ────────────────
           # network prune above may have removed the deploy_default network.
-          # Start DB services first so the migration container can reach them.
+          # Start the DB service first so the migration container can reach it.
           echo "[INFO] Starting database services..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis v1_postgres
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
 
-          echo "[INFO] Waiting for postgres to be healthy..."
-          for i in $(seq 1 30); do
-            if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T postgres \
-                pg_isready >/dev/null 2>&1; then
-              echo "[INFO] postgres is ready (attempt $i)"
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "[ERROR] postgres did not become healthy in time"
-              exit 1
-            fi
-            sleep 2
-          done
-
-          # ── Bootstrap or apply database migrations before new containers ──
-          # Empty databases cannot replay the current migration chain from
-          # scratch because the repo lacks an old baseline migration. In that
-          # case we bootstrap the current schema with prisma db push and mark
-          # the existing migrations as applied. Non-empty databases still use
-          # migrate deploy, and a non-empty DB without migration history fails
-          # closed instead of auto-resolving unknown drift.
           echo "[INFO] Waiting for v1_postgres to be healthy..."
           for i in $(seq 1 30); do
             if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T v1_postgres \
@@ -384,9 +322,6 @@ jobs:
             sleep 2
           done
 
-          echo "[INFO] Bootstrapping deploy database..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/bootstrap-deploy-db.ts"
           echo "[INFO] Syncing v1 deploy database schema..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
@@ -402,11 +337,8 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 12); do
-            if ssh ec2 'curl -fsS http://localhost:8100/api/v1/health | \
-                        jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null 2>&1 && \
-                        curl -fsS http://localhost:8121/api/v1/health | \
+            if ssh ec2 'curl -fsS http://localhost:8121/api/v1/health | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        curl -fsS http://localhost/landing > /dev/null 2>&1 && \
                         curl -fsS http://localhost/v1/landing > /dev/null 2>&1 && \
                         curl -fsSI http://localhost/v1/api/v1/health | \
                         grep -qE "^HTTP/[0-9.]+ 301" && \

@@ -296,7 +296,7 @@ export class TournamentReviewsService {
 
   /** 어워드 설정 (어드민 전용, 전체 replace — support 등급은 mutation 불가) */
   async setAwards(user: V1AuthUser, tournamentId: string, dto: SetTournamentAwardsDto) {
-    await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getMutationAdmin(user.id);
 
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
@@ -305,9 +305,16 @@ export class TournamentReviewsService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
+    // 검증과 저장이 같은 값을 쓰도록 선(先)정규화 — 공백 섞인 입력이 그대로 저장되는 것을 방지.
+    const awards = dto.awards.map((a) => ({
+      ...a,
+      recipientName: a.recipientName.trim(),
+      teamName: a.teamName?.trim() || null,
+    }));
+
     // 로스터 전용 강제 — 수상자는 해당 대회 확정(confirmed) 등록 팀 명단의 선수여야 하고,
     // 팀명이 지정된 경우 확정 등록 팀명과 일치해야 한다 (자유 입력 차단).
-    if (dto.awards.length > 0) {
+    if (awards.length > 0) {
       const registrations = await this.prisma.v1TournamentRegistration.findMany({
         where: { tournamentId, status: 'confirmed' },
         select: {
@@ -320,14 +327,14 @@ export class TournamentReviewsService {
       );
       const registeredTeamNames = new Set(registrations.map((r) => r.team.name.trim()));
 
-      for (const a of dto.awards) {
-        if (!rosterNames.has(a.recipientName.trim())) {
+      for (const a of awards) {
+        if (!rosterNames.has(a.recipientName)) {
           throw new BadRequestException({
             code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
             message: `'${a.recipientName}'은(는) 대회 참가 명단에 없어요. 명단에서 수상자를 선택해 주세요.`,
           });
         }
-        if (a.teamName && !registeredTeamNames.has(a.teamName.trim())) {
+        if (a.teamName && !registeredTeamNames.has(a.teamName)) {
           throw new BadRequestException({
             code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
             message: `'${a.teamName}'은(는) 대회에 참가 확정된 팀이 아니에요. 참가 팀에서 선택해 주세요.`,
@@ -336,23 +343,47 @@ export class TournamentReviewsService {
       }
     }
 
+    // 감사 로그용 변경 전 스냅샷 (게이트·검증 통과 후에만 조회)
+    const before = await this.listAwardsInternal(tournamentId);
+
     // 전체 삭제 후 재생성 (simple replace)
     await this.prisma.$transaction([
       this.prisma.v1TournamentAward.deleteMany({ where: { tournamentId } }),
-      ...dto.awards.map((a, idx) =>
+      ...awards.map((a, idx) =>
         this.prisma.v1TournamentAward.create({
           data: {
             tournamentId,
             awardType: a.awardType,
             awardLabel: a.awardLabel,
             recipientName: a.recipientName,
-            teamName: a.teamName ?? null,
+            teamName: a.teamName,
             note: a.note ?? null,
             sortOrder: a.sortOrder ?? idx,
           },
         }),
       ),
     ]);
+
+    // 어워드 교체 감사 기록 — 다른 admin mutation과 동일 패턴 (커밋 후 기록)
+    await this.adminContext.logAdminAction(admin, {
+      action: 'tournament.awards_replace',
+      targetType: 'tournament',
+      targetId: tournamentId,
+      beforeJson: {
+        awards: before.map((a) => ({
+          awardLabel: a.awardLabel,
+          recipientName: a.recipientName,
+          teamName: a.teamName,
+        })),
+      },
+      afterJson: {
+        awards: awards.map((a) => ({
+          awardLabel: a.awardLabel,
+          recipientName: a.recipientName,
+          teamName: a.teamName,
+        })),
+      },
+    });
 
     return this.listAwardsInternal(tournamentId);
   }

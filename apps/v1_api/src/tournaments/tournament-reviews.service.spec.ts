@@ -8,7 +8,9 @@
  * a legitimate admin can still read/write awards end-to-end, and setAwards
  * rejects recipients/teams that are not in the tournament roster
  * (400 AWARD_RECIPIENT_NOT_IN_ROSTER, no mutation executed).
- * Asserts observable behaviour only — no mock-for-mock assertions.
+ * Forbidden/invalid paths verify "no DB mutation" as behaviour by asserting
+ * the Prisma $transaction/deleteMany mocks were not invoked; success paths
+ * assert persisted values and the admin audit log record.
  */
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -82,6 +84,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
       create: jest.Mock;
     };
     v1TournamentRegistration: { findMany: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock };
     $transaction: jest.Mock;
   };
 
@@ -95,6 +98,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
         create: jest.fn(),
       },
       v1TournamentRegistration: { findMany: jest.fn() },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       $transaction: jest.fn(),
     };
     (prisma.$transaction as jest.Mock).mockImplementation(
@@ -189,6 +193,45 @@ describe('TournamentReviewsService — awards admin gate', () => {
     });
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ awardType: 'mvp', recipientName: '김철수' });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'tournament.awards_replace',
+          targetType: 'tournament',
+          targetId: 'tournament-1',
+        }),
+      }),
+    );
+  });
+
+  it('setAwards: 공백 섞인 수상자·팀명은 trim된 값으로 검증·저장된다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          recipientName: '  김철수  ',
+          teamName: ' 레알마드리드 ',
+        },
+      ],
+    });
+
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          recipientName: '김철수',
+          teamName: '레알마드리드',
+        }),
+      }),
+    );
   });
 
   it('setAwards: unknown tournament → 404 TOURNAMENT_NOT_FOUND', async () => {

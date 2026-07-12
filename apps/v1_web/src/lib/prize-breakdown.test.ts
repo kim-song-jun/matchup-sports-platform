@@ -194,3 +194,11 @@ describe('sanitize 트레일링 구분자 정리', () => {
     expect(serializePrizeRows([{ label: 'MVP', amount: '/티셔츠' }])).toBe('MVP 티셔츠');
   });
 });
+
+describe('isPrizeAmountValue 숫자 최소 1개 요구', () => {
+  it('콤마·원만 있는 값은 금액이 아니다', () => {
+    expect(isPrizeAmountValue(',')).toBe(false);
+    expect(isPrizeAmountValue(',,원')).toBe(false);
+    expect(isPrizeAmountValue('원')).toBe(false);
+  });
+});

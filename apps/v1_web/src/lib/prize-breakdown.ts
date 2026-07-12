@@ -105,7 +105,8 @@ export function serializePrizeRows(rows: PrizeRow[]): string {
  */
 export function isPrizeAmountValue(value: string): boolean {
   const compact = value.replace(/\s+/g, '');
-  return compact.length > 0 && /^[\d,]+원?$/.test(compact);
+  // 콤마만 있는 값(",")이 금액으로 오분류되지 않도록 숫자 1개 이상을 요구한다.
+  return /\d/.test(compact) && /^[\d,]+원?$/.test(compact);
 }
 
 /** 금액 값을 정수로 추출 ("600,000원" → 600000). 금액이 아니면(물품) null */

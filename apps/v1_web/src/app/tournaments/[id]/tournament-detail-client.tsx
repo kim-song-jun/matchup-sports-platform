@@ -11,6 +11,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
   TournamentApplicationGuideSection,
@@ -50,6 +51,11 @@ function getFormatLabel(format: V1TournamentFormat): string {
   }
 }
 
+/**
+ * 칩 구분자는 "/"·줄바꿈·(비-천단위) 콤마만 사용한다. "·"(가운뎃점)는 분리하지 않고 자유 텍스트에
+ * 남겨둔다 — 물품 나열용("MVP 축구화 · 상품권")으로 한 칩 안에 그대로 표시하기 위함. parsePrizeRows
+ * (lib/prize-breakdown)와 동일한 구분자 규칙을 공유해 어드민 미리보기·공개 화면 표시가 어긋나지 않게 한다.
+ */
 export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
   if (!prizeBreakdown) return [];
 
@@ -61,7 +67,7 @@ export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] 
     const previous = prizeBreakdown[index - 1] ?? '';
     const next = prizeBreakdown[index + 1] ?? '';
     const isNumericComma = char === ',' && isAsciiDigit(previous) && isAsciiDigit(next);
-    const isSeparator = char === '/' || char === '·' || char === '\n' || (char === ',' && !isNumericComma);
+    const isSeparator = char === '/' || char === '\n' || (char === ',' && !isNumericComma);
 
     if (isSeparator) {
       const segment = current.trim();
@@ -358,7 +364,7 @@ function TournamentDetailView({
   const bottomPad = isOpen ? 96 : 48;
 
   /* ── Prize card — rendered in left column just after metric strip ── */
-  // 상금 칩 분리: '/'·'·'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
+  // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
   // 분리하지 않는다 — dev의 콤마 구분 요구를 더 견고한 getPrizeBreakdownChips 헬퍼(테스트 보유)로 충족.
   const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
   const prizeCard = hasPrize ? (
@@ -391,7 +397,11 @@ function TournamentDetailView({
                   {m ? (
                     <>
                       <strong style={{ color: 'var(--text-strong)', fontWeight: 800, marginRight: 4 }}>{m[1]}</strong>
-                      {m[2]}
+                      {isPrizeAmountValue(m[2]) ? (
+                        formatPrizeRowValue(m[2])
+                      ) : (
+                        <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>{m[2].trim()}</span>
+                      )}
                     </>
                   ) : (
                     seg

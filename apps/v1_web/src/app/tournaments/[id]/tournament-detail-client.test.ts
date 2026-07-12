@@ -323,6 +323,18 @@ describe('getPrizeBreakdownChips', () => {
       'MVP 상품권',
     ]);
   });
+
+  it('splits a mixed amount + goods breakdown on a non-numeric comma', () => {
+    expect(getPrizeBreakdownChips('1위 600,000원, MVP 축구화')).toEqual([
+      '1위 600,000원',
+      'MVP 축구화',
+    ]);
+  });
+
+  it('keeps a "·" goods listing inside a single chip instead of splitting it', () => {
+    expect(getPrizeBreakdownChips('MVP 축구화 · 상품권')).toEqual(['MVP 축구화 · 상품권']);
+    expect(getPrizeBreakdownChips('참가팀 전원 음료·간식 제공')).toEqual(['참가팀 전원 음료·간식 제공']);
+  });
 });
 
 describe('partitionTournamentSections', () => {

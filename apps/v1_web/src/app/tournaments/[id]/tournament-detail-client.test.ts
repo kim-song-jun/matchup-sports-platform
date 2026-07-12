@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { partitionTournamentSections } from './tournament-detail-client';
-import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
+import {
+  getTournamentPostEventCards,
+  getTournamentVenuePrepItems,
+} from '@/components/tournaments/tournament-venue-retention-sections';
+import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
+import { getParticipantTeamBuckets, getPrizeBreakdownChips, partitionTournamentSections } from './tournament-detail-client';
+import type {
+  V1TournamentFixture,
+  V1TournamentGroup,
+  V1TournamentParticipantTeam,
+  V1TournamentSponsor,
+} from '@/types/api';
 
 /* ── Factories ── */
 
@@ -38,7 +48,282 @@ function makeFixture(
   };
 }
 
+function makeParticipantTeam(
+  overrides: Partial<V1TournamentParticipantTeam> & Pick<V1TournamentParticipantTeam, 'registrationId' | 'status'>,
+): V1TournamentParticipantTeam {
+  return {
+    teamId: `team-${overrides.registrationId}`,
+    teamName: `팀 ${overrides.registrationId}`,
+    confirmedAt: null,
+    ...overrides,
+  };
+}
+
+function makeSponsor(overrides: Partial<V1TournamentSponsor> & Pick<V1TournamentSponsor, 'id' | 'name'>): V1TournamentSponsor {
+  return {
+    description: null,
+    logoUrl: null,
+    websiteUrl: null,
+    instagramUrl: null,
+    benefitText: null,
+    boothText: null,
+    eventTitle: null,
+    eventDescription: null,
+    eventResultText: null,
+    sortOrder: 0,
+    ...overrides,
+  };
+}
+
 /* ── Tests ── */
+
+describe('getParticipantTeamBuckets', () => {
+  it('groups confirmed teams before waitlisted teams for public participant display', () => {
+    const buckets = getParticipantTeamBuckets([
+      makeParticipantTeam({ registrationId: 'wait-1', status: 'waitlisted' }),
+      makeParticipantTeam({ registrationId: 'confirmed-1', status: 'confirmed' }),
+      makeParticipantTeam({ registrationId: 'confirmed-2', status: 'confirmed' }),
+    ]);
+
+    expect(buckets.confirmed.map((team) => team.registrationId)).toEqual(['confirmed-1', 'confirmed-2']);
+    expect(buckets.waitlisted.map((team) => team.registrationId)).toEqual(['wait-1']);
+    expect(buckets.hasAny).toBe(true);
+  });
+});
+
+describe('getTournamentVenuePrepItems', () => {
+  it('shows confirmed venue data while keeping parking as an operator update state', () => {
+    const items = getTournamentVenuePrepItems({
+      venue: '서울 풋살파크',
+      hasRules: true,
+    });
+
+    expect(items.find((item) => item.key === 'venue')).toMatchObject({
+      label: '장소',
+      value: '서울 풋살파크',
+      status: 'confirmed',
+    });
+    expect(items.find((item) => item.key === 'parking')).toMatchObject({
+      label: '주차',
+      status: 'operator_update',
+    });
+    expect(items.find((item) => item.key === 'rules')).toMatchObject({
+      status: 'confirmed',
+    });
+  });
+
+  it('does not invent venue or rules text when the public tournament contract is missing them', () => {
+    const items = getTournamentVenuePrepItems({
+      venue: null,
+      hasRules: false,
+    });
+
+    expect(items.find((item) => item.key === 'venue')).toMatchObject({
+      value: '장소 공지 전',
+      status: 'operator_update',
+    });
+    expect(items.find((item) => item.key === 'rules')).toMatchObject({
+      value: '규정 공지 전',
+      status: 'operator_update',
+    });
+  });
+
+  it('links venue, parking, and preparation rows to the published venue notice when present', () => {
+    const context = {
+      venue: null,
+      hasRules: false,
+      announcements: [
+        {
+          id: 'ann-venue',
+          title: '주차·입장·경기 준비 안내',
+          category: 'venue' as const,
+        },
+      ],
+    };
+
+    const items = getTournamentVenuePrepItems(context);
+
+    expect(items.find((item) => item.key === 'venue')).toMatchObject({
+      value: '주차·입장·경기 준비 안내',
+      status: 'available',
+      actionLabel: '공지 보기',
+      href: '#announcement-ann-venue',
+    });
+    expect(items.find((item) => item.key === 'parking')).toMatchObject({
+      status: 'available',
+      actionLabel: '공지 보기',
+      href: '#announcement-ann-venue',
+    });
+    expect(items.find((item) => item.key === 'rules')).toMatchObject({
+      status: 'available',
+      actionLabel: '공지 보기',
+      href: '#announcement-ann-venue',
+    });
+  });
+});
+
+describe('getTournamentPostEventCards', () => {
+  it('keeps sponsor, video, and review affordances unavailable before v1 contracts exist', () => {
+    const cards = getTournamentPostEventCards({
+      status: 'open',
+      hasCompletedFixture: false,
+      hasAnnouncements: false,
+    });
+
+    expect(cards.find((card) => card.key === 'sponsor')).toMatchObject({
+      status: 'operator_update',
+      actionLabel: null,
+    });
+    expect(cards.find((card) => card.key === 'video')).toMatchObject({
+      status: 'upcoming',
+      actionLabel: null,
+    });
+    expect(cards.find((card) => card.key === 'reviews')).toMatchObject({
+      status: 'upcoming',
+      actionLabel: null,
+    });
+  });
+
+  it('marks results as available only when completed fixture results are present', () => {
+    const pending = getTournamentPostEventCards({
+      status: 'completed',
+      hasCompletedFixture: false,
+      hasAnnouncements: true,
+    });
+    const ready = getTournamentPostEventCards({
+      status: 'completed',
+      hasCompletedFixture: true,
+      hasAnnouncements: true,
+    });
+
+    expect(pending.find((card) => card.key === 'results')).toMatchObject({
+      status: 'operator_update',
+      actionLabel: null,
+    });
+    expect(ready.find((card) => card.key === 'results')).toMatchObject({
+      status: 'available',
+      actionLabel: '결과 보기',
+    });
+  });
+
+  it('opens post-event cards only to matching published announcement anchors', () => {
+    const context = {
+      status: 'completed' as const,
+      hasCompletedFixture: false,
+      hasAnnouncements: true,
+      announcements: [
+        { id: 'ann-sponsor', title: '현장 이벤트 당첨 안내', category: 'sponsor' as const },
+        { id: 'ann-media', title: '하이라이트 링크 안내', category: 'media' as const },
+        { id: 'ann-review', title: '리뷰 작성 안내', category: 'review' as const },
+        { id: 'ann-results', title: '최종 결과 안내', category: 'results' as const },
+      ],
+    };
+
+    const cards = getTournamentPostEventCards(context);
+
+    expect(cards.find((card) => card.key === 'results')).toMatchObject({
+      status: 'available',
+      actionLabel: '결과 공지 보기',
+      href: '#announcement-ann-results',
+    });
+    expect(cards.find((card) => card.key === 'video')).toMatchObject({
+      status: 'available',
+      actionLabel: '미디어 공지 보기',
+      href: '#announcement-ann-media',
+    });
+    expect(cards.find((card) => card.key === 'reviews')).toMatchObject({
+      status: 'available',
+      actionLabel: '리뷰 안내 보기',
+      href: '#announcement-ann-review',
+    });
+    expect(cards.find((card) => card.key === 'sponsor')).toMatchObject({
+      status: 'available',
+      actionLabel: '이벤트 공지 보기',
+      href: '#announcement-ann-sponsor',
+    });
+  });
+
+  it('links sponsor retention directly to the structured sponsor section when sponsors exist', () => {
+    const cards = getTournamentPostEventCards({
+      status: 'completed',
+      hasCompletedFixture: false,
+      hasAnnouncements: false,
+      sponsorCount: 2,
+    });
+
+    expect(cards.find((card) => card.key === 'sponsor')).toMatchObject({
+      status: 'available',
+      actionLabel: '협찬 보기',
+      href: '#tournament-sponsors',
+    });
+  });
+
+  it('links the next-tournament retention card to the real tournament list', () => {
+    const cards = getTournamentPostEventCards({
+      status: 'completed',
+      hasCompletedFixture: false,
+      hasAnnouncements: false,
+    });
+
+    expect(cards.find((card) => card.key === 'next_tournament')).toMatchObject({
+      status: 'available',
+      actionLabel: '다음 대회 찾기',
+      href: '/tournaments',
+    });
+  });
+});
+
+describe('getTournamentSponsorCards', () => {
+  it('maps sponsor benefits, booth, event, and result fields without inventing missing data', () => {
+    const cards = getTournamentSponsorCards([
+      makeSponsor({
+        id: 'sponsor-1',
+        name: '서울 스포츠랩',
+        benefitText: '리뷰 참여자에게 풋살공 제공',
+        boothText: '본부석 옆 체험 부스 운영',
+        eventTitle: '매너 리뷰 이벤트',
+        eventDescription: '상대팀 리뷰를 남긴 참가팀 중 추첨으로 협찬품을 지급해요.',
+        eventResultText: '당첨팀은 운영진 공지 후 현장 지급',
+      }),
+      makeSponsor({
+        id: 'sponsor-empty',
+        name: '지역 파트너',
+      }),
+    ]);
+
+    expect(cards[0]).toMatchObject({
+      id: 'sponsor-1',
+      name: '서울 스포츠랩',
+      facts: [
+        { label: '제공 혜택', value: '리뷰 참여자에게 풋살공 제공' },
+        { label: '현장 부스', value: '본부석 옆 체험 부스 운영' },
+        { label: '이벤트', value: '매너 리뷰 이벤트' },
+        { label: '참여 방법', value: '상대팀 리뷰를 남긴 참가팀 중 추첨으로 협찬품을 지급해요.' },
+        { label: '이벤트 결과', value: '당첨팀은 운영진 공지 후 현장 지급' },
+      ],
+    });
+    expect(cards[1]).toMatchObject({
+      id: 'sponsor-empty',
+      facts: [],
+    });
+  });
+});
+
+describe('getPrizeBreakdownChips', () => {
+  it('keeps numeric thousands separators inside prize amounts', () => {
+    expect(getPrizeBreakdownChips('우승 200,000원 / 준우승 100,000원')).toEqual([
+      '우승 200,000원',
+      '준우승 100,000원',
+    ]);
+  });
+
+  it('still splits comma-separated prize labels when the comma is not numeric', () => {
+    expect(getPrizeBreakdownChips('우승 200,000원, MVP 상품권')).toEqual([
+      '우승 200,000원',
+      'MVP 상품권',
+    ]);
+  });
+});
 
 describe('partitionTournamentSections', () => {
   describe('league format', () => {

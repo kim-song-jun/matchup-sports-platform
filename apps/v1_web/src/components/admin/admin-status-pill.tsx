@@ -133,6 +133,11 @@ export const STATUS_META: Record<string, StatusMeta> = {
 
   // ── Registration ─────────────────────────────────────────────────────
   // cancelled already defined above (red/XCircle — reused)
+  submitted: {
+    label: '운영진 확인',
+    tone: 'blue',
+    icon: <FileText size={12} aria-hidden="true" />,
+  },
   awaiting_payment: {
     label: '입금 대기',
     tone: 'amber',

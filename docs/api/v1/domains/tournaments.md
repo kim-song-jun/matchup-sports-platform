@@ -7,7 +7,7 @@
 | `GET` | `/api/v1/tournaments` | optional user | `TournamentListQueryDto` | public tournament list page |
 | `GET` | `/api/v1/tournaments/:tournamentId` | optional user | path id | public tournament detail |
 
-Tournament list/detail reads are public. Clients may call them without a stored v1 session; authenticated-only state such as the caller's registrations must use the registration endpoints below and should only be queried after login.
+Tournament list/detail reads are public. Clients may call them without a stored v1 session; authenticated-only state such as the caller's registrations must use the registration endpoints below and should only be queried after login. Public read endpoints expose only tournaments with `open`, `closed`, `in_progress`, or `completed` status and `deletedAt = null`. Registration, roster, and admin tournament routes remain authenticated.
 
 ## Admin Tournament Creation
 

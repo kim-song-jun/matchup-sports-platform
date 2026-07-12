@@ -17,6 +17,9 @@ import { TournamentsReadController } from './tournaments-read.controller';
 import { TournamentsReadService } from './tournaments-read.service';
 import { TournamentAnnouncementsController } from './tournament-announcements.controller';
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
+import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
+import { TournamentSponsorsController } from './tournament-sponsors.controller';
+import { TournamentSponsorsService } from './tournament-sponsors.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
 
@@ -38,6 +41,7 @@ import { TournamentReviewsService } from './tournament-reviews.service';
     TournamentPlayersAdminController,
     TournamentRegistrationsController,
     TournamentAnnouncementsController,
+    TournamentSponsorsController,
     TournamentReviewsController,
     TournamentsReadController,
   ],
@@ -49,6 +53,8 @@ import { TournamentReviewsService } from './tournament-reviews.service';
     TournamentPlayersService,
     TournamentsReadService,
     TournamentAnnouncementsService,
+    TournamentSponsorsService,
+    TournamentPaymentExpiryService,
     TournamentReviewsService,
     OptionalV1AuthGuard,
     V1AuthGuard,

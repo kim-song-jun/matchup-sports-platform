@@ -110,16 +110,22 @@ export class TournamentsReadService {
           where: { audience: 'public', publishedAt: { not: null } },
           orderBy: { publishedAt: 'desc' },
         },
+        sponsors: {
+          where: { isActive: true },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+        },
+        registrations: {
+          where: {
+            status: { in: ['confirmed', 'waitlisted', 'awaiting_payment', 'payment_checking', 'paid'] },
+          },
+          include: { team: { select: { id: true, name: true } } },
+        },
         _count: {
           select: {
             registrations: {
               where: { status: 'confirmed' },
             },
           },
-        },
-        registrations: {
-          where: { status: { in: ['awaiting_payment', 'payment_checking', 'paid'] } },
-          select: { status: true },
         },
         reviews: {
           orderBy: { createdAt: 'desc' as const },
@@ -186,7 +192,23 @@ export class TournamentsReadService {
       promoListPrizeText: row.promoListPrizeText,
       promoListPriority: row.promoListPriority,
       confirmedCount: row._count.registrations,
-      pendingPaymentCount: row.registrations.length,
+      participantTeams: row.registrations
+        .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
+        .sort((a, b) => {
+          const aRank = a.status === 'confirmed' ? 0 : 1;
+          const bRank = b.status === 'confirmed' ? 0 : 1;
+          return aRank - bRank;
+        })
+        .map((registration) => ({
+          registrationId: registration.id,
+          teamId: registration.team.id,
+          teamName: registration.team.name,
+          status: registration.status,
+          confirmedAt: registration.confirmedAt?.toISOString() ?? null,
+        })),
+      pendingPaymentCount: row.registrations.filter((registration) =>
+        ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),
+      ).length,
       groups: row.groups.map((g) => ({
         id: g.id,
         name: g.name,
@@ -248,9 +270,24 @@ export class TournamentsReadService {
         id: a.id,
         title: a.title,
         body: a.body,
+        category: a.category,
         audience: a.audience,
         publishedAt: a.publishedAt!.toISOString(),
         createdAt: a.createdAt.toISOString(),
+      })),
+      sponsors: row.sponsors.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        logoUrl: s.logoUrl,
+        websiteUrl: s.websiteUrl,
+        instagramUrl: s.instagramUrl,
+        benefitText: s.benefitText,
+        boothText: s.boothText,
+        eventTitle: s.eventTitle,
+        eventDescription: s.eventDescription,
+        eventResultText: s.eventResultText,
+        sortOrder: s.sortOrder,
       })),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

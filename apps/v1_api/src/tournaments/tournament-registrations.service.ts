@@ -13,6 +13,10 @@ import {
   CreateRegistrationDto,
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
+import {
+  getTournamentPaymentDueAt,
+  TournamentPaymentExpiryService,
+} from './tournament-payment-expiry.service';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -32,7 +36,10 @@ const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
 
 @Injectable()
 export class TournamentRegistrationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paymentExpiry: TournamentPaymentExpiryService,
+  ) {}
 
   /** 팀장 또는 운영진(manager+)만 대회 신청을 관리할 수 있다. */
   private async assertTeamManager(teamId: string, userId: string) {
@@ -250,9 +257,19 @@ export class TournamentRegistrationsService {
   ) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const expiry = await this.paymentExpiry.expireIfOverdue(registration, payment ?? null);
+
+    if (expiry.expired) {
+      return this.serialize(
+        expiry.registration,
+        expiry.payment,
+        await this.countPlayers(registrationId),
+      );
+    }
 
     // draft는 운영 반영 전이라 즉시 취소(self-service). 그 이후 상태는 어드민 처리 대기.
-    if (registration.status === 'draft') {
+    if (expiry.registration.status === 'draft') {
       const cancelled = await this.prisma.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {
@@ -264,7 +281,7 @@ export class TournamentRegistrationsService {
       });
       return this.serialize(cancelled, null, 0);
     }
-    if (!CANCELLABLE_VIA_REQUEST.includes(registration.status)) {
+    if (!CANCELLABLE_VIA_REQUEST.includes(expiry.registration.status)) {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_CANCELLABLE',
         message: '현재 상태에서는 취소할 수 없어요.',
@@ -318,7 +335,8 @@ export class TournamentRegistrationsService {
       this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
       this.countPlayers(registrationId),
     ]);
-    return this.serialize(registration, payment, playerCount);
+    const expiry = await this.paymentExpiry.expireIfOverdue(registration, payment ?? null);
+    return this.serialize(expiry.registration, expiry.payment, playerCount);
   }
 
   /**
@@ -342,7 +360,8 @@ export class TournamentRegistrationsService {
       this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
       this.countPlayers(registrationId),
     ]);
-    return this.serialize(registration, payment, playerCount);
+    const expiry = await this.paymentExpiry.expireIfOverdue(registration, payment ?? null);
+    return this.serialize(expiry.registration, expiry.payment, playerCount);
   }
 
   /**
@@ -442,6 +461,7 @@ export class TournamentRegistrationsService {
             status: payment.status,
             amount: payment.amount,
             paidAt: payment.paidAt?.toISOString() ?? null,
+            paymentDueAt: getTournamentPaymentDueAt(payment).toISOString(),
           }
         : null,
       createdAt: row.createdAt.toISOString(),

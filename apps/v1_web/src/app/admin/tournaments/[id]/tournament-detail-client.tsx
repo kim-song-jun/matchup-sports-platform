@@ -79,11 +79,13 @@ import type {
   V1AdminTournamentAnnouncement,
   V1TournamentGroupPhase,
   V1AnnouncementAudience,
+  V1AnnouncementCategory,
   V1UpdateTournamentPayload,
   V1TournamentAward,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
+import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 
 import {
   AdminPageHeader,
@@ -96,6 +98,8 @@ import {
 } from '@/components/admin';
 import type { AdminTableColumn } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
+import { TournamentSponsorsTab } from './tournament-sponsors-tab';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -200,6 +204,23 @@ function formatDateRange(startStr: string | null, endStr: string | null): string
 function formatCurrency(n: number): string {
   if (n === 0) return '무료';
   return `${n.toLocaleString('ko-KR')}원`;
+}
+
+function formatRegistrationPaymentSubtitle(
+  payment: V1AdminTournamentRegistration['payment'],
+): string | undefined {
+  if (!payment) return undefined;
+  const method = PAYMENT_METHOD_LABEL[payment.method] ?? payment.method;
+  const status = PAYMENT_STATUS_LABEL[payment.status] ?? payment.status;
+  return `${method} · ${status} · ${formatCurrency(payment.amount)}`;
+}
+
+function getRegistrationPaymentDeadlineLabel(
+  payment: V1AdminTournamentRegistration['payment'],
+): string | null {
+  if (!payment || payment.status !== 'ready') return null;
+  const deadline = getTournamentPaymentDeadlineState(payment.paymentDueAt);
+  return deadline ? `${deadline.label}까지` : null;
 }
 
 function isoToDatetimeLocalValue(dateStr: string | null | undefined): string {
@@ -350,13 +371,14 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'awards';
+type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'awards';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'info', label: '대회 정보' },
   { id: 'registrations', label: '신청 관리' },
   { id: 'bracket', label: '대진 관리' },
   { id: 'announcements', label: '공지' },
+  { id: 'sponsors', label: '협찬' },
   { id: 'awards', label: '개인 어워드' },
 ];
 
@@ -765,9 +787,7 @@ function RegistrationsTab({
               <span className="truncate">{r.teamName ?? r.teamId}</span>
             </span>
           ),
-          subtitle: r.payment
-            ? `${PAYMENT_METHOD_LABEL[r.payment.method] ?? r.payment.method} · ${PAYMENT_STATUS_LABEL[r.payment.status] ?? r.payment.status} · ${formatCurrency(r.payment.amount)}`
-            : undefined,
+          subtitle: formatRegistrationPaymentSubtitle(r.payment),
           status: r.status,
           meta: [
             {
@@ -778,6 +798,14 @@ function RegistrationsTab({
               icon: <User size={14} aria-hidden="true" />,
               label: r.depositorName ?? '—',
             },
+            ...(getRegistrationPaymentDeadlineLabel(r.payment)
+              ? [
+                  {
+                    icon: <Clock size={14} aria-hidden="true" />,
+                    label: getRegistrationPaymentDeadlineLabel(r.payment),
+                  },
+                ]
+              : []),
             {
               icon: <Clock size={14} aria-hidden="true" />,
               label: `신청 ${formatDate(r.createdAt)}`,
@@ -2346,6 +2374,7 @@ function AnnouncementsTab({
   const [editingAnnouncement, setEditingAnnouncement] = useState<V1AdminTournamentAnnouncement | null>(null);
   const [annTitle, setAnnTitle] = useState('');
   const [annBody, setAnnBody] = useState('');
+  const [annCategory, setAnnCategory] = useState<V1AnnouncementCategory>('general');
   const [annAudience, setAnnAudience] = useState<V1AnnouncementAudience>('all_registered');
   const [annPublish, setAnnPublish] = useState(false);
   const isSavingAnnouncement = createAnnouncement.isPending || updateAnnouncement.isPending;
@@ -2354,6 +2383,7 @@ function AnnouncementsTab({
     setEditingAnnouncement(null);
     setAnnTitle('');
     setAnnBody('');
+    setAnnCategory('general');
     setAnnAudience('all_registered');
     setAnnPublish(false);
   };
@@ -2396,6 +2426,7 @@ function AnnouncementsTab({
       {
         title: annTitle.trim(),
         body: annBody.trim(),
+        category: annCategory,
         audience: annAudience,
         publish: annPublish,
       },
@@ -2495,6 +2526,26 @@ function AnnouncementsTab({
 
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex flex-col gap-1.5 flex-1">
+              <label htmlFor="ann-category" className="text-[13px] text-gray-900">
+                분류
+              </label>
+              <select
+                id="ann-category"
+                value={annCategory}
+                onChange={(e) => setAnnCategory(e.target.value as V1AnnouncementCategory)}
+                disabled={createAnnouncement.isPending}
+                className={inputCls}
+              >
+                <option value="general">일반</option>
+                <option value="venue">장소·준비</option>
+                <option value="sponsor">협찬·이벤트</option>
+                <option value="media">미디어</option>
+                <option value="results">결과</option>
+                <option value="review">리뷰</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5 flex-1">
               <label htmlFor="ann-audience" className="text-[13px] text-gray-900">
                 대상
               </label>
@@ -2557,6 +2608,8 @@ function AnnouncementsTab({
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-bold text-gray-900 mb-0.5 truncate">{ann.title}</p>
                   <p className="text-xs text-gray-500">
+                    {getTournamentAnnouncementCategoryLabel(ann.category)}
+                    {' '}·{' '}
                     {ann.publishedAt ? `발행됨 · ${formatDate(ann.publishedAt)}` : '미발행'}
                     {' '}·{' '}
                     {ann.audience === 'public'
@@ -3196,6 +3249,17 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             tournamentId={id}
             showToast={showToast}
           />
+        )}
+      </div>
+
+      <div
+        id={`panel-sponsors`}
+        role="tabpanel"
+        aria-labelledby="tab-sponsors"
+        hidden={activeTab !== 'sponsors'}
+      >
+        {activeTab === 'sponsors' && (
+          <TournamentSponsorsTab tournamentId={id} showToast={showToast} />
         )}
       </div>
 

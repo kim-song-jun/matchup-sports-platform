@@ -824,7 +824,7 @@ export type V1MyTeamMatch = {
   detailRoute: string;
 };
 
-export type V1ReviewSourceType = 'match' | 'team_match';
+export type V1ReviewSourceType = 'match' | 'team_match' | 'tournament_fixture';
 export type V1ReviewTargetType = 'user' | 'team';
 
 export type V1ReviewActorUser = {
@@ -1471,6 +1471,7 @@ export type V1PublicTournamentStatus = Extract<
 
 export type V1TournamentRegistrationStatus =
   | 'draft'
+  | 'submitted'
   | 'awaiting_payment'
   | 'payment_checking'
   | 'paid'
@@ -1478,6 +1479,11 @@ export type V1TournamentRegistrationStatus =
   | 'waitlisted'
   | 'cancel_requested'
   | 'cancelled';
+
+export type V1TournamentParticipantStatus = Extract<
+  V1TournamentRegistrationStatus,
+  'confirmed' | 'waitlisted'
+>;
 
 export type V1TournamentPaymentMethod = 'pg' | 'bank_transfer';
 
@@ -1497,6 +1503,14 @@ export type V1AnnouncementAudience =
   | 'all_registered'
   | 'confirmed_only'
   | 'waitlist';
+
+export type V1AnnouncementCategory =
+  | 'general'
+  | 'venue'
+  | 'sponsor'
+  | 'media'
+  | 'results'
+  | 'review';
 
 /** Serialized by TournamentsReadService.serializeCard — list view */
 export type V1TournamentListItem = {
@@ -1662,9 +1676,33 @@ export type V1TournamentAnnouncement = {
   id: string;
   title: string;
   body: string;
+  category: V1AnnouncementCategory;
   audience: string;
   publishedAt: string;
   createdAt: string;
+};
+
+export type V1TournamentSponsor = {
+  id: string;
+  name: string;
+  description: string | null;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  instagramUrl: string | null;
+  benefitText: string | null;
+  boothText: string | null;
+  eventTitle: string | null;
+  eventDescription: string | null;
+  eventResultText: string | null;
+  sortOrder: number;
+};
+
+export type V1TournamentParticipantTeam = {
+  registrationId: string;
+  teamId: string;
+  teamName: string;
+  status: V1TournamentParticipantStatus;
+  confirmedAt: string | null;
 };
 
 /** Serialized by TournamentsReadService.get — full public detail */
@@ -1713,10 +1751,12 @@ export type V1TournamentDetail = {
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
+  participantTeams: V1TournamentParticipantTeam[];
   pendingPaymentCount: number;
   groups: V1TournamentGroup[];
   fixtures: V1TournamentFixture[];
   announcements: V1TournamentAnnouncement[];
+  sponsors: V1TournamentSponsor[];
   /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능) */
   reviews: V1TournamentReview[];
   /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
@@ -1765,6 +1805,7 @@ export type V1TournamentPaymentSummary = {
   status: V1TournamentPaymentStatus;
   amount: number;
   paidAt: string | null;
+  paymentDueAt: string | null;
 };
 
 /** Serialized by TournamentRegistrationsService.serialize (consumer-facing) */
@@ -1905,6 +1946,7 @@ export type V1AdminTournamentAnnouncement = {
   tournamentId: string;
   title: string;
   body: string;
+  category: V1AnnouncementCategory;
   audience: string;
   publishedAt: string | null;
   createdAt: string;
@@ -1913,6 +1955,13 @@ export type V1AdminTournamentAnnouncement = {
 
 export type V1AdminTournamentAnnouncementWithIdempotent = V1AdminTournamentAnnouncement & {
   alreadyPublished: boolean;
+};
+
+export type V1AdminTournamentSponsor = V1TournamentSponsor & {
+  tournamentId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type V1AdminTournamentStatusChangeResult = {
@@ -2101,9 +2150,27 @@ export type V1RecordResultPayload = {
 export type V1CreateAnnouncementPayload = {
   title: string;
   body: string;
+  category?: V1AnnouncementCategory;
   audience?: V1AnnouncementAudience;
   publish?: boolean;
 };
+
+export type V1CreateTournamentSponsorPayload = {
+  name: string;
+  description?: string;
+  logoUrl?: string;
+  websiteUrl?: string;
+  instagramUrl?: string;
+  benefitText?: string;
+  boothText?: string;
+  eventTitle?: string;
+  eventDescription?: string;
+  eventResultText?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type V1UpdateTournamentSponsorPayload = Partial<V1CreateTournamentSponsorPayload>;
 
 export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
 
@@ -2115,6 +2182,10 @@ export type V1DeleteAnnouncementResult = {
 
 export type V1AdminAnnouncementListResult = {
   items: V1AdminTournamentAnnouncement[];
+};
+
+export type V1AdminTournamentSponsorListResult = {
+  items: V1AdminTournamentSponsor[];
 };
 
 // ── Team Invitations ──────────────────────────────────────────────────────────

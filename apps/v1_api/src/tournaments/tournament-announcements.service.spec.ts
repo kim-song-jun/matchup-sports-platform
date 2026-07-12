@@ -51,6 +51,7 @@ function announcementRow(overrides: Record<string, unknown> = {}) {
     tournamentId: 'tournament-1',
     title: '경기 일정 공지',
     body: '7월 1일 오전 10시 시작합니다.',
+    category: 'general',
     audience: 'all_registered',
     publishedAt: null,
     createdAt: new Date('2026-06-14T00:00:00.000Z'),
@@ -184,10 +185,11 @@ describe('TournamentAnnouncementsService', () => {
     );
   });
 
-  it('listByTournament: serializes all required fields (id/title/body/audience/publishedAt/createdAt)', async () => {
+  it('listByTournament: serializes all required fields including category', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
     const row = announcementRow({
+      category: 'venue',
       publishedAt: new Date('2026-06-14T12:00:00.000Z'),
     });
     prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([row]);
@@ -199,6 +201,7 @@ describe('TournamentAnnouncementsService', () => {
       id: 'ann-1',
       title: '경기 일정 공지',
       body: '7월 1일 오전 10시 시작합니다.',
+      category: 'venue',
       audience: 'all_registered',
       publishedAt: '2026-06-14T12:00:00.000Z',
       createdAt: '2026-06-14T00:00:00.000Z',
@@ -287,6 +290,32 @@ describe('TournamentAnnouncementsService', () => {
 
     const createArgs = prisma.v1TournamentAnnouncement.create.mock.calls[0][0];
     expect(createArgs.data.audience).toBe('all_registered');
+  });
+
+  it('create: stores and returns the supplied announcement category', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentAnnouncement.create.mockResolvedValue(
+      announcementRow({ category: 'sponsor' }),
+    );
+    const dto = {
+      title: '협찬 이벤트',
+      body: '현장 이벤트는 이 공지에서만 안내합니다.',
+      category: 'sponsor' as const,
+    };
+
+    const result = await service.create(ownerAuthUser, 'tournament-1', dto);
+
+    expect(result).toMatchObject({ id: 'ann-1', category: 'sponsor' });
+    const createArgs = prisma.v1TournamentAnnouncement.create.mock.calls[0][0];
+    expect(createArgs.data.category).toBe('sponsor');
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          afterJson: expect.objectContaining({ category: 'sponsor' }),
+        }),
+      }),
+    );
   });
 
   it('create: accepts public audience for logged-out tournament detail visibility', async () => {

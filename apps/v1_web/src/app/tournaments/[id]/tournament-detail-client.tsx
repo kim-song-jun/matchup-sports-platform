@@ -13,6 +13,16 @@ import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
+  TournamentApplicationGuideSection,
+  TournamentParticipantSection,
+} from '@/components/tournaments/tournament-event-hub-sections';
+import {
+  TournamentPostEventHubSection,
+  TournamentVenuePrepSection,
+} from '@/components/tournaments/tournament-venue-retention-sections';
+import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
+import {
   formatTournamentDateShort,
   formatTournamentDateRangeShort,
   formatTournamentDateLong,
@@ -28,6 +38,8 @@ import type {
   V1TournamentRegistration,
 } from '@/types/api';
 
+export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-event-hub-sections';
+
 /* ── Format helpers ── */
 
 function getFormatLabel(format: V1TournamentFormat): string {
@@ -36,6 +48,37 @@ function getFormatLabel(format: V1TournamentFormat): string {
     case 'knockout': return '토너먼트';
     case 'group_knockout': return '조별리그 후 토너먼트';
   }
+}
+
+export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
+  if (!prizeBreakdown) return [];
+
+  const chips: string[] = [];
+  let current = '';
+
+  for (let index = 0; index < prizeBreakdown.length; index += 1) {
+    const char = prizeBreakdown[index];
+    const previous = prizeBreakdown[index - 1] ?? '';
+    const next = prizeBreakdown[index + 1] ?? '';
+    const isNumericComma = char === ',' && isAsciiDigit(previous) && isAsciiDigit(next);
+    const isSeparator = char === '/' || char === '·' || char === '\n' || (char === ',' && !isNumericComma);
+
+    if (isSeparator) {
+      const segment = current.trim();
+      if (segment) chips.push(segment);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  const last = current.trim();
+  if (last) chips.push(last);
+  return chips;
+}
+
+function isAsciiDigit(value: string): boolean {
+  return value >= '0' && value <= '9';
 }
 
 function formatPublishedAt(dateStr: string): string {
@@ -315,10 +358,9 @@ function TournamentDetailView({
   const bottomPad = isOpen ? 96 : 48;
 
   /* ── Prize card — rendered in left column just after metric strip ── */
-  // 콤마 구분도 지원 — 단, "600,000원" 같은 금액 천단위 콤마(뒤에 숫자)는 분리하지 않는다
-  const prizeChips = tournament.prizeBreakdown
-    ? tournament.prizeBreakdown.split(/[/·\n]+|,(?!\d)/).map((s) => s.trim()).filter(Boolean)
-    : [];
+  // 상금 칩 분리: '/'·'·'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
+  // 분리하지 않는다 — dev의 콤마 구분 요구를 더 견고한 getPrizeBreakdownChips 헬퍼(테스트 보유)로 충족.
+  const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
   const prizeCard = hasPrize ? (
     <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
       <Card pad={18} style={{ background: 'var(--orange50)' }}>
@@ -489,6 +531,24 @@ function TournamentDetailView({
       {/* ── Prize card — shown HIGH in left column, right after metric strip ── */}
       {prizeCard}
 
+      <TournamentApplicationGuideSection
+        minPlayers={tournament.minPlayers}
+        maxPlayers={tournament.maxPlayers}
+      />
+
+      <TournamentParticipantSection
+        teams={tournament.participantTeams}
+        teamCount={tournament.teamCount}
+      />
+
+      <TournamentVenuePrepSection
+        venue={tournament.venue}
+        hasRules={Boolean(tournament.rulesText)}
+        minPlayers={tournament.minPlayers}
+        maxPlayers={tournament.maxPlayers}
+        announcements={tournament.announcements}
+      />
+
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
       <TournamentFlowSection tournament={tournament} />
 
@@ -508,7 +568,20 @@ function TournamentDetailView({
         </section>
       ) : null}
 
-      {/* ── 조별리그/브래킷은 /bracket 전용 페이지에서 표시 — 여기서는 삭제 ── */}
+      <TournamentSponsorSection sponsors={tournament.sponsors} />
+
+      <TournamentPostEventHubSection
+        status={tournament.status}
+        fixtures={tournament.fixtures}
+        hasAnnouncements={hasAnnouncements}
+        sponsorCount={tournament.sponsors.length}
+        announcements={tournament.announcements}
+      />
+
+      {/* ── Section 3 + 4: Format-aware fixtures / standings (non-bracket portions) ── */}
+      <div id="tournament-results">
+        <FormatLeftSections tournament={tournament} />
+      </div>
 
     </>
   );
@@ -1585,21 +1658,26 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
 
 function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnouncement }) {
   return (
-    <Card pad={16}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0 }}>
-          {announcement.title}
+    <div id={`announcement-${announcement.id}`} style={{ scrollMarginTop: 96 }}>
+      <Card pad={16}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0 }}>
+            {announcement.title}
+          </div>
+          <span className="tm-text-micro" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
+            {formatPublishedAt(announcement.publishedAt)}
+          </span>
         </div>
-        <span className="tm-text-micro" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
-          {formatPublishedAt(announcement.publishedAt)}
+        <span className="tm-badge tm-badge-grey" style={{ marginTop: 8 }}>
+          {getTournamentAnnouncementCategoryLabel(announcement.category)}
         </span>
-      </div>
-      <FormattedText
-        text={announcement.body}
-        className="tm-text-caption"
-        style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65 }}
-      />
-    </Card>
+        <FormattedText
+          text={announcement.body}
+          className="tm-text-caption"
+          style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65 }}
+        />
+      </Card>
+    </div>
   );
 }
 

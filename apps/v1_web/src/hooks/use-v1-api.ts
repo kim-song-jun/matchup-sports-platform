@@ -121,6 +121,8 @@ import type {
   V1AdminBracketResult,
   V1AdminTournamentAnnouncement,
   V1AdminTournamentAnnouncementWithIdempotent,
+  V1AdminTournamentSponsor,
+  V1AdminTournamentSponsorListResult,
   V1AdminTournamentStatusChangeResult,
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
@@ -143,6 +145,8 @@ import type {
   V1UpdateFixturePayload,
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
+  V1CreateTournamentSponsorPayload,
+  V1UpdateTournamentSponsorPayload,
   V1DeleteAnnouncementResult,
   V1AdminAnnouncementListResult,
   V1UpdateAnnouncementPayload,
@@ -1734,14 +1738,14 @@ export function useV1Registration(tournamentId: string, registrationId: string) 
 }
 
 /** 로그인 유저 본인의 신청을 registrationId 없이 조회한다. 없으면 404 (data=undefined). */
-export function useV1MyRegistration(tournamentId: string) {
+export function useV1MyRegistration(tournamentId: string, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.myTournamentRegistration(tournamentId),
     queryFn: () =>
       v1Get<V1TournamentRegistration>(
         `/tournaments/${tournamentId}/registrations/my-registration`,
       ),
-    enabled: !!tournamentId,
+    enabled: (options?.enabled ?? true) && !!tournamentId,
     retry: (failureCount, error) => {
       // 404 (no registration yet) is expected — do not retry
       if (error instanceof V1ApiError && error.statusCode === 404) return false;
@@ -2371,6 +2375,64 @@ export function useV1PublishAnnouncement(tournamentId?: string) {
       }
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'tournaments'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'tournaments'] });
+    },
+  });
+}
+
+export function useV1AdminTournamentSponsors(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentSponsors(tournamentId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentSponsorListResult>(
+        `/admin/tournaments/${tournamentId}/sponsors`,
+      ),
+    enabled: !!tournamentId,
+  });
+}
+
+export function useV1CreateTournamentSponsor(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateTournamentSponsorPayload) =>
+      v1Post<V1AdminTournamentSponsor>(
+        `/admin/tournaments/${tournamentId}/sponsors`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentSponsors(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1UpdateTournamentSponsor(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { sponsorId: string; body: V1UpdateTournamentSponsorPayload }) =>
+      v1Patch<V1AdminTournamentSponsor>(
+        `/admin/tournaments/${tournamentId}/sponsors/${input.sponsorId}`,
+        input.body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentSponsors(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1DeactivateTournamentSponsor(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sponsorId: string) =>
+      v1Post<V1AdminTournamentSponsor>(
+        `/admin/tournaments/${tournamentId}/sponsors/${sponsorId}/deactivate`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentSponsors(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });
 }

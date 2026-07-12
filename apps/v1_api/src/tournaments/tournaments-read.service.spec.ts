@@ -112,6 +112,7 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     groups: [],
     fixtures: [],
     announcements: [],
+    sponsors: [],
     ...overrides,
   };
 }
@@ -325,6 +326,7 @@ describe('TournamentsReadService', () => {
           id: 'ann-1',
           title: '경기 일정 공지',
           body: '7월 1일 오전 10시 시작',
+          category: 'venue',
           audience: 'public',
           publishedAt: new Date('2026-06-10T00:00:00Z'),
           createdAt: new Date('2026-06-10T00:00:00Z'),
@@ -360,6 +362,109 @@ describe('TournamentsReadService', () => {
     expect(result.announcements[0]).toMatchObject({
       id: 'ann-1',
       title: '경기 일정 공지',
+      category: 'venue',
+    });
+  });
+
+  it('get: returns public participant teams and filters to active registration statuses', async () => {
+    const row = fullTournamentRow({
+      registrations: [
+        {
+          id: 'reg-confirmed',
+          status: 'confirmed',
+          confirmedAt: new Date('2026-06-20T00:00:00Z'),
+          team: { id: 'team-confirmed', name: '확정 FC' },
+        },
+        {
+          id: 'reg-waitlisted',
+          status: 'waitlisted',
+          confirmedAt: null,
+          team: { id: 'team-waitlisted', name: '대기 FC' },
+        },
+      ],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.participantTeams).toEqual([
+      {
+        registrationId: 'reg-confirmed',
+        teamId: 'team-confirmed',
+        teamName: '확정 FC',
+        status: 'confirmed',
+        confirmedAt: '2026-06-20T00:00:00.000Z',
+      },
+      {
+        registrationId: 'reg-waitlisted',
+        teamId: 'team-waitlisted',
+        teamName: '대기 FC',
+        status: 'waitlisted',
+        confirmedAt: null,
+      },
+    ]);
+
+    const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
+    // Merged registration lifecycle: 결제 진행(awaiting_payment/payment_checking/paid) 팀도 공개 참가팀에 포함.
+    expect(callArgs.include.registrations.where.status.in).toEqual([
+      'confirmed',
+      'waitlisted',
+      'awaiting_payment',
+      'payment_checking',
+      'paid',
+    ]);
+    expect(callArgs.include.registrations.where.status.in).not.toContain('draft');
+    expect(callArgs.include.registrations.where.status.in).not.toContain('cancelled');
+  });
+
+  it('get: includes active tournament-scoped sponsor and event data', async () => {
+    const row = fullTournamentRow({
+      sponsors: [
+        {
+          id: 'sponsor-main',
+          tournamentId: 'tournament-1',
+          name: '서울 스포츠랩',
+          description: '풋살 장비 파트너',
+          logoUrl: 'https://cdn.teammeet.test/sponsors/sportslab.png',
+          websiteUrl: 'https://sportslab.example.com',
+          instagramUrl: 'https://instagram.com/sportslab',
+          benefitText: '리뷰 참여자 3팀에게 풋살공 제공',
+          boothText: '본부석 옆 체험 부스 운영',
+          eventTitle: '매너 리뷰 이벤트',
+          eventDescription: '상대팀 리뷰를 남긴 참가팀 중 추첨으로 협찬품을 지급해요.',
+          eventResultText: null,
+          sortOrder: 10,
+          isActive: true,
+          createdAt: new Date('2026-06-12T00:00:00.000Z'),
+          updatedAt: new Date('2026-06-12T00:00:00.000Z'),
+        },
+      ],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.sponsors).toEqual([
+      {
+        id: 'sponsor-main',
+        name: '서울 스포츠랩',
+        description: '풋살 장비 파트너',
+        logoUrl: 'https://cdn.teammeet.test/sponsors/sportslab.png',
+        websiteUrl: 'https://sportslab.example.com',
+        instagramUrl: 'https://instagram.com/sportslab',
+        benefitText: '리뷰 참여자 3팀에게 풋살공 제공',
+        boothText: '본부석 옆 체험 부스 운영',
+        eventTitle: '매너 리뷰 이벤트',
+        eventDescription: '상대팀 리뷰를 남긴 참가팀 중 추첨으로 협찬품을 지급해요.',
+        eventResultText: null,
+        sortOrder: 10,
+      },
+    ]);
+
+    const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
+    expect(callArgs.include.sponsors).toMatchObject({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
   });
 

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
+import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
 import {
   useV1Tournament,
   useV1MyTeams,
@@ -258,7 +260,7 @@ function TeamSelectStep({
   const hasManagerTeam = managerTeams.length > 0;
 
   return (
-    <div style={{ padding: '0 20px 120px' }}>
+    <div style={{ padding: '0 20px 168px' }}>
       <section aria-labelledby="team-select-heading" style={{ marginTop: 20 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="team-select-heading" title="참가 팀 선택" />
@@ -1261,9 +1263,13 @@ function TournamentSubmitConfirmDialog({
 function PaymentGuideStep({
   tournament,
   registrationId,
+  paymentDueAt,
+  onBack,
 }: {
   tournament: V1TournamentDetail;
   registrationId: string;
+  paymentDueAt: string | null;
+  onBack: () => void;
 }) {
   // P0: 방금 제출한 입금자명을 모바일에서도 재확인할 수 있게 배선 (입금자명 불일치 = 자동취소 정책)
   const { data: registration } = useV1Registration(tournament.id, registrationId);
@@ -1274,6 +1280,13 @@ function PaymentGuideStep({
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
+  const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
+  const rosterNextStep = getTournamentRosterNextStep({
+    tournamentId: tournament.id,
+    registrationId,
+    minPlayers: tournament.minPlayers,
+    maxPlayers: tournament.maxPlayers,
+  });
 
   function handleCopyAccount() {
     if (!tournament.bankAccount) return;
@@ -1369,8 +1382,11 @@ function PaymentGuideStep({
               <InfoRow
                 label="입금자명"
                 value={registration?.depositorName ?? '—'}
-                isLast
+                isLast={!paymentDeadline}
               />
+              {paymentDeadline ? (
+                <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
+              ) : null}
             </div>
           ) : (
             <div style={{ padding: '0 16px 14px' }}>
@@ -1382,54 +1398,48 @@ function PaymentGuideStep({
                 <InfoRow
                   label="입금액"
                   value={formatEntryFee(tournament.entryFee)}
-                  isLast
+                  isLast={!paymentDeadline}
                 />
+                {paymentDeadline ? (
+                  <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
+                ) : null}
               </div>
             </div>
           )}
         </Card>
 
         <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <h2 className="tm-text-label" style={{ margin: 0, color: 'var(--text-strong)', fontWeight: 700 }}>
-              대회 신청이 접수되었습니다.
-            </h2>
-            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              <p style={{ margin: 0 }}>아직 참가가 확정된 상태는 아닙니다.</p>
-              <p style={{ margin: '8px 0 0' }}>
-                안내된 계좌로 참가비를 입금해 주세요.
-                <br />
-                입금 확인이 완료되면 참가가 최종 확정됩니다.
-              </p>
-              <p style={{ margin: '8px 0 0' }}>
-                신청 후 2시간 이내에 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
-              </p>
-            </div>
-          </div>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+            {paymentDeadline
+              ? `${paymentDeadline.message} 입금자명이 다르면 확인이 늦어질 수 있어요.`
+              : '입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.'}
+          </p>
         </Card>
-      </section>
 
-      {/* P0: 다음 행동 안내 — 선수 명단 등록 (입금 확정 전에도 등록 가능) */}
-      <section aria-labelledby="next-step-heading" style={{ marginTop: 16 }}>
-        <Card pad={14} style={{ border: '1px solid var(--blue100)', background: 'var(--blue50)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div id="next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
-                다음 단계: 선수 명단 등록
+        <section aria-labelledby="roster-next-step-heading" style={{ marginTop: 12, scrollMarginBottom: 144 }}>
+          <Card pad={14}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div id="roster-next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+                  {rosterNextStep.title}
+                </div>
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: '4px 0 0' }}>
+                  {rosterNextStep.body}
+                </p>
               </div>
-              <div className="tm-text-micro" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-                입금 확인을 기다리는 동안에도 등록할 수 있어요. (최소 {tournament.minPlayers}명)
-              </div>
+              <span className="tm-badge tm-badge-grey" style={{ whiteSpace: 'nowrap' }}>
+                {rosterNextStep.rosterRangeLabel}
+              </span>
             </div>
             <Link
-              href={`/tournaments/${tournament.id}/registrations/${registrationId}/roster`}
-              className="tm-btn tm-btn-sm tm-btn-primary"
-              style={{ flexShrink: 0 }}
+              href={rosterNextStep.href}
+              className="tm-btn tm-btn-md tm-btn-neutral"
+              style={{ marginTop: 12 }}
             >
-              명단 등록
+              {rosterNextStep.ctaLabel}
             </Link>
-          </div>
-        </Card>
+          </Card>
+        </section>
       </section>
 
       {/* Fixed CTA — hidden on desktop (rail takes over) */}
@@ -1481,6 +1491,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const [step, setStep] = useState<ApplyStep>('team');
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const [paymentDueAt, setPaymentDueAt] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<AgreementsState>({
     agreedRules: false,
     agreedPrivacy: false,
@@ -1747,7 +1758,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       const targetRegistrationId = registrationId
         ?? (await createRegistration.mutateAsync({ teamId: selectedTeamId })).id;
       setRegistrationId(targetRegistrationId);
-      await submitRegistration.mutateAsync({
+      const submittedRegistration = await submitRegistration.mutateAsync({
         registrationIdOverride: targetRegistrationId,
         paymentMethod: agreements.paymentMethod,
         depositorName: agreements.paymentMethod === 'bank_transfer' ? agreements.depositorName : undefined,
@@ -1756,6 +1767,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         agreedRefund: agreements.agreedRefund,
         agreedMediaConsent: agreements.agreedMediaConsent,
       });
+      setPaymentDueAt(submittedRegistration.payment?.paymentDueAt ?? null);
       setStep('payment');
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '신청 제출 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
@@ -1826,6 +1838,8 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               <PaymentGuideStep
                 tournament={tournament}
                 registrationId={registrationId}
+                paymentDueAt={paymentDueAt}
+                onBack={() => setStep('agreements')}
               />
             ) : null}
           </div>

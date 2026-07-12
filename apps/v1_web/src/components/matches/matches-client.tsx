@@ -111,7 +111,14 @@ export function MatchListPageClient() {
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
         filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        matches: [],
         sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
+        summary: {
+          ...base.summary,
+          count: 0,
+          today: 0,
+          urgent: 0,
+        },
       };
 
   return <MatchListPageView model={model} />;

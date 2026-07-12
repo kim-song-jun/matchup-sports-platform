@@ -25,9 +25,28 @@ function getPendingPaymentCount(item: Pick<V1TournamentListItem, 'pendingPayment
   return Math.max(0, item.pendingPaymentCount ?? 0);
 }
 
+const TOURNAMENT_LIST_ERROR_FALLBACK = '대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+
+function getTournamentListErrorMessage(err: unknown): string {
+  const message = extractErrorMessage(err, TOURNAMENT_LIST_ERROR_FALLBACK);
+  const maybeApiError = err as { code?: unknown; statusCode?: unknown } | null;
+
+  if (
+    maybeApiError?.code === 'UNAUTHENTICATED' ||
+    maybeApiError?.statusCode === 401 ||
+    /authentication is required/i.test(message)
+  ) {
+    return '세션 정보를 확인하는 중 문제가 생겼어요. 로그인 상태를 새로고침한 뒤 목록을 다시 불러와 주세요.';
+  }
+
+  return message;
+}
+
 function getReservedTeamCount(item: Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount' | 'teamCount'>): number {
   return Math.min(item.teamCount, item.confirmedCount + getPendingPaymentCount(item));
 }
+
+/* ── Status helpers ── */
 
 function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
   const pendingPaymentCount = getPendingPaymentCount(item);
@@ -215,8 +234,10 @@ function TournamentsListContent() {
           <TournamentSkeletonList />
         ) : isError ? (
           <ErrorState
-            message={extractErrorMessage(error, '대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')}
+            title="대회 목록을 불러오지 못했어요"
+            message={getTournamentListErrorMessage(error)}
             onRetry={() => void refetch()}
+            retryLabel="목록 다시 불러오기"
           />
         ) : displayItems.length === 0 ? (
           <EmptyState
@@ -252,7 +273,6 @@ function TournamentsListContent() {
         )}
       </section>
 
-      {/* ── 진행 방식 (슬림 안내 — 리스트 아래) ── */}
       <section
         aria-labelledby="process-flow-heading"
         className="tm-tournament-promo-section"

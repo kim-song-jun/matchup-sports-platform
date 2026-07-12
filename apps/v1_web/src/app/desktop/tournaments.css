@@ -462,7 +462,7 @@
   font-size: var(--font-size-body-lg);
   font-weight: 700;
   color: var(--text-strong);
-  margin: 0 0 14px;
+  margin: 0;
 }
 
 /* ── Prize Breakdown: 3-card grid ── */

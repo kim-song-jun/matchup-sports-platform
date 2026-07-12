@@ -57,6 +57,16 @@ export const ANNOUNCEMENT_AUDIENCES = [
 ] as const;
 export type AnnouncementAudience = (typeof ANNOUNCEMENT_AUDIENCES)[number];
 
+export const ANNOUNCEMENT_CATEGORIES = [
+  'general',
+  'venue',
+  'sponsor',
+  'media',
+  'results',
+  'review',
+] as const;
+export type AnnouncementCategory = (typeof ANNOUNCEMENT_CATEGORIES)[number];
+
 export class CreateAnnouncementDto {
   @IsString()
   @MaxLength(200)
@@ -69,6 +79,10 @@ export class CreateAnnouncementDto {
   @IsOptional()
   @IsIn(ANNOUNCEMENT_AUDIENCES)
   audience?: AnnouncementAudience;
+
+  @IsOptional()
+  @IsIn(ANNOUNCEMENT_CATEGORIES)
+  category?: AnnouncementCategory;
 
   @IsOptional()
   @IsBoolean()

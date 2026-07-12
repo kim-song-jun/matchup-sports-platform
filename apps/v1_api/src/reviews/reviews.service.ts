@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
+import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 
 const REVIEW_TAGS = {
   punctual: '시간 약속을 잘 지켜요',
@@ -34,7 +35,7 @@ type ReviewTagCode = keyof typeof REVIEW_TAGS;
 const ELIGIBLE_PARTICIPANT_STATUSES: V1MatchParticipantStatus[] = ['active', 'completed'];
 const TEAM_REVIEW_ROLES: V1TeamMembershipRole[] = ['owner', 'manager'];
 
-type SourceType = 'match' | 'team_match';
+type SourceType = 'match' | 'team_match' | 'tournament_fixture';
 type TargetType = 'user' | 'team';
 type PrismaTx = Omit<
   PrismaService,
@@ -43,18 +44,22 @@ type PrismaTx = Omit<
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tournamentFixtureReviews: TournamentFixtureReviewsService,
+  ) {}
 
   async list(user: V1AuthUser, query: ListReviewsQueryDto) {
     const tab = query.tab ?? 'pending';
     if (tab === 'written') return this.written(user, query);
 
     const limit = normalizeLimit(query.limit);
-    const [personalItems, teamItems] = await Promise.all([
+    const [personalItems, teamItems, tournamentFixtureItems] = await Promise.all([
       this.pendingPersonalReviews(user, limit),
       this.pendingTeamReviews(user, limit),
+      this.tournamentFixtureReviews.pending(user, limit),
     ]);
-    const items = [...personalItems, ...teamItems]
+    const items = [...personalItems, ...teamItems, ...tournamentFixtureItems]
       .sort((a, b) => b.completedAtSort - a.completedAtSort)
       .slice(0, limit)
       .map(({ completedAtSort: _completedAtSort, ...item }) => item);
@@ -87,7 +92,8 @@ export class ReviewsService {
 
   async source(user: V1AuthUser, params: ReviewSourceParamsDto) {
     if (params.sourceType === 'match') return this.matchSource(user, params.sourceId);
-    return this.teamMatchSource(user, params.sourceId);
+    if (params.sourceType === 'team_match') return this.teamMatchSource(user, params.sourceId);
+    return this.tournamentFixtureReviews.source(user, params.sourceId);
   }
 
   async submit(user: V1AuthUser, dto: SubmitReviewDto) {
@@ -97,7 +103,10 @@ export class ReviewsService {
     if (dto.sourceType === 'match') {
       return this.submitPersonalReview(user, dto, tagCodes);
     }
-    return this.submitTeamReview(user, dto, tagCodes);
+    if (dto.sourceType === 'team_match') {
+      return this.submitTeamReview(user, dto, tagCodes);
+    }
+    return this.tournamentFixtureReviews.submit(user, dto, tagCodes);
   }
 
   private async written(user: V1AuthUser, query: ListReviewsQueryDto) {
@@ -429,7 +438,8 @@ export class ReviewsService {
   private async reviewSourceSummaries(reviews: ReviewWithIncludes[]) {
     const matchIds = reviews.filter((review) => review.sourceType === 'match').map((review) => review.sourceId);
     const teamMatchIds = reviews.filter((review) => review.sourceType === 'team_match').map((review) => review.sourceId);
-    const [matches, teamMatches] = await Promise.all([
+    const tournamentFixtureIds = reviews.filter((review) => review.sourceType === 'tournament_fixture').map((review) => review.sourceId);
+    const [matches, teamMatches, tournamentFixtures] = await Promise.all([
       matchIds.length
         ? this.prisma.v1Match.findMany({
             where: { id: { in: matchIds } },
@@ -442,11 +452,13 @@ export class ReviewsService {
             select: { id: true, title: true, completedAt: true, startAt: true },
           })
         : [],
+      this.tournamentFixtureReviews.sourceSummaries(tournamentFixtureIds),
     ]);
 
     return new Map([
       ...matches.map((match) => [`match:${match.id}`, sourceSummary('match', match.id, match.title, match.completedAt ?? match.startAt)] as const),
       ...teamMatches.map((match) => [`team_match:${match.id}`, sourceSummary('team_match', match.id, match.title, match.completedAt ?? match.startAt)] as const),
+      ...tournamentFixtures,
     ]);
   }
 
@@ -546,6 +558,9 @@ export class ReviewsService {
     }
     if (dto.sourceType === 'team_match' && (dto.targetType !== 'team' || !dto.targetTeamId || dto.targetUserId)) {
       throw badRequest('INVALID_TEAM_MATCH_REVIEW_TARGET', 'Team match reviews require targetType=team and targetTeamId only');
+    }
+    if (dto.sourceType === 'tournament_fixture' && (dto.targetType !== 'team' || !dto.targetTeamId || dto.targetUserId)) {
+      throw badRequest('INVALID_TOURNAMENT_FIXTURE_REVIEW_TARGET', 'Tournament fixture reviews require targetType=team and targetTeamId only');
     }
   }
 

@@ -323,7 +323,8 @@ jobs:
           for i in $(seq 1 12); do
             if ssh ec2 'curl -fsS http://localhost:8121/api/v1/health | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        curl -fsS --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/v1/landing > /dev/null 2>&1 && \
+                        curl -fsS --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/v1/landing 2>/dev/null | \
+                        grep -qx 200 && \
                         curl -fsSI --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/ | \
                         grep -qE "^HTTP/[0-9.]+ 308" && \
                         curl -fsSI --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/api/v1/health | \

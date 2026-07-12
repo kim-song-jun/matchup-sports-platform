@@ -12,7 +12,7 @@ const { chromium } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 
-const REPO_ROOT = path.resolve(__dirname, '..');
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const WEB_BASE = process.env.WEB_BASE || 'http://localhost:3013';
 const API_BASE = process.env.API_BASE || 'http://localhost:8121';
 const OUT_DIR = process.env.OUT_DIR || path.join(REPO_ROOT, 'output', 'playwright', 'prize-smart-value');

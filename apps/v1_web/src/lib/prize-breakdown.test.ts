@@ -183,3 +183,14 @@ describe('prizeRowAmountValue / prizeRowsTotal (backward compat)', () => {
     expect(prizeRowsTotal(rows)).toBe(900000);
   });
 });
+
+describe('sanitize 트레일링 구분자 정리', () => {
+  it('구분자 문자로 끝나는 값은 꼬리 · 없이 저장된다', () => {
+    expect(serializePrizeRows([{ label: 'MVP', amount: '티셔츠/' }])).toBe('MVP 티셔츠');
+    expect(serializePrizeRows([{ label: '전원', amount: '음료, ' }])).toBe('전원 음료');
+  });
+
+  it('구분자로 시작하는 값도 선행 · 없이 저장된다', () => {
+    expect(serializePrizeRows([{ label: 'MVP', amount: '/티셔츠' }])).toBe('MVP 티셔츠');
+  });
+});

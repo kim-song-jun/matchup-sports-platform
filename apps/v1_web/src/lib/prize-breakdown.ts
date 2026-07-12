@@ -84,7 +84,8 @@ function sanitizePrizeCellText(text: string): string {
       out += char;
     }
   }
-  return out.trim();
+  // 값이 구분자 문자로 시작/끝나면 트레일링 '·'가 남으므로 양끝을 정리한다.
+  return out.trim().replace(/^·+|·+$/g, '').trim();
 }
 
 /** 편집기 행 → 저장 텍스트. 빈 행은 제외하고, 셀 안의 행 구분자 문자는 나열 표기로 정규화한다. */

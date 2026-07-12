@@ -2,7 +2,7 @@
 // 대상 대회의 prizeBreakdown에 금액+물품 혼합 값(예: "1위 600,000원 / MVP 축구화 · 상품권")을 넣어두고 실행한다.
 //
 // Usage:
-//   TID=<tournamentId> node scripts/capture_prize_smart_value.js
+//   TID=<tournamentId> node scripts/qa/capture_prize_smart_value.js
 // Env:
 //   TID      (required) 캡처 대상 대회 ID
 //   WEB_BASE (default http://localhost:3013) v1 web 베이스 URL
@@ -18,7 +18,7 @@ const API_BASE = process.env.API_BASE || 'http://localhost:8121';
 const OUT_DIR = process.env.OUT_DIR || path.join(REPO_ROOT, 'output', 'playwright', 'prize-smart-value');
 const TID = process.env.TID;
 if (!TID) {
-  console.error('TID 환경변수가 필요해요. 예: TID=<tournamentId> node scripts/capture_prize_smart_value.js');
+  console.error('TID 환경변수가 필요해요. 예: TID=<tournamentId> node scripts/qa/capture_prize_smart_value.js');
   process.exit(1);
 }
 

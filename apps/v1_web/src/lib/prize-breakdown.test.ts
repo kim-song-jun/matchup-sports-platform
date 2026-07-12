@@ -92,6 +92,42 @@ describe('serializePrizeRows', () => {
   });
 });
 
+describe('round-trip 보호 — 값 안의 구분자 문자', () => {
+  it('keeps a goods value containing "/" as one row after serialize → re-parse', () => {
+    const serialized = serializePrizeRows([{ label: 'MVP', amount: '티셔츠/모자' }]);
+    expect(serialized).toBe('MVP 티셔츠·모자');
+    expect(parsePrizeRows(serialized)).toEqual([{ label: 'MVP', amount: '티셔츠·모자' }]);
+  });
+
+  it('folds surrounding spaces into the "·" replacement', () => {
+    expect(serializePrizeRows([{ label: 'MVP', amount: '티셔츠 / 모자' }])).toBe('MVP 티셔츠·모자');
+  });
+
+  it('neutralizes non-numeric commas and newlines while preserving thousands commas', () => {
+    const serialized = serializePrizeRows([
+      { label: '1위', amount: '600,000원' },
+      { label: '참가팀', amount: '음료, 간식\n제공' },
+    ]);
+    expect(serialized).toBe('1위 600,000원 / 참가팀 음료·간식 제공');
+    expect(parsePrizeRows(serialized)).toEqual([
+      { label: '1위', amount: '600,000원' },
+      { label: '참가팀', amount: '음료·간식 제공' },
+    ]);
+  });
+
+  it('sanitizes separator characters inside labels too', () => {
+    const serialized = serializePrizeRows([{ label: '득점왕/도움왕', amount: '트로피' }]);
+    expect(serialized).toBe('득점왕·도움왕 트로피');
+    expect(parsePrizeRows(serialized)).toEqual([{ label: '득점왕·도움왕', amount: '트로피' }]);
+  });
+
+  it('leaves already-safe "·" listings untouched (spacing preserved)', () => {
+    expect(serializePrizeRows([{ label: 'MVP', amount: '축구화 · 상품권' }])).toBe(
+      'MVP 축구화 · 상품권',
+    );
+  });
+});
+
 describe('isPrizeAmountValue', () => {
   it('classifies pure numeric + optional 원 suffix as amount', () => {
     expect(isPrizeAmountValue('600,000원')).toBe(true);

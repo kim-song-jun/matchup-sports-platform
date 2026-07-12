@@ -16,6 +16,15 @@ function isAsciiDigit(value: string): boolean {
   return value >= '0' && value <= '9';
 }
 
+/** 천 단위 콤마 판정 — 양쪽이 모두 숫자인 ","만 보존한다 (스플리터·직렬화 정규화 공용 규칙) */
+function isThousandsComma(text: string, index: number): boolean {
+  return (
+    text[index] === ',' &&
+    isAsciiDigit(text[index - 1] ?? '') &&
+    isAsciiDigit(text[index + 1] ?? '')
+  );
+}
+
 /**
  * prizeBreakdown 텍스트 → 항목(segment) 분리 — 공개 상세 칩과 시상/어드민 행이 공유하는 단일 스플리터.
  * 구분자 규칙:
@@ -30,10 +39,8 @@ export function splitPrizeSegments(breakdown: string): string[] {
 
   for (let index = 0; index < breakdown.length; index += 1) {
     const char = breakdown[index];
-    const previous = breakdown[index - 1] ?? '';
-    const next = breakdown[index + 1] ?? '';
-    const isNumericComma = char === ',' && isAsciiDigit(previous) && isAsciiDigit(next);
-    const isSeparator = char === '/' || char === '\n' || (char === ',' && !isNumericComma);
+    const isSeparator =
+      char === '/' || char === '\n' || (char === ',' && !isThousandsComma(breakdown, index));
 
     if (isSeparator) {
       const segment = current.trim();
@@ -57,10 +64,33 @@ export function parsePrizeRows(breakdown: string): PrizeRow[] {
   });
 }
 
-/** 편집기 행 → 저장 텍스트. 빈 행은 제외한다. */
+/**
+ * 라벨·값 안의 행 구분자 문자를 나열 표기로 정규화 — 저장 텍스트를 재파싱해도 행이 쪼개지지
+ * 않게 한다(round-trip 보호). "/"와 비-천단위 콤마는 주변 공백째로 "·"(나열 의미 보존)로 접고,
+ * 줄바꿈은 공백으로 치환한다. 천 단위 콤마("600,000")는 splitPrizeSegments와 동일 규칙으로 보존.
+ * 예: "티셔츠/모자" → "티셔츠·모자", "음료, 간식" → "음료·간식".
+ */
+function sanitizePrizeCellText(text: string): string {
+  const flattened = text.replace(/\n+/g, ' ');
+  let out = '';
+  for (let index = 0; index < flattened.length; index += 1) {
+    const char = flattened[index];
+    const isRowSeparatorChar =
+      char === '/' || (char === ',' && !isThousandsComma(flattened, index));
+    if (isRowSeparatorChar) {
+      out = out.replace(/[\s·]+$/, '') + '·';
+      while (index + 1 < flattened.length && /\s/.test(flattened[index + 1])) index += 1;
+    } else {
+      out += char;
+    }
+  }
+  return out.trim();
+}
+
+/** 편집기 행 → 저장 텍스트. 빈 행은 제외하고, 셀 안의 행 구분자 문자는 나열 표기로 정규화한다. */
 export function serializePrizeRows(rows: PrizeRow[]): string {
   return rows
-    .map((r) => ({ label: r.label.trim(), amount: r.amount.trim() }))
+    .map((r) => ({ label: sanitizePrizeCellText(r.label), amount: sanitizePrizeCellText(r.amount) }))
     .filter((r) => r.label.length > 0)
     .map((r) => (r.amount ? `${r.label} ${r.amount}` : r.label))
     .join(' / ');

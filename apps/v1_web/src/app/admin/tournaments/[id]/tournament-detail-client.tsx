@@ -3885,7 +3885,8 @@ function InfoTab({
                 type="text"
                 value={row.value}
                 onChange={(e) => {
-                  const next = formatIfNumeric(e.target.value);
+                  // "/"는 저장 텍스트의 행 구분자라 값 안에 둘 수 없어요 — 입력 즉시 나열 점("·")으로 치환
+                  const next = formatIfNumeric(e.target.value.replace(/\//g, '·'));
                   setPrizeRows((prev) => prev.map((r, j) => (j === i ? { ...r, value: next } : r)));
                 }}
                 disabled={updateTournament.isPending}
@@ -3937,7 +3938,7 @@ function InfoTab({
               </button>
             )}
           </div>
-          <p className="text-[11px] text-gray-400 m-0">숫자만 입력하면 금액으로 자동 콤마 포맷돼요. 트로피·상품권 같은 물품도 이 칸에 그대로 적을 수 있어요.</p>
+          <p className="text-[11px] text-gray-400 m-0">숫자만 입력하면 금액으로 자동 콤마 포맷돼요. 트로피·상품권 같은 물품도 적을 수 있고, 여러 물품 나열은 ·(가운뎃점)로 구분해요.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">

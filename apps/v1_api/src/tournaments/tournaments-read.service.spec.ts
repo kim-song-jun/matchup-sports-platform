@@ -366,7 +366,7 @@ describe('TournamentsReadService', () => {
     });
   });
 
-  it('get: returns only public participant teams from confirmed and waitlisted registrations', async () => {
+  it('get: returns public participant teams and filters to active registration statuses', async () => {
     const row = fullTournamentRow({
       registrations: [
         {
@@ -405,7 +405,16 @@ describe('TournamentsReadService', () => {
     ]);
 
     const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
-    expect(callArgs.include.registrations.where.status.in).toEqual(['confirmed', 'waitlisted']);
+    // Merged registration lifecycle: 결제 진행(awaiting_payment/payment_checking/paid) 팀도 공개 참가팀에 포함.
+    expect(callArgs.include.registrations.where.status.in).toEqual([
+      'confirmed',
+      'waitlisted',
+      'awaiting_payment',
+      'payment_checking',
+      'paid',
+    ]);
+    expect(callArgs.include.registrations.where.status.in).not.toContain('draft');
+    expect(callArgs.include.registrations.where.status.in).not.toContain('cancelled');
   });
 
   it('get: includes active tournament-scoped sponsor and event data', async () => {

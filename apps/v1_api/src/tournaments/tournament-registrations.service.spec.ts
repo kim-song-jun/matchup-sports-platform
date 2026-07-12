@@ -96,6 +96,7 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
     prisma.v1TournamentPayment.findUnique.mockResolvedValue({
       method: 'bank_transfer', status: 'paid', amount: 120000, paidAt: new Date('2026-06-14T01:00:00Z'),
+      createdAt: new Date('2026-06-14T00:00:00Z'),
     });
     prisma.v1TournamentPlayer.count.mockResolvedValue(4);
 
@@ -426,7 +427,10 @@ describe('TournamentRegistrationsService', () => {
       },
       {
         ...registrationRow({ id: 'reg-team-2', teamId: 'team-2', status: 'awaiting_payment' }),
-        payment: { method: 'bank_transfer', status: 'ready', amount: 120000, paidAt: null },
+        payment: {
+          method: 'bank_transfer', status: 'ready', amount: 120000, paidAt: null,
+          createdAt: new Date('2026-06-14T00:00:00Z'),
+        },
         team: { id: 'team-2', name: '2번 팀' },
       },
     ];

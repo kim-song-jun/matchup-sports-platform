@@ -6,17 +6,6 @@ on:
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
-    inputs:
-      reset_db:
-        description: 'DANGER: Drop all tables, re-run migrations, re-seed'
-        required: false
-        default: false
-        type: boolean
-      run_seed:
-        description: 'DANGER: Run destructive full seed data refresh'
-        required: false
-        default: false
-        type: boolean
 
 # PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
 # - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
@@ -192,8 +181,6 @@ jobs:
       - name: Build and deploy
         timeout-minutes: 35
         env:
-          RESET_DB: ${{ inputs.reset_db }}
-          RUN_SEED: ${{ inputs.run_seed }}
           KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
@@ -204,11 +191,8 @@ jobs:
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
           V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
 
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' V1_HOST_ADMIN_PASSWORD_B64='${V1_HOST_ADMIN_PASSWORD_B64}' bash -se" <<'EOF'
+          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' V1_HOST_ADMIN_PASSWORD_B64='${V1_HOST_ADMIN_PASSWORD_B64}' bash -se" <<'EOF'
           set -euo pipefail
-
-          RESET_DB="${RESET_DB:-false}"
-          RUN_SEED="${RUN_SEED:-false}"
 
           cd ~/teameet
 
@@ -332,7 +316,7 @@ jobs:
         timeout-minutes: 15
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 \
-            "RESET_DB='${{ inputs.reset_db }}' RUN_SEED='${{ inputs.run_seed }}' bash ~/teameet/deploy/restart-containers.sh"
+            "bash ~/teameet/deploy/restart-containers.sh"
 
       - name: Health check
         run: |

@@ -316,6 +316,7 @@ describe('TournamentsReadService', () => {
           awayRegistrationId: null,
           homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
           awayRegistration: null,
+          videos: [],
           result: null,
         },
       ],
@@ -378,6 +379,7 @@ describe('TournamentsReadService', () => {
           awayRegistrationId: 'reg-2',
           homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
           awayRegistration: { team: { id: 'team-2', name: '부산 아이파크' } },
+          videos: [],
           result: {
             homeScore: 3,
             awayScore: 2,

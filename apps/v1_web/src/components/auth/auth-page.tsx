@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
+import { KakaoLoginButton } from './kakao-login-button';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
 
 export function LoginPageView({ model }: { model: LoginViewModel }) {
@@ -157,10 +158,14 @@ function ProviderButton({ provider }: { provider: LoginProvider }) {
   }
 
   if (provider.href?.startsWith('http')) {
+    // OAuth(카카오): 클릭 시점에 CSRF 방지 state를 생성·저장해야 하므로 클라이언트 버튼 사용.
     return (
-      <a className="tm-btn tm-btn-md tm-btn-outline tm-pressable" href={provider.href} style={activeStyle}>
-        {provider.label}
-      </a>
+      <KakaoLoginButton
+        className="tm-btn tm-btn-md tm-btn-outline tm-pressable"
+        href={provider.href}
+        style={activeStyle}
+        label={provider.label}
+      />
     );
   }
 

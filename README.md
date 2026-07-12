@@ -368,6 +368,8 @@ pnpm v1:db:seed:all      # demo plus coverage data
 pnpm v1:db:cleanup:demo  # dry-run counts for 00000000/@teameet.v1 demo cleanup
 ```
 
+`demo`/`coverage`/`all` seed modes require `V1_HOST_ADMIN_PASSWORD` (8+ chars) set in `apps/v1_api/.env` — used as the `host@teameet.v1` account password. Seeding fails fast without it.
+
 Actual v1 demo cleanup requires a backup, count review, and explicit execution:
 
 ```bash

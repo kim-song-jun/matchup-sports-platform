@@ -7,6 +7,7 @@ import { V1ApiError, v1Post } from '@/lib/api-client';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
 import { AuthFrame } from './auth-page';
+import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 
 function getKakaoRedirectUri() {
   return process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
@@ -17,6 +18,15 @@ function getSavedRedirectPath() {
   const value = window.sessionStorage.getItem('teameet.v1.kakao.redirect');
   window.sessionStorage.removeItem('teameet.v1.kakao.redirect');
   return sanitizeRedirectPath(value);
+}
+
+// 로그인 CSRF(세션 고정) 방지: authorize 이동 시 저장해 둔 state 값을 읽고 즉시 제거한다.
+// 콜백에서 kauth가 돌려준 state와 대조한 뒤에만 code 교환을 진행한다.
+function getStoredKakaoOAuthState() {
+  if (typeof window === 'undefined') return null;
+  const value = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+  window.sessionStorage.removeItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+  return value;
 }
 
 export function KakaoCallbackClient() {
@@ -34,6 +44,14 @@ export function KakaoCallbackClient() {
 
     if (providerError || !code) {
       setError('카카오 로그인을 완료하지 못했어요.');
+      return;
+    }
+
+    const returnedState = searchParams.get('state');
+    const storedState = getStoredKakaoOAuthState();
+
+    if (!returnedState || !storedState || returnedState !== storedState) {
+      setError('로그인 요청이 유효하지 않아요. 다시 시도해 주세요.');
       return;
     }
 

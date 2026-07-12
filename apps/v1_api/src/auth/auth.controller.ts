@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
@@ -19,16 +20,19 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @Post('kakao')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   kakaoLogin(@Body() dto: KakaoLoginDto) {
     return this.authService.kakaoLogin(dto);
   }
 
   @Post('register')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -46,11 +50,13 @@ export class AuthController {
   }
 
   @Get('check-email')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   checkEmail(@Query('email') email: string) {
     return this.authService.checkEmail(email);
   }
 
   @Get('check-nickname')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   checkNickname(@Query('nickname') nickname: string) {
     return this.authService.checkNickname(nickname);
   }

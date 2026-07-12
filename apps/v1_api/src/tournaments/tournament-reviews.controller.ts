@@ -85,17 +85,17 @@ export class TournamentReviewsController {
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
   ) {
-    return this.reviewsService.listAwards(tournamentId);
+    return this.reviewsService.listAwards(user, tournamentId);
   }
 
   /** PUT /admin/tournaments/:tournamentId/awards */
   @Put('admin/tournaments/:tournamentId/awards')
   @UseGuards(V1AuthGuard)
   async setAwards(
-    @CurrentUser() _user: V1AuthUser,
+    @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
     @Body() dto: SetTournamentAwardsDto,
   ) {
-    return this.reviewsService.setAwards(tournamentId, dto);
+    return this.reviewsService.setAwards(user, tournamentId, dto);
   }
 }

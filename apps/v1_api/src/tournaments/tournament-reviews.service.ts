@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -84,7 +85,10 @@ export class SetTournamentAwardsDto {
 
 @Injectable()
 export class TournamentReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminContext: AdminContextService,
+  ) {}
 
   /** 대회 리뷰 목록 (최신순, 페이지네이션 + 검색) */
   async listReviews(tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
@@ -263,10 +267,10 @@ export class TournamentReviewsService {
     return !!reg;
   }
 
-  // ───────────────────── 어워드 ─────────────────────
+  // ───────────────────── 어워드 (어드민 전용) ─────────────────────
 
-  /** 어워드 목록 (tournamentDetail에 포함) */
-  async listAwards(tournamentId: string) {
+  /** 어워드 목록 조회 — 실제 DB 조회. 어드민 게이트를 거친 호출부에서만 사용. */
+  private async listAwardsInternal(tournamentId: string) {
     const awards = await this.prisma.v1TournamentAward.findMany({
       where: { tournamentId },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
@@ -281,8 +285,19 @@ export class TournamentReviewsService {
     }));
   }
 
-  /** 어워드 설정 (어드민, 전체 replace) */
-  async setAwards(tournamentId: string, dto: SetTournamentAwardsDto) {
+  /**
+   * 어워드 목록 (어드민 전용 조회).
+   * active admin이면 support 포함 조회 가능 (읽기 전용이므로 getMutationAdmin 불필요).
+   */
+  async listAwards(user: V1AuthUser, tournamentId: string) {
+    await this.adminContext.getActiveAdmin(user.id);
+    return this.listAwardsInternal(tournamentId);
+  }
+
+  /** 어워드 설정 (어드민 전용, 전체 replace — support 등급은 mutation 불가) */
+  async setAwards(user: V1AuthUser, tournamentId: string, dto: SetTournamentAwardsDto) {
+    await this.adminContext.getMutationAdmin(user.id);
+
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
     });
@@ -308,6 +323,6 @@ export class TournamentReviewsService {
       ),
     ]);
 
-    return this.listAwards(tournamentId);
+    return this.listAwardsInternal(tournamentId);
   }
 }

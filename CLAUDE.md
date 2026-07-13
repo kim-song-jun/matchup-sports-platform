@@ -158,7 +158,7 @@ infra/
 
 > **주의**: dev 와 prod 의 API 포트(8111 vs 8100) · Web 포트(3003 vs 3000) 가 다릅니다. 주요 설정 위치: `apps/api/src/config/configuration.ts` (`API_PORT || 8111`), `apps/web/next.config.ts` (`http://localhost:8111` dev / `http://api:8100` prod), `docker-compose.yml` (dev), `deploy/docker-compose.prod.yml` (prod).
 
-> **로컬 dev 서버는 항상 web·api 각 1개 쌍만 유지한다.** 여러 worktree/에이전트가 검증 목적으로 임시 서버(`next dev`, `ts-node src/main.ts` 등)를 추가로 띄우기 쉬운데, 검증이 끝나면 즉시 종료해야 한다 — 방치하면 포트가 계속 늘어나고(예: 3013 외 3014/3016/3020/3021, 8121 외 8122/8123/8221 등) 어떤 프로세스가 실제로 쓰이는지 혼선이 생긴다. 새로 서버를 띄우기 전에 `lsof -nP -iTCP -sTCP:LISTEN | grep node`로 기존에 이 프로젝트용으로 떠 있는 프로세스가 있는지 먼저 확인하고, 있으면 그걸 재사용한다. 부득이하게 별도 포트로 임시 서버를 띄웠다면(예: PR 검증용 격리 worktree), 검증이 끝나는 즉시 `kill`해서 정리한다.
+> **로컬 dev 서버는 항상 web·api 각 1개 쌍만 유지한다.** 여러 worktree/에이전트가 검증 목적으로 임시 서버(`next dev`, `ts-node src/main.ts` 등)를 추가로 띄우기 쉬운데, 검증이 끝나면 즉시 종료해야 한다 — 방치하면 포트가 계속 늘어나고(예: 위 포트 맵과 별개인 v1 스택 기준 — web 3013 외 3014/3016/3020/3021, api 8121 외 8122/8123/8221 등) 어떤 프로세스가 실제로 쓰이는지 혼선이 생긴다. 새로 서버를 띄우기 전에 `lsof -nP -iTCP -sTCP:LISTEN | grep node`로 기존에 이 프로젝트용으로 떠 있는 프로세스(PID 포함)가 있는지 먼저 확인하고, 있으면 그걸 재사용한다. 부득이하게 별도 포트로 임시 서버를 띄웠다면(예: PR 검증용 격리 worktree), 검증이 끝나는 즉시 위 `lsof` 결과의 PID로 `kill <PID>`해서 정리한다.
 
 ## 개발 명령어
 

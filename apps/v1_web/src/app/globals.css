@@ -1563,7 +1563,7 @@ button:disabled {
 }
 
 .tm-featured-cta {
-  /* 텍스트→CTA 간격은 이 파일 내 동일 카드군의 다른 버튼(home-page.tsx 로그인/채팅 CTA,
+  /* 텍스트→CTA 간격은 동일 카드군의 다른 버튼(home-page.tsx 로그인/채팅 CTA,
      marginTop:12)과 통일한 고정값. 이전 marginTop:auto 는 두 히어로 카드 높이를 맞추려는
      의도였지만, 텍스트가 짧은 카드(대회)에서 텍스트-버튼 사이에 불필요하게 큰 여백을
      만들었다. 카드 높이 정합은 .tm-featured-card{height:100%} + 부모 flex stretch로 이미

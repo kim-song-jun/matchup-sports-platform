@@ -169,6 +169,8 @@ export class TournamentsReadService {
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      latitude: row.latitude,
+      longitude: row.longitude,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,

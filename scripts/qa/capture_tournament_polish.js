@@ -48,33 +48,46 @@ const SHOTS = [
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const browser = await chromium.launch();
   const out = {};
-  for (const [name, route, auth, w, adminTab] of SHOTS) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, deviceScaleFactor: 2 });
-    await ctx.addInitScript(([i, e]) => {
-      if (i) window.localStorage.setItem('teameet.v1.userId', i);
-      if (e) window.localStorage.setItem('teameet.v1.userEmail', e);
-    }, auth);
-    const page = await ctx.newPage();
-    const errs = [];
-    page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 160)); });
-    await page.goto(`${WEB_BASE}${route}`, { waitUntil: 'networkidle', timeout: 45000 });
-    await page.addStyleTag({ content: HIDE });
-    if (adminTab) {
-      await page.getByRole('tab', { name: adminTab }).click();
-      await page.waitForTimeout(700);
-      await page.waitForLoadState('networkidle');
+  let failures = 0;
+  try {
+    for (const [name, route, auth, w, adminTab] of SHOTS) {
+      // 샷 단위로 격리 — 한 샷이 실패해도 나머지 샷·cleanup·manifest 작성을 보장한다.
+      const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, deviceScaleFactor: 2 });
+      try {
+        await ctx.addInitScript(([i, e]) => {
+          if (i) window.localStorage.setItem('teameet.v1.userId', i);
+          if (e) window.localStorage.setItem('teameet.v1.userEmail', e);
+        }, auth);
+        const page = await ctx.newPage();
+        const errs = [];
+        page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 160)); });
+        await page.goto(`${WEB_BASE}${route}`, { waitUntil: 'networkidle', timeout: 45000 });
+        await page.addStyleTag({ content: HIDE });
+        if (adminTab) {
+          await page.getByRole('tab', { name: adminTab }).click();
+          await page.waitForTimeout(700);
+          await page.waitForLoadState('networkidle');
+        }
+        // 입장 애니메이션(최대 ~1.2s)이 끝난 정지 상태를 캡처
+        await page.waitForTimeout(1500);
+        const file = path.join(OUT_DIR, `${name}.png`);
+        // fullPage 캡처는 CSS 키프레임을 재시작시켜 입장 애니메이션의 초기 프레임(투명)이 찍힌다
+        // → 유한 애니메이션을 종료 상태로 fast-forward 하는 disabled 모드로 정지 화면을 얻는다.
+        await page.screenshot({ path: file, fullPage: true, animations: 'disabled' });
+        out[name] = { file, consoleErrors: errs };
+        console.log(`${name}: ${file}${errs.length ? ` (console errors: ${errs.length})` : ''}`);
+      } catch (e) {
+        failures += 1;
+        out[name] = { error: e.message || String(e) };
+        console.error(`${name}: FAILED — ${e.message || e}`);
+      } finally {
+        await ctx.close();
+      }
     }
-    // 입장 애니메이션(최대 ~1.2s)이 끝난 정지 상태를 캡처
-    await page.waitForTimeout(1500);
-    const file = path.join(OUT_DIR, `${name}.png`);
-    // fullPage 캡처는 CSS 키프레임을 재시작시켜 입장 애니메이션의 초기 프레임(투명)이 찍힌다
-    // → 유한 애니메이션을 종료 상태로 fast-forward 하는 disabled 모드로 정지 화면을 얻는다.
-    await page.screenshot({ path: file, fullPage: true, animations: 'disabled' });
-    out[name] = { file, consoleErrors: errs };
-    console.log(`${name}: ${file}${errs.length ? ` (console errors: ${errs.length})` : ''}`);
-    await ctx.close();
+  } finally {
+    await browser.close();
+    fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(out, null, 2));
   }
-  await browser.close();
-  fs.writeFileSync(path.join(OUT_DIR, 'manifest.json'), JSON.stringify(out, null, 2));
-  console.log('done');
+  console.log(`done${failures ? ` (${failures} shot(s) failed — manifest에 기록됨)` : ''}`);
+  if (failures) process.exit(1);
 })();

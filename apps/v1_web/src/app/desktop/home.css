@@ -400,7 +400,9 @@
   .tm-home-featured-carousel {
     overflow-x: visible;
     flex-wrap: wrap;
-    gap: 16px;
+    /* 16px → 24px — 두 히어로 카드가 붙어 보인다는 피드백. 1440+ 사이드바 컬럼 gap(24px,
+       하단 min-width:1440px 블록)과 동일 리듬으로 맞춰 카드 사이 여백을 확실히 벌렸다. */
+    gap: 24px;
   }
 
   .tm-home-featured-carousel > * {

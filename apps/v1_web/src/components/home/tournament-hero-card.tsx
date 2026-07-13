@@ -14,7 +14,7 @@ import type { V1TournamentListItem } from '@/types/api';
 export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
   if (loading) {
     return (
-      <Card pad={0} style={{ overflow: 'hidden' }} aria-busy="true">
+      <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }} aria-busy="true">
         <div
           className="tm-featured-media"
           style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
@@ -27,7 +27,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             </div>
           </div>
         </div>
-        <div style={{ padding: 16 }}>
+        <div className="tm-featured-content">
           <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} aria-hidden="true" />
           <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} aria-hidden="true" />
         </div>
@@ -64,7 +64,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
       href={`/tournaments/${featured.id}`}
       aria-label={`대회 상세 — ${cardTitle}`}
     >
-      <Card pad={0} style={{ overflow: 'hidden' }}>
+      <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
         <div
           className="tm-featured-media"
           style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
@@ -91,13 +91,28 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             </div>
           </div>
         </div>
-        <div style={{ padding: 16 }}>
+        <div className="tm-featured-content">
           <div className="tm-text-body-lg">{cardBody}</div>
           {facts ? (
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               {facts}
             </div>
           ) : null}
+          {/*
+           * FeaturedMatchCard와 짝을 이루는 시각적 CTA — 카드 전체가 이미 <Link>이므로
+           * 순수 시각 신호만 제공하는 비-interactive 요소(span)로 렌더링한다.
+           * <a> 안에 <button>(interactive-in-interactive) 중첩은 HTML5 스펙 위반이라
+           * span으로 대체했다(Copilot 리뷰 지적, PR #51).
+           * (매치 히어로 카드의 tm-btn tm-btn-primary tm-btn-sm 패턴과 동일)
+           * marginTop:auto(.tm-featured-cta) — facts 텍스트가 길어(2줄 랩) 매치 카드보다
+           * 콘텐츠가 길어져도, 두 카드의 Card 바닥 경계가 항상 일치하도록 하단 고정한다.
+           */}
+          <span
+            className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
+            aria-hidden="true"
+          >
+            참가 신청하기
+          </span>
         </div>
       </Card>
     </Link>

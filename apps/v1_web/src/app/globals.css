@@ -191,8 +191,24 @@
   /* 홈 "오늘의 추천" 히어로(.tm-featured-media) 커버 사진 crop 비율 — 모바일/데스크톱
      이전엔 height(146px→220px→260px)만 breakpoint별로 늘고 카드 폭은 독립적으로 변해
      같은 사진이 뷰포트마다 다른 비율로 잘려 보였다. aspect-ratio 단일 토큰으로 통일해
-     폭이 커지면 높이도 비례해서 커지도록(=같은 crop 유지) 고정. */
-  --tm-featured-media-ratio: 2 / 1;
+     폭이 커지면 높이도 비례해서 커지도록(=같은 crop 유지) 고정.
+     2/1(와이드·짧음) → 4/3 로 조정 — 사진이 카드 안에서 텍스트 콘텐츠 영역(~130-140px
+     고정)보다 확실히 우세한 비중(약 62-64%)을 갖도록 세로 비중을 키웠다. 카드 폭 기준
+     308px에서 이전 154px→약 231px, 카드 전체 높이는 296px→약 355px로 커지지만 과도하게
+     세로로 길어지는 지점(1:1 이하)까지는 가지 않았다. */
+  --tm-featured-media-ratio: 4 / 3;
+
+  /* /tournaments 목록 상단 추천 배너(.tm-tournament-featured-banner) 데스크톱 사진 crop
+     비율 — 이전엔 height가 없어 오버레이 텍스트 길이(부제/일정/장소 텍스트 유무)에 따라
+     배너 세로 크기·사진 크롭 영역이 대회마다 들쭉날쭉했다. 데스크톱(≥1024px)에서만
+     aspect-ratio로 고정해 항상 같은 crop으로 보이게 한다(모바일은 기존 컨텐츠 기반
+     높이 유지). 텍스트가 이보다 길어지는 예외 케이스는 aspect-ratio가 min-content를
+     넘지 못하는 대신 박스가 자동으로 늘어나 잘림 없이 안전하게 처리된다(브라우저 확인 완료).
+     이전 6/1은 지나치게 납작해 사진 하단부(약 55~65% 지점)가 크게 잘려나가 — 예:
+     실제 배너 사진 속 펜스 광고판에 박혀 있는 teameet 워터마크가 crop 경계에 걸려
+     거의 안 보였다. 4/1로 완화해 세로 가시 영역을 넓혀 사진 하단부가 안정적으로
+     드러나도록 함(1440px 데스크톱 실측: 라이브 스크린샷으로 확인 완료). */
+  --tm-tournament-banner-ratio: 4 / 1;
 }
 
 * {
@@ -1516,6 +1532,36 @@ button:disabled {
 
 .tm-featured-link {
   display: block;
+}
+
+/* 히어로 카드 쌍(FeaturedMatchCard·TournamentHeroCard) 높이 정합.
+ * .tm-home-featured-carousel(flex row)이 두 <Link>를 align-items:stretch 로
+ * 같은 높이로 늘려도, Card 자신은 콘텐츠 길이만큼만 커지므로(예: 대회 facts 텍스트가
+ * 2줄로 랩되면 매치 카드보다 길어짐) 더 짧은 카드의 보더박스가 부모보다 낮게 끝나
+ * 두 카드 하단이 어긋나 보인다. Card를 stretch된 부모 높이(100%)까지 채우고,
+ * 콘텐츠 영역을 flex column으로 만들어 CTA 버튼을 marginTop:auto로 하단 고정하면
+ * 텍스트 길이 차이와 무관하게 두 카드의 바닥 경계가 항상 일치한다. */
+.tm-featured-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* hairline shadow — 사이드 추천 매치 카드(.tm-match-card)가 이미 동일 목적으로 쓰는
+     shadow-2 를 히어로 카드에도 적용해, 이미지 비중이 커진 만큼 media+content 를 한
+     덩어리로 묶어 '붕 떠' 보이지 않게 한다. border만 있던 이전보다 카드가 배경 위에
+     자연스럽게 자리 잡은 느낌을 준다(과한 확산 없는 절제된 값 그대로 재사용). */
+  box-shadow: var(--shadow-2);
+}
+
+.tm-featured-content {
+  padding: 16px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-featured-cta {
+  margin-top: auto;
+  width: 100%;
 }
 
 /* 헤더와 인사 사이 숨 트이게 (헤더에 붙어 겹쳐 보이던 문제) */

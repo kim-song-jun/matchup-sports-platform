@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { publicAssetPath } from '@/lib/assets';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentCard } from './tournament-card';
 
@@ -62,6 +63,8 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     );
 
     const img = container.querySelector('img');
-    expect(img).toHaveAttribute('src', '/uploads/cover-real.jpg');
+    // publicAssetPath()를 거쳐 렌더링되므로 원본 문자열을 그대로 하드코딩하지 않고
+    // 같은 함수로 기대값을 계산한다(NEXT_PUBLIC_BASE_PATH가 설정된 환경에서도 안전).
+    expect(img).toHaveAttribute('src', publicAssetPath('/uploads/cover-real.jpg'));
   });
 });

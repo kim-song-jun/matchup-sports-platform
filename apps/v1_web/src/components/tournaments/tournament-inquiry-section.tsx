@@ -16,15 +16,14 @@ type InquiryFormErrors = Partial<Record<'title' | 'body' | 'guestContact' | 'for
  * category/relatedType/relatedId를 대회 문의로 고정해서 제출하는 것 외에 새 백엔드
  * 로직은 없다. 로그인 여부는 `hasStoredV1Session()`으로 판단하며, 비로그인일 때만
  * 이메일/전화번호 입력을 추가로 받는다(둘 중 최소 1개 필수 — 서버도 동일하게 검증).
+ *
+ * 로그인 판별은 lazy useState initializer로 첫 렌더부터 동기적으로 계산한다(effect로
+ * 미루면 effect 실행 전에 모달을 여는 로그인 사용자가 게스트로 오판될 수 있음).
  */
 export function TournamentInquirySection({ tournamentId }: { tournamentId: string }) {
-  const [hasSessionHint, setHasSessionHint] = useState(false);
+  const [isLoggedIn] = useState(() => hasStoredV1Session());
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    setHasSessionHint(hasStoredV1Session());
-  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -47,7 +46,7 @@ export function TournamentInquirySection({ tournamentId }: { tournamentId: strin
       {open ? (
         <InquiryModal
           tournamentId={tournamentId}
-          isLoggedIn={hasSessionHint}
+          isLoggedIn={isLoggedIn}
           onClose={() => setOpen(false)}
           onSubmitted={() => {
             setOpen(false);
@@ -174,7 +173,12 @@ function InquiryModal({
         body: trimmedBody,
         relatedType: 'tournament',
         relatedId: tournamentId,
-        ...(isLoggedIn ? {} : { guestEmail: trimmedEmail || undefined, guestPhone: trimmedPhone || undefined }),
+        ...(isLoggedIn
+          ? {}
+          : {
+              ...(trimmedEmail ? { guestEmail: trimmedEmail } : {}),
+              ...(trimmedPhone ? { guestPhone: trimmedPhone } : {}),
+            }),
       },
       {
         onSuccess: () => onSubmitted(),

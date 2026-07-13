@@ -356,7 +356,7 @@ function FeaturedMatchCard({
   onRetry?: () => void;
 }) {
   const card = (
-    <Card pad={0} style={{ overflow: 'hidden' }}>
+    <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
       <div
         className="tm-featured-media"
         style={{ background: network ? 'var(--grey100)' : `${cssUrl(match.imageUrl)} center/cover` }}
@@ -374,7 +374,7 @@ function FeaturedMatchCard({
           </div>
         ) : null}
       </div>
-      <div style={{ padding: 16 }}>
+      <div className="tm-featured-content">
         {network ? (
           <>
             {/* [P2 UX 라이팅] 에러 상황: 수동형 유지(실패 사실 전달) + CTA 능동형 */}
@@ -404,11 +404,13 @@ function FeaturedMatchCard({
              * 시각적 종착점(explicit CTA)이 없어 행동 유도력이 약했다.
              * 카드 전체 Link를 유지하되, 카드 내부 CTA 버튼을 추가해
              * 명시적 행동 신호를 제공한다. (R-K5: CTA 화면당 최대 1개)
+             * marginTop:auto(.tm-featured-cta) — 대회 히어로(TournamentHeroCard)와 짝을
+             * 이루는 flex column 하단 고정. 두 카드 텍스트 길이가 달라도 바닥 경계가 맞는다.
              */}
             <button
-              className="tm-btn tm-btn-primary tm-btn-sm"
+              className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
               type="button"
-              style={{ marginTop: 12, width: '100%', pointerEvents: 'none' }}
+              style={{ pointerEvents: 'none' }}
               aria-hidden="true"
               tabIndex={-1}
             >

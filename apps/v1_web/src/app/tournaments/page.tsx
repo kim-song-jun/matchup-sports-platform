@@ -122,7 +122,12 @@ function TournamentsListContent() {
             marginTop: 12,
             padding: '16px 18px',
             borderRadius: 16,
-            background: featuredImageUrl ? `${cssUrl(featuredImageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+            // vertical-position 62% (기본 50% center 대비 살짝 아래) — 대회 배너 사진은
+            // 보통 하단부(경기장 펜스·바닥)에 스폰서 로고/워터마크가 있는 경우가 많아
+            // 사진 중앙보다 살짝 아래를 보여주는 쪽이 일반적으로 더 안전한 기본값
+            // (globals.css --tm-tournament-banner-ratio 4/1과 함께 실측 조정, 특정 사진
+            // 좌표에 하드코딩한 crop이 아니라 photo-agnostic 기본값).
+            background: featuredImageUrl ? `${cssUrl(featuredImageUrl)} center 62%/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
             color: 'var(--static-white)',
             textDecoration: 'none',
             position: 'relative',

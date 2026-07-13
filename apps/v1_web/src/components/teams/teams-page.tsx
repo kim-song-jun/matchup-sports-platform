@@ -1394,9 +1394,10 @@ function TeamCard({ team }: { team: TeamModel }) {
   return (
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        {/* size="xl"(60px) — 팀장/감독 줄이 늘어난 헤더 텍스트 블록 옆에서 기존 "lg"(54px)가
-            작고 외로워 보이던 간격을 메운다. 헤더 블록이 더 길어져도 아바타는 top-align만
-            유지하고 픽셀 단위로 높이를 맞추지는 않는다. */}
+        {/* size="xl"(72px) — 팀장/감독 줄 + 배지 줄까지 늘어난 헤더 텍스트 블록(4줄) 옆에서
+            기존 60px가 텍스트 스택 대비 작아 보이던 것을 보완(실측: 배지 하단까지 잔여 gap
+            40px→28px). 헤더 블록이 더 길어져도 아바타는 top-align만 유지하고 픽셀 단위로
+            높이를 맞추지는 않는다. */}
         <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tm-text-body-lg line-clamp-2">{team.name}</div>

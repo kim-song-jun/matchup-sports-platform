@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Trophy, LayoutGrid, Star, ChevronRight } from 'lucide-react';
+import { Trophy, LayoutGrid, Star, ChevronRight, Video, Gift, Search } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import type {
   V1TournamentFixture,
@@ -11,6 +11,7 @@ import {
   getTournamentVenuePrepItems,
   type HubState,
   type TournamentAnnouncementSummary,
+  type TournamentPostEventCard,
   type TournamentVenuePrepItem,
 } from './tournament-venue-retention-model';
 
@@ -20,30 +21,16 @@ export {
 } from './tournament-venue-retention-model';
 
 export function TournamentVenuePrepSection({
-  venue,
-  hasRules,
-  minPlayers,
-  maxPlayers,
   announcements,
 }: {
-  venue: string | null;
-  hasRules: boolean;
-  minPlayers: number;
-  maxPlayers: number;
   announcements: TournamentAnnouncementSummary[];
 }) {
-  const items = getTournamentVenuePrepItems({
-    venue,
-    hasRules,
-    minPlayers,
-    maxPlayers,
-    announcements,
-  });
+  const items = getTournamentVenuePrepItems({ announcements });
 
   return (
     <section aria-labelledby="venue-prep-heading" style={{ marginTop: 24 }}>
       <div id="venue-prep-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
-        장소·준비 안내
+        현장 안내
       </div>
       <Card pad={16} style={{ marginTop: 4 }}>
         <div style={{ display: 'grid', gap: 12 }}>
@@ -76,6 +63,12 @@ export function TournamentPostEventHubSection({
     return <TournamentCompletedActionList tournamentId={tournamentId} />;
   }
 
+  // draft/open/closed: 대회가 아직 시작도 안 했는데 "대회 후" 콘텐츠를 보여줄 단계가
+  // 아니다 — 예전엔 이 상태에서도 전부 "준비 중"인 5카드를 그대로 노출해 혼란을 줬다.
+  if (status !== 'in_progress') {
+    return null;
+  }
+
   const hasCompletedFixture = fixtures.some(
     (fixture) => fixture.status === 'completed' && fixture.result !== null,
   );
@@ -87,33 +80,75 @@ export function TournamentPostEventHubSection({
     announcements,
   });
 
+  // in_progress: "준비 중"(upcoming)·"공지 대기"(operator_update) 같은 빈 placeholder는
+  // 숨기고, 실제로 확인할 거리가 있는(available) 항목만 컴팩트 리스트로 노출한다.
+  // "다음 대회"는 상태 무관 항상 available이라 완료 리스트(TournamentCompletedActionList)와
+  // 동일하게 절제 원칙상 제외. 아무것도 없으면(경기 결과·공지 전무) 섹션째 숨긴다 — 조별
+  // 순위·대진표는 이미 같은 페이지 다른 섹션에서 보여주고 있어 여기서 반복하지 않는다.
+  const availableCards = cards.filter((card) => card.status === 'available' && card.key !== 'next_tournament');
+  if (availableCards.length === 0) return null;
+
+  return <PostEventActionList heading="대회 현황" cards={availableCards} />;
+}
+
+const POST_EVENT_CARD_ICON: Record<TournamentPostEventCard['key'], ReactNode> = {
+  results: <Trophy size={18} strokeWidth={2} aria-hidden="true" />,
+  video: <Video size={18} strokeWidth={2} aria-hidden="true" />,
+  reviews: <Star size={18} strokeWidth={2} aria-hidden="true" />,
+  sponsor: <Gift size={18} strokeWidth={2} aria-hidden="true" />,
+  next_tournament: <Search size={18} strokeWidth={2} aria-hidden="true" />,
+};
+
+/** completed 전용 리스트(TournamentCompletedActionList)와 동일한 hairline-row 스타일 공유. */
+function PostEventActionList({ heading, cards }: { heading: string; cards: TournamentPostEventCard[] }) {
   return (
     <section aria-labelledby="post-event-heading" style={{ marginTop: 24 }}>
       <div id="post-event-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
-        대회 후 허브
+        {heading}
       </div>
-      <div style={{ display: 'grid', gap: 8 }}>
-        {cards.map((card) => (
-          <Card key={card.key} pad={16}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ minWidth: 0 }}>
-                <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-                  {card.title}
-                </div>
-                <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.55, marginTop: 3 }}>
-                  {card.body}
-                </div>
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        {cards.map((card, idx) => (
+          <Link
+            key={card.key}
+            href={card.href ?? '#'}
+            className="tm-list-row-interactive tm-pressable"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              minHeight: 60,
+              padding: '12px 16px',
+              borderBottom: idx < cards.length - 1 ? '1px solid var(--border)' : 'none',
+              textDecoration: 'none',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                flexShrink: 0,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'var(--blue50)',
+                color: 'var(--blue500)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              {POST_EVENT_CARD_ICON[card.key]}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
+                {card.title}
               </div>
-              <StatusBadge status={card.status} />
+              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 1 }}>
+                {card.body}
+              </div>
             </div>
-            {card.actionLabel && card.href ? (
-              <Link href={card.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 12 }}>
-                {card.actionLabel}
-              </Link>
-            ) : null}
-          </Card>
+            <ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" style={{ color: 'var(--text-caption)', flexShrink: 0 }} />
+          </Link>
         ))}
-      </div>
+      </Card>
     </section>
   );
 }

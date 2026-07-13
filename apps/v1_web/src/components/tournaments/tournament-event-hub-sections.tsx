@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import type { V1TournamentParticipantTeam } from '@/types/api';
@@ -158,14 +159,18 @@ function ParticipantTeamList({
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {teams.map((team) => (
-        <div
+        <Link
           key={team.registrationId}
+          href={`/teams/${team.teamId}`}
+          className="tm-list-row-interactive tm-pressable"
           style={{
             display: 'grid',
             gridTemplateColumns: 'auto 1fr auto',
             alignItems: 'center',
             gap: 12,
             minHeight: 44,
+            borderRadius: 12,
+            textDecoration: 'none',
           }}
         >
           <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
@@ -188,7 +193,7 @@ function ParticipantTeamList({
           <span className={`tm-badge ${badgeClass}`} style={{ whiteSpace: 'nowrap' }}>
             {label}
           </span>
-        </div>
+        </Link>
       ))}
     </div>
   );

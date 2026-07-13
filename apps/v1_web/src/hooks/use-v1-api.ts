@@ -1720,7 +1720,7 @@ export function useV1AdminTournamentReviews(
   params?: { page?: number; pageSize?: number; search?: string },
 ) {
   return useQuery({
-    queryKey: ['admin-tournament-reviews', tournamentId, params],
+    queryKey: ['admin-tournament-reviews', tournamentId, params ?? {}],
     queryFn: () =>
       v1Get<V1AdminTournamentReviewsPage>(`/admin/tournaments/${tournamentId}/reviews`, params),
     enabled: !!tournamentId,

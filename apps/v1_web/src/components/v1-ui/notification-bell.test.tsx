@@ -76,4 +76,24 @@ describe('NotificationBellLink', () => {
     expect(dot).toHaveAttribute('aria-hidden', 'true');
     expect(dot).toBeEmptyDOMElement();
   });
+
+  it('shows a generic indicator instead of a fabricated "1" when forceUnread fires before the real count loads', () => {
+    mockUnreadCount(0);
+
+    render(<NotificationBellLink className="bell" forceUnread />);
+
+    expect(screen.queryByText('1')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '알림 (읽지 않은 알림 있음)' })).toBeInTheDocument();
+    const indicator = screen.getByRole('link').querySelector('.tm-unread-dot');
+    expect(indicator).toBeInTheDocument();
+  });
+
+  it('shows the real numeric badge (not the generic indicator) once the count is known, even with forceUnread set', () => {
+    mockUnreadCount(7);
+
+    render(<NotificationBellLink className="bell" forceUnread />);
+
+    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '알림 (읽지 않은 알림 7개)' })).toBeInTheDocument();
+  });
 });

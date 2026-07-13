@@ -65,7 +65,7 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
         }}
         aria-label={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
-        {/* Top row: (선택) 커버 이미지 썸네일 + 제목 + 상태 배지 */}
+        {/* Top row: (선택) 커버 이미지 썸네일 + [제목·배지 / 종목·일정·장소] 세로 스택 */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           {item.coverImageUrl ? (
             <div
@@ -79,6 +79,10 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
               />
             </div>
           ) : (
+            // 커버 이미지가 없는 대회는 종목색 그라디언트 배지로 대체한다 — 대회 상세 헤더의
+            // 트로피 배지(linear-gradient 135deg, 500→600 + 흰 아이콘)와 동일한 시각 언어.
+            // 이전의 옅은 pastel bg(badgeBg)+톤온톤 아이콘(badgeText) 조합은 카드 목록에서
+            // 밋밋하고 흐릿하게 보였다(사용자 피드백: "아이콘도 촌스러워").
             <div
               aria-hidden="true"
               style={{
@@ -87,83 +91,86 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
                 borderRadius: 12,
                 overflow: 'hidden',
                 flexShrink: 0,
-                background: sportAccent.badgeBg,
+                background: `linear-gradient(135deg, ${sportAccent.dot} 0%, ${sportAccent.gradientTo} 100%)`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <SportGlyph code={item.sport.code} size={28} style={{ color: sportAccent.badgeText }} />
+              <SportGlyph code={item.sport.code} size={28} style={{ color: 'var(--static-white)' }} />
             </div>
           )}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
-            <div
-              className="tm-text-body-lg"
-              style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0, lineHeight: 1.35 }}
-            >
-              {item.title}
+          {/* 제목·배지 행 + 종목·일정·장소 메타 행을 같은 컬럼에 묶어 아이콘이 아닌
+              제목과 같은 x축에 메타 행이 정렬되도록 한다(이전엔 형제 div라 아이콘 밑에
+              깔려 제목과 어긋나 보였다 — 사용자 피드백: "align도 안맞네"). */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
+              <div
+                className="tm-text-body-lg"
+                style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0, lineHeight: 1.35 }}
+              >
+                {item.title}
+              </div>
+              <span className={`tm-badge ${status.badgeClass}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {status.label}
+              </span>
             </div>
-            <span className={`tm-badge ${status.badgeClass}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-              {status.label}
-            </span>
+
+            {/* Sport identity chip + meta row */}
+            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px' }}>
+              {/* Sport chip: colored dot + Korean label */}
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: sportAccent.badgeBg,
+                  flexShrink: 0,
+                }}
+                aria-label={`종목: ${sportAccent.label}`}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: sportAccent.dot,
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  className="tm-text-caption"
+                  style={{ color: sportAccent.badgeText, fontWeight: 600, lineHeight: 1 }}
+                >
+                  {sportAccent.label}
+                </span>
+              </span>
+
+              {/* Date + venue */}
+              {item.scheduledAt ? (
+                <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                  {formatTournamentDateRangeShort(item.scheduledAt, item.scheduledEndAt) ?? '날짜 미정'}
+                </span>
+              ) : null}
+              {item.venue ? (
+                <span
+                  className="tm-text-caption"
+                  style={{
+                    color: 'var(--text-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: 160,
+                  }}
+                >
+                  {item.venue}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </div>
-
-        {/* Sport identity chip + meta row */}
-        <div
-          style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px' }}
-        >
-          {/* Sport chip: colored dot + Korean label */}
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '2px 8px',
-              borderRadius: 999,
-              background: sportAccent.badgeBg,
-              flexShrink: 0,
-            }}
-            aria-label={`종목: ${sportAccent.label}`}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: sportAccent.dot,
-                flexShrink: 0,
-              }}
-            />
-            <span
-              className="tm-text-caption"
-              style={{ color: sportAccent.badgeText, fontWeight: 600, lineHeight: 1 }}
-            >
-              {sportAccent.label}
-            </span>
-          </span>
-
-          {/* Date + venue */}
-          {item.scheduledAt ? (
-            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-              {formatTournamentDateRangeShort(item.scheduledAt, item.scheduledEndAt) ?? '날짜 미정'}
-            </span>
-          ) : null}
-          {item.venue ? (
-            <span
-              className="tm-text-caption"
-              style={{
-                color: 'var(--text-muted)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: 160,
-              }}
-            >
-              {item.venue}
-            </span>
-          ) : null}
         </div>
 
         {/* Prize line — admin-entered text is shown as-is. */}

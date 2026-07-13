@@ -3564,9 +3564,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               value={editRulesText}
               onChange={(e) => setEditRulesText(e.target.value)}
               disabled={updateTournament.isPending}
-              rows={4}
-              placeholder="대회 규정을 입력해 주세요."
-              className={textareaCls}
+              rows={16}
+              placeholder="대회 규정을 입력해 주세요. 참가 자격, 경기 방식, 경기 진행, 순위 결정 기준 등 긴 문서도 그대로 붙여넣을 수 있어요."
+              className={`${textareaCls} font-mono text-[12px] leading-relaxed`}
             />
           </div>
 
@@ -3577,9 +3577,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               value={editRefundPolicyText}
               onChange={(e) => setEditRefundPolicyText(e.target.value)}
               disabled={updateTournament.isPending}
-              rows={3}
-              placeholder="환불 정책을 입력해 주세요."
-              className={textareaCls}
+              rows={12}
+              placeholder="환불 정책을 입력해 주세요. 신청·입금 안내, 환불 기준, 예외 사항 등 긴 문서도 그대로 붙여넣을 수 있어요."
+              className={`${textareaCls} font-mono text-[12px] leading-relaxed`}
             />
           </div>
 

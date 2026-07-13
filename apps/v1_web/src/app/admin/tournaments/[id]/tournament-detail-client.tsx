@@ -1725,8 +1725,10 @@ function BracketTab({
                 />
               </div>
 
-              {/* Away team — exclude home selection */}
-              <div className="flex flex-col gap-1">
+              {/* Away team — exclude home selection.
+                  sm:col-span-2 only when 소속 조 필드가 있어 항목 수가 홀수(5)가 될 때 —
+                  짝수(4, 소속조 없음)일 때 걸면 오히려 그 경우에 빈 칸이 생긴다. */}
+              <div className={`flex flex-col gap-1${groups.length > 0 ? ' sm:col-span-2' : ''}`}>
                 <label htmlFor="fixture-away" className="text-[13px] text-gray-900">
                   어웨이 팀 (선택)
                   {awayBooked && (

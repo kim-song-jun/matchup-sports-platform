@@ -402,12 +402,13 @@ function FeaturedMatchCard({
              * [taste-A] 히어로 카드 주요 CTA — solid blue primary 버튼 1개.
              * 기존에는 카드 자체(Link)가 CTA 역할을 암묵적으로 맡고 있었으나,
              * 시각적 종착점(explicit CTA)이 없어 행동 유도력이 약했다.
-             * 카드 전체 Link를 유지하되, 카드 내부에 시각적 CTA를 추가해
+             * 카드 전체 Link를 유지하되, 카드 내부 CTA 버튼을 추가해
              * 명시적 행동 신호를 제공한다. (R-K5: CTA 화면당 최대 1개)
              * <a> 안에 <button>(interactive-in-interactive) 중첩은 HTML5 스펙 위반이라
              * 비-interactive 요소(span)로 렌더링한다(Copilot 리뷰 지적, PR #51).
-             * marginTop:auto(.tm-featured-cta) — 대회 히어로(TournamentHeroCard)와 짝을
-             * 이루는 flex column 하단 고정. 두 카드 텍스트 길이가 달라도 바닥 경계가 맞는다.
+             * .tm-featured-cta(marginTop:12px 고정) — 대회 히어로(TournamentHeroCard)와
+             * 짝을 이루는 텍스트→버튼 간격. 카드 바닥 경계 정합은 .tm-featured-card의
+             * height:100%가 담당하므로 버튼 자체는 하단 고정 대신 텍스트 바로 아래 붙인다.
              */}
             <span
               className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"

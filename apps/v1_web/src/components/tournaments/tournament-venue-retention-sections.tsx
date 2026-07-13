@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { Trophy, LayoutGrid, Star, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import type {
   V1TournamentFixture,
@@ -55,18 +57,25 @@ export function TournamentVenuePrepSection({
 }
 
 export function TournamentPostEventHubSection({
+  tournamentId,
   status,
   fixtures,
   hasAnnouncements,
   sponsorCount,
   announcements,
 }: {
+  tournamentId: string;
   status: V1TournamentStatus;
   fixtures: V1TournamentFixture[];
   hasAnnouncements: boolean;
   sponsorCount?: number;
   announcements: TournamentAnnouncementSummary[];
 }) {
+  // completed: verbose 5카드 대신 Toss식 컴팩트 액션 리스트로 대체(스크롤·복잡도 축소).
+  if (status === 'completed') {
+    return <TournamentCompletedActionList tournamentId={tournamentId} />;
+  }
+
   const hasCompletedFixture = fixtures.some(
     (fixture) => fixture.status === 'completed' && fixture.result !== null,
   );
@@ -105,6 +114,97 @@ export function TournamentPostEventHubSection({
           </Card>
         ))}
       </div>
+    </section>
+  );
+}
+
+type CompletedActionItem = {
+  key: string;
+  label: string;
+  caption: string;
+  href: string;
+  icon: ReactNode;
+};
+
+/**
+ * completed 전용 Toss식 컴팩트 액션 리스트 — 결과·시상 / 대진표·조별 순위 / 후기·매너 평가
+ * 3개 행을 하나의 Card에 hairline 구분선으로 묶는다. 각 row 전체가 링크(44px+ 터치 타겟).
+ * 하이라이트 영상 "준비 중"·협찬 "공지 대기" 같은 빈 placeholder는 제거하고, "다음 대회" 링크도
+ * Toss 절제 원칙에 따라 생략했다(핵심 3개 행만 유지).
+ */
+function TournamentCompletedActionList({ tournamentId }: { tournamentId: string }) {
+  const items: CompletedActionItem[] = [
+    {
+      key: 'results',
+      label: '최종 결과·시상',
+      caption: '최종 순위와 시상 내역을 확인해요',
+      href: `/tournaments/${tournamentId}/results`,
+      icon: <Trophy size={18} strokeWidth={2} aria-hidden="true" />,
+    },
+    {
+      key: 'bracket',
+      label: '대진표·조별 순위',
+      caption: '전체 경기 기록과 순위를 확인해요',
+      href: `/tournaments/${tournamentId}/bracket`,
+      icon: <LayoutGrid size={18} strokeWidth={2} aria-hidden="true" />,
+    },
+    {
+      key: 'reviews',
+      label: '후기·매너 평가',
+      caption: '함께한 팀에게 리뷰를 남겨요',
+      href: '/my/reviews',
+      icon: <Star size={18} strokeWidth={2} aria-hidden="true" />,
+    },
+  ];
+
+  return (
+    <section aria-labelledby="post-event-heading" style={{ marginTop: 24 }}>
+      <div id="post-event-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+        대회 후 더보기
+      </div>
+      <Card pad={0} style={{ overflow: 'hidden' }}>
+        {items.map((item, idx) => (
+          <Link
+            key={item.key}
+            href={item.href}
+            className="tm-list-row-interactive tm-pressable"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              minHeight: 60,
+              padding: '12px 16px',
+              borderBottom: idx < items.length - 1 ? '1px solid var(--border)' : 'none',
+              textDecoration: 'none',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                flexShrink: 0,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'var(--blue50)',
+                color: 'var(--blue500)',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              {item.icon}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
+                {item.label}
+              </div>
+              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 1 }}>
+                {item.caption}
+              </div>
+            </div>
+            <ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" style={{ color: 'var(--text-caption)', flexShrink: 0 }} />
+          </Link>
+        ))}
+      </Card>
     </section>
   );
 }

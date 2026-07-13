@@ -329,6 +329,20 @@
     line-height: 1;
   }
 
+  /* "count unknown" generic indicator — shares .tm-desktop-nav-badge's exact
+   * anchor (top:3px/right:3px) so it doesn't visually drift once the real
+   * count loads and the numeric badge takes over. */
+  .tm-desktop-nav-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--red500);
+    border: 2px solid var(--bg);
+  }
+
   /* Account avatar — desktop-only top-right entry to My page. */
   .tm-desktop-nav-avatar {
     display: inline-flex;

@@ -74,7 +74,10 @@ export class TournamentPlayersService {
     }
   }
 
-  private assertRosterMutable(registration: V1TournamentRegistration) {
+  private assertRosterMutable(
+    registration: V1TournamentRegistration,
+    tournament: { rosterDeadlineAt: Date | null },
+  ) {
     if (registration.rosterLockedAt) {
       throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
     }
@@ -82,6 +85,17 @@ export class TournamentPlayersService {
       throw new ConflictException({
         code: 'REGISTRATION_ROSTER_NOT_MUTABLE',
         message: '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.',
+      });
+    }
+    // 명단 제출 마감 하드 차단 — 어드민이 해당 팀에 개별 예외(rosterDeadlineOverrideAt)를 부여한 경우만 예외.
+    if (
+      tournament.rosterDeadlineAt &&
+      new Date() > tournament.rosterDeadlineAt &&
+      !registration.rosterDeadlineOverrideAt
+    ) {
+      throw new ConflictException({
+        code: 'ROSTER_DEADLINE_PASSED',
+        message: '명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.',
       });
     }
   }
@@ -122,15 +136,15 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    this.assertRosterMutable(registration);
-
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      select: { maxPlayers: true, minPlayers: true },
+      select: { maxPlayers: true, minPlayers: true, rosterDeadlineAt: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
+
+    this.assertRosterMutable(registration, tournament);
 
     // 활성 선수 수 < maxPlayers 가드
     const activeCount = await this.prisma.v1TournamentPlayer.count({
@@ -222,7 +236,14 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    this.assertRosterMutable(registration);
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: { rosterDeadlineAt: true },
+    });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, registrationId, removedAt: null },
@@ -251,7 +272,14 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    this.assertRosterMutable(registration);
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: { rosterDeadlineAt: true },
+    });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, registrationId, removedAt: null },

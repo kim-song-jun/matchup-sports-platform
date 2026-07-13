@@ -108,6 +108,7 @@ export class TournamentsAdminService {
           title: dto.title,
           format: dto.format ?? 'group_knockout',
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
+          rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           venue: dto.venue ?? null,
@@ -205,6 +206,9 @@ export class TournamentsAdminService {
     if (dto.format !== undefined) data.format = dto.format;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
+    }
+    if (dto.rosterDeadlineAt !== undefined) {
+      data.rosterDeadlineAt = dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null;
     }
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
     if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
@@ -330,6 +334,7 @@ export class TournamentsAdminService {
       status: row.status,
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
+      rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,

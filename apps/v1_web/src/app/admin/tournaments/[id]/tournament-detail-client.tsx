@@ -4506,9 +4506,11 @@ function ReviewsTab({
               onChange={(e) => setHideReason(e.target.value)}
               disabled={hideReview.isPending}
               rows={3}
+              maxLength={200}
               placeholder="예: 욕설/비방 신고 접수"
               className={textareaCls}
             />
+            <p className="text-[11px] text-gray-400 text-right">{hideReason.length}/200</p>
           </div>
           <div className="flex gap-2 mt-1">
             <button

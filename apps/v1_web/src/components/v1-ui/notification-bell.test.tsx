@@ -88,6 +88,23 @@ describe('NotificationBellLink', () => {
     expect(indicator).toBeInTheDocument();
   });
 
+  it('uses unknownDotClassName (not the default .tm-unread-dot) for the count-unknown state when a caller anchors its badge elsewhere', () => {
+    mockUnreadCount(0);
+
+    render(
+      <NotificationBellLink
+        className="bell"
+        forceUnread
+        badgeClassName="tm-desktop-nav-badge"
+        unknownDotClassName="tm-desktop-nav-dot"
+      />,
+    );
+
+    const link = screen.getByRole('link');
+    expect(link.querySelector('.tm-desktop-nav-dot')).toBeInTheDocument();
+    expect(link.querySelector('.tm-unread-dot')).not.toBeInTheDocument();
+  });
+
   it('shows the real numeric badge (not the generic indicator) once the count is known, even with forceUnread set', () => {
     mockUnreadCount(7);
 

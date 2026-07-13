@@ -15,6 +15,15 @@ type NotificationBellProps = {
    * of a numeric badge — omit it to get the default numeric badge.
    */
   dotClassName?: string;
+  /**
+   * Dot class used only for the "count unknown" state (forceUnread=true but
+   * the real unreadCount hasn't loaded yet). Defaults to `dotClassName ??
+   * 'tm-unread-dot'`. Pass this when badgeClassName anchors the badge at a
+   * different position than the shared `.tm-unread-dot` (e.g. desktop nav's
+   * `.tm-desktop-nav-badge` sits at top:3px/right:3px, not the default
+   * top:4px/right:2px) so the two indicators share the same visual anchor.
+   */
+  unknownDotClassName?: string;
   forceUnread?: boolean;
   iconSize?: number;
   onClick?: () => void;
@@ -49,15 +58,17 @@ function UnreadIndicator({
   unknown,
   badgeClassName,
   dotClassName,
+  unknownDotClassName,
 }: {
   unreadCount: number;
   unknown: boolean;
   badgeClassName: string;
   dotClassName?: string;
+  unknownDotClassName?: string;
 }) {
   if (unknown) {
     // 개수를 모를 때는 숫자를 지어내지 않고 범용 표시(도트)만 노출
-    return <span className={dotClassName ?? 'tm-unread-dot'} aria-hidden="true" />;
+    return <span className={unknownDotClassName ?? dotClassName ?? 'tm-unread-dot'} aria-hidden="true" />;
   }
   if (unreadCount <= 0) return null;
   if (dotClassName) {
@@ -75,6 +86,7 @@ export function NotificationBellLink({
   ariaLabel = '알림',
   badgeClassName = 'tm-unread-badge',
   dotClassName,
+  unknownDotClassName,
   forceUnread = false,
   iconSize = 21,
 }: NotificationBellProps) {
@@ -82,7 +94,13 @@ export function NotificationBellLink({
   return (
     <Link className={className} href="/notifications" aria-label={buildAriaLabel(ariaLabel, count, unknown)}>
       <BellIcon size={iconSize} strokeWidth={2} />
-      <UnreadIndicator unreadCount={count} unknown={unknown} badgeClassName={badgeClassName} dotClassName={dotClassName} />
+      <UnreadIndicator
+        unreadCount={count}
+        unknown={unknown}
+        badgeClassName={badgeClassName}
+        dotClassName={dotClassName}
+        unknownDotClassName={unknownDotClassName}
+      />
     </Link>
   );
 }
@@ -92,6 +110,7 @@ export function NotificationBellButton({
   ariaLabel = '알림',
   badgeClassName = 'tm-unread-badge',
   dotClassName,
+  unknownDotClassName,
   forceUnread = false,
   iconSize = 20,
   onClick,
@@ -100,7 +119,13 @@ export function NotificationBellButton({
   return (
     <button className={className} type="button" aria-label={buildAriaLabel(ariaLabel, count, unknown)} onClick={onClick}>
       <BellIcon size={iconSize} strokeWidth={2} />
-      <UnreadIndicator unreadCount={count} unknown={unknown} badgeClassName={badgeClassName} dotClassName={dotClassName} />
+      <UnreadIndicator
+        unreadCount={count}
+        unknown={unknown}
+        badgeClassName={badgeClassName}
+        dotClassName={dotClassName}
+        unknownDotClassName={unknownDotClassName}
+      />
     </button>
   );
 }

@@ -429,6 +429,21 @@ export type V1Team = {
   minLevel?: { code: string; name: string } | null;
   maxLevel?: { code: string; name: string } | null;
   genderRule?: string | null;
+  /**
+   * 팀장 — nickname/displayName 미설정 시 백엔드에서 '팀장'으로 폴백(항상 non-empty).
+   * optional인 이유: 이 필드를 아직 채우지 않는 기존 fixture/mock과의 하위 호환
+   * (V1Team의 다른 대다수 필드와 동일하게 optional 컨벤션을 따름).
+   */
+  owner?: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+  /** 감독 — manager 역할 멤버가 없으면 null */
+  manager?: {
+    userId: string;
+    displayName: string;
+  } | null;
   viewerRole?: string;
   viewerJoinState?: string;
 };

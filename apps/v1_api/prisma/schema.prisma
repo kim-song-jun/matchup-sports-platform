@@ -1123,7 +1123,9 @@ model V1StatusChangeLog {
 
 model V1Inquiry {
   id          String                @id @default(uuid())
-  userId      String                @map("user_id")
+  userId      String?               @map("user_id")
+  guestEmail  String?               @map("guest_email")
+  guestPhone  String?               @map("guest_phone")
   category    V1InquiryCategory
   title       String
   body        String
@@ -1135,7 +1137,7 @@ model V1Inquiry {
   createdAt   DateTime              @default(now()) @map("created_at")
   updatedAt   DateTime              @updatedAt @map("updated_at")
 
-  user    V1User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    V1User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies V1InquiryReply[]
 
   @@index([userId, status, createdAt])

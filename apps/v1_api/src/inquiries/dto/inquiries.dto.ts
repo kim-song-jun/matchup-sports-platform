@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsEmail, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export const inquiryCategories = [
   'account',
@@ -59,4 +59,16 @@ export class CreateInquiryDto {
   @IsString()
   @MaxLength(80)
   relatedId?: string;
+
+  /** 비로그인(게스트) 문의자의 이메일 — userId가 없을 때 guestPhone과 함께 최소 1개 필수 */
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(120)
+  guestEmail?: string;
+
+  /** 비로그인(게스트) 문의자의 전화번호 — userId가 없을 때 guestEmail과 함께 최소 1개 필수 */
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9-]{9,20}$/)
+  guestPhone?: string;
 }

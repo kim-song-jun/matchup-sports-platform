@@ -73,7 +73,15 @@ function formatDateTime(value: string | null | undefined) {
 }
 
 function requesterLabel(row: V1AdminInquiryRow) {
-  return row.requesterName ?? row.requesterEmail ?? row.userId.slice(0, 8);
+  if (row.isGuest) return '비회원';
+  return row.requesterName ?? row.requesterEmail ?? row.userId?.slice(0, 8) ?? '알 수 없음';
+}
+
+function requesterContact(row: V1AdminInquiryRow) {
+  const email = row.isGuest ? row.guestEmail : row.requesterEmail;
+  const phone = row.isGuest ? row.guestPhone : null;
+  if (email && phone) return `${email} · ${phone}`;
+  return email ?? phone ?? '-';
 }
 
 export default function AdminInquiriesPage() {
@@ -179,7 +187,7 @@ export default function AdminInquiriesPage() {
             meta: [
               { icon: <Tag size={14} aria-hidden="true" />, label: CATEGORY_LABEL[row.category] },
               { icon: <UserRound size={14} aria-hidden="true" />, label: requesterLabel(row) },
-              { icon: <Mail size={14} aria-hidden="true" />, label: row.requesterEmail ?? '-' },
+              { icon: <Mail size={14} aria-hidden="true" />, label: requesterContact(row) },
               { icon: <MessageSquareText size={14} aria-hidden="true" />, label: `답변 ${row.replyCount}` },
               { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
             ],

@@ -127,8 +127,11 @@ export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
   return {
     inquiryId: inquiry.inquiryId,
     userId: 'user-1',
+    isGuest: false,
     requesterName: '송준',
     requesterEmail: 'songjun@example.com',
+    guestEmail: null,
+    guestPhone: null,
     category: inquiry.category,
     title: inquiry.title,
     status: inquiry.status,

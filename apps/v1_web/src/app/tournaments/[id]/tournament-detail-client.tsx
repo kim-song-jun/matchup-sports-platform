@@ -23,6 +23,7 @@ import {
   TournamentVenuePrepSection,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import {
   formatTournamentDateShort,
@@ -600,6 +601,7 @@ export function TournamentDetailView({
         <FormatLeftSections tournament={tournament} />
       </div>
 
+      <TournamentInquirySection tournamentId={tournament.id} />
     </>
   );
 
@@ -697,6 +699,8 @@ export function TournamentDetailView({
           </div>
         </AccordionSection>
       </div>
+
+      <TournamentInquirySection tournamentId={tournament.id} />
     </>
   );
 

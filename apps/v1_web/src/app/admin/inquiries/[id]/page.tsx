@@ -59,8 +59,26 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
-function requesterName(inquiry: { requesterName: string | null; requesterEmail: string | null; userId: string }) {
-  return inquiry.requesterName ?? inquiry.requesterEmail ?? inquiry.userId.slice(0, 8);
+function requesterName(inquiry: {
+  requesterName: string | null;
+  requesterEmail: string | null;
+  userId: string | null;
+  isGuest: boolean;
+}) {
+  if (inquiry.isGuest) return '비회원';
+  return inquiry.requesterName ?? inquiry.requesterEmail ?? inquiry.userId?.slice(0, 8) ?? '알 수 없음';
+}
+
+function requesterContact(inquiry: {
+  requesterEmail: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
+  isGuest: boolean;
+}) {
+  const email = inquiry.isGuest ? inquiry.guestEmail : inquiry.requesterEmail;
+  const phone = inquiry.isGuest ? inquiry.guestPhone : null;
+  if (email && phone) return `${email} · ${phone}`;
+  return email ?? phone ?? '-';
 }
 
 export default function AdminInquiryDetailPage() {
@@ -186,7 +204,7 @@ export default function AdminInquiryDetailPage() {
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Mail size={14} aria-hidden="true" />
-                    {inquiry.requesterEmail ?? '-'}
+                    {requesterContact(inquiry)}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <Clock size={14} aria-hidden="true" />

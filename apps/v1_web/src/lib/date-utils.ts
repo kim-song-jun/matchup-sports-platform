@@ -51,6 +51,20 @@ export function formatTournamentDateLong(dateStr: string | null | undefined): st
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`;
 }
 
+/**
+ * 상세 슬롯용 날짜+시각 형식: 'M월 D일 (요일) HH:MM'
+ * 명단 제출 마감일처럼 시각까지 정확히 안내해야 하는 슬롯에서 사용해요.
+ * dateStr 이 없거나 invalid 이면 null 반환.
+ */
+export function formatTournamentDateTimeLong(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]}) ${hh}:${mm}`;
+}
+
 export function formatTournamentDateRangeLong(
   startStr: string | null | undefined,
   endStr: string | null | undefined,

@@ -253,7 +253,7 @@ function datetimeLocalValueToIso(value: string): string | null {
 /** h-[44px] unified submit button (f12) */
 const submitBtnCls = [
   'inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl',
-  'whitespace-nowrap shrink-0',
+  'whitespace-nowrap',
   'text-[13px] text-white bg-blue-500 hover:bg-blue-600',
   'transition-colors disabled:opacity-50',
   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',

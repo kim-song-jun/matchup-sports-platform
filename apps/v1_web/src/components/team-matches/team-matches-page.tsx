@@ -10,7 +10,8 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
-import { cssUrl, publicAssetPath } from '@/lib/assets';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { cssUrl } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
   TeamMatchDetailViewModel,
@@ -145,15 +146,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
    * Desktop 우측 컬럼에 이동해 40% 보이드를 채움(T1). 모바일은 기존 위치 유지. */
   const hostTeamCard = (
     <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
-      {/* 팀 로고 아바타 */}
-      <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, overflow: 'hidden', background: 'var(--grey100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {match.hostTeamLogoUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={publicAssetPath(match.hostTeamLogoUrl)} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <span className="tm-text-subhead" style={{ color: 'var(--text-caption)' }}>{match.hostTeam.slice(0, 1)}</span>
-        )}
-      </div>
+      {/* 팀 로고 아바타 — 원본은 48px였으나 TeamAvatar 표준 사이즈 중 가장 근접한 md(40px)로 통일 */}
+      <TeamAvatar seed={match.hostTeamId ?? match.hostTeam} name={match.hostTeam} logoUrl={match.hostTeamLogoUrl} size="md" />
       {/* 팀 정보 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>홈팀 정보</div>

@@ -68,6 +68,7 @@ export type TeamMatchDetailViewModel = {
     description: string;
     address: string;
     hostTeamHref?: string;
+    hostTeamId?: string | null;
     hostTeamLogoUrl?: string | null;
     hostTeamTrustState?: string | null;
     applicantActionError?: string | null;

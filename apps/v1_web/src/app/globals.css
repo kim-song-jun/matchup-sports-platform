@@ -2624,31 +2624,6 @@ button:disabled {
   outline-offset: 2px;
 }
 
-.tm-team-logo {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
-  background: var(--grey900);
-  color: var(--static-white);
-  display: grid;
-  place-items: center;
-  font-size: 20px;
-  font-weight: 800;
-  flex: 0 0 auto;
-}
-
-.tm-team-card:active .tm-team-logo,
-.tm-team-logo-large {
-  background: var(--blue500);
-}
-
-.tm-team-logo-large {
-  width: 60px;
-  height: 60px;
-  border-radius: 18px;
-  font-size: 22px;
-}
-
 .tm-team-inline-stats {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;

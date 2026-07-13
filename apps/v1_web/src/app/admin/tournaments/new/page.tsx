@@ -20,6 +20,7 @@ const FORM_SECTIONS = [
   { id: 'tsec-basic', label: '기본 정보' },
   { id: 'tsec-team', label: '팀·선수 설정' },
   { id: 'tsec-fee', label: '참가비·계좌' },
+  { id: 'tsec-prize', label: '상금·시상' },
   { id: 'tsec-rules', label: '규정·환불 정책' },
 ] as const;
 
@@ -586,11 +587,64 @@ export default function AdminTournamentsNewPage() {
                 </FormField>
               </div>
 
+              {/* 은행/계좌/예금주 — 3열 한 행 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField id="bank-name" label="은행명">
+                  <input
+                    id="bank-name"
+                    type="text"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 국민은행"
+                    maxLength={20}
+                    className={inputCls}
+                  />
+                </FormField>
+
+                <FormField id="bank-account" label="계좌번호">
+                  <input
+                    id="bank-account"
+                    type="text"
+                    value={bankAccount}
+                    onChange={(e) => setBankAccount(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 123-456-789012"
+                    maxLength={30}
+                    className={inputCls}
+                  />
+                </FormField>
+
+                <FormField id="bank-holder" label="예금주">
+                  <input
+                    id="bank-holder"
+                    type="text"
+                    value={bankHolder}
+                    onChange={(e) => setBankHolder(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 티밋 주식회사"
+                    maxLength={30}
+                    className={inputCls}
+                  />
+                </FormField>
+              </div>
+            </div>
+          </section>
+
+          {/* ── 상금 / 시상 ──────────────────────────────────────────── */}
+          <section id="tsec-prize" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
+            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-1">
+              상금 · 시상 <span className="font-medium text-[var(--text-caption)]">(선택)</span>
+            </h2>
+            <p className="text-[var(--font-size-caption)] text-[var(--text-caption)] mb-4">
+              현금 상금 없이 트로피·상품권 같은 물품만으로도 구성할 수 있어요.
+            </p>
+            <div className="flex flex-col gap-4">
               {/* 총상금 — 숫자 */}
               <FormField
                 id="prize-pool"
                 label="총상금 (원)"
-                hint="시상·리뷰 페이지의 '총 상금' 카드에 표시돼요"
+                hint="현금 상금 합계예요. 물품만 있다면 비워 두세요 — 시상·리뷰 페이지의 '총 상금' 카드에 표시돼요"
               >
                 <input
                   id="prize-pool"
@@ -638,48 +692,6 @@ export default function AdminTournamentsNewPage() {
                   className={textareaCls}
                 />
               </FormField>
-
-              {/* 은행/계좌/예금주 — 3열 한 행 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField id="bank-name" label="은행명">
-                  <input
-                    id="bank-name"
-                    type="text"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 국민은행"
-                    maxLength={20}
-                    className={inputCls}
-                  />
-                </FormField>
-
-                <FormField id="bank-account" label="계좌번호">
-                  <input
-                    id="bank-account"
-                    type="text"
-                    value={bankAccount}
-                    onChange={(e) => setBankAccount(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 123-456-789012"
-                    maxLength={30}
-                    className={inputCls}
-                  />
-                </FormField>
-
-                <FormField id="bank-holder" label="예금주">
-                  <input
-                    id="bank-holder"
-                    type="text"
-                    value={bankHolder}
-                    onChange={(e) => setBankHolder(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 티밋 주식회사"
-                    maxLength={30}
-                    className={inputCls}
-                  />
-                </FormField>
-              </div>
             </div>
           </section>
 

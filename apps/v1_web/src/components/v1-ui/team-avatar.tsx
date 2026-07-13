@@ -9,7 +9,7 @@ const SIZE_MAP: Record<TeamAvatarSize, { px: number; radius: number }> = {
   sm: { px: 28, radius: 8 },
   md: { px: 40, radius: 14 },
   lg: { px: 54, radius: 16 },
-  xl: { px: 60, radius: 18 },
+  xl: { px: 72, radius: 22 },
 };
 
 /**

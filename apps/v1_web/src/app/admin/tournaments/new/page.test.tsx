@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import { useV1CreateTournament, useV1MasterSports, useV1UploadImages } from '@/hooks/use-v1-api';
+import { publicAssetPath } from '@/lib/assets';
 import AdminTournamentsNewPage from './page';
 
 vi.mock('next/navigation', () => ({
@@ -189,7 +190,9 @@ describe('AdminTournamentsNewPage — 커버 이미지 업로드', () => {
     fireEvent.change(fileInput, { target: { files: [file] } });
 
     const preview = await screen.findByAltText('');
-    expect(preview).toHaveAttribute('src', '/uploads/cover-test.jpg');
+    // publicAssetPath()를 거쳐 렌더링되므로 원본 문자열을 그대로 하드코딩하지 않고
+    // 같은 함수로 기대값을 계산한다(NEXT_PUBLIC_BASE_PATH가 설정된 환경에서도 안전).
+    expect(preview).toHaveAttribute('src', publicAssetPath('/uploads/cover-test.jpg'));
     expect(screen.getByRole('button', { name: '이미지 변경' })).toBeInTheDocument();
   });
 

@@ -4,11 +4,11 @@ import { publicAssetPath } from '@/lib/assets';
 
 export type TeamAvatarSize = 'sm' | 'md' | 'lg' | 'xl';
 
-const SIZE_MAP: Record<TeamAvatarSize, { px: number; radius: number; fontSize: number }> = {
-  sm: { px: 28, radius: 8, fontSize: 12 },
-  md: { px: 40, radius: 14, fontSize: 15 },
-  lg: { px: 54, radius: 16, fontSize: 20 },
-  xl: { px: 60, radius: 18, fontSize: 22 },
+const SIZE_MAP: Record<TeamAvatarSize, { px: number; radius: number }> = {
+  sm: { px: 28, radius: 8 },
+  md: { px: 40, radius: 14 },
+  lg: { px: 54, radius: 16 },
+  xl: { px: 60, radius: 18 },
 };
 
 /**

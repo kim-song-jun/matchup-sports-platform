@@ -63,8 +63,9 @@ export function TournamentPostEventHubSection({
     return <TournamentCompletedActionList tournamentId={tournamentId} />;
   }
 
-  // draft/open/closed: 대회가 아직 시작도 안 했는데 "대회 후" 콘텐츠를 보여줄 단계가
-  // 아니다 — 예전엔 이 상태에서도 전부 "준비 중"인 5카드를 그대로 노출해 혼란을 줬다.
+  // draft/open/closed/cancelled: 대회가 아직 시작도 안 했거나(draft/open/closed) 취소되어
+  // (cancelled) "대회 후" 콘텐츠를 보여줄 단계가 아니다 — 예전엔 이 상태에서도 전부 "준비 중"인
+  // 5카드를 그대로 노출해 혼란을 줬다.
   if (status !== 'in_progress') {
     return null;
   }

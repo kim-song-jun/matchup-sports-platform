@@ -51,8 +51,8 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     expect(screen.getByText('대회 후 더보기')).toBeInTheDocument();
   });
 
-  it('renders nothing for draft/open/closed tournaments — too early for any "대회 후" content', () => {
-    for (const status of ['draft', 'open', 'closed'] as const) {
+  it('renders nothing for draft/open/closed/cancelled tournaments — too early (or cancelled) for any "대회 후" content', () => {
+    for (const status of ['draft', 'open', 'closed', 'cancelled'] as const) {
       const { container, unmount } = render(
         createElement(TournamentPostEventHubSection, {
           tournamentId: 'tour-42',

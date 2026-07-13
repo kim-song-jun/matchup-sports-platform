@@ -24,8 +24,13 @@ import {
   Trophy,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   AlertCircle,
   Undo2,
+  Search,
+  Star,
+  Timer,
+  TimerOff,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { onlyDigits, formatWithComma, formatIfNumeric } from '@/lib/number-format';
@@ -45,6 +50,8 @@ import {
   useV1RejectCancelRequest,
   useV1RosterLock,
   useV1RosterUnlock,
+  useV1RosterDeadlineOverrideGrant,
+  useV1RosterDeadlineOverrideRevoke,
   useV1ExportRosterCsv,
   useV1TournamentPlayers,
   useV1UpdatePlayerEligibility,
@@ -69,6 +76,9 @@ import {
   useV1UploadVideo,
   useV1AdminTournamentAwards,
   useV1SetTournamentAwards,
+  useV1AdminTournamentReviews,
+  useV1HideReview,
+  useV1UnhideReview,
 } from '@/hooks/use-v1-api';
 import type {
   V1TournamentStatus,
@@ -82,6 +92,7 @@ import type {
   V1AnnouncementCategory,
   V1UpdateTournamentPayload,
   V1TournamentAward,
+  V1AdminTournamentReview,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
@@ -372,7 +383,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'awards';
+type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'reviews' | 'awards';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'info', label: '대회 정보' },
@@ -380,6 +391,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'bracket', label: '대진 관리' },
   { id: 'announcements', label: '공지' },
   { id: 'sponsors', label: '협찬' },
+  { id: 'reviews', label: '리뷰 관리' },
   { id: 'awards', label: '개인 어워드' },
 ];
 
@@ -509,7 +521,9 @@ function ExportCsvButton({
 
 // ── Tab: Registrations ────────────────────────────────────────────────────
 
-function RegistrationsTab({
+// exported for component-level testing (roster deadline override toggle) — see
+// tournament-detail-registrations-tab.test.tsx
+export function RegistrationsTab({
   tournamentId,
   showToast,
   tournamentTeamCount,
@@ -526,6 +540,8 @@ function RegistrationsTab({
   const rejectCancelRequest = useV1RejectCancelRequest();
   const rosterLock = useV1RosterLock();
   const rosterUnlock = useV1RosterUnlock();
+  const rosterDeadlineOverrideGrant = useV1RosterDeadlineOverrideGrant();
+  const rosterDeadlineOverrideRevoke = useV1RosterDeadlineOverrideRevoke();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
   const { confirm: confirmDialog, ConfirmModal } = useConfirm();
@@ -655,6 +671,28 @@ function RegistrationsTab({
         onSuccess: () => showToast('명단 잠금을 해제했어요.', 'success'),
         onError: (err) =>
           showToast(extractErrorMessage(err, '명단 잠금 해제에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRosterDeadlineOverrideGrant = (reg: V1AdminTournamentRegistration) => {
+    rosterDeadlineOverrideGrant.mutate(
+      reg.id,
+      {
+        onSuccess: () => showToast('명단 제출 마감 예외를 허용했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '마감 예외 허용에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRosterDeadlineOverrideRevoke = (reg: V1AdminTournamentRegistration) => {
+    rosterDeadlineOverrideRevoke.mutate(
+      reg.id,
+      {
+        onSuccess: () => showToast('예외를 해제했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '예외 해제에 실패했어요.'), 'error'),
       },
     );
   };
@@ -885,6 +923,24 @@ function RegistrationsTab({
                     disabled={rosterLock.isPending}
                     icon={<Lock size={13} />}
                     label="명단 잠금"
+                    tone="gray"
+                  />
+                ))}
+              {reg.status === 'confirmed' &&
+                (reg.rosterDeadlineOverrideAt ? (
+                  <ActionButton
+                    onClick={() => handleRosterDeadlineOverrideRevoke(reg)}
+                    disabled={rosterDeadlineOverrideRevoke.isPending}
+                    icon={<TimerOff size={13} />}
+                    label="예외 해제"
+                    tone="gray"
+                  />
+                ) : (
+                  <ActionButton
+                    onClick={() => handleRosterDeadlineOverrideGrant(reg)}
+                    disabled={rosterDeadlineOverrideGrant.isPending}
+                    icon={<Timer size={13} />}
+                    label="마감 예외 허용"
                     tone="gray"
                   />
                 ))}
@@ -2698,6 +2754,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editScheduledAt, setEditScheduledAt] = useState('');
   const [editScheduledEndAt, setEditScheduledEndAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
+  const [editRosterDeadlineAt, setEditRosterDeadlineAt] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editEntryFee, setEditEntryFee] = useState('');
   const [editTeamCount, setEditTeamCount] = useState('');
@@ -2739,6 +2796,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditScheduledAt(isoToDatetimeLocalValue(tournament.scheduledAt));
     setEditScheduledEndAt(isoToDatetimeLocalValue(tournament.scheduledEndAt));
     setEditDeadlineAt(isoToDatetimeLocalValue(tournament.registrationDeadlineAt));
+    setEditRosterDeadlineAt(isoToDatetimeLocalValue(tournament.rosterDeadlineAt));
     setEditVenue(tournament.venue ?? '');
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
@@ -2798,6 +2856,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     if (editDeadlineAt !== isoToDatetimeLocalValue(tournament.registrationDeadlineAt)) {
       const deadlineAtIso = datetimeLocalValueToIso(editDeadlineAt);
       if (deadlineAtIso) payload.registrationDeadlineAt = deadlineAtIso;
+    }
+    if (editRosterDeadlineAt !== isoToDatetimeLocalValue(tournament.rosterDeadlineAt)) {
+      const rosterDeadlineAtIso = datetimeLocalValueToIso(editRosterDeadlineAt);
+      if (rosterDeadlineAtIso) payload.rosterDeadlineAt = rosterDeadlineAtIso;
     }
     if (editVenue.trim()) payload.venue = editVenue.trim();
     // 빈 입력은 전송하지 않는다 — Number('')===0 이라 참가비가 0원으로 덮어써진다
@@ -3039,6 +3101,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             { label: '신청 수', value: `${tournament.registrationCount}팀` },
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
+            { label: '명단 마감', value: formatDate(tournament.rosterDeadlineAt) },
             { label: '대회 일정', value: scheduleLabel },
             { label: '상품 및 상금', value: tournament.prizeSummary || '—' },
           ].map(({ label, value }) => (
@@ -3272,6 +3335,20 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       </div>
 
       <div
+        id="panel-reviews"
+        role="tabpanel"
+        aria-labelledby="tab-reviews"
+        hidden={activeTab !== 'reviews'}
+      >
+        {activeTab === 'reviews' && (
+          <ReviewsTab
+            tournamentId={id}
+            showToast={showToast}
+          />
+        )}
+      </div>
+
+      <div
         id="panel-awards"
         role="tabpanel"
         aria-labelledby="tab-awards"
@@ -3355,6 +3432,17 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 type="datetime-local"
                 value={editDeadlineAt}
                 onChange={(e) => setEditDeadlineAt(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-roster-deadline-at" className="text-[13px] text-gray-900">명단 제출 마감일</label>
+              <input
+                id="edit-roster-deadline-at"
+                type="datetime-local"
+                value={editRosterDeadlineAt}
+                onChange={(e) => setEditRosterDeadlineAt(e.target.value)}
                 disabled={updateTournament.isPending}
                 className={inputCls}
               />
@@ -3799,6 +3887,7 @@ function InfoTab({
         <InfoRow label="장소" value={tournament.venue ?? '미정'} />
         <InfoRow label="대회 기간" value={formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt)} />
         <InfoRow label="신청 마감" value={formatDate(tournament.registrationDeadlineAt)} />
+        <InfoRow label="명단 마감" value={formatDate(tournament.rosterDeadlineAt)} />
         <InfoRow label="참가비" value={formatCurrency(tournament.entryFee)} />
         <InfoRow label="팀 수" value={`${tournament.teamCount}팀`} />
         <InfoRow label="선수 구성" value={`${tournament.minPlayers}~${tournament.maxPlayers}명`} />
@@ -4218,6 +4307,349 @@ function AwardRow({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+// ── ReviewsTab (리뷰 모더레이션) ──────────────────────────────────────────
+
+const REVIEWS_PAGE_SIZE = 10;
+
+function ReviewsTab({
+  tournamentId,
+  showToast,
+}: {
+  tournamentId: string;
+  showToast: (msg: string, v?: 'success' | 'error') => void;
+}) {
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [hideTarget, setHideTarget] = useState<V1AdminTournamentReview | null>(null);
+  const [hideReason, setHideReason] = useState('');
+
+  const { data, isPending, isError, error, refetch, isFetching } = useV1AdminTournamentReviews(
+    tournamentId,
+    { page, pageSize: REVIEWS_PAGE_SIZE, search: search || undefined },
+  );
+  const hideReview = useV1HideReview(tournamentId);
+  const unhideReview = useV1UnhideReview(tournamentId);
+
+  const reviews = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / REVIEWS_PAGE_SIZE));
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    setSearch(searchInput.trim());
+  };
+
+  const closeHideModal = () => {
+    if (hideReview.isPending) return;
+    setHideTarget(null);
+    setHideReason('');
+  };
+
+  const handleHideConfirm = () => {
+    if (!hideTarget) return;
+    hideReview.mutate(
+      { reviewId: hideTarget.id, reason: hideReason.trim() || undefined },
+      {
+        onSuccess: (res) => {
+          showToast(res.alreadyHidden ? '이미 숨겨진 리뷰예요.' : '리뷰를 숨겼어요.', 'success');
+          setHideTarget(null);
+          setHideReason('');
+        },
+        onError: (err) => showToast(extractErrorMessage(err, '처리에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleUnhide = (review: V1AdminTournamentReview) => {
+    unhideReview.mutate(
+      { reviewId: review.id },
+      {
+        onSuccess: (res) => {
+          showToast(res.alreadyVisible ? '이미 공개된 리뷰예요.' : '리뷰를 다시 공개했어요.', 'success');
+        },
+        onError: (err) => showToast(extractErrorMessage(err, '처리에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  return (
+    <div className="p-4">
+      <div className="mb-4">
+        <h3 className="text-[15px] font-bold text-gray-900">리뷰 관리</h3>
+        <p className="text-[12px] text-gray-500 mt-0.5">
+          부적절한 리뷰를 숨기거나 다시 공개할 수 있어요. 숨긴 리뷰는 사용자 화면에서 보이지 않아요.
+        </p>
+      </div>
+
+      <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1">
+          <label htmlFor="review-search" className="sr-only">리뷰 검색</label>
+          <span
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            aria-hidden="true"
+          >
+            <Search size={16} />
+          </span>
+          <input
+            id="review-search"
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="작성자, 팀명, 후기 내용으로 검색"
+            className="w-full h-[44px] pl-9 pr-3 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+          />
+        </div>
+        <button
+          type="submit"
+          className="h-[44px] px-4 inline-flex items-center justify-center bg-gray-100 text-gray-700 text-[13px] font-semibold rounded-xl hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        >
+          검색
+        </button>
+      </form>
+
+      {isPending ? (
+        <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 p-3.5 animate-pulse">
+              <div className="h-3.5 w-1/3 rounded bg-gray-100" />
+              <div className="mt-2 h-2.5 w-2/3 rounded bg-gray-100" />
+              <div className="mt-3 h-10 rounded-lg bg-gray-100" />
+            </div>
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="bg-white rounded-2xl border border-gray-100 py-10 px-4 flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-red-500 font-medium">
+            {extractErrorMessage(error, '리뷰를 불러오지 못했어요.')}
+          </p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="text-sm text-blue-500 hover:text-blue-600 underline underline-offset-2 min-h-[44px] px-3 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          >
+            다시 시도하기
+          </button>
+        </div>
+      ) : reviews.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <AdminEmpty
+            title={search ? '검색 결과가 없어요' : '등록된 리뷰가 없어요'}
+            description={
+              search
+                ? '다른 검색어로 다시 시도해보세요.'
+                : '참가팀의 후기가 등록되면 여기에서 볼 수 있어요.'
+            }
+          />
+        </div>
+      ) : (
+        <>
+          <p className="text-[12px] text-gray-400 mb-2">총 {total}개</p>
+          <div className="flex flex-col gap-3" style={{ opacity: isFetching ? 0.6 : 1 }}>
+            {reviews.map((review) => (
+              <ReviewModerationCard
+                key={review.id}
+                review={review}
+                onHide={() => { setHideTarget(review); setHideReason(''); }}
+                onUnhide={() => handleUnhide(review)}
+                unhidePending={unhideReview.isPending}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                aria-label="이전 페이지"
+                className="w-[44px] h-[44px] inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                <ChevronLeft size={16} aria-hidden="true" />
+              </button>
+              <span className="text-[13px] text-gray-600 tabular-nums">{page} / {totalPages}</span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                aria-label="다음 페이지"
+                className="w-[44px] h-[44px] inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                <ChevronRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      <SimpleModal
+        open={!!hideTarget}
+        title="리뷰 숨기기"
+        onClose={closeHideModal}
+        pending={hideReview.isPending}
+      >
+        <div className="flex flex-col gap-3">
+          <p className="text-[13px] text-gray-600">
+            이 리뷰를 사용자에게 숨길까요? 숨긴 리뷰는 관리자만 볼 수 있어요.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="hide-reason" className="text-[13px] text-gray-900">숨김 사유 (선택)</label>
+            <textarea
+              id="hide-reason"
+              value={hideReason}
+              onChange={(e) => setHideReason(e.target.value)}
+              disabled={hideReview.isPending}
+              rows={3}
+              placeholder="예: 욕설/비방 신고 접수"
+              className={textareaCls}
+            />
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button
+              type="button"
+              onClick={closeHideModal}
+              disabled={hideReview.isPending}
+              className="flex-1 h-[44px] rounded-xl text-[13px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleHideConfirm}
+              disabled={hideReview.isPending}
+              className="flex-1 h-[44px] rounded-xl text-[13px] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              {hideReview.isPending ? '처리 중...' : '숨기기'}
+            </button>
+          </div>
+        </div>
+      </SimpleModal>
+    </div>
+  );
+}
+
+// ── ReviewsTab 카드 컴포넌트 ────────────────────────────────────────────────
+
+function ReviewModerationCard({
+  review,
+  onHide,
+  onUnhide,
+  unhidePending,
+}: {
+  review: V1AdminTournamentReview;
+  onHide: () => void;
+  onUnhide: () => void;
+  unhidePending: boolean;
+}) {
+  const isHidden = !!review.hiddenAt;
+  const letter = (review.authorNickname || '?').charAt(0);
+  const photoUrls = review.photoUrls ?? [];
+
+  return (
+    <div
+      className={[
+        'rounded-xl border p-3.5',
+        isHidden ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100',
+      ].join(' ')}
+    >
+      <div className="flex items-start gap-3">
+        {review.authorProfileImageUrl ? (
+          <img
+            src={publicAssetPath(review.authorProfileImageUrl)}
+            alt=""
+            aria-hidden="true"
+            className="w-9 h-9 rounded-full object-cover shrink-0"
+          />
+        ) : (
+          <div
+            aria-hidden="true"
+            className="w-9 h-9 rounded-full bg-gray-100 text-gray-500 text-[13px] font-semibold flex items-center justify-center shrink-0"
+          >
+            {letter}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-[13px] font-semibold text-gray-900 truncate">{review.authorNickname}</p>
+            {review.teamName && (
+              <span className="text-[12px] text-gray-400 truncate">· {review.teamName}</span>
+            )}
+            {isHidden && (
+              <span className="inline-flex items-center h-5 px-2 rounded-full bg-gray-200 text-gray-600 text-[11px] font-semibold">
+                숨김
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="inline-flex items-center gap-0.5" aria-label={`별점 ${review.rating}점`}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star
+                  key={i}
+                  size={13}
+                  aria-hidden="true"
+                  className={i < review.rating ? 'fill-amber-400 stroke-amber-400' : 'fill-none stroke-gray-300'}
+                />
+              ))}
+            </span>
+            <span className="text-[11px] text-gray-400">{formatDate(review.createdAt)}</span>
+          </div>
+        </div>
+      </div>
+
+      {review.comment && (
+        <p className="text-[13px] text-gray-700 mt-2.5 leading-relaxed whitespace-pre-wrap break-words">
+          {review.comment}
+        </p>
+      )}
+
+      {photoUrls.length > 0 && (
+        <div className="flex gap-2 mt-2.5 flex-wrap">
+          {photoUrls.map((url) => (
+            <a
+              key={url}
+              href={publicAssetPath(url)}
+              target="_blank"
+              rel="noreferrer"
+              className="block w-14 h-14 rounded-lg overflow-hidden border border-gray-100 shrink-0"
+            >
+              <img src={publicAssetPath(url)} alt="" className="w-full h-full object-cover" />
+            </a>
+          ))}
+        </div>
+      )}
+
+      {isHidden && review.hiddenReason && (
+        <p className="text-[12px] text-gray-500 mt-2.5 bg-gray-100 rounded-lg px-3 py-2">
+          숨김 사유: {review.hiddenReason}
+        </p>
+      )}
+
+      <div className="mt-3">
+        {isHidden ? (
+          <button
+            type="button"
+            onClick={onUnhide}
+            disabled={unhidePending}
+            className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            {unhidePending ? '처리 중...' : '공개로 전환'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onHide}
+            className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            숨기기
+          </button>
+        )}
+      </div>
     </div>
   );
 }

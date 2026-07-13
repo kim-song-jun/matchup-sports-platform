@@ -106,6 +106,7 @@ import type {
   V1PendingTournamentReview,
   V1TournamentReview,
   V1TournamentReviewsPage,
+  V1AdminTournamentReviewsPage,
   V1TournamentAward,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
@@ -1713,6 +1714,48 @@ export function useV1SetTournamentAwards(tournamentId: string) {
   });
 }
 
+/** 어드민: 리뷰 모더레이션 목록 조회 */
+export function useV1AdminTournamentReviews(
+  tournamentId: string,
+  params?: { page?: number; pageSize?: number; search?: string },
+) {
+  return useQuery({
+    queryKey: ['admin-tournament-reviews', tournamentId, params],
+    queryFn: () =>
+      v1Get<V1AdminTournamentReviewsPage>(`/admin/tournaments/${tournamentId}/reviews`, params),
+    enabled: !!tournamentId,
+  });
+}
+
+/** 어드민: 리뷰 숨기기 */
+export function useV1HideReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId, reason }: { reviewId: string; reason?: string }) =>
+      v1Patch<{ alreadyHidden: boolean }>(
+        `/admin/tournaments/${tournamentId}/reviews/${reviewId}/hide`,
+        { reason },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-reviews', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 리뷰 다시 공개하기 */
+export function useV1UnhideReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId }: { reviewId: string }) =>
+      v1Patch<{ alreadyVisible: boolean }>(
+        `/admin/tournaments/${tournamentId}/reviews/${reviewId}/unhide`,
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-reviews', tournamentId] });
+    },
+  });
+}
+
 export function useV1CreateRegistration(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2116,6 +2159,41 @@ export function useV1RosterUnlock() {
     mutationFn: (registrationId: string) =>
       v1Api<V1AdminTournamentRegistration>(
         `/admin/registrations/${registrationId}/roster-lock`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
+/** 명단 제출 마감 예외 부여 — 마감이 지나도 해당 신청 팀은 명단을 계속 수정할 수 있게 한다 */
+export function useV1RosterDeadlineOverrideGrant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationId: string) =>
+      v1Post<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/roster-deadline-override`,
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
+/** 명단 제출 마감 예외 해제 */
+export function useV1RosterDeadlineOverrideRevoke() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationId: string) =>
+      v1Api<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/roster-deadline-override`,
         { method: 'DELETE' },
       ),
     onSuccess: (_data) => {

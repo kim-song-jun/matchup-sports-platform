@@ -161,20 +161,71 @@ function ParticipantTeamList({
           key={team.registrationId}
           style={{
             display: 'grid',
-            gridTemplateColumns: '1fr auto',
+            gridTemplateColumns: 'auto 1fr auto',
             alignItems: 'center',
             gap: 12,
             minHeight: 44,
           }}
         >
-          <div className="tm-text-label" style={{ color: 'var(--text-strong)', minWidth: 0 }}>
-            {team.teamName}
+          <TeamLogo name={team.teamName} logoUrl={team.teamLogoUrl} />
+          <div style={{ minWidth: 0 }}>
+            <div
+              className="tm-text-label"
+              style={{ color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {team.teamName}
+            </div>
+            {team.teamRegionName ? (
+              <div
+                className="tm-text-caption"
+                style={{ color: 'var(--text-caption)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {team.teamRegionName}
+              </div>
+            ) : null}
           </div>
           <span className={`tm-badge ${badgeClass}`} style={{ whiteSpace: 'nowrap' }}>
             {label}
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function TeamLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  const initial = Array.from(name.trim())[0] ?? '';
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        background: 'var(--grey100)',
+        display: 'grid',
+        placeItems: 'center',
+        flexShrink: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <span aria-hidden="true" className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
+        {initial}
+      </span>
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt=""
+          width={28}
+          height={28}
+          loading="lazy"
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: 'var(--grey50)' }}
+        />
+      ) : null}
     </div>
   );
 }

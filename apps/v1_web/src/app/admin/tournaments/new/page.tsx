@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, Check } from 'lucide-react';
-import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
+import { useV1CreateTournament, useV1MasterSports, useV1UploadImages } from '@/hooks/use-v1-api';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { extractErrorMessage } from '@/lib/error-message';
+import { publicAssetPath } from '@/lib/assets';
 import type { V1TournamentFormat } from '@/types/api';
 import {
   AdminPageHeader,
@@ -251,6 +252,70 @@ function DatetimeTextInput({
   );
 }
 
+// ── Cover image upload field ──────────────────────────────────────────────
+
+function CoverImageUploadField({
+  coverImageUrl,
+  uploading,
+  onSelectFile,
+  onClear,
+}: {
+  coverImageUrl: string | null;
+  uploading: boolean;
+  onSelectFile: (file: File) => void;
+  onClear: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      {coverImageUrl ? (
+        <img
+          src={publicAssetPath(coverImageUrl)}
+          alt=""
+          className="w-20 h-20 rounded-xl object-cover border border-[var(--border)] flex-shrink-0"
+        />
+      ) : null}
+      <div className="flex items-center gap-2 flex-wrap">
+        <label htmlFor="cover-image-input" className="sr-only">
+          커버 이미지 파일 선택
+        </label>
+        <input
+          id="cover-image-input"
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onSelectFile(file);
+            e.target.value = '';
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="inline-flex items-center justify-center h-[38px] px-4 rounded-lg text-[var(--font-size-caption)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        >
+          {uploading ? '업로드 중…' : coverImageUrl ? '이미지 변경' : '이미지 선택'}
+        </button>
+        {coverImageUrl ? (
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={uploading}
+            className="inline-flex items-center justify-center h-[38px] px-4 rounded-lg text-[var(--font-size-caption)] font-semibold text-[var(--text-caption)] hover:text-[var(--red500)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            제거
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTournamentsNewPage() {
@@ -258,6 +323,7 @@ export default function AdminTournamentsNewPage() {
   const { toasts, showToast } = useAdminToast();
   const { data: sports, isPending: sportsPending } = useV1MasterSports();
   const createMutation = useV1CreateTournament();
+  const uploadImages = useV1UploadImages();
 
   // ── Form state ──────────────────────────────────────────────────────
   const [sportId, setSportId] = useState('');
@@ -270,6 +336,7 @@ export default function AdminTournamentsNewPage() {
   // 사용자가 명단 제출 마감일을 직접 수정하면 true로 전환 — 이후 대회 시작일 변경에 따른 자동 제안을 멈춘다
   const [rosterDeadlineTouched, setRosterDeadlineTouched] = useState(false);
   const [venue, setVenue] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [teamCount, setTeamCount] = useState('');
   const [minPlayers, setMinPlayers] = useState('');
   const [maxPlayers, setMaxPlayers] = useState('');
@@ -284,6 +351,19 @@ export default function AdminTournamentsNewPage() {
   const [refundPolicyText, setRefundPolicyText] = useState('');
 
   const isPending = createMutation.isPending;
+
+  // 커버 이미지는 선택 즉시 업로드하고 반환된 URL만 폼 상태에 보관한다 —
+  // 팀 생성 폼(teams-form-client.tsx)과 동일한 "생성 전 업로드" 패턴.
+  const handleCoverFileSelect = async (file: File) => {
+    try {
+      const result = await uploadImages.mutateAsync([file]);
+      const url = result.urls[0];
+      if (!url) throw new Error('이미지를 올리지 못했어요. 다시 시도해 주세요.');
+      setCoverImageUrl(url);
+    } catch (err) {
+      showToast(extractErrorMessage(err, '이미지 업로드에 실패했어요.'), 'error');
+    }
+  };
 
   // 대회 시작일이 바뀌면 명단 제출 마감일을 자동으로 제안한다(시작 7일 전 23:59) —
   // 사용자가 이미 직접 수정했다면(rosterDeadlineTouched) 값을 덮어쓰지 않는다.
@@ -365,6 +445,7 @@ export default function AdminTournamentsNewPage() {
         ...(registrationDeadlineAtIso ? { registrationDeadlineAt: registrationDeadlineAtIso } : {}),
         ...(rosterDeadlineAtIso ? { rosterDeadlineAt: rosterDeadlineAtIso } : {}),
         ...(venue.trim() ? { venue: venue.trim() } : {}),
+        ...(coverImageUrl ? { coverImageUrl } : {}),
         teamCount: parseInt(teamCount, 10),
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
@@ -549,6 +630,21 @@ export default function AdminTournamentsNewPage() {
                     className={inputCls}
                   />
                 </FormField>
+              </div>
+
+              <div className="md:col-span-2 flex flex-col gap-1.5">
+                <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+                  커버 이미지 <span className="font-medium text-[var(--text-caption)]">(선택)</span>
+                </span>
+                <CoverImageUploadField
+                  coverImageUrl={coverImageUrl}
+                  uploading={uploadImages.isPending}
+                  onSelectFile={(file) => void handleCoverFileSelect(file)}
+                  onClear={() => setCoverImageUrl(null)}
+                />
+                <p className="text-[var(--font-size-caption)] text-[var(--text-caption)]">
+                  대회 목록·상세 상단에 표시돼요. JPG, PNG, WebP, GIF
+                </p>
               </div>
             </div>
           </section>

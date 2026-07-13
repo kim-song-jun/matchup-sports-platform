@@ -24,6 +24,13 @@ export interface SportAccent {
   badgeBg: string;
   /** CSS var color for badge text */
   badgeText: string;
+  /**
+   * 아이콘 배지 그라디언트의 어두운 쪽 stop(항상 `dot`보다 한 단계 진한 색).
+   * `linear-gradient(135deg, dot 0%, gradientTo 100%)` 형태로 사용 — 대회 상세
+   * 헤더의 트로피 배지(`linear-gradient(135deg, var(--blue500), var(--blue600))`)와
+   * 동일한 시각 언어를 카드형 종목 아이콘에도 적용하기 위함(TournamentCard).
+   */
+  gradientTo: string;
 }
 
 /** Accent map keyed by v1 sport code (lower-case, matches DB `v1Sport.code`). */
@@ -34,24 +41,28 @@ const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
     badgeText: 'var(--green500)',
+    gradientTo: 'var(--green600)',
   },
   futsal: {
     label: '풋살',
     dot: 'var(--blue500)',
     badgeBg: 'var(--blue50)',
     badgeText: 'var(--blue500)',
+    gradientTo: 'var(--blue600)',
   },
   running: {
     label: '러닝',
     dot: 'var(--orange500)',
     badgeBg: 'var(--orange50)',
     badgeText: 'var(--orange500)',
+    gradientTo: 'var(--orange600)',
   },
   swimming: {
     label: '수영',
     dot: 'var(--teal500)',
     badgeBg: 'var(--teal50)',
     badgeText: 'var(--teal500)',
+    gradientTo: 'var(--teal600)',
   },
   // ── Additional codes that may appear if new sports are seeded ──────────
   basketball: {
@@ -59,42 +70,49 @@ const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
     dot: 'var(--orange500)',
     badgeBg: 'var(--orange50)',
     badgeText: 'var(--orange500)',
+    gradientTo: 'var(--orange600)',
   },
   badminton: {
     label: '배드민턴',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
     badgeText: 'var(--green500)',
+    gradientTo: 'var(--green600)',
   },
   tennis: {
     label: '테니스',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
     badgeText: 'var(--green500)',
+    gradientTo: 'var(--green600)',
   },
   baseball: {
     label: '야구',
     dot: 'var(--orange500)',
     badgeBg: 'var(--orange50)',
     badgeText: 'var(--orange500)',
+    gradientTo: 'var(--orange600)',
   },
   volleyball: {
     label: '배구',
     dot: 'var(--blue500)',
     badgeBg: 'var(--blue50)',
     badgeText: 'var(--blue500)',
+    gradientTo: 'var(--blue600)',
   },
   cycling: {
     label: '사이클',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
     badgeText: 'var(--green500)',
+    gradientTo: 'var(--green600)',
   },
   golf: {
     label: '골프',
     dot: 'var(--green500)',
     badgeBg: 'var(--green50)',
     badgeText: 'var(--green500)',
+    gradientTo: 'var(--green600)',
   },
 };
 
@@ -104,6 +122,7 @@ const FALLBACK_ACCENT: SportAccent = {
   dot: 'var(--grey400)',
   badgeBg: 'var(--grey100)',
   badgeText: 'var(--grey600)',
+  gradientTo: 'var(--grey600)',
 };
 
 /**

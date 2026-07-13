@@ -8,7 +8,8 @@ import { ChevronDown, Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
-import { cssUrl, publicAssetPath } from '@/lib/assets';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { cssUrl } from '@/lib/assets';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -343,7 +344,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             >
               <ShareIcon size={20} />
             </button>
-            <TeamLogo team={team} large />
+            <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
             <h2 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h2>
             <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
@@ -443,7 +444,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           >
             <ShareIcon size={20} />
           </button>
-          <TeamLogo team={team} large />
+          <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
           <h1 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h1>
           <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
@@ -837,8 +838,6 @@ function TeamLogoField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const trimmedName = teamName.trim();
-  const fallbackChar = trimmedName ? Array.from(trimmedName)[0] : '팀';
 
   const handleFile = async (file: File | undefined) => {
     if (!file || !uploadImage) return;
@@ -861,13 +860,8 @@ function TeamLogoField({
         팀 로고 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
-        <div className="tm-team-logo tm-team-logo-large" style={{ overflow: 'hidden' }} aria-hidden="true">
-          {logoUrl ? (
-            <img src={publicAssetPath(logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            fallbackChar
-          )}
-        </div>
+        {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용(TeamAvatar 자체 fallback과 동일 규칙). */}
+        <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -884,7 +878,10 @@ function TeamLogoField({
               </button>
             ) : null}
           </div>
-          <div className="tm-text-caption">정사각형 이미지를 권장해요. 안 올려도 첫 글자로 표시돼요.</div>
+          <div className="tm-text-caption">
+            정사각형·투명 배경 이미지를 권장해요. 배경색이 있는 이미지는 테두리처럼 보일 수 있어요.
+            안 올려도 팀 아이콘이 자동으로 만들어져요.
+          </div>
         </div>
         <input
           ref={inputRef}
@@ -1003,7 +1000,6 @@ function TeamFormPreview({
   const gender = team.genderRule || '성별 무관';
   const intro = team.description.trim();
   const activity = formatActivityPreview(team);
-  const logoChar = hasName ? Array.from(trimmedName)[0] : '팀';
   return (
     <div aria-hidden="true">
       <div className="tm-text-caption" style={{ fontWeight: 600, color: 'var(--text-caption)', marginBottom: 8 }}>
@@ -1011,13 +1007,8 @@ function TeamFormPreview({
       </div>
       <div className="tm-team-card" style={{ cursor: 'default' }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <div className="tm-team-logo" style={{ overflow: 'hidden' }}>
-            {team.logoUrl ? (
-              <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              logoChar
-            )}
-          </div>
+          {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용 — 위 TeamLogoField 미리보기와 동일 색으로 보인다. */}
+          <TeamAvatar seed={team.name} name={team.name} logoUrl={team.logoUrl} size="lg" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-body-lg line-clamp-2" style={{ color: hasName ? 'var(--text-strong)' : 'var(--text-caption)' }}>
               {hasName ? trimmedName : '팀 이름'}
@@ -1402,7 +1393,7 @@ function TeamCard({ team }: { team: TeamModel }) {
   return (
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <TeamLogo team={team} />
+        <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
         <div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
       </div>
       {/* 실제 팀 소개가 있을 때만 intro-box를 렌더한다. */}
@@ -1433,18 +1424,6 @@ function formatCapacity(team: Pick<TeamModel, 'capacity'>) {
 
 function dedupeTags(tags: string[]) {
   return Array.from(new Set(tags.filter(Boolean)));
-}
-
-function TeamLogo({ team, large }: { team: Pick<TeamModel, 'logo' | 'logoUrl'>; large?: boolean }) {
-  return (
-    <div className={`tm-team-logo ${large ? 'tm-team-logo-large' : ''}`} style={{ overflow: 'hidden' }}>
-      {team.logoUrl ? (
-        <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        team.logo
-      )}
-    </div>
-  );
 }
 
 function SectionTitle({ title, sub }: { title: string; sub: string }) {

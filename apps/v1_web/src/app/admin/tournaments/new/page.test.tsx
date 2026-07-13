@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
-import { useV1CreateTournament, useV1MasterSports } from '@/hooks/use-v1-api';
+import { useV1CreateTournament, useV1MasterSports, useV1UploadImages } from '@/hooks/use-v1-api';
+import { publicAssetPath } from '@/lib/assets';
 import AdminTournamentsNewPage from './page';
 
 vi.mock('next/navigation', () => ({
@@ -11,10 +12,12 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateTournament: vi.fn(),
   useV1MasterSports: vi.fn(),
+  useV1UploadImages: vi.fn(),
 }));
 
 const useV1CreateTournamentMock = vi.mocked(useV1CreateTournament);
 const useV1MasterSportsMock = vi.mocked(useV1MasterSports);
+const useV1UploadImagesMock = vi.mocked(useV1UploadImages);
 
 // SectionStepper(작성 단계 스크롤스파이)가 IntersectionObserver를 사용한다 —
 // jsdom엔 구현체가 없으므로 렌더가 깨지지 않도록 최소 스텁만 제공한다(불가피한 브라우저 API mock).
@@ -51,6 +54,10 @@ describe('AdminTournamentsNewPage — 명단 제출 마감일', () => {
       mutate: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof useV1CreateTournament>);
+    useV1UploadImagesMock.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ urls: ['/uploads/cover-test.jpg'] }),
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1UploadImages>);
   });
 
   it('auto-fills the roster deadline to 7 days before the tournament start at 23:59', () => {
@@ -151,5 +158,73 @@ describe('AdminTournamentsNewPage — 명단 제출 마감일', () => {
 
     const submitButton = screen.getByRole('button', { name: '대회 만들기' });
     expect(submitButton).toBeDisabled();
+  });
+});
+
+describe('AdminTournamentsNewPage — 커버 이미지 업로드', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  beforeEach(() => {
+    useV1MasterSportsMock.mockReturnValue({
+      data: [{ id: 'sport-futsal', name: '풋살', levels: [] }],
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1MasterSports>);
+    useV1CreateTournamentMock.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1CreateTournament>);
+  });
+
+  it('uploads the selected file and shows a preview thumbnail', async () => {
+    useV1UploadImagesMock.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ urls: ['/uploads/cover-test.jpg'] }),
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1UploadImages>);
+
+    renderPage();
+
+    const file = new File(['cover'], 'cover.png', { type: 'image/png' });
+    const fileInput = screen.getByLabelText('커버 이미지 파일 선택');
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    const preview = await screen.findByAltText('');
+    // publicAssetPath()를 거쳐 렌더링되므로 원본 문자열을 그대로 하드코딩하지 않고
+    // 같은 함수로 기대값을 계산한다(NEXT_PUBLIC_BASE_PATH가 설정된 환경에서도 안전).
+    expect(preview).toHaveAttribute('src', publicAssetPath('/uploads/cover-test.jpg'));
+    expect(screen.getByRole('button', { name: '이미지 변경' })).toBeInTheDocument();
+  });
+
+  it('includes coverImageUrl in the submit payload once an upload succeeds', async () => {
+    const mutate = vi.fn();
+    useV1CreateTournamentMock.mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1CreateTournament>);
+    useV1UploadImagesMock.mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ urls: ['/uploads/cover-test.jpg'] }),
+      isPending: false,
+    } as unknown as ReturnType<typeof useV1UploadImages>);
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
+    fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText(/명단 제출 마감일/), { target: { value: '2026-05-01 10:00' } });
+
+    const file = new File(['cover'], 'cover.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('커버 이미지 파일 선택'), { target: { files: [file] } });
+    await screen.findByAltText('');
+
+    const submitButton = screen.getByRole('button', { name: '대회 만들기' });
+    await waitFor(() => expect(submitButton).not.toBeDisabled());
+    fireEvent.click(submitButton);
+
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ coverImageUrl: '/uploads/cover-test.jpg' }),
+      expect.anything(),
+    );
   });
 });

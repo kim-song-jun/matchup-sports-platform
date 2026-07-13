@@ -824,6 +824,7 @@ export function TournamentRosterPageClient({
   const isRosterEditBlockedByStatus =
     registration?.status === 'cancel_requested' || registration?.status === 'cancelled';
   const rosterDeadlineAt = tournament?.rosterDeadlineAt ?? null;
+  const rosterDeadlineFormatted = formatTournamentDateTimeLong(rosterDeadlineAt);
   const rosterDeadlineState = getRosterDeadlineState(
     rosterDeadlineAt,
     registration?.rosterDeadlineOverrideAt,
@@ -981,12 +982,12 @@ export function TournamentRosterPageClient({
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
         {/* Roster deadline info row */}
-        {rosterDeadlineAt && formatTournamentDateTimeLong(rosterDeadlineAt) ? (
+        {rosterDeadlineFormatted ? (
           <p
             className="tm-text-caption"
             style={{ color: 'var(--text-muted)', marginBottom: 10 }}
           >
-            {`명단 제출 마감: ${formatTournamentDateTimeLong(rosterDeadlineAt)}까지`}
+            {`명단 제출 마감: ${rosterDeadlineFormatted}까지`}
           </p>
         ) : null}
 

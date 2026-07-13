@@ -114,7 +114,7 @@ function invitationRow(overrides: Record<string, unknown> = {}) {
 describe('TeamsService', () => {
   let service: TeamsService;
   let prisma: {
-    v1Team: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1Team: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock };
     v1TeamJoinApplication: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
@@ -131,7 +131,7 @@ describe('TeamsService', () => {
 
   beforeEach(async () => {
     prisma = {
-      v1Team: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
+      v1Team: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn(), create: jest.fn() },
       v1TeamProfile: { upsert: jest.fn() },
       v1TeamMembership: {
         findFirst: jest.fn(),
@@ -275,6 +275,84 @@ describe('TeamsService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('list', () => {
+    it('includes owner and active manager in each list item', async () => {
+      prisma.v1Team.findMany.mockResolvedValueOnce([
+        {
+          ...teamRow(),
+          name: '테스트팀',
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [
+            {
+              ...membershipRow({ id: 'owner-membership', role: 'owner', userId: owner.id }),
+              user: { profile: { nickname: 'owner-nick', displayName: '오너', profileImageUrl: null } },
+            },
+            {
+              ...membershipRow({ id: 'manager-membership', role: 'manager', userId: manager.id }),
+              user: { profile: { nickname: 'manager-nick', displayName: '감독님', profileImageUrl: null } },
+            },
+          ],
+          joinApplications: [],
+          trustScore: null,
+          ownerUser: {
+            id: owner.id,
+            profile: { nickname: 'owner-nick', displayName: '오너', profileImageUrl: 'https://example.com/owner.png' },
+          },
+        },
+      ]);
+
+      const result = await service.list(null, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].owner).toEqual({
+        userId: owner.id,
+        displayName: '오너',
+        profileImageUrl: 'https://example.com/owner.png',
+      });
+      expect(result.items[0].manager).toEqual({
+        userId: manager.id,
+        displayName: '감독님',
+      });
+    });
+
+    it('returns manager=null when the team has no active manager', async () => {
+      prisma.v1Team.findMany.mockResolvedValueOnce([
+        {
+          ...teamRow(),
+          name: '테스트팀',
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [
+            {
+              ...membershipRow({ id: 'owner-membership', role: 'owner', userId: owner.id }),
+              user: { profile: { nickname: 'owner-nick', displayName: null, profileImageUrl: null } },
+            },
+            {
+              ...membershipRow({ id: 'member-membership', role: 'member', userId: member.id }),
+              user: { profile: { nickname: 'member-nick', displayName: null, profileImageUrl: null } },
+            },
+          ],
+          joinApplications: [],
+          trustScore: null,
+          ownerUser: { id: owner.id, profile: null },
+        },
+      ]);
+
+      const result = await service.list(null, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].owner).toEqual({
+        userId: owner.id,
+        displayName: '팀장',
+        profileImageUrl: null,
+      });
+      expect(result.items[0].manager).toBeNull();
     });
   });
 

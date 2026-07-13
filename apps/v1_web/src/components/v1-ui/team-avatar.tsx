@@ -142,6 +142,11 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
           // 깨진 이미지 아이콘(테두리 박스)이 onError 처리 전까지 잠깐 보이는 깜빡임이 있었다.
           // 로드 성공 확인 전까지 계속 투명 상태로 두면 그 깜빡임 자체가 발생하지 않는다.
           onLoad={(event) => {
+            // onError가 남긴 display:none을 되돌려야 한다 — 이전 logoUrl이 깨져 있다가
+            // 이후(재업로드 등으로) 유효한 URL로 바뀌었을 때, React가 style.display를
+            // 관리하지 않으므로(JSX style 객체에 display가 없음) 직접 되돌리지 않으면
+            // 새 이미지가 로드돼도 계속 숨겨진 채로 남는다.
+            event.currentTarget.style.display = '';
             event.currentTarget.style.opacity = '1';
           }}
           onError={(event) => {

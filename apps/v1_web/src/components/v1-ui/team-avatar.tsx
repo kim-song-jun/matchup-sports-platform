@@ -22,7 +22,7 @@ const PALETTE: { bg: string; fg: string }[] = [
   { bg: 'var(--teal50)', fg: 'var(--teal500)' },
 ];
 
-/** Deterministic small hash so the same team always lands on the same palette color. */
+/** Deterministic small hash so the same team always lands on the same palette color/pattern. */
 function hashSeed(seed: string): number {
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) {
@@ -31,8 +31,31 @@ function hashSeed(seed: string): number {
   return Math.abs(hash);
 }
 
+const IDENTICON_ROWS = 5;
+/** 왼쪽 절반(2열)+중앙(1열)만 계산하고 나머지 2열은 그대로 좌우 대칭 미러링한다(GitHub identicon 방식). */
+const IDENTICON_HALF_COLS = 3;
+
+/**
+ * GitHub 프로필의 identicon과 같은 방식 — 팀 id 해시로 5x5 좌우대칭 격자 무늬를 만들어
+ * 로고 없는 팀도 "생성된 로고"처럼 팀마다 고유하게 보이게 한다. 순수 함수라 같은 seed는
+ * 항상 같은 무늬를 낸다. 팀명은 옆에 항상 텍스트로 같이 표시되므로 무늬 자체는 장식용.
+ */
+function buildIdenticonCells(seed: string): boolean[][] {
+  const base = hashSeed(seed);
+  const cells: boolean[][] = [];
+  for (let row = 0; row < IDENTICON_ROWS; row += 1) {
+    const rowCells: boolean[] = [];
+    for (let col = 0; col < IDENTICON_HALF_COLS; col += 1) {
+      const cellHash = hashSeed(`${base}:${row}:${col}`);
+      rowCells.push(cellHash % 5 >= 2); // ~60% 채움 — 너무 성기거나 빽빽하지 않게
+    }
+    cells.push(rowCells);
+  }
+  return cells;
+}
+
 export interface TeamAvatarProps {
-  /** Stable identity for consistent color pick across renders/screens — pass team.id. */
+  /** Stable identity for consistent color/pattern pick across renders/screens — pass team.id. */
   seed: string;
   name: string;
   logoUrl?: string | null;
@@ -41,13 +64,16 @@ export interface TeamAvatarProps {
 }
 
 /**
- * 팀 기본 아이콘 — 로고 없는 팀에 팀 id 기반 팔레트 색 + 이름 첫 글자를 보여주고,
+ * 팀 기본 아이콘 — 로고 없는 팀에 팀 id 기반 identicon(색+기하학 무늬)을 보여주고,
  * logoUrl이 있으면 이미지로 덮는다. teams/tournaments/my 전 도메인 공용 컴포넌트.
  */
 export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: TeamAvatarProps) {
-  const { px, radius, fontSize } = SIZE_MAP[size];
-  const initial = Array.from(name.trim())[0] ?? '팀';
-  const palette = PALETTE[hashSeed(seed || name) % PALETTE.length];
+  const { px, radius } = SIZE_MAP[size];
+  const identitySeed = seed || name;
+  const palette = PALETTE[hashSeed(identitySeed) % PALETTE.length];
+  const cells = buildIdenticonCells(identitySeed);
+  const cellSize = px / IDENTICON_ROWS;
+  const cellRadius = cellSize * 0.22;
 
   return (
     <div
@@ -59,13 +85,30 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
         height: px,
         borderRadius: radius,
         background: palette.bg,
-        display: 'grid',
-        placeItems: 'center',
         flexShrink: 0,
         overflow: 'hidden',
       }}
     >
-      <span style={{ fontSize, fontWeight: 800, color: palette.fg, lineHeight: 1 }}>{initial}</span>
+      <svg width={px} height={px} viewBox={`0 0 ${px} ${px}`} style={{ position: 'absolute', inset: 0 }}>
+        {cells.flatMap((rowCells, row) =>
+          rowCells.flatMap((filled, col) => {
+            if (!filled) return [];
+            // col 2는 중앙열(미러링 없음), col 0·1은 우측(4·3열)에도 대칭 반사
+            const mirroredCols = col === IDENTICON_HALF_COLS - 1 ? [col] : [col, IDENTICON_ROWS - 1 - col];
+            return mirroredCols.map((c) => (
+              <rect
+                key={`${row}-${c}`}
+                x={c * cellSize}
+                y={row * cellSize}
+                width={cellSize}
+                height={cellSize}
+                rx={cellRadius}
+                fill={palette.fg}
+              />
+            ));
+          }),
+        )}
+      </svg>
       {logoUrl ? (
         <img
           src={publicAssetPath(logoUrl)}

@@ -215,6 +215,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           description: query.data.description ?? query.data.descriptionPreview ?? fallback.match.description,
           address: query.data.place?.addressText ?? query.data.placeName ?? fallback.match.address,
           hostTeamHref: query.data.hostTeam?.teamId ? `/teams/${query.data.hostTeam.teamId}` : undefined,
+          hostTeamId: query.data.hostTeam?.teamId ?? null,
           hostTeamLogoUrl: query.data.hostTeam?.logoUrl ?? null,
           hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
           applicantActionError: actionError,

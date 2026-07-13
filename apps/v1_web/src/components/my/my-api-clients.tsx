@@ -1449,8 +1449,9 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
 function toMyInvitationItem(invitation: V1ReceivedInvitation): MyInvitationItem {
   return {
     invitationId: invitation.invitationId,
+    teamId: invitation.team.teamId,
     teamName: invitation.team.name,
-    teamLogo: invitation.team.name.slice(0, 1),
+    logoUrl: invitation.team.logoUrl ?? null,
     invitedByName: invitation.invitedBy.displayName,
     message: invitation.message,
     dateLabel: new Date(invitation.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),

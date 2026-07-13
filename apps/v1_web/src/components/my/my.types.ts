@@ -126,8 +126,9 @@ export type SettingsViewModel = {
 
 export type MyInvitationItem = {
   invitationId: string;
+  teamId: string;
   teamName: string;
-  teamLogo: string;
+  logoUrl: string | null;
   invitedByName: string;
   message: string | null;
   dateLabel: string;

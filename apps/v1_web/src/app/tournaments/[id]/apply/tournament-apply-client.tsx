@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
 import {
@@ -16,7 +17,6 @@ import {
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { publicAssetPath } from '@/lib/assets';
 import { appRoute } from '@/lib/app-route';
 import { formatEntryFee } from '@/lib/date-utils';
 import type {
@@ -337,30 +337,7 @@ function TeamSelectStep({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {/* Team logo placeholder */}
-                      <div
-                        aria-hidden="true"
-                        style={{
-                          flexShrink: 0,
-                          width: 40,
-                          height: 40,
-                          borderRadius: 14,
-                          background: 'var(--grey100)',
-                          overflow: 'hidden',
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: 'var(--text-caption)',
-                          fontSize: 'var(--font-size-body-lg)',
-                        }}
-                      >
-                        {team.logoUrl ? (
-                          <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-caption)' }}>
-                            {team.name?.charAt(0)}
-                          </span>
-                        )}
-                      </div>
+                      <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <span

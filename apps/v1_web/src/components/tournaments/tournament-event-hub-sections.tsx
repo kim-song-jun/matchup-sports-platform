@@ -1,5 +1,5 @@
 import { Card } from '@/components/v1-ui/primitives';
-import { publicAssetPath } from '@/lib/assets';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import type { V1TournamentParticipantTeam } from '@/types/api';
 
 type ParticipantTeamBuckets = {
@@ -168,7 +168,7 @@ function ParticipantTeamList({
             minHeight: 44,
           }}
         >
-          <TeamLogo name={team.teamName} logoUrl={team.teamLogoUrl} />
+          <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
           <div style={{ minWidth: 0 }}>
             <div
               className="tm-text-label"
@@ -194,39 +194,3 @@ function ParticipantTeamList({
   );
 }
 
-function TeamLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
-  const initial = Array.from(name.trim())[0] ?? '';
-
-  return (
-    <div
-      style={{
-        position: 'relative',
-        width: 28,
-        height: 28,
-        borderRadius: 8,
-        background: 'var(--grey100)',
-        display: 'grid',
-        placeItems: 'center',
-        flexShrink: 0,
-        overflow: 'hidden',
-      }}
-    >
-      <span aria-hidden="true" className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
-        {initial}
-      </span>
-      {logoUrl ? (
-        <img
-          src={publicAssetPath(logoUrl)}
-          alt=""
-          width={28}
-          height={28}
-          loading="lazy"
-          onError={(event) => {
-            event.currentTarget.hidden = true;
-          }}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: 'var(--grey50)' }}
-        />
-      ) : null}
-    </div>
-  );
-}

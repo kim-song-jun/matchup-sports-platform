@@ -18,7 +18,8 @@ import { LogoutButton } from '@/components/auth/logout-button';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { cssUrl, publicAssetPath } from '@/lib/assets';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { cssUrl } from '@/lib/assets';
 import { PendingTournamentReviewCard } from '@/components/tournaments/pending-review-card';
 import { MyMemberCard } from './my-member-card';
 import type {
@@ -209,7 +210,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
             {model.invitations.map((invitation) => (
               <div key={invitation.invitationId} className="tm-invitation-card">
                 <div className="tm-invitation-card-head">
-                  <div className="tm-team-logo">{invitation.teamLogo}</div>
+                  <TeamAvatar seed={invitation.teamId} name={invitation.teamName} logoUrl={invitation.logoUrl} size="lg" />
                   <div className="tm-invitation-meta">
                     <div className="tm-invitation-meta-name">{invitation.teamName}</div>
                     <div className="tm-invitation-meta-sub">{invitation.invitedByName}님이 초대했어요</div>
@@ -264,7 +265,7 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
           {/* LEFT: hero + info + recent matches */}
           <div className="tm-my-team-detail-left">
             <section className="tm-my-team-hero">
-              <MyTeamLogo team={model.team} large />
+              <TeamAvatar seed={model.team.id} name={model.team.name} logoUrl={model.team.logoUrl} size="xl" />
               <div>
                 <h2 className="tm-text-heading">{model.team.name}</h2>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
@@ -458,7 +459,7 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
     <Link className="tm-my-team-card tm-pressable" href={`/teams/${team.id}`}>
-      <MyTeamLogo team={team} />
+      <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">
           <div className="tm-text-body-lg">{team.name}</div>
@@ -476,18 +477,6 @@ function MyTeamCard({ team }: { team: MyTeam }) {
       </div>
       <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
     </Link>
-  );
-}
-
-function MyTeamLogo({ team, large }: { team: Pick<MyTeam, 'logo' | 'logoUrl'>; large?: boolean }) {
-  return (
-    <div className={`tm-team-logo ${large ? 'tm-team-logo-large' : ''}`} style={{ overflow: 'hidden' }}>
-      {team.logoUrl ? (
-        <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        team.logo
-      )}
-    </div>
   );
 }
 

@@ -1,12 +1,22 @@
+import { createElement } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   getTournamentPostEventCards,
   getTournamentVenuePrepItems,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
-import { getParticipantTeamBuckets, getPrizeBreakdownChips, partitionTournamentSections } from './tournament-detail-client';
+import {
+  getCompletedChampionName,
+  getParticipantTeamBuckets,
+  getPrizeBreakdownChips,
+  partitionTournamentSections,
+  TournamentDetailView,
+} from './tournament-detail-client';
 import type {
+  V1TournamentDetail,
   V1TournamentFixture,
+  V1TournamentFixtureResult,
   V1TournamentGroup,
   V1TournamentParticipantTeam,
   V1TournamentSponsor,
@@ -73,6 +83,77 @@ function makeSponsor(overrides: Partial<V1TournamentSponsor> & Pick<V1Tournament
     eventDescription: null,
     eventResultText: null,
     sortOrder: 0,
+    ...overrides,
+  };
+}
+
+function makeFixtureResult(overrides: Partial<V1TournamentFixtureResult> = {}): V1TournamentFixtureResult {
+  return {
+    homeScore: 0,
+    awayScore: 0,
+    hasPenalty: false,
+    homePenaltyScore: null,
+    awayPenaltyScore: null,
+    note: null,
+    recordedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeTournament(
+  overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'id' | 'status' | 'format'>,
+): V1TournamentDetail {
+  return {
+    sportId: 'sport-futsal',
+    sport: { code: 'futsal', name: '풋살' },
+    title: '테스트 대회',
+    registrationDeadlineAt: null,
+    scheduledAt: null,
+    scheduledEndAt: null,
+    venue: null,
+    teamCount: 8,
+    minPlayers: 5,
+    maxPlayers: 10,
+    entryFee: 0,
+    prizePool: null,
+    prizeSummary: null,
+    prizeBreakdown: null,
+    promoHomeEnabled: false,
+    promoHomeTitle: null,
+    promoHomeSubtitle: null,
+    promoHomeImageUrl: null,
+    promoHomeBadgeText: null,
+    promoHomeDateText: null,
+    promoHomeTeamsText: null,
+    promoHomeLocationText: null,
+    promoHomePrizeText: null,
+    promoHomePriority: 0,
+    promoListEnabled: false,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    promoListPriority: 0,
+    bankName: null,
+    bankAccount: null,
+    bankHolder: null,
+    rulesText: null,
+    refundPolicyText: null,
+    confirmedCount: 0,
+    participantTeams: [],
+    pendingPaymentCount: 0,
+    groups: [],
+    fixtures: [],
+    announcements: [],
+    sponsors: [],
+    reviews: [],
+    awards: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -490,5 +571,213 @@ describe('partitionTournamentSections', () => {
       expect(result.knockoutFixtures.map((f) => f.id).sort()).toEqual(['f-final-orphan', 'f-semi-orphan']);
       expect(result.hasKnockoutFixtures).toBe(true);
     });
+  });
+});
+
+describe('getCompletedChampionName', () => {
+  it('returns the home team name when the final fixture result is a home win (knockout)', () => {
+    const final = makeFixture({
+      id: 'f-final',
+      round: 'final',
+      homeTeamName: '레드 FC',
+      awayTeamName: '블루 FC',
+      result: makeFixtureResult({ homeScore: 3, awayScore: 1 }),
+    });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'knockout', fixtures: [final] });
+
+    expect(getCompletedChampionName(tournament)).toBe('레드 FC');
+  });
+
+  it('matches the Korean "결승" round label used by admin-authored group_knockout fixtures', () => {
+    const final = makeFixture({
+      id: 'f-final',
+      round: '결승',
+      homeTeamName: '레드 FC',
+      awayTeamName: '블루 FC',
+      result: makeFixtureResult({ homeScore: 0, awayScore: 2 }),
+    });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'group_knockout', fixtures: [final] });
+
+    expect(getCompletedChampionName(tournament)).toBe('블루 FC');
+  });
+
+  it('resolves the winner via penalty shootout scores when regulation time ends level', () => {
+    const final = makeFixture({
+      id: 'f-final',
+      round: 'final',
+      homeTeamName: '레드 FC',
+      awayTeamName: '블루 FC',
+      result: makeFixtureResult({
+        homeScore: 1,
+        awayScore: 1,
+        hasPenalty: true,
+        homePenaltyScore: 5,
+        awayPenaltyScore: 4,
+      }),
+    });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'knockout', fixtures: [final] });
+
+    expect(getCompletedChampionName(tournament)).toBe('레드 FC');
+  });
+
+  it('returns null instead of throwing when no final fixture exists yet', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'knockout', fixtures: [] });
+
+    expect(getCompletedChampionName(tournament)).toBeNull();
+  });
+
+  it('returns null when the final fixture has not been recorded (result is null)', () => {
+    const final = makeFixture({ id: 'f-final', round: 'final', result: null });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'knockout', fixtures: [final] });
+
+    expect(getCompletedChampionName(tournament)).toBeNull();
+  });
+
+  it('returns null on an unresolved draw with no penalty shootout recorded', () => {
+    const final = makeFixture({
+      id: 'f-final',
+      round: 'final',
+      result: makeFixtureResult({ homeScore: 1, awayScore: 1, hasPenalty: false }),
+    });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'knockout', fixtures: [final] });
+
+    expect(getCompletedChampionName(tournament)).toBeNull();
+  });
+
+  it('returns the top-of-standings team name for league format', () => {
+    const group = makeGroup({
+      id: 'g1',
+      phase: 'group',
+      standings: [
+        {
+          registrationId: 'r2', teamId: 'team-2', teamName: '2위팀', position: 2,
+          points: 10, wins: 3, draws: 1, losses: 1, goalsFor: 8, goalsAgainst: 5, recalculatedAt: null,
+        },
+        {
+          registrationId: 'r1', teamId: 'team-1', teamName: '1위팀', position: 1,
+          points: 13, wins: 4, draws: 1, losses: 0, goalsFor: 12, goalsAgainst: 3, recalculatedAt: null,
+        },
+      ],
+    });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league', groups: [group] });
+
+    expect(getCompletedChampionName(tournament)).toBe('1위팀');
+  });
+
+  it('returns null for league format when no phase=group group exists', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league', groups: [] });
+
+    expect(getCompletedChampionName(tournament)).toBeNull();
+  });
+});
+
+describe('TournamentDetailView — completed vs non-completed section rendering', () => {
+  it('hides the application guide, flow explainer, and inline standings/fixtures sections when completed', () => {
+    const group = makeGroup({ id: 'g1', phase: 'group', standings: [] });
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'completed',
+      format: 'league',
+      groups: [group],
+      fixtures: [],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.queryByText('참가 신청 안내')).not.toBeInTheDocument();
+    expect(screen.queryByText('대회 진행 방식')).not.toBeInTheDocument();
+    expect(screen.queryByText('순위표')).not.toBeInTheDocument();
+    expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
+  });
+
+  it('keeps the application guide, flow explainer, and inline standings/fixtures sections for open tournaments (non-destructive)', () => {
+    const group = makeGroup({ id: 'g1', phase: 'group', standings: [] });
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'open',
+      format: 'league',
+      groups: [group],
+      fixtures: [],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('참가 신청 안내')).toBeInTheDocument();
+    expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
+    expect(screen.getByText('순위표')).toBeInTheDocument();
+    expect(screen.getByText('대진표 준비 중')).toBeInTheDocument();
+  });
+
+  it('keeps the application guide and flow explainer for in_progress tournaments (non-destructive)', () => {
+    const tournament = makeTournament({ id: 't1', status: 'in_progress', format: 'league', groups: [], fixtures: [] });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('참가 신청 안내')).toBeInTheDocument();
+    expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
+  });
+
+  it('renders the CompletedResultHero entry point with a safe fallback title when a champion cannot be derived', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league', groups: [] });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('대회가 끝났어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '대회 최종 결과 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t1/results',
+    );
+  });
+
+  it('renders the champion name in the CompletedResultHero title when the final result is resolvable', () => {
+    const final = makeFixture({
+      id: 'f-final',
+      round: 'final',
+      homeTeamName: '레드 FC',
+      awayTeamName: '블루 FC',
+      result: makeFixtureResult({ homeScore: 2, awayScore: 0 }),
+    });
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'knockout', fixtures: [final] });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getByText('레드 FC 우승!')).toBeInTheDocument();
+  });
+
+  it('renders the pre-participation checklist exactly once via the accordion and drops the old duplicated copy', () => {
+    const tournament = makeTournament({ id: 't1', status: 'completed', format: 'league', groups: [] });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    // 완료 상태 전용 아코디언("참가 전 유의사항")이 유일한 소스여야 하고, 예전 두 곳
+    // (모바일 카드 + 데스크탑 aside)에서 쓰던 "참가 전 꼭 확인해 주세요" 카피는 남아있으면 안 된다.
+    expect(screen.getAllByText('참가 전 유의사항')).toHaveLength(1);
+    expect(screen.queryByText('참가 전 꼭 확인해 주세요')).not.toBeInTheDocument();
+  });
+});
+
+describe('AccordionSection toggle (rendered via completed TournamentDetailView)', () => {
+  it('toggles aria-expanded from false to true to false across real click interactions', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'completed',
+      format: 'league',
+      groups: [],
+      rulesText: '경기 시작 10분 전까지 집합해 주세요.',
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    const toggle = screen.getByRole('button', { name: '대회 규정' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('경기 시작 10분 전까지 집합해 주세요.')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('경기 시작 10분 전까지 집합해 주세요.')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('경기 시작 10분 전까지 집합해 주세요.')).not.toBeInTheDocument();
   });
 });

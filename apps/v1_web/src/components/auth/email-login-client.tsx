@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
@@ -30,12 +30,14 @@ export function EmailLoginClient() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // isPending 은 리렌더 이후에나 반영되므로, 같은 이벤트 루프 틱에서 두 번 눌리는
+  // 극단적인 케이스(연타/마우스 더블클릭 버그 등)까지 막으려면 ref 기반 동기 락이 필요하다.
+  const submitBusyRef = useRef(false);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
-    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
-    if (login.isPending) return;
+    if (submitBusyRef.current) return;
+    submitBusyRef.current = true;
     setError(null);
 
     login.mutate(
@@ -48,6 +50,9 @@ export function EmailLoginClient() {
         },
         onError: (nextError) => {
           setError(mapEmailLoginError(nextError));
+        },
+        onSettled: () => {
+          submitBusyRef.current = false;
         },
       },
     );

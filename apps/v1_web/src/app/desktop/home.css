@@ -226,12 +226,11 @@
 /* ─── Featured hero card (desktop) ────────────────────────────────────────── */
 @media (min-width: 1024px) {
   /*
-   * On mobile the featured card media is 146px tall.
-   * On desktop it sits in a wider column, so we give it a proper hero height.
+   * .tm-featured-media now uses a fixed aspect-ratio (--tm-featured-media-ratio,
+   * globals.css) instead of a per-breakpoint height, so it grows taller in step
+   * with the wider desktop card automatically — same crop as mobile, no override
+   * needed here.
    */
-  .tm-featured-media {
-    height: 220px;
-  }
 
   /* The featured wrapper removes its inline margin — grid gap handles spacing */
   .tm-home-featured-block {
@@ -423,10 +422,8 @@
     min-width: 0;
   }
 
-  /* Larger featured hero on wide screens */
-  .tm-featured-media {
-    height: 260px;
-  }
+  /* Featured hero grows automatically at 1440+ via aspect-ratio (see 1024px
+     block above) — no height override needed here anymore. */
 
   /* [clear-win] 1440+ 추천 매치 카드 2x2 그리드 — ragged 정렬 해소.
    * 기존 3-up(repeat(3,1fr))을 2-up(repeat(2,1fr))으로 낮춰 4개 카드가

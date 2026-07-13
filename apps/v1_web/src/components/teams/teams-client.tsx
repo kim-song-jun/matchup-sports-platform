@@ -453,7 +453,7 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
     tags: [levelTag, genderRule].filter(Boolean),
     genderRule,
-    ownerName: team.owner?.displayName ?? '팀장',
+    ownerName: team.owner?.displayName,
     managerName: team.manager?.displayName ?? null,
     intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
     next: team.activitySummary ?? team.activityAreaText ?? '',

@@ -1454,6 +1454,28 @@ button:disabled {
   border: 2px solid var(--bg);
 }
 
+/* Numeric unread badge — replaces .tm-unread-dot as the default indicator on
+ * NotificationBellLink/Button. 1-99 shows the count, 100+ shows "99+". */
+.tm-unread-badge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--red500);
+  color: var(--static-white);
+  border: 2px solid var(--bg);
+  font-size: var(--font-size-micro);
+  font-weight: 700;
+  line-height: 1;
+}
+
 .tm-home-stats {
   margin-top: 12px;
   display: flex;

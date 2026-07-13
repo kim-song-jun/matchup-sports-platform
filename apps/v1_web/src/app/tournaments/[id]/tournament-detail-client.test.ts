@@ -54,6 +54,8 @@ function makeParticipantTeam(
   return {
     teamId: `team-${overrides.registrationId}`,
     teamName: `팀 ${overrides.registrationId}`,
+    teamLogoUrl: null,
+    teamRegionName: null,
     confirmedAt: null,
     ...overrides,
   };

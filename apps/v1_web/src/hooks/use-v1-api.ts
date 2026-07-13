@@ -106,6 +106,7 @@ import type {
   V1PendingTournamentReview,
   V1TournamentReview,
   V1TournamentReviewsPage,
+  V1AdminTournamentReviewsPage,
   V1TournamentAward,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
@@ -1709,6 +1710,48 @@ export function useV1SetTournamentAwards(tournamentId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       void queryClient.invalidateQueries({ queryKey: ['admin-tournament-awards', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 리뷰 모더레이션 목록 조회 */
+export function useV1AdminTournamentReviews(
+  tournamentId: string,
+  params?: { page?: number; pageSize?: number; search?: string },
+) {
+  return useQuery({
+    queryKey: ['admin-tournament-reviews', tournamentId, params],
+    queryFn: () =>
+      v1Get<V1AdminTournamentReviewsPage>(`/admin/tournaments/${tournamentId}/reviews`, params),
+    enabled: !!tournamentId,
+  });
+}
+
+/** 어드민: 리뷰 숨기기 */
+export function useV1HideReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId, reason }: { reviewId: string; reason?: string }) =>
+      v1Patch<{ alreadyHidden: boolean }>(
+        `/admin/tournaments/${tournamentId}/reviews/${reviewId}/hide`,
+        { reason },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-reviews', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 리뷰 다시 공개하기 */
+export function useV1UnhideReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId }: { reviewId: string }) =>
+      v1Patch<{ alreadyVisible: boolean }>(
+        `/admin/tournaments/${tournamentId}/reviews/${reviewId}/unhide`,
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-reviews', tournamentId] });
     },
   });
 }

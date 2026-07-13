@@ -308,16 +308,25 @@
     border-radius: 8px;
   }
 
-  /* Unread notification dot on the bell icon */
-  .tm-desktop-nav-dot {
+  /* Unread notification count badge on the bell icon (numeric pill) */
+  .tm-desktop-nav-badge {
     position: absolute;
-    top: 9px;
-    right: 9px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
+    top: 3px;
+    right: 3px;
+    box-sizing: border-box;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
     background: var(--red500);
-    border: 1.5px solid var(--bg);
+    color: var(--static-white);
+    border: 2px solid var(--bg);
+    font-size: var(--font-size-micro);
+    font-weight: 700;
+    line-height: 1;
   }
 
   /* Account avatar — desktop-only top-right entry to My page. */

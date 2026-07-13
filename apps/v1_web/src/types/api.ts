@@ -1786,6 +1786,19 @@ export type V1TournamentReviewsPage = {
   pageSize: number;
 };
 
+/** 어드민: 리뷰 모더레이션 뷰 — 공개 리뷰 필드 + 숨김 상태 */
+export type V1AdminTournamentReview = V1TournamentReview & {
+  hiddenAt: string | null;
+  hiddenReason: string | null;
+};
+
+export type V1AdminTournamentReviewsPage = {
+  items: V1AdminTournamentReview[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type V1PendingTournamentReview = {
   tournamentId: string;
   tournamentTitle: string;

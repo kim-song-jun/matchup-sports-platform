@@ -29,6 +29,8 @@ import {
   Undo2,
   Search,
   Star,
+  Timer,
+  TimerOff,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { onlyDigits, formatWithComma, formatIfNumeric } from '@/lib/number-format';
@@ -48,6 +50,8 @@ import {
   useV1RejectCancelRequest,
   useV1RosterLock,
   useV1RosterUnlock,
+  useV1RosterDeadlineOverrideGrant,
+  useV1RosterDeadlineOverrideRevoke,
   useV1ExportRosterCsv,
   useV1TournamentPlayers,
   useV1UpdatePlayerEligibility,
@@ -517,7 +521,9 @@ function ExportCsvButton({
 
 // ── Tab: Registrations ────────────────────────────────────────────────────
 
-function RegistrationsTab({
+// exported for component-level testing (roster deadline override toggle) — see
+// tournament-detail-registrations-tab.test.tsx
+export function RegistrationsTab({
   tournamentId,
   showToast,
   tournamentTeamCount,
@@ -534,6 +540,8 @@ function RegistrationsTab({
   const rejectCancelRequest = useV1RejectCancelRequest();
   const rosterLock = useV1RosterLock();
   const rosterUnlock = useV1RosterUnlock();
+  const rosterDeadlineOverrideGrant = useV1RosterDeadlineOverrideGrant();
+  const rosterDeadlineOverrideRevoke = useV1RosterDeadlineOverrideRevoke();
   const [rosterRegistration, setRosterRegistration] = useState<V1AdminTournamentRegistration | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
   const { confirm: confirmDialog, ConfirmModal } = useConfirm();
@@ -663,6 +671,28 @@ function RegistrationsTab({
         onSuccess: () => showToast('명단 잠금을 해제했어요.', 'success'),
         onError: (err) =>
           showToast(extractErrorMessage(err, '명단 잠금 해제에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRosterDeadlineOverrideGrant = (reg: V1AdminTournamentRegistration) => {
+    rosterDeadlineOverrideGrant.mutate(
+      reg.id,
+      {
+        onSuccess: () => showToast('명단 제출 마감 예외를 허용했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '마감 예외 허용에 실패했어요.'), 'error'),
+      },
+    );
+  };
+
+  const handleRosterDeadlineOverrideRevoke = (reg: V1AdminTournamentRegistration) => {
+    rosterDeadlineOverrideRevoke.mutate(
+      reg.id,
+      {
+        onSuccess: () => showToast('예외를 해제했어요.', 'success'),
+        onError: (err) =>
+          showToast(extractErrorMessage(err, '예외 해제에 실패했어요.'), 'error'),
       },
     );
   };
@@ -893,6 +923,24 @@ function RegistrationsTab({
                     disabled={rosterLock.isPending}
                     icon={<Lock size={13} />}
                     label="명단 잠금"
+                    tone="gray"
+                  />
+                ))}
+              {reg.status === 'confirmed' &&
+                (reg.rosterDeadlineOverrideAt ? (
+                  <ActionButton
+                    onClick={() => handleRosterDeadlineOverrideRevoke(reg)}
+                    disabled={rosterDeadlineOverrideRevoke.isPending}
+                    icon={<TimerOff size={13} />}
+                    label="예외 해제"
+                    tone="gray"
+                  />
+                ) : (
+                  <ActionButton
+                    onClick={() => handleRosterDeadlineOverrideGrant(reg)}
+                    disabled={rosterDeadlineOverrideGrant.isPending}
+                    icon={<Timer size={13} />}
+                    label="마감 예외 허용"
                     tone="gray"
                   />
                 ))}
@@ -2706,6 +2754,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editScheduledAt, setEditScheduledAt] = useState('');
   const [editScheduledEndAt, setEditScheduledEndAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
+  const [editRosterDeadlineAt, setEditRosterDeadlineAt] = useState('');
   const [editVenue, setEditVenue] = useState('');
   const [editEntryFee, setEditEntryFee] = useState('');
   const [editTeamCount, setEditTeamCount] = useState('');
@@ -2747,6 +2796,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditScheduledAt(isoToDatetimeLocalValue(tournament.scheduledAt));
     setEditScheduledEndAt(isoToDatetimeLocalValue(tournament.scheduledEndAt));
     setEditDeadlineAt(isoToDatetimeLocalValue(tournament.registrationDeadlineAt));
+    setEditRosterDeadlineAt(isoToDatetimeLocalValue(tournament.rosterDeadlineAt));
     setEditVenue(tournament.venue ?? '');
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
@@ -2806,6 +2856,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     if (editDeadlineAt !== isoToDatetimeLocalValue(tournament.registrationDeadlineAt)) {
       const deadlineAtIso = datetimeLocalValueToIso(editDeadlineAt);
       if (deadlineAtIso) payload.registrationDeadlineAt = deadlineAtIso;
+    }
+    if (editRosterDeadlineAt !== isoToDatetimeLocalValue(tournament.rosterDeadlineAt)) {
+      const rosterDeadlineAtIso = datetimeLocalValueToIso(editRosterDeadlineAt);
+      if (rosterDeadlineAtIso) payload.rosterDeadlineAt = rosterDeadlineAtIso;
     }
     if (editVenue.trim()) payload.venue = editVenue.trim();
     // 빈 입력은 전송하지 않는다 — Number('')===0 이라 참가비가 0원으로 덮어써진다
@@ -3047,6 +3101,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             { label: '신청 수', value: `${tournament.registrationCount}팀` },
             { label: '은행', value: tournament.bankName ? `${tournament.bankName} ${tournament.bankAccount} (${tournament.bankHolder})` : '—' },
             { label: '신청 마감', value: formatDate(tournament.registrationDeadlineAt) },
+            { label: '명단 마감', value: formatDate(tournament.rosterDeadlineAt) },
             { label: '대회 일정', value: scheduleLabel },
             { label: '상품 및 상금', value: tournament.prizeSummary || '—' },
           ].map(({ label, value }) => (
@@ -3377,6 +3432,17 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 type="datetime-local"
                 value={editDeadlineAt}
                 onChange={(e) => setEditDeadlineAt(e.target.value)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-roster-deadline-at" className="text-[13px] text-gray-900">명단 제출 마감일</label>
+              <input
+                id="edit-roster-deadline-at"
+                type="datetime-local"
+                value={editRosterDeadlineAt}
+                onChange={(e) => setEditRosterDeadlineAt(e.target.value)}
                 disabled={updateTournament.isPending}
                 className={inputCls}
               />
@@ -3821,6 +3887,7 @@ function InfoTab({
         <InfoRow label="장소" value={tournament.venue ?? '미정'} />
         <InfoRow label="대회 기간" value={formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt)} />
         <InfoRow label="신청 마감" value={formatDate(tournament.registrationDeadlineAt)} />
+        <InfoRow label="명단 마감" value={formatDate(tournament.rosterDeadlineAt)} />
         <InfoRow label="참가비" value={formatCurrency(tournament.entryFee)} />
         <InfoRow label="팀 수" value={`${tournament.teamCount}팀`} />
         <InfoRow label="선수 구성" value={`${tournament.minPlayers}~${tournament.maxPlayers}명`} />

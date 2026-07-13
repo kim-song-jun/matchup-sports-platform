@@ -178,6 +178,22 @@ function datetimeTextToIso(value: string): string | null {
   return iso;
 }
 
+/**
+ * 대회 시작일("YYYY-MM-DD HH:MM")로부터 명단 제출 마감일 기본값(시작 7일 전 23:59)을 계산한다.
+ * scheduledAt 이 비어있거나 형식이 유효하지 않으면 null을 반환 — 자동 채움을 하지 않는다.
+ */
+function suggestRosterDeadline(scheduledAt: string): string | null {
+  const trimmed = scheduledAt.trim();
+  if (!trimmed || !isValidDatetimeText(trimmed)) return null;
+  const start = new Date(trimmed.replace(' ', 'T'));
+  if (Number.isNaN(start.getTime())) return null;
+  const suggested = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const yyyy = suggested.getFullYear();
+  const mm = String(suggested.getMonth() + 1).padStart(2, '0');
+  const dd = String(suggested.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} 23:59`;
+}
+
 // ── Styled datetime text input ────────────────────────────────────────────
 
 function DatetimeTextInput({
@@ -240,6 +256,9 @@ export default function AdminTournamentsNewPage() {
   const [scheduledAt, setScheduledAt] = useState('');
   const [scheduledEndAt, setScheduledEndAt] = useState('');
   const [registrationDeadlineAt, setRegistrationDeadlineAt] = useState('');
+  const [rosterDeadlineAt, setRosterDeadlineAt] = useState('');
+  // 사용자가 명단 제출 마감일을 직접 수정하면 true로 전환 — 이후 대회 시작일 변경에 따른 자동 제안을 멈춘다
+  const [rosterDeadlineTouched, setRosterDeadlineTouched] = useState(false);
   const [venue, setVenue] = useState('');
   const [teamCount, setTeamCount] = useState('');
   const [minPlayers, setMinPlayers] = useState('');
@@ -255,6 +274,15 @@ export default function AdminTournamentsNewPage() {
   const [refundPolicyText, setRefundPolicyText] = useState('');
 
   const isPending = createMutation.isPending;
+
+  // 대회 시작일이 바뀌면 명단 제출 마감일을 자동으로 제안한다(시작 7일 전 23:59) —
+  // 사용자가 이미 직접 수정했다면(rosterDeadlineTouched) 값을 덮어쓰지 않는다.
+  useEffect(() => {
+    if (rosterDeadlineTouched) return;
+    const suggested = suggestRosterDeadline(scheduledAt);
+    if (!suggested) return;
+    setRosterDeadlineAt(suggested);
+  }, [scheduledAt, rosterDeadlineTouched]);
 
   // ── Inline validation errors ────────────────────────────────────────
   const teamCountNum = teamCount ? parseInt(teamCount, 10) : null;
@@ -290,6 +318,9 @@ export default function AdminTournamentsNewPage() {
     return null;
   })();
 
+  const rosterDeadlineError: string | null =
+    rosterDeadlineAt.trim().length === 0 ? '명단 제출 마감일을 입력해 주세요.' : null;
+
   // ── Validation ───────────────────────────────────────────────────────
   const canSubmit =
     !isPending &&
@@ -298,6 +329,8 @@ export default function AdminTournamentsNewPage() {
     isValidDatetimeText(scheduledAt) &&
     isValidDatetimeText(scheduledEndAt) &&
     isValidDatetimeText(registrationDeadlineAt) &&
+    isValidDatetimeText(rosterDeadlineAt) &&
+    rosterDeadlineError === null &&
     teamCountError === null &&
     playersRangeError === null &&
     scheduleRangeError === null;
@@ -316,6 +349,9 @@ export default function AdminTournamentsNewPage() {
         ...(datetimeTextToIso(scheduledEndAt) ? { scheduledEndAt: datetimeTextToIso(scheduledEndAt)! } : {}),
         ...(datetimeTextToIso(registrationDeadlineAt)
           ? { registrationDeadlineAt: datetimeTextToIso(registrationDeadlineAt)! }
+          : {}),
+        ...(datetimeTextToIso(rosterDeadlineAt)
+          ? { rosterDeadlineAt: datetimeTextToIso(rosterDeadlineAt)! }
           : {}),
         ...(venue.trim() ? { venue: venue.trim() } : {}),
         teamCount: parseInt(teamCount, 10),
@@ -461,6 +497,31 @@ export default function AdminTournamentsNewPage() {
                     disabled={isPending}
                     placeholder="예: 2026-08-01 23:59"
                   />
+                </FormField>
+              </div>
+
+              <div className="md:col-span-2">
+                <FormField
+                  id="roster-deadline-at"
+                  label="명단 제출 마감일"
+                  required
+                  hint="기본값은 대회 시작 7일 전 23:59예요. 필요하면 직접 수정해 주세요. 예: 2026-08-08 23:59"
+                >
+                  <DatetimeTextInput
+                    id="roster-deadline-at"
+                    value={rosterDeadlineAt}
+                    onChange={(v) => {
+                      setRosterDeadlineAt(v);
+                      setRosterDeadlineTouched(true);
+                    }}
+                    disabled={isPending}
+                    placeholder="예: 2026-08-08 23:59"
+                  />
+                  {rosterDeadlineError ? (
+                    <p role="alert" className="mt-1 text-[var(--font-size-caption)] text-red-600">
+                      {rosterDeadlineError}
+                    </p>
+                  ) : null}
                 </FormField>
               </div>
 

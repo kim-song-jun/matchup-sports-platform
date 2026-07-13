@@ -18,7 +18,36 @@ import { v1Get } from '@/lib/api-client';
 import { josa } from '@/lib/korean';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
+
+/* ── Roster deadline helper ── */
+
+export type RosterDeadlineState = {
+  /** 명단 제출 마감이 지나 예외 없이는 편집이 막힌 상태 */
+  blocked: boolean;
+  /** 마감은 지났지만 어드민이 예외를 허용해 편집 가능한 상태 */
+  overridden: boolean;
+};
+
+/**
+ * 명단 제출 마감 상태를 판정한다.
+ * - 마감일이 없으면 항상 편집 가능.
+ * - 마감일이 지났고 어드민 예외(override)가 없으면 편집 차단.
+ * - 마감일이 지났어도 어드민 예외가 있으면 편집 가능(overridden=true로 안내만 표시).
+ */
+export function getRosterDeadlineState(
+  rosterDeadlineAt: string | null | undefined,
+  overrideAt: string | null | undefined,
+  now: Date = new Date(),
+): RosterDeadlineState {
+  if (!rosterDeadlineAt) return { blocked: false, overridden: false };
+  const deadline = new Date(rosterDeadlineAt);
+  if (Number.isNaN(deadline.getTime())) return { blocked: false, overridden: false };
+  const isPast = now.getTime() > deadline.getTime();
+  if (!isPast) return { blocked: false, overridden: false };
+  return overrideAt ? { blocked: false, overridden: true } : { blocked: true, overridden: false };
+}
 
 /* ── Helpers ── */
 
@@ -794,7 +823,16 @@ export function TournamentRosterPageClient({
   const isRosterLocked = Boolean(registration?.rosterLockedAt);
   const isRosterEditBlockedByStatus =
     registration?.status === 'cancel_requested' || registration?.status === 'cancelled';
-  const canEditRoster = Boolean(registration) && !isRosterLocked && !isRosterEditBlockedByStatus;
+  const rosterDeadlineAt = tournament?.rosterDeadlineAt ?? null;
+  const rosterDeadlineState = getRosterDeadlineState(
+    rosterDeadlineAt,
+    registration?.rosterDeadlineOverrideAt,
+  );
+  const canEditRoster =
+    Boolean(registration) &&
+    !isRosterLocked &&
+    !isRosterEditBlockedByStatus &&
+    !rosterDeadlineState.blocked;
   const minPlayers = tournament?.minPlayers ?? 0;
   const maxPlayers = tournament?.maxPlayers ?? 999;
   const shortfall = Math.max(0, minPlayers - players.length);
@@ -942,6 +980,36 @@ export function TournamentRosterPageClient({
     <AppChrome title="선수 명단" backHref={backHref} bottomNav={false} activeTab="tournaments">
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
+        {/* Roster deadline info row */}
+        {rosterDeadlineAt ? (
+          <p
+            className="tm-text-caption"
+            style={{ color: 'var(--text-muted)', marginBottom: 10 }}
+          >
+            {`명단 제출 마감: ${formatTournamentDateTimeLong(rosterDeadlineAt)}까지`}
+          </p>
+        ) : null}
+
+        {/* Roster deadline passed banner (blocks edit unless admin granted an override) */}
+        {rosterDeadlineState.blocked ? (
+          <div style={{ marginBottom: 14 }}>
+            <AlertBanner
+              message="명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요."
+              tone="info"
+            />
+          </div>
+        ) : null}
+
+        {/* Deadline passed but admin granted an override — editing stays open */}
+        {rosterDeadlineState.overridden ? (
+          <div style={{ marginBottom: 14 }}>
+            <AlertBanner
+              message="운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요."
+              tone="info"
+            />
+          </div>
+        ) : null}
+
         {/* Locked banner */}
         {isRosterLocked ? (
           <div style={{ marginBottom: 14 }}>
@@ -979,7 +1047,9 @@ export function TournamentRosterPageClient({
             >
               {`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.`}
               {shortfall > 0 ? <strong> → {shortfall}명 더 필요해요</strong> : null}
-              {isRosterLocked ? ' (명단이 마감된 상태예요 — 운영팀에 문의해 주세요)' : null}
+              {isRosterLocked || rosterDeadlineState.blocked
+                ? ' (명단이 마감된 상태예요 — 운영팀에 문의해 주세요)'
+                : null}
             </div>
           </div>
         ) : null}

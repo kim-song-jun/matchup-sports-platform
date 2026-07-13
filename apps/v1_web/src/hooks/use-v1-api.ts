@@ -2170,6 +2170,41 @@ export function useV1RosterUnlock() {
   });
 }
 
+/** 명단 제출 마감 예외 부여 — 마감이 지나도 해당 신청 팀은 명단을 계속 수정할 수 있게 한다 */
+export function useV1RosterDeadlineOverrideGrant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationId: string) =>
+      v1Post<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/roster-deadline-override`,
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
+/** 명단 제출 마감 예외 해제 */
+export function useV1RosterDeadlineOverrideRevoke() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationId: string) =>
+      v1Api<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/roster-deadline-override`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
 /**
  * Lazy CSV export — returns a callable function rather than auto-fetching.
  * The server returns { filename, csv } (wrapped in ApiEnvelope). Callers

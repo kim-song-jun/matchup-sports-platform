@@ -157,6 +157,9 @@ import type {
   V1ReceivedInvitationsPage,
   V1SendInvitationResult,
   V1InvitationActionResult,
+  V1IntegrationSettings,
+  V1UpdateIntegrationSettingsPayload,
+  V1PublicKakaoMapsKeyResponse,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
@@ -2596,5 +2599,40 @@ export function useV1DeclineTeamInvitation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.receivedInvitations() });
     },
+  });
+}
+
+// ─── 어드민: 외부 연동 키 설정(카카오맵 REST/JS 키) ────────────────────────────
+
+/** GET /admin/settings/integrations — 마스킹된 현재 값 + 출처(admin/env/none) 조회 */
+export function useV1AdminIntegrationSettings() {
+  return useQuery({
+    queryKey: v1Keys.adminIntegrationSettings(),
+    queryFn: () => v1Get<V1IntegrationSettings>('/admin/settings/integrations'),
+  });
+}
+
+/** PATCH /admin/settings/integrations — 값 저장(빈 문자열 전달 시 해당 키 삭제 → env 폴백 복귀) */
+export function useV1UpdateIntegrationSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1UpdateIntegrationSettingsPayload) =>
+      v1Patch<V1IntegrationSettings>('/admin/settings/integrations', payload),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminIntegrationSettings(), data);
+    },
+  });
+}
+
+/**
+ * GET /public/integrations/kakao-maps-key — 인증 불필요. 카카오맵 JS SDK는 도메인 제한으로
+ * 보호되므로 공개돼도 안전 — 지도 임베드 컴포넌트가 SDK 스크립트 로드 직전에 호출한다.
+ */
+export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.publicKakaoMapsKey(),
+    queryFn: () => v1Get<V1PublicKakaoMapsKeyResponse>('/public/integrations/kakao-maps-key'),
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled,
   });
 }

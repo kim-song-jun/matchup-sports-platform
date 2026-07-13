@@ -1585,6 +1585,9 @@ export type V1Tournament = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
+  latitude: number | null;
+  longitude: number | null;
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
@@ -1739,6 +1742,9 @@ export type V1TournamentDetail = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
+  latitude: number | null;
+  longitude: number | null;
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
@@ -2296,4 +2302,27 @@ export type V1InvitationActionResult = {
   status: V1InvitationStatus;
   alreadyCancelled?: boolean;
   alreadyProcessed?: boolean;
+};
+
+/** 어드민이 편집하는 외부 연동 키의 출처 — 어떤 값이 실제로 쓰이고 있는지 화면에 안내하기 위함. */
+export type V1IntegrationKeySource = 'admin' | 'env' | 'none';
+
+/** GET/PATCH /admin/settings/integrations 응답 — 값은 항상 마스킹(끝 4자리만 노출). */
+export type V1IntegrationSettings = {
+  kakaoRestApiKey: string | null;
+  kakaoRestApiKeySource: V1IntegrationKeySource;
+  kakaoMapsJsKey: string | null;
+  kakaoMapsJsKeySource: V1IntegrationKeySource;
+  updatedAt: string | null;
+};
+
+/** PATCH /admin/settings/integrations 바디 — undefined=미변경, ""=삭제(env 폴백 복귀), 값=설정 */
+export type V1UpdateIntegrationSettingsPayload = {
+  kakaoRestApiKey?: string;
+  kakaoMapsJsKey?: string;
+};
+
+/** GET /public/integrations/kakao-maps-key — 인증 불필요, 카카오맵 JS SDK 로드용 공개 키. */
+export type V1PublicKakaoMapsKeyResponse = {
+  kakaoMapsJsKey: string | null;
 };

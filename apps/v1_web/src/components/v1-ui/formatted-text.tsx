@@ -8,13 +8,18 @@
  * - 빈 줄       → 문단 구분
  * - "- " "• " "* " "· " 로 시작하는 줄 → 불릿 목록
  * - "1. " "1) " 같은 숫자 접두 줄     → 번호 목록 (입력한 번호 유지)
+ * - "---" "___" "───" "***" 등 동일 문자 3회 이상 반복 줄 → 구분선(hr)
+ * - "⸻"(U+2E3B, 일부 노트 앱이 "---" 입력을 자동 변환하는 삼중 엠대시) 한 글자 이상 반복 줄 → 구분선(hr)
  * - 그 외 연속 줄                     → 하나의 문단 (줄바꿈 유지)
  */
+
+const HR_PATTERN = /^[ \t]*(?:([-_─*])(?:[ \t]*\1){2,}|⸻+)[ \t]*$/;
 
 type Block =
   | { type: 'p'; lines: string[] }
   | { type: 'ul'; items: string[] }
-  | { type: 'ol'; items: { num: string; text: string }[] };
+  | { type: 'ol'; items: { num: string; text: string }[] }
+  | { type: 'hr' };
 
 function parseBlocks(text: string): Block[] {
   const rawLines = text.replace(/\r\n/g, '\n').split('\n');
@@ -35,7 +40,10 @@ function parseBlocks(text: string): Block[] {
     }
     const bullet = line.match(/^[-•*·]\s+(.+)$/);
     const ordered = line.match(/^(\d{1,2})[.)]\s+(.+)$/);
-    if (bullet) {
+    if (HR_PATTERN.test(line)) {
+      flush();
+      blocks.push({ type: 'hr' });
+    } else if (bullet) {
       if (cur?.type !== 'ul') {
         flush();
         cur = { type: 'ul', items: [] };
@@ -96,6 +104,9 @@ export function FormattedText({
               ))}
             </ul>
           );
+        }
+        if (block.type === 'hr') {
+          return <hr key={i} className="tm-fmt-hr" aria-hidden="true" />;
         }
         return (
           <ol key={i} className="tm-fmt-list">

@@ -198,8 +198,12 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const showChat = mode === 'approved' && Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
+  const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
-    if (!action) return;
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
+    // 동기적인 ref 락으로 한 번 더 막는다.
+    if (!action || heroActionBusyRef.current) return;
+    heroActionBusyRef.current = true;
     void Promise.resolve(action())
       .then((result) => {
         // null = 액션이 UX를 직접 처리(네이티브 공유/취소/prompt 폴백) → 토스트 미표시.
@@ -211,6 +215,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       .catch(() => {
         setHeroMessage('잠깐 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 1800);
+      })
+      .finally(() => {
+        heroActionBusyRef.current = false;
       });
   };
 

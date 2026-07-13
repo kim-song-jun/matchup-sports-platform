@@ -101,6 +101,9 @@ function InquiryModal({
   const [guestPhone, setGuestPhone] = useState('');
   const [errors, setErrors] = useState<InquiryFormErrors>({});
   const dialogRef = useRef<HTMLDivElement>(null);
+  // isPending 은 리렌더 이후에나 반영되므로, 같은 이벤트 루프 틱에서 두 번 눌리는
+  // 극단적인 케이스(연타/마우스 더블클릭 버그 등)까지 막으려면 ref 기반 동기 락이 필요하다.
+  const submitBusyRef = useRef(false);
 
   // ESC로 닫기
   useEffect(() => {
@@ -150,6 +153,7 @@ function InquiryModal({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitBusyRef.current) return;
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
     const trimmedEmail = guestEmail.trim();
@@ -166,6 +170,7 @@ function InquiryModal({
       return;
     }
 
+    submitBusyRef.current = true;
     createInquiry.mutate(
       {
         category: 'tournament',
@@ -183,6 +188,9 @@ function InquiryModal({
       {
         onSuccess: () => onSubmitted(),
         onError: (error) => setErrors({ form: friendlyErrorMessage(error) }),
+        onSettled: () => {
+          submitBusyRef.current = false;
+        },
       },
     );
   };

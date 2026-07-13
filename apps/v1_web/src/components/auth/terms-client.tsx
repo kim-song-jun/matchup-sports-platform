@@ -65,6 +65,9 @@ export function TermsClient() {
     if (!requiredAccepted) {
       return;
     }
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+    if (socialTerms.isPending) return;
 
     setError(null);
     if (isSocialMode) {

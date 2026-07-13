@@ -307,8 +307,12 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const capacity = formatCapacity(team);
   const [heroMessage, setHeroMessage] = useState('');
 
+  const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string, failureMessage = '잠시 후 다시 시도해 주세요.') => {
-    if (!action) return;
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
+    // 동기적인 ref 락으로 한 번 더 막는다.
+    if (!action || heroActionBusyRef.current) return;
+    heroActionBusyRef.current = true;
     void Promise.resolve(action())
       .then(() => {
         setHeroMessage(successMessage);
@@ -317,6 +321,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       .catch(() => {
         setHeroMessage(failureMessage);
         window.setTimeout(() => setHeroMessage(''), 2000);
+      })
+      .finally(() => {
+        heroActionBusyRef.current = false;
       });
   };
 

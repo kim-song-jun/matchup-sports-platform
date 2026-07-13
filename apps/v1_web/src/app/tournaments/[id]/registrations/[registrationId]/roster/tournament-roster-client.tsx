@@ -618,6 +618,9 @@ function PlayerRow({
   const [editError, setEditError] = useState<string | null>(null);
 
   async function handleSave() {
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+    if (isUpdating) return;
     setEditError(null);
     try {
       await onUpdate(player.id, draftEligibility);
@@ -910,7 +913,9 @@ export function TournamentRosterPageClient({
     birthDate: string;
     eligibilityStatus: V1PlayerEligibilityStatus;
   }) {
-    if (!canEditRoster) return;
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+    if (!canEditRoster || addPlayer.isPending) return;
     const usedByAnotherDraft = draftForms.some((form) => form.id !== formId && form.userId === formData.userId);
     if (registeredUserIds.has(formData.userId) || usedByAnotherDraft) {
       setDraftErrors((prev) => ({

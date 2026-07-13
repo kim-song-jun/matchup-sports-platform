@@ -143,6 +143,9 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const pending = savePreferences.isPending || completeOnboarding.isPending || deferOnboarding.isPending;
 
   const saveAndGo = (currentStep: V1OnboardingPreferencePayload['currentStep'], href: string) => {
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+    if (pending) return;
     setError(null);
     const payloadDraft = sanitizeDraft(draft);
 
@@ -184,6 +187,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   };
 
   const defer = () => {
+    if (pending) return;
     setError(null);
     deferOnboarding.mutate(
       { reason: 'later' },
@@ -195,6 +199,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   };
 
   const complete = () => {
+    if (pending) return;
     setError(null);
     completeOnboarding.mutate(undefined, {
       onSuccess: (result) => {

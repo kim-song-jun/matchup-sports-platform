@@ -681,6 +681,9 @@ function RegistrationDetailView({
   const showAwaitingPaymentNotice = registration.status === 'awaiting_payment';
 
   async function handleCancelConfirm(reason: string) {
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+    if (cancelRequest.isPending) return;
     setCancelError(null);
     try {
       await cancelRequest.mutateAsync({ reason: reason || undefined });
@@ -691,6 +694,7 @@ function RegistrationDetailView({
   }
 
   async function handleWithdrawCancelRequest() {
+    if (withdrawCancelRequest.isPending) return;
     setWithdrawCancelError(null);
     try {
       await withdrawCancelRequest.mutateAsync();

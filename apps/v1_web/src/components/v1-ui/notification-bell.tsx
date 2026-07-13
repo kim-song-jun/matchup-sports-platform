@@ -26,18 +26,39 @@ export function formatUnreadCount(count: number): string {
   return count > MAX_DISPLAY_COUNT ? `${MAX_DISPLAY_COUNT}+` : String(count);
 }
 
-function useUnreadNotificationCount(forceUnread?: boolean): number {
+/**
+ * unreadCount는 서버가 안 실제 개수. forceUnread는 "무언가 안 읽음이 있다"는
+ * 신호(예: 실시간 이벤트)만 줄 뿐 개수를 모를 수 있으므로, 실제 count가 0일 때
+ * 임의로 1을 지어내지 않고 unknown 상태로 구분한다.
+ */
+function useUnreadState(forceUnread?: boolean): { count: number; unknown: boolean } {
   const summary = useV1NotificationUnreadSummary();
   const unreadCount = summary.data?.unreadCount ?? 0;
-  return forceUnread ? Math.max(unreadCount, 1) : unreadCount;
+  if (unreadCount > 0) return { count: unreadCount, unknown: false };
+  return { count: 0, unknown: Boolean(forceUnread) };
 }
 
-export function buildAriaLabel(ariaLabel: string, unreadCount: number): string {
+export function buildAriaLabel(ariaLabel: string, unreadCount: number, unknown?: boolean): string {
+  if (unknown) return `${ariaLabel} (읽지 않은 알림 있음)`;
   if (unreadCount <= 0) return ariaLabel;
   return `${ariaLabel} (읽지 않은 알림 ${formatUnreadCount(unreadCount)}개)`;
 }
 
-function UnreadIndicator({ unreadCount, badgeClassName, dotClassName }: { unreadCount: number; badgeClassName: string; dotClassName?: string }) {
+function UnreadIndicator({
+  unreadCount,
+  unknown,
+  badgeClassName,
+  dotClassName,
+}: {
+  unreadCount: number;
+  unknown: boolean;
+  badgeClassName: string;
+  dotClassName?: string;
+}) {
+  if (unknown) {
+    // 개수를 모를 때는 숫자를 지어내지 않고 범용 표시(도트)만 노출
+    return <span className={dotClassName ?? 'tm-unread-dot'} aria-hidden="true" />;
+  }
   if (unreadCount <= 0) return null;
   if (dotClassName) {
     return <span className={dotClassName} aria-hidden="true" />;
@@ -57,11 +78,11 @@ export function NotificationBellLink({
   forceUnread = false,
   iconSize = 21,
 }: NotificationBellProps) {
-  const unreadCount = useUnreadNotificationCount(forceUnread);
+  const { count, unknown } = useUnreadState(forceUnread);
   return (
-    <Link className={className} href="/notifications" aria-label={buildAriaLabel(ariaLabel, unreadCount)}>
+    <Link className={className} href="/notifications" aria-label={buildAriaLabel(ariaLabel, count, unknown)}>
       <BellIcon size={iconSize} strokeWidth={2} />
-      <UnreadIndicator unreadCount={unreadCount} badgeClassName={badgeClassName} dotClassName={dotClassName} />
+      <UnreadIndicator unreadCount={count} unknown={unknown} badgeClassName={badgeClassName} dotClassName={dotClassName} />
     </Link>
   );
 }
@@ -75,11 +96,11 @@ export function NotificationBellButton({
   iconSize = 20,
   onClick,
 }: NotificationBellProps) {
-  const unreadCount = useUnreadNotificationCount(forceUnread);
+  const { count, unknown } = useUnreadState(forceUnread);
   return (
-    <button className={className} type="button" aria-label={buildAriaLabel(ariaLabel, unreadCount)} onClick={onClick}>
+    <button className={className} type="button" aria-label={buildAriaLabel(ariaLabel, count, unknown)} onClick={onClick}>
       <BellIcon size={iconSize} strokeWidth={2} />
-      <UnreadIndicator unreadCount={unreadCount} badgeClassName={badgeClassName} dotClassName={dotClassName} />
+      <UnreadIndicator unreadCount={count} unknown={unknown} badgeClassName={badgeClassName} dotClassName={dotClassName} />
     </button>
   );
 }

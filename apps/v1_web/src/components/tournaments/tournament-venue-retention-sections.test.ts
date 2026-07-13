@@ -51,11 +51,29 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
     expect(screen.getByText('대회 후 더보기')).toBeInTheDocument();
   });
 
-  it('keeps rendering the original 5-card hub (not the completed action list) for a non-completed tournament', () => {
-    render(
+  it('renders nothing for draft/open/closed tournaments — too early for any "대회 후" content', () => {
+    for (const status of ['draft', 'open', 'closed'] as const) {
+      const { container, unmount } = render(
+        createElement(TournamentPostEventHubSection, {
+          tournamentId: 'tour-42',
+          status,
+          fixtures: NO_FIXTURES,
+          hasAnnouncements: false,
+          sponsorCount: 0,
+          announcements: [],
+        }),
+      );
+
+      expect(container).toBeEmptyDOMElement();
+      unmount();
+    }
+  });
+
+  it('renders nothing for an in_progress tournament with no completed fixtures/announcements/sponsors — nothing real to show yet', () => {
+    const { container } = render(
       createElement(TournamentPostEventHubSection, {
         tournamentId: 'tour-42',
-        status: 'open',
+        status: 'in_progress',
         fixtures: NO_FIXTURES,
         hasAnnouncements: false,
         sponsorCount: 0,
@@ -63,8 +81,39 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
       }),
     );
 
-    expect(screen.getByText('대회 후 허브')).toBeInTheDocument();
-    expect(screen.queryByText('대회 후 더보기')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /최종 결과·시상/ })).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders only the genuinely available rows (not "준비 중" placeholders) for an in_progress tournament with a completed fixture', () => {
+    const fixtures: V1TournamentFixture[] = [
+      {
+        id: 'f1',
+        groupId: null,
+        round: '조별 1라운드',
+        status: 'completed',
+        homeRegistrationId: 'r1',
+        awayRegistrationId: 'r2',
+        homeTeamName: '팀A',
+        awayTeamName: '팀B',
+        result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
+      } as V1TournamentFixture,
+    ];
+
+    render(
+      createElement(TournamentPostEventHubSection, {
+        tournamentId: 'tour-42',
+        status: 'in_progress',
+        fixtures,
+        hasAnnouncements: false,
+        sponsorCount: 0,
+        announcements: [],
+      }),
+    );
+
+    expect(screen.getByText('대회 현황')).toBeInTheDocument();
+    // 결과·순위, 리뷰 등 "available" 상태 카드만 뜨고, "하이라이트 영상" 같은 upcoming
+    // placeholder는 나오지 않는다.
+    expect(screen.queryByText('하이라이트 영상')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /리뷰·매너 기록/ })).toHaveAttribute('href', '/my/reviews');
   });
 });

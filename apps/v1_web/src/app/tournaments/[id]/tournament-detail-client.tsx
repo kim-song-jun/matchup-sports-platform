@@ -563,13 +563,7 @@ export function TournamentDetailView({
         teamCount={tournament.teamCount}
       />
 
-      <TournamentVenuePrepSection
-        venue={tournament.venue}
-        hasRules={Boolean(tournament.rulesText)}
-        minPlayers={tournament.minPlayers}
-        maxPlayers={tournament.maxPlayers}
-        announcements={tournament.announcements}
-      />
+      <TournamentVenuePrepSection announcements={tournament.announcements} />
 
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
       <TournamentFlowSection tournament={tournament} />

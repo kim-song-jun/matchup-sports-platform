@@ -8,7 +8,7 @@ export type HubState = 'confirmed' | 'operator_update' | 'upcoming' | 'available
 export type TournamentAnnouncementSummary = Pick<V1TournamentAnnouncement, 'id' | 'title' | 'category'>;
 
 export type TournamentVenuePrepItem = {
-  key: 'venue' | 'parking' | 'rules' | 'roster';
+  key: 'parking';
   label: string;
   value: string;
   detail: string;
@@ -26,40 +26,21 @@ export type TournamentPostEventCard = {
   href: string | null;
 };
 
+/**
+ * 장소·규정·선수단은 대회 상세 페이지 상단 "대회 정보" 섹션에 이미 나오는 값을
+ * 그대로 반복 표시하면서 "확정" 배지까지 붙어 오히려 혼란을 줬다(사용자 피드백).
+ * 이 섹션이 실제로 새 정보를 주는 건 "주차"(현장 공지 전까지는 알 수 없는 정보)
+ * 뿐이라 그 항목만 남긴다.
+ */
 export function getTournamentVenuePrepItems({
-  venue,
-  hasRules,
-  minPlayers,
-  maxPlayers,
   announcements = [],
 }: {
-  venue: string | null;
-  hasRules: boolean;
-  minPlayers?: number;
-  maxPlayers?: number;
   announcements?: TournamentAnnouncementSummary[];
 }): TournamentVenuePrepItem[] {
   const venueNotice = findAnnouncementByCategory(announcements, 'venue');
   const venueNoticeLink = venueNotice ? announcementHref(venueNotice.id) : null;
-  const rosterValue =
-    minPlayers != null && maxPlayers != null
-      ? `${minPlayers}~${maxPlayers}명`
-      : '팀 명단 확인';
 
   return [
-    {
-      key: 'venue',
-      label: '장소',
-      value: venue ?? venueNotice?.title ?? '장소 공지 전',
-      detail: venue
-        ? '대회 당일 이 장소를 기준으로 모여요.'
-        : venueNotice
-          ? '장소·주차·입장 동선은 공지사항에서 확인해요.'
-          : '최종 장소는 운영진 공지사항으로 업데이트돼요.',
-      status: venue ? 'confirmed' : venueNotice ? 'available' : 'operator_update',
-      actionLabel: venueNoticeLink ? '공지 보기' : null,
-      href: venueNoticeLink,
-    },
     {
       key: 'parking',
       label: '주차',
@@ -70,28 +51,6 @@ export function getTournamentVenuePrepItems({
       status: venueNotice ? 'available' : 'operator_update',
       actionLabel: venueNoticeLink ? '공지 보기' : null,
       href: venueNoticeLink,
-    },
-    {
-      key: 'rules',
-      label: '규정',
-      value: hasRules ? '규정 공개됨' : venueNotice ? '공지 확인 가능' : '규정 공지 전',
-      detail: hasRules
-        ? '아래 대회 규정 섹션에서 세부 규칙을 확인해요.'
-        : venueNotice
-          ? '경기 준비물과 현장 운영 규칙은 장소·준비 공지로 안내돼요.'
-          : '확정된 경기 규정은 운영진 공지 또는 대회 규정 섹션에 공개돼요.',
-      status: hasRules ? 'confirmed' : venueNotice ? 'available' : 'operator_update',
-      actionLabel: !hasRules && venueNoticeLink ? '공지 보기' : null,
-      href: !hasRules ? venueNoticeLink : null,
-    },
-    {
-      key: 'roster',
-      label: '선수단',
-      value: rosterValue,
-      detail: '팀장과 운영진이 신청 전 선수단 명단과 입금자명을 함께 확인해요.',
-      status: 'confirmed',
-      actionLabel: null,
-      href: null,
     },
   ];
 }

@@ -176,46 +176,23 @@ describe('getParticipantTeamBuckets', () => {
 });
 
 describe('getTournamentVenuePrepItems', () => {
-  it('shows confirmed venue data while keeping parking as an operator update state', () => {
-    const items = getTournamentVenuePrepItems({
-      venue: '서울 풋살파크',
-      hasRules: true,
-    });
+  // 장소·규정·선수단은 "대회 정보" 섹션과 중복 표시되어 제거됨(사용자 피드백) —
+  // 이 섹션은 이제 현장 공지 전까지 알 수 없는 "주차" 한 항목만 다룬다.
+  it('returns only the parking item, defaulting to operator_update with no venue notice', () => {
+    const items = getTournamentVenuePrepItems({});
 
-    expect(items.find((item) => item.key === 'venue')).toMatchObject({
-      label: '장소',
-      value: '서울 풋살파크',
-      status: 'confirmed',
-    });
-    expect(items.find((item) => item.key === 'parking')).toMatchObject({
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      key: 'parking',
       label: '주차',
       status: 'operator_update',
-    });
-    expect(items.find((item) => item.key === 'rules')).toMatchObject({
-      status: 'confirmed',
+      actionLabel: null,
+      href: null,
     });
   });
 
-  it('does not invent venue or rules text when the public tournament contract is missing them', () => {
+  it('links the parking row to the published venue notice when present', () => {
     const items = getTournamentVenuePrepItems({
-      venue: null,
-      hasRules: false,
-    });
-
-    expect(items.find((item) => item.key === 'venue')).toMatchObject({
-      value: '장소 공지 전',
-      status: 'operator_update',
-    });
-    expect(items.find((item) => item.key === 'rules')).toMatchObject({
-      value: '규정 공지 전',
-      status: 'operator_update',
-    });
-  });
-
-  it('links venue, parking, and preparation rows to the published venue notice when present', () => {
-    const context = {
-      venue: null,
-      hasRules: false,
       announcements: [
         {
           id: 'ann-venue',
@@ -223,22 +200,9 @@ describe('getTournamentVenuePrepItems', () => {
           category: 'venue' as const,
         },
       ],
-    };
-
-    const items = getTournamentVenuePrepItems(context);
-
-    expect(items.find((item) => item.key === 'venue')).toMatchObject({
-      value: '주차·입장·경기 준비 안내',
-      status: 'available',
-      actionLabel: '공지 보기',
-      href: '#announcement-ann-venue',
     });
+
     expect(items.find((item) => item.key === 'parking')).toMatchObject({
-      status: 'available',
-      actionLabel: '공지 보기',
-      href: '#announcement-ann-venue',
-    });
-    expect(items.find((item) => item.key === 'rules')).toMatchObject({
       status: 'available',
       actionLabel: '공지 보기',
       href: '#announcement-ann-venue',

@@ -30,6 +30,32 @@ describe('TeamAvatar', () => {
     expect(first.querySelector('svg')?.innerHTML).toBe(second.querySelector('svg')?.innerHTML);
   });
 
+  it('uses the white card-surface background (not the identicon pastel palette) when a logo image is present', () => {
+    const { container } = render(<TeamAvatar seed="team-1" name="성수 러너스" logoUrl="/uploads/logo.png" />);
+    const wrapper = container.firstElementChild as HTMLElement;
+    // 로드 성공/실패와 무관하게 logoUrl prop 존재 여부만으로 결정돼야 깜빡임이 없다 —
+    // 하드코딩 #fff 대신 --card-surface 토큰(다른 카드 배경과 동일 소스) 재사용.
+    expect(wrapper.style.background).toBe('var(--card-surface)');
+  });
+
+  it('keeps the identicon pastel palette background when there is no logo', () => {
+    const { container } = render(<TeamAvatar seed="team-1" name="성수 러너스" logoUrl={null} />);
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.style.background).not.toBe('var(--card-surface)');
+    expect(wrapper.style.background).toMatch(/^var\(--(green|orange|teal)50\)$/);
+  });
+
+  it('hides the identicon svg once the logo image successfully loads', () => {
+    const { container } = render(<TeamAvatar seed="team-1" name="성수 러너스" logoUrl="/uploads/logo.png" />);
+    const img = container.querySelector('img') as HTMLImageElement;
+    const svg = container.querySelector('svg') as SVGSVGElement;
+    // 로드 전에는 identicon이 여전히 폴백으로 보여야 한다 (logoUrl이 있다는 사실만으로 숨기지 않음).
+    expect(svg.style.display).not.toBe('none');
+
+    fireEvent.load(img);
+    expect(svg.style.display).toBe('none');
+  });
+
   it('recovers visibility when logoUrl changes from a broken URL to a valid one', () => {
     const { container, rerender } = render(<TeamAvatar seed="team-1" name="성수 러너스" logoUrl="/uploads/broken.png" />);
     const img = container.querySelector('img') as HTMLImageElement;

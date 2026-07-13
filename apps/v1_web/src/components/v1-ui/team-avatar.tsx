@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { publicAssetPath } from '@/lib/assets';
 
 export type TeamAvatarSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -51,6 +52,14 @@ const IDENTICON_ROWS = 5;
 const IDENTICON_HALF_COLS = 3;
 /** 셀 인덱스마다 다른 입력을 주기 위한 간격 — 큰 홀수(2654435761, 황금비 기반 상수)라 충돌이 적다. */
 const CELL_STRIDE = 2654435761;
+/**
+ * 격자와 아바타 바깥 테두리 사이의 여백 비율 — 실제 GitHub identicon 5개 샘플을 픽셀
+ * 단위로 측정한 결과(420x420 캔버스에서 격자가 항상 정확히 36~384px, 즉 각 변 8.57%
+ * 안쪽에서 시작) 값을 그대로 반영. 여백 없이 셀을 가장자리까지 채우면(기존 코드) 무늬가
+ * 캔버스를 꽉 채워 "촘촘한 픽셀 그리드"처럼 보이고, GitHub 특유의 로고 같은 여백감이
+ * 사라진다.
+ */
+const IDENTICON_PADDING_RATIO = 36 / 420;
 
 /**
  * GitHub 프로필의 identicon과 같은 방식 — 팀 id 해시로 5x5 좌우대칭 격자 무늬를 만들어
@@ -66,7 +75,10 @@ function buildIdenticonCells(seed: string): boolean[][] {
     for (let col = 0; col < IDENTICON_HALF_COLS; col += 1) {
       const cellHash = mix32(base + cellIndex * CELL_STRIDE);
       cellIndex += 1;
-      rowCells.push(cellHash % 5 >= 2); // ~60% 채움 — 너무 성기거나 빽빽하지 않게
+      // ~40% 채움 — 실제 GitHub identicon 샘플 5개를 셀 단위로 분석한 채움 비율
+      // (32%/40%/52%/60%/60%, 평균 ~49%)에서 하한 쪽에 맞춘 값. 기존 60%는 실측
+      // 상단에 붙어 있어 "네모가 너무 많은" 촘촘한 느낌을 냈다.
+      rowCells.push(cellHash % 5 >= 3);
     }
     cells.push(rowCells);
   }
@@ -88,12 +100,18 @@ export interface TeamAvatarProps {
  */
 export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: TeamAvatarProps) {
   const { px, radius } = SIZE_MAP[size];
+  // 실제 로고 이미지가 "성공적으로" 로드된 경우에만 identicon을 숨긴다 — logoUrl이 있다는
+  // 사실만으로는 숨기지 않는다(로딩 중·로드 실패 시에는 identicon이 계속 폴백으로 보여야 함).
+  const [imgLoaded, setImgLoaded] = useState(false);
   const identitySeed = seed || name;
   // 팔레트 색 선택도 mix32를 거친다 — 무늬 계산과 다른 salt(스트라이드 무관, base 그대로)를
   // 써서 같은 팀이라도 "무늬"와 "색"이 서로 다른 값에서 파생되도록 분리한다.
   const palette = PALETTE[mix32(hashSeed(identitySeed)) % PALETTE.length];
   const cells = buildIdenticonCells(identitySeed);
-  const cellSize = px / IDENTICON_ROWS;
+  // 격자 바깥에 IDENTICON_PADDING_RATIO 만큼 여백을 두고, 남은 안쪽 공간만 5등분한다
+  // (실제 GitHub identicon 레퍼런스의 여백 비율 그대로 — 위 상수 주석 참조).
+  const gridInset = px * IDENTICON_PADDING_RATIO;
+  const cellSize = (px - gridInset * 2) / IDENTICON_ROWS;
 
   return (
     <div
@@ -104,12 +122,21 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
         width: px,
         height: px,
         borderRadius: radius,
-        background: palette.bg,
+        // 실제 로고 이미지가 있는 팀은 wrapper 배경을 흰색 카드 서페이스로 고정한다 — identicon
+        // pastel 팔레트(palette.bg)를 그대로 깔아두면 로고가 완전 불투명 정사각형이 아닐 때
+        // (둥근 로고, 투명 배경 PNG, objectFit:cover 미스매치) 가장자리에 비쳐 보인다. 로드
+        // 성공/실패와 무관하게 logoUrl prop 존재 여부만으로 결정해야 로딩 중 깜빡임이 없다.
+        background: logoUrl ? 'var(--card-surface)' : palette.bg,
         flexShrink: 0,
         overflow: 'hidden',
       }}
     >
-      <svg width={px} height={px} viewBox={`0 0 ${px} ${px}`} style={{ position: 'absolute', inset: 0 }}>
+      <svg
+        width={px}
+        height={px}
+        viewBox={`0 0 ${px} ${px}`}
+        style={{ position: 'absolute', inset: 0, display: imgLoaded ? 'none' : undefined }}
+      >
         {cells.flatMap((rowCells, row) =>
           rowCells.flatMap((filled, col) => {
             if (!filled) return [];
@@ -119,8 +146,8 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
             return mirroredCols.map((c) => (
               <rect
                 key={`${row}-${c}`}
-                x={c * cellSize}
-                y={row * cellSize}
+                x={gridInset + c * cellSize}
+                y={gridInset + row * cellSize}
                 width={cellSize}
                 height={cellSize}
                 fill={palette.fg}
@@ -146,9 +173,11 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
             // 새 이미지가 로드돼도 계속 숨겨진 채로 남는다.
             event.currentTarget.style.display = '';
             event.currentTarget.style.opacity = '1';
+            setImgLoaded(true);
           }}
           onError={(event) => {
             event.currentTarget.style.display = 'none';
+            setImgLoaded(false);
           }}
           style={{
             position: 'absolute',

@@ -1389,17 +1389,28 @@ function TeamCard({ team }: { team: TeamModel }) {
   const hasIntro = team.intro.trim().length > 0;
   const activity = team.next.trim();
   const memberCapacity = formatMemberCapacity(team);
+  const leaderLine = formatTeamLeaderLine(team);
 
   return (
     <Link className="tm-team-card tm-pressable" href={`/teams/${team.id}`}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
-        <div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body-lg line-clamp-2">{team.name}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div></div>
+        {/* size="xl"(60px) — 팀장/감독 줄이 늘어난 헤더 텍스트 블록 옆에서 기존 "lg"(54px)가
+            작고 외로워 보이던 간격을 메운다. 헤더 블록이 더 길어져도 아바타는 top-align만
+            유지하고 픽셀 단위로 높이를 맞추지는 않는다. */}
+        <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="tm-text-body-lg line-clamp-2">{team.name}</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div>
+          {leaderLine ? (
+            <div className="tm-text-caption line-clamp-1" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{leaderLine}</div>
+          ) : null}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div>
+        </div>
       </div>
       {/* 실제 팀 소개가 있을 때만 intro-box를 렌더한다. */}
       {hasIntro ? (
         <div className="tm-team-intro-box">
-          <div className="tm-text-body line-clamp-2" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
+          <div className="tm-text-body line-clamp-3" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
         </div>
       ) : null}
       <div className="tm-team-card-action-row" aria-hidden="true">
@@ -1412,6 +1423,12 @@ function TeamCard({ team }: { team: TeamModel }) {
       </div>
     </Link>
   );
+}
+
+/** "팀장 {이름}" + (감독이 있으면) "· 감독 {이름}" — 팀장이 없는(폴백/구버전) 데이터에는 빈 문자열. */
+function formatTeamLeaderLine(team: Pick<TeamModel, 'ownerName' | 'managerName'>) {
+  if (!team.ownerName) return '';
+  return team.managerName ? `팀장 ${team.ownerName} · 감독 ${team.managerName}` : `팀장 ${team.ownerName}`;
 }
 
 function formatMemberCapacity(team: Pick<TeamModel, 'members' | 'capacity'>) {

@@ -1565,6 +1565,8 @@ export type V1Tournament = {
   status: V1TournamentStatus;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
+  /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
+  rosterDeadlineAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -1701,6 +1703,8 @@ export type V1TournamentParticipantTeam = {
   registrationId: string;
   teamId: string;
   teamName: string;
+  teamLogoUrl: string | null;
+  teamRegionName: string | null;
   status: V1TournamentParticipantStatus;
   confirmedAt: string | null;
 };
@@ -1715,6 +1719,8 @@ export type V1TournamentDetail = {
   status: V1TournamentStatus;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
+  /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
+  rosterDeadlineAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -1784,6 +1790,19 @@ export type V1TournamentReviewsPage = {
   pageSize: number;
 };
 
+/** 어드민: 리뷰 모더레이션 뷰 — 공개 리뷰 필드 + 숨김 상태 */
+export type V1AdminTournamentReview = V1TournamentReview & {
+  hiddenAt: string | null;
+  hiddenReason: string | null;
+};
+
+export type V1AdminTournamentReviewsPage = {
+  items: V1AdminTournamentReview[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type V1PendingTournamentReview = {
   tournamentId: string;
   tournamentTitle: string;
@@ -1823,6 +1842,8 @@ export type V1TournamentRegistration = {
   agreedMediaConsent: boolean;
   confirmedAt: string | null;
   rosterLockedAt: string | null;
+  /** 어드민이 부여한 명단 제출 마감 예외 — 부여된 이후에는 마감이 지나도 명단을 계속 수정할 수 있다 */
+  rosterDeadlineOverrideAt: string | null;
   cancelRequestedAt: string | null;
   cancelReason: string | null;
   playerCount: number;
@@ -2013,6 +2034,8 @@ export type V1CreateTournamentPayload = {
   title: string;
   format?: V1TournamentFormat;
   registrationDeadlineAt?: string;
+  /** 명단(선수단) 제출 마감일 */
+  rosterDeadlineAt?: string;
   scheduledAt?: string;
   scheduledEndAt?: string | null;
   venue?: string;

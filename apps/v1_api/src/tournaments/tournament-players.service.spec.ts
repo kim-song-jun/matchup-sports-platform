@@ -66,6 +66,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     appliedByUserId: 'manager-user-id',
     status: 'draft',
     rosterLockedAt: null,
+    rosterDeadlineOverrideAt: null,
     ...overrides,
   };
 }
@@ -76,6 +77,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     minPlayers: 6,
     maxPlayers: 10,
     deletedAt: null,
+    rosterDeadlineAt: null,
     ...overrides,
   };
 }
@@ -221,6 +223,7 @@ describe('TournamentPlayersService', () => {
       registrationRow({ rosterLockedAt: new Date('2026-06-10T00:00:00Z') }),
     );
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
 
     await expect(
       service.addPlayer(manager, 'tournament-1', 'reg-1', {
@@ -236,11 +239,151 @@ describe('TournamentPlayersService', () => {
       registrationRow({ rosterLockedAt: new Date('2026-06-10T00:00:00Z') }),
     );
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
 
     await expect(
       service.removePlayer(manager, 'tournament-1', 'reg-1', 'player-1'),
     ).rejects.toMatchObject({ response: { code: 'ROSTER_LOCKED' } });
     expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  // ─── 3-1. 명단 제출 마감 하드 차단 + 개별 예외 ─────────────────────────────
+
+  const pastDeadline = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const futureDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  it('addPlayer: rosterDeadlineAt 과거 + override 없음 → 409 ROSTER_DEADLINE_PASSED', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: pastDeadline }));
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_PASSED' } });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
+  it('addPlayer: rosterDeadlineAt 미래 → 정상 동작', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: futureDeadline }));
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow());
+
+    const result = await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(result).toMatchObject({ id: 'player-1' });
+  });
+
+  it('addPlayer: rosterDeadlineOverrideAt 있으면 마감이 지나도 허용', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ rosterDeadlineOverrideAt: new Date() }),
+    );
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: pastDeadline }));
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow());
+
+    const result = await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(result).toMatchObject({ id: 'player-1' });
+  });
+
+  it('addPlayer: rosterDeadlineAt 미설정(null) → 기존처럼 무제한 허용 (회귀 없음)', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: null }));
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow());
+
+    const result = await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(result).toMatchObject({ id: 'player-1' });
+  });
+
+  it('removePlayer: rosterDeadlineAt 과거 + override 없음 → 409 ROSTER_DEADLINE_PASSED', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: pastDeadline }));
+
+    await expect(
+      service.removePlayer(manager, 'tournament-1', 'reg-1', 'player-1'),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_PASSED' } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  it('removePlayer: rosterDeadlineOverrideAt 있으면 마감이 지나도 허용', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ rosterDeadlineOverrideAt: new Date() }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: pastDeadline }));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ removedAt: new Date() }));
+
+    const result = await service.removePlayer(manager, 'tournament-1', 'reg-1', 'player-1');
+    expect(result.id).toBe('player-1');
+  });
+
+  it('updatePlayer: rosterDeadlineAt 과거 + override 없음 → 409 ROSTER_DEADLINE_PASSED', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: pastDeadline }));
+
+    await expect(
+      service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
+        eligibilityStatus: 'pro',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_PASSED' } });
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayer: rosterDeadlineOverrideAt 있으면 마감이 지나도 허용', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ rosterDeadlineOverrideAt: new Date() }),
+    );
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ rosterDeadlineAt: pastDeadline }));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
+
+    const result = await service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
+      eligibilityStatus: 'pro',
+    });
+    expect(result).toMatchObject({ id: 'player-1', eligibilityStatus: 'pro' });
+  });
+
+  it('listPlayers: 명단 제출 마감이 지나고 override가 없어도 조회는 항상 성공', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'member' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({ minPlayers: 6, rosterDeadlineAt: pastDeadline }),
+    );
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow()]);
+
+    const result = await service.listPlayers(manager, 'tournament-1', 'reg-1');
+    expect(result.players).toHaveLength(1);
   });
 
   // ─── 4. maxPlayers 초과 ────────────────────────────────────────────────────
@@ -394,6 +537,7 @@ describe('TournamentPlayersService', () => {
   it('removePlayer: manager + unlocked → soft removes player', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
     const removedAt = new Date('2026-06-14T10:00:00Z');
     prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ removedAt }));
@@ -412,6 +556,7 @@ describe('TournamentPlayersService', () => {
   it('removePlayer: player not found → 404 PLAYER_NOT_FOUND', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
 
     await expect(
@@ -425,6 +570,7 @@ describe('TournamentPlayersService', () => {
   it('updatePlayer: manager + unlocked → updates eligibility status', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
     prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
 
@@ -447,6 +593,7 @@ describe('TournamentPlayersService', () => {
   it('updatePlayer: latest team member profile is not revalidated for eligibility-only edit', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
     prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
 
@@ -472,6 +619,7 @@ describe('TournamentPlayersService', () => {
       registrationRow({ rosterLockedAt: new Date('2026-06-10T00:00:00Z') }),
     );
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
 
     await expect(
       service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
@@ -484,6 +632,7 @@ describe('TournamentPlayersService', () => {
   it('updatePlayer: player not found → 404 PLAYER_NOT_FOUND', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
 
     await expect(

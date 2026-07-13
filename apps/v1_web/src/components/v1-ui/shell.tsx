@@ -191,7 +191,8 @@ function DesktopNav({
         </Link>
         <NotificationBellLink
           className="tm-desktop-nav-action"
-          dotClassName="tm-desktop-nav-dot"
+          badgeClassName="tm-desktop-nav-badge"
+          unknownDotClassName="tm-desktop-nav-dot"
           forceUnread={hasNewNotification}
           iconSize={20}
         />

@@ -118,7 +118,16 @@ export class TournamentsReadService {
           where: {
             status: { in: ['confirmed', 'waitlisted', 'awaiting_payment', 'payment_checking', 'paid'] },
           },
-          include: { team: { select: { id: true, name: true } } },
+          include: {
+            team: {
+              select: {
+                id: true,
+                name: true,
+                profile: { select: { logoUrl: true } },
+                region: { select: { name: true } },
+              },
+            },
+          },
         },
         _count: {
           select: {
@@ -128,6 +137,7 @@ export class TournamentsReadService {
           },
         },
         reviews: {
+          where: { hiddenAt: null },
           orderBy: { createdAt: 'desc' as const },
           take: 30,
           include: {
@@ -155,6 +165,7 @@ export class TournamentsReadService {
       status: row.status,
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
+      rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
@@ -203,6 +214,8 @@ export class TournamentsReadService {
           registrationId: registration.id,
           teamId: registration.team.id,
           teamName: registration.team.name,
+          teamLogoUrl: registration.team.profile?.logoUrl ?? null,
+          teamRegionName: registration.team.region?.name ?? null,
           status: registration.status,
           confirmedAt: registration.confirmedAt?.toISOString() ?? null,
         })),

@@ -21,6 +21,8 @@ import { AdminRegistrationsService } from './admin-registrations.service';
  * PATCH /admin/registrations/:registrationId/reject-cancel    취소 요청 거부(잔류)
  * POST  /admin/registrations/:registrationId/roster-lock      명단 잠금
  * DELETE /admin/registrations/:registrationId/roster-lock     명단 잠금 해제
+ * POST  /admin/registrations/:registrationId/roster-deadline-override    명단 제출 마감 예외 부여
+ * DELETE /admin/registrations/:registrationId/roster-deadline-override   명단 제출 마감 예외 취소
  */
 @Controller()
 @UseGuards(V1AuthGuard)
@@ -123,5 +125,30 @@ export class AdminRegistrationsController {
     @Param('registrationId') registrationId: string,
   ) {
     return this.adminRegistrationsService.rosterUnlock(user, registrationId);
+  }
+
+  /**
+   * POST /admin/registrations/:registrationId/roster-deadline-override
+   * 명단 제출 마감 예외 부여(rosterDeadlineOverrideAt = now). 대회의 rosterDeadlineAt이 지나도
+   * 해당 팀(신청건)만 명단을 계속 수정할 수 있게 한다. body 없음.
+   */
+  @Post('admin/registrations/:registrationId/roster-deadline-override')
+  grantRosterDeadlineOverride(
+    @CurrentUser() user: V1AuthUser,
+    @Param('registrationId') registrationId: string,
+  ) {
+    return this.adminRegistrationsService.grantRosterDeadlineOverride(user, registrationId);
+  }
+
+  /**
+   * DELETE /admin/registrations/:registrationId/roster-deadline-override
+   * 명단 제출 마감 예외 취소(rosterDeadlineOverrideAt = null).
+   */
+  @Delete('admin/registrations/:registrationId/roster-deadline-override')
+  revokeRosterDeadlineOverride(
+    @CurrentUser() user: V1AuthUser,
+    @Param('registrationId') registrationId: string,
+  ) {
+    return this.adminRegistrationsService.revokeRosterDeadlineOverride(user, registrationId);
   }
 }

@@ -302,7 +302,7 @@ model V1User {
   tournamentPlayerEntries        V1TournamentPlayer[]
   tournamentReviews              V1TournamentReview[]       @relation("V1TournamentReviewAuthor")
   verificationTokens             V1VerificationToken[]
-  inquiries                       V1Inquiry[]
+  inquiries                      V1Inquiry[]
 
   @@index([accountStatus])
   @@index([onboardingStatus])
@@ -698,24 +698,24 @@ model V1Team {
 }
 
 model V1TeamProfile {
-  id              String    @id @default(uuid())
-  teamId          String    @unique @map("team_id")
-  logoUrl         String?   @map("logo_url")
-  coverImageUrl   String?   @map("cover_image_url")
-  description     String?
-  activityNote    String?   @map("activity_note")
-  activityDays      String[] @default([]) @map("activity_days")
-  activityFrequency String?  @map("activity_frequency")
-  activityTimeSlots String[] @default([]) @map("activity_time_slots")
-  activityTypes     String[] @default([]) @map("activity_types")
-  skillNote       String?   @map("skill_note")
-  minSportLevelId String?   @map("min_sport_level_id")
-  maxSportLevelId String?   @map("max_sport_level_id")
-  genderRule      String?   @map("gender_rule")
-  memberGoalCount Int?      @map("member_goal_count")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  deletedAt       DateTime? @map("deleted_at")
+  id                String    @id @default(uuid())
+  teamId            String    @unique @map("team_id")
+  logoUrl           String?   @map("logo_url")
+  coverImageUrl     String?   @map("cover_image_url")
+  description       String?
+  activityNote      String?   @map("activity_note")
+  activityDays      String[]  @default([]) @map("activity_days")
+  activityFrequency String?   @map("activity_frequency")
+  activityTimeSlots String[]  @default([]) @map("activity_time_slots")
+  activityTypes     String[]  @default([]) @map("activity_types")
+  skillNote         String?   @map("skill_note")
+  minSportLevelId   String?   @map("min_sport_level_id")
+  maxSportLevelId   String?   @map("max_sport_level_id")
+  genderRule        String?   @map("gender_rule")
+  memberGoalCount   Int?      @map("member_goal_count")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
 
   team          V1Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
   minSportLevel V1SportLevel? @relation("V1TeamProfileMinSportLevel", fields: [minSportLevelId], references: [id], onDelete: SetNull)
@@ -1135,7 +1135,7 @@ model V1Inquiry {
   createdAt   DateTime              @default(now()) @map("created_at")
   updatedAt   DateTime              @updatedAt @map("updated_at")
 
-  user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    V1User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies V1InquiryReply[]
 
   @@index([userId, status, createdAt])
@@ -1248,6 +1248,7 @@ model V1Tournament {
   status                 V1TournamentStatus @default(draft)
   format                 V1TournamentFormat @default(group_knockout)
   registrationDeadlineAt DateTime?          @map("registration_deadline_at")
+  rosterDeadlineAt       DateTime?          @map("roster_deadline_at")
   scheduledAt            DateTime?          @map("scheduled_at")
   scheduledEndAt         DateTime?          @map("scheduled_end_at")
   venue                  String?
@@ -1307,15 +1308,17 @@ model V1Tournament {
 
 /// 대회 참가팀 후기 (status=completed 이후, 확정 등록된 팀만 작성 가능)
 model V1TournamentReview {
-  id           String   @id @default(uuid())
-  tournamentId String   @map("tournament_id")
-  authorUserId String   @map("author_user_id")
-  teamName     String?  @map("team_name")   // 작성자 팀명 (snapshot)
-  rating       Int      // 1~5
-  comment      String?  @db.Text
-  photoUrls    String[] @default([]) @map("photo_urls")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id           String    @id @default(uuid())
+  tournamentId String    @map("tournament_id")
+  authorUserId String    @map("author_user_id")
+  teamName     String?   @map("team_name") // 작성자 팀명 (snapshot)
+  rating       Int // 1~5
+  comment      String?   @db.Text
+  photoUrls    String[]  @default([]) @map("photo_urls")
+  hiddenAt     DateTime? @map("hidden_at")
+  hiddenReason String?   @map("hidden_reason")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   author     V1User       @relation("V1TournamentReviewAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
@@ -1329,11 +1332,11 @@ model V1TournamentReview {
 model V1TournamentAward {
   id            String   @id @default(uuid())
   tournamentId  String   @map("tournament_id")
-  awardType     String   @map("award_type")     // 'mvp' | 'top_scorer' | 'best_defense' | etc.
-  awardLabel    String   @map("award_label")    // 표시명: 'MVP', '득점왕', '베스트 11' 등
+  awardType     String   @map("award_type") // 'mvp' | 'top_scorer' | 'best_defense' | etc.
+  awardLabel    String   @map("award_label") // 표시명: 'MVP', '득점왕', '베스트 11' 등
   recipientName String   @map("recipient_name") // 수심자 이름
-  teamName      String?  @map("team_name")      // 수심자 팀명
-  note          String?  // 추가 설명
+  teamName      String?  @map("team_name") // 수심자 팀명
+  note          String? // 추가 설명
   sortOrder     Int      @default(0) @map("sort_order") // 표시 순서
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -1346,24 +1349,25 @@ model V1TournamentAward {
 }
 
 model V1TournamentRegistration {
-  id                     String                         @id @default(uuid())
-  tournamentId           String                         @map("tournament_id")
-  teamId                 String                         @map("team_id")
-  appliedByUserId        String                         @map("applied_by_user_id")
-  status                 V1TournamentRegistrationStatus @default(draft)
-  depositorName          String?                        @map("depositor_name")
-  agreedRules            Boolean                        @default(false) @map("agreed_rules")
-  agreedPrivacy          Boolean                        @default(false) @map("agreed_privacy")
-  agreedRefund           Boolean                        @default(false) @map("agreed_refund")
-  agreedMediaConsent     Boolean                        @default(false) @map("agreed_media_consent")
-  confirmedByAdminUserId String?                        @map("confirmed_by_admin_user_id")
-  confirmedAt            DateTime?                      @map("confirmed_at")
-  rosterLockedAt         DateTime?                      @map("roster_locked_at")
-  cancelRequestedAt      DateTime?                      @map("cancel_requested_at")
-  cancelPreviousStatus   V1TournamentRegistrationStatus? @map("cancel_previous_status")
-  cancelReason           String?                        @map("cancel_reason")
-  createdAt              DateTime                       @default(now()) @map("created_at")
-  updatedAt              DateTime                       @updatedAt @map("updated_at")
+  id                       String                          @id @default(uuid())
+  tournamentId             String                          @map("tournament_id")
+  teamId                   String                          @map("team_id")
+  appliedByUserId          String                          @map("applied_by_user_id")
+  status                   V1TournamentRegistrationStatus  @default(draft)
+  depositorName            String?                         @map("depositor_name")
+  agreedRules              Boolean                         @default(false) @map("agreed_rules")
+  agreedPrivacy            Boolean                         @default(false) @map("agreed_privacy")
+  agreedRefund             Boolean                         @default(false) @map("agreed_refund")
+  agreedMediaConsent       Boolean                         @default(false) @map("agreed_media_consent")
+  confirmedByAdminUserId   String?                         @map("confirmed_by_admin_user_id")
+  confirmedAt              DateTime?                       @map("confirmed_at")
+  rosterLockedAt           DateTime?                       @map("roster_locked_at")
+  rosterDeadlineOverrideAt DateTime?                       @map("roster_deadline_override_at")
+  cancelRequestedAt        DateTime?                       @map("cancel_requested_at")
+  cancelPreviousStatus     V1TournamentRegistrationStatus? @map("cancel_previous_status")
+  cancelReason             String?                         @map("cancel_reason")
+  createdAt                DateTime                        @default(now()) @map("created_at")
+  updatedAt                DateTime                        @updatedAt @map("updated_at")
 
   tournament       V1Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   team             V1Team                  @relation(fields: [teamId], references: [id], onDelete: Restrict)

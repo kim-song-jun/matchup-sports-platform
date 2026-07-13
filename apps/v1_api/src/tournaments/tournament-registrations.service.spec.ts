@@ -9,6 +9,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
 
@@ -46,6 +47,7 @@ describe('TournamentRegistrationsService', () => {
     v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock };
     $transaction: jest.Mock;
   };
+  let notifications: { emitNotification: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -61,8 +63,15 @@ describe('TournamentRegistrationsService', () => {
     // 기본: 매니저 권한 통과
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
 
+    notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TournamentRegistrationsService, TournamentPaymentExpiryService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        TournamentRegistrationsService,
+        TournamentPaymentExpiryService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
+      ],
     }).compile();
     service = module.get(TournamentRegistrationsService);
   });
@@ -244,6 +253,25 @@ describe('TournamentRegistrationsService', () => {
     );
     expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
     expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+  });
+
+  it('submit: emits tournament_registration_submitted to the registration owner', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ appliedByUserId: 'original-applicant' }),
+    );
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'awaiting_payment', appliedByUserId: 'original-applicant' }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'original-applicant',
+      'tournament_registration_submitted',
+      'tournament-1',
+    );
   });
 
   it('submit: pg method does not require depositorName', async () => {

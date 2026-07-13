@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -1714,7 +1715,12 @@ function StandingRow({
   isQualifying: boolean;
 }) {
   return (
-    <tr style={isQualifying ? { background: 'var(--blue50)' } : undefined}>
+    <tr
+      style={{
+        // zebra: 진출 팀은 파란 강조가 우선, 그 외엔 짝수 행에만 옅은 회색을 줘 가독성을 높인다.
+        background: isQualifying ? 'var(--blue50)' : rank % 2 === 0 ? 'var(--grey50)' : undefined,
+      }}
+    >
       <td
         style={{
           padding: '8px 8px 8px 0',
@@ -1724,32 +1730,38 @@ function StandingRow({
       >
         <span
           className="tm-text-caption tab-num"
-          style={{ color: isQualifying ? 'var(--text-strong)' : 'var(--text-caption)' }}
+          style={{ color: isQualifying ? 'var(--text-strong)' : 'var(--text-caption)', fontWeight: isQualifying ? 700 : 400 }}
         >
           {rank}
         </span>
       </td>
-      <td
-        style={{ padding: '8px 4px', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-      >
-        <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-          {standing.teamName}
-        </span>
-        {isQualifying ? (
-          <span className="tm-badge tm-badge-blue" style={{ marginLeft: 6, verticalAlign: 'middle' }}>
-            진출
+      <td style={{ padding: '8px 4px', maxWidth: 160 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <TeamAvatar seed={standing.teamId} name={standing.teamName} size="sm" />
+          <span
+            className="tm-text-label"
+            style={{ color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+          >
+            {standing.teamName}
           </span>
-        ) : null}
+          {isQualifying ? (
+            <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>
+              진출
+            </span>
+          ) : null}
+        </div>
       </td>
       <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
+        <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
           {standing.points}
         </span>
       </td>
       <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-micro tab-num" style={{ color: 'var(--text-muted)' }}>
-          {standing.wins}승{standing.draws}무{standing.losses}패
-        </span>
+        <div style={{ display: 'inline-flex', gap: 3 }}>
+          <span className="tm-badge tm-badge-green tm-badge-sm tab-num">{standing.wins}승</span>
+          <span className="tm-badge tm-badge-grey tm-badge-sm tab-num">{standing.draws}무</span>
+          <span className="tm-badge tm-badge-red tm-badge-sm tab-num">{standing.losses}패</span>
+        </div>
       </td>
       <td style={{ padding: '8px 0 8px 4px', textAlign: 'center' }}>
         <span className="tm-text-micro">
@@ -1775,7 +1787,7 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
         <table
           /* colgroup으로 열 너비를 명시해 카드 끝선까지 순위표가 확장되도록 함.
              maxWidth 캡 제거 — 카드 너비에 맞게 테이블이 늘어남. */
-          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}
+          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 320 }}
           aria-label={`${group.name} 순위표`}
         >
           <colgroup>
@@ -1785,8 +1797,8 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
             <col />
             {/* 승점 */}
             <col style={{ width: 48 }} />
-            {/* 전적 */}
-            <col style={{ width: 88 }} />
+            {/* 전적 — 승/무/패 개별 배지 3개라 텍스트보다 폭이 더 필요하다 */}
+            <col style={{ width: 128 }} />
             {/* 득실 */}
             <col style={{ width: 48 }} />
           </colgroup>

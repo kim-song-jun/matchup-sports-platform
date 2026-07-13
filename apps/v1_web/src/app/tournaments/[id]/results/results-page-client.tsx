@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Trophy } from 'lucide-react';
 import { MatchVideos } from '@/components/tournaments/match-videos';
@@ -74,6 +74,39 @@ function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[]): FinalRankRo
   return rows;
 }
 
+/* ── 트로피 마크 — 골드 그라디언트 필드 SVG (lucide 스트로크 대체, 토스풍 솔리드 아이콘) ── */
+function TrophyMark({ size = 56 }: { size?: number }) {
+  const uid = useId();
+  const cupId = `tm-trophy-cup-${uid}`;
+  const baseId = `tm-trophy-base-${uid}`;
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id={cupId} x1="32" y1="10" x2="32" y2="42" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFE28A" />
+          <stop offset="0.55" stopColor="#F6B93B" />
+          <stop offset="1" stopColor="#E8960C" />
+        </linearGradient>
+        <linearGradient id={baseId} x1="32" y1="46" x2="32" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#E8A20D" />
+          <stop offset="1" stopColor="#C77E06" />
+        </linearGradient>
+      </defs>
+      {/* 손잡이 */}
+      <path d="M16 15 H8 c0 10 5 15 10 16" stroke={`url(#${cupId})`} strokeWidth="4.5" strokeLinecap="round" fill="none" />
+      <path d="M48 15 H56 c0 10 -5 15 -10 16" stroke={`url(#${cupId})`} strokeWidth="4.5" strokeLinecap="round" fill="none" />
+      {/* 컵 */}
+      <path d="M16 10 h32 v12 c0 12 -7 19 -16 19 s-16 -7 -16 -19 z" fill={`url(#${cupId})`} />
+      {/* 하이라이트 */}
+      <ellipse cx="24.5" cy="21" rx="3.2" ry="6.5" fill="#FFFFFF" opacity="0.35" transform="rotate(-12 24.5 21)" />
+      {/* 스템 + 받침 */}
+      <rect x="29" y="41" width="6" height="7" rx="2" fill={`url(#${baseId})`} />
+      <rect x="21" y="48" width="22" height="5" rx="2.5" fill={`url(#${baseId})`} />
+      <rect x="18" y="53" width="28" height="4.5" rx="2.25" fill="#C77E06" />
+    </svg>
+  );
+}
+
 /* confetti */
 const CONFETTI_COLORS = ['#3182F6','#FCD34D','#10B981','#F97316','#8B5CF6','#EC4899','#EF4444','#06B6D4','#84CC16','#F59E0B'];
 
@@ -114,14 +147,16 @@ function DesktopChampionHero({
   tournament: V1TournamentDetail;
 }) {
   const rec = computeTeamRecord(champion, tournament.fixtures);
+  const diff = rec.gf - rec.ga;
   return (
     <div className="tm-show-desktop">
     <div
+      className="tm-resd-hero"
       style={{
         position: 'relative',
         background: 'linear-gradient(160deg, #0A0E1A 0%, #0D1B2A 40%, #1A0A2E 100%)',
         borderRadius: 16,
-        padding: '48px 56px',
+        padding: '44px 56px 40px',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -139,22 +174,11 @@ function DesktopChampionHero({
         pointerEvents: 'none',
       }} />
       {/* 트로피 */}
-      <div style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 16, filter: 'drop-shadow(0 0 24px rgba(255,215,0,0.5))' }} aria-hidden="true">
-        <Trophy size={52} className="tm-medal-gold" strokeWidth={1.6} />
-      </div>
-      {/* CHAMPION 배지 */}
-      <div style={{
-        display: 'inline-flex', alignItems: 'center', gap: 8,
-        background: 'rgba(255,215,0,0.12)', border: '1px solid rgba(255,215,0,0.3)',
-        borderRadius: 20, padding: '4px 14px',
-        fontSize: 11, fontWeight: 800, letterSpacing: '0.16em',
-        color: 'rgba(255,215,0,0.85)', textTransform: 'uppercase',
-        marginBottom: 12,
-      }}>
-        ★ CHAMPION ★
+      <div className="tm-resd-trophy" style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 18, filter: 'drop-shadow(0 6px 20px rgba(246,185,59,0.45))' }} aria-hidden="true">
+        <TrophyMark size={60} />
       </div>
       {/* 팀명 */}
-      <div style={{
+      <div className="tm-resd-name" style={{
         fontSize: 44, fontWeight: 900, color: '#FFFFFF',
         letterSpacing: '-0.03em', lineHeight: 1.1,
         marginBottom: 8,
@@ -162,7 +186,7 @@ function DesktopChampionHero({
         {champion}
       </div>
       {/* 대회명 */}
-      <div style={{
+      <div className="tm-resd-meta" style={{
         fontSize: 12, color: 'rgba(255,255,255,0.4)',
         fontWeight: 600, letterSpacing: '0.04em',
         marginBottom: 28,
@@ -172,11 +196,11 @@ function DesktopChampionHero({
       {/* 스탯 3칸 */}
       <div style={{ display: 'flex', gap: 40, alignItems: 'center' }}>
         {[
-          { n: rec.w, label: '승리', sub: `${rec.games}경기 중` },
-          { n: rec.gf, label: '득점', sub: `${rec.ga}실점` },
-          { n: rec.w, label: '무패', sub: '전 경기' },
+          { n: String(rec.w), label: '승리', sub: `${rec.games}경기 중` },
+          { n: String(rec.gf), label: '득점', sub: `${rec.ga}실점` },
+          { n: `${diff > 0 ? '+' : ''}${diff}`, label: '득실차', sub: '전 경기 합산' },
         ].map(({ n, label, sub }) => (
-          <div key={label} style={{ textAlign: 'center' }}>
+          <div key={label} className="tm-resd-stat" style={{ textAlign: 'center' }}>
             <div style={{
               fontSize: 36, fontWeight: 900, lineHeight: 1,
               color: '#FDE68A', fontVariantNumeric: 'tabular-nums',
@@ -202,6 +226,7 @@ function MobileChampionBanner({
 }) {
   const [played, setPlayed] = useState(false);
   const rec = computeTeamRecord(champion, tournament.fixtures);
+  const diff = rec.gf - rec.ga;
 
   useEffect(() => {
     const t = setTimeout(() => setPlayed(true), 80);
@@ -221,8 +246,7 @@ function MobileChampionBanner({
       style={{ cursor: 'pointer' }}
     >
       {played && <Confetti count={32} />}
-      <div className="tm-res-hero-trophy" aria-hidden="true"><Trophy size={40} className="tm-medal-gold" strokeWidth={1.6} /></div>
-      <div className="tm-res-hero-label">★ CHAMPION ★</div>
+      <div className="tm-res-hero-trophy" aria-hidden="true"><TrophyMark size={44} /></div>
       <div className="tm-res-hero-name">{champion}</div>
       <div className="tm-res-hero-inline-stat">
         {tournament.sport?.name ?? ''} &middot; {rec.games}경기 &middot; {rec.w}승 &middot; {rec.gf}득점
@@ -230,9 +254,9 @@ function MobileChampionBanner({
       {/* 스탯 3칸 */}
       <div style={{ display: 'flex', gap: 28, marginTop: 16, alignItems: 'center' }}>
         {[
-          { n: rec.w, label: '승리', sub: `${rec.games}경기 중` },
-          { n: rec.gf, label: '득점', sub: `${rec.ga}실점` },
-          { n: rec.w, label: '무패', sub: '전 경기' },
+          { n: String(rec.w), label: '승리', sub: `${rec.games}경기 중` },
+          { n: String(rec.gf), label: '득점', sub: `${rec.ga}실점` },
+          { n: `${diff > 0 ? '+' : ''}${diff}`, label: '득실차', sub: '전 경기 합산' },
         ].map(({ n, label, sub }) => (
           <div key={label} style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1, color: '#FDE68A', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{n}</div>
@@ -611,7 +635,8 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
           <DesktopChampionHero champion={championName} tournament={tournament} />
           {/* 모바일: 컴팩트 배너 */}
           <MobileChampionBanner champion={championName} tournament={tournament} />
-          <div style={{ marginTop: 16 }}>
+          {/* 대회 요약 — 데스크탑에서는 최종 순위 아래(좌측 컬럼)로 이동 */}
+          <div className="tm-hide-desktop" style={{ marginTop: 16 }}>
             <TournamentSummaryCard tournament={tournament} />
           </div>
           {videosTotal > 0 && (
@@ -653,6 +678,10 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>최종 순위</h3>
             {knockoutRows.length > 0 && <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />}
+            {/* 데스크탑: 순위표가 짧아 비는 좌측 컬럼을 대회 요약으로 채우고 sticky로 고정 */}
+            <div className="tm-show-desktop" style={{ marginTop: 16 }}>
+              <TournamentSummaryCard tournament={tournament} />
+            </div>
           </div>
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             {knockoutFixtures.length > 0 && (

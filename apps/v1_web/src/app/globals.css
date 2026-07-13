@@ -5439,8 +5439,7 @@ button:disabled {
   opacity: 1;
   transform: scale(1) translateY(0);
 }
-.tm-res-hero-trophy { font-size: 44px; line-height: 1; margin-bottom: 4px; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.2)); }
-.tm-res-hero-label { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.75; }
+.tm-res-hero-trophy { font-size: 44px; line-height: 1; margin-bottom: 4px; filter: drop-shadow(0 4px 12px rgba(246, 185, 59, 0.35)); }
 .tm-res-hero-name { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.2; }
 .tm-res-hero-inline-stat {
   margin-top: 10px;
@@ -5448,6 +5447,32 @@ button:disabled {
   font-weight: 500;
   color: rgba(255,255,255,0.5);
   letter-spacing: 0.02em;
+}
+
+/* ── 데스크탑 챔피언 히어로 입장 시퀀스 (트로피 팝 → 팀명 → 메타 → 스탯 스태거) ── */
+@keyframes tmResdFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tmResdTrophy {
+  0%   { opacity: 0; transform: scale(0.5) translateY(10px); }
+  60%  { opacity: 1; transform: scale(1.08) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes tmResdRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tm-resd-hero   { animation: tmResdFade 0.5s ease both; }
+.tm-resd-trophy { animation: tmResdTrophy 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both; }
+.tm-resd-name   { animation: tmResdRise 0.55s ease 0.25s both; }
+.tm-resd-meta   { animation: tmResdRise 0.55s ease 0.38s both; }
+.tm-resd-stat   { animation: tmResdRise 0.5s ease both; }
+.tm-resd-stat:nth-child(1) { animation-delay: 0.5s; }
+.tm-resd-stat:nth-child(2) { animation-delay: 0.58s; }
+.tm-resd-stat:nth-child(3) { animation-delay: 0.66s; }
+@media (prefers-reduced-motion: reduce) {
+  .tm-resd-hero, .tm-resd-trophy, .tm-resd-name, .tm-resd-meta, .tm-resd-stat { animation: none; }
 }
 
 /* ── 시상대 (Podium) ── */
@@ -6533,11 +6558,10 @@ button:disabled {
   .tm-awards-col-prize .tm-prize-section { flex: 1; display: flex; flex-direction: column; }
   .tm-awards-col-prize .tm-prize-card { flex: 1; display: flex; flex-direction: column; }
 
-  /* 최종결과 페이지: 좌(최종순위) 컬럼이 우(결선·조별)보다 짧아 생기는 하단 백색 공간을
-     시상 페이지와 동일하게 카드 스트레치로 흡수 */
-  .tm-results-grid { align-items: stretch; }
-  .tm-results-grid > .tm-tourn-sub-col:first-child { display: flex; flex-direction: column; }
-  .tm-results-grid > .tm-tourn-sub-col:first-child > div:last-child { flex: 1; }
+  /* 최종결과 페이지: 좌(최종순위+대회요약) 컬럼은 내용 높이만 차지하고 sticky로 고정
+     — 우측 결선 경기를 스크롤하는 동안에도 순위표가 계속 보인다 */
+  .tm-results-grid { align-items: start; }
+  .tm-results-grid > .tm-tourn-sub-col:first-child { position: sticky; top: 12px; }
   /* 챔피언 카드 풀 너비 래퍼 */
   .tm-tourn-hero-full { padding-top: 16px; padding-left: 0 !important; padding-right: 0 !important; }
 
@@ -6554,9 +6578,6 @@ button:disabled {
     font-size: 40px;
     margin-bottom: 0;
     flex-shrink: 0;
-  }
-  .tm-tourn-hero-full .tm-res-hero-label {
-    margin-bottom: 2px;
   }
   .tm-tourn-hero-full .tm-res-hero-name {
     font-size: 22px;

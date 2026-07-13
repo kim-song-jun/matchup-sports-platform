@@ -3,12 +3,24 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AlertCircle } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
+import { BrandMark } from '@/components/v1-ui/brand-logo';
+import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { useV1EmailLogin } from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
+
+function mapEmailLoginError(err: unknown): string {
+  if (err instanceof V1ApiError) {
+    if (err.code === 'UNAUTHENTICATED') return '이메일 또는 비밀번호가 올바르지 않아요.';
+    if (err.code === 'PERMISSION_DENIED') return '이 계정으로는 로그인할 수 없어요. 고객센터에 문의해 주세요.';
+  }
+  return '로그인에 실패했어요. 잠시 후 다시 시도해 주세요.';
+}
 
 export function EmailLoginClient() {
   const model = getEmailLoginViewModel();
@@ -16,10 +28,14 @@ export function EmailLoginClient() {
   const login = useV1EmailLogin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+    if (login.isPending) return;
     setError(null);
 
     login.mutate(
@@ -31,7 +47,7 @@ export function EmailLoginClient() {
           router.replace(redirect ?? '/home');
         },
         onError: (nextError) => {
-          setError(nextError instanceof Error ? nextError.message : '로그인에 실패했어요.');
+          setError(mapEmailLoginError(nextError));
         },
       },
     );
@@ -40,8 +56,20 @@ export function EmailLoginClient() {
   return (
     <AuthFrame topTitle="이메일 로그인" backHref={model.backHref} className="tm-auth-email-frame">
       <form className="tm-auth-body" id="v1-email-login-form" onSubmit={submit}>
+        <div className="tm-auth-logo" style={{ background: 'var(--surface)', boxShadow: 'inset 0 0 0 1px var(--grey200)' }}>
+          <BrandMark size={42} alt="Teameet" />
+        </div>
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         {model.sub ? <p className="tm-text-body tm-auth-sub">{model.sub}</p> : null}
+        {error ? (
+          <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertCircle aria-hidden="true" color="var(--red500)" size={18} strokeWidth={2.2} />
+              <span className="tm-text-body-lg">로그인에 실패했어요</span>
+            </div>
+            <p className="tm-text-caption" id="email-login-error" role="alert">{error}</p>
+          </Card>
+        ) : null}
         <div className="tm-auth-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">이메일</span>
@@ -58,23 +86,33 @@ export function EmailLoginClient() {
           </label>
           <label className="tm-auth-field">
             <span className="tm-text-label">비밀번호</span>
-            <input
-              className={`tm-input tm-auth-input${error ? ' tm-auth-input-error' : ''}`}
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="비밀번호"
-              required
-              type="password"
-              value={password}
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? 'email-login-error' : undefined}
-            />
+            <span className="tm-auth-password-field">
+              <input
+                className={`tm-input tm-auth-input${error ? ' tm-auth-input-error' : ''}`}
+                minLength={8}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="비밀번호"
+                required
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'email-login-error' : undefined}
+              />
+              <button
+                className="tm-auth-password-toggle"
+                type="button"
+                aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? <EyeOffIcon size={20} strokeWidth={1.8} /> : <EyeIcon size={20} strokeWidth={1.8} />}
+              </button>
+            </span>
           </label>
         </div>
         <Button className="tm-auth-email-submit" block loading={login.isPending} size="lg" type="submit" variant="primary">
           {model.primary.label}
         </Button>
-        {error ? <p id="email-login-error" role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">{error}</p> : null}
         <div className="tm-auth-link-row">
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/auth/password-reset">비밀번호 찾기</Link>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>

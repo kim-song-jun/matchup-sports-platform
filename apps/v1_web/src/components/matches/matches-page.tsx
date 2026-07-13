@@ -115,13 +115,18 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
           <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>
         </div>
-        <div className="tm-match-card-stack">
-          {model.matches.length ? (
-            model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)
-          ) : (
-            <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
-          )}
-        </div>
+        {model.matches.length ? (
+          <div className="tm-match-card-stack">
+            {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
+          </div>
+        ) : (
+          /* EmptyState must be a sibling of .tm-match-card-stack, not nested inside it —
+             the stack becomes a 2-up/3-up CSS grid on desktop (matches.css), and a single
+             grid-item child gets confined to the first grid cell (~50%/33% width), reading
+             as flush-left instead of centered across the full content column. Matches the
+             pattern already used by teams-page.tsx / team-matches-page.tsx / tournaments page.tsx. */
+          <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
+        )}
       </div>
       {model.filterSheet?.open ? <MatchFilterSheet model={model} /> : null}
     </AppChrome>

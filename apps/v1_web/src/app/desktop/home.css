@@ -22,6 +22,21 @@
   margin: 0 20px 28px;
 }
 
+/*
+ * Bug fix: .tm-section-title carries its own `padding: 0 20px 12px` (globals.css)
+ * so that sections using it standalone (e.g. .tm-home-matches-block, which has no
+ * horizontal margin of its own) get correct left/right inset from the title alone.
+ * .tm-home-chat-block already supplies that 20px inset via its own margin above,
+ * so without this override the "최근 채팅" title doubled up to 40px — misaligned
+ * with both its own chat rows below (20px) and sibling section titles (20px).
+ * Zeroing it here (unconditionally, not just at the desktop breakpoint) makes the
+ * title rely solely on the block's own margin, matching every other home section.
+ */
+.tm-home-chat-block .tm-section-title {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .tm-home-chat-list {
   display: grid;
   gap: 8px;

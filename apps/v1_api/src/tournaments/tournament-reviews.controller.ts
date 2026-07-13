@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -17,6 +18,7 @@ import {
   SubmitTournamentReviewDto,
   SetTournamentAwardsDto,
   ListTournamentReviewsQueryDto,
+  HideTournamentReviewDto,
   TournamentReviewsService,
 } from './tournament-reviews.service';
 
@@ -74,6 +76,42 @@ export class TournamentReviewsController {
   @UseGuards(V1AuthGuard)
   async listMyPendingReviews(@CurrentUser() user: V1AuthUser) {
     return this.reviewsService.listMyPendingReviews(user.id);
+  }
+
+  // ─────────── 리뷰 숨김 모더레이션 (어드민 — V1AuthGuard + 서비스 레벨 admin 체크) ───────────
+
+  /** GET /admin/tournaments/:tournamentId/reviews — 숨김 포함 전체 목록 */
+  @Get('admin/tournaments/:tournamentId/reviews')
+  @UseGuards(V1AuthGuard)
+  async listReviewsAdmin(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Query() query: ListTournamentReviewsQueryDto,
+  ) {
+    return this.reviewsService.listReviewsAdmin(user, tournamentId, query);
+  }
+
+  /** PATCH /admin/tournaments/:tournamentId/reviews/:reviewId/hide */
+  @Patch('admin/tournaments/:tournamentId/reviews/:reviewId/hide')
+  @UseGuards(V1AuthGuard)
+  async hideReview(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('reviewId') reviewId: string,
+    @Body() dto: HideTournamentReviewDto,
+  ) {
+    return this.reviewsService.hideReview(user, tournamentId, reviewId, dto);
+  }
+
+  /** PATCH /admin/tournaments/:tournamentId/reviews/:reviewId/unhide */
+  @Patch('admin/tournaments/:tournamentId/reviews/:reviewId/unhide')
+  @UseGuards(V1AuthGuard)
+  async unhideReview(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('reviewId') reviewId: string,
+  ) {
+    return this.reviewsService.unhideReview(user, tournamentId, reviewId);
   }
 
   // ─────────── 어워드 (어드민 — V1AuthGuard + 서비스 레벨 admin 체크) ───────────

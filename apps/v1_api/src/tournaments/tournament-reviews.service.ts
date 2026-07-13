@@ -83,6 +83,17 @@ export class SetTournamentAwardsDto {
   awards!: TournamentAwardItemDto[];
 }
 
+export class HideTournamentReviewDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
+type ReviewRowWithAuthor = Prisma.V1TournamentReviewGetPayload<{
+  include: { author: { select: { id: true; profile: { select: { nickname: true; profileImageUrl: true } } } } };
+}>;
+
 @Injectable()
 export class TournamentReviewsService {
   constructor(
@@ -90,14 +101,14 @@ export class TournamentReviewsService {
     private readonly adminContext: AdminContextService,
   ) {}
 
-  /** 대회 리뷰 목록 (최신순, 페이지네이션 + 검색) */
-  async listReviews(tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
-    const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? 10;
-    const search = query.search?.trim();
-
-    const where: Prisma.V1TournamentReviewWhereInput = {
+  private buildReviewWhere(
+    tournamentId: string,
+    search?: string,
+    onlyVisible = true,
+  ): Prisma.V1TournamentReviewWhereInput {
+    return {
       tournamentId,
+      ...(onlyVisible ? { hiddenAt: null } : {}),
       ...(search
         ? {
             OR: [
@@ -108,6 +119,31 @@ export class TournamentReviewsService {
           }
         : {}),
     };
+  }
+
+  private mapReviewRow(r: ReviewRowWithAuthor) {
+    return {
+      id: r.id,
+      authorId: r.authorUserId,
+      authorNickname: r.author.profile?.nickname ?? '익명',
+      authorProfileImageUrl: r.author.profile?.profileImageUrl ?? null,
+      teamName: r.teamName ?? null,
+      rating: r.rating,
+      comment: r.comment ?? null,
+      photoUrls: r.photoUrls,
+      createdAt: r.createdAt.toISOString(),
+    };
+  }
+
+  private async queryReviews(
+    tournamentId: string,
+    query: ListTournamentReviewsQueryDto,
+    onlyVisible: boolean,
+  ) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
+    const search = query.search?.trim();
+    const where = this.buildReviewWhere(tournamentId, search, onlyVisible);
 
     const [rows, total] = await Promise.all([
       this.prisma.v1TournamentReview.findMany({
@@ -122,18 +158,14 @@ export class TournamentReviewsService {
       this.prisma.v1TournamentReview.count({ where }),
     ]);
 
+    return { rows, total, page, pageSize };
+  }
+
+  /** 대회 리뷰 목록 (공개, 최신순, 페이지네이션 + 검색). 숨김 처리된 리뷰는 제외. */
+  async listReviews(tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
+    const { rows, total, page, pageSize } = await this.queryReviews(tournamentId, query, true);
     return {
-      items: rows.map((r) => ({
-        id: r.id,
-        authorId: r.authorUserId,
-        authorNickname: r.author.profile?.nickname ?? '익명',
-        authorProfileImageUrl: r.author.profile?.profileImageUrl ?? null,
-        teamName: r.teamName ?? null,
-        rating: r.rating,
-        comment: r.comment ?? null,
-        photoUrls: r.photoUrls,
-        createdAt: r.createdAt.toISOString(),
-      })),
+      items: rows.map((r) => this.mapReviewRow(r)),
       total,
       page,
       pageSize,
@@ -196,17 +228,7 @@ export class TournamentReviewsService {
       },
     });
 
-    return {
-      id: review.id,
-      authorId: review.authorUserId,
-      authorNickname: review.author.profile?.nickname ?? '익명',
-      authorProfileImageUrl: review.author.profile?.profileImageUrl ?? null,
-      teamName: review.teamName ?? null,
-      rating: review.rating,
-      comment: review.comment ?? null,
-      photoUrls: review.photoUrls,
-      createdAt: review.createdAt.toISOString(),
-    };
+    return this.mapReviewRow(review);
   }
 
   /** 내가 참가 확정한 대회 중 종료됐지만 아직 리뷰를 작성하지 않은 대회 목록 (최근 종료순) */
@@ -265,6 +287,102 @@ export class TournamentReviewsService {
       where: { tournamentId, appliedByUserId: userId, status: 'confirmed' },
     });
     return !!reg;
+  }
+
+  // ───────────────────── 리뷰 숨김 모더레이션 (어드민 전용) ─────────────────────
+
+  /** 어드민 리뷰 목록 — 숨김 포함 전체 조회. active admin이면 조회 가능 (읽기 전용). */
+  async listReviewsAdmin(user: V1AuthUser, tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
+    await this.adminContext.getActiveAdmin(user.id);
+    const { rows, total, page, pageSize } = await this.queryReviews(tournamentId, query, false);
+    return {
+      items: rows.map((r) => ({
+        ...this.mapReviewRow(r),
+        hiddenAt: r.hiddenAt?.toISOString() ?? null,
+        hiddenReason: r.hiddenReason ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  /** 리뷰 숨김 (멱등 — 이미 숨김이면 alreadyHidden: true) */
+  async hideReview(user: V1AuthUser, tournamentId: string, reviewId: string, dto: HideTournamentReviewDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+
+    const review = await this.prisma.v1TournamentReview.findFirst({
+      where: { id: reviewId, tournamentId },
+    });
+    if (!review) {
+      throw new NotFoundException({ code: 'REVIEW_NOT_FOUND', message: '리뷰를 찾을 수 없어요.' });
+    }
+    if (review.hiddenAt) {
+      return { alreadyHidden: true };
+    }
+
+    const reason = dto.reason?.trim() || null;
+    const hiddenAt = new Date();
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1TournamentReview.update({
+        where: { id: reviewId },
+        data: { hiddenAt, hiddenReason: reason },
+      });
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.review_hide',
+          targetType: 'tournament_review',
+          targetId: reviewId,
+          reason,
+          beforeJson: { hiddenAt: null, hiddenReason: null },
+          afterJson: { hiddenAt: hiddenAt.toISOString(), hiddenReason: reason },
+        },
+        tx,
+      );
+    });
+
+    return { alreadyHidden: false };
+  }
+
+  /** 리뷰 숨김 해제 (멱등 — 이미 노출 중이면 alreadyVisible: true) */
+  async unhideReview(user: V1AuthUser, tournamentId: string, reviewId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+
+    const review = await this.prisma.v1TournamentReview.findFirst({
+      where: { id: reviewId, tournamentId },
+    });
+    if (!review) {
+      throw new NotFoundException({ code: 'REVIEW_NOT_FOUND', message: '리뷰를 찾을 수 없어요.' });
+    }
+    const previouslyHiddenAt = review.hiddenAt;
+    if (!previouslyHiddenAt) {
+      return { alreadyVisible: true };
+    }
+    const previouslyHiddenReason = review.hiddenReason ?? null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1TournamentReview.update({
+        where: { id: reviewId },
+        data: { hiddenAt: null, hiddenReason: null },
+      });
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.review_unhide',
+          targetType: 'tournament_review',
+          targetId: reviewId,
+          beforeJson: { hiddenAt: previouslyHiddenAt.toISOString(), hiddenReason: previouslyHiddenReason },
+          afterJson: { hiddenAt: null, hiddenReason: null },
+        },
+        tx,
+      );
+    });
+
+    return { alreadyVisible: false };
   }
 
   // ───────────────────── 어워드 (어드민 전용) ─────────────────────

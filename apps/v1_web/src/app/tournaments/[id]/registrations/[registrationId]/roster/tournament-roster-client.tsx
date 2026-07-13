@@ -15,7 +15,6 @@ import {
   useV1RemovePlayer,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
-import { josa } from '@/lib/korean';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
@@ -178,7 +177,6 @@ function AddPlayerForm({
 }) {
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
   const [birthDateError, setBirthDateError] = useState<string | null>(null);
-  const [memberQuery, setMemberQuery] = useState('');
 
   // ROSTER-004: cursor-paginated team member fetch so 50+ member teams work.
   // useInfiniteQuery accumulates all loaded pages; "더 보기" fetches the next page.
@@ -210,13 +208,6 @@ function AddPlayerForm({
     () => members.filter((member) => !isRegisterableMember(member)),
     [members],
   );
-  // ROSTER P2-8: 팀원이 많은 팀(8명 이상)에서만 검색으로 select 옵션을 좁힌다.
-  const showMemberSearch = members.length >= 8;
-  const filteredMembers = useMemo(() => {
-    const q = memberQuery.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) => m.displayName.toLowerCase().includes(q));
-  }, [members, memberQuery]);
 
   function patch(partial: Partial<AddPlayerFormState>) {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -297,22 +288,6 @@ function AddPlayerForm({
             </div>
           ) : (
             <>
-              {showMemberSearch ? (
-                <input
-                  type="text"
-                  value={memberQuery}
-                  onChange={(e) => setMemberQuery(e.target.value)}
-                  placeholder="이름으로 검색"
-                  aria-label="팀원 이름 검색"
-                  className="tm-input"
-                  style={{ minHeight: 44, marginBottom: 8 }}
-                />
-              ) : null}
-              {unavailableMembers.length > 0 ? (
-                <p className="tm-text-micro" style={{ color: 'var(--text-muted)', margin: '0 0 8px' }}>
-                  프로필(생년월일·휴대폰)이 완성된 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.
-                </p>
-              ) : null}
               <select
                 id={memberFieldId}
                 value={form.userId}
@@ -322,7 +297,7 @@ function AddPlayerForm({
                 aria-required="true"
               >
                 <option value="">팀원을 선택해 주세요</option>
-                {filteredMembers.map((m) => {
+                {members.map((m) => {
                   const registerable = isRegisterableMember(m);
                   const alreadyRegistered = registeredUserIds.has(m.userId);
                   const alreadyPending = pendingUserIds.has(m.userId);
@@ -356,7 +331,7 @@ function AddPlayerForm({
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {unavailableMembers.map((m) => (
                     <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
-                      {josa(m.displayName, ['은', '는'])} {josa(memberMissingReason(m), ['으로', '로'])} 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
+                      {m.displayName}은 {memberMissingReason(m)}으로 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
                     </div>
                   ))}
                 </div>
@@ -797,7 +772,6 @@ export function TournamentRosterPageClient({
   const canEditRoster = Boolean(registration) && !isRosterLocked && !isRosterEditBlockedByStatus;
   const minPlayers = tournament?.minPlayers ?? 0;
   const maxPlayers = tournament?.maxPlayers ?? 999;
-  const shortfall = Math.max(0, minPlayers - players.length);
   const registeredUserIds = useMemo(
     () => new Set(players.map((player) => player.userId)),
     [players],
@@ -909,11 +883,9 @@ export function TournamentRosterPageClient({
     if (!canEditRoster) return;
     const player = players.find((p) => p.id === playerId);
     const nameLabel = player?.realName ? `"${player.realName}"` : '이 선수';
-    // 조사는 따옴표가 아니라 이름의 받침 기준으로 고른다 ("김민준"을 / "이수아"를)
-    const nameJosa = josa(player?.realName ?? '이 선수', ['을', '를']).slice((player?.realName ?? '이 선수').length);
     const ok = await confirmRemove({
       title: '선수 삭제',
-      message: `${nameLabel}${nameJosa} 명단에서 삭제할까요?`,
+      message: `${nameLabel}를 명단에서 삭제할까요?`,
       confirmLabel: '삭제',
       tone: 'danger',
     });
@@ -961,26 +933,13 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
-        {/* Below minimum warning — 잠금/상태와 무관하게 미달 사실은 계속 노출 (P0: 조건 버그 수정) */}
-        {belowMinimum ? (
+        {/* Below minimum warning */}
+        {canEditRoster && belowMinimum ? (
           <div style={{ marginBottom: 14 }}>
-            {/* P1-3a: 델타(K명 더 필요해요)를 굵게 병기 — AlertBanner는 string만 받으므로 동일 스타일을 직접 구성 */}
-            <div
-              role="status"
-              aria-live="polite"
-              className="tm-text-label"
-              style={{
-                padding: '10px 14px',
-                borderRadius: 12,
-                background: 'var(--orange50)',
-                color: 'var(--orange500)',
-                lineHeight: 1.55,
-              }}
-            >
-              {`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.`}
-              {shortfall > 0 ? <strong> → {shortfall}명 더 필요해요</strong> : null}
-              {isRosterLocked ? ' (명단이 마감된 상태예요 — 운영팀에 문의해 주세요)' : null}
-            </div>
+            <AlertBanner
+              message={`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.`}
+              tone="warning"
+            />
           </div>
         ) : null}
 

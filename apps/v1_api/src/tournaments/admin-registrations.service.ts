@@ -232,8 +232,7 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
-        // 팀이 남긴 취소 요청 사유는 어드민이 별도 사유를 주지 않는 한 보존한다 (감사 추적)
-        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? registration.cancelReason ?? null },
+        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? null },
       });
 
       // 결제가 있고 아직 cancelled 아니면 payment도 cancelled로 변경.
@@ -275,54 +274,6 @@ export class AdminRegistrationsService {
 
     const playerCount = await this.countPlayers(registrationId);
     return this.serialize(result.updated, result.updatedPayment ?? null, playerCount);
-  }
-
-  /**
-   * 취소 요청 거부(잔류) — cancel_requested 상태의 신청을 이전 상태로 되돌린다.
-   * cancelReason은 감사 추적을 위해 유지한다(팀이 왜 취소하려 했는지 보존).
-   * cancelRequestedAt은 초기화한다 — 남겨두면 목록 UI가 되돌린 이후에도 "취소 요청" 배지를 계속 표시함.
-   */
-  async rejectCancelRequest(user: V1AuthUser, registrationId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
-    const registration = await this.loadRegistration(registrationId);
-
-    if (registration.status !== 'cancel_requested') {
-      throw new ConflictException({
-        code: 'NOT_CANCEL_REQUESTED',
-        message: '취소 요청 상태가 아니에요.',
-      });
-    }
-
-    const restoredStatus = registration.cancelPreviousStatus ?? 'confirmed';
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.v1TournamentRegistration.update({
-        where: { id: registrationId },
-        data: {
-          status: restoredStatus,
-          cancelPreviousStatus: null,
-          cancelRequestedAt: null,
-        },
-      });
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.registration.cancel_reject',
-          targetType: 'tournament_registration',
-          targetId: registrationId,
-          beforeJson: { status: registration.status },
-          afterJson: { status: restoredStatus },
-          fromStatus: registration.status,
-          toStatus: restoredStatus,
-        },
-        tx,
-      );
-      return updated;
-    });
-
-    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
-    const playerCount = await this.countPlayers(registrationId);
-    return this.serialize(result, payment ?? null, playerCount);
   }
 
   async rosterLock(user: V1AuthUser, registrationId: string, dto: AdminRosterLockDto) {

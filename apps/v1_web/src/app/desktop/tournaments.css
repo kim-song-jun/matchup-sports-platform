@@ -445,21 +445,8 @@
   padding: 0 20px;
 }
 
-/* 대회 목록 섹션(필터 칩 + 카드 그리드) — promo-section과 동일한 반응형 padding으로
-   맞춰 데스크탑에서 두 섹션의 좌우 여백이 어긋나지 않도록 함. */
-.tm-tournament-list-section {
-  padding: 0 20px;
-}
-
-/* 추천 대회 배너 — 위 두 섹션과 동일한 반응형 좌우 여백(모바일 20px / 데스크탑 0) */
-.tm-tournament-featured-banner {
-  margin-left: 20px;
-  margin-right: 20px;
-}
-
 .tm-tournament-promo-section-title {
-  /* 페이지 내 형제 섹션("대회 목록" = tm-text-body-lg 17px)과 동일 스케일로 통일 */
-  font-size: var(--font-size-body-lg);
+  font-size: var(--font-size-subhead);
   font-weight: 700;
   color: var(--text-strong);
   margin: 0 0 14px;
@@ -538,28 +525,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
   position: relative;
-}
-
-/* label+sub+desc를 묶는 텍스트 블록 — 모바일은 아이콘 아래 중앙 정렬 스택 */
-.tm-tournament-promo-step-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
 }
 
 .tm-tournament-promo-step-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   background: var(--blue50);
-  border-radius: 14px;
-  position: relative;
-  /* 테두리 + 옅은 블루 hairline shadow로 살짝 입체감 */
-  box-shadow: 0 0 0 1px var(--blue100, rgba(49, 130, 246, 0.15)), 0 1px 3px rgba(49, 130, 246, 0.16);
+  border-radius: 12px;
+  /* 테두리로 아이콘 박스를 더 정제되게 */
+  box-shadow: 0 0 0 1px var(--blue100, rgba(49, 130, 246, 0.15));
+}
+
+.tm-tournament-promo-step-num {
+  font-size: var(--font-size-micro);
+  color: var(--text-caption);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .tm-tournament-promo-step-label {
@@ -570,7 +555,7 @@
   white-space: nowrap;
 }
 
-/* 단계 한 줄 설명 — label 아래 muted 보조 텍스트 (모바일 전용, 데스크탑은 -desc로 대체) */
+/* 단계 한 줄 설명 — label 아래 muted 보조 텍스트 */
 .tm-tournament-promo-step-sub {
   font-size: var(--font-size-micro);
   color: var(--text-caption);
@@ -580,12 +565,9 @@
   line-height: 1.3;
 }
 
-/* 단계 상세 설명 — 데스크탑 카드형에서만 노출되는 한 문장 설명 */
-.tm-tournament-promo-step-desc {
+/* Connectors hidden in grid layout — grid spacing is the separator */
+.tm-tournament-promo-step-connector {
   display: none;
-  font-size: var(--font-size-label);
-  color: var(--text-muted);
-  line-height: 1.5;
 }
 
 /* Mini bracket preview */
@@ -764,72 +746,36 @@
     padding: 0;
   }
 
-  .tm-tournament-list-section {
-    padding: 0;
-  }
-
-  .tm-tournament-featured-banner {
-    margin-left: 0;
-    margin-right: 0;
-  }
-
   /* Prize cards: stay 3-col on desktop (already set) */
 
-  /* 데스크탑: 좁은 아이콘 스텝퍼 대신 설명이 포함된 3열 카드 그리드로 전환.
-     보더 대신 grey50 배경 하나로 구분(solid-first) — 흰 원형 아이콘 칩이
-     카드 위에 살짝 뜨는 hairline shadow만 사용, 장식 최소화. */
+  /* Desktop: revert to single-row flex so all 6 steps sit on one horizontal line.
+     max-width 유지, margin-inline: 0 으로 좌측 정렬 (중앙 centering 제거). */
   .tm-tournament-promo-steps {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    display: flex;
+    grid-template-columns: unset;
+    flex-wrap: nowrap;
+    gap: 4px;
+    justify-content: flex-start;
+    align-items: center;
     padding-bottom: 0;
     margin-bottom: 20px;
-    max-width: unset;
+    max-width: 700px;
     margin-inline: 0;
   }
 
   .tm-tournament-promo-step {
-    min-width: unset;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-    background: var(--grey50);
-    border-radius: 20px;
-    padding: 24px;
+    min-width: 70px;
   }
 
-  .tm-tournament-promo-step-icon {
-    flex-shrink: 0;
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: var(--bg);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  }
-
-  .tm-tournament-promo-step-text {
-    align-items: flex-start;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .tm-tournament-promo-step-label {
-    text-align: left;
-    font-size: var(--font-size-body-lg);
-    font-weight: 700;
-    color: var(--text-strong);
-    white-space: normal;
-  }
-
-  .tm-tournament-promo-step-desc {
+  /* Restore connector visibility on desktop */
+  .tm-tournament-promo-step-connector {
     display: block;
-    text-align: left;
-    white-space: normal;
-  }
-
-  /* 카드형에서는 짧은 caption 대신 한 문장 설명으로 대체 */
-  .tm-tournament-promo-step-sub {
-    display: none;
+    position: absolute;
+    right: -14px;
+    top: 22px;
+    width: 12px;
+    height: 2px;
+    background: var(--grey200);
   }
 
   .tm-tournament-promo-how-grid {

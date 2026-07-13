@@ -3,13 +3,11 @@
  *
  * Maps v1 sport codes to display metadata (Korean label + design-token colors).
  *
- * Color strategy — 노출 종목은 서로 구분, 나머지는 카테고리 유지 (무지개 지양):
- *   - soccer   → green  (필드/잔디)
- *   - futsal   → blue   (브랜드 액센트 / 실내 코트)
- *   - running  → orange (에너지)
- *   - swimming → teal   (물)
- *   - 그 외 시드되지 않은 종목 → 카테고리 컬러 (ball=blue/orange, endurance=green)
- *   - Unknown / fallback → grey
+ * Color strategy — category-based, not rainbow:
+ *   - Ball/team sports (soccer, futsal)  → blue  (action / competitive)
+ *   - Endurance/individual (running)     → green (vitality / outdoors)
+ *   - Water sports (swimming)            → blue  (shared with ball sports for restraint)
+ *   - Unknown / fallback                 → grey
  *
  * All color values reference CSS custom properties defined in globals.css so they
  * respond to any theme overrides.  Do NOT add hardcoded hex values here.
@@ -28,12 +26,12 @@ export interface SportAccent {
 
 /** Accent map keyed by v1 sport code (lower-case, matches DB `v1Sport.code`). */
 const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
-  // ── 노출 종목 (서로 구분되는 고유 컬러) ──────────────────────────────
+  // ── Ball / team sports ─────────────────────────────────────────────────
   soccer: {
     label: '축구',
-    dot: 'var(--green500)',
-    badgeBg: 'var(--green50)',
-    badgeText: 'var(--green500)',
+    dot: 'var(--blue500)',
+    badgeBg: 'var(--blue50)',
+    badgeText: 'var(--blue500)',
   },
   futsal: {
     label: '풋살',
@@ -41,17 +39,19 @@ const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
     badgeBg: 'var(--blue50)',
     badgeText: 'var(--blue500)',
   },
+  // ── Endurance / individual ─────────────────────────────────────────────
   running: {
     label: '러닝',
-    dot: 'var(--orange500)',
-    badgeBg: 'var(--orange50)',
-    badgeText: 'var(--orange500)',
+    dot: 'var(--green500)',
+    badgeBg: 'var(--green50)',
+    badgeText: 'var(--green500)',
   },
+  // ── Water sports ───────────────────────────────────────────────────────
   swimming: {
     label: '수영',
-    dot: 'var(--teal500)',
-    badgeBg: 'var(--teal50)',
-    badgeText: 'var(--teal500)',
+    dot: 'var(--blue500)',
+    badgeBg: 'var(--blue50)',
+    badgeText: 'var(--blue500)',
   },
   // ── Additional codes that may appear if new sports are seeded ──────────
   basketball: {

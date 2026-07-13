@@ -239,6 +239,7 @@ describe('TournamentPlayersService', () => {
       registrationRow({ rosterLockedAt: new Date('2026-06-10T00:00:00Z') }),
     );
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
 
     await expect(
       service.removePlayer(manager, 'tournament-1', 'reg-1', 'player-1'),
@@ -536,6 +537,7 @@ describe('TournamentPlayersService', () => {
   it('removePlayer: manager + unlocked → soft removes player', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
     const removedAt = new Date('2026-06-14T10:00:00Z');
     prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ removedAt }));
@@ -554,6 +556,7 @@ describe('TournamentPlayersService', () => {
   it('removePlayer: player not found → 404 PLAYER_NOT_FOUND', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
 
     await expect(
@@ -567,6 +570,7 @@ describe('TournamentPlayersService', () => {
   it('updatePlayer: manager + unlocked → updates eligibility status', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
     prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
 
@@ -589,6 +593,7 @@ describe('TournamentPlayersService', () => {
   it('updatePlayer: latest team member profile is not revalidated for eligibility-only edit', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
     prisma.v1TournamentPlayer.update.mockResolvedValue(playerRow({ eligibilityStatus: 'pro' }));
 
@@ -614,6 +619,7 @@ describe('TournamentPlayersService', () => {
       registrationRow({ rosterLockedAt: new Date('2026-06-10T00:00:00Z') }),
     );
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
 
     await expect(
       service.updatePlayer(manager, 'tournament-1', 'reg-1', 'player-1', {
@@ -626,6 +632,7 @@ describe('TournamentPlayersService', () => {
   it('updatePlayer: player not found → 404 PLAYER_NOT_FOUND', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
 
     await expect(

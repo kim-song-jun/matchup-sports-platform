@@ -1719,13 +1719,8 @@ export type V1TournamentDetail = {
   status: V1TournamentStatus;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
-  /**
-   * 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능).
-   * 백엔드 응답에는 항상 포함되지만, 이 타입을 사용하는 tournament-detail-client.test.ts의
-   * makeTournament() 픽스처(동시 작업 중인 다른 세션 소유 파일 — 수정 금지 지시)가 이 필드를
-   * 아직 채우지 않으므로, 그 픽스처를 건드리지 않기 위해 optional로 선언한다.
-   */
-  rosterDeadlineAt?: string | null;
+  /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
+  rosterDeadlineAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;

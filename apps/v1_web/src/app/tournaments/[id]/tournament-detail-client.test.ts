@@ -108,6 +108,7 @@ function makeTournament(
     sport: { code: 'futsal', name: '풋살' },
     title: '테스트 대회',
     registrationDeadlineAt: null,
+    rosterDeadlineAt: null,
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,

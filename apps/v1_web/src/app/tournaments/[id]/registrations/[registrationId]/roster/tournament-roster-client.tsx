@@ -981,7 +981,7 @@ export function TournamentRosterPageClient({
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
         {/* Roster deadline info row */}
-        {rosterDeadlineAt ? (
+        {rosterDeadlineAt && formatTournamentDateTimeLong(rosterDeadlineAt) ? (
           <p
             className="tm-text-caption"
             style={{ color: 'var(--text-muted)', marginBottom: 10 }}

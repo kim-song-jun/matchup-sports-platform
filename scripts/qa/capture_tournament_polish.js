@@ -51,9 +51,11 @@ const SHOTS = [
   let failures = 0;
   try {
     for (const [name, route, auth, w, adminTab] of SHOTS) {
-      // 샷 단위로 격리 — 한 샷이 실패해도 나머지 샷·cleanup·manifest 작성을 보장한다.
-      const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, deviceScaleFactor: 2 });
+      // 샷 단위로 격리 — newContext() 실패까지 포함해 한 샷이 실패해도
+      // 나머지 샷·cleanup·manifest 작성을 보장한다.
+      let ctx = null;
       try {
+        ctx = await browser.newContext({ viewport: { width: w, height: 900 }, deviceScaleFactor: 2 });
         await ctx.addInitScript(([i, e]) => {
           if (i) window.localStorage.setItem('teameet.v1.userId', i);
           if (e) window.localStorage.setItem('teameet.v1.userEmail', e);
@@ -81,7 +83,7 @@ const SHOTS = [
         out[name] = { error: e.message || String(e) };
         console.error(`${name}: FAILED — ${e.message || e}`);
       } finally {
-        await ctx.close();
+        if (ctx) await ctx.close();
       }
     }
   } finally {

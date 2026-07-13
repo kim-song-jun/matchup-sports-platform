@@ -236,12 +236,14 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    // 명단 마감 체크에만 필요한 최소 조회 — 대회를 찾지 못해도(예외적 상황) 마감 없음으로 간주해 fail-open.
     const tournament = await this.prisma.v1Tournament.findFirst({
-      where: { id: tournamentId },
+      where: { id: tournamentId, deletedAt: null },
       select: { rosterDeadlineAt: true },
     });
-    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament?.rosterDeadlineAt ?? null });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, registrationId, removedAt: null },
@@ -270,12 +272,14 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    // 명단 마감 체크에만 필요한 최소 조회 — 대회를 찾지 못해도(예외적 상황) 마감 없음으로 간주해 fail-open.
     const tournament = await this.prisma.v1Tournament.findFirst({
-      where: { id: tournamentId },
+      where: { id: tournamentId, deletedAt: null },
       select: { rosterDeadlineAt: true },
     });
-    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament?.rosterDeadlineAt ?? null });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, registrationId, removedAt: null },

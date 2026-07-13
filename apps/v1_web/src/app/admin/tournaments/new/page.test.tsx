@@ -116,4 +116,40 @@ describe('AdminTournamentsNewPage — 명단 제출 마감일', () => {
 
     expect(submitButton).not.toBeDisabled();
   });
+
+  it('rejects an impossible-but-shape-matching roster deadline (e.g. month 99) without crashing, keeping submit disabled', () => {
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
+    fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '8' } });
+
+    const rosterDeadlineInput = screen.getByLabelText(/명단 제출 마감일/);
+    fireEvent.change(rosterDeadlineInput, { target: { value: '2026-99-99 99:99' } });
+
+    const submitButton = screen.getByRole('button', { name: '대회 만들기' });
+    expect(submitButton).toBeDisabled();
+
+    // Submitting via a disabled/invalid form must not throw (previously
+    // datetimeTextToIso called Date(...).toISOString() on an Invalid Date,
+    // which raises RangeError uncaught).
+    expect(() => fireEvent.click(submitButton)).not.toThrow();
+    expect(useV1CreateTournamentMock.mock.results[0]?.value.mutate).not.toHaveBeenCalled();
+  });
+
+  it('does not crash and skips the field when the tournament start date is impossible-but-shape-matching', () => {
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
+    fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText(/명단 제출 마감일/), { target: { value: '2026-05-01 10:00' } });
+
+    expect(() =>
+      fireEvent.change(screen.getByLabelText('대회 시작'), { target: { value: '2026-13-40 25:99' } }),
+    ).not.toThrow();
+
+    const submitButton = screen.getByRole('button', { name: '대회 만들기' });
+    expect(submitButton).toBeDisabled();
+  });
 });

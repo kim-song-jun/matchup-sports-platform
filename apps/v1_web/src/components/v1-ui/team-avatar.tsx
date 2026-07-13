@@ -94,7 +94,6 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
   const palette = PALETTE[mix32(hashSeed(identitySeed)) % PALETTE.length];
   const cells = buildIdenticonCells(identitySeed);
   const cellSize = px / IDENTICON_ROWS;
-  const cellRadius = cellSize * 0.22;
 
   return (
     <div
@@ -124,7 +123,6 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
                 y={row * cellSize}
                 width={cellSize}
                 height={cellSize}
-                rx={cellRadius}
                 fill={palette.fg}
               />
             ));

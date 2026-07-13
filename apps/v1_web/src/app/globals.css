@@ -15,6 +15,7 @@
   --blue700: #1b64da; /* blue600보다 진한 강조색 — active 상태(.tm-review-tag-chip 등) */
   --green50: #e3f8ef;
   --green500: #03b26c;
+  --green600: #039e60; /* green500과 동일한 명도차(blue500→600, orange500→600 평균)로 파생 — 종목 아이콘 그라디언트용 */
   --orange50: #fff3e0;
   --orange500: #fe9800;
   --red50: #feebec;
@@ -23,6 +24,7 @@
   --yellow500: #ffc342;
   --teal50: #e2f7f8;
   --teal500: #0eb8c0;
+  --teal600: #0da6ad; /* teal500과 동일한 명도차로 파생 — 종목 아이콘 그라디언트용 */
   --grey50: #f9fafb;
   --grey100: #f2f4f6;
   --grey150: #eaedf0;

@@ -177,13 +177,13 @@ function DesktopChampionHero({
       <div className="tm-resd-trophy" style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 18, filter: 'drop-shadow(0 6px 20px rgba(246,185,59,0.45))' }} aria-hidden="true">
         <TrophyMark size={60} />
       </div>
-      {/* 팀명 */}
+      {/* 팀명 — 배지 제거 후에도 스크린리더에는 '우승팀' 맥락 유지 */}
       <div className="tm-resd-name" style={{
         fontSize: 44, fontWeight: 900, color: '#FFFFFF',
         letterSpacing: '-0.03em', lineHeight: 1.1,
         marginBottom: 8,
       }}>
-        {champion}
+        <span className="sr-only">우승팀 </span>{champion}
       </div>
       {/* 대회명 */}
       <div className="tm-resd-meta" style={{

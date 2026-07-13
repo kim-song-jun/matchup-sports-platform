@@ -747,7 +747,7 @@ function RegistrationsTab({
 
       {/* P2-7: 일괄 처리 바 */}
       {selectedIds.size > 0 && (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
           <span className="text-[13px] text-blue-700">{selectedIds.size}건 선택됨</span>
           <button
             type="button"

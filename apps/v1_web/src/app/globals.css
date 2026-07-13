@@ -3153,6 +3153,16 @@ button:disabled {
   border-top-right-radius: 6px;
 }
 
+/* 그룹 내 후속 버블(첫 메시지 제외)도 동일한 모서리 처리를 유지해
+   촘촘히 붙은 그룹 전체가 하나로 이어지는 말풍선처럼 보이게 한다. */
+.tm-chat-bubble-grouped.tm-chat-bubble-other {
+  border-top-left-radius: 6px;
+}
+
+.tm-chat-bubble-grouped.tm-chat-bubble-me {
+  border-top-right-radius: 6px;
+}
+
 .tm-chat-inputbar {
   position: absolute;
   left: 0;

@@ -125,11 +125,13 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
             }
             /* 카카오톡/토스 관례: 같은 발신자가 연달아 보낸 메시지는 한 그룹으로 묶는다.
                - 그룹 첫 메시지에만 발신자 라벨(상대방) 노출 — "나"는 정렬·색상으로 이미 구분되므로 라벨 생략.
-               - 그룹 마지막 메시지에만 시각 노출. */
+               - 그룹 마지막 메시지에만 시각 노출.
+               - 그룹 경계는 label(displayName)이 아닌 senderId(userId)로 비교한다 —
+                 다자 채팅에서 서로 다른 사용자가 같은 표시 이름을 쓸 수 있어 label 비교는 오판 가능. */
             const prev = model.messages[index - 1];
             const next = model.messages[index + 1];
-            const isFirstInGroup = !prev || prev.who !== message.who || prev.label !== message.label;
-            const isLastInGroup = !next || next.who !== message.who || next.label !== message.label;
+            const isFirstInGroup = !prev || prev.who !== message.who || prev.senderId !== message.senderId;
+            const isLastInGroup = !next || next.who !== message.who || next.senderId !== message.senderId;
             return (
               <div
                 key={message.id}
@@ -139,7 +141,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
                   <div className="tm-text-micro tm-chat-sender-label">{message.label}</div>
                 ) : null}
                 <div className={`tm-chat-message-line tm-chat-message-line-${message.who}`}>
-                  {message.who === 'me' && isLastInGroup ? (
+                  {message.who === 'me' && isLastInGroup && message.time ? (
                     <span className="tm-text-micro tm-chat-time">{message.time}</span>
                   ) : null}
                   <div
@@ -147,7 +149,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
                   >
                     <div className="tm-text-body">{message.body}</div>
                   </div>
-                  {message.who === 'other' && isLastInGroup ? (
+                  {message.who === 'other' && isLastInGroup && message.time ? (
                     <span className="tm-text-micro tm-chat-time">{message.time}</span>
                   ) : null}
                 </div>

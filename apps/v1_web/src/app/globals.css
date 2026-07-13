@@ -1443,10 +1443,13 @@ button:disabled {
   color: var(--static-white);
 }
 
+/* forceUnread=true인데 실제 unreadCount를 아직 모를 때(0)의 범용 표시.
+ * .tm-unread-badge와 같은 top/right 앵커를 사용해 숫자 뱃지가 나타났다
+ * 사라졌다 해도(count 확정 시) 같은 자리에서 전환되도록 정렬한다. */
 .tm-unread-dot {
   position: absolute;
-  top: 11px;
-  right: 11px;
+  top: 4px;
+  right: 2px;
   width: 7px;
   height: 7px;
   border-radius: 999px;

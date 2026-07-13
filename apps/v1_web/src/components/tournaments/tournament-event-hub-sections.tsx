@@ -1,4 +1,5 @@
 import { Card } from '@/components/v1-ui/primitives';
+import { publicAssetPath } from '@/lib/assets';
 import type { V1TournamentParticipantTeam } from '@/types/api';
 
 type ParticipantTeamBuckets = {
@@ -215,7 +216,7 @@ function TeamLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
       </span>
       {logoUrl ? (
         <img
-          src={logoUrl}
+          src={publicAssetPath(logoUrl)}
           alt=""
           width={28}
           height={28}

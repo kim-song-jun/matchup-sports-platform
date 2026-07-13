@@ -7,8 +7,6 @@ import HomePage from './page';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
-  // PendingTournamentReviewModal(홈 리뷰 독려)이 useRouter를 사용한다
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
 }));
 
 describe('HomePage', () => {

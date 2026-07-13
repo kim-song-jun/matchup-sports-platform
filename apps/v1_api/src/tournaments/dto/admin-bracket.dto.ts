@@ -1,19 +1,15 @@
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize,
-  IsArray,
   IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
   Max,
   MaxLength,
   Min,
-  ValidateNested,
 } from 'class-validator';
 
 // ─── Group phase constants ─────────────────────────────────────────────────────
@@ -37,20 +33,6 @@ export class CreateGroupDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
-
-  /** 이 그룹에서 다음 라운드로 진출하는 팀 수. null = 진출선 없음. */
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  advanceCount?: number;
-}
-
-export class UpdateGroupDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(60)
-  name?: string;
 
   /** 이 그룹에서 다음 라운드로 진출하는 팀 수. null = 진출선 없음. */
   @IsOptional()
@@ -127,26 +109,6 @@ export class CreateFixtureDto {
   venue?: string;
 }
 
-export class UpdateFixtureDto {
-  @IsOptional()
-  @IsDateString()
-  scheduledAt?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  venue?: string;
-
-  /** 결과가 이미 기록된 경기는 팀 변경 불가 (409) — 결과를 먼저 삭제해야 한다 */
-  @IsOptional()
-  @IsUUID()
-  homeRegistrationId?: string;
-
-  @IsOptional()
-  @IsUUID()
-  awayRegistrationId?: string;
-}
-
 // ─── Result DTOs ──────────────────────────────────────────────────────────────
 
 export class RecordResultDto {
@@ -182,28 +144,4 @@ export class RecordResultDto {
   @IsString()
   @MaxLength(500)
   note?: string;
-
-  /**
-   * 경기 하이라이트/중계 영상 목록 (옵션) — 전달 시 replace-all.
-   * undefined 로 생략하면 기존 영상 목록을 유지한다.
-   */
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(10)
-  @ValidateNested({ each: true })
-  @Type(() => FixtureVideoDto)
-  videos?: FixtureVideoDto[];
-}
-
-export class FixtureVideoDto {
-  /** 표시 제목 (예: "전반 하이라이트") — 없으면 "경기 영상 N"으로 표시 */
-  @IsOptional()
-  @IsString()
-  @MaxLength(80)
-  title?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(1000)
-  url!: string;
 }

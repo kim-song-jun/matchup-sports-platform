@@ -299,7 +299,6 @@ model V1User {
   postEventUserReviewsReceived   V1PostEventReview[]        @relation("V1PostEventReviewTargetUser")
   tournamentRegistrationsApplied V1TournamentRegistration[] @relation("V1TournamentRegistrationApplicant")
   tournamentPlayerEntries        V1TournamentPlayer[]
-  tournamentReviews              V1TournamentReview[]       @relation("V1TournamentReviewAuthor")
   verificationTokens             V1VerificationToken[]
   inquiries                       V1Inquiry[]
 
@@ -1238,7 +1237,6 @@ model V1Tournament {
   scheduledAt            DateTime?          @map("scheduled_at")
   scheduledEndAt         DateTime?          @map("scheduled_end_at")
   venue                  String?
-  coverImageUrl          String?            @map("cover_image_url")
   teamCount              Int                @default(8) @map("team_count")
   minPlayers             Int                @default(6) @map("min_players")
   maxPlayers             Int                @default(10) @map("max_players")
@@ -1283,52 +1281,10 @@ model V1Tournament {
   groups         V1TournamentGroup[]
   fixtures       V1TournamentFixture[]
   announcements  V1TournamentAnnouncement[]
-  reviews        V1TournamentReview[]
-  awards         V1TournamentAward[]
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
   @@map("v1_tournaments")
-}
-
-/// 대회 참가팀 후기 (status=completed 이후, 확정 등록된 팀만 작성 가능)
-model V1TournamentReview {
-  id           String   @id @default(uuid())
-  tournamentId String   @map("tournament_id")
-  authorUserId String   @map("author_user_id")
-  teamName     String?  @map("team_name")   // 작성자 팀명 (snapshot)
-  rating       Int      // 1~5
-  comment      String?  @db.Text
-  photoUrls    String[] @default([]) @map("photo_urls")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  author     V1User       @relation("V1TournamentReviewAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
-
-  @@unique([tournamentId, authorUserId])
-  @@index([tournamentId, createdAt])
-  @@map("v1_tournament_reviews")
-}
-
-/// 대회 개인 어워드 (MVP, 득점왕 등) - 어드민이 수동 입력
-model V1TournamentAward {
-  id            String   @id @default(uuid())
-  tournamentId  String   @map("tournament_id")
-  awardType     String   @map("award_type")     // 'mvp' | 'top_scorer' | 'best_defense' | etc.
-  awardLabel    String   @map("award_label")    // 표시명: 'MVP', '득점왕', '베스트 11' 등
-  recipientName String   @map("recipient_name") // 수심자 이름
-  teamName      String?  @map("team_name")      // 수심자 팀명
-  note          String?  // 추가 설명
-  sortOrder     Int      @default(0) @map("sort_order") // 표시 순서
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
-  @@unique([tournamentId, awardType])
-  @@index([tournamentId, sortOrder])
-  @@map("v1_tournament_awards")
 }
 
 model V1TournamentRegistration {
@@ -1474,7 +1430,6 @@ model V1TournamentFixture {
   homeRegistration V1TournamentRegistration?  @relation("V1TournamentFixtureHome", fields: [homeRegistrationId], references: [id], onDelete: SetNull)
   awayRegistration V1TournamentRegistration?  @relation("V1TournamentFixtureAway", fields: [awayRegistrationId], references: [id], onDelete: SetNull)
   result           V1TournamentFixtureResult?
-  videos           V1TournamentFixtureVideo[]
 
   @@index([tournamentId, round, fixtureNumber])
   @@index([groupId])
@@ -1500,22 +1455,6 @@ model V1TournamentFixtureResult {
   recordedByAdmin V1AdminUser?        @relation("V1TournamentFixtureResultRecordedByAdmin", fields: [recordedByAdminUserId], references: [id], onDelete: SetNull)
 
   @@map("v1_tournament_fixture_results")
-}
-
-/// 경기 하이라이트/중계 영상 — 경기당 여러 개 (유튜브 링크 또는 업로드 파일 URL)
-model V1TournamentFixtureVideo {
-  id        String   @id @default(uuid())
-  fixtureId String   @map("fixture_id")
-  /// 표시 제목 (예: "전반 하이라이트", "결승골") — 없으면 "경기 영상 N"으로 표시
-  title     String?
-  url       String
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  fixture V1TournamentFixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
-
-  @@index([fixtureId, sortOrder])
-  @@map("v1_tournament_fixture_videos")
 }
 
 model V1TournamentStanding {

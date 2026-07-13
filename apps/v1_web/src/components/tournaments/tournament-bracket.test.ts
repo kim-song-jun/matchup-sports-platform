@@ -19,7 +19,6 @@ function makeFixture(
     awayRegistrationId: null,
     awayTeamName: 'Away',
     result: null,
-    videos: [],
     ...overrides,
   };
 }

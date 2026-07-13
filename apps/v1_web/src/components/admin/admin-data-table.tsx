@@ -136,9 +136,12 @@ export function AdminDataTable<T>({
   // inside a horizontally scrollable wrapper instead).
   function renderTable(compact: boolean) {
     const cellPad = compact ? 'px-3 py-2.5' : 'px-4 py-3';
+    // tableMaxWidth는 데스크톱 래퍼(아래 hidden lg:block div)에만 적용한다 —
+    // 여기 <table> 자체에 같이 걸면 w-max로 콘텐츠 폭까지 자라야 할 테이블이
+    // 그 cap에 눌려 overflow-x-auto 스크롤 대신 다시 컬럼 압축이 재발한다.
     const tableClassName = compact
       ? 'w-max min-w-full text-[13px] text-gray-700'
-      : ['w-full text-sm text-gray-700', tableMaxWidth ?? ''].join(' ').trim();
+      : 'w-max min-w-full text-sm text-gray-700';
 
     return (
       <table className={tableClassName}>

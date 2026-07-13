@@ -1725,8 +1725,10 @@ function BracketTab({
                 />
               </div>
 
-              {/* Away team — exclude home selection */}
-              <div className="flex flex-col gap-1">
+              {/* Away team — exclude home selection.
+                  sm:col-span-2 only when 소속 조 필드가 있어 항목 수가 홀수(5)가 될 때 —
+                  짝수(4, 소속조 없음)일 때 걸면 오히려 그 경우에 빈 칸이 생긴다. */}
+              <div className={`flex flex-col gap-1${groups.length > 0 ? ' sm:col-span-2' : ''}`}>
                 <label htmlFor="fixture-away" className="text-[13px] text-gray-900">
                   어웨이 팀 (선택)
                   {awayBooked && (
@@ -1940,9 +1942,13 @@ function BracketTab({
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2 lg:col-span-2">
           <h3 className="text-[15px] font-bold text-gray-900">경기 일정</h3>
-          {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens */}
+          {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens.
+              tableMaxWidth="max-w-none" — 이 섹션은 이미 lg:col-span-2로 전폭이라
+              기본 900px 캡을 걸 이유가 없고, 오히려 좁은 데스크톱(~1024px)에서
+              불필요한 가로 스크롤을 유발했다. */}
           <AdminDataTable<V1AdminBracketFixture>
             scrollOnMobile
+            tableMaxWidth="max-w-none"
             columns={[
               {
                 key: 'round',

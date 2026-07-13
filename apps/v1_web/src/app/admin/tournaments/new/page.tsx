@@ -162,20 +162,30 @@ const textareaCls = [
 
 // ── Datetime text input helpers ───────────────────────────────────────────
 
-/** Accepts "YYYY-MM-DD HH:MM" — returns true if it looks valid */
+/**
+ * Parses "YYYY-MM-DD HH:MM" → Date, or null for empty/malformed/impossible
+ * values (e.g. "2026-99-99 99:99" matches the shape regex but is not a real
+ * calendar date — Date(...) yields Invalid Date, which we reject here rather
+ * than let it reach .toISOString() later and throw RangeError).
+ */
+function parseDatetimeText(value: string): Date | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(trimmed)) return null;
+  const date = new Date(trimmed.replace(' ', 'T'));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Accepts "YYYY-MM-DD HH:MM" — returns true if it looks valid (empty counts as valid/optional) */
 function isValidDatetimeText(value: string): boolean {
   if (!value.trim()) return true; // empty is valid (optional field)
-  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value.trim());
+  return parseDatetimeText(value) !== null;
 }
 
 /** Converts "YYYY-MM-DD HH:MM" → ISO string, or returns null for empty/invalid */
 function datetimeTextToIso(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (!isValidDatetimeText(trimmed)) return null;
-  // Replace space with "T" so Date can parse it
-  const iso = new Date(trimmed.replace(' ', 'T')).toISOString();
-  return iso;
+  const date = parseDatetimeText(value);
+  return date ? date.toISOString() : null;
 }
 
 /**
@@ -340,19 +350,20 @@ export default function AdminTournamentsNewPage() {
     e.preventDefault();
     if (!canSubmit) return;
 
+    const scheduledAtIso = datetimeTextToIso(scheduledAt);
+    const scheduledEndAtIso = datetimeTextToIso(scheduledEndAt);
+    const registrationDeadlineAtIso = datetimeTextToIso(registrationDeadlineAt);
+    const rosterDeadlineAtIso = datetimeTextToIso(rosterDeadlineAt);
+
     createMutation.mutate(
       {
         sportId: sportId.trim(),
         title: title.trim(),
         format,
-        ...(datetimeTextToIso(scheduledAt) ? { scheduledAt: datetimeTextToIso(scheduledAt)! } : {}),
-        ...(datetimeTextToIso(scheduledEndAt) ? { scheduledEndAt: datetimeTextToIso(scheduledEndAt)! } : {}),
-        ...(datetimeTextToIso(registrationDeadlineAt)
-          ? { registrationDeadlineAt: datetimeTextToIso(registrationDeadlineAt)! }
-          : {}),
-        ...(datetimeTextToIso(rosterDeadlineAt)
-          ? { rosterDeadlineAt: datetimeTextToIso(rosterDeadlineAt)! }
-          : {}),
+        ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
+        ...(scheduledEndAtIso ? { scheduledEndAt: scheduledEndAtIso } : {}),
+        ...(registrationDeadlineAtIso ? { registrationDeadlineAt: registrationDeadlineAtIso } : {}),
+        ...(rosterDeadlineAtIso ? { rosterDeadlineAt: rosterDeadlineAtIso } : {}),
         ...(venue.trim() ? { venue: venue.trim() } : {}),
         teamCount: parseInt(teamCount, 10),
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),

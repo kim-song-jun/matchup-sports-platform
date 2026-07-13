@@ -32,8 +32,11 @@ interface AdminCardListProps<T> {
   rows: T[];
   keyExtractor: (row: T) => string;
   card: (row: T) => AdminCardModel;
-  /** 카드 하단 액션 영역 (full-width 로 stretch) */
+  /** 카드 하단 액션 영역 */
   renderActions?: (row: T) => ReactNode;
+  /** 액션 배치 — stretch(기본): 버튼을 행 너비로 늘림 / compact: 고유 너비 칩으로 좌측 정렬
+   *  (액션이 4개 이상이라 줄바꿈될 때 마지막 버튼 혼자 풀너비가 되는 것을 막는다) */
+  actionLayout?: 'stretch' | 'compact';
   loading?: boolean;
   empty?: ReactNode;
   error?: string;
@@ -57,6 +60,7 @@ export function AdminCardList<T>({
   keyExtractor,
   card,
   renderActions,
+  actionLayout = 'stretch',
   loading = false,
   empty,
   error,
@@ -185,9 +189,14 @@ export function AdminCardList<T>({
               </div>
             ) : null}
 
-            {/* 액션 (full-width stretch) */}
+            {/* 액션 — stretch: full-width / compact: 고유 너비 칩 */}
             {hasActions && (
-              <div className="mt-3 flex flex-wrap items-center gap-2 [&>*]:min-w-[88px] [&>*]:flex-1">
+              <div
+                className={[
+                  'mt-3 flex flex-wrap items-center gap-2',
+                  actionLayout === 'stretch' ? '[&>*]:min-w-[88px] [&>*]:flex-1' : '',
+                ].join(' ').trim()}
+              >
                 {renderActions!(row)}
               </div>
             )}

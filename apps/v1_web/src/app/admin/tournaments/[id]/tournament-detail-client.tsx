@@ -253,6 +253,7 @@ function datetimeLocalValueToIso(value: string): string | null {
 /** h-[44px] unified submit button (f12) */
 const submitBtnCls = [
   'inline-flex items-center justify-center gap-1.5 h-[44px] px-4 rounded-xl',
+  'whitespace-nowrap shrink-0',
   'text-[13px] text-white bg-blue-500 hover:bg-blue-600',
   'transition-colors disabled:opacity-50',
   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
@@ -764,6 +765,7 @@ function RegistrationsTab({
       <AdminCardList<V1AdminTournamentRegistration>
         rows={filteredRegistrations}
         keyExtractor={(r) => r.id}
+        actionLayout="compact"
         card={(r) => ({
           title: (
             <span className="inline-flex items-center gap-2 min-w-0">
@@ -792,12 +794,16 @@ function RegistrationsTab({
           meta: [
             {
               icon: <Users size={14} aria-hidden="true" />,
-              label: `${r.playerCount}명`,
+              label: r.playerCount > 0 ? `${r.playerCount}명` : '명단 미등록',
             },
-            {
-              icon: <User size={14} aria-hidden="true" />,
-              label: r.depositorName ?? '—',
-            },
+            ...(r.depositorName
+              ? [
+                  {
+                    icon: <User size={14} aria-hidden="true" />,
+                    label: `입금자 ${r.depositorName}`,
+                  },
+                ]
+              : []),
             ...(getRegistrationPaymentDeadlineLabel(r.payment)
               ? [
                   {
@@ -1405,7 +1411,8 @@ function BracketTab({
       {/* ── 조 만들기 ───────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
         <h3 className="text-[15px] font-bold text-gray-900 mb-4">조 만들기</h3>
-        <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row gap-3 sm:items-end">
+        {/* sm:flex-wrap — 고정폭 입력 합이 좁은 좌측 컬럼(480px)을 넘으면 버튼이 카드 밖으로 흘렀다 */}
+        <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
           <div className="flex flex-col gap-1">
             <label htmlFor="group-name" className="text-[13px] text-gray-900">
               조 이름
@@ -1473,7 +1480,7 @@ function BracketTab({
       {groups.length > 0 && confirmedRegistrations.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
           <h3 className="text-[15px] font-bold text-gray-900 mb-4">팀 배정</h3>
-          <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row gap-3 sm:items-end">
+          <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
             <div className="flex flex-col gap-1">
               <label htmlFor="assign-group" className="text-[13px] text-gray-900">
                 조 선택
@@ -1870,9 +1877,12 @@ function BracketTab({
         </div>
       )}
 
-      {/* ── 픽스처 목록 (f13: AdminDataTable — 모바일 card reflow 자동 적용) ── */}
+      </div>{/* end right column */}
+
+      {/* ── 픽스처 목록 — 전폭 섹션: 좁은 우측 컬럼에 있을 때 팀명·액션 버튼이
+             세로로 꺾이던 문제를 그리드 밖 전체 너비로 빼서 해결 ── */}
       {fixtures.length > 0 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 lg:col-span-2">
           <h3 className="text-[15px] font-bold text-gray-900">경기 일정</h3>
           {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens */}
           <AdminDataTable<V1AdminBracketFixture>
@@ -1893,12 +1903,12 @@ function BracketTab({
               {
                 key: 'homeTeamName',
                 header: '홈',
-                render: (f) => <span className="font-medium text-gray-900">{f.homeTeamName ?? '—'}</span>,
+                render: (f) => <span className="font-medium text-gray-900 break-keep">{f.homeTeamName ?? '—'}</span>,
               },
               {
                 key: 'awayTeamName',
                 header: '어웨이',
-                render: (f) => <span className="font-medium text-gray-900">{f.awayTeamName ?? '—'}</span>,
+                render: (f) => <span className="font-medium text-gray-900 break-keep">{f.awayTeamName ?? '—'}</span>,
               },
               {
                 key: 'result',
@@ -1933,7 +1943,7 @@ function BracketTab({
                       setEditFxAwayRegId(f.awayRegistrationId ?? '');
                     }}
                     aria-label={`${f.round} ${f.fixtureNumber}번 경기 수정`}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
                   </button>
@@ -1954,7 +1964,7 @@ function BracketTab({
                     aria-label={`${f.round} ${f.fixtureNumber}번 결과 입력`}
                     title={disabledTitle}
                     aria-disabled={!bothAssigned}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {f.result ? '결과 수정' : '결과 입력'}
                   </button>
@@ -1963,7 +1973,7 @@ function BracketTab({
                       type="button"
                       onClick={() => void handleDeleteResult(f)}
                       aria-label={`${f.round} ${f.fixtureNumber}번 결과 삭제`}
-                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-red-500 bg-red-50 hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                      className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-red-500 bg-red-50 hover:bg-red-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                     >
                       결과 삭제
                     </button>
@@ -1983,8 +1993,6 @@ function BracketTab({
           />
         </div>
       )}
-
-      </div>{/* end right column */}
 
       {/* ── Fixture edit modal ────────────────────────────────────────── */}
       <SimpleModal
@@ -3852,7 +3860,7 @@ function InfoTab({
           <p className="text-[11px] text-gray-500 mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="info-prize-pool" className="text-[12px] text-gray-700">총상금 (원)</label>
+          <label htmlFor="info-prize-pool" className="text-[12px] text-gray-700">총상금 (원) <span className="text-gray-400">— 선택</span></label>
           <input
             id="info-prize-pool"
             type="text"
@@ -3863,6 +3871,7 @@ function InfoTab({
             placeholder="예: 1000000"
             className={inputBoxCls}
           />
+          <p className="text-[11px] text-gray-400 m-0">현금 상금이 없는 대회라면 비워 두세요 — 트로피·상품권 같은 물품만으로도 시상을 구성할 수 있어요.</p>
         </div>
 
         {/* 배분 행 편집기 — 저장 시 "1위 600,000원 / …" 텍스트로 직렬화 (공개 파서 호환) */}

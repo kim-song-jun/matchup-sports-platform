@@ -3076,7 +3076,6 @@ button:disabled {
 
 .tm-chat-bubble {
   max-width: 286px;
-  margin-bottom: 10px;
   padding: 10px 12px;
   border-radius: 14px;
   background: var(--bg);
@@ -3086,15 +3085,13 @@ button:disabled {
 
 .tm-chat-bubble-me {
   max-width: 250px;
-  margin-left: auto;
   background: var(--blue500);
   color: var(--static-white);
 }
 
 .tm-chat-bubble-system {
   max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0 auto 14px;
   background: transparent;
   box-shadow: none;
   text-align: center;
@@ -3104,6 +3101,56 @@ button:disabled {
 .tm-chat-bubble-me .tm-text-body,
 .tm-chat-bubble-me .tm-text-micro {
   color: inherit;
+}
+
+/* ── 메시지 그룹핑(카카오톡/토스 관례) ──────────────────────────────────────
+ * 같은 발신자가 연달아 보낸 메시지는 좁은 간격(-mid)으로 붙이고, 발신자가
+ * 바뀌거나 그룹이 끝나면 넓은 간격(-end)으로 시각적으로 분리한다. */
+.tm-chat-message-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-chat-message-group-mid {
+  margin-bottom: 3px;
+}
+
+.tm-chat-message-group-end {
+  margin-bottom: 14px;
+}
+
+/* 상대방 그룹의 첫 메시지 위에만 이름 노출 — 내 메시지는 정렬·색상으로 이미 구분되므로 라벨 생략 */
+.tm-chat-sender-label {
+  margin-bottom: 4px;
+  margin-left: 2px;
+  color: var(--text-caption);
+}
+
+.tm-chat-message-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.tm-chat-message-line-me {
+  justify-content: flex-end;
+}
+
+/* 그룹의 마지막 메시지 옆에만 시각 노출 */
+.tm-chat-time {
+  color: var(--text-caption);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-bottom: 2px;
+}
+
+/* 그룹 첫 버블만 이름표/정렬 방향 쪽 모서리를 살짝 좁혀 "말풍선 시작" 느낌을 준다 */
+.tm-chat-bubble-head.tm-chat-bubble-other {
+  border-top-left-radius: 6px;
+}
+
+.tm-chat-bubble-head.tm-chat-bubble-me {
+  border-top-right-radius: 6px;
 }
 
 .tm-chat-inputbar {

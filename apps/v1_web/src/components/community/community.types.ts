@@ -30,7 +30,7 @@ export type ChatListViewModel = {
 export type ChatRoomViewModel = {
   title: string;
   context: { title: string; sub: string; href: string };
-  messages: Array<{ id: string; who: 'me' | 'other' | 'system'; label: string; body: string }>;
+  messages: Array<{ id: string; who: 'me' | 'other' | 'system'; label: string; body: string; time: string }>;
   status?: 'loading' | 'error' | 'ready';
   emptyTitle?: string;
   emptyBody?: string;

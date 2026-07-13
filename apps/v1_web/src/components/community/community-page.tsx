@@ -114,7 +114,46 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
           ) : null}
-          {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
+          {model.messages.map((message, index) => {
+            if (message.who === 'system') {
+              return (
+                <div key={message.id} className="tm-chat-bubble tm-chat-bubble-system">
+                  <div className="tm-text-micro">{message.label}</div>
+                  <div className="tm-text-body">{message.body}</div>
+                </div>
+              );
+            }
+            /* 카카오톡/토스 관례: 같은 발신자가 연달아 보낸 메시지는 한 그룹으로 묶는다.
+               - 그룹 첫 메시지에만 발신자 라벨(상대방) 노출 — "나"는 정렬·색상으로 이미 구분되므로 라벨 생략.
+               - 그룹 마지막 메시지에만 시각 노출. */
+            const prev = model.messages[index - 1];
+            const next = model.messages[index + 1];
+            const isFirstInGroup = !prev || prev.who !== message.who || prev.label !== message.label;
+            const isLastInGroup = !next || next.who !== message.who || next.label !== message.label;
+            return (
+              <div
+                key={message.id}
+                className={`tm-chat-message-group ${isLastInGroup ? 'tm-chat-message-group-end' : 'tm-chat-message-group-mid'}`}
+              >
+                {message.who === 'other' && isFirstInGroup ? (
+                  <div className="tm-text-micro tm-chat-sender-label">{message.label}</div>
+                ) : null}
+                <div className={`tm-chat-message-line tm-chat-message-line-${message.who}`}>
+                  {message.who === 'me' && isLastInGroup ? (
+                    <span className="tm-text-micro tm-chat-time">{message.time}</span>
+                  ) : null}
+                  <div
+                    className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}`}
+                  >
+                    <div className="tm-text-body">{message.body}</div>
+                  </div>
+                  {message.who === 'other' && isLastInGroup ? (
+                    <span className="tm-text-micro tm-chat-time">{message.time}</span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
         {/* 이미지 첨부는 미구현 상태 — aria-label로 준비 중 안내, title 중복 제거 */}

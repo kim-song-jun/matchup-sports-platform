@@ -8,6 +8,10 @@ import { publicAssetPath } from '@/lib/assets';
  * (사용자 피드백: "우리 teameet 아이콘이 아닌데"). `/brand/icon-512.png` 자체에 파란
  * 둥근모서리 타일 배경이 이미 구워져 있으므로 별도 CSS 배경·border-radius가 필요 없다
  * — favicon(`/favicon.png`)도 동일 원본에서 생성돼 탭 아이콘까지 일관된 모양을 보장한다.
+ *
+ * 모든 호출부가 22~42px 사이의 작은 크기로만 렌더링하므로(nav/footer/auth 패널),
+ * 512px 원본을 매번 그대로 내려받는 건 낭비 — `srcSet`으로 192px 변형도 함께 제공해
+ * 저해상도/저DPR 화면에서는 브라우저가 더 작은 파일을 고르게 한다.
  */
 export function BrandMark({
   size = 24,
@@ -20,7 +24,9 @@ export function BrandMark({
 }) {
   return (
     <img
-      src={publicAssetPath('/brand/icon-512.png')}
+      src={publicAssetPath('/brand/icon-192.png')}
+      srcSet={`${publicAssetPath('/brand/icon-192.png')} 192w, ${publicAssetPath('/brand/icon-512.png')} 512w`}
+      sizes={`${size}px`}
       alt={alt}
       aria-hidden={alt === '' ? true : undefined}
       width={size}

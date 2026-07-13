@@ -22,7 +22,7 @@ type NotificationBellProps = {
 
 const MAX_DISPLAY_COUNT = 99;
 
-function formatUnreadCount(count: number): string {
+export function formatUnreadCount(count: number): string {
   return count > MAX_DISPLAY_COUNT ? `${MAX_DISPLAY_COUNT}+` : String(count);
 }
 
@@ -32,7 +32,7 @@ function useUnreadNotificationCount(forceUnread?: boolean): number {
   return forceUnread ? Math.max(unreadCount, 1) : unreadCount;
 }
 
-function buildAriaLabel(ariaLabel: string, unreadCount: number): string {
+export function buildAriaLabel(ariaLabel: string, unreadCount: number): string {
   if (unreadCount <= 0) return ariaLabel;
   return `${ariaLabel} (읽지 않은 알림 ${formatUnreadCount(unreadCount)}개)`;
 }

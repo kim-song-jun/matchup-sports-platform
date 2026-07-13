@@ -2307,7 +2307,12 @@ export type V1InvitationActionResult = {
 /** 어드민이 편집하는 외부 연동 키의 출처 — 어떤 값이 실제로 쓰이고 있는지 화면에 안내하기 위함. */
 export type V1IntegrationKeySource = 'admin' | 'env' | 'none';
 
-/** GET/PATCH /admin/settings/integrations 응답 — 값은 항상 마스킹(끝 4자리만 노출). */
+/**
+ * GET/PATCH /admin/settings/integrations 응답.
+ * 값이 DB(어드민 설정)에 있으면 마스킹(끝 4자리만 노출)해서 반환하지만, source가 'env'
+ * (환경변수 폴백 사용 중)이거나 'none'(둘 다 없음)이면 DB 원문 자체가 없으므로 null을 반환한다
+ * — "값은 항상 마스킹"이 아니라 "DB에 값이 있을 때만 마스킹, 그 외엔 null".
+ */
 export type V1IntegrationSettings = {
   kakaoRestApiKey: string | null;
   kakaoRestApiKeySource: V1IntegrationKeySource;

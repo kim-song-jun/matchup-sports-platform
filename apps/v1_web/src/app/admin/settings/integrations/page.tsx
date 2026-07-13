@@ -2,10 +2,16 @@
 
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { useV1AdminIntegrationSettings, useV1AdminMe, useV1UpdateIntegrationSettings } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1IntegrationKeySource } from '@/types/api';
+
+// undefined = 미변경(전송 안 함), ''(빈 문자열) = 삭제 의도(전송 시 서버가 env 폴백/미설정으로 되돌림),
+// 그 외 문자열 = 새 값으로 설정. useState('')를 쓰면 "안 건드림"과 "삭제"를 구분할 수 없어
+// truthy 체크(`value ? {...} : {}`)로 빈 문자열 제출이 통째로 드롭되는 버그가 생긴다.
+type KeyFieldValue = string | undefined;
 
 function sourceLabel(source: V1IntegrationKeySource): string {
   if (source === 'admin') return '이 화면에서 설정한 값 사용 중';
@@ -14,8 +20,8 @@ function sourceLabel(source: V1IntegrationKeySource): string {
 }
 
 export default function AdminIntegrationSettingsPage() {
-  const [kakaoRestApiKey, setKakaoRestApiKey] = useState('');
-  const [kakaoMapsJsKey, setKakaoMapsJsKey] = useState('');
+  const [kakaoRestApiKey, setKakaoRestApiKey] = useState<KeyFieldValue>(undefined);
+  const [kakaoMapsJsKey, setKakaoMapsJsKey] = useState<KeyFieldValue>(undefined);
 
   const { toasts, showToast } = useAdminToast();
   const { data: adminMe } = useV1AdminMe();
@@ -28,27 +34,27 @@ export default function AdminIntegrationSettingsPage() {
   // 그대로 다시 저장해버릴 위험이 있다. 대신 현재 상태는 마스킹된 값 + 출처로만 안내한다.
   useEffect(() => {
     if (settings) {
-      setKakaoRestApiKey('');
-      setKakaoMapsJsKey('');
+      setKakaoRestApiKey(undefined);
+      setKakaoMapsJsKey(undefined);
     }
   }, [settings]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!kakaoRestApiKey && !kakaoMapsJsKey) {
-      showToast('변경할 키를 하나 이상 입력해 주세요.', 'error');
+    if (kakaoRestApiKey === undefined && kakaoMapsJsKey === undefined) {
+      showToast('변경할 키를 하나 이상 입력하거나 삭제해 주세요.', 'error');
       return;
     }
 
     updateSettings.mutate(
       {
-        ...(kakaoRestApiKey ? { kakaoRestApiKey } : {}),
-        ...(kakaoMapsJsKey ? { kakaoMapsJsKey } : {}),
+        ...(kakaoRestApiKey !== undefined ? { kakaoRestApiKey } : {}),
+        ...(kakaoMapsJsKey !== undefined ? { kakaoMapsJsKey } : {}),
       },
       {
         onSuccess: () => {
-          setKakaoRestApiKey('');
-          setKakaoMapsJsKey('');
+          setKakaoRestApiKey(undefined);
+          setKakaoMapsJsKey(undefined);
           showToast('연동 설정을 저장했어요.', 'success');
         },
         onError: (err) => {
@@ -97,31 +103,43 @@ export default function AdminIntegrationSettingsPage() {
             <label className="flex flex-col gap-1.5">
               <span className="text-[var(--font-size-label)] font-semibold text-gray-700">카카오 REST API 키</span>
               <input
-                value={kakaoRestApiKey}
+                value={kakaoRestApiKey ?? ''}
                 onChange={(event) => setKakaoRestApiKey(event.target.value)}
                 maxLength={200}
                 disabled={!canWrite || isPending || updateSettings.isPending}
                 placeholder={isPending ? '불러오는 중...' : settings?.kakaoRestApiKey ? `현재: ${settings.kakaoRestApiKey}` : '새 키 입력'}
                 className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
               />
-              <span className="text-[var(--font-size-micro)] text-gray-500">
-                {settings ? sourceLabel(settings.kakaoRestApiKeySource) : ' '}
-              </span>
+              <KeyFieldFooter
+                canWrite={canWrite}
+                disabled={isPending || updateSettings.isPending}
+                sourceText={settings ? sourceLabel(settings.kakaoRestApiKeySource) : ' '}
+                canDelete={settings?.kakaoRestApiKeySource === 'admin'}
+                pendingDelete={kakaoRestApiKey === ''}
+                onDelete={() => setKakaoRestApiKey('')}
+                onCancelDelete={() => setKakaoRestApiKey(undefined)}
+              />
             </label>
 
             <label className="flex flex-col gap-1.5">
               <span className="text-[var(--font-size-label)] font-semibold text-gray-700">카카오맵 JS 키</span>
               <input
-                value={kakaoMapsJsKey}
+                value={kakaoMapsJsKey ?? ''}
                 onChange={(event) => setKakaoMapsJsKey(event.target.value)}
                 maxLength={200}
                 disabled={!canWrite || isPending || updateSettings.isPending}
                 placeholder={isPending ? '불러오는 중...' : settings?.kakaoMapsJsKey ? `현재: ${settings.kakaoMapsJsKey}` : '새 키 입력'}
                 className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
               />
-              <span className="text-[var(--font-size-micro)] text-gray-500">
-                {settings ? sourceLabel(settings.kakaoMapsJsKeySource) : ' '}
-              </span>
+              <KeyFieldFooter
+                canWrite={canWrite}
+                disabled={isPending || updateSettings.isPending}
+                sourceText={settings ? sourceLabel(settings.kakaoMapsJsKeySource) : ' '}
+                canDelete={settings?.kakaoMapsJsKeySource === 'admin'}
+                pendingDelete={kakaoMapsJsKey === ''}
+                onDelete={() => setKakaoMapsJsKey('')}
+                onCancelDelete={() => setKakaoMapsJsKey(undefined)}
+              />
               <span className="text-[var(--font-size-micro)] text-gray-400">
                 JS 키는 지도 스크립트에 포함되어 브라우저에 그대로 노출돼요 — 카카오 개발자 콘솔에서 이 앱의
                 사용 도메인을 등록해두면 다른 도메인에서의 무단 사용을 막을 수 있어요.
@@ -147,5 +165,62 @@ export default function AdminIntegrationSettingsPage() {
 
       <AdminToasts toasts={toasts} />
     </>
+  );
+}
+
+/**
+ * 키 입력칸 하단 출처 안내 + 삭제 액션. 삭제 예정 상태(빈 문자열 전송 예약)는 별도 문구 +
+ * "취소"로 명시적으로 보여준다 — 입력칸을 그냥 비우는 것만으로는 삭제 의도인지 단순
+ * 미입력인지 사용자도, 코드도 구분할 수 없기 때문.
+ */
+function KeyFieldFooter({
+  canWrite,
+  disabled,
+  sourceText,
+  canDelete,
+  pendingDelete,
+  onDelete,
+  onCancelDelete,
+}: {
+  canWrite: boolean;
+  disabled: boolean;
+  sourceText: string;
+  canDelete: boolean;
+  pendingDelete: boolean;
+  onDelete: () => void;
+  onCancelDelete: () => void;
+}) {
+  if (pendingDelete) {
+    return (
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[var(--font-size-micro)] font-semibold text-red-600">
+          삭제 예정 — 저장하면 이 키가 삭제되고 환경변수 값(또는 미설정)으로 되돌아가요.
+        </span>
+        <button
+          type="button"
+          onClick={onCancelDelete}
+          disabled={disabled}
+          className="shrink-0 text-[var(--font-size-micro)] font-semibold text-gray-500 underline hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          취소
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[var(--font-size-micro)] text-gray-500">{sourceText}</span>
+      {canWrite && canDelete ? (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={disabled}
+          className="inline-flex shrink-0 items-center gap-1 text-[var(--font-size-micro)] font-semibold text-gray-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <X size={12} aria-hidden="true" />이 키 삭제
+        </button>
+      ) : null}
+    </div>
   );
 }

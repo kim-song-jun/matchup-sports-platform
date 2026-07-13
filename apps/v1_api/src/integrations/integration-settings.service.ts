@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { V1ActiveAdmin } from '../common/admin-context.service';
+import { AdminContextService, V1ActiveAdmin } from '../common/admin-context.service';
 import { UpdateIntegrationSettingsDto } from './dto/integration-settings.dto';
 
 const SETTINGS_ROW_ID = 'singleton';
@@ -16,7 +16,10 @@ const SETTINGS_ROW_ID = 'singleton';
  */
 @Injectable()
 export class IntegrationSettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminContext: AdminContextService,
+  ) {}
 
   async getKakaoRestApiKey(): Promise<string | null> {
     const row = await this.getRow();
@@ -48,10 +51,30 @@ export class IntegrationSettingsService {
     if (dto.kakaoRestApiKey !== undefined) data.kakaoRestApiKey = nonEmpty(dto.kakaoRestApiKey) ?? null;
     if (dto.kakaoMapsJsKey !== undefined) data.kakaoMapsJsKey = nonEmpty(dto.kakaoMapsJsKey) ?? null;
 
-    await this.prisma.v1IntegrationSettings.upsert({
-      where: { id: SETTINGS_ROW_ID },
-      create: { id: SETTINGS_ROW_ID, updatedByAdminUserId: admin.id, ...data },
-      update: { updatedByAdminUserId: admin.id, ...data },
+    // 감사 로그에는 키 원문을 남기지 않는다 — 어떤 필드가 set/cleared 됐는지만 기록한다.
+    const changes: Record<string, 'set' | 'cleared'> = {};
+    if (dto.kakaoRestApiKey !== undefined) changes.kakaoRestApiKey = data.kakaoRestApiKey ? 'set' : 'cleared';
+    if (dto.kakaoMapsJsKey !== undefined) changes.kakaoMapsJsKey = data.kakaoMapsJsKey ? 'set' : 'cleared';
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1IntegrationSettings.upsert({
+        where: { id: SETTINGS_ROW_ID },
+        create: { id: SETTINGS_ROW_ID, updatedByAdminUserId: admin.id, ...data },
+        update: { updatedByAdminUserId: admin.id, ...data },
+      });
+
+      if (Object.keys(changes).length > 0) {
+        await this.adminContext.logAdminAction(
+          admin,
+          {
+            action: 'integration_settings.update',
+            targetType: 'integration_settings',
+            targetId: SETTINGS_ROW_ID,
+            afterJson: changes,
+          },
+          tx,
+        );
+      }
     });
 
     return this.getMasked();

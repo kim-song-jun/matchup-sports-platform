@@ -12,7 +12,7 @@ interface KakaoKeywordSearchResponse {
  *
  * WebPushService와 동일한 graceful-disable 패턴: REST 키가 없으면(env var도, 어드민
  * 설정도 없으면) 조회를 시도하지 않고 null을 반환한다 — 실패해도 venue 저장 자체를
- *막지 않는다(호출부에서 try/catch로 감싸는 것과 별개로, 이 서비스 자체도 절대 throw하지 않는다).
+ * 막지 않는다(호출부에서 try/catch로 감싸는 것과 별개로, 이 서비스 자체도 절대 throw하지 않는다).
  */
 @Injectable()
 export class KakaoGeocodingService {

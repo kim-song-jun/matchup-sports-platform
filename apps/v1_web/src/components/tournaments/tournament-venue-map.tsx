@@ -36,16 +36,21 @@ function loadKakaoMapsSdk(appKey: string): Promise<void> {
     const script = document.createElement('script');
     script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false`;
     script.async = true;
+    // 실패 시 모듈 스코프 캐시를 리셋해야 다음 렌더(재시도)에서 새 <script>로 재로드한다 —
+    // 리셋하지 않으면 한 번 reject된 promise를 영구히 재사용해 재시도가 불가능해진다.
+    const fail = (error: Error) => {
+      sdkLoadPromise = null;
+      reject(error);
+    };
     script.onload = () => {
       if (!window.kakao) {
-        reject(new Error('Kakao Maps SDK loaded but window.kakao is missing'));
+        fail(new Error('Kakao Maps SDK loaded but window.kakao is missing'));
         return;
       }
       window.kakao.maps.load(() => resolve());
     };
     script.onerror = () => {
-      sdkLoadPromise = null;
-      reject(new Error('Failed to load Kakao Maps SDK script'));
+      fail(new Error('Failed to load Kakao Maps SDK script'));
     };
     document.head.appendChild(script);
   });

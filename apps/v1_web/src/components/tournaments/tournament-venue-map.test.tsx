@@ -110,4 +110,63 @@ describe('TournamentVenueMap', () => {
 
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
+
+  it('after a script load failure, a later mount retries with a fresh script instead of reusing the dead rejected promise', async () => {
+    // Regression test: loadKakaoMapsSdk() caches its in-flight promise at module scope so
+    // concurrent mounts share one <script> tag. If a failure path forgets to clear that
+    // cache, every mount after the first failure short-circuits on the same already-rejected
+    // promise forever — no new <script> is ever injected again, so the map can never recover
+    // even after the network issue clears up.
+    kakaoMapsKeyMock.mockReturnValue({ data: { kakaoMapsJsKey: 'test-js-key' } });
+    const TournamentVenueMap = await freshTournamentVenueMap();
+
+    const first = render(
+      createElement(TournamentVenueMap, { venue: '잠실종합운동장', latitude: 37.5, longitude: 127.07 }),
+    );
+    const firstScript = document.head.querySelector('script[src*="dapi.kakao.com"]') as HTMLScriptElement;
+    expect(firstScript).toBeTruthy();
+    firstScript.onerror?.(new Event('error'));
+    await waitFor(() => expect(first.container).toBeEmptyDOMElement());
+
+    first.unmount();
+    clearInjectedScripts();
+
+    // Simulate the user navigating back to the page (a fresh mount) — this must attempt a
+    // brand-new SDK load rather than silently reusing the stale rejected promise.
+    render(createElement(TournamentVenueMap, { venue: '잠실종합운동장', latitude: 37.5, longitude: 127.07 }));
+
+    await waitFor(() => {
+      const retryScript = document.head.querySelector('script[src*="dapi.kakao.com"]');
+      expect(retryScript).toBeTruthy();
+    });
+  });
+
+  it('SDK "loads" but window.kakao never attaches (blocked global) → a later mount still retries with a fresh script', async () => {
+    // This is the reject path the fix targets directly: the <script> fires onload (the
+    // network request itself succeeded) but window.kakao is missing — e.g. an ad/tracker
+    // blocker stripped the global. Unlike a network-level onerror, this failure only
+    // surfaces inside the onload handler, so it has its own place to (and previously
+    // didn't) reset the module-scope sdkLoadPromise cache.
+    kakaoMapsKeyMock.mockReturnValue({ data: { kakaoMapsJsKey: 'test-js-key' } });
+    const TournamentVenueMap = await freshTournamentVenueMap();
+
+    const first = render(
+      createElement(TournamentVenueMap, { venue: '잠실종합운동장', latitude: 37.5, longitude: 127.07 }),
+    );
+    const firstScript = document.head.querySelector('script[src*="dapi.kakao.com"]') as HTMLScriptElement;
+    expect(firstScript).toBeTruthy();
+    expect((window as { kakao?: unknown }).kakao).toBeUndefined();
+    firstScript.onload?.(new Event('load'));
+    await waitFor(() => expect(first.container).toBeEmptyDOMElement());
+
+    first.unmount();
+    clearInjectedScripts();
+
+    render(createElement(TournamentVenueMap, { venue: '잠실종합운동장', latitude: 37.5, longitude: 127.07 }));
+
+    await waitFor(() => {
+      const retryScript = document.head.querySelector('script[src*="dapi.kakao.com"]');
+      expect(retryScript).toBeTruthy();
+    });
+  });
 });

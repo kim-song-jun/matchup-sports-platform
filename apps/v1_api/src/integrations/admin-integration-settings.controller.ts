@@ -6,7 +6,10 @@ import { AdminContextService } from '../common/admin-context.service';
 import { UpdateIntegrationSettingsDto } from './dto/integration-settings.dto';
 import { IntegrationSettingsService } from './integration-settings.service';
 
-/** 어드민 전용 외부 연동 키 설정(현재: 카카오맵 REST/JS 키) — 값은 항상 마스킹 응답. */
+/**
+ * 어드민 전용 외부 연동 키 설정(현재: 카카오맵 REST/JS 키).
+ * 응답 값은 DB(어드민 설정)에 있을 때만 마스킹되고, env 폴백/미설정 상태에서는 null이다.
+ */
 @Controller('admin/settings/integrations')
 @UseGuards(V1AuthGuard)
 export class AdminIntegrationSettingsController {

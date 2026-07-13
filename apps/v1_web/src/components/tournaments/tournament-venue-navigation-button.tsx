@@ -68,7 +68,7 @@ export function TournamentVenueNavigationButton({
         type="button"
         className="tm-btn tm-btn-sm tm-btn-neutral"
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44 }}
-        aria-haspopup="true"
+        aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((prev) => !prev)}

@@ -878,7 +878,10 @@ function TeamLogoField({
               </button>
             ) : null}
           </div>
-          <div className="tm-text-caption">정사각형 이미지를 권장해요. 안 올려도 첫 글자로 표시돼요.</div>
+          <div className="tm-text-caption">
+            정사각형·투명 배경 이미지를 권장해요. 배경색이 있는 이미지는 테두리처럼 보일 수 있어요.
+            안 올려도 팀 아이콘이 자동으로 만들어져요.
+          </div>
         </div>
         <input
           ref={inputRef}

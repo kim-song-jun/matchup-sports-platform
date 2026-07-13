@@ -1262,6 +1262,15 @@ export type V1AdminNoticeUpdateResult = {
   notice: V1AdminNoticeRow;
 };
 
+export type V1AdminNoticeDetailResult = {
+  notice: V1AdminNoticeRow;
+};
+
+export type V1AdminNoticeDeleteResult = {
+  noticeId: string;
+  deleted: true;
+};
+
 export type V1AdminInquiryRow = {
   inquiryId: string;
   userId: string;

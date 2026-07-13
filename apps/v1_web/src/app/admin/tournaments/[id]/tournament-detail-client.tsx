@@ -2697,6 +2697,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               value={editRulesText}
               onChange={(e) => setEditRulesText(e.target.value)}
               disabled={updateTournament.isPending}
+              maxLength={10000}
               rows={4}
               placeholder="대회 규정을 입력해 주세요."
               className={textareaCls}

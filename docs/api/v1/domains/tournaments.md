@@ -13,6 +13,8 @@ Tournament list/detail reads are public. Clients may call them without a stored 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+Admin create/update accepts `rulesText` up to 10,000 characters. `refundPolicyText` remains a separate field with a 2,000-character limit.
+
 Tournament schedule stores a start datetime in `scheduledAt` and an optional end datetime in `scheduledEndAt`. Admin create/update rejects `scheduledEndAt` when it is earlier than the final `scheduledAt` with `400 TOURNAMENT_SCHEDULE_RANGE_INVALID`. Public list/detail/admin responses include both fields; clients render a single date when `scheduledEndAt` is empty or the same calendar label, and a range when it spans multiple dates.
 
 Admin-facing prize entry is text-first. `prizeSummary` is the public "상품 및 상금" display string and clients must render that text as entered instead of deriving `총 N원` or `최대 N원` copy from `prizePool`. `prizeBreakdown` remains the comma/dot/newline-delimited breakdown string that public detail renders as separate chips below the main prize card.

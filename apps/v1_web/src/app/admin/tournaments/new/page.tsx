@@ -672,6 +672,7 @@ export default function AdminTournamentsNewPage() {
                   value={rulesText}
                   onChange={(e) => setRulesText(e.target.value)}
                   disabled={isPending}
+                  maxLength={10000}
                   rows={4}
                   placeholder="대회 참가 규정을 입력해 주세요."
                   className={textareaCls}

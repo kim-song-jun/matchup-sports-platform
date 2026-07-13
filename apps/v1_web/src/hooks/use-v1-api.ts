@@ -16,6 +16,8 @@ import type {
   V1AdminLog,
   V1AdminNoticeCreatePayload,
   V1AdminNoticeCreateResult,
+  V1AdminNoticeDeleteResult,
+  V1AdminNoticeDetailResult,
   V1AdminNoticeRow,
   V1AdminNoticeUpdatePayload,
   V1AdminNoticeUpdateResult,
@@ -1352,6 +1354,14 @@ export function useV1AdminNotices(filters?: AdminListFilters) {
   });
 }
 
+export function useV1AdminNoticeDetail(noticeId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminNotice(noticeId),
+    queryFn: () => v1Get<V1AdminNoticeDetailResult>(`/admin/notices/${noticeId}`),
+    enabled: !!noticeId,
+  });
+}
+
 export function useV1AdminInquiries(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
@@ -1483,7 +1493,7 @@ export function useV1CreateAdminNotice() {
     mutationFn: (body: V1AdminNoticeCreatePayload) =>
       v1Post<V1AdminNoticeCreateResult>('/admin/notices', body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
@@ -1495,8 +1505,23 @@ export function useV1UpdateAdminNotice() {
   return useMutation({
     mutationFn: ({ noticeId, body }: { noticeId: string; body: V1AdminNoticeUpdatePayload }) =>
       v1Patch<V1AdminNoticeUpdateResult>(`/admin/notices/${noticeId}`, body),
-    onSuccess: (_data, { noticeId }) => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
+    onSuccess: (data, { noticeId }) => {
+      queryClient.setQueryData(v1Keys.adminNotice(noticeId), data);
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+export function useV1DeleteAdminNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeId: string) => v1Delete<V1AdminNoticeDeleteResult>(`/admin/notices/${noticeId}`),
+    onSuccess: (_data, noticeId) => {
+      queryClient.removeQueries({ queryKey: v1Keys.adminNotice(noticeId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
@@ -1550,10 +1575,52 @@ type TournamentListFilters = {
   limit?: number;
 };
 
+type AllTournamentListFilters = Pick<TournamentListFilters, 'status' | 'sportId'>;
+
+export async function fetchAllV1Tournaments(
+  params?: AllTournamentListFilters,
+): Promise<V1TournamentListPage['items']> {
+  const items: V1TournamentListPage['items'] = [];
+  const seenItemIds = new Set<string>();
+  const seenCursors = new Set<string>();
+  let cursor: string | undefined;
+
+  while (true) {
+    const page = await v1Get<V1TournamentListPage>('/tournaments', {
+      ...params,
+      cursor,
+      limit: 50,
+    });
+
+    for (const item of page.items) {
+      if (seenItemIds.has(item.id)) continue;
+      seenItemIds.add(item.id);
+      items.push(item);
+    }
+
+    if (!page.pageInfo.hasNext) return items;
+
+    const nextCursor = page.pageInfo.nextCursor;
+    if (!nextCursor || seenCursors.has(nextCursor)) {
+      throw new Error('대회 목록 cursor가 유효하게 진행되지 않아 전체 대회를 불러오지 못했어요.');
+    }
+
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+}
+
 export function useV1Tournaments(params?: TournamentListFilters) {
   return useQuery({
     queryKey: v1Keys.tournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
+  });
+}
+
+export function useV1AllTournaments(params?: AllTournamentListFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.tournaments(params as Record<string, unknown>), 'all'],
+    queryFn: () => fetchAllV1Tournaments(params),
   });
 }
 

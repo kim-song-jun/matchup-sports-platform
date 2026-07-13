@@ -51,6 +51,7 @@ export class AdminTournamentListQueryDto {
 
 export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout'] as const;
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
+export const TOURNAMENT_RULES_TEXT_MAX_LENGTH = 10_000;
 
 export class CreateTournamentDto {
   @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
@@ -126,7 +127,9 @@ export class CreateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(5000)
+  @MaxLength(TOURNAMENT_RULES_TEXT_MAX_LENGTH, {
+    message: '대회 규정은 10,000자를 넘을 수 없어요.',
+  })
   rulesText?: string;
 
   @IsOptional()
@@ -326,7 +329,9 @@ export class UpdateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(5000)
+  @MaxLength(TOURNAMENT_RULES_TEXT_MAX_LENGTH, {
+    message: '대회 규정은 10,000자를 넘을 수 없어요.',
+  })
   rulesText?: string;
 
   @IsOptional()

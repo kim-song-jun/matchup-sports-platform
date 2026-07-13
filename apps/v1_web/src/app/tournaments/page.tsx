@@ -5,11 +5,11 @@ import { useState } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
-import { useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
+import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
+import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
-import { cssUrl } from '@/lib/assets';
 import type { V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 export default function TournamentsPage() {
@@ -92,6 +92,10 @@ function TournamentsListContent() {
     limit: 20,
     sportId: activeSportId ?? undefined,
   });
+  const promoTournaments = useV1AllTournaments({
+    status: 'open',
+    sportId: activeSportId ?? undefined,
+  });
 
   // Accumulate pages when cursor is set
   const pageItems = data?.items ?? [];
@@ -100,32 +104,6 @@ function TournamentsListContent() {
     : pageItems;
 
   const hasNext = data?.pageInfo?.hasNext ?? false;
-
-  // Derive featured tournament: admin-enabled promo; priority first, then closest scheduledAt.
-  const promoItems = pageItems.filter(
-    (item) => item.status === 'open' && item.promoListEnabled,
-  );
-  const featured: V1TournamentListItem | null = promoItems.length > 0
-    ? promoItems.reduce((best, cur) => {
-        if (cur.promoListPriority > best.promoListPriority) return cur;
-        if (cur.promoListPriority < best.promoListPriority) return best;
-        const bestDate = best.scheduledAt ? new Date(best.scheduledAt).getTime() : Infinity;
-        const curDate = cur.scheduledAt ? new Date(cur.scheduledAt).getTime() : Infinity;
-        return curDate < bestDate ? cur : best;
-      })
-    : null;
-  const featuredTitle = featured?.promoListTitle?.trim() || featured?.title || '';
-  const featuredSubtitle = featured?.promoListSubtitle?.trim() || '';
-  const featuredBadge = featured?.promoListBadgeText?.trim() || '추천 대회';
-  const featuredImageUrl = featured?.promoListImageUrl?.trim();
-  const featuredFacts = featured
-    ? [
-        featured.promoListDateText?.trim(),
-        featured.promoListTeamsText?.trim(),
-        featured.promoListLocationText?.trim(),
-      ].filter(Boolean).join(' · ')
-    : '';
-  const featuredPrizeText = featured?.promoListPrizeText?.trim() || '';
 
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor) return;
@@ -147,47 +125,12 @@ function TournamentsListContent() {
   return (
     <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
 
-      {/* ── Compact featured banner — admin-enabled promo tournament ── */}
-      {featured ? (
-        <Link
-          href={`/tournaments/${featured.id}`}
-          aria-label={`${featuredTitle} 자세히 보기`}
-          style={{
-            display: 'block',
-            margin: '12px 20px 0',
-            padding: '16px 18px',
-            borderRadius: 16,
-            background: featuredImageUrl ? `${cssUrl(featuredImageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
-            color: 'var(--static-white)',
-            textDecoration: 'none',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          {featuredImageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
-              <TrophyIcon size={12} strokeWidth={2} aria-hidden="true" />
-              {featuredBadge}
-            </span>
-            <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featuredTitle}</div>
-            {featuredSubtitle ? (
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-                {featuredSubtitle}
-              </div>
-            ) : null}
-            {featuredFacts ? (
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-                {featuredFacts}
-              </div>
-            ) : null}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12 }}>
-              <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
-              <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
-            </div>
-          </div>
-        </Link>
-      ) : null}
+      <TournamentPromoCarousel
+        items={promoTournaments.data ?? []}
+        loading={promoTournaments.isLoading}
+        error={promoTournaments.isError}
+        onRetry={() => void promoTournaments.refetch()}
+      />
 
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" style={{ marginTop: 28, padding: '0 20px' }}>

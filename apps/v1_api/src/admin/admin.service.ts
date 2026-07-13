@@ -810,6 +810,29 @@ export class AdminService {
     };
   }
 
+  async getNotice(user: V1AuthUser, noticeId: string) {
+    await this.getActiveAdmin(user.id);
+    const row = await this.prisma.v1Notice.findUnique({
+      where: { id: noticeId },
+      select: {
+        id: true,
+        audience: true,
+        category: true,
+        title: true,
+        body: true,
+        status: true,
+        publishedAt: true,
+        archivedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!row) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Notice was not found' });
+    }
+    return { notice: this.toAdminNoticeRow(row) };
+  }
+
   async createNotice(user: V1AuthUser, dto: CreateAdminNoticeDto) {
     const admin = await this.getMutationAdmin(user.id);
     const now = new Date();
@@ -908,6 +931,38 @@ export class AdminService {
     });
 
     return { notice: this.toAdminNoticeRow(row) };
+  }
+
+  async deleteNotice(user: V1AuthUser, noticeId: string) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Notice.findUnique({ where: { id: noticeId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Notice was not found' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'notice.delete',
+          targetType: 'notice',
+          targetId: existing.id,
+          reason: '공지 삭제',
+          beforeJson: {
+            noticeId: existing.id,
+            audience: existing.audience,
+            category: existing.category,
+            status: existing.status,
+            pinned: existing.category === '고정',
+            title: existing.title,
+          } as Prisma.InputJsonValue,
+          afterJson: Prisma.JsonNull,
+        },
+      });
+      await tx.v1Notice.delete({ where: { id: noticeId } });
+    });
+
+    return { noticeId, deleted: true };
   }
 
   // ─── Inquiry list / detail / replies ───────────────────────────────────────

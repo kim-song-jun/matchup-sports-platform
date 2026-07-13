@@ -28,11 +28,13 @@ export class InquiriesService {
     };
   }
 
-  async create(user: V1AuthUser, dto: CreateInquiryDto) {
+  async create(user: V1AuthUser | undefined, dto: CreateInquiryDto) {
     const title = dto.title.trim();
     const body = dto.body.trim();
     const contact = dto.contact?.trim();
     const relatedId = dto.relatedId?.trim();
+    const guestEmail = dto.guestEmail?.trim();
+    const guestPhone = dto.guestPhone?.trim();
     if (!title || !body) {
       throw new BadRequestException({ code: 'INVALID_INQUIRY', message: 'Title and body are required' });
     }
@@ -42,10 +44,18 @@ export class InquiriesService {
     if (!dto.relatedType && relatedId) {
       throw new BadRequestException({ code: 'INVALID_INQUIRY_RELATED_TARGET', message: 'relatedType is required when relatedId is provided' });
     }
+    if (!user && !guestEmail && !guestPhone) {
+      throw new BadRequestException({
+        code: 'GUEST_CONTACT_REQUIRED',
+        message: 'guestEmail or guestPhone is required when not logged in',
+      });
+    }
 
     const inquiry = await this.prisma.v1Inquiry.create({
       data: {
-        userId: user.id,
+        userId: user?.id ?? null,
+        guestEmail: user ? null : guestEmail || null,
+        guestPhone: user ? null : guestPhone || null,
         category: dto.category,
         title,
         body,

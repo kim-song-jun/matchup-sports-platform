@@ -245,6 +245,10 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
+  /** 비로그인(게스트) 문의자의 이메일 — 로그인 상태가 아니면 guestPhone과 함께 최소 1개 필수 */
+  guestEmail?: string;
+  /** 비로그인(게스트) 문의자의 전화번호 — 로그인 상태가 아니면 guestEmail과 함께 최소 1개 필수 */
+  guestPhone?: string;
 };
 
 export type V1Match = {
@@ -1279,9 +1283,13 @@ export type V1AdminNoticeUpdateResult = {
 
 export type V1AdminInquiryRow = {
   inquiryId: string;
-  userId: string;
+  userId: string | null;
+  /** true면 비회원(guest) 문의 — userId가 없고 guestEmail/guestPhone으로만 식별됨 */
+  isGuest: boolean;
   requesterName: string | null;
   requesterEmail: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
   category: V1InquiryCategory;
   title: string;
   status: V1InquiryStatus;

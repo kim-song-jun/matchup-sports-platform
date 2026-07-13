@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
+import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { InquiriesController } from './inquiries.controller';
 import { InquiriesService } from './inquiries.service';
 
@@ -28,6 +29,8 @@ describe('InquiriesController', () => {
     })
       .overrideGuard(V1AuthGuard)
       .useValue({ canActivate: jest.fn(() => true) })
+      .overrideGuard(OptionalV1AuthGuard)
+      .useValue({ canActivate: jest.fn(() => true) })
       .compile();
     controller = moduleRef.get(InquiriesController);
   });
@@ -44,6 +47,19 @@ describe('InquiriesController', () => {
       title: 'Title',
       body: 'Body',
     })).resolves.toEqual({ inquiryId: 'inquiry-1' });
+  });
+
+  it('creates a guest inquiry without a current user', async () => {
+    inquiriesService.create.mockResolvedValue({ inquiryId: 'inquiry-guest-1' });
+    await expect(controller.create(undefined, {
+      category: 'tournament',
+      title: 'Guest question',
+      body: 'Guest body',
+      guestEmail: 'guest@example.com',
+    })).resolves.toEqual({ inquiryId: 'inquiry-guest-1' });
+    expect(inquiriesService.create).toHaveBeenCalledWith(undefined, expect.objectContaining({
+      guestEmail: 'guest@example.com',
+    }));
   });
 
   it('returns detail', async () => {

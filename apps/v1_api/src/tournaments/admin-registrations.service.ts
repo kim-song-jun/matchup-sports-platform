@@ -415,6 +415,65 @@ export class AdminRegistrationsService {
     return this.serialize(result, payment ?? null, playerCount);
   }
 
+  /**
+   * 명단 제출 마감 예외 부여 — 대회 rosterDeadlineAt이 지나도 이 팀(신청건)은 명단을 계속 수정할 수 있게 한다.
+   * status 제약 없음(취소된 신청에도 기술적으로 부여 가능하나 실무상 무해).
+   */
+  async grantRosterDeadlineOverride(user: V1AuthUser, registrationId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.loadRegistration(registrationId);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TournamentRegistration.update({
+        where: { id: registrationId },
+        data: { rosterDeadlineOverrideAt: new Date() },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'registration.roster_deadline_override_grant',
+          targetType: 'tournament_registration',
+          targetId: registrationId,
+          afterJson: { rosterDeadlineOverrideAt: updated.rosterDeadlineOverrideAt?.toISOString() },
+        },
+        tx,
+      );
+      return updated;
+    });
+
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const playerCount = await this.countPlayers(registrationId);
+    return this.serialize(result, payment ?? null, playerCount);
+  }
+
+  /** 명단 제출 마감 예외 취소(rosterDeadlineOverrideAt = null). */
+  async revokeRosterDeadlineOverride(user: V1AuthUser, registrationId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.loadRegistration(registrationId);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TournamentRegistration.update({
+        where: { id: registrationId },
+        data: { rosterDeadlineOverrideAt: null },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'registration.roster_deadline_override_revoke',
+          targetType: 'tournament_registration',
+          targetId: registrationId,
+          afterJson: { rosterDeadlineOverrideAt: null },
+        },
+        tx,
+      );
+      return updated;
+    });
+
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const playerCount = await this.countPlayers(registrationId);
+    return this.serialize(result, payment ?? null, playerCount);
+  }
+
   private async loadRegistration(registrationId: string): Promise<V1TournamentRegistration> {
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
@@ -451,6 +510,7 @@ export class AdminRegistrationsService {
       confirmedByAdminUserId: row.confirmedByAdminUserId,
       confirmedAt: row.confirmedAt?.toISOString() ?? null,
       rosterLockedAt: row.rosterLockedAt?.toISOString() ?? null,
+      rosterDeadlineOverrideAt: row.rosterDeadlineOverrideAt?.toISOString() ?? null,
       cancelRequestedAt: row.cancelRequestedAt?.toISOString() ?? null,
       cancelReason: row.cancelReason,
       playerCount,

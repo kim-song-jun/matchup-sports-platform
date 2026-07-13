@@ -37,6 +37,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     confirmedByAdminUserId: null,
     confirmedAt: null,
     rosterLockedAt: null,
+    rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
     createdAt: new Date(),
@@ -344,6 +345,67 @@ describe('AdminRegistrationsService', () => {
 
     const result = await service.rosterUnlock(opsAuth, 'reg-1');
     expect(result.rosterLockedAt).toBeNull();
+  });
+
+  // ─── roster deadline override (grant / revoke) ─────────────────────────────
+
+  it('grantRosterDeadlineOverride: sets rosterDeadlineOverrideAt + audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    const overrideAt = new Date();
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterDeadlineOverrideAt: overrideAt }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    const result = await service.grantRosterDeadlineOverride(opsAuth, 'reg-1');
+
+    expect(result.rosterDeadlineOverrideAt).toBe(overrideAt.toISOString());
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'registration.roster_deadline_override_grant' }),
+      }),
+    );
+  });
+
+  it('grantRosterDeadlineOverride: unknown registration → 404 REGISTRATION_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+
+    await expect(service.grantRosterDeadlineOverride(opsAuth, 'ghost-reg')).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('revokeRosterDeadlineOverride: clears rosterDeadlineOverrideAt + audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterDeadlineOverrideAt: new Date() }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterDeadlineOverrideAt: null }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    const result = await service.revokeRosterDeadlineOverride(opsAuth, 'reg-1');
+
+    expect(result.rosterDeadlineOverrideAt).toBeNull();
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'registration.roster_deadline_override_revoke' }),
+      }),
+    );
+  });
+
+  it('revokeRosterDeadlineOverride: unknown registration → 404 REGISTRATION_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+
+    await expect(service.revokeRosterDeadlineOverride(opsAuth, 'ghost-reg')).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
   });
 
   // ─── list ───────────────────────────────────────────────────────────────────

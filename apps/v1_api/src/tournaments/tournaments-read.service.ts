@@ -165,6 +165,7 @@ export class TournamentsReadService {
       status: row.status,
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
+      rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,

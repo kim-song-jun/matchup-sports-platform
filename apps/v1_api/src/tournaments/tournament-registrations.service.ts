@@ -461,6 +461,7 @@ export class TournamentRegistrationsService {
       agreedMediaConsent: row.agreedMediaConsent,
       confirmedAt: row.confirmedAt?.toISOString() ?? null,
       rosterLockedAt: row.rosterLockedAt?.toISOString() ?? null,
+      rosterDeadlineOverrideAt: row.rosterDeadlineOverrideAt?.toISOString() ?? null,
       cancelRequestedAt: row.cancelRequestedAt?.toISOString() ?? null,
       cancelReason: row.cancelReason,
       playerCount,

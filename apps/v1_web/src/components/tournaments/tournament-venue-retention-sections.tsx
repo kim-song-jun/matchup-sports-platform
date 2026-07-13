@@ -14,6 +14,8 @@ import {
   type TournamentPostEventCard,
   type TournamentVenuePrepItem,
 } from './tournament-venue-retention-model';
+import { TournamentVenueMap } from './tournament-venue-map';
+import { TournamentVenueNavigationButton } from './tournament-venue-navigation-button';
 
 export {
   getTournamentPostEventCards,
@@ -21,11 +23,19 @@ export {
 } from './tournament-venue-retention-model';
 
 export function TournamentVenuePrepSection({
+  venue,
   announcements,
+  latitude = null,
+  longitude = null,
 }: {
+  venue: string | null;
   announcements: TournamentAnnouncementSummary[];
+  /** 카카오 지오코딩 좌표. 둘 다 있을 때만 지도 임베드 + 내비게이션 버튼을 보여준다. */
+  latitude?: number | null;
+  longitude?: number | null;
 }) {
-  const items = getTournamentVenuePrepItems({ announcements });
+  const items = getTournamentVenuePrepItems({ venue, announcements, latitude, longitude });
+  const hasCoordinates = venue !== null && latitude !== null && longitude !== null;
 
   return (
     <section aria-labelledby="venue-prep-heading" style={{ marginTop: 24 }}>
@@ -38,6 +48,12 @@ export function TournamentVenuePrepSection({
             <HubFactRow key={item.key} item={item} />
           ))}
         </div>
+        {hasCoordinates ? (
+          <>
+            <TournamentVenueMap venue={venue} latitude={latitude} longitude={longitude} />
+            <TournamentVenueNavigationButton venue={venue} latitude={latitude} longitude={longitude} />
+          </>
+        ) : null}
       </Card>
     </section>
   );
@@ -63,9 +79,8 @@ export function TournamentPostEventHubSection({
     return <TournamentCompletedActionList tournamentId={tournamentId} />;
   }
 
-  // draft/open/closed/cancelled: 대회가 아직 시작도 안 했거나(draft/open/closed) 취소되어
-  // (cancelled) "대회 후" 콘텐츠를 보여줄 단계가 아니다 — 예전엔 이 상태에서도 전부 "준비 중"인
-  // 5카드를 그대로 노출해 혼란을 줬다.
+  // draft/open/closed: 대회가 아직 시작도 안 했는데 "대회 후" 콘텐츠를 보여줄 단계가
+  // 아니다 — 예전엔 이 상태에서도 전부 "준비 중"인 5카드를 그대로 노출해 혼란을 줬다.
   if (status !== 'in_progress') {
     return null;
   }
@@ -259,9 +274,35 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
           {item.detail}
         </div>
         {item.actionLabel && item.href ? (
-          <Link href={item.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 8 }}>
-            {item.actionLabel}
-          </Link>
+          item.hrefExternal ? (
+            <a
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tm-btn tm-btn-sm tm-btn-neutral"
+              style={{ marginTop: 8 }}
+            >
+              {item.actionLabel}
+            </a>
+          ) : (
+            <Link href={item.href} className="tm-btn tm-btn-sm tm-btn-neutral" style={{ marginTop: 8 }}>
+              {item.actionLabel}
+            </Link>
+          )
+        ) : null}
+        {item.notice ? (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {item.notice.summary}
+            </div>
+            <Link
+              href={item.notice.href}
+              className="tm-text-caption"
+              style={{ color: 'var(--blue500)', fontWeight: 600, marginTop: 2, display: 'inline-block' }}
+            >
+              {item.notice.actionLabel}
+            </Link>
+          </div>
         ) : null}
       </div>
       <StatusBadge status={item.status} />

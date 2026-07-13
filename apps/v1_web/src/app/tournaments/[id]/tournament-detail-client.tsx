@@ -187,26 +187,32 @@ function CollapsiblePolicyText({
         <FormattedText text={text} className={className} style={{ color, lineHeight }} />
       </div>
       {shouldCollapse ? (
-        <button
-          type="button"
-          className="tm-btn tm-btn-sm tm-btn-ghost"
-          aria-controls={id}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((prev) => !prev)}
-          style={{ marginTop: 10, paddingInline: 0, minHeight: 36 }}
-        >
-          {expanded ? '접기' : '전체 보기'}
-          <ChevronRight
-            size={14}
-            strokeWidth={2.2}
-            aria-hidden="true"
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <button
+            type="button"
+            className="tm-btn tm-btn-sm tm-btn-ghost"
+            aria-controls={id}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((prev) => !prev)}
             style={{
-              marginLeft: 2,
-              transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)',
-              transition: 'transform 0.16s ease',
+              fontSize: 'var(--font-size-caption)',
+              fontWeight: 500,
+              color: 'var(--text-muted)',
             }}
-          />
-        </button>
+          >
+            {expanded ? '접기' : '전체 보기'}
+            <ChevronRight
+              size={12}
+              strokeWidth={2.2}
+              aria-hidden="true"
+              style={{
+                marginLeft: 2,
+                transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)',
+                transition: 'transform 0.16s ease',
+              }}
+            />
+          </button>
+        </div>
       ) : null}
     </>
   );
@@ -564,7 +570,12 @@ export function TournamentDetailView({
         teamCount={tournament.teamCount}
       />
 
-      <TournamentVenuePrepSection announcements={tournament.announcements} />
+      <TournamentVenuePrepSection
+        venue={tournament.venue}
+        announcements={tournament.announcements}
+        latitude={tournament.latitude}
+        longitude={tournament.longitude}
+      />
 
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
       <TournamentFlowSection tournament={tournament} />

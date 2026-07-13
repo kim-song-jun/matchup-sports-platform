@@ -1254,6 +1254,10 @@ model V1Tournament {
   scheduledAt            DateTime?          @map("scheduled_at")
   scheduledEndAt         DateTime?          @map("scheduled_end_at")
   venue                  String?
+  // 카카오 로컬 API 키워드 검색으로 venue를 지오코딩한 좌표(KakaoGeocodingService). 키 미설정/검색
+  // 실패 시 null로 남고, 그 경우 프론트는 네이버 지도 검색 링크 폴백을 그대로 사용한다.
+  latitude               Float?
+  longitude              Float?
   coverImageUrl          String?            @map("cover_image_url")
   teamCount              Int                @default(8) @map("team_count")
   minPlayers             Int                @default(6) @map("min_players")
@@ -1601,4 +1605,22 @@ model V1TournamentSponsor {
 
   @@index([tournamentId, isActive, sortOrder])
   @@map("v1_tournament_sponsors")
+}
+
+/**
+ * 어드민이 런타임에 편집하는 외부 연동 키 저장소(싱글턴 row, id="singleton").
+ * 카카오맵 REST/JS 키 우선순위: DB(이 테이블) > 환경변수(KAKAO_REST_API_KEY /
+ * NEXT_PUBLIC_KAKAO_MAPS_JS_KEY) > 없음(기능 graceful-disable, WebPushService와
+ * 동일 패턴). REST 키는 서버 전용(지오코딩), JS 키는 공개 엔드포인트로 노출되어
+ * 지도 SDK 로드에 사용된다 — 카카오맵 JS 키는 도메인 제한으로 보호되므로 공개돼도 안전하다.
+ */
+model V1IntegrationSettings {
+  id                   String   @id @default("singleton")
+  kakaoRestApiKey      String?  @map("kakao_rest_api_key")
+  kakaoMapsJsKey       String?  @map("kakao_maps_js_key")
+  // 감사 추적용 참조 문자열 — FK 관계는 두지 않는다(설정 히스토리가 아니라 최신 편집자만 기록).
+  updatedByAdminUserId String?  @map("updated_by_admin_user_id")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("v1_integration_settings")
 }

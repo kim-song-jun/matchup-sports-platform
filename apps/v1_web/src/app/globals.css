@@ -6379,6 +6379,13 @@ button:disabled {
   font-variant-numeric: tabular-nums;
   line-height: inherit;
 }
+.tm-fmt-hr {
+  width: 100%;
+  height: 1px;
+  margin: 4px 0;
+  border: none;
+  background: var(--border);
+}
 
 /* 참가팀 후기 전체보기 — 검색 + 목록(모바일 카드 / 데스크탑 테이블) + 페이지네이션 */
 .tm-reviews-searchbar {

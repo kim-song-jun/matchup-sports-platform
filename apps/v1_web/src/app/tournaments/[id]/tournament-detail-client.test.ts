@@ -112,6 +112,8 @@ function makeTournament(
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,
+    latitude: null,
+    longitude: null,
     teamCount: 8,
     minPlayers: 5,
     maxPlayers: 10,
@@ -176,9 +178,54 @@ describe('getParticipantTeamBuckets', () => {
 });
 
 describe('getTournamentVenuePrepItems', () => {
-  // 장소·규정·선수단은 "대회 정보" 섹션과 중복 표시되어 제거됨(사용자 피드백) —
-  // 이 섹션은 이제 현장 공지 전까지 알 수 없는 "주차" 한 항목만 다룬다.
-  it('returns only the parking item, defaulting to operator_update with no venue notice', () => {
+  // venue(장소명)는 대회 생성 시 항상 입력되는 값 — 관리자 공지 유무와 무관하게
+  // 항상 장소명 + 지도 링크를 보여준다. venue가 없는 극히 드문 edge case에서만
+  // 기존 "운영진 공지 확인 / 공지 대기" 폴백을 유지한다. 4가지 조합(venue 있음/없음 ×
+  // 공지 있음/없음)을 모두 커버한다.
+
+  it('venue 있음 + 공지 없음: 장소명과 네이버 지도 검색 링크를 보여주고 보조 공지는 없다', () => {
+    const items = getTournamentVenuePrepItems({ venue: '데일리그라운드 청라국제도시점' });
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      key: 'parking',
+      label: '장소',
+      value: '데일리그라운드 청라국제도시점',
+      status: 'available',
+      actionLabel: '지도에서 보기',
+      href: 'https://map.naver.com/v5/search/' + encodeURIComponent('데일리그라운드 청라국제도시점'),
+      hrefExternal: true,
+      notice: null,
+    });
+  });
+
+  it('venue 있음 + 공지 있음: 장소 정보는 그대로 유지되고 공지는 보조 정보로 덧붙는다', () => {
+    const items = getTournamentVenuePrepItems({
+      venue: '데일리그라운드 청라국제도시점',
+      announcements: [
+        {
+          id: 'ann-venue',
+          title: '주차·입장·경기 준비 안내',
+          category: 'venue' as const,
+        },
+      ],
+    });
+
+    expect(items[0]).toMatchObject({
+      label: '장소',
+      value: '데일리그라운드 청라국제도시점',
+      status: 'available',
+      actionLabel: '지도에서 보기',
+      hrefExternal: true,
+      notice: {
+        summary: '공지: 주차·입장·경기 준비 안내',
+        actionLabel: '공지 보기',
+        href: '#announcement-ann-venue',
+      },
+    });
+  });
+
+  it('venue 없음 + 공지 없음(edge case): 기존 운영진 공지 확인 폴백을 유지한다', () => {
     const items = getTournamentVenuePrepItems({});
 
     expect(items).toHaveLength(1);
@@ -188,10 +235,11 @@ describe('getTournamentVenuePrepItems', () => {
       status: 'operator_update',
       actionLabel: null,
       href: null,
+      notice: null,
     });
   });
 
-  it('links the parking row to the published venue notice when present', () => {
+  it('venue 없음 + 공지 있음(edge case): 기존처럼 공지 링크로 폴백한다', () => {
     const items = getTournamentVenuePrepItems({
       announcements: [
         {
@@ -206,6 +254,7 @@ describe('getTournamentVenuePrepItems', () => {
       status: 'available',
       actionLabel: '공지 보기',
       href: '#announcement-ann-venue',
+      notice: null,
     });
   });
 });

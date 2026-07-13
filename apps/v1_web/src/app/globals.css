@@ -187,6 +187,12 @@
   --v1-shell-scroll-bottom-pad: 12px;
   --v1-shell-cta-bottom-pad: 22px;
   --v1-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* 홈 "오늘의 추천" 히어로(.tm-featured-media) 커버 사진 crop 비율 — 모바일/데스크톱
+     이전엔 height(146px→220px→260px)만 breakpoint별로 늘고 카드 폭은 독립적으로 변해
+     같은 사진이 뷰포트마다 다른 비율로 잘려 보였다. aspect-ratio 단일 토큰으로 통일해
+     폭이 커지면 높이도 비례해서 커지도록(=같은 crop 유지) 고정. */
+  --tm-featured-media-ratio: 2 / 1;
 }
 
 * {
@@ -1489,7 +1495,8 @@ button:disabled {
 }
 
 .tm-featured-media {
-  height: 146px;
+  /* 고정 height 대신 비율 고정 — 카드 폭이 breakpoint별로 달라져도 동일한 crop 유지 */
+  aspect-ratio: var(--tm-featured-media-ratio);
   position: relative;
 }
 

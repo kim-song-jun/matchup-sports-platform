@@ -1,15 +1,64 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from './dto/tournament-read.dto';
+
+/**
+ * 공지 audience → 알림 수신 대상 신청 상태 매핑.
+ * - confirmed_only: 확정된 팀만.
+ * - waitlist: 대기 중인 팀만.
+ * - all_registered / public: draft(미제출)·cancelled(취소)를 제외한 모든 활성 신청 팀.
+ *   (public은 비로그인 방문자에게도 노출되는 더 넓은 공개 범위이지만, 알림은 어차피
+ *   신청 테이블에 있는 사용자에게만 보내므로 all_registered와 동일 집합을 사용한다.)
+ */
+const ACTIVE_TOURNAMENT_REGISTRATION_STATUSES: V1TournamentRegistration['status'][] = [
+  'awaiting_payment',
+  'payment_checking',
+  'paid',
+  'confirmed',
+  'waitlisted',
+  'cancel_requested',
+];
+
+function registrationStatusesForAudience(
+  audience: string,
+): V1TournamentRegistration['status'][] {
+  if (audience === 'confirmed_only') return ['confirmed'];
+  if (audience === 'waitlist') return ['waitlisted'];
+  return ACTIVE_TOURNAMENT_REGISTRATION_STATUSES;
+}
 
 @Injectable()
 export class TournamentAnnouncementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * 알림: 공지 audience에 부합하는 신청 팀의 appliedByUserId에게 발송.
+   * 수신자 조회 실패를 포함해 전 과정이 실패해도 호출자의 트랜잭션에는 영향 없음(fire-and-forget).
+   */
+  private notifyAnnouncementPublished(tournamentId: string, title: string, audience: string) {
+    const statuses = registrationStatusesForAudience(audience);
+    this.notifications.emitToManyDeferred(
+      async () => {
+        const rows = await this.prisma.v1TournamentRegistration.findMany({
+          where: { tournamentId, status: { in: statuses } },
+          select: { appliedByUserId: true },
+          distinct: ['appliedByUserId'],
+        });
+        return rows.map((row) => row.appliedByUserId);
+      },
+      'tournament_announcement_published',
+      tournamentId,
+      `"${title}" 공지를 확인해 보세요.`,
+    );
+  }
 
   /**
    * 어드민 공지 목록 조회.
@@ -40,7 +89,7 @@ export class TournamentAnnouncementsService {
   /**
    * 어드민 공지 생성.
    * publish=true이면 publishedAt=now()로 즉시 공개. 기본은 draft(publishedAt=null).
-   * audience는 현재 타겟 발송 메타로만 저장(실제 발송은 후속 task).
+   * 즉시 공개되면 audience에 부합하는 신청 팀에게 tournament_announcement_published 알림 발송.
    * logAdminAction으로 감사 기록.
    */
   async create(
@@ -95,6 +144,10 @@ export class TournamentAnnouncementsService {
       return created;
     });
 
+    if (announcement.publishedAt) {
+      this.notifyAnnouncementPublished(tournamentId, announcement.title, announcement.audience);
+    }
+
     return this.serialize(announcement);
   }
 
@@ -125,6 +178,9 @@ export class TournamentAnnouncementsService {
       ? announcement.publishedAt ?? new Date()
       : null;
     const audience = dto.audience ?? announcement.audience;
+    // 이미 공개된 공지가 재저장(publishedAt 유지)되는 경우가 아니라, draft → 공개로
+    // 새로 전환되는 경우에만 알림을 보낸다(중복 발송 금지).
+    const newlyPublished = announcement.publishedAt === null && publishedAt !== null;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.v1TournamentAnnouncement.update({
@@ -159,6 +215,10 @@ export class TournamentAnnouncementsService {
       );
       return result;
     });
+
+    if (newlyPublished) {
+      this.notifyAnnouncementPublished(updated.tournamentId, updated.title, updated.audience);
+    }
 
     return this.serialize(updated);
   }
@@ -206,6 +266,8 @@ export class TournamentAnnouncementsService {
       );
       return result;
     });
+
+    this.notifyAnnouncementPublished(updated.tournamentId, updated.title, updated.audience);
 
     return { ...this.serialize(updated), alreadyPublished: false };
   }

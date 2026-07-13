@@ -376,6 +376,25 @@ describe('AdminRegistrationsService', () => {
 
   // ─── notification emissions ──────────────────────────────────────────────────
 
+  it('confirmPayment: emits tournament_payment_confirmed to registrant', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'awaiting_payment', appliedByUserId: 'manager-user', tournamentId: 'tournament-1' }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'ready' }));
+    prisma.v1TournamentPayment.update.mockResolvedValue(paymentRow({ status: 'paid', paidAt: new Date() }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
+
+    await service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'manager-user',
+      'tournament_payment_confirmed',
+      'tournament-1',
+      expect.any(String),
+    );
+  });
+
   it('confirm: decision=confirm emits tournament_registration_confirmed to registrant', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(

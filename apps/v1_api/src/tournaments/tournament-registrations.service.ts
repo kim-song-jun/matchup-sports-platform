@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1Tournament, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
@@ -39,6 +40,7 @@ export class TournamentRegistrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentExpiry: TournamentPaymentExpiryService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** 팀장 또는 운영진(manager+)만 대회 신청을 관리할 수 있다. */
@@ -242,6 +244,13 @@ export class TournamentRegistrationsService {
       });
       return { updated, payment };
     });
+
+    // 알림: 신청자에게 접수 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    void this.notifications.emitNotification(
+      result.updated.appliedByUserId,
+      'tournament_registration_submitted',
+      tournamentId,
+    );
 
     const playerCount = await this.prisma.v1TournamentPlayer.count({
       where: { registrationId, removedAt: null },

@@ -65,6 +65,23 @@ function awardRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function reviewRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'review-1',
+    tournamentId: 'tournament-1',
+    authorUserId: 'plain-user-id',
+    teamName: '레알마드리드',
+    rating: 5,
+    comment: '좋은 대회였어요',
+    photoUrls: [],
+    hiddenAt: null,
+    hiddenReason: null,
+    createdAt: new Date('2026-06-14T00:00:00.000Z'),
+    author: { id: 'plain-user-id', profile: { nickname: '김철수', profileImageUrl: null } },
+    ...overrides,
+  };
+}
+
 /** confirmed 등록 2건 — '레알마드리드'(김철수·이영희), '바르셀로나'(박지성) */
 const confirmedRegistrationRows = [
   {
@@ -88,6 +105,12 @@ describe('TournamentReviewsService — awards admin gate', () => {
       create: jest.Mock;
     };
     v1TournamentRegistration: { findMany: jest.Mock };
+    v1TournamentReview: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
     v1AdminActionLog: { create: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -102,6 +125,12 @@ describe('TournamentReviewsService — awards admin gate', () => {
         create: jest.fn(),
       },
       v1TournamentRegistration: { findMany: jest.fn() },
+      v1TournamentReview: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       $transaction: jest.fn(),
     };
@@ -348,5 +377,245 @@ describe('TournamentReviewsService — awards admin gate', () => {
         where: { tournamentId: 'tournament-1', status: 'confirmed' },
       }),
     );
+  });
+});
+
+describe('TournamentReviewsService — review hide moderation', () => {
+  let service: TournamentReviewsService;
+  let prisma: {
+    v1AdminUser: { findUnique: jest.Mock };
+    v1TournamentReview: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findFirst: jest.Mock;
+      update: jest.Mock;
+    };
+    v1AdminActionLog: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      v1AdminUser: { findUnique: jest.fn() },
+      v1TournamentReview: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
+      $transaction: jest.fn(),
+    };
+    (prisma.$transaction as jest.Mock).mockImplementation(async (arg: unknown) =>
+      Array.isArray(arg)
+        ? Promise.all(arg as Promise<unknown>[])
+        : (arg as (tx: unknown) => Promise<unknown>)(prisma),
+    );
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        TournamentReviewsService,
+        AdminContextService,
+        { provide: PrismaService, useValue: prisma },
+      ],
+    }).compile();
+
+    service = module.get(TournamentReviewsService);
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  // ─── listReviews (공개) — 숨김 리뷰 제외 ───────────────────────────────
+
+  it('listReviews: where절에 hiddenAt: null이 포함되어 숨김 리뷰가 목록/카운트에서 제외된다', async () => {
+    prisma.v1TournamentReview.findMany.mockResolvedValue([reviewRow()]);
+    prisma.v1TournamentReview.count.mockResolvedValue(1);
+
+    const result = await service.listReviews('tournament-1');
+
+    expect(prisma.v1TournamentReview.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tournamentId: 'tournament-1', hiddenAt: null }),
+      }),
+    );
+    expect(prisma.v1TournamentReview.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ hiddenAt: null }),
+      }),
+    );
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).not.toHaveProperty('hiddenAt');
+  });
+
+  // ─── listReviewsAdmin ───────────────────────────────────────────────────
+
+  it('listReviewsAdmin: non-admin authenticated user → 403 PERMISSION_DENIED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+
+    await expect(service.listReviewsAdmin(plainUser, 'tournament-1')).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prisma.v1TournamentReview.findMany).not.toHaveBeenCalled();
+  });
+
+  it('listReviewsAdmin: 숨김 리뷰도 포함해 조회하고 hiddenAt/hiddenReason을 반환한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+    const hidden = reviewRow({
+      id: 'review-2',
+      hiddenAt: new Date('2026-07-13T00:00:00.000Z'),
+      hiddenReason: '부적절한 표현',
+    });
+    prisma.v1TournamentReview.findMany.mockResolvedValue([reviewRow(), hidden]);
+    prisma.v1TournamentReview.count.mockResolvedValue(2);
+
+    const result = await service.listReviewsAdmin(supportAuthUser, 'tournament-1');
+
+    expect(prisma.v1TournamentReview.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tournamentId: 'tournament-1' },
+      }),
+    );
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]).toMatchObject({ hiddenAt: null, hiddenReason: null });
+    expect(result.items[1]).toMatchObject({
+      hiddenAt: '2026-07-13T00:00:00.000Z',
+      hiddenReason: '부적절한 표현',
+    });
+  });
+
+  // ─── hideReview ─────────────────────────────────────────────────────────
+
+  it('hideReview: non-admin authenticated user → 403, no mutation', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+
+    await expect(service.hideReview(plainUser, 'tournament-1', 'review-1', {})).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prisma.v1TournamentReview.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('hideReview: support admin cannot mutate → 403 PERMISSION_DENIED', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+
+    await expect(
+      service.hideReview(supportAuthUser, 'tournament-1', 'review-1', {}),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('hideReview: 다른 대회 소속이거나 존재하지 않는 리뷰 → 404 REVIEW_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.hideReview(ownerAuthUser, 'tournament-1', 'ghost-review', {}),
+    ).rejects.toMatchObject({ response: { code: 'REVIEW_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith({
+      where: { id: 'ghost-review', tournamentId: 'tournament-1' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('hideReview: owner admin이 리뷰를 숨기고 감사 로그를 남긴다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(reviewRow());
+    prisma.v1TournamentReview.update.mockResolvedValue(
+      reviewRow({ hiddenAt: new Date(), hiddenReason: '욕설 포함' }),
+    );
+
+    const result = await service.hideReview(ownerAuthUser, 'tournament-1', 'review-1', {
+      reason: '욕설 포함',
+    });
+
+    expect(result).toEqual({ alreadyHidden: false });
+    expect(prisma.v1TournamentReview.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'review-1' },
+        data: expect.objectContaining({ hiddenReason: '욕설 포함' }),
+      }),
+    );
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'tournament.review_hide',
+          targetType: 'tournament_review',
+          targetId: 'review-1',
+          reason: '욕설 포함',
+        }),
+      }),
+    );
+  });
+
+  it('hideReview: 이미 숨김 상태면 alreadyHidden: true를 반환하고 재-mutation하지 않는다 (멱등)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(
+      reviewRow({ hiddenAt: new Date('2026-07-01T00:00:00.000Z'), hiddenReason: '기존 사유' }),
+    );
+
+    const result = await service.hideReview(ownerAuthUser, 'tournament-1', 'review-1', {});
+
+    expect(result).toEqual({ alreadyHidden: true });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentReview.update).not.toHaveBeenCalled();
+  });
+
+  // ─── unhideReview ───────────────────────────────────────────────────────
+
+  it('unhideReview: non-admin authenticated user → 403, no mutation', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.unhideReview(plainUser, 'tournament-1', 'review-1'),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('unhideReview: 존재하지 않는 리뷰 → 404 REVIEW_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.unhideReview(ownerAuthUser, 'tournament-1', 'ghost-review'),
+    ).rejects.toMatchObject({ response: { code: 'REVIEW_NOT_FOUND' } });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('unhideReview: owner admin이 숨김을 해제하고 감사 로그를 남긴다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(
+      reviewRow({ hiddenAt: new Date('2026-07-01T00:00:00.000Z'), hiddenReason: '기존 사유' }),
+    );
+    prisma.v1TournamentReview.update.mockResolvedValue(reviewRow());
+
+    const result = await service.unhideReview(ownerAuthUser, 'tournament-1', 'review-1');
+
+    expect(result).toEqual({ alreadyVisible: false });
+    expect(prisma.v1TournamentReview.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'review-1' },
+        data: { hiddenAt: null, hiddenReason: null },
+      }),
+    );
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'tournament.review_unhide',
+          targetType: 'tournament_review',
+          targetId: 'review-1',
+        }),
+      }),
+    );
+  });
+
+  it('unhideReview: 이미 노출 중이면 alreadyVisible: true를 반환하고 재-mutation하지 않는다 (멱등)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(reviewRow({ hiddenAt: null }));
+
+    const result = await service.unhideReview(ownerAuthUser, 'tournament-1', 'review-1');
+
+    expect(result).toEqual({ alreadyVisible: true });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentReview.update).not.toHaveBeenCalled();
   });
 });

@@ -1701,6 +1701,8 @@ export type V1TournamentParticipantTeam = {
   registrationId: string;
   teamId: string;
   teamName: string;
+  teamLogoUrl: string | null;
+  teamRegionName: string | null;
   status: V1TournamentParticipantStatus;
   confirmedAt: string | null;
 };

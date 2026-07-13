@@ -1314,6 +1314,8 @@ model V1TournamentReview {
   rating       Int      // 1~5
   comment      String?  @db.Text
   photoUrls    String[] @default([]) @map("photo_urls")
+  hiddenAt     DateTime? @map("hidden_at")
+  hiddenReason String?   @map("hidden_reason")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

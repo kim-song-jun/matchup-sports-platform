@@ -156,6 +156,14 @@ export class AdminRegistrationsService {
       return { updatedRegistration, updatedPayment };
     });
 
+    // 알림: 신청자에게 입금 확인 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    void this.notifications.emitNotification(
+      registration.appliedByUserId,
+      'tournament_payment_confirmed',
+      registration.tournamentId,
+      '운영진 확정을 기다려 주세요.',
+    );
+
     const playerCount = await this.countPlayers(registrationId);
     return this.serialize(result.updatedRegistration, result.updatedPayment, playerCount);
   }

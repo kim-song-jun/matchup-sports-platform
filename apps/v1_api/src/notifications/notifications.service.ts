@@ -28,6 +28,9 @@ export type NotificationEventType =
   | 'tournament_registration_confirmed'
   | 'tournament_registration_waitlisted'
   | 'tournament_registration_cancelled'
+  | 'tournament_registration_submitted'
+  | 'tournament_payment_confirmed'
+  | 'tournament_announcement_published'
   | 'team_invitation_received'
   | 'team_invitation_accepted';
 
@@ -79,7 +82,10 @@ function preferenceFieldForEvent(
   if (
     type === 'tournament_registration_confirmed' ||
     type === 'tournament_registration_waitlisted' ||
-    type === 'tournament_registration_cancelled'
+    type === 'tournament_registration_cancelled' ||
+    type === 'tournament_registration_submitted' ||
+    type === 'tournament_payment_confirmed' ||
+    type === 'tournament_announcement_published'
   ) {
     return 'activityEnabled';
   }
@@ -108,7 +114,10 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   if (
     type === 'tournament_registration_confirmed' ||
     type === 'tournament_registration_waitlisted' ||
-    type === 'tournament_registration_cancelled'
+    type === 'tournament_registration_cancelled' ||
+    type === 'tournament_registration_submitted' ||
+    type === 'tournament_payment_confirmed' ||
+    type === 'tournament_announcement_published'
   ) {
     return 'tournament';
   }
@@ -166,6 +175,9 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_registration_confirmed: '대회 참가가 확정됐어요',
   tournament_registration_waitlisted: '대기자 명단에 등록됐어요',
   tournament_registration_cancelled: '대회 참가가 취소됐어요',
+  tournament_registration_submitted: '대회 신청이 접수됐어요',
+  tournament_payment_confirmed: '입금이 확인됐어요',
+  tournament_announcement_published: '대회 공지가 올라왔어요',
   team_invitation_received: '팀 초대가 도착했어요',
   team_invitation_accepted: '팀 초대를 수락했어요',
 };

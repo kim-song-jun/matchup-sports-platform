@@ -138,7 +138,7 @@ export function AdminDataTable<T>({
     const cellPad = compact ? 'px-3 py-2.5' : 'px-4 py-3';
     const tableClassName = compact
       ? 'w-max min-w-full text-[13px] text-gray-700'
-      : ['w-full text-sm text-gray-700', tableMaxWidth ?? ''].join(' ').trim();
+      : ['w-max min-w-full text-sm text-gray-700', tableMaxWidth ?? ''].join(' ').trim();
 
     return (
       <table className={tableClassName}>

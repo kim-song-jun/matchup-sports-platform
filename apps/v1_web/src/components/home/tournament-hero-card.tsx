@@ -100,20 +100,19 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
           ) : null}
           {/*
            * FeaturedMatchCard와 짝을 이루는 시각적 CTA — 카드 전체가 이미 <Link>이므로
-           * pointerEvents:'none' + aria-hidden + tabIndex=-1 로 순수 시각 신호만 제공한다.
+           * 순수 시각 신호만 제공하는 비-interactive 요소(span)로 렌더링한다.
+           * <a> 안에 <button>(interactive-in-interactive) 중첩은 HTML5 스펙 위반이라
+           * span으로 대체했다(Copilot 리뷰 지적, PR #51).
            * (매치 히어로 카드의 tm-btn tm-btn-primary tm-btn-sm 패턴과 동일)
            * marginTop:auto(.tm-featured-cta) — facts 텍스트가 길어(2줄 랩) 매치 카드보다
            * 콘텐츠가 길어져도, 두 카드의 Card 바닥 경계가 항상 일치하도록 하단 고정한다.
            */}
-          <button
+          <span
             className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
-            type="button"
-            style={{ pointerEvents: 'none' }}
             aria-hidden="true"
-            tabIndex={-1}
           >
             참가 신청하기
-          </button>
+          </span>
         </div>
       </Card>
     </Link>

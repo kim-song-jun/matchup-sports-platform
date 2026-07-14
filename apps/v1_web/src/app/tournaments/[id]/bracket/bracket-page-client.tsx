@@ -191,19 +191,23 @@ function LeagueStandingsSection({ standings }: { standings: V1TournamentStanding
 }
 
 /* ── 빈 브래킷 안내 ── */
-function BracketEmpty() {
+function BracketEmpty({ format }: { format: 'knockout' | 'group_knockout' }) {
+  const message = format === 'group_knockout'
+    ? <>대진표는 조별리그가 끝난 후<br />공개돼요.</>
+    : <>대진 편성이 완료되면<br />대진표가 공개돼요.</>;
+
   return (
     <Card pad={24} style={{ textAlign: 'center', marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true"><Trophy size={32} style={{ color: 'var(--grey400)' }} strokeWidth={1.6} /></div>
       <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-        대진표는 조별리그가 끝난 후<br />공개돼요.
+        {message}
       </p>
     </Card>
   );
 }
 
 /* ── 메인 콘텐츠 ── */
-function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
+export function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
   const stages = buildTournamentStages(tournament);
 
@@ -271,7 +275,7 @@ function BracketPageContent({ tournament }: { tournament: V1TournamentDetail }) 
                   />
                 </div>
               ) : (
-                <BracketEmpty />
+                <BracketEmpty format={format} />
               )}
             </section>
           </div>

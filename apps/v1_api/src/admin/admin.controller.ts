@@ -160,6 +160,12 @@ export class AdminController {
     return this.adminService.listInquiries(user, query);
   }
 
+  /** 사이드바 배지용 — received/reviewing(미답변) 문의 건수만 가볍게 반환 */
+  @Get('inquiries/pending-count')
+  getPendingInquiryCount(@CurrentUser() user: V1AuthUser) {
+    return this.adminService.getPendingInquiryCount(user);
+  }
+
   @Get('inquiries/:inquiryId')
   getInquiry(@CurrentUser() user: V1AuthUser, @Param('inquiryId') inquiryId: string) {
     return this.adminService.getInquiry(user, inquiryId);

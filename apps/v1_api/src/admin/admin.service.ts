@@ -964,6 +964,15 @@ export class AdminService {
     };
   }
 
+  /** 사이드바 배지용 — 전체 목록을 가져오지 않고 미답변(received/reviewing) 건수만 count */
+  async getPendingInquiryCount(user: V1AuthUser) {
+    await this.getActiveAdmin(user.id);
+    const count = await this.prisma.v1Inquiry.count({
+      where: { status: { in: ['received', 'reviewing'] } },
+    });
+    return { count };
+  }
+
   async getInquiry(user: V1AuthUser, inquiryId: string) {
     await this.getActiveAdmin(user.id);
     const row = await this.prisma.v1Inquiry.findUnique({

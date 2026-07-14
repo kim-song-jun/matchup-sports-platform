@@ -58,13 +58,13 @@ describe('AdminService — inquiries null-safety (guest inquiries)', () => {
   let service: AdminService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
-    v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock };
+    v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock; count: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
-      v1Inquiry: { findMany: jest.fn(), findUnique: jest.fn() },
+      v1Inquiry: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -142,5 +142,22 @@ describe('AdminService — inquiries null-safety (guest inquiries)', () => {
   it('getInquiry throws 404 with code NOT_FOUND when inquiry is missing', async () => {
     prisma.v1Inquiry.findUnique.mockResolvedValue(null);
     await expect(service.getInquiry(adminAuthUser, 'missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('getPendingInquiryCount throws 403 for non-admin', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(service.getPendingInquiryCount(nonAdminAuthUser)).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1Inquiry.count).not.toHaveBeenCalled();
+  });
+
+  it('getPendingInquiryCount counts only received/reviewing (미답변) inquiries, not answered/closed', async () => {
+    prisma.v1Inquiry.count.mockResolvedValue(3);
+
+    const result = await service.getPendingInquiryCount(adminAuthUser);
+
+    expect(prisma.v1Inquiry.count).toHaveBeenCalledWith({
+      where: { status: { in: ['received', 'reviewing'] } },
+    });
+    expect(result).toEqual({ count: 3 });
   });
 });

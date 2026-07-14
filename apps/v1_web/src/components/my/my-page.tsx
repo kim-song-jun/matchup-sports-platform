@@ -66,7 +66,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               <div className="tm-my-avatar" style={avatarStyle}>{model.user.profileImageUrl ? null : model.user.initials}</div>
               <div className="tm-my-profile-copy">
                 <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
-                <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region}</div>
+                <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region} · {model.user.genderLabel}</div>
                 {model.user.loginMethod ? (
                   <div style={{ marginTop: 6 }}>
                     <span

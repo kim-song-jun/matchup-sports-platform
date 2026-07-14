@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateProfileDto {
@@ -30,6 +30,9 @@ export class UpdateProfileDto {
   @IsString()
   @Matches(/^\d{8}$/)
   birthDate?: string | null;
+
+  @IsIn(['male', 'female'])
+  gender!: 'male' | 'female';
 
 }
 

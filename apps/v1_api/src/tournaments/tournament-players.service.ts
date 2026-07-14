@@ -295,6 +295,7 @@ export class TournamentPlayersService {
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
       where: { registrationId, removedAt: null },
+      include: { user: { select: { phone: true } } },
       orderBy: { addedAt: 'asc' },
     });
 
@@ -303,7 +304,10 @@ export class TournamentPlayersService {
       teamId: registration.teamId,
       teamName: registration.team.name,
       rosterLockedAt: registration.rosterLockedAt?.toISOString() ?? null,
-      players: players.map((player) => this.serializePlayer(player)),
+      players: players.map(({ user: playerUser, ...player }) => ({
+        ...this.serializePlayer(player),
+        phone: playerUser.phone?.trim() || null,
+      })),
       belowMinimum: players.length < registration.tournament.minPlayers,
     };
   }

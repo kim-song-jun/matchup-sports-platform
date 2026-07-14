@@ -145,7 +145,7 @@ describe('AuthController', () => {
       kakaoLogin: jest.fn(),
       completeSocialTerms: jest.fn().mockResolvedValue({
         session: { userId: 'user-1', userEmail: null },
-        next: { route: '/onboarding/sport' },
+        next: { route: '/signup/social' },
       }),
       completeSocialProfile: jest.fn(),
       login: jest.fn(),
@@ -170,7 +170,7 @@ describe('AuthController', () => {
 
     await expect(controller.completeSocialTerms(user, dto)).resolves.toEqual({
       session: { userId: 'user-1', userEmail: null },
-      next: { route: '/onboarding/sport' },
+      next: { route: '/signup/social' },
     });
     expect(authService.completeSocialTerms).toHaveBeenCalledWith('user-1', dto);
   });

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Calendar, Clock, Eye, Shield } from 'lucide-react';
+import { Activity, Calendar, Clock, Eye, Shield, UserRound } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminUsers,
@@ -43,6 +43,12 @@ function formatUserTitle(row: V1AdminUserRow): string {
   if (row.onboardingStatus === 'social_terms_required') return '가입 진행 중 · 약관 미동의';
   if (row.onboardingStatus === 'social_profile_required') return '가입 진행 중 · 프로필 미완료';
   return '프로필 없음';
+}
+
+function formatGender(gender: V1AdminUserRow['gender']) {
+  if (gender === 'male') return '남';
+  if (gender === 'female') return '여';
+  return '성별 미등록';
 }
 
 function getTeamRoleCounts(row: V1AdminUserRow) {
@@ -223,29 +229,33 @@ function AdminUsersPageContent() {
               subtitle: row.email ?? undefined,
               status: row.accountStatus,
               meta: [
-              ...(row.adminRole
-                ? [{ icon: <Shield size={14} aria-hidden="true" />, label: '운영자' }]
-                : []),
-              {
-                icon: <Activity size={14} aria-hidden="true" />,
-                label: `매치 ${row.hostedMatchCount} · 생성/소유 ${row.ownedTeamCount}`,
-              },
-              {
-                icon: <Shield size={14} aria-hidden="true" />,
-                label: `소속 ${row.membershipCount} · 팀장 ${teamRoles.owner}`,
-              },
-              {
-                icon: <Shield size={14} aria-hidden="true" />,
-                label: `운영진 ${teamRoles.manager} · 멤버 ${teamRoles.member}`,
-              },
-              {
-                icon: <Calendar size={14} aria-hidden="true" />,
-                label: formatDateCompact(row.createdAt),
-              },
-              {
-                icon: <Clock size={14} aria-hidden="true" />,
-                label: formatDateCompact(row.lastLoginAt),
-              },
+                {
+                  icon: <UserRound size={14} aria-hidden="true" />,
+                  label: formatGender(row.gender),
+                },
+                ...(row.adminRole
+                  ? [{ icon: <Shield size={14} aria-hidden="true" />, label: '운영자' }]
+                  : []),
+                {
+                  icon: <Activity size={14} aria-hidden="true" />,
+                  label: `매치 ${row.hostedMatchCount} · 생성/소유 ${row.ownedTeamCount}`,
+                },
+                {
+                  icon: <Shield size={14} aria-hidden="true" />,
+                  label: `소속 ${row.membershipCount} · 팀장 ${teamRoles.owner}`,
+                },
+                {
+                  icon: <Shield size={14} aria-hidden="true" />,
+                  label: `운영진 ${teamRoles.manager} · 멤버 ${teamRoles.member}`,
+                },
+                {
+                  icon: <Calendar size={14} aria-hidden="true" />,
+                  label: formatDateCompact(row.createdAt),
+                },
+                {
+                  icon: <Clock size={14} aria-hidden="true" />,
+                  label: formatDateCompact(row.lastLoginAt),
+                },
               ],
               tone:
               row.accountStatus === 'blocked' || row.accountStatus === 'deleted'

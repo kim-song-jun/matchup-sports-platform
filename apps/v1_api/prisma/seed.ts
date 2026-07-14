@@ -1680,7 +1680,6 @@ async function seedCoverageTermsAndNotices() {
     ['00000000-0000-4000-8000-000000001102', 'admins', 'published', '안내', '관리자 공지 커버리지'],
     ['00000000-0000-4000-8000-000000001103', 'public', 'draft', '업데이트', '초안 공지 커버리지'],
     ['00000000-0000-4000-8000-000000001104', 'public', 'archived', '안내', '보관 공지 커버리지'],
-    ['00000000-0000-4000-8000-000000001105', 'public', 'published', '고정', '이번 주 고정 공지'],
     ['00000000-0000-4000-8000-000000001106', 'public', 'published', '업데이트', '매너 점수 업데이트'],
     ['00000000-0000-4000-8000-000000001107', 'public', 'published', '안내', '비 예보 경기 안내'],
   ] as const;
@@ -1709,6 +1708,32 @@ async function seedCoverageTermsAndNotices() {
       },
     });
   }
+
+  const popupId = '00000000-0000-4000-8000-000000001105';
+  const popupTitle = '이번 주 고정 공지';
+  await prisma.v1Popup.upsert({
+    where: { id: popupId },
+    update: {
+      audience: 'public',
+      title: popupTitle,
+      body: `${popupTitle} seed data`,
+      status: 'published',
+      publishedAt: seedNow,
+      archivedAt: null,
+      displayStartAt: null,
+      displayEndAt: null,
+    },
+    create: {
+      id: popupId,
+      audience: 'public',
+      title: popupTitle,
+      body: `${popupTitle} seed data`,
+      status: 'published',
+      publishedAt: seedNow,
+      displayStartAt: null,
+      displayEndAt: null,
+    },
+  });
 }
 
 async function seedCoverageTeams(

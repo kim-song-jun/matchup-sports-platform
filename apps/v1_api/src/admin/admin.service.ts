@@ -14,6 +14,7 @@ import {
   AdminInquiryListQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
+  AdminPopupListQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
   AdminNoticeListQueryDto,
@@ -24,10 +25,12 @@ import {
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
+  CreateAdminPopupDto,
   DeleteAdminUserDto,
   GrantAdminDto,
   ReplyInquiryDto,
   UpdateAdminNoticeDto,
+  UpdateAdminPopupDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 
@@ -385,7 +388,7 @@ export class AdminService {
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true } },
+        profile: { select: { nickname: true, displayName: true, gender: true } },
         adminUser: { select: { adminRole: true } },
         teamMemberships: {
           where: { status: 'active' },
@@ -407,6 +410,7 @@ export class AdminService {
     return {
       items: pageItems.map((row) => ({
         userId: row.id,
+        gender: normalizeProfileGender(row.profile?.gender),
         nickname: row.profile?.nickname ?? null,
         displayName: row.profile?.displayName ?? null,
         email: row.email ?? null,
@@ -441,7 +445,7 @@ export class AdminService {
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true } },
+        profile: { select: { nickname: true, displayName: true, gender: true } },
         adminUser: { select: { adminRole: true } },
         reputationSummary: {
           select: { trustState: true, mannerScore: true, reviewCount: true, calculatedAt: true },
@@ -504,6 +508,7 @@ export class AdminService {
       accountStatus: row.accountStatus,
       onboardingStatus: row.onboardingStatus,
       lastLoginAt: row.lastLoginAt,
+      gender: normalizeProfileGender(row.profile?.gender),
       createdAt: row.createdAt,
       deletedAt: row.deletedAt,
       hostedMatchCount: row._count.hostedMatches,
@@ -762,12 +767,185 @@ export class AdminService {
     };
   }
 
+  // ─── Popup list / create ──────────────────────────────────────────────────
+
+  async listPopups(user: V1AuthUser, query: AdminPopupListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const searchWhere = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { body: { contains: query.q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
+    const rows = await this.prisma.v1Popup.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...searchWhere,
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      take: limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    });
+
+    const pageItems = rows.slice(0, limit);
+    const hasNext = rows.length > limit;
+    return {
+      items: pageItems.map((row) => this.toAdminPopupRow(row)),
+      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+    };
+  }
+
+  async getPopup(user: V1AuthUser, popupId: string) {
+    await this.getActiveAdmin(user.id);
+    const row = await this.prisma.v1Popup.findUnique({ where: { id: popupId } });
+    if (!row) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Popup was not found' });
+    }
+    return { popup: this.toAdminPopupRow(row) };
+  }
+
+  async createPopup(user: V1AuthUser, dto: CreateAdminPopupDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const now = new Date();
+    const publishedAt = dto.status === 'published' ? now : null;
+    const archivedAt = dto.status === 'archived' ? now : null;
+    const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const popup = await tx.v1Popup.create({
+        data: {
+          audience: dto.audience,
+          title: dto.title.trim(),
+          body: dto.body.trim(),
+          status: dto.status,
+          publishedAt,
+          archivedAt,
+          displayStartAt,
+          displayEndAt,
+        },
+      });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'popup.create',
+          targetType: 'popup',
+          targetId: popup.id,
+          reason: dto.status === 'published' ? '팝업 작성 및 발행' : '팝업 초안 작성',
+          beforeJson: Prisma.JsonNull,
+          afterJson: {
+            popupId: popup.id,
+            audience: popup.audience,
+            status: popup.status,
+            displayStartAt: popup.displayStartAt?.toISOString() ?? null,
+            displayEndAt: popup.displayEndAt?.toISOString() ?? null,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return popup;
+    });
+
+    return { popup: this.toAdminPopupRow(row) };
+  }
+
+  async updatePopup(user: V1AuthUser, popupId: string, dto: UpdateAdminPopupDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Popup.findUnique({ where: { id: popupId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Popup was not found' });
+    }
+
+    const now = new Date();
+    const statusChanged = existing.status !== dto.status;
+    const publishedAt = dto.status === 'published' ? existing.publishedAt ?? now : null;
+    const archivedAt = dto.status === 'archived' ? existing.archivedAt ?? now : null;
+    const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
+
+    const row = await this.prisma.$transaction(async (tx) => {
+      const popup = await tx.v1Popup.update({
+        where: { id: popupId },
+        data: {
+          audience: dto.audience,
+          title: dto.title.trim(),
+          body: dto.body.trim(),
+          status: dto.status,
+          publishedAt,
+          archivedAt,
+          displayStartAt,
+          displayEndAt,
+        },
+      });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'popup.update',
+          targetType: 'popup',
+          targetId: popup.id,
+          reason: statusChanged ? `팝업 수정 및 상태 변경: ${existing.status} -> ${dto.status}` : '팝업 수정',
+          beforeJson: {
+            popupId: existing.id,
+            audience: existing.audience,
+            status: existing.status,
+            displayStartAt: existing.displayStartAt?.toISOString() ?? null,
+            displayEndAt: existing.displayEndAt?.toISOString() ?? null,
+          } as Prisma.InputJsonValue,
+          afterJson: {
+            popupId: popup.id,
+            audience: popup.audience,
+            status: popup.status,
+            displayStartAt: popup.displayStartAt?.toISOString() ?? null,
+            displayEndAt: popup.displayEndAt?.toISOString() ?? null,
+          } as Prisma.InputJsonValue,
+        },
+      });
+
+      return popup;
+    });
+
+    return { popup: this.toAdminPopupRow(row) };
+  }
+
+  async deletePopup(user: V1AuthUser, popupId: string) {
+    const admin = await this.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Popup.findUnique({ where: { id: popupId } });
+    if (!existing) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Popup was not found' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'popup.delete',
+          targetType: 'popup',
+          targetId: existing.id,
+          reason: '팝업 삭제',
+          beforeJson: {
+            popupId: existing.id,
+            audience: existing.audience,
+            status: existing.status,
+            title: existing.title,
+          } as Prisma.InputJsonValue,
+          afterJson: Prisma.JsonNull,
+        },
+      });
+      await tx.v1Popup.delete({ where: { id: popupId } });
+    });
+
+    return { popupId, deleted: true };
+  }
+
   // ─── Notice list / create ─────────────────────────────────────────────────
 
   async listNotices(user: V1AuthUser, query: AdminNoticeListQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-
     const searchWhere = query.q
       ? {
           OR: [
@@ -787,23 +965,10 @@ export class AdminService {
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        audience: true,
-        category: true,
-        title: true,
-        body: true,
-        status: true,
-        publishedAt: true,
-        archivedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
     });
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
-
     return {
       items: pageItems.map((row) => this.toAdminNoticeRow(row)),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
@@ -812,21 +977,7 @@ export class AdminService {
 
   async getNotice(user: V1AuthUser, noticeId: string) {
     await this.getActiveAdmin(user.id);
-    const row = await this.prisma.v1Notice.findUnique({
-      where: { id: noticeId },
-      select: {
-        id: true,
-        audience: true,
-        category: true,
-        title: true,
-        body: true,
-        status: true,
-        publishedAt: true,
-        archivedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const row = await this.prisma.v1Notice.findUnique({ where: { id: noticeId } });
     if (!row) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Notice was not found' });
     }
@@ -836,18 +987,19 @@ export class AdminService {
   async createNotice(user: V1AuthUser, dto: CreateAdminNoticeDto) {
     const admin = await this.getMutationAdmin(user.id);
     const now = new Date();
-    const category = dto.pinned ? '고정' : dto.category === '고정' ? '안내' : dto.category;
     const publishedAt = dto.status === 'published' ? now : null;
+    const archivedAt = dto.status === 'archived' ? now : null;
 
     const row = await this.prisma.$transaction(async (tx) => {
       const notice = await tx.v1Notice.create({
         data: {
           audience: dto.audience,
-          category,
+          category: dto.category,
           title: dto.title.trim(),
           body: dto.body.trim(),
           status: dto.status,
           publishedAt,
+          archivedAt,
         },
       });
 
@@ -864,7 +1016,6 @@ export class AdminService {
             audience: notice.audience,
             category: notice.category,
             status: notice.status,
-            pinned: notice.category === '고정',
           } as Prisma.InputJsonValue,
         },
       });
@@ -883,23 +1034,21 @@ export class AdminService {
     }
 
     const now = new Date();
-    const category = dto.pinned ? '고정' : dto.category === '고정' ? '안내' : dto.category;
     const statusChanged = existing.status !== dto.status;
-    const publishedAt = dto.status === 'published'
-      ? existing.publishedAt ?? now
-      : null;
+    const publishedAt = dto.status === 'published' ? existing.publishedAt ?? now : null;
+    const archivedAt = dto.status === 'archived' ? existing.archivedAt ?? now : null;
 
     const row = await this.prisma.$transaction(async (tx) => {
       const notice = await tx.v1Notice.update({
         where: { id: noticeId },
         data: {
           audience: dto.audience,
-          category,
+          category: dto.category,
           title: dto.title.trim(),
           body: dto.body.trim(),
           status: dto.status,
           publishedAt,
-          archivedAt: null,
+          archivedAt,
         },
       });
 
@@ -915,14 +1064,12 @@ export class AdminService {
             audience: existing.audience,
             category: existing.category,
             status: existing.status,
-            pinned: existing.category === '고정',
           } as Prisma.InputJsonValue,
           afterJson: {
             noticeId: notice.id,
             audience: notice.audience,
             category: notice.category,
             status: notice.status,
-            pinned: notice.category === '고정',
           } as Prisma.InputJsonValue,
         },
       });
@@ -953,7 +1100,6 @@ export class AdminService {
             audience: existing.audience,
             category: existing.category,
             status: existing.status,
-            pinned: existing.category === '고정',
             title: existing.title,
           } as Prisma.InputJsonValue,
           afterJson: Prisma.JsonNull,
@@ -964,7 +1110,6 @@ export class AdminService {
 
     return { noticeId, deleted: true };
   }
-
   // ─── Inquiry list / detail / replies ───────────────────────────────────────
 
   async listInquiries(user: V1AuthUser, query: AdminInquiryListQueryDto) {
@@ -1449,6 +1594,46 @@ export class AdminService {
     };
   }
 
+  private parsePopupDisplayWindow(dto: CreateAdminPopupDto) {
+    const displayStartAt = dto.displayStartAt ? new Date(dto.displayStartAt) : null;
+    const displayEndAt = dto.displayEndAt ? new Date(dto.displayEndAt) : null;
+    if (displayStartAt && displayEndAt && displayEndAt <= displayStartAt) {
+      throw new BadRequestException({
+        code: 'INVALID_DISPLAY_WINDOW',
+        message: 'Popup display end must be later than display start',
+      });
+    }
+    return { displayStartAt, displayEndAt };
+  }
+
+  private toAdminPopupRow(row: {
+    id: string;
+    audience: string;
+    title: string;
+    body: string;
+    status: string;
+    publishedAt: Date | null;
+    archivedAt: Date | null;
+    displayStartAt: Date | null;
+    displayEndAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      popupId: row.id,
+      audience: row.audience,
+      title: row.title,
+      body: row.body,
+      status: row.status,
+      publishedAt: row.publishedAt,
+      archivedAt: row.archivedAt,
+      displayStartAt: row.displayStartAt,
+      displayEndAt: row.displayEndAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+  }
+
   private toAdminNoticeRow(row: {
     id: string;
     audience: string;
@@ -1465,7 +1650,6 @@ export class AdminService {
       noticeId: row.id,
       audience: row.audience,
       category: row.category,
-      pinned: row.category === '고정',
       title: row.title,
       body: row.body,
       status: row.status,
@@ -1475,7 +1659,6 @@ export class AdminService {
       updatedAt: row.updatedAt,
     };
   }
-
   private toAdminInquiryRow(row: {
     id: string;
     userId: string;
@@ -1565,6 +1748,10 @@ export class AdminService {
       })),
     };
   }
+}
+
+function normalizeProfileGender(value: string | null | undefined): 'male' | 'female' | null {
+  return value === 'male' || value === 'female' ? value : null;
 }
 
 function getCapabilities(role: ActiveAdmin['adminRole']) {

@@ -400,7 +400,7 @@ export class TeamsService {
         user: {
           select: {
             phone: true,
-            profile: { select: { nickname: true, displayName: true, profileImageUrl: true, birthDate: true } },
+            profile: { select: { nickname: true, displayName: true, profileImageUrl: true, birthDate: true, gender: true } },
           },
         },
       },
@@ -426,6 +426,7 @@ export class TeamsService {
           realName: viewerIsTeamMember ? membership.user.profile?.displayName ?? null : null,
           phone: viewerIsTeamMember ? membership.user.phone ?? null : null,
           birthDate: viewerIsTeamMember ? membership.user.profile?.birthDate ?? null : null,
+          gender: viewerIsTeamMember ? normalizeProfileGender(membership.user.profile?.gender) : null,
           profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
           role: membership.role,
           status: membership.status,
@@ -1938,6 +1939,10 @@ function getTeamGenderRuleWhere(genderRule: NonNullable<TeamsQueryDto['genderRul
   }
 
   return { profile: { genderRule } };
+}
+
+function normalizeProfileGender(value: string | null | undefined): 'male' | 'female' | null {
+  return value === 'male' || value === 'female' ? value : null;
 }
 
 function teamLevelCodeWhere(levelCodes: ReturnType<typeof parseLevelCodes>): Prisma.V1TeamWhereInput {

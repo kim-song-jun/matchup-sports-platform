@@ -99,6 +99,7 @@ Notes:
 | AUTH-003 | 이메일/닉네임 중복 확인 | `/signup` | `GUEST` | `GET /auth/check-email`, `GET /auth/check-nickname`, 중복 메시지, 수정 후 재검증 |
 | AUTH-004 | 소셜 회원가입 진입 | `/signup/social`, `/callback/kakao` | `GUEST` | Kakao success, denied, missing email, provider denied, account conflict route |
 | AUTH-005 | 소셜 추가 정보 입력 | `/signup/social`, auth error routes | `GUEST` | `POST /auth/social-profile`, `POST /auth/social-terms`, 약관 누락, 닉네임 중복, 완료 후 진입 |
+| AUTH-005A | Required gender contract | `/signup`, `/signup/social`, `/my/profile` | `GUEST`, `USER_A` | male/female only, missing selection blocks submit, legacy null prompts selection before save |
 | AUTH-006 | 이메일 로그인 happy path | `/login`, `/login/email`, `/home` | `GUEST` | 정상 로그인, token 저장, `/auth/me`, 홈 진입, 뒤로가기 시 auth 화면 루프 없음 |
 | AUTH-007 | 로그인 실패 처리 | `/login/email` | `GUEST` | 없는 계정, 틀린 비밀번호, blocked user, 네트워크 실패, 성공처럼 이동 금지 |
 | AUTH-008 | 세션 유지 | `/home`, `/my`, `/teams` | `USER_A` | 새로고침, 새 탭, 같은 브라우저 컨텍스트, `/auth/me` 재검증 |

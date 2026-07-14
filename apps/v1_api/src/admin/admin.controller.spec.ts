@@ -28,6 +28,11 @@ describe('AdminController', () => {
     getMatch: jest.fn(),
     listTeams: jest.fn(),
     getTeam: jest.fn(),
+    listPopups: jest.fn(),
+    getPopup: jest.fn(),
+    createPopup: jest.fn(),
+    updatePopup: jest.fn(),
+    deletePopup: jest.fn(),
     listNotices: jest.fn(),
     getNotice: jest.fn(),
     createNotice: jest.fn(),
@@ -284,17 +289,39 @@ describe('AdminController', () => {
 
   // ─── Notice list / create ─────────────────────────────────────────────────
 
+  it('lists and creates popups through the independent popup contract', async () => {
+    const query = { status: 'published' as const };
+    const listPayload = {
+      items: [{ popupId: 'p-1', title: '서비스 점검', status: 'published' }],
+      pageInfo: { nextCursor: null, hasNext: false },
+    };
+    adminService.listPopups.mockResolvedValue(listPayload);
+    await expect(controller.listPopups(user, query)).resolves.toEqual(listPayload);
+    expect(adminService.listPopups).toHaveBeenCalledWith(user, query);
+
+    const dto = {
+      audience: 'public' as const,
+      title: '서비스 점검',
+      body: '점검 내용',
+      status: 'published' as const,
+      displayStartAt: null,
+      displayEndAt: null,
+    };
+    const createPayload = { popup: { popupId: 'p-1', ...dto } };
+    adminService.createPopup.mockResolvedValue(createPayload);
+    await expect(controller.createPopup(user, dto)).resolves.toEqual(createPayload);
+    expect(adminService.createPopup).toHaveBeenCalledWith(user, dto);
+  });
   it('lists notices and returns items + pageInfo', async () => {
-    const query = { status: 'published' as const, category: '고정' as const };
+    const query = { status: 'published' as const, category: '안내' as const };
     const payload = {
       items: [
         {
           noticeId: 'n-1',
-          title: '이번 주 고정 공지',
+          title: '이번 주 이용 안내',
           body: '체크인 안내',
           audience: 'public',
-          category: '고정',
-          pinned: true,
+          category: '안내',
           status: 'published',
           publishedAt: new Date('2026-05-18T00:00:00.000Z'),
           archivedAt: null,
@@ -313,7 +340,6 @@ describe('AdminController', () => {
     const dto = {
       audience: 'public' as const,
       category: '안내' as const,
-      pinned: true,
       title: '새 공지',
       body: '공지 내용',
       status: 'published' as const,
@@ -324,8 +350,7 @@ describe('AdminController', () => {
         title: '새 공지',
         body: '공지 내용',
         audience: 'public',
-        category: '고정',
-        pinned: true,
+        category: '안내',
         status: 'published',
       },
     };
@@ -335,7 +360,7 @@ describe('AdminController', () => {
   });
 
   it('gets a notice', async () => {
-    const payload = { notice: { noticeId: 'n-1', title: '팝업 공지', body: '내용' } };
+    const payload = { notice: { noticeId: 'n-1', title: '일반 공지', body: '내용' } };
     adminService.getNotice.mockResolvedValue(payload);
     await expect(controller.getNotice(user, 'n-1')).resolves.toEqual(payload);
     expect(adminService.getNotice).toHaveBeenCalledWith(user, 'n-1');
@@ -345,7 +370,6 @@ describe('AdminController', () => {
     const dto = {
       audience: 'public' as const,
       category: '안내' as const,
-      pinned: false,
       title: '수정 공지',
       body: '수정 내용',
       status: 'draft' as const,
@@ -357,7 +381,6 @@ describe('AdminController', () => {
         body: '수정 내용',
         audience: 'public',
         category: '안내',
-        pinned: false,
         status: 'draft',
       },
     };

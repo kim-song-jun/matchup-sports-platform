@@ -83,6 +83,7 @@ export class ProfileService {
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
+    const gender = dto.gender;
 
     const before = await this.prisma.v1User.findUnique({
       where: { id: user.id },
@@ -99,6 +100,7 @@ export class ProfileService {
             nickname: true,
             profileImageUrl: true,
             birthDate: true,
+            gender: true,
           },
         },
       },
@@ -185,6 +187,7 @@ export class ProfileService {
           nickname,
           profileImageUrl,
           birthDate,
+          gender,
         },
         create: {
           userId: user.id,
@@ -192,6 +195,7 @@ export class ProfileService {
           nickname,
           profileImageUrl,
           birthDate,
+          gender,
           visibility: 'public',
         },
       });
@@ -206,6 +210,7 @@ export class ProfileService {
           nickname: before?.profile?.nickname ?? null,
           profileImageUrl: before?.profile?.profileImageUrl ?? null,
           birthDate: before?.profile?.birthDate ?? null,
+          gender: before?.profile?.gender ?? null,
         }, {
           email,
           phone,
@@ -213,6 +218,7 @@ export class ProfileService {
           nickname,
           profileImageUrl,
           birthDate,
+          gender,
         }).join(',') || 'no_change'}`,
       });
 
@@ -682,13 +688,19 @@ function toProfilePayload(profile: {
   displayName: string | null;
   profileImageUrl: string | null;
   birthDate: string | null;
+  gender: string | null;
 } | null) {
   return {
     displayName: profile?.displayName ?? profile?.nickname ?? '사용자',
     nickname: profile?.nickname ?? null,
     profileImageUrl: profile?.profileImageUrl ?? null,
     birthDate: profile?.birthDate ?? null,
+    gender: normalizeProfileGender(profile?.gender),
   };
+}
+
+function normalizeProfileGender(value: string | null | undefined): 'male' | 'female' | null {
+  return value === 'male' || value === 'female' ? value : null;
 }
 
 function toReputationPayload(reputation: {

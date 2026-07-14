@@ -17,6 +17,7 @@ import {
 import { v1Get } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
 
 /* ── Helpers ── */
@@ -64,6 +65,80 @@ export function formatRosterBirthDate(dateStr: string | null): string {
   if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return '미입력';
   const [year, month, day] = normalized.split('-');
   return `${year}.${month}.${day}`;
+}
+
+export type RegistrationDeadlineState = 'upcoming' | 'closed' | 'unscheduled';
+
+export function getRegistrationDeadlineState(
+  deadlineAt: string | null | undefined,
+  nowMs = Date.now(),
+): RegistrationDeadlineState {
+  if (!deadlineAt) return 'unscheduled';
+  const deadlineMs = new Date(deadlineAt).getTime();
+  if (Number.isNaN(deadlineMs)) return 'unscheduled';
+  return deadlineMs <= nowMs ? 'closed' : 'upcoming';
+}
+
+export function TournamentRosterDeadlineCard({
+  deadlineAt,
+  isRosterLocked,
+  isRosterEditBlockedByStatus,
+  nowMs,
+}: {
+  deadlineAt: string | null;
+  isRosterLocked: boolean;
+  isRosterEditBlockedByStatus: boolean;
+  nowMs?: number;
+}) {
+  const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
+  const deadlineBadge = deadlineState === 'upcoming'
+    ? { label: '신청 접수 중', className: 'tm-badge-green' }
+    : deadlineState === 'closed'
+      ? { label: '신청 마감', className: 'tm-badge-grey' }
+      : { label: '일정 미정', className: 'tm-badge-grey' };
+  const canEditRoster = !isRosterLocked && !isRosterEditBlockedByStatus;
+  const rosterEditBadge = isRosterLocked
+    ? '명단 마감'
+    : isRosterEditBlockedByStatus
+      ? '수정 불가'
+      : '수정 가능';
+  const rosterEditMessage = isRosterLocked
+    ? '선수 명단이 운영진에 의해 마감됐어요.'
+    : isRosterEditBlockedByStatus
+      ? '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.'
+      : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
+
+  return (
+    <Card pad={16} style={{ marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', fontWeight: 600 }}>
+            대회 신청 마감
+          </div>
+          <div className={'tm-text-label'} style={{ color: 'var(--text-strong)', fontWeight: 700, marginTop: 4 }}>
+            {formatTournamentDateTimeLong(deadlineAt)}
+          </div>
+        </div>
+        <span className={`tm-badge ${deadlineBadge.className}`} style={{ flexShrink: 0 }}>
+          {deadlineBadge.label}
+        </span>
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--border)', marginTop: 14, paddingTop: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span className={'tm-text-caption'} style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+            선수 명단
+          </span>
+          <span className={`tm-badge ${canEditRoster ? 'tm-badge-green' : 'tm-badge-grey'}`}>
+            {rosterEditBadge}
+          </span>
+        </div>
+        <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', lineHeight: 1.5, marginTop: 6 }}>
+          {rosterEditMessage}
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 /* ── Add player form ── */
@@ -913,6 +988,14 @@ export function TournamentRosterPageClient({
   return (
     <AppChrome title="선수 명단" backHref={backHref} bottomNav={false} activeTab="tournaments">
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
+
+        {tournament && registration ? (
+          <TournamentRosterDeadlineCard
+            deadlineAt={tournament.registrationDeadlineAt}
+            isRosterLocked={isRosterLocked}
+            isRosterEditBlockedByStatus={isRosterEditBlockedByStatus}
+          />
+        ) : null}
 
         {/* Locked banner */}
         {isRosterLocked ? (

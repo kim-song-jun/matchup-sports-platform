@@ -15,20 +15,20 @@ import {
 } from '@/components/admin';
 import {
   useV1AdminMe,
-  useV1AdminNoticeDetail,
-  useV1AdminNotices,
-  useV1CreateAdminNotice,
-  useV1DeleteAdminNotice,
-  useV1UpdateAdminNotice,
+  useV1AdminPopupDetail,
+  useV1AdminPopups,
+  useV1CreateAdminPopup,
+  useV1DeleteAdminPopup,
+  useV1UpdateAdminPopup,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import type {
   AdminListFilters,
   CursorPage,
-  V1AdminNoticeCreatePayload,
-  V1AdminNoticeRow,
-  V1AdminNoticeStatus,
+  V1AdminPopupCreatePayload,
+  V1AdminPopupRow,
+  V1AdminPopupStatus,
 } from '@/types/api';
 import { noticeSummary } from '../notices/notice-summary';
 
@@ -36,23 +36,24 @@ type EditorMode = 'view' | 'create' | 'edit';
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
-  { value: 'published', label: '게시 중' },
+  { value: 'published', label: '공개' },
+  { value: 'archived', label: '비공개' },
   { value: 'draft', label: '초안' },
-  { value: 'archived', label: '보관' },
 ];
 
 const EDITABLE_STATUS_OPTIONS: Array<{
-  value: Extract<V1AdminNoticeStatus, 'draft' | 'published'>;
+  value: V1AdminPopupStatus;
   label: string;
 }> = [
-  { value: 'published', label: '바로 게시' },
-  { value: 'draft', label: '초안 저장' },
+  { value: 'published', label: '공개' },
+  { value: 'archived', label: '비공개' },
+  { value: 'draft', label: '초안' },
 ];
 
-const STATUS_LABEL: Record<V1AdminNoticeStatus, string> = {
-  published: '게시 중',
+const STATUS_LABEL: Record<V1AdminPopupStatus, string> = {
+  published: '공개',
   draft: '초안',
-  archived: '보관',
+  archived: '비공개',
 };
 
 function formatDateTime(value: string | null | undefined) {
@@ -69,18 +70,37 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
+function toDateTimeLocal(value: string | null | undefined) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function toIsoOrNull(value: string) {
+  return value ? new Date(value).toISOString() : null;
+}
+
+function formatDisplayWindow(start: string | null | undefined, end: string | null | undefined) {
+  if (!start && !end) return '상시 노출';
+  return `${start ? formatDateTime(start) : '즉시'} ~ ${end ? formatDateTime(end) : '종료 없음'}`;
+}
+
 export default function AdminPopupsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
-  const [extraRows, setExtraRows] = useState<V1AdminNoticeRow[]>([]);
+  const [extraRows, setExtraRows] = useState<V1AdminPopupRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [mode, setMode] = useState<EditorMode>('view');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [status, setStatus] = useState<Extract<V1AdminNoticeStatus, 'draft' | 'published'>>('published');
+  const [status, setStatus] = useState<V1AdminPopupStatus>('published');
+  const [displayStartAt, setDisplayStartAt] = useState('');
+  const [displayEndAt, setDisplayEndAt] = useState('');
 
   const { toasts, showToast } = useAdminToast();
   const { data: adminMe } = useV1AdminMe();
@@ -97,16 +117,15 @@ export default function AdminPopupsPage() {
   }, [activeStatus, debouncedSearch]);
 
   const filters: AdminListFilters = {
-    category: '고정',
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     limit: 20,
   };
-  const listQuery = useV1AdminNotices(filters);
-  const detailQuery = useV1AdminNoticeDetail(selectedId);
-  const createPopup = useV1CreateAdminNotice();
-  const updatePopup = useV1UpdateAdminNotice();
-  const deletePopup = useV1DeleteAdminNotice();
+  const listQuery = useV1AdminPopups(filters);
+  const detailQuery = useV1AdminPopupDetail(selectedId);
+  const createPopup = useV1CreateAdminPopup();
+  const updatePopup = useV1UpdateAdminPopup();
+  const deletePopup = useV1DeleteAdminPopup();
   const isSaving = createPopup.isPending || updatePopup.isPending;
   const isMutating = isSaving || deletePopup.isPending;
 
@@ -117,13 +136,13 @@ export default function AdminPopupsPage() {
   }, [listQuery.data]);
 
   const rows = [...(listQuery.data?.items ?? []), ...extraRows];
-  const selectedPopup = detailQuery.data?.notice ?? rows.find((row) => row.noticeId === selectedId) ?? null;
+  const selectedPopup = detailQuery.data?.popup ?? rows.find((row) => row.popupId === selectedId) ?? null;
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const page = await v1Get<CursorPage<V1AdminNoticeRow>>('/admin/notices', { ...filters, cursor: nextCursor });
+      const page = await v1Get<CursorPage<V1AdminPopupRow>>('/admin/popups', { ...filters, cursor: nextCursor });
       setExtraRows((previous) => [...previous, ...page.items]);
       setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
     } catch (error) {
@@ -133,8 +152,8 @@ export default function AdminPopupsPage() {
     }
   }
 
-  function openView(row: V1AdminNoticeRow) {
-    setSelectedId(row.noticeId);
+  function openView(row: V1AdminPopupRow) {
+    setSelectedId(row.popupId);
     setMode('view');
   }
 
@@ -143,14 +162,18 @@ export default function AdminPopupsPage() {
     setTitle('');
     setBody('');
     setStatus('published');
+    setDisplayStartAt('');
+    setDisplayEndAt('');
     setMode('create');
   }
 
-  function openEdit(row: V1AdminNoticeRow) {
-    setSelectedId(row.noticeId);
+  function openEdit(row: V1AdminPopupRow) {
+    setSelectedId(row.popupId);
     setTitle(row.title);
     setBody(row.body);
-    setStatus(row.status === 'published' ? 'published' : 'draft');
+    setStatus(row.status);
+    setDisplayStartAt(toDateTimeLocal(row.displayStartAt));
+    setDisplayEndAt(toDateTimeLocal(row.displayEndAt));
     setMode('edit');
   }
 
@@ -164,24 +187,28 @@ export default function AdminPopupsPage() {
 
   function submitPopup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const payload: V1AdminNoticeCreatePayload = {
+    const payload: V1AdminPopupCreatePayload = {
       audience: 'public',
-      category: '안내',
-      pinned: true,
       title: title.trim(),
       body: body.trim(),
       status,
+      displayStartAt: toIsoOrNull(displayStartAt),
+      displayEndAt: toIsoOrNull(displayEndAt),
     };
     if (!payload.title || !payload.body) {
       showToast('제목과 본문을 입력해 주세요.', 'error');
       return;
     }
+    if (displayStartAt && displayEndAt && new Date(displayEndAt) <= new Date(displayStartAt)) {
+      showToast('노출 종료는 노출 시작보다 늦어야 해요.', 'error');
+      return;
+    }
 
     if (mode === 'edit' && selectedId) {
-      updatePopup.mutate({ noticeId: selectedId, body: payload }, {
-        onSuccess: ({ notice }) => {
+      updatePopup.mutate({ popupId: selectedId, body: payload }, {
+        onSuccess: ({ popup }) => {
           setMode('view');
-          setSelectedId(notice.noticeId);
+          setSelectedId(popup.popupId);
           setExtraRows([]);
           showToast('팝업을 수정했어요.', 'success');
         },
@@ -191,21 +218,21 @@ export default function AdminPopupsPage() {
     }
 
     createPopup.mutate(payload, {
-      onSuccess: ({ notice }) => {
+      onSuccess: ({ popup }) => {
         setMode('view');
-        setSelectedId(notice.noticeId);
+        setSelectedId(popup.popupId);
         setExtraRows([]);
-        showToast(status === 'published' ? '팝업을 게시했어요.' : '팝업 초안을 저장했어요.', 'success');
+        showToast(status === 'published' ? '팝업을 공개했어요.' : status === 'archived' ? '팝업을 비공개로 저장했어요.' : '팝업 초안을 저장했어요.', 'success');
       },
       onError: (error) => showToast(extractErrorMessage(error, '팝업 생성에 실패했어요.'), 'error'),
     });
   }
 
-  function removePopup(row: V1AdminNoticeRow) {
+  function removePopup(row: V1AdminPopupRow) {
     if (!window.confirm(`“${row.title}” 팝업을 삭제할까요? 삭제한 내용은 복구할 수 없어요.`)) return;
-    deletePopup.mutate(row.noticeId, {
+    deletePopup.mutate(row.popupId, {
       onSuccess: () => {
-        if (selectedId === row.noticeId) setSelectedId('');
+        if (selectedId === row.popupId) setSelectedId('');
         setMode('view');
         setExtraRows([]);
         showToast('팝업을 삭제했어요.', 'success');
@@ -223,7 +250,7 @@ export default function AdminPopupsPage() {
       <AdminPageHeader
         eyebrow="콘텐츠 운영"
         title="팝업 관리"
-        description="홈 중앙에 노출되는 공지 팝업을 조회하고 게시 상태를 관리해요."
+        description="홈 중앙에 노출되는 팝업을 조회하고 게시 상태를 관리해요."
         action={(
           <button
             type="button"
@@ -249,9 +276,9 @@ export default function AdminPopupsPage() {
             onStatusChange={setActiveStatus}
           />
 
-          <AdminCardList<V1AdminNoticeRow>
+          <AdminCardList<V1AdminPopupRow>
             rows={rows}
-            keyExtractor={(row) => row.noticeId}
+            keyExtractor={(row) => row.popupId}
             loading={listQuery.isPending && rows.length === 0}
             error={errorMessage}
             onRetry={() => void listQuery.refetch()}
@@ -272,10 +299,10 @@ export default function AdminPopupsPage() {
             )}
             card={(row) => ({
               title: row.title,
-              subtitle: `홈 중앙 팝업 · ${formatDateTime(row.publishedAt)}`,
+              subtitle: `홈 중앙 팝업 · ${formatDisplayWindow(row.displayStartAt, row.displayEndAt)}`,
               statusNode: <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
               meta: [
-                { icon: <MonitorUp size={14} aria-hidden="true" />, label: row.status === 'published' ? '홈 노출 대상' : '홈 미노출' },
+                { icon: <MonitorUp size={14} aria-hidden="true" />, label: row.status === 'published' ? '공개 설정' : '홈 미노출' },
                 { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.updatedAt) },
               ],
               description: noticeSummary(row.body),
@@ -307,11 +334,15 @@ export default function AdminPopupsPage() {
               title={title}
               body={body}
               status={status}
+              displayStartAt={displayStartAt}
+              displayEndAt={displayEndAt}
               canWrite={canWrite}
               saving={isSaving}
               onTitleChange={setTitle}
               onBodyChange={setBody}
               onStatusChange={setStatus}
+              onDisplayStartAtChange={setDisplayStartAt}
+              onDisplayEndAtChange={setDisplayEndAt}
               onCancel={closeEditor}
               onSubmit={submitPopup}
             />
@@ -331,7 +362,7 @@ function PopupDetail({
   canWrite,
   onEdit,
 }: {
-  popup: V1AdminNoticeRow | null;
+  popup: V1AdminPopupRow | null;
   loading: boolean;
   error?: string;
   canWrite: boolean;
@@ -352,6 +383,7 @@ function PopupDetail({
       <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-3 text-sm">
         <div><dt className="text-xs text-gray-400">게시일</dt><dd className="mt-1 text-gray-700">{formatDateTime(popup.publishedAt)}</dd></div>
         <div><dt className="text-xs text-gray-400">수정일</dt><dd className="mt-1 text-gray-700">{formatDateTime(popup.updatedAt)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 기간</dt><dd className="mt-1 text-gray-700">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
       </dl>
       <div className="mt-4 max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-gray-100 p-4 text-sm leading-7 text-gray-700">{popup.body}</div>
       {canWrite && onEdit ? (
@@ -368,23 +400,31 @@ function PopupForm({
   title,
   body,
   status,
+  displayStartAt,
+  displayEndAt,
   canWrite,
   saving,
   onTitleChange,
   onBodyChange,
   onStatusChange,
+  onDisplayStartAtChange,
+  onDisplayEndAtChange,
   onCancel,
   onSubmit,
 }: {
   mode: Exclude<EditorMode, 'view'>;
   title: string;
   body: string;
-  status: Extract<V1AdminNoticeStatus, 'draft' | 'published'>;
+  status: V1AdminPopupStatus;
+  displayStartAt: string;
+  displayEndAt: string;
   canWrite: boolean;
   saving: boolean;
   onTitleChange: (value: string) => void;
   onBodyChange: (value: string) => void;
-  onStatusChange: (value: Extract<V1AdminNoticeStatus, 'draft' | 'published'>) => void;
+  onStatusChange: (value: V1AdminPopupStatus) => void;
+  onDisplayStartAtChange: (value: string) => void;
+  onDisplayEndAtChange: (value: string) => void;
   onCancel: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -398,9 +438,13 @@ function PopupForm({
       </div>
       <form className="mt-4 flex flex-col gap-3" onSubmit={onSubmit}>
         <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">제목</span><input value={title} onChange={(event) => onTitleChange(event.target.value)} maxLength={120} disabled={!canWrite || saving} required className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="팝업 제목" /></label>
-        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">게시 상태</span><select value={status} onChange={(event) => onStatusChange(event.target.value as Extract<V1AdminNoticeStatus, 'draft' | 'published'>)} disabled={!canWrite || saving} className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50">{EDITABLE_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">공개 상태</span><select value={status} onChange={(event) => onStatusChange(event.target.value as V1AdminPopupStatus)} disabled={!canWrite || saving} className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50">{EDITABLE_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 시작</span><input type="datetime-local" value={displayStartAt} onChange={(event) => onDisplayStartAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 종료</span><input type="datetime-local" value={displayEndAt} min={displayStartAt || undefined} onChange={(event) => onDisplayEndAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
+        </div>
         <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">본문</span><textarea value={body} onChange={(event) => onBodyChange(event.target.value)} maxLength={5000} rows={10} disabled={!canWrite || saving} required className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-6 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="홈 팝업에 표시할 내용을 입력해 주세요." /></label>
-        <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">게시 중인 팝업 가운데 가장 최근 항목이 홈 중앙에 노출돼요. 사용자는 해당 팝업을 일주일 동안 숨길 수 있어요.</p>
+        <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">공개 상태이며 노출 기간 안에 있는 팝업 가운데 가장 최근 항목이 홈 중앙에 노출돼요. 기간을 비우면 시작 또는 종료 제한 없이 노출됩니다.</p>
         <button type="submit" disabled={!canWrite || saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">{saving ? '저장 중...' : mode === 'create' ? '팝업 생성' : '수정 저장'}</button>
       </form>
     </div>

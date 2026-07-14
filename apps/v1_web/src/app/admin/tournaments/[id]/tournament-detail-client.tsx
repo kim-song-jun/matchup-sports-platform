@@ -95,6 +95,20 @@ const GENDER_LABEL: Record<string, string> = {
   female: '여성',
 };
 
+const PHONE_LABEL = '휴대폰';
+
+function formatPhoneNumber(phone: string | null): string {
+  if (!phone) return '미등록';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 11) {
+    return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7);
+  }
+  if (digits.length === 10) {
+    return digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6);
+  }
+  return phone;
+}
+
 // f9: 결제 상태·수단 한글 라벨 (schema enum=ready|paid|failed|cancelled|refunded, my-registration-client 동일 기준)
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
   ready: '결제 대기',
@@ -393,6 +407,9 @@ export function RosterModal({
                 <p className="text-xs text-gray-500">
                   {p.birthDateSnapshot ?? '생년월일 미등록'} ·{' '}
                   {p.genderSnapshot ? GENDER_LABEL[p.genderSnapshot] : '성별 미등록'}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {PHONE_LABEL} {formatPhoneNumber(p.phone)}
                 </p>
               </div>
               <select

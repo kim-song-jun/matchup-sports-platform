@@ -13,7 +13,7 @@ export function NoticeListPageClient() {
   const query = useV1Notices(selectedCategory === '전체' ? undefined : { category: selectedCategory });
   const fallback = getNoticeListViewModel();
   const categories = useMemo(() => {
-    const labels = ['전체', '고정', '업데이트', '안내'];
+    const labels = ['전체', '업데이트', '안내'];
     return labels.map((label) => ({
       label,
       active: selectedCategory === label,
@@ -29,7 +29,7 @@ export function NoticeListPageClient() {
 
   // fallback 정적 목업은 ready 상태에서 실제 데이터가 없을 때만 사용한다.
   // 로딩·에러 중에는 목업을 실데이터처럼 노출하지 않는다.
-  const noticesFromApi = query.data ? sortPinnedFirst(getNoticeItems(query.data).map(toNotice)) : [];
+  const noticesFromApi = query.data ? getNoticeItems(query.data).map(toNotice) : [];
   // Copilot: ready 상태에선 API 결과(빈 배열 포함)를 그대로 사용 — 실제 공지가 0건일 때
   // 목업을 실데이터처럼 노출하지 않는다. fallback 은 응답 자체가 없는 예외(query.data 부재)에만.
   const noticesReady = status === 'ready'
@@ -92,12 +92,4 @@ function fallbackNotice(noticeId: string): V1Notice {
     body: fallback.body.join('\n'),
     publishedAt: new Date().toISOString(),
   };
-}
-
-function sortPinnedFirst(notices: NoticeModel[]) {
-  return [...notices].sort((a, b) => {
-    if (a.pinned && !b.pinned) return -1;
-    if (!a.pinned && b.pinned) return 1;
-    return 0;
-  });
 }

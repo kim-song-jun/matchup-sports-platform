@@ -1,8 +1,9 @@
 import { http, HttpResponse } from 'msw';
-import type { V1AdminNoticeCategory, V1AdminNoticeRow, V1Inquiry } from '@/types/api';
+import type { V1AdminNoticeRow, V1AdminPopupRow, V1Inquiry } from '@/types/api';
 import {
   v1AdminLogsFixture,
   v1AdminNoticesFixture,
+  v1AdminPopupsFixture,
   v1AdminOverviewFixture,
   v1ChatMessagesByRoomFixture,
   v1ChatMessagesFixture,
@@ -176,6 +177,7 @@ export const v1MswHandlers = [
         phone: '01012345678',
         birthDate: '1995-03-15',
         profileImageUrl: null,
+        gender: 'male',
         role: 'owner',
         status: 'active',
         joinedAt: '2026-05-18T00:00:00.000Z',
@@ -190,6 +192,7 @@ export const v1MswHandlers = [
         phone: null,
         birthDate: '1997-08-20',
         profileImageUrl: null,
+        gender: 'female',
         role: 'member',
         status: 'active',
         joinedAt: '2026-05-18T00:00:00.000Z',
@@ -321,6 +324,68 @@ export const v1MswHandlers = [
   http.get(`${api}/me/settings`, () => ok(v1SettingsFixture)),
   http.get(`${api}/admin/overview`, () => ok(v1AdminOverviewFixture)),
   http.get(`${api}/admin/action-logs`, () => ok(v1AdminLogsFixture)),
+  http.get(api + '/admin/popups', ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    const status = params.get('status');
+    const q = params.get('q')?.trim().toLowerCase();
+    const rows = v1AdminPopupsFixture.filter((popup) => {
+      if (status && popup.status !== status) return false;
+      if (q && !(popup.title + ' ' + popup.body).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    return ok(page(rows));
+  }),
+  http.get(api + '/admin/popups/:popupId', ({ params }) => {
+    const popup = v1AdminPopupsFixture.find((item) => item.popupId === params.popupId);
+    return popup ? ok({ popup }) : HttpResponse.json({ status: 'error', message: 'Popup was not found' }, { status: 404 });
+  }),
+  http.post(api + '/admin/popups', async ({ request }) => {
+    const body = await request.json() as {
+      audience: 'public' | 'users' | 'admins';
+      title: string;
+      body: string;
+      status: 'draft' | 'published' | 'archived';
+      displayStartAt?: string | null;
+      displayEndAt?: string | null;
+    };
+    const now = '2026-05-18T10:00:00.000Z';
+    const popup: V1AdminPopupRow = {
+      popupId: 'popup-new',
+      audience: body.audience,
+      title: body.title,
+      body: body.body,
+      status: body.status,
+      publishedAt: body.status === 'published' ? now : null,
+      archivedAt: body.status === 'archived' ? now : null,
+      displayStartAt: body.displayStartAt ?? null,
+      displayEndAt: body.displayEndAt ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    v1AdminPopupsFixture.unshift(popup);
+    return ok({ popup });
+  }),
+  http.patch(api + '/admin/popups/:popupId', async ({ params, request }) => {
+    const body = await request.json() as Omit<V1AdminPopupRow, 'popupId' | 'publishedAt' | 'archivedAt' | 'createdAt' | 'updatedAt'>;
+    const index = v1AdminPopupsFixture.findIndex((popup) => popup.popupId === params.popupId);
+    const previous = index >= 0 ? v1AdminPopupsFixture[index] : v1AdminPopupsFixture[0];
+    const now = '2026-05-18T11:00:00.000Z';
+    const popup: V1AdminPopupRow = {
+      ...previous,
+      ...body,
+      publishedAt: body.status === 'published' ? previous.publishedAt ?? now : null,
+      archivedAt: body.status === 'archived' ? previous.archivedAt ?? now : null,
+      updatedAt: now,
+    };
+    if (index >= 0) v1AdminPopupsFixture[index] = popup;
+    return ok({ popup });
+  }),
+  http.delete(api + '/admin/popups/:popupId', ({ params }) => {
+    const index = v1AdminPopupsFixture.findIndex((popup) => popup.popupId === params.popupId);
+    if (index < 0) return HttpResponse.json({ status: 'error', message: 'Popup was not found' }, { status: 404 });
+    v1AdminPopupsFixture.splice(index, 1);
+    return ok({ popupId: params.popupId, deleted: true });
+  }),
   http.get(`${api}/admin/notices`, ({ request }) => {
     const params = new URL(request.url).searchParams;
     const status = params.get('status');
@@ -394,23 +459,21 @@ export const v1MswHandlers = [
   http.post(`${api}/admin/notices`, async ({ request }) => {
     const body = await request.json() as {
       audience: 'public' | 'users' | 'admins';
-      category: '고정' | '업데이트' | '안내';
-      pinned: boolean;
+      category: '업데이트' | '안내';
       title: string;
       body: string;
-      status: 'draft' | 'published';
+      status: 'draft' | 'published' | 'archived';
     };
     const now = '2026-05-18T10:00:00.000Z';
     const notice: V1AdminNoticeRow = {
       noticeId: 'notice-new',
       audience: body.audience,
-      category: body.pinned ? '고정' : body.category === '고정' ? '안내' : body.category,
-      pinned: body.pinned,
+      category: body.category,
       title: body.title,
       body: body.body,
       status: body.status,
       publishedAt: body.status === 'published' ? now : null,
-      archivedAt: null,
+      archivedAt: body.status === 'archived' ? now : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -420,26 +483,24 @@ export const v1MswHandlers = [
   http.patch(`${api}/admin/notices/:noticeId`, async ({ params, request }) => {
     const body = await request.json() as {
       audience: 'public' | 'users' | 'admins';
-      category: '고정' | '업데이트' | '안내';
-      pinned: boolean;
+      category: '업데이트' | '안내';
       title: string;
       body: string;
-      status: 'draft' | 'published';
+      status: 'draft' | 'published' | 'archived';
     };
     const now = '2026-05-18T11:00:00.000Z';
     const index = v1AdminNoticesFixture.findIndex((notice) => notice.noticeId === params.noticeId);
     const previous = index >= 0 ? v1AdminNoticesFixture[index] : v1AdminNoticesFixture[0];
-    const category: V1AdminNoticeCategory = body.pinned ? '고정' : body.category === '고정' ? '안내' : body.category;
+    const category = body.category;
     const notice = {
       ...previous,
       audience: body.audience,
       category,
-      pinned: body.pinned,
       title: body.title,
       body: body.body,
       status: body.status,
       publishedAt: body.status === 'published' ? previous.publishedAt ?? now : null,
-      archivedAt: null,
+      archivedAt: body.status === 'archived' ? previous.archivedAt ?? now : null,
       updatedAt: now,
     };
     if (index >= 0) v1AdminNoticesFixture[index] = notice;

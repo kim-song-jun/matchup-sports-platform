@@ -14,6 +14,13 @@ import type {
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
   V1AdminLog,
+  V1AdminPopupCreatePayload,
+  V1AdminPopupCreateResult,
+  V1AdminPopupDeleteResult,
+  V1AdminPopupDetailResult,
+  V1AdminPopupRow,
+  V1AdminPopupUpdatePayload,
+  V1AdminPopupUpdateResult,
   V1AdminNoticeCreatePayload,
   V1AdminNoticeCreateResult,
   V1AdminNoticeDeleteResult,
@@ -185,7 +192,7 @@ export function useV1Register() {
       nickname: string;
       email: string;
       password: string;
-      gender?: 'male' | 'female';
+      gender: 'male' | 'female';
       displayName?: string;
       phone?: string;
       birthDate?: string;
@@ -202,7 +209,7 @@ export function useV1CompleteSocialProfile() {
   return useMutation({
     mutationFn: (body: {
       nickname: string;
-      gender?: 'male' | 'female';
+      gender: 'male' | 'female';
       displayName?: string;
       phone?: string;
       birthDate?: string;
@@ -1153,6 +1160,7 @@ export function useV1UpdateProfile() {
       profileImageUrl?: string | null;
       phone?: string | null;
       birthDate?: string | null;
+      gender: 'male' | 'female';
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
     onSuccess: () => {
@@ -1348,6 +1356,20 @@ export function useV1AdminTeam(teamId: string) {
   });
 }
 
+export function useV1AdminPopups(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminPopups(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminPopupRow>>('/admin/popups', filters),
+  });
+}
+
+export function useV1AdminPopupDetail(popupId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminPopup(popupId),
+    queryFn: () => v1Get<V1AdminPopupDetailResult>(`/admin/popups/${popupId}`),
+    enabled: !!popupId,
+  });
+}
 export function useV1AdminNotices(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
@@ -1488,6 +1510,42 @@ export function useV1ChangeTeamMatchStatus() {
   });
 }
 
+export function useV1CreateAdminPopup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminPopupCreatePayload) =>
+      v1Post<V1AdminPopupCreateResult>('/admin/popups', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'popups'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+export function useV1UpdateAdminPopup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ popupId, body }: { popupId: string; body: V1AdminPopupUpdatePayload }) =>
+      v1Patch<V1AdminPopupUpdateResult>(`/admin/popups/${popupId}`, body),
+    onSuccess: (data, { popupId }) => {
+      queryClient.setQueryData(v1Keys.adminPopup(popupId), data);
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'popups'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+export function useV1DeleteAdminPopup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (popupId: string) => v1Delete<V1AdminPopupDeleteResult>(`/admin/popups/${popupId}`),
+    onSuccess: (_data, popupId) => {
+      queryClient.removeQueries({ queryKey: v1Keys.adminPopup(popupId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'popups'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
 export function useV1CreateAdminNotice() {
   const queryClient = useQueryClient();
   return useMutation({

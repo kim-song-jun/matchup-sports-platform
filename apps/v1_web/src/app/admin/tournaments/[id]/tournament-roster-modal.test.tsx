@@ -53,6 +53,7 @@ describe('admin tournament roster modal', () => {
             realName: '홍길동',
             birthDateSnapshot: '1995-03-15',
             genderSnapshot: 'male',
+            phone: '01012345678',
             eligibilityStatus: 'needs_review',
             eligibilityNote: null,
             addedAt: '2026-07-14T00:00:00.000Z',
@@ -80,13 +81,15 @@ describe('admin tournament roster modal', () => {
 
     expect(screen.getByRole('dialog', { name: '명단 검토 — 번개팀' })).toBeInTheDocument();
     expect(screen.getByText('1995-03-15 · 남성')).toBeInTheDocument();
+    expect(screen.getByText('휴대폰 010-1234-5678')).toBeInTheDocument();
   });
 
   it('renders a missing gender without blocking support read access or enabling mutation', () => {
     const roster = queryState.data as {
-      players: Array<{ genderSnapshot: 'male' | 'female' | null }>;
+      players: Array<{ genderSnapshot: 'male' | 'female' | null; phone: string | null }>;
     };
     roster.players[0].genderSnapshot = null;
+    roster.players[0].phone = null;
 
     render(
       <RosterModal
@@ -99,6 +102,7 @@ describe('admin tournament roster modal', () => {
     );
 
     expect(screen.getByText('1995-03-15 · 성별 미등록')).toBeInTheDocument();
+    expect(screen.getByText('휴대폰 미등록')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
   });
 

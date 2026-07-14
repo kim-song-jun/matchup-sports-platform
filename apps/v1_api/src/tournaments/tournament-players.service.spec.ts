@@ -585,16 +585,27 @@ describe('TournamentPlayersService', () => {
       team: { name: '번개팀' },
       tournament: { minPlayers: 2 },
     });
-    prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow()]);
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow(), user: { phone: '01012345678' } },
+    ]);
 
     await expect(service.listPlayersForAdmin(adminUser, 'reg-1')).resolves.toEqual({
       registrationId: 'reg-1',
       teamId: 'team-1',
       teamName: '번개팀',
       rosterLockedAt: null,
-      players: [expect.objectContaining({ realName: '홍길동', genderSnapshot: 'male' })],
+      players: [
+        expect.objectContaining({
+          realName: '홍길동',
+          genderSnapshot: 'male',
+          phone: '01012345678',
+        }),
+      ],
       belowMinimum: true,
     });
+    expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: { user: { select: { phone: true } } } }),
+    );
     expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
   });
 
@@ -607,11 +618,17 @@ describe('TournamentPlayersService', () => {
       team: { name: '번개팀' },
       tournament: { minPlayers: 1 },
     });
-    prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow()]);
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow(), user: { phone: null } },
+    ]);
 
     await expect(
       service.listPlayersForAdmin({ ...adminUser, id: 'support-user-id' }, 'reg-1'),
-    ).resolves.toMatchObject({ belowMinimum: false, rosterLockedAt: '2026-07-14T00:00:00.000Z' });
+    ).resolves.toMatchObject({
+      belowMinimum: false,
+      rosterLockedAt: '2026-07-14T00:00:00.000Z',
+      players: [expect.objectContaining({ phone: null })],
+    });
   });
 
   it('listPlayersForAdmin: non-admin receives 403 and no roster PII', async () => {

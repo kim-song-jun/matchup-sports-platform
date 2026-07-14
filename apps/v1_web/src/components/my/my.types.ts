@@ -2,6 +2,7 @@ export type MyUser = {
   name: string;
   handle: string;
   region: string;
+  genderLabel: string;
   sports: string[];
   intro: string;
   initials: string;

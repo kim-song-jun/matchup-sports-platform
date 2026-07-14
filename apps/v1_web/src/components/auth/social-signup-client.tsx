@@ -9,7 +9,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
 
-type FieldErrors = Partial<Record<'nickname', string>>;
+type FieldErrors = Partial<Record<'nickname' | 'gender', string>>;
 type DuplicateCheckState = {
   status: 'idle' | 'available' | 'taken' | 'error';
   value: string;
@@ -20,14 +20,16 @@ export function SocialSignupClient() {
   const completeProfile = useV1CompleteSocialProfile();
   const checkNickname = useV1CheckNickname();
   const [nickname, setNickname] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
 
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
-  const isBlocked = completeProfile.isPending || checkNickname.isPending || !nicknameVerified;
+  const isBlocked = completeProfile.isPending || checkNickname.isPending || !nicknameVerified || !gender;
   const disabledReason = !nicknameVerified ? '닉네임 중복 확인이 필요해요.' : null;
 
+  const actionReason = disabledReason ?? (!gender ? '성별을 선택해 주세요.' : null);
   const runNicknameCheck = () => {
     const nextNickname = nickname.trim();
     setError(null);
@@ -59,8 +61,13 @@ export function SocialSignupClient() {
       return;
     }
 
+    if (!gender) {
+      setFieldErrors({ gender: '성별을 선택해 주세요.' });
+      return;
+    }
+
     completeProfile.mutate(
-      { nickname },
+      { nickname, gender },
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
@@ -110,7 +117,7 @@ export function SocialSignupClient() {
           >
             {isBlocked ? '입력 확인 후 계속' : '운동 설정으로 계속'}
           </Button>
-          {disabledReason ? <div className="tm-text-micro tm-auth-fixed-reason">{disabledReason}</div> : null}
+          {actionReason ? <div className="tm-text-micro tm-auth-fixed-reason">{actionReason}</div> : null}
         </>
       }
     >
@@ -148,6 +155,34 @@ export function SocialSignupClient() {
               </span>
             ) : null}
           </label>
+          <div className="tm-auth-field">
+            <span className="tm-text-label">성별</span>
+            <div
+              className="tm-auth-segmented"
+              role="radiogroup"
+              aria-label="성별"
+              aria-invalid={fieldErrors.gender ? true : undefined}
+              aria-describedby={fieldErrors.gender ? 'social-signup-gender-error' : undefined}
+            >
+              <button className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'male'} onClick={() => {
+                setGender('male');
+                setFieldErrors((current) => ({ ...current, gender: undefined }));
+              }}>
+                남
+              </button>
+              <button className={`tm-auth-segment ${gender === 'female' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'female'} onClick={() => {
+                setGender('female');
+                setFieldErrors((current) => ({ ...current, gender: undefined }));
+              }}>
+                여
+              </button>
+            </div>
+            {fieldErrors.gender ? (
+              <span id="social-signup-gender-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">
+                {fieldErrors.gender}
+              </span>
+            ) : null}
+          </div>
         </div>
         {error ? (
           <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">

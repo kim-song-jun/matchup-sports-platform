@@ -40,6 +40,12 @@ function formatDateTime(value: string | null | undefined) {
     hour12: false,
   });
 }
+function formatGender(gender: V1AdminUserDetail['gender']) {
+  if (gender === 'male') return '남';
+  if (gender === 'female') return '여';
+  return '성별 미등록';
+}
+
 
 function userTitle(user: V1AdminUserDetail) {
   return user.nickname ?? user.displayName ?? user.email ?? user.userId.slice(0, 8);
@@ -166,6 +172,7 @@ export default function AdminUserDetailPage() {
               <DetailRow label="회원 ID" value={user.userId} />
               <DetailRow label="이름" value={user.displayName} />
               <DetailRow label="닉네임" value={user.nickname} />
+              <DetailRow label="성별" value={formatGender(user.gender)} />
               <DetailRow label="온보딩" value={user.onboardingStatus} />
               <DetailRow label="가입일" value={formatDateTime(user.createdAt)} />
               <DetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />

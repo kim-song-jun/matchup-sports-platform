@@ -59,7 +59,7 @@
 | `nickname` | string | No | No |
 | `profileImageUrl` | string | No | No |
 | `phone` | string | No | No |
-| `gender` | Gender (`male`, `female`) | No | No |
+| `gender` | `male` or `female` | Yes for v1 profile save | DB remains nullable for legacy rows |
 | `birthYear` | int(1950~2015) | No | No |
 | `locationCity` | string | No | No |
 | `locationDistrict` | string | No | No |

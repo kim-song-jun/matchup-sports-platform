@@ -56,12 +56,16 @@
 | `PATCH` | `/api/v1/admin/venues/:id` | 시설 수정 |
 | `DELETE` | `/api/v1/admin/venues/:id` | 시설 삭제 |
 | `GET` | `/api/v1/admin/payments` | 결제 목록 |
-| `GET` | `/api/v1/admin/notices` | 공지·팝업 전체 목록(cursored, `category=고정`이면 팝업만 조회) |
-| `GET` | `/api/v1/admin/notices/:noticeId` | 공지·팝업 상세 조회 |
-| `POST` | `/api/v1/admin/notices` | 공지·팝업 생성(`pinned=true`이면 홈 팝업) |
-| `PATCH` | `/api/v1/admin/notices/:noticeId` | 공지·팝업 수정 및 게시 상태 변경 |
-| `DELETE` | `/api/v1/admin/notices/:noticeId` | 공지·팝업 삭제 및 `notice.delete` 감사 로그 기록 |
-
+| GET | /api/v1/admin/notices | 일반 공지 목록 |
+| GET | /api/v1/admin/notices/:noticeId | 일반 공지 상세 |
+| POST | /api/v1/admin/notices | 일반 공지 생성 |
+| PATCH | /api/v1/admin/notices/:noticeId | 일반 공지 수정 |
+| DELETE | /api/v1/admin/notices/:noticeId | 일반 공지 삭제 및 notice.delete 감사 로그 |
+| GET | /api/v1/admin/popups | 팝업 목록 |
+| GET | /api/v1/admin/popups/:popupId | 팝업 상세 |
+| POST | /api/v1/admin/popups | 팝업 생성 |
+| PATCH | /api/v1/admin/popups/:popupId | 팝업 수정 및 노출 기간 변경 |
+| DELETE | /api/v1/admin/popups/:popupId | 팝업 삭제 및 popup.delete 감사 로그 |
 ### B. `/admin/disputes`
 
 | Method | Path | 용도 |
@@ -137,8 +141,12 @@
   - 프론트 훅은 `extractCollection`으로 배열/`items` 모두 수용하고 있음.
 - 사용자 상태 변경, 매치 상태 변경, 강좌 상태 변경은 mutation 후 관련 목록/상세 query invalidation이 필요하다.
 - 분쟁/정산 mutation payload는 현재 `Record<string, unknown>`로 전달된다. 폼 검증은 프론트에서 선행해야 한다.
-- `/admin/popups`는 `category=고정` 목록을 사용하며 목록·상세·생성·수정·삭제를 모두 실제 `/admin/notices` API에 연결한다. 게시된 공개 팝업 가운데 최신 항목이 홈 중앙 팝업으로 노출된다.
-
+- /admin/popups는 독립 /admin/popups API와 v1_popups 테이블만 사용한다. /admin/notices 또는 category=고정 필터를 재사용하지 않는다.
+- /admin/notices는 안내/업데이트 공지만 관리하며 pinned와 display window를 전송하지 않는다.
+- 관리자 회원 목록과 상세 응답은 gender: male | female | null을 포함한다. 공개 프로필에는 노출하지 않는다.
+- 팝업 운영 라벨은 published=공개, archived=비공개, draft=초안이다.
+- 팝업 생성/수정은 선택적으로 displayStartAt, displayEndAt ISO datetime을 받는다. 종료는 시작보다 늦어야 하며 위반 시 400 INVALID_DISPLAY_WINDOW다.
+- 홈 중앙 팝업은 v1_popups의 published + public + active-window 행만 사용한다. 홈 notices와는 별도 응답 필드다.
 ## 엣지 케이스 / 안티패턴
 
 - 운영 API를 사용자 페이지 CTA와 직접 연결하지 않는다(권한 실패 + UX 혼선).

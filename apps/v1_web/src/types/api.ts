@@ -163,6 +163,13 @@ export type V1Notice = {
   body?: string | null;
 };
 
+export type V1Popup = {
+  popupId: string;
+  title: string;
+  body: string;
+  publishedAt: string | null;
+};
+
 export type V1NoticesResponse = {
   notices: V1Notice[];
   pageInfo?: {
@@ -648,6 +655,7 @@ export type V1TeamMember = {
   realName: string | null;
   phone: string | null;
   birthDate: string | null;
+  gender: 'male' | 'female' | null;
   profileImageUrl: string | null;
   role: 'owner' | 'manager' | 'member';
   status: string;
@@ -1087,6 +1095,7 @@ export type V1Profile = {
     nickname?: string | null;
     profileImageUrl: string | null;
     birthDate?: string | null;
+    gender: 'male' | 'female' | null;
   };
   reputation: {
     trustState: TrustState;
@@ -1195,7 +1204,7 @@ export type V1Home = {
   } | null;
   shortcuts?: V1HomeShortcut[];
   recommendations?: V1HomeRecommendation[];
-  notice?: { noticeId: string; title: string; pinned: boolean } | null;
+  popup?: V1Popup | null;
   notifications?: { unreadCount: number };
   notices?: V1Notice[];
   recommendedMatches?: V1Match[];
@@ -1246,13 +1255,12 @@ export type V1AdminMe = {
 
 export type V1AdminNoticeStatus = 'draft' | 'published' | 'archived';
 export type V1AdminNoticeAudience = 'public' | 'users' | 'admins';
-export type V1AdminNoticeCategory = '고정' | '업데이트' | '안내';
+export type V1AdminNoticeCategory = '업데이트' | '안내';
 
 export type V1AdminNoticeRow = {
   noticeId: string;
   audience: V1AdminNoticeAudience;
   category: V1AdminNoticeCategory;
-  pinned: boolean;
   title: string;
   body: string;
   status: V1AdminNoticeStatus;
@@ -1265,10 +1273,9 @@ export type V1AdminNoticeRow = {
 export type V1AdminNoticeCreatePayload = {
   audience: V1AdminNoticeAudience;
   category: V1AdminNoticeCategory;
-  pinned: boolean;
   title: string;
   body: string;
-  status: Extract<V1AdminNoticeStatus, 'draft' | 'published'>;
+  status: V1AdminNoticeStatus;
 };
 
 export type V1AdminNoticeUpdatePayload = V1AdminNoticeCreatePayload;
@@ -1290,6 +1297,49 @@ export type V1AdminNoticeDeleteResult = {
   deleted: true;
 };
 
+export type V1AdminPopupStatus = 'draft' | 'published' | 'archived';
+
+export type V1AdminPopupRow = {
+  popupId: string;
+  audience: V1AdminNoticeAudience;
+  title: string;
+  body: string;
+  status: V1AdminPopupStatus;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  displayStartAt: string | null;
+  displayEndAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminPopupCreatePayload = {
+  audience: V1AdminNoticeAudience;
+  title: string;
+  body: string;
+  status: V1AdminPopupStatus;
+  displayStartAt?: string | null;
+  displayEndAt?: string | null;
+};
+
+export type V1AdminPopupUpdatePayload = V1AdminPopupCreatePayload;
+
+export type V1AdminPopupCreateResult = {
+  popup: V1AdminPopupRow;
+};
+
+export type V1AdminPopupUpdateResult = {
+  popup: V1AdminPopupRow;
+};
+
+export type V1AdminPopupDetailResult = {
+  popup: V1AdminPopupRow;
+};
+
+export type V1AdminPopupDeleteResult = {
+  popupId: string;
+  deleted: true;
+};
 export type V1AdminInquiryRow = {
   inquiryId: string;
   userId: string | null;
@@ -1339,6 +1389,7 @@ export type V1AdminUserRow = {
   nickname: string | null;
   displayName: string | null;
   email: string | null;
+  gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
   lastLoginAt: string | null;
@@ -1926,8 +1977,13 @@ export type V1TournamentRosterResponse = {
   belowMinimum: boolean;
 };
 
+export type V1AdminTournamentPlayer = V1TournamentPlayer & {
+  phone: string | null;
+};
+
 /** 어드민 전용 로스터 조회 응답 — 팀 비멤버 어드민도 조회 가능 (Task 110) */
-export type V1AdminTournamentRosterResponse = V1TournamentRosterResponse & {
+export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, 'players'> & {
+  players: V1AdminTournamentPlayer[];
   registrationId: string;
   teamId: string;
   teamName: string;

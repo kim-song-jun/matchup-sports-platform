@@ -8,6 +8,7 @@ import {
   AdminInquiryListQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
+  AdminPopupListQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
   AdminNoticeListQueryDto,
@@ -18,10 +19,12 @@ import {
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
+  CreateAdminPopupDto,
   DeleteAdminUserDto,
   GrantAdminDto,
   ReplyInquiryDto,
   UpdateAdminNoticeDto,
+  UpdateAdminPopupDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { AdminService } from './admin.service';
@@ -132,6 +135,36 @@ export class AdminController {
     return this.adminService.getTeam(user, teamId);
   }
 
+  // ─── Popups ───────────────────────────────────────────────────────────────
+
+  @Get('popups')
+  listPopups(@CurrentUser() user: V1AuthUser, @Query() query: AdminPopupListQueryDto) {
+    return this.adminService.listPopups(user, query);
+  }
+
+  @Get('popups/:popupId')
+  getPopup(@CurrentUser() user: V1AuthUser, @Param('popupId') popupId: string) {
+    return this.adminService.getPopup(user, popupId);
+  }
+
+  @Post('popups')
+  createPopup(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminPopupDto) {
+    return this.adminService.createPopup(user, dto);
+  }
+
+  @Patch('popups/:popupId')
+  updatePopup(
+    @CurrentUser() user: V1AuthUser,
+    @Param('popupId') popupId: string,
+    @Body() dto: UpdateAdminPopupDto,
+  ) {
+    return this.adminService.updatePopup(user, popupId, dto);
+  }
+
+  @Delete('popups/:popupId')
+  deletePopup(@CurrentUser() user: V1AuthUser, @Param('popupId') popupId: string) {
+    return this.adminService.deletePopup(user, popupId);
+  }
   // ─── Notices ──────────────────────────────────────────────────────────────
 
   @Get('notices')

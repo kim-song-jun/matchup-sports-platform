@@ -13,6 +13,8 @@ const marker = Date.now().toString(36);
 const popupTitle = `QA 중앙 팝업 ${marker}`;
 const initialBody = '관리자 화면에서 생성한 실제 팝업입니다. 홈 화면 중앙 노출을 확인합니다.';
 const updatedBody = '수정 완료: 생성, 상세 조회, 수정, 홈 중앙 노출, 삭제 계약을 검증합니다.';
+const displayStartAt = new Date(Date.now() - 5 * 60 * 1000);
+const displayEndAt = new Date(Date.now() + 60 * 60 * 1000);
 const viewports = [
   { key: 'mobile', width: 390, height: 844, isMobile: true },
   { key: 'tablet', width: 768, height: 1024, isMobile: false },
@@ -22,7 +24,12 @@ const viewports = [
 await mkdir(outDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const results = [];
-let createdNoticeId = null;
+let createdPopupId = null;
+
+function toDateTimeLocal(date) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 function observe(page, scope) {
   const consoleErrors = [];
@@ -58,7 +65,7 @@ async function authenticatedContext(email, viewport) {
     window.localStorage.removeItem('teameet.v1.userId');
     for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
       const key = window.localStorage.key(index);
-      if (key?.startsWith('teameet:v1:home-notice:hidden-until:')) window.localStorage.removeItem(key);
+      if (key?.startsWith('teameet:v1:home-popup:hidden-until:')) window.localStorage.removeItem(key);
     }
   }, email);
   return context;
@@ -80,13 +87,22 @@ try {
     await page.getByRole('button', { name: '새 팝업' }).click();
     await page.getByLabel('제목').fill(popupTitle);
     await page.getByLabel('본문').fill(initialBody);
-    const createResponsePromise = page.waitForResponse((item) => item.request().method() === 'POST' && item.url().includes('/admin/notices'));
+    const statusSelect = page.getByLabel('공개 상태');
+    for (const label of ['공개', '비공개', '초안']) {
+      if (await statusSelect.getByRole('option', { name: label, exact: true }).count() !== 1) result.issues.push(`${label} status option missing`);
+    }
+    await page.getByLabel('노출 시작').fill(toDateTimeLocal(displayStartAt));
+    await page.getByLabel('노출 종료').fill(toDateTimeLocal(displayEndAt));
+    const createResponsePromise = page.waitForResponse((item) => item.request().method() === 'POST' && item.url().includes('/admin/popups'));
     await page.getByRole('button', { name: '팝업 생성' }).click();
     const createResponse = await createResponsePromise;
     if (!createResponse.ok()) result.issues.push(`create HTTP ${createResponse.status()}`);
     const createJson = await createResponse.json();
-    createdNoticeId = createJson?.data?.notice?.noticeId ?? null;
-    if (!createdNoticeId) result.issues.push('created notice id missing');
+    createdPopupId = createJson?.data?.popup?.popupId ?? null;
+    if (!createdPopupId) result.issues.push('created popup id missing');
+    if (!createJson?.data?.popup?.displayStartAt || !createJson?.data?.popup?.displayEndAt) {
+      result.issues.push('created display window missing');
+    }
 
     await page.getByRole('heading', { name: popupTitle }).waitFor({ state: 'visible', timeout: 20_000 });
     const createdCard = page.locator('li').filter({ hasText: popupTitle });
@@ -95,7 +111,7 @@ try {
 
     await page.getByRole('button', { name: '수정하기' }).click();
     await page.getByLabel('본문').fill(updatedBody);
-    const updateResponsePromise = page.waitForResponse((item) => item.request().method() === 'PATCH' && item.url().includes(`/admin/notices/${createdNoticeId}`));
+    const updateResponsePromise = page.waitForResponse((item) => item.request().method() === 'PATCH' && item.url().includes(`/admin/popups/${createdPopupId}`));
     await page.getByRole('button', { name: '수정 저장' }).click();
     const updateResponse = await updateResponsePromise;
     if (!updateResponse.ok()) result.issues.push(`update HTTP ${updateResponse.status()}`);
@@ -107,7 +123,7 @@ try {
   }
   await context.close();
 
-  if (createdNoticeId) {
+  if (createdPopupId) {
     for (const viewport of viewports) {
       const adminContext = await authenticatedContext(adminEmail, viewport);
       const adminPage = await adminContext.newPage();
@@ -158,11 +174,60 @@ try {
       }
       await userContext.close();
     }
+
+    const scheduleContext = await authenticatedContext(adminEmail, viewports[2]);
+    const scheduleResult = { scope: 'visibility-and-schedule', consoleErrors: [], pageErrors: [], networkErrors: [], issues: [] };
+    results.push(scheduleResult);
+    const popupUrl = `${baseUrl}/api/v1/admin/popups/${createdPopupId}`;
+    const homeUrl = `${baseUrl}/api/v1/home`;
+    const requestHeaders = { 'x-v1-user-email': adminEmail };
+    const basePayload = {
+      audience: 'public',
+      title: popupTitle,
+      body: updatedBody,
+    };
+    const assertHomeVisibility = async (expected, label) => {
+      const response = await scheduleContext.request.get(homeUrl, { headers: { 'x-v1-user-email': userEmail } });
+      if (!response.ok()) {
+        scheduleResult.issues.push(`${label} home HTTP ${response.status()}`);
+        return;
+      }
+      const json = await response.json();
+      const visible = json?.data?.popup?.popupId === createdPopupId;
+      if (visible !== expected) scheduleResult.issues.push(`${label} expected visible=${expected} received ${visible}`);
+    };
+    try {
+      const privateResponse = await scheduleContext.request.patch(popupUrl, {
+        headers: requestHeaders,
+        data: { ...basePayload, status: 'archived', displayStartAt: displayStartAt.toISOString(), displayEndAt: displayEndAt.toISOString() },
+      });
+      if (!privateResponse.ok()) scheduleResult.issues.push(`private update HTTP ${privateResponse.status()}`);
+      await assertHomeVisibility(false, 'private');
+
+      const futureStart = new Date(Date.now() + 60 * 60 * 1000);
+      const futureEnd = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      const futureResponse = await scheduleContext.request.patch(popupUrl, {
+        headers: requestHeaders,
+        data: { ...basePayload, status: 'published', displayStartAt: futureStart.toISOString(), displayEndAt: futureEnd.toISOString() },
+      });
+      if (!futureResponse.ok()) scheduleResult.issues.push(`future update HTTP ${futureResponse.status()}`);
+      await assertHomeVisibility(false, 'before display start');
+
+      const activeResponse = await scheduleContext.request.patch(popupUrl, {
+        headers: requestHeaders,
+        data: { ...basePayload, status: 'published', displayStartAt: displayStartAt.toISOString(), displayEndAt: displayEndAt.toISOString() },
+      });
+      if (!activeResponse.ok()) scheduleResult.issues.push(`active update HTTP ${activeResponse.status()}`);
+      await assertHomeVisibility(true, 'inside display window');
+    } catch (error) {
+      scheduleResult.issues.push(error instanceof Error ? error.message : String(error));
+    }
+    await scheduleContext.close();
   }
 } finally {
-  if (createdNoticeId) {
+  if (createdPopupId) {
     const cleanupContext = await authenticatedContext(adminEmail, viewports[2]);
-    const cleanupResponse = await cleanupContext.request.delete(`${baseUrl}/api/v1/admin/notices/${createdNoticeId}`, {
+    const cleanupResponse = await cleanupContext.request.delete(`${baseUrl}/api/v1/admin/popups/${createdPopupId}`, {
       headers: { 'x-v1-user-email': adminEmail },
     });
     if (!cleanupResponse.ok()) {
@@ -186,7 +251,7 @@ const report = [
   `- Run ID: ${runId}`,
   `- Admin persona: ${adminEmail}`,
   `- User persona: ${userEmail}`,
-  `- CRUD: create → detail → update → delete cleanup`,
+  `- CRUD: create with display window → detail → update → 공개/비공개/초안 options → schedule visibility → delete cleanup`,
   `- Verdict: ${issueCount === 0 ? 'PASS' : `FAIL (${issueCount} issues)`}`,
   '',
   '| Scope | Console | Page | Network | Issues |',
@@ -194,7 +259,7 @@ const report = [
   ...results.map((result) => `| ${result.scope} | ${result.consoleErrors.length} | ${result.pageErrors.length} | ${result.networkErrors.length} | ${result.issues.length ? result.issues.join('<br>') : 'OK'} |`),
   '',
 ].join('\n');
-await writeFile(path.join(outDir, 'results.json'), JSON.stringify({ baseUrl, runId, popupTitle, createdNoticeId, issueCount, results }, null, 2));
+await writeFile(path.join(outDir, 'results.json'), JSON.stringify({ baseUrl, runId, popupTitle, createdPopupId, issueCount, results }, null, 2));
 await writeFile(path.join(outDir, 'report.md'), report);
 console.log(`verdict=${issueCount === 0 ? 'PASS' : 'FAIL'}`);
 console.log(`report=${path.join(outDir, 'report.md')}`);

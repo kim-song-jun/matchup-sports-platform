@@ -14,11 +14,10 @@ function relativeDate(daysAgo: number): string {
 const notices: NoticeModel[] = [
   {
     id: 'notice-1',
-    tag: '고정',
-    title: '이번 주 고정 공지',
+    tag: '안내',
+    title: '이번 주 이용 안내',
     summary: '주말 경기장 입장 시간과 체크인 안내',
     date: relativeDate(0),
-    pinned: true,
     body: [
       '이번 주말 상암, 잠실, 성수 주요 경기장은 예약 경기와 행사 일정이 겹쳐 입장 대기 시간이 길어질 수 있어요.',
       '매치 시작 20분 전까지 현장 체크인을 완료해 주세요. 늦게 도착하는 경우 호스트 채팅방에 먼저 알려야 해요.',
@@ -64,7 +63,6 @@ export function getNoticeListViewModel(): NoticeListViewModel {
   return {
     filters: [
       { label: '전체', active: true },
-      { label: '고정' },
       { label: '업데이트' },
       { label: '안내' },
     ],

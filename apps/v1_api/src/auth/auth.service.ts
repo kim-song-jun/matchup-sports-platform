@@ -9,7 +9,6 @@ import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { hashPassword, verifyPassword } from './password-hash';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
-const SOCIAL_AUTO_NICKNAME_MAX_LENGTH = 14;
 
 type KakaoProfile = {
   providerUserKey: string;
@@ -411,35 +410,15 @@ export class AuthService {
       select: { id: true },
     });
 
-    const draft = readSocialSignupDraft(user.onboardingProgress?.draftJson);
-    const nickname = await this.resolveUniqueNickname(draft.kakaoNickname ?? randomPlayerNickname());
-    const profileImageUrl = draft.kakaoProfileImageUrl ?? null;
-
     const mutations = [
-      this.prisma.v1UserProfile.upsert({
-        where: { userId },
-        update: {
-          nickname,
-          displayName: nickname,
-          profileImageUrl,
-          visibility: 'public',
-        },
-        create: {
-          userId,
-          nickname,
-          displayName: nickname,
-          profileImageUrl,
-          visibility: 'public',
-        },
-      }),
       this.prisma.v1User.update({
         where: { id: userId },
-        data: { onboardingStatus: 'signup_done' },
+        data: { onboardingStatus: 'social_profile_required' },
       }),
       this.prisma.v1UserOnboardingProgress.upsert({
         where: { userId },
-        update: { currentStep: 'sport' },
-        create: { userId, currentStep: 'sport' },
+        update: { currentStep: 'signup' },
+        create: { userId, currentStep: 'signup' },
       }),
       ...(requiredTerms.length > 0 ? [this.prisma.v1UserTermsConsent.createMany({
         data: requiredTerms.map((termsDocument) => ({
@@ -563,7 +542,7 @@ export class AuthService {
         update: {
           nickname,
           displayName,
-          gender: dto.gender ?? null,
+          gender: dto.gender,
           birthDate,
           profileImageUrl,
           visibility: 'public',
@@ -572,7 +551,7 @@ export class AuthService {
           userId,
           nickname,
           displayName,
-          gender: dto.gender ?? null,
+          gender: dto.gender,
           birthDate,
           profileImageUrl,
           visibility: 'public',
@@ -784,23 +763,6 @@ export class AuthService {
     };
   }
 
-  private async resolveUniqueNickname(base: string) {
-    const normalizedBase = base.trim().slice(0, SOCIAL_AUTO_NICKNAME_MAX_LENGTH) || '사용자';
-    let candidate = normalizedBase;
-    let attempt = 0;
-
-    while (true) {
-      const existing = await this.prisma.v1UserProfile.findFirst({
-        where: { nickname: candidate, deletedAt: null },
-        select: { id: true },
-      });
-      if (!existing) return candidate;
-
-      attempt += 1;
-      const suffix = `_${attempt}`;
-      candidate = `${normalizedBase.slice(0, SOCIAL_AUTO_NICKNAME_MAX_LENGTH - suffix.length)}${suffix}`;
-    }
-  }
 }
 
 function normalizeEmail(email: string) {
@@ -847,22 +809,6 @@ function isExpiredSocialSignup(user: { onboardingStatus: string; createdAt: Date
 
   const referenceTime = user.updatedAt ?? user.createdAt;
   return Date.now() - referenceTime.getTime() > SOCIAL_SIGNUP_TTL_MS;
-}
-
-function readSocialSignupDraft(value: unknown): { kakaoNickname: string | null; kakaoProfileImageUrl: string | null } {
-  if (!value || typeof value !== 'object') {
-    return { kakaoNickname: null, kakaoProfileImageUrl: null };
-  }
-
-  const draft = value as Record<string, unknown>;
-  return {
-    kakaoNickname: typeof draft.kakaoNickname === 'string' ? draft.kakaoNickname.trim() || null : null,
-    kakaoProfileImageUrl: typeof draft.kakaoProfileImageUrl === 'string' ? draft.kakaoProfileImageUrl.trim() || null : null,
-  };
-}
-
-function randomPlayerNickname() {
-  return `플레이어${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
 function buildTermsConsentCreate(requiredTerms: Array<{ id: string }>) {

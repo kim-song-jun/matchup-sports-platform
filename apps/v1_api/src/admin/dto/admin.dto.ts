@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
 
@@ -100,8 +100,8 @@ export class AdminNoticeListQueryDto {
   audience?: 'public' | 'users' | 'admins';
 
   @IsOptional()
-  @IsIn(['고정', '업데이트', '안내'])
-  category?: '고정' | '업데이트' | '안내';
+  @IsIn(['업데이트', '안내'])
+  category?: '업데이트' | '안내';
 
   @IsOptional()
   @IsString()
@@ -166,11 +166,8 @@ export class CreateAdminNoticeDto {
   @IsIn(['public', 'users', 'admins'])
   audience!: 'public' | 'users' | 'admins';
 
-  @IsIn(['고정', '업데이트', '안내'])
-  category!: '고정' | '업데이트' | '안내';
-
-  @IsBoolean()
-  pinned!: boolean;
+  @IsIn(['업데이트', '안내'])
+  category!: '업데이트' | '안내';
 
   @IsString()
   @MaxLength(120)
@@ -180,11 +177,59 @@ export class CreateAdminNoticeDto {
   @MaxLength(5000)
   body!: string;
 
-  @IsIn(['draft', 'published'])
-  status!: 'draft' | 'published';
+  @IsIn(['draft', 'published', 'archived'])
+  status!: 'draft' | 'published' | 'archived';
 }
 
 export class UpdateAdminNoticeDto extends CreateAdminNoticeDto {}
+
+export class AdminPopupListQueryDto {
+  @IsOptional()
+  @IsIn(['draft', 'published', 'archived'])
+  status?: 'draft' | 'published' | 'archived';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+export class CreateAdminPopupDto {
+  @IsIn(['public', 'users', 'admins'])
+  audience!: 'public' | 'users' | 'admins';
+
+  @IsString()
+  @MaxLength(120)
+  title!: string;
+
+  @IsString()
+  @MaxLength(5000)
+  body!: string;
+
+  @IsIn(['draft', 'published', 'archived'])
+  status!: 'draft' | 'published' | 'archived';
+
+  @IsOptional()
+  @IsDateString()
+  displayStartAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  displayEndAt?: string | null;
+}
+
+export class UpdateAdminPopupDto extends CreateAdminPopupDto {}
 
 export class AdminOverviewQueryDto {
   @IsOptional()

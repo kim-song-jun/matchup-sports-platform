@@ -25,14 +25,14 @@ function promo(id: string, priority: number, enabled = true): V1TournamentListIt
 }
 
 describe('TournamentHeroCard', () => {
-  it('renders all enabled home promos in priority order', () => {
+  it('renders all enabled home promos with priority 0 first', () => {
     render(
       <TournamentHeroCard
         items={[
-          promo('third', 1),
-          promo('first', 30),
+          promo('third', 2),
+          promo('first', 0),
           promo('hidden', 100, false),
-          promo('second', 20),
+          promo('second', 1),
         ]}
       />,
     );

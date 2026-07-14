@@ -8,6 +8,7 @@
  *   - compact 슬롯 (홈 티저 · 목록 카드): formatTournamentDateShort  → 'M/D (요일)'
  *   - compact 범위 슬롯:                 formatTournamentDateRangeShort → 'M/D (요일)~M/D (요일)'
  *   - 상세 슬롯 (대회 상세 페이지):        formatTournamentDateLong   → 'YYYY년 M월 D일 (요일)'
+ *   - 상세 일시 슬롯 (마감 안내):          formatTournamentDateTimeLong → 'YYYY년 M월 D일 (요일) 오후 H:mm'
  *   - 상세 범위 슬롯:                    formatTournamentDateRangeLong
  *   - 대회 상세 페이지 "일정" 슬롯(시각 포함): formatTournamentDateRangeWithTime
  *     → 'M/D (요일) HH:MM ~ M/D (요일) HH:MM' (같은 날이면 'M/D (요일) HH:MM~HH:MM'로 압축).
@@ -56,17 +57,20 @@ export function formatTournamentDateLong(dateStr: string | null | undefined): st
 }
 
 /**
- * 상세 슬롯용 날짜+시각 형식: 'M월 D일 (요일) HH:MM'
- * 명단 제출 마감일처럼 시각까지 정확히 안내해야 하는 슬롯에서 사용해요.
- * dateStr 이 없거나 invalid 이면 null 반환.
+ * 상세 일시 슬롯용 형식: 'YYYY년 M월 D일 (요일) 오후 H:mm'
+ * 신청 마감처럼 날짜와 시각을 함께 확인해야 하는 화면에서 사용해요.
+ * dateStr 이 없거나 invalid 이면 '일정 미정' 반환.
  */
-export function formatTournamentDateTimeLong(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
+export function formatTournamentDateTimeLong(dateStr: string | null | undefined): string {
+  if (!dateStr) return '일정 미정';
   const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]}) ${hh}:${mm}`;
+  if (Number.isNaN(d.getTime())) return '일정 미정';
+
+  const hour = d.getHours();
+  const period = hour < 12 ? '오전' : '오후';
+  const displayHour = hour % 12 || 12;
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]}) ${period} ${displayHour}:${minute}`;
 }
 
 export function formatTournamentDateRangeLong(

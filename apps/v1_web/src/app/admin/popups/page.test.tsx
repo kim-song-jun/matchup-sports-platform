@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminPopupsPage from './page';
@@ -8,37 +8,37 @@ const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
 
 const popup = {
-  noticeId: 'popup-1',
+  popupId: 'popup-1',
   audience: 'public' as const,
-  category: '고정' as const,
-  pinned: true,
   title: '서비스 점검 안내',
   body: '7월 15일 새벽에 서비스 점검을 진행합니다.',
   status: 'published' as const,
   publishedAt: '2026-07-13T00:00:00.000Z',
   archivedAt: null,
+  displayStartAt: '2026-07-14T00:00:00.000Z',
+  displayEndAt: '2026-07-20T00:00:00.000Z',
   createdAt: '2026-07-13T00:00:00.000Z',
   updatedAt: '2026-07-13T00:00:00.000Z',
 };
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
-  useV1AdminNotices: () => ({
+  useV1AdminPopups: () => ({
     data: { items: [popup], pageInfo: { hasNext: false, nextCursor: null } },
     isPending: false,
     isError: false,
     error: null,
     refetch: vi.fn(),
   }),
-  useV1AdminNoticeDetail: (noticeId: string) => ({
-    data: noticeId ? { notice: popup } : undefined,
+  useV1AdminPopupDetail: (popupId: string) => ({
+    data: popupId ? { popup } : undefined,
     isPending: false,
     isError: false,
     error: null,
   }),
-  useV1CreateAdminNotice: () => ({ mutate: createMutate, isPending: false }),
-  useV1UpdateAdminNotice: () => ({ mutate: updateMutate, isPending: false }),
-  useV1DeleteAdminNotice: () => ({ mutate: deleteMutate, isPending: false }),
+  useV1CreateAdminPopup: () => ({ mutate: createMutate, isPending: false }),
+  useV1UpdateAdminPopup: () => ({ mutate: updateMutate, isPending: false }),
+  useV1DeleteAdminPopup: () => ({ mutate: deleteMutate, isPending: false }),
 }));
 
 describe('AdminPopupsPage', () => {
@@ -67,5 +67,47 @@ describe('AdminPopupsPage', () => {
     await user.click(screen.getByRole('button', { name: '삭제' }));
     expect(window.confirm).toHaveBeenCalled();
     expect(deleteMutate).toHaveBeenCalledWith('popup-1', expect.any(Object));
+  });
+
+  it('edits popup visibility as public, private, or draft with a display window', async () => {
+    const user = userEvent.setup();
+    render(<AdminPopupsPage />);
+
+    await user.click(screen.getByRole('button', { name: '수정' }));
+
+    const status = screen.getByLabelText('공개 상태');
+    expect(within(status).getByRole('option', { name: '공개' })).toBeInTheDocument();
+    expect(within(status).getByRole('option', { name: '비공개' })).toBeInTheDocument();
+    expect(within(status).getByRole('option', { name: '초안' })).toBeInTheDocument();
+    expect(screen.getByLabelText('노출 시작')).not.toHaveValue('');
+    expect(screen.getByLabelText('노출 종료')).not.toHaveValue('');
+
+    await user.selectOptions(status, 'archived');
+    await user.click(screen.getByRole('button', { name: '수정 저장' }));
+
+    expect(updateMutate).toHaveBeenCalledWith(
+      {
+        popupId: 'popup-1',
+        body: expect.objectContaining({
+          status: 'archived',
+          displayStartAt: '2026-07-14T00:00:00.000Z',
+          displayEndAt: '2026-07-20T00:00:00.000Z',
+        }),
+      },
+      expect.any(Object),
+    );
+  });
+
+  it('does not submit when the display end is not later than the start', async () => {
+    const user = userEvent.setup();
+    render(<AdminPopupsPage />);
+
+    await user.click(screen.getByRole('button', { name: '수정' }));
+    fireEvent.change(screen.getByLabelText('노출 시작'), { target: { value: '2026-07-20T10:00' } });
+    fireEvent.change(screen.getByLabelText('노출 종료'), { target: { value: '2026-07-20T10:00' } });
+    await user.click(screen.getByRole('button', { name: '수정 저장' }));
+
+    expect(screen.getByText('노출 종료는 노출 시작보다 늦어야 해요.')).toBeInTheDocument();
+    expect(updateMutate).not.toHaveBeenCalled();
   });
 });

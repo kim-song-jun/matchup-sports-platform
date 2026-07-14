@@ -56,6 +56,7 @@ describe('ProfileController', () => {
       profileImageUrl: null,
       phone: '01012345678',
       birthDate: '19900102',
+      gender: 'male' as const,
     };
     profileService.updateMe.mockResolvedValue({ profile: dto });
     await expect(controller.updateMe(user, dto)).resolves.toEqual({ profile: dto });

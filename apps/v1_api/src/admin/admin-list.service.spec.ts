@@ -52,7 +52,7 @@ function makeUserRow(overrides: Record<string, unknown> = {}) {
     lastLoginAt: null,
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
     deletedAt: null,
-    profile: { nickname: '호스트민', displayName: '호스트민' },
+    profile: { nickname: '호스트민', displayName: '호스트민', gender: 'male' },
     adminUser: null,
     teamMemberships: [{ role: 'owner' }, { role: 'member' }],
     _count: { hostedMatches: 3, ownedTeams: 1, teamMemberships: 2 },
@@ -195,6 +195,7 @@ describe('AdminService — list/detail endpoints', () => {
         email: 'host@teameet.v1',
         accountStatus: 'active',
         onboardingStatus: 'completed',
+        gender: 'male',
         hostedMatchCount: 3,
         ownedTeamCount: 1,
         membershipCount: 2,
@@ -295,6 +296,7 @@ describe('AdminService — list/detail endpoints', () => {
 
       const result = await service.getUser(adminAuthUser, 'u-1');
 
+      expect(result.gender).toBe('male');
       expect(result.reputationSummary).not.toBeNull();
       expect(result.reputationSummary?.trustState).toBe('estimated');
       expect(result.hostedMatches).toHaveLength(1);
@@ -304,6 +306,21 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.teamRoleCounts).toEqual({ owner: 1, manager: 0, member: 1 });
       expect(result.teamMemberships).toHaveLength(2);
       expect(result.withdrawalRequest).toMatchObject({ reason: '잠시 쉬고 싶어요' });
+    });
+
+    it('returns null gender for a legacy member without a saved gender', async () => {
+      prisma.v1User.findUnique.mockResolvedValue({
+        ...makeUserRow({ profile: { nickname: '레거시 회원', displayName: '레거시 회원', gender: null } }),
+        reputationSummary: null,
+        hostedMatches: [],
+        ownedTeams: [],
+        teamMemberships: [],
+        statusLogs: [],
+      });
+
+      const result = await service.getUser(adminAuthUser, 'u-1');
+
+      expect(result.gender).toBeNull();
     });
 
     it('returns reputationSummary=null when absent', async () => {

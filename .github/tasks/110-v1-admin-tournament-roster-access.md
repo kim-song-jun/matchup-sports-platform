@@ -45,6 +45,7 @@
 ## Progress snapshot
 
 - Current: implementation and code-level validation complete.
+- Follow-up: the admin roster response and modal now include the player's current phone after the active-admin gate; the team-member roster contract remains unchanged.
 - Validation: API unit 38 suites / 501 tests, Web unit 25 files / 93 tests, API/Web production builds, Web lint/pattern check, Prisma validate, DB guardrail, QA policy contract, and `git diff --check` passed.
 - Runtime follow-up: the local authenticated v1 admin runtime was not running, so browser screenshot/console/network verification remains to be executed after the migration is applied to a QA database.
 

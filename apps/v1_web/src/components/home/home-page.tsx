@@ -16,7 +16,7 @@ import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { useV1AllTournaments } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
-import { HomeNoticePopup } from './home-notice-popup';
+import { HomePopupDialog } from './home-notice-popup';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
@@ -31,7 +31,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
   return (
     <>
-      <HomeNoticePopup notice={model.notices[0] ?? null} />
+      <HomePopupDialog popup={model.popup} />
       <AppChrome
         title="teameet"
         activeTab="home"

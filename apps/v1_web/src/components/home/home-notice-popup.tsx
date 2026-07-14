@@ -1,19 +1,18 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { HomeNotice } from './home.types';
+import type { HomePopup } from './home.types';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
-const STORAGE_KEY_PREFIX = 'teameet:v1:home-notice:hidden-until:';
+const STORAGE_KEY_PREFIX = 'teameet:v1:home-popup:hidden-until:';
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function getHomeNoticeStorageKey(noticeId: string) {
-  return `${STORAGE_KEY_PREFIX}${noticeId}`;
+export function getHomePopupStorageKey(popupId: string) {
+  return `${STORAGE_KEY_PREFIX}${popupId}`;
 }
 
-export function HomeNoticePopup({ notice }: { notice: HomeNotice | null }) {
+export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -21,18 +20,18 @@ export function HomeNoticePopup({ notice }: { notice: HomeNotice | null }) {
   const bodyId = useId();
 
   useEffect(() => {
-    if (!notice) {
+    if (!popup) {
       setOpen(false);
       return;
     }
 
     try {
-      const hiddenUntil = Number(window.localStorage.getItem(getHomeNoticeStorageKey(notice.id)));
+      const hiddenUntil = Number(window.localStorage.getItem(getHomePopupStorageKey(popup.id)));
       setOpen(!Number.isFinite(hiddenUntil) || hiddenUntil <= Date.now());
     } catch {
       setOpen(true);
     }
-  }, [notice?.id]);
+  }, [popup?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -72,11 +71,11 @@ export function HomeNoticePopup({ notice }: { notice: HomeNotice | null }) {
     };
   }, [open]);
 
-  if (!notice || !open || typeof document === 'undefined') return null;
+  if (!popup || !open || typeof document === 'undefined') return null;
 
   const hideForAWeek = () => {
     try {
-      window.localStorage.setItem(getHomeNoticeStorageKey(notice.id), String(Date.now() + HIDE_DURATION_MS));
+      window.localStorage.setItem(getHomePopupStorageKey(popup.id), String(Date.now() + HIDE_DURATION_MS));
     } catch {
       // Storage can be unavailable in private browsing; closing the popup must still work.
     }
@@ -103,13 +102,13 @@ export function HomeNoticePopup({ notice }: { notice: HomeNotice | null }) {
         <div style={{ padding: '24px 24px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
             <h2 id={titleId} className="tm-text-subhead" style={{ margin: 0, color: 'var(--text-strong)' }}>
-              {notice.title}
+              {popup.title}
             </h2>
             <button
               ref={closeButtonRef}
               type="button"
               className="tm-btn tm-btn-icon tm-btn-ghost"
-              aria-label="공지 팝업 닫기"
+              aria-label="팝업 닫기"
               onClick={() => setOpen(false)}
               style={{ marginTop: -10, marginRight: -10 }}
             >
@@ -118,14 +117,14 @@ export function HomeNoticePopup({ notice }: { notice: HomeNotice | null }) {
           </div>
 
           <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-subtle)' }}>
-            {notice.trailing}
+            {popup.trailing}
           </div>
           <p
             id={bodyId}
             className="tm-text-label"
             style={{ margin: '24px 0 0', color: 'var(--text-muted)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 180, overflowY: 'auto' }}
           >
-            {notice.body ?? '자세한 내용은 공지사항에서 확인해 주세요.'}
+            {popup.body}
           </p>
         </div>
 
@@ -133,9 +132,9 @@ export function HomeNoticePopup({ notice }: { notice: HomeNotice | null }) {
           <button type="button" className="tm-btn tm-btn-md tm-btn-ghost" onClick={hideForAWeek}>
             일주일 안 보기
           </button>
-          <Link className="tm-btn tm-btn-md tm-btn-primary" href={`/notices/${notice.id}`} onClick={() => setOpen(false)}>
-            자세히 보기
-          </Link>
+          <button type="button" className="tm-btn tm-btn-md tm-btn-primary" onClick={() => setOpen(false)}>
+            닫기
+          </button>
         </div>
       </div>
     </div>,

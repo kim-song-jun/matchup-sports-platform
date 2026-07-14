@@ -52,27 +52,27 @@ function tournament(
 }
 
 describe('getSortedTournamentPromos', () => {
-  it('returns every enabled open home promo in priority and creation order', () => {
+  it('returns every enabled open home promo with priority 0 first, then creation order', () => {
     const items = [
-      tournament('low', { promoHomePriority: 1 }),
+      tournament('later-priority', { promoHomePriority: 1 }),
       tournament('disabled', { promoHomePriority: 100, promoHomeEnabled: false }),
       tournament('closed', { promoHomePriority: 100, status: 'closed' }),
-      tournament('high-created-later', { promoHomePriority: 10, createdAt: '2026-07-02T09:00:00.000Z' }),
-      tournament('high-created-first', { promoHomePriority: 10, createdAt: '2026-07-01T09:00:00.000Z' }),
+      tournament('first-created-later', { promoHomePriority: 0, createdAt: '2026-07-02T09:00:00.000Z' }),
+      tournament('first-created-first', { promoHomePriority: 0, createdAt: '2026-07-01T09:00:00.000Z' }),
     ];
 
     expect(getSortedTournamentPromos(items, 'home').map((item) => item.id)).toEqual([
-      'high-created-first',
-      'high-created-later',
-      'low',
+      'first-created-first',
+      'first-created-later',
+      'later-priority',
     ]);
   });
 
   it('uses list-specific enablement and priority', () => {
     const items = [
       tournament('home-only', { promoHomePriority: 100, promoListEnabled: false }),
-      tournament('list-first', { promoListPriority: 20 }),
-      tournament('list-second', { promoListPriority: 10 }),
+      tournament('list-first', { promoListPriority: 0 }),
+      tournament('list-second', { promoListPriority: 1 }),
     ];
 
     expect(getSortedTournamentPromos(items, 'list').map((item) => item.id)).toEqual([

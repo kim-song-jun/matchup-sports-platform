@@ -9,6 +9,10 @@
  *   - compact 범위 슬롯:                 formatTournamentDateRangeShort → 'M/D (요일)~M/D (요일)'
  *   - 상세 슬롯 (대회 상세 페이지):        formatTournamentDateLong   → 'YYYY년 M월 D일 (요일)'
  *   - 상세 범위 슬롯:                    formatTournamentDateRangeLong
+ *   - 대회 상세 페이지 "일정" 슬롯(시각 포함): formatTournamentDateRangeWithTime
+ *     → 'M/D (요일) HH:MM ~ M/D (요일) HH:MM' (같은 날이면 'M/D (요일) HH:MM~HH:MM'로 압축).
+ *     대회 상세 페이지의 일정 표시 전용 — 참가비/장소처럼 시각이 불필요한 다른 슬롯은
+ *     그대로 formatTournamentDateRangeShort/Long 사용.
  *
  * 금액 포맷터:
  *   - formatEntryFee(fee)   → 0이면 '무료', 그 외 'N원' (ko-KR 천 단위 구분)
@@ -74,6 +78,37 @@ export function formatTournamentDateRangeLong(
   const end = formatTournamentDateLong(endStr);
   if (end === '날짜 미정' || end === start) return start;
   return `${start} ~ ${end}`;
+}
+
+/**
+ * 대회 상세 페이지 "일정" 슬롯 전용: 날짜+시각 범위 'M/D (요일) HH:MM ~ M/D (요일) HH:MM'.
+ * 시작·종료가 같은 날이면 날짜 반복을 생략하고 'M/D (요일) HH:MM~HH:MM'로 압축한다.
+ * startStr 이 없거나 invalid 이면 null 반환.
+ */
+export function formatTournamentDateRangeWithTime(
+  startStr: string | null | undefined,
+  endStr: string | null | undefined,
+): string | null {
+  if (!startStr) return null;
+  const start = new Date(startStr);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const startDateLabel = formatTournamentDateShort(startStr);
+  const startTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+  const startFull = `${startDateLabel} ${startTime}`;
+
+  if (!endStr) return startFull;
+  const end = new Date(endStr);
+  if (Number.isNaN(end.getTime())) return startFull;
+
+  const endDateLabel = formatTournamentDateShort(endStr);
+  const endTime = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+
+  if (endDateLabel === startDateLabel) {
+    if (endTime === startTime) return startFull;
+    return `${startFull}~${endTime}`;
+  }
+  return `${startFull} ~ ${endDateLabel} ${endTime}`;
 }
 
 /**

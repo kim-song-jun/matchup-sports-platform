@@ -40,6 +40,19 @@ function ok<T>(data: T) {
   });
 }
 
+function notFound(message: string) {
+  return HttpResponse.json(
+    {
+      status: 'error',
+      statusCode: 404,
+      code: 'NOT_FOUND',
+      message,
+      timestamp: '2026-05-18T00:00:00.000Z',
+    },
+    { status: 404 },
+  );
+}
+
 function page<T>(items: T[]) {
   return { items, nextCursor: null };
 }
@@ -338,7 +351,7 @@ export const v1MswHandlers = [
   }),
   http.get(`${api}/admin/notices/:noticeId`, ({ params }) => {
     const notice = v1AdminNoticesFixture.find((item) => item.noticeId === params.noticeId);
-    return notice ? ok({ notice }) : HttpResponse.json({ status: 'error', message: 'Notice was not found' }, { status: 404 });
+    return notice ? ok({ notice }) : notFound('Notice was not found');
   }),
   http.get(`${api}/admin/inquiries`, ({ request }) => {
     const params = new URL(request.url).searchParams;
@@ -447,7 +460,7 @@ export const v1MswHandlers = [
   }),
   http.delete(`${api}/admin/notices/:noticeId`, ({ params }) => {
     const index = v1AdminNoticesFixture.findIndex((notice) => notice.noticeId === params.noticeId);
-    if (index < 0) return HttpResponse.json({ status: 'error', message: 'Notice was not found' }, { status: 404 });
+    if (index < 0) return notFound('Notice was not found');
     v1AdminNoticesFixture.splice(index, 1);
     return ok({ noticeId: params.noticeId, deleted: true });
   }),

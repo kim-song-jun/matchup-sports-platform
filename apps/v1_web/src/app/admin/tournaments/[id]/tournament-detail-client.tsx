@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useId } from 'react';
+import { useState, useRef, useEffect, useId, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -284,6 +284,61 @@ const textareaCls = [
   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
   'transition-colors disabled:opacity-50 w-full',
 ].join(' ');
+
+// ── 대진관리 스텝 위저드 (조 만들기 → 팀 배정 → 경기 일정 만들기) ─────────────
+// 순서·선행조건을 시각적으로 안내: 번호 배지 + 연결선, 선행조건 미충족 시 잠금 안내로 대체
+
+function StepBadge({ n, locked }: { n: number; locked: boolean }) {
+  if (locked) {
+    return (
+      <div
+        className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-400 shrink-0"
+        aria-hidden="true"
+      >
+        <Lock size={14} />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="flex items-center justify-center w-8 h-8 rounded-full text-[13px] font-bold shrink-0 bg-blue-50 text-blue-600 border-2 border-blue-500"
+      aria-hidden="true"
+    >
+      {n}
+    </div>
+  );
+}
+
+function StepRow({
+  n,
+  locked,
+  isLast,
+  children,
+}: {
+  n: number;
+  locked: boolean;
+  isLast?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-[32px_1fr] gap-x-3">
+      <div className="flex flex-col items-center">
+        <StepBadge n={n} locked={locked} />
+        {!isLast && <div className="w-px flex-1 bg-gray-200 my-1" aria-hidden="true" />}
+      </div>
+      <div className={isLast ? '' : 'pb-6'}>{children}</div>
+    </div>
+  );
+}
+
+function LockedStepNotice({ reason }: { reason: string }) {
+  return (
+    <div className="flex items-center gap-2 bg-gray-50 rounded-2xl border border-dashed border-gray-200 px-5 py-5 text-[13px] text-gray-500">
+      <Lock size={14} aria-hidden="true" />
+      {reason}
+    </div>
+  );
+}
 
 // ── Inline modal (reusable within this file) ──────────────────────────────
 
@@ -1465,9 +1520,11 @@ function BracketTab({
       {/* ── 좌측 컬럼: 관리 폼 (조 만들기 · 팀 배정 · 픽스처 만들기) ── */}
       <div className="flex flex-col gap-6">
 
-      {/* ── 조 만들기 ───────────────────────────────────────────────── */}
+      {/* ── Step 1: 조 만들기 ───────────────────────────────────────── */}
+      <StepRow n={1} locked={false}>
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
-        <h3 className="text-[15px] font-bold text-gray-900 mb-4">조 만들기</h3>
+        <h3 className="text-[15px] font-bold text-gray-900 mb-1">조 만들기</h3>
+        <p className="text-xs text-gray-500 mb-4">먼저 조를 만들어야 2·3단계(팀 배정·경기 일정)를 진행할 수 있어요.</p>
         {/* sm:flex-wrap — 고정폭 입력 합이 좁은 좌측 컬럼(480px)을 넘으면 버튼이 카드 밖으로 흘렀다 */}
         <form onSubmit={handleCreateGroup} noValidate className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
           <div className="flex flex-col gap-1">
@@ -1532,9 +1589,15 @@ function BracketTab({
           진출 팀 수를 입력하면 순위표에 상위 N팀 진출선이 표시돼요.
         </p>
       </div>
+      </StepRow>
 
-      {/* ── 팀 배정 ─────────────────────────────────────────────────── */}
-      {groups.length > 0 && confirmedRegistrations.length > 0 && (
+      {/* ── Step 2: 팀 배정 ─────────────────────────────────────────── */}
+      <StepRow n={2} locked={groups.length === 0 || confirmedRegistrations.length === 0}>
+      {groups.length === 0 ? (
+        <LockedStepNotice reason="1단계에서 조를 먼저 만들어 주세요." />
+      ) : confirmedRegistrations.length === 0 ? (
+        <LockedStepNotice reason="확정된 참가팀이 아직 없어요." />
+      ) : (
         <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
           <h3 className="text-[15px] font-bold text-gray-900 mb-4">팀 배정</h3>
           <form onSubmit={handleAssignTeam} noValidate className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
@@ -1579,14 +1642,20 @@ function BracketTab({
           <p className="text-xs text-gray-500 mt-1" aria-live="polite">확정된 팀만 배정할 수 있어요.</p>
         </div>
       )}
+      </StepRow>
 
-      {/* ── 픽스처 만들기 ────────────────────────────────────────────── */}
+      {/* ── Step 3: 경기 일정 만들기 ────────────────────────────────── */}
+      <StepRow n={3} locked={groups.length === 0 || confirmedRegistrations.length === 0} isLast>
+      {groups.length === 0 ? (
+        <LockedStepNotice reason="1단계에서 조를 먼저 만들어 주세요." />
+      ) : confirmedRegistrations.length === 0 ? (
+        <LockedStepNotice reason="확정된 참가팀이 아직 없어요." />
+      ) : (
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
         <h3 className="text-[15px] font-bold text-gray-900 mb-4">경기 일정 만들기</h3>
 
-        {/* ── 대진 자동 생성 ── */}
-        {groups.length > 0 && (
-          <div className="mb-5 pb-5 border-b border-gray-100">
+        {/* ── 대진 자동 생성 (이 스텝은 groups.length>0 일 때만 unlock 되므로 별도 조건 불필요) ── */}
+        <div className="mb-5 pb-5 border-b border-gray-100">
             <p className="text-xs text-gray-500 mb-2">
               조를 선택하면 조별 라운드로빈 또는 토너먼트 시드 배정 경기 일정을 자동으로 만들어요.
             </p>
@@ -1620,7 +1689,6 @@ function BracketTab({
               </button>
             </div>
           </div>
-        )}
 
         {/* ── 수동 픽스처 생성 폼 ── */}
         {(() => {
@@ -1770,6 +1838,8 @@ function BracketTab({
           );
         })()}
       </div>
+      )}
+      </StepRow>
 
       </div>{/* end left column */}
 

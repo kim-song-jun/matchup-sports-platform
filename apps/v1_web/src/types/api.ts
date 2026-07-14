@@ -1281,6 +1281,15 @@ export type V1AdminNoticeUpdateResult = {
   notice: V1AdminNoticeRow;
 };
 
+export type V1AdminNoticeDetailResult = {
+  notice: V1AdminNoticeRow;
+};
+
+export type V1AdminNoticeDeleteResult = {
+  noticeId: string;
+  deleted: true;
+};
+
 export type V1AdminInquiryRow = {
   inquiryId: string;
   userId: string | null;
@@ -1905,6 +1914,7 @@ export type V1TournamentPlayer = {
   userId: string;
   realName: string;
   birthDateSnapshot: string | null;
+  genderSnapshot: 'male' | 'female' | null;
   eligibilityStatus: V1PlayerEligibilityStatus;
   eligibilityNote: string | null;
   addedAt: string;
@@ -1914,6 +1924,14 @@ export type V1TournamentPlayer = {
 export type V1TournamentRosterResponse = {
   players: V1TournamentPlayer[];
   belowMinimum: boolean;
+};
+
+/** 어드민 전용 로스터 조회 응답 — 팀 비멤버 어드민도 조회 가능 (Task 110) */
+export type V1AdminTournamentRosterResponse = V1TournamentRosterResponse & {
+  registrationId: string;
+  teamId: string;
+  teamName: string;
+  rosterLockedAt: string | null;
 };
 
 /** Admin bracket bracket view: TournamentBracketService.getBracket groups item */

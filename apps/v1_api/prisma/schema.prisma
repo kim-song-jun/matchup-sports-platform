@@ -1399,6 +1399,7 @@ model V1TournamentPlayer {
   userId            String                        @map("user_id")
   realName          String                        @map("real_name")
   birthDateSnapshot String?                       @map("birth_date_snapshot")
+  genderSnapshot    String?                       @map("gender_snapshot")
   eligibilityStatus V1TournamentPlayerEligibility @default(needs_review) @map("eligibility_status")
   eligibilityNote   String?                       @map("eligibility_note")
   addedAt           DateTime                      @default(now()) @map("added_at")

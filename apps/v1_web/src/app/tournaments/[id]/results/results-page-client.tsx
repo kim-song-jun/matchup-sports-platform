@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, Trophy } from 'lucide-react';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -583,7 +583,7 @@ function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) 
 }
 
 /* ── 메인 콘텐츠 ── */
-function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
+export function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const [showGroup, setShowGroup] = useState(false);
   // 결과(순위·결선·조별)와 경기 영상을 세그먼트 탭으로 분리
   const [activeTab, setActiveTab] = useState<'results' | 'videos'>('results');
@@ -677,7 +677,14 @@ function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) 
         <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>최종 순위</h3>
-            {knockoutRows.length > 0 && <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />}
+            {knockoutRows.length > 0 ? (
+              <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />
+            ) : (
+              <EmptyState
+                title="최종 순위가 아직 등록되지 않았어요."
+                sub="운영진이 결과를 확정하면 이곳에서 순위를 확인할 수 있어요."
+              />
+            )}
             {/* 데스크탑: 순위표가 짧아 비는 좌측 컬럼을 대회 요약으로 채우고 sticky로 고정 */}
             <div className="tm-show-desktop" style={{ marginTop: 16 }}>
               <TournamentSummaryCard tournament={tournament} />

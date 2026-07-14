@@ -13,26 +13,32 @@ import {
 import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
-import { useV1Tournaments } from '@/hooks/use-v1-api';
+import { useV1AllTournaments } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
+import { HomeNoticePopup } from './home-notice-popup';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
-  const tournaments = useV1Tournaments({ status: 'open', limit: 5 });
-  const tournamentItems = tournaments.data?.items ?? [];
-  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournamentItems.length > 0;
+  const tournaments = useV1AllTournaments({ status: 'open' });
+  const tournamentItems = tournaments.data ?? [];
+  // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
+  // to know whether *any* eligible item exists, to decide the section's visibility.
+  const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
+  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || hasHomePromo;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
 
   return (
-    <AppChrome
-      title="teameet"
-      activeTab="home"
-      showSearch
-      hasNewNotification={model.hasNewNotification && !model.network}
-      floatingSlot={<HomeChatFloatingButton model={model} />}
-    >
+    <>
+      <HomeNoticePopup notice={model.notices[0] ?? null} />
+      <AppChrome
+        title="teameet"
+        activeTab="home"
+        showSearch
+        hasNewNotification={model.hasNewNotification && !model.network}
+        floatingSlot={<HomeChatFloatingButton model={model} />}
+      >
       {/*
        * .tm-home-desktop: display:contents on mobile → transparent to layout.
        * display:grid on desktop → 2-column dashboard (main | sidebar).
@@ -96,7 +102,22 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               {model.featuredMatch ? (
                 <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
               ) : null}
-              <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
+              {tournaments.isError ? (
+                <div role="alert">
+                  <Card pad={16} style={{ display: 'grid', alignContent: 'center', gap: 10 }}>
+                    <div className="tm-text-body-lg">대회 추천을 불러오지 못했어요</div>
+                    <button
+                      type="button"
+                      className="tm-btn tm-btn-sm tm-btn-neutral"
+                      onClick={() => void tournaments.refetch()}
+                    >
+                      다시 불러오기
+                    </button>
+                  </Card>
+                </div>
+              ) : (
+                <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
+              )}
             </div>
           </div>
           ) : null}
@@ -182,7 +203,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         </div>{/* /tm-home-sidebar */}
 
       </div>{/* /tm-home-desktop */}
-    </AppChrome>
+      </AppChrome>
+    </>
   );
 }
 

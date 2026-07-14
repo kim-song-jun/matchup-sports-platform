@@ -17,6 +17,8 @@ import type {
   V1AdminLog,
   V1AdminNoticeCreatePayload,
   V1AdminNoticeCreateResult,
+  V1AdminNoticeDeleteResult,
+  V1AdminNoticeDetailResult,
   V1AdminNoticeRow,
   V1AdminNoticeUpdatePayload,
   V1AdminNoticeUpdateResult,
@@ -111,6 +113,7 @@ import type {
   V1TournamentAward,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
+  V1AdminTournamentRosterResponse,
   V1TournamentPlayer,
   V1AdminTournamentListPage,
   V1AdminRegistrationListPage,
@@ -1435,6 +1438,14 @@ export function useV1AdminNotices(filters?: AdminListFilters) {
   });
 }
 
+export function useV1AdminNoticeDetail(noticeId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminNotice(noticeId),
+    queryFn: () => v1Get<V1AdminNoticeDetailResult>(`/admin/notices/${noticeId}`),
+    enabled: !!noticeId,
+  });
+}
+
 export function useV1AdminInquiries(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
@@ -1611,6 +1622,20 @@ export function useV1UpdateAdminNotice() {
   });
 }
 
+export function useV1DeleteAdminNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeId: string) => v1Delete<V1AdminNoticeDeleteResult>(`/admin/notices/${noticeId}`),
+    onSuccess: (_data, noticeId) => {
+      queryClient.removeQueries({ queryKey: v1Keys.adminNotice(noticeId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Admin — admin-management (owner-only)
 // ---------------------------------------------------------------------------
@@ -1661,6 +1686,45 @@ export function useV1Tournaments(params?: TournamentListFilters) {
   return useQuery({
     queryKey: v1Keys.tournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
+  });
+}
+
+type AllTournamentListFilters = Pick<TournamentListFilters, 'status' | 'sportId'>;
+
+/** 홈/목록 프로모 캐러셀은 전체 대회를 훑어 promoHome/promoListEnabled 필터링이 필요 —
+ * cursor 페이지를 전부 순회해 누적한다. 무한 루프 방지로 cursor 재등장을 감지한다. */
+export async function fetchAllV1Tournaments(
+  params?: AllTournamentListFilters,
+): Promise<V1TournamentListPage['items']> {
+  const items: V1TournamentListPage['items'] = [];
+  const seenItemIds = new Set<string>();
+  const seenCursors = new Set<string>();
+  let cursor: string | undefined;
+  while (true) {
+    const page = await v1Get<V1TournamentListPage>('/tournaments', {
+      ...params,
+      cursor,
+      limit: 50,
+    });
+    for (const item of page.items) {
+      if (seenItemIds.has(item.id)) continue;
+      seenItemIds.add(item.id);
+      items.push(item);
+    }
+    if (!page.pageInfo.hasNext) return items;
+    const nextCursor = page.pageInfo.nextCursor;
+    if (!nextCursor || seenCursors.has(nextCursor)) {
+      throw new Error('대회 목록 cursor가 유효하게 진행되지 않아 전체 대회를 불러오지 못했어요.');
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+}
+
+export function useV1AllTournaments(params?: AllTournamentListFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.tournaments(params as Record<string, unknown>), 'all'],
+    queryFn: () => fetchAllV1Tournaments(params),
   });
 }
 
@@ -1947,6 +2011,17 @@ export function useV1TournamentPlayers(tournamentId: string, registrationId: str
         `/tournaments/${tournamentId}/registrations/${registrationId}/players`,
       ),
     enabled: !!tournamentId && !!registrationId,
+  });
+}
+
+/** 어드민 전용 로스터 조회 — 팀 비멤버 어드민도 403 없이 조회 가능 (Task 110) */
+export function useV1AdminTournamentPlayers(registrationId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentRoster(registrationId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`),
+    enabled: !!registrationId,
+    retry: false,
   });
 }
 

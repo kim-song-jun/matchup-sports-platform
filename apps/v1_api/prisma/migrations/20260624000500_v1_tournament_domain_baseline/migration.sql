@@ -103,30 +103,7 @@ CREATE TABLE IF NOT EXISTS "v1_tournaments" (
     created_by_admin_user_id text,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp(3) without time zone NOT NULL,
-    deleted_at timestamp(3) without time zone,
-    prize_summary text,
-    promo_home_badge_text text,
-    promo_home_date_text text,
-    promo_home_enabled boolean DEFAULT false NOT NULL,
-    promo_home_image_url text,
-    promo_home_location_text text,
-    promo_home_priority integer DEFAULT 0 NOT NULL,
-    promo_home_prize_text text,
-    promo_home_subtitle text,
-    promo_home_teams_text text,
-    promo_home_title text,
-    promo_list_badge_text text,
-    promo_list_date_text text,
-    promo_list_enabled boolean DEFAULT false NOT NULL,
-    promo_list_image_url text,
-    promo_list_location_text text,
-    promo_list_priority integer DEFAULT 0 NOT NULL,
-    promo_list_prize_text text,
-    promo_list_subtitle text,
-    promo_list_teams_text text,
-    promo_list_title text,
-    scheduled_end_at timestamp(3) without time zone,
-    cover_image_url text
+    deleted_at timestamp(3) without time zone
 );
 
 CREATE TABLE IF NOT EXISTS "v1_tournament_registrations" (
@@ -146,8 +123,7 @@ CREATE TABLE IF NOT EXISTS "v1_tournament_registrations" (
     cancel_requested_at timestamp(3) without time zone,
     cancel_reason text,
     created_at timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp(3) without time zone NOT NULL,
-    cancel_previous_status "V1TournamentRegistrationStatus"
+    updated_at timestamp(3) without time zone NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "v1_tournament_players" (

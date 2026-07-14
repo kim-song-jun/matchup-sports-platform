@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { V1AdminNoticeCategory, V1Inquiry } from '@/types/api';
+import type { V1AdminNoticeCategory, V1AdminNoticeRow, V1Inquiry } from '@/types/api';
 import {
   v1AdminLogsFixture,
   v1AdminNoticesFixture,
@@ -38,6 +38,19 @@ function ok<T>(data: T) {
     data,
     timestamp: '2026-05-18T00:00:00.000Z',
   });
+}
+
+function notFound(message: string) {
+  return HttpResponse.json(
+    {
+      status: 'error',
+      statusCode: 404,
+      code: 'NOT_FOUND',
+      message,
+      timestamp: '2026-05-18T00:00:00.000Z',
+    },
+    { status: 404 },
+  );
 }
 
 function page<T>(items: T[]) {
@@ -336,6 +349,10 @@ export const v1MswHandlers = [
     });
     return ok(page(rows));
   }),
+  http.get(`${api}/admin/notices/:noticeId`, ({ params }) => {
+    const notice = v1AdminNoticesFixture.find((item) => item.noticeId === params.noticeId);
+    return notice ? ok({ notice }) : notFound('Notice was not found');
+  }),
   http.get(`${api}/admin/inquiries`, ({ request }) => {
     const params = new URL(request.url).searchParams;
     const status = params.get('status');
@@ -397,7 +414,7 @@ export const v1MswHandlers = [
       status: 'draft' | 'published';
     };
     const now = '2026-05-18T10:00:00.000Z';
-    const notice = {
+    const notice: V1AdminNoticeRow = {
       noticeId: 'notice-new',
       audience: body.audience,
       category: body.pinned ? '고정' : body.category === '고정' ? '안내' : body.category,
@@ -410,6 +427,7 @@ export const v1MswHandlers = [
       createdAt: now,
       updatedAt: now,
     };
+    v1AdminNoticesFixture.unshift(notice);
     return ok({ notice });
   }),
   http.patch(`${api}/admin/notices/:noticeId`, async ({ params, request }) => {
@@ -439,6 +457,12 @@ export const v1MswHandlers = [
     };
     if (index >= 0) v1AdminNoticesFixture[index] = notice;
     return ok({ notice });
+  }),
+  http.delete(`${api}/admin/notices/:noticeId`, ({ params }) => {
+    const index = v1AdminNoticesFixture.findIndex((notice) => notice.noticeId === params.noticeId);
+    if (index < 0) return notFound('Notice was not found');
+    v1AdminNoticesFixture.splice(index, 1);
+    return ok({ noticeId: params.noticeId, deleted: true });
   }),
 ];
 

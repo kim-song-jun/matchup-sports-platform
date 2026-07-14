@@ -16,6 +16,7 @@ import {
 import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
+import { toDetailMode } from './matches.mode';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
 import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
@@ -403,14 +404,6 @@ function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1ViewerState
   if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
   if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'full';
   return 'open';
-}
-
-function toDetailMode(viewerState: V1ViewerState, status: V1MatchApiStatus): MatchDetailViewModel['mode'] {
-  if (viewerState === 'host') return 'mine';
-  if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'approved';
-  return 'default';
 }
 
 function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {

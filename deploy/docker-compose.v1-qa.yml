@@ -2,7 +2,7 @@ services:
   v1_api:
     command: sh -c "cd /app/apps/v1_api && pnpm db:generate && pnpm db:push && pnpm db:seed:demo && pnpm dev"
     environment:
-      V1_HOST_ADMIN_PASSWORD: v1-local-admin-qa
+      V1_HOST_ADMIN_PASSWORD: ${V1_QA_ADMIN_PASSWORD:-v1-local-admin-qa}
     ports: !override
       - "${V1_QA_API_PORT:-18121}:8121"
 

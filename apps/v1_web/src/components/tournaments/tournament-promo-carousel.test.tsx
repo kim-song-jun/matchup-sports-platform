@@ -27,14 +27,14 @@ describe('TournamentPromoCarousel', () => {
     vi.useRealTimers();
   });
 
-  it('renders every enabled promo in priority order with carousel controls', () => {
+  it('renders every enabled promo with priority 0 first and carousel controls', () => {
     render(
       <TournamentPromoCarousel
         items={[
-          promo('second', 10),
+          promo('second', 1),
           promo('hidden', 100, false),
-          promo('first', 20),
-          promo('third', 1),
+          promo('first', 0),
+          promo('third', 2),
         ]}
       />,
     );

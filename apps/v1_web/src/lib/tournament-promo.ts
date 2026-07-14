@@ -13,7 +13,7 @@ export function getSortedTournamentPromos(
     .filter((item) => item.status === 'open' && item[enabledKey])
     .slice()
     .sort((a, b) => {
-      const priorityDifference = b[priorityKey] - a[priorityKey];
+      const priorityDifference = a[priorityKey] - b[priorityKey];
       if (priorityDifference !== 0) return priorityDifference;
 
       const createdAtDifference = a.createdAt.localeCompare(b.createdAt);

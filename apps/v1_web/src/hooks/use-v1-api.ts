@@ -1458,6 +1458,19 @@ export function useV1ReplyAdminInquiry(inquiryId: string) {
   });
 }
 
+export function useV1UpdateAdminInquiryReply(inquiryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ replyId, body }: { replyId: string } & V1AdminInquiryReplyPayload) =>
+      v1Patch<V1AdminInquiryDetail>(`/admin/inquiries/${inquiryId}/replies/${replyId}`, { body }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminInquiry(inquiryId), data);
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'inquiries'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.inquiry(inquiryId) });
+    },
+  });
+}
+
 export function useV1ChangeAdminInquiryStatus(inquiryId: string) {
   const queryClient = useQueryClient();
   return useMutation({

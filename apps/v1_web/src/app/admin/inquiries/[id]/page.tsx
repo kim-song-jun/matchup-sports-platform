@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { ArrowLeft, Clock, Mail, MessageSquareText, Send, Tag, UserRound } from 'lucide-react';
+import { ArrowLeft, Clock, Mail, MessageSquareText, Pencil, Send, Tag, UserRound } from 'lucide-react';
 import {
   AdminEmpty,
   AdminPageHeader,
@@ -17,6 +17,7 @@ import {
   useV1AdminMe,
   useV1ChangeAdminInquiryStatus,
   useV1ReplyAdminInquiry,
+  useV1UpdateAdminInquiryReply,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1InquiryCategory, V1InquiryStatus } from '@/types/api';
@@ -59,6 +60,19 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
+/**
+ * Prisma @updatedAt은 생성 시점에도 createdAt과 수 밀리초 차이가 날 수 있어(같은 요청
+ * 안에서도 각 필드가 별도로 타임스탬프를 찍음), 엄격한 부등호 비교는 갓 작성된(수정 안 한)
+ * 답변에도 "(수정됨)"을 잘못 표시할 수 있다(Copilot 리뷰 지적, PR #61). 1초 이상 차이날
+ * 때만 실제 수정으로 간주한다.
+ */
+function wasReplyEdited(reply: { createdAt: string; updatedAt: string }) {
+  const created = new Date(reply.createdAt).getTime();
+  const updated = new Date(reply.updatedAt).getTime();
+  if (Number.isNaN(created) || Number.isNaN(updated)) return false;
+  return updated - created > 1000;
+}
+
 function requesterName(inquiry: {
   requesterName: string | null;
   requesterEmail: string | null;
@@ -87,11 +101,45 @@ export default function AdminInquiryDetailPage() {
   const { data: adminMe } = useV1AdminMe();
   const { data: inquiry, isPending, isError, error, refetch } = useV1AdminInquiry(inquiryId);
   const replyMutation = useV1ReplyAdminInquiry(inquiryId);
+  const updateReplyMutation = useV1UpdateAdminInquiryReply(inquiryId);
   const statusMutation = useV1ChangeAdminInquiryStatus(inquiryId);
   const { toasts, showToast } = useAdminToast();
   const [replyBody, setReplyBody] = useState('');
   const [status, setStatus] = useState<V1InquiryStatus>('reviewing');
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+
+  function startEditReply(replyId: string, currentBody: string) {
+    setEditingReplyId(replyId);
+    setEditDraft(currentBody);
+  }
+
+  function cancelEditReply() {
+    setEditingReplyId(null);
+    setEditDraft('');
+  }
+
+  function saveEditReply(replyId: string) {
+    const body = editDraft.trim();
+    if (!body) {
+      showToast('답변 내용을 입력해 주세요.', 'error');
+      return;
+    }
+
+    updateReplyMutation.mutate(
+      { replyId, body },
+      {
+        onSuccess: () => {
+          cancelEditReply();
+          showToast('답변을 수정했어요.', 'success');
+        },
+        onError: (err) => {
+          showToast(extractErrorMessage(err, '답변 수정에 실패했어요.'), 'error');
+        },
+      },
+    );
+  }
 
   useEffect(() => {
     if (inquiry) setStatus(inquiry.status);
@@ -231,20 +279,70 @@ export default function AdminInquiryDetailPage() {
 
             {inquiry.replies.length > 0 ? (
               <ol className="flex flex-col gap-3">
-                {inquiry.replies.map((reply) => (
-                  <li key={reply.replyId} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {reply.adminName ?? '운영팀'}
-                        {reply.adminRole ? (
-                          <span className="ml-2 text-xs font-medium text-gray-400">{reply.adminRole}</span>
-                        ) : null}
-                      </p>
-                      <time className="text-xs text-gray-400">{formatDateTime(reply.createdAt)}</time>
-                    </div>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-700">{reply.body}</p>
-                  </li>
-                ))}
+                {inquiry.replies.map((reply) => {
+                  const isEditing = editingReplyId === reply.replyId;
+                  return (
+                    <li key={reply.replyId} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {reply.adminName ?? '운영팀'}
+                          {reply.adminRole ? (
+                            <span className="ml-2 text-xs font-medium text-gray-400">{reply.adminRole}</span>
+                          ) : null}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <time className="text-xs text-gray-400">
+                            {formatDateTime(reply.createdAt)}
+                            {wasReplyEdited(reply) ? ' (수정됨)' : ''}
+                          </time>
+                          {canWrite && !isEditing ? (
+                            <button
+                              type="button"
+                              onClick={() => startEditReply(reply.replyId, reply.body)}
+                              aria-label="답변 수정"
+                              className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                            >
+                              <Pencil size={15} aria-hidden="true" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      {isEditing ? (
+                        <div className="mt-2 flex flex-col gap-2">
+                          <textarea
+                            value={editDraft}
+                            onChange={(event) => setEditDraft(event.target.value)}
+                            rows={5}
+                            maxLength={2000}
+                            disabled={updateReplyMutation.isPending}
+                            aria-label="답변 내용 수정"
+                            className="resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => saveEditReply(reply.replyId)}
+                              disabled={updateReplyMutation.isPending}
+                              className="inline-flex h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                            >
+                              {updateReplyMutation.isPending ? '저장 중...' : '저장'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditReply}
+                              disabled={updateReplyMutation.isPending}
+                              className="inline-flex h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-gray-700">{reply.body}</p>
+                      )}
+                    </li>
+                  );
+                })}
               </ol>
             ) : (
               <div className="rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">

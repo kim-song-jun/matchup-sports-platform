@@ -1055,6 +1055,37 @@ export class AdminService {
     return this.getInquiry(user, inquiryId);
   }
 
+  async updateInquiryReply(user: V1AuthUser, inquiryId: string, replyId: string, dto: ReplyInquiryDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const body = dto.body.trim();
+    if (!body) {
+      throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1InquiryReply.findUnique({ where: { id: replyId } });
+      if (!existing || existing.inquiryId !== inquiryId) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: 'Reply was not found' });
+      }
+
+      await tx.v1InquiryReply.update({ where: { id: replyId }, data: { body } });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'inquiry.reply.update',
+          targetType: 'inquiry_reply',
+          targetId: replyId,
+          reason: '문의 답변 수정',
+          beforeJson: { inquiryId, replyId, bodyPreview: existing.body.slice(0, 60) } as Prisma.InputJsonValue,
+          afterJson: { inquiryId, replyId, bodyPreview: body.slice(0, 60) } as Prisma.InputJsonValue,
+        },
+      });
+    });
+
+    return this.getInquiry(user, inquiryId);
+  }
+
   async changeInquiryStatus(user: V1AuthUser, inquiryId: string, dto: ChangeInquiryStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
     const existing = await this.prisma.v1Inquiry.findUnique({ where: { id: inquiryId } });

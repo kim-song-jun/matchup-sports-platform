@@ -180,6 +180,16 @@ export class AdminController {
     return this.adminService.replyInquiry(user, inquiryId, dto);
   }
 
+  @Patch('inquiries/:inquiryId/replies/:replyId')
+  updateInquiryReply(
+    @CurrentUser() user: V1AuthUser,
+    @Param('inquiryId') inquiryId: string,
+    @Param('replyId') replyId: string,
+    @Body() dto: ReplyInquiryDto,
+  ) {
+    return this.adminService.updateInquiryReply(user, inquiryId, replyId, dto);
+  }
+
   @Post('inquiries/:inquiryId/status')
   changeInquiryStatus(
     @CurrentUser() user: V1AuthUser,

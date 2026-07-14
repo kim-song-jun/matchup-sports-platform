@@ -501,6 +501,28 @@ export function useV1MatchApplications(matchId: string, filters?: ListFilters, o
   });
 }
 
+const EMPTY_MATCH_APPLICATIONS_PAGE: V1MatchApplicationsPage = {
+  matchId: '',
+  items: [],
+  pageInfo: {
+    nextCursor: null,
+    hasNext: false,
+  },
+};
+
+/**
+ * queryFn이 malformed/undefined 페이지를 반환해도(네트워크 파싱 실패 등) 안전한 빈 페이지로
+ * 정규화한다 — team-members useInfiniteQuery(tournament-roster-client.tsx)와 동일 패턴.
+ */
+function normalizeMatchApplicationsPage(
+  page: V1MatchApplicationsPage | undefined | null,
+): V1MatchApplicationsPage {
+  if (!page || !Array.isArray(page.items) || !page.pageInfo) {
+    return EMPTY_MATCH_APPLICATIONS_PAGE;
+  }
+  return page;
+}
+
 // Cursor-paginated applicant list for the host management screen. A match can hold
 // up to 100 participants while the server caps each page at 50, so a single page can
 // hide applicants the host must act on. useInfiniteQuery accumulates pages and, on
@@ -517,9 +539,10 @@ export function useV1MatchApplicationsInfinite(
       v1Get<V1MatchApplicationsPage>(`/matches/${matchId}/applications`, {
         ...filters,
         ...(pageParam ? { cursor: pageParam } : {}),
-      }),
+      }).then(normalizeMatchApplicationsPage),
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => (lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined),
+    getNextPageParam: (lastPage) =>
+      lastPage?.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor : undefined,
     enabled: Boolean(matchId) && (options?.enabled ?? true),
     retry: false,
   });

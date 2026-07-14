@@ -317,7 +317,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
           </div>
         ) : null}
       </div>
-      {hasBadge ? <StatusBadge status={item.status as HubState} /> : null}
+      {item.status !== null ? <StatusBadge status={item.status} /> : null}
     </div>
   );
 }

@@ -501,6 +501,21 @@ export function useV1MatchApplications(matchId: string, filters?: ListFilters, o
   });
 }
 
+/**
+ * queryFn 응답 shape을 검증한다. 서버가 malformed/undefined 페이지를 반환하면(네트워크 파싱
+ * 실패 등) "신청자 0명"으로 조용히 뭉개지 않고 에러를 던져 react-query의 isError 경로로
+ * 넘긴다 — 목록 화면(client.tsx)이 이미 `applicationsQuery.isError`에서 "신청 목록을
+ * 불러오지 못했어요" 에러 상태를 렌더링하므로, 실패를 빈 상태로 위장하지 않고 그대로 노출한다.
+ */
+function assertValidMatchApplicationsPage(
+  page: V1MatchApplicationsPage | undefined | null,
+): V1MatchApplicationsPage {
+  if (!page || !Array.isArray(page.items) || !page.pageInfo) {
+    throw new Error('Malformed match applications page response');
+  }
+  return page;
+}
+
 // Cursor-paginated applicant list for the host management screen. A match can hold
 // up to 100 participants while the server caps each page at 50, so a single page can
 // hide applicants the host must act on. useInfiniteQuery accumulates pages and, on
@@ -517,9 +532,10 @@ export function useV1MatchApplicationsInfinite(
       v1Get<V1MatchApplicationsPage>(`/matches/${matchId}/applications`, {
         ...filters,
         ...(pageParam ? { cursor: pageParam } : {}),
-      }),
+      }).then(assertValidMatchApplicationsPage),
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => (lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined),
+    getNextPageParam: (lastPage) =>
+      lastPage?.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor : undefined,
     enabled: Boolean(matchId) && (options?.enabled ?? true),
     retry: false,
   });

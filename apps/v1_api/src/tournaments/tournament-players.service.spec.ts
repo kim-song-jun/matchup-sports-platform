@@ -78,6 +78,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     maxPlayers: 10,
     deletedAt: null,
     rosterDeadlineAt: null,
+    genderCategory: null,
     ...overrides,
   };
 }
@@ -89,6 +90,7 @@ function playerRow(overrides: Record<string, unknown> = {}) {
     userId: 'player-user-id',
     realName: '홍길동',
     birthDateSnapshot: '1995-03-15',
+    gender: null,
     eligibilityStatus: 'needs_review',
     eligibilityNote: null,
     addedAt: new Date('2026-06-14T00:00:00Z'),
@@ -108,6 +110,7 @@ function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
       profile: {
         displayName: '홍길동',
         birthDate: '1995-03-15',
+        gender: 'male',
       },
     },
     ...overrides,
@@ -503,6 +506,75 @@ describe('TournamentPlayersService', () => {
       }),
     ).rejects.toMatchObject({ response: { code: 'PLAYER_REQUIRED_PROFILE_MISSING' } });
     expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
+  // ─── 7-1. 성별 카테고리(mixed) 처리 ───────────────────────────────────────
+
+  it('addPlayer: mixed 대회 + 팀원 프로필에 gender 없음 → 400 PLAYER_REQUIRED_PROFILE_MISSING', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(
+        teamPlayerMembershipRow({
+          user: { phone: '01012345678', profile: { displayName: '홍길동', birthDate: '1995-03-15', gender: null } },
+        }),
+      );
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ genderCategory: 'mixed' }));
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_REQUIRED_PROFILE_MISSING' } });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
+  it('addPlayer: 비mixed 대회 + gender 없는 팀원 → 성공(gender null 스냅샷, 프로필 게이트 미적용)', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(
+        teamPlayerMembershipRow({
+          user: { phone: '01012345678', profile: { displayName: '홍길동', birthDate: '1995-03-15', gender: null } },
+        }),
+      );
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ genderCategory: null }));
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ gender: null }));
+
+    const result = await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(result).toMatchObject({ id: 'player-1', gender: null });
+    expect(prisma.v1TournamentPlayer.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ gender: null }) }),
+    );
+  });
+
+  it('addPlayer: mixed 대회 + gender 있는 팀원 → 성공하고 gender 스냅샷 + serializePlayer에 노출', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow({ user: { phone: '01012345678', profile: { displayName: '홍길동', birthDate: '1995-03-15', gender: 'female' } } }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ genderCategory: 'mixed' }));
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ gender: 'female' }));
+
+    const result = await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(result).toMatchObject({ id: 'player-1', gender: 'female' });
+    expect(prisma.v1TournamentPlayer.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ gender: 'female' }) }),
+    );
   });
 
   // ─── 8. 명단 조회 + belowMinimum ────────────────────────────────────────

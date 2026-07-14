@@ -138,7 +138,7 @@ export class TournamentPlayersService {
 
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      select: { maxPlayers: true, minPlayers: true, rosterDeadlineAt: true },
+      select: { maxPlayers: true, minPlayers: true, rosterDeadlineAt: true, genderCategory: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -169,7 +169,7 @@ export class TournamentPlayersService {
         user: {
           select: {
             phone: true,
-            profile: { select: { displayName: true, birthDate: true } },
+            profile: { select: { displayName: true, birthDate: true, gender: true } },
           },
         },
       },
@@ -183,10 +183,16 @@ export class TournamentPlayersService {
     const memberRealName = teamMembership.user.profile?.displayName?.trim();
     const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
     const memberPhone = teamMembership.user.phone?.trim();
-    if (!memberRealName || !memberBirthDate || !memberPhone) {
+    const memberGender = teamMembership.user.profile?.gender?.trim() || null;
+    // gender는 mixed 대회에서만 필수(성별 쿼터 검증에 사용). mixed가 아니면 스냅샷은
+    // 값이 있으면 기록하되(무해) 프로필 누락 가드에는 포함하지 않는다.
+    const genderRequired = tournament.genderCategory === 'mixed';
+    if (!memberRealName || !memberBirthDate || !memberPhone || (genderRequired && !memberGender)) {
       throw new BadRequestException({
         code: 'PLAYER_REQUIRED_PROFILE_MISSING',
-        message: '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+        message: genderRequired
+          ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
+          : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
       });
     }
 
@@ -210,11 +216,13 @@ export class TournamentPlayersService {
         userId: dto.userId,
         realName: memberRealName,
         birthDateSnapshot: memberBirthDate,
+        gender: memberGender,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
       },
       update: {
         realName: memberRealName,
         birthDateSnapshot: memberBirthDate,
+        gender: memberGender,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
         eligibilityNote: null,
         removedAt: null,
@@ -390,6 +398,7 @@ export class TournamentPlayersService {
       userId: row.userId,
       realName: row.realName,
       birthDateSnapshot: row.birthDateSnapshot ?? null,
+      gender: row.gender ?? null,
       eligibilityStatus: row.eligibilityStatus,
       eligibilityNote: row.eligibilityNote ?? null,
       addedAt: row.addedAt.toISOString(),

@@ -364,6 +364,50 @@ export class AdminRegistrationsService {
       });
     }
 
+    // mixed 대회에서만 성별 쿼터를 검증한다 — 남성부/여성부/성별정책 없음(null)은 스킵.
+    const tournament = await this.prisma.v1Tournament.findUnique({
+      where: { id: registration.tournamentId },
+      select: {
+        genderCategory: true,
+        genderMinMale: true,
+        genderMaxMale: true,
+        genderMinFemale: true,
+        genderMaxFemale: true,
+      },
+    });
+    if (tournament?.genderCategory === 'mixed') {
+      const roster = await this.prisma.v1TournamentPlayer.findMany({
+        where: { registrationId, removedAt: null },
+        select: { gender: true },
+      });
+      const maleCount = roster.filter((p) => p.gender === 'male').length;
+      const femaleCount = roster.filter((p) => p.gender === 'female').length;
+
+      const male = {
+        count: maleCount,
+        min: tournament.genderMinMale,
+        max: tournament.genderMaxMale,
+        ok:
+          (tournament.genderMinMale == null || maleCount >= tournament.genderMinMale) &&
+          (tournament.genderMaxMale == null || maleCount <= tournament.genderMaxMale),
+      };
+      const female = {
+        count: femaleCount,
+        min: tournament.genderMinFemale,
+        max: tournament.genderMaxFemale,
+        ok:
+          (tournament.genderMinFemale == null || femaleCount >= tournament.genderMinFemale) &&
+          (tournament.genderMaxFemale == null || femaleCount <= tournament.genderMaxFemale),
+      };
+      if (!male.ok || !female.ok) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_GENDER_QUOTA_NOT_MET',
+          message: '성별 인원 조건을 충족하지 않아 명단을 확정할 수 없어요.',
+          details: { male, female },
+        });
+      }
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },

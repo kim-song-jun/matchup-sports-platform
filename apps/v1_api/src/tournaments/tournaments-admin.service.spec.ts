@@ -33,6 +33,11 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    genderCategory: null,
+    genderMinMale: null,
+    genderMaxMale: null,
+    genderMinFemale: null,
+    genderMaxFemale: null,
     entryFee: 120000,
     bankName: null,
     bankAccount: null,
@@ -473,5 +478,162 @@ describe('TournamentsAdminService', () => {
         }),
       }),
     );
+  });
+
+  // ─── 성별 카테고리 · 쿼터 ───────────────────────────────────────────────────────
+
+  it('create: mixed + genderMinMale > genderMaxMale → 400 TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: 'x',
+        teamCount: 8,
+        genderCategory: 'mixed',
+        genderMinMale: 5,
+        genderMaxMale: 3,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' } });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: mixed + min합(male+female)이 maxPlayers 초과 → 400 TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: 'x',
+        teamCount: 8,
+        maxPlayers: 10,
+        genderCategory: 'mixed',
+        genderMinMale: 6,
+        genderMinFemale: 6,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' } });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: mixed + 유효한 쿼터 → 저장되고 응답에 그대로 노출', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(
+      tournamentRow({ genderCategory: 'mixed', genderMinMale: 2, genderMaxMale: 6, genderMinFemale: 2, genderMaxFemale: 6 }),
+    );
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: 'x',
+      teamCount: 8,
+      maxPlayers: 10,
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 6,
+      genderMinFemale: 2,
+      genderMaxFemale: 6,
+    });
+
+    expect(result).toMatchObject({ genderCategory: 'mixed', genderMinMale: 2, genderMaxMale: 6, genderMinFemale: 2, genderMaxFemale: 6 });
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ genderCategory: 'mixed', genderMinMale: 2, genderMaxMale: 6, genderMinFemale: 2, genderMaxFemale: 6 }),
+      }),
+    );
+  });
+
+  it('create: genderCategory=male(비mixed) + 쿼터 값 전송 → 쿼터는 전부 null로 정규화되어 저장', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ genderCategory: 'male' }));
+
+    await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: 'x',
+      teamCount: 8,
+      genderCategory: 'male',
+      genderMinMale: 5, // non-mixed 카테고리에서는 무시되어야 함
+    });
+
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          genderCategory: 'male',
+          genderMinMale: null,
+          genderMaxMale: null,
+          genderMinFemale: null,
+          genderMaxFemale: null,
+        }),
+      }),
+    );
+  });
+
+  it('create: genderCategory 미지정 → null로 저장(성별정책 없음, 기존 대회와 동일 동작)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
+
+    await service.create(ownerAuthUser, { sportId: 'sport-1', title: 'x', teamCount: 8 });
+
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ genderCategory: null, genderMinMale: null, genderMaxMale: null, genderMinFemale: null, genderMaxFemale: null }),
+      }),
+    );
+  });
+
+  it('update: mixed로 전환하며 min>max 쿼터 전송 → 400 TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID (update 미호출)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ genderCategory: null, maxPlayers: 10 }));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', {
+        genderCategory: 'mixed',
+        genderMinFemale: 8,
+        genderMaxFemale: 4,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' } });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('update: mixed → male로 카테고리 변경 시 기존 쿼터값이 전부 null로 덮어써짐', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ genderCategory: 'mixed', genderMinMale: 2, genderMaxMale: 6, genderMinFemale: 2, genderMaxFemale: 6 });
+    const updated = tournamentRow({ genderCategory: 'male', genderMinMale: null, genderMaxMale: null, genderMinFemale: null, genderMaxFemale: null });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(updated);
+
+    await service.update(ownerAuthUser, 'tournament-1', { genderCategory: 'male' });
+
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          genderCategory: 'male',
+          genderMinMale: null,
+          genderMaxMale: null,
+          genderMinFemale: null,
+          genderMaxFemale: null,
+        }),
+      }),
+    );
+  });
+
+  it('update: 성별 필드 미포함 → data에 gender* 키가 아예 없음(기존값 그대로 보존)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ genderCategory: 'mixed', genderMinMale: 2, genderMaxMale: 6 });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(existing);
+
+    await service.update(ownerAuthUser, 'tournament-1', { title: '제목만 변경' });
+
+    const updateCallData = prisma.v1Tournament.update.mock.calls[0][0].data;
+    expect(updateCallData).not.toHaveProperty('genderCategory');
+    expect(updateCallData).not.toHaveProperty('genderMinMale');
   });
 });

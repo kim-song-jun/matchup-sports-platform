@@ -14,6 +14,7 @@ import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
   CreateTournamentDto,
+  TournamentGenderCategory,
   TournamentStatus,
   UpdateTournamentDto,
 } from './dto/admin-tournament.dto';
@@ -100,6 +101,14 @@ export class TournamentsAdminService {
       dto.scheduledAt ? new Date(dto.scheduledAt) : null,
       dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
     );
+    const genderQuota = this.normalizeGenderConfig({
+      genderCategory: dto.genderCategory,
+      genderMinMale: dto.genderMinMale,
+      genderMaxMale: dto.genderMaxMale,
+      genderMinFemale: dto.genderMinFemale,
+      genderMaxFemale: dto.genderMaxFemale,
+      maxPlayers: dto.maxPlayers ?? 10,
+    });
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
     if (!sport) {
@@ -127,6 +136,8 @@ export class TournamentsAdminService {
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
+          genderCategory: dto.genderCategory ?? null,
+          ...genderQuota,
           entryFee: dto.entryFee ?? 0,
           bankName: dto.bankName ?? null,
           bankAccount: dto.bankAccount ?? null,
@@ -189,6 +200,28 @@ export class TournamentsAdminService {
     const nextMin = dto.minPlayers ?? existing.minPlayers;
     const nextMax = dto.maxPlayers ?? existing.maxPlayers;
     this.assertPlayerRange(nextMin, nextMax);
+
+    // category 또는 쿼터 필드 중 하나라도 변경되면, 최종 병합값 기준으로 재정규화·재검증한다.
+    // (category가 mixed→비mixed로 바뀌면 쿼터는 전부 null로 덮어써야 하므로 항상 4개 필드 전체를 대입)
+    const nextGenderCategory: TournamentGenderCategory | null =
+      dto.genderCategory !== undefined ? dto.genderCategory : (existing.genderCategory as TournamentGenderCategory | null);
+    const genderConfigChanged =
+      dto.genderCategory !== undefined ||
+      dto.genderMinMale !== undefined ||
+      dto.genderMaxMale !== undefined ||
+      dto.genderMinFemale !== undefined ||
+      dto.genderMaxFemale !== undefined;
+    const genderQuota = genderConfigChanged
+      ? this.normalizeGenderConfig({
+          genderCategory: nextGenderCategory,
+          genderMinMale: dto.genderMinMale ?? existing.genderMinMale,
+          genderMaxMale: dto.genderMaxMale ?? existing.genderMaxMale,
+          genderMinFemale: dto.genderMinFemale ?? existing.genderMinFemale,
+          genderMaxFemale: dto.genderMaxFemale ?? existing.genderMaxFemale,
+          maxPlayers: nextMax,
+        })
+      : null;
+
     const nextScheduledAt =
       dto.scheduledAt !== undefined
         ? dto.scheduledAt
@@ -237,6 +270,13 @@ export class TournamentsAdminService {
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
     if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
+    if (dto.genderCategory !== undefined) data.genderCategory = dto.genderCategory;
+    if (genderQuota) {
+      data.genderMinMale = genderQuota.genderMinMale;
+      data.genderMaxMale = genderQuota.genderMaxMale;
+      data.genderMinFemale = genderQuota.genderMinFemale;
+      data.genderMaxFemale = genderQuota.genderMaxFemale;
+    }
     if (dto.entryFee !== undefined) data.entryFee = dto.entryFee;
     if (dto.bankName !== undefined) data.bankName = dto.bankName;
     if (dto.bankAccount !== undefined) data.bankAccount = dto.bankAccount;
@@ -350,6 +390,47 @@ export class TournamentsAdminService {
     }
   }
 
+  /**
+   * genderCategory가 'mixed'가 아니면 쿼터는 전부 null로 정규화(mixed 아닌 대회는 성별
+   * 쿼터가 무의미하므로 값을 보내도 무시). 'mixed'면 성별별 min<=max + 최소합
+   * feasibility(대회 최대 선수 수 초과 여부)를 검증한다.
+   */
+  private normalizeGenderConfig(input: {
+    genderCategory?: TournamentGenderCategory | null;
+    genderMinMale?: number | null;
+    genderMaxMale?: number | null;
+    genderMinFemale?: number | null;
+    genderMaxFemale?: number | null;
+    maxPlayers: number;
+  }) {
+    if (input.genderCategory !== 'mixed') {
+      return { genderMinMale: null, genderMaxMale: null, genderMinFemale: null, genderMaxFemale: null };
+    }
+    const q = {
+      genderMinMale: input.genderMinMale ?? null,
+      genderMaxMale: input.genderMaxMale ?? null,
+      genderMinFemale: input.genderMinFemale ?? null,
+      genderMaxFemale: input.genderMaxFemale ?? null,
+    };
+    const badPair =
+      (q.genderMinMale != null && q.genderMaxMale != null && q.genderMinMale > q.genderMaxMale) ||
+      (q.genderMinFemale != null && q.genderMaxFemale != null && q.genderMinFemale > q.genderMaxFemale);
+    if (badPair) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID',
+        message: '성별 최소 인원은 최대 인원보다 클 수 없어요.',
+      });
+    }
+    // feasibility: 최소 인원 합이 대회 최대 선수 수를 넘으면 충족 불가능
+    if ((q.genderMinMale ?? 0) + (q.genderMinFemale ?? 0) > input.maxPlayers) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID',
+        message: '성별 최소 인원 합이 대회 최대 선수 수를 넘을 수 없어요.',
+      });
+    }
+    return q;
+  }
+
   private assertScheduleRange(start: Date | null, end: Date | null) {
     if (!end) return;
     if (!start || end.getTime() < start.getTime()) {
@@ -378,6 +459,11 @@ export class TournamentsAdminService {
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
+      genderCategory: row.genderCategory,
+      genderMinMale: row.genderMinMale,
+      genderMaxMale: row.genderMaxMale,
+      genderMinFemale: row.genderMinFemale,
+      genderMaxFemale: row.genderMaxFemale,
       entryFee: row.entryFee,
       bankName: row.bankName,
       bankAccount: row.bankAccount,

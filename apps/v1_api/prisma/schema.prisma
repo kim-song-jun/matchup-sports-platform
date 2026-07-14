@@ -1213,6 +1213,12 @@ enum V1TournamentPlayerEligibility {
   needs_review
 }
 
+enum V1TournamentGenderCategory {
+  mixed
+  male
+  female
+}
+
 enum V1TournamentGroupPhase {
   group
   semi
@@ -1244,58 +1250,63 @@ enum V1TournamentAnnouncementCategory {
 }
 
 model V1Tournament {
-  id                     String             @id @default(uuid())
-  sportId                String             @map("sport_id")
+  id                     String                      @id @default(uuid())
+  sportId                String                      @map("sport_id")
   title                  String
-  status                 V1TournamentStatus @default(draft)
-  format                 V1TournamentFormat @default(group_knockout)
-  registrationDeadlineAt DateTime?          @map("registration_deadline_at")
-  rosterDeadlineAt       DateTime?          @map("roster_deadline_at")
-  scheduledAt            DateTime?          @map("scheduled_at")
-  scheduledEndAt         DateTime?          @map("scheduled_end_at")
+  status                 V1TournamentStatus          @default(draft)
+  format                 V1TournamentFormat          @default(group_knockout)
+  registrationDeadlineAt DateTime?                   @map("registration_deadline_at")
+  rosterDeadlineAt       DateTime?                   @map("roster_deadline_at")
+  scheduledAt            DateTime?                   @map("scheduled_at")
+  scheduledEndAt         DateTime?                   @map("scheduled_end_at")
   venue                  String?
   // 카카오 로컬 API 키워드 검색으로 venue를 지오코딩한 좌표(KakaoGeocodingService). 키 미설정/검색
   // 실패 시 null로 남고, 그 경우 프론트는 네이버 지도 검색 링크 폴백을 그대로 사용한다.
   latitude               Float?
   longitude              Float?
-  coverImageUrl          String?            @map("cover_image_url")
-  teamCount              Int                @default(8) @map("team_count")
-  minPlayers             Int                @default(6) @map("min_players")
-  maxPlayers             Int                @default(10) @map("max_players")
-  entryFee               Int                @default(0) @map("entry_fee")
+  coverImageUrl          String?                     @map("cover_image_url")
+  teamCount              Int                         @default(8) @map("team_count")
+  minPlayers             Int                         @default(6) @map("min_players")
+  maxPlayers             Int                         @default(10) @map("max_players")
+  genderCategory         V1TournamentGenderCategory? @map("gender_category")
+  genderMinMale          Int?                        @map("gender_min_male")
+  genderMaxMale          Int?                        @map("gender_max_male")
+  genderMinFemale        Int?                        @map("gender_min_female")
+  genderMaxFemale        Int?                        @map("gender_max_female")
+  entryFee               Int                         @default(0) @map("entry_fee")
   // 상금: prizeSummary=대표 상품/상금 문구, prizeBreakdown=순위별 안내 텍스트(예: "1위 100만원 · 2위 50만원"). prizePool은 하위 호환용 숫자 필드.
-  prizePool              Int?               @map("prize_pool")
-  prizeSummary           String?            @map("prize_summary")
-  prizeBreakdown         String?            @map("prize_breakdown")
-  promoHomeEnabled       Boolean            @default(false) @map("promo_home_enabled")
-  promoHomeTitle         String?            @map("promo_home_title")
-  promoHomeSubtitle      String?            @map("promo_home_subtitle")
-  promoHomeImageUrl      String?            @map("promo_home_image_url")
-  promoHomeBadgeText     String?            @map("promo_home_badge_text")
-  promoHomeDateText      String?            @map("promo_home_date_text")
-  promoHomeTeamsText     String?            @map("promo_home_teams_text")
-  promoHomeLocationText  String?            @map("promo_home_location_text")
-  promoHomePrizeText     String?            @map("promo_home_prize_text")
-  promoHomePriority      Int                @default(0) @map("promo_home_priority")
-  promoListEnabled       Boolean            @default(false) @map("promo_list_enabled")
-  promoListTitle         String?            @map("promo_list_title")
-  promoListSubtitle      String?            @map("promo_list_subtitle")
-  promoListImageUrl      String?            @map("promo_list_image_url")
-  promoListBadgeText     String?            @map("promo_list_badge_text")
-  promoListDateText      String?            @map("promo_list_date_text")
-  promoListTeamsText     String?            @map("promo_list_teams_text")
-  promoListLocationText  String?            @map("promo_list_location_text")
-  promoListPrizeText     String?            @map("promo_list_prize_text")
-  promoListPriority      Int                @default(0) @map("promo_list_priority")
-  bankName               String?            @map("bank_name")
-  bankAccount            String?            @map("bank_account")
-  bankHolder             String?            @map("bank_holder")
-  rulesText              String?            @map("rules_text")
-  refundPolicyText       String?            @map("refund_policy_text")
-  createdByAdminUserId   String?            @map("created_by_admin_user_id")
-  createdAt              DateTime           @default(now()) @map("created_at")
-  updatedAt              DateTime           @updatedAt @map("updated_at")
-  deletedAt              DateTime?          @map("deleted_at")
+  prizePool              Int?                        @map("prize_pool")
+  prizeSummary           String?                     @map("prize_summary")
+  prizeBreakdown         String?                     @map("prize_breakdown")
+  promoHomeEnabled       Boolean                     @default(false) @map("promo_home_enabled")
+  promoHomeTitle         String?                     @map("promo_home_title")
+  promoHomeSubtitle      String?                     @map("promo_home_subtitle")
+  promoHomeImageUrl      String?                     @map("promo_home_image_url")
+  promoHomeBadgeText     String?                     @map("promo_home_badge_text")
+  promoHomeDateText      String?                     @map("promo_home_date_text")
+  promoHomeTeamsText     String?                     @map("promo_home_teams_text")
+  promoHomeLocationText  String?                     @map("promo_home_location_text")
+  promoHomePrizeText     String?                     @map("promo_home_prize_text")
+  promoHomePriority      Int                         @default(0) @map("promo_home_priority")
+  promoListEnabled       Boolean                     @default(false) @map("promo_list_enabled")
+  promoListTitle         String?                     @map("promo_list_title")
+  promoListSubtitle      String?                     @map("promo_list_subtitle")
+  promoListImageUrl      String?                     @map("promo_list_image_url")
+  promoListBadgeText     String?                     @map("promo_list_badge_text")
+  promoListDateText      String?                     @map("promo_list_date_text")
+  promoListTeamsText     String?                     @map("promo_list_teams_text")
+  promoListLocationText  String?                     @map("promo_list_location_text")
+  promoListPrizeText     String?                     @map("promo_list_prize_text")
+  promoListPriority      Int                         @default(0) @map("promo_list_priority")
+  bankName               String?                     @map("bank_name")
+  bankAccount            String?                     @map("bank_account")
+  bankHolder             String?                     @map("bank_holder")
+  rulesText              String?                     @map("rules_text")
+  refundPolicyText       String?                     @map("refund_policy_text")
+  createdByAdminUserId   String?                     @map("created_by_admin_user_id")
+  createdAt              DateTime                    @default(now()) @map("created_at")
+  updatedAt              DateTime                    @updatedAt @map("updated_at")
+  deletedAt              DateTime?                   @map("deleted_at")
 
   sport          V1Sport                    @relation(fields: [sportId], references: [id], onDelete: Restrict)
   createdByAdmin V1AdminUser?               @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
@@ -1399,6 +1410,7 @@ model V1TournamentPlayer {
   userId            String                        @map("user_id")
   realName          String                        @map("real_name")
   birthDateSnapshot String?                       @map("birth_date_snapshot")
+  gender            String?                       @map("gender")
   eligibilityStatus V1TournamentPlayerEligibility @default(needs_review) @map("eligibility_status")
   eligibilityNote   String?                       @map("eligibility_note")
   addedAt           DateTime                      @default(now()) @map("added_at")

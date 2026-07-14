@@ -174,6 +174,11 @@ export class TournamentsReadService {
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
+      genderCategory: row.genderCategory,
+      genderMinMale: row.genderMinMale,
+      genderMaxMale: row.genderMaxMale,
+      genderMinFemale: row.genderMinFemale,
+      genderMaxFemale: row.genderMaxFemale,
       entryFee: row.entryFee,
       // 계좌이체 신청자에게 입금 계좌 안내가 필요하므로 공개 상세에 포함(주최자 수령 계좌).
       bankName: row.bankName,

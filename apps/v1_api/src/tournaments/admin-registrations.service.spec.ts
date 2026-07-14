@@ -74,7 +74,7 @@ describe('AdminRegistrationsService', () => {
     v1Tournament: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
-    v1TournamentPlayer: { count: jest.Mock };
+    v1TournamentPlayer: { count: jest.Mock; findMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -86,7 +86,7 @@ describe('AdminRegistrationsService', () => {
       v1Tournament: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
@@ -335,6 +335,74 @@ describe('AdminRegistrationsService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'registration.roster_lock' }) }),
     );
+  });
+
+  it('rosterLock: mixed 대회 + 성별 쿼터 미충족(남성 초과) → 409 TOURNAMENT_GENDER_QUOTA_NOT_MET', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1Tournament.findUnique.mockResolvedValue({
+      id: 'tournament-1',
+      teamCount: 8,
+      genderCategory: 'mixed',
+      genderMinMale: null,
+      genderMaxMale: 4,
+      genderMinFemale: 2,
+      genderMaxFemale: null,
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { gender: 'male' }, { gender: 'male' }, { gender: 'male' }, { gender: 'male' }, { gender: 'male' },
+      { gender: 'female' },
+    ]);
+
+    await expect(service.rosterLock(opsAuth, 'reg-1', {})).rejects.toMatchObject({
+      response: {
+        code: 'TOURNAMENT_GENDER_QUOTA_NOT_MET',
+        details: {
+          male: { count: 5, min: null, max: 4, ok: false },
+          female: { count: 1, min: 2, max: null, ok: false },
+        },
+      },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('rosterLock: mixed 대회 + 성별 쿼터 충족 → 잠금 성공', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1Tournament.findUnique.mockResolvedValue({
+      id: 'tournament-1',
+      teamCount: 8,
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 4,
+      genderMinFemale: 2,
+      genderMaxFemale: 4,
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { gender: 'male' }, { gender: 'male' },
+      { gender: 'female' }, { gender: 'female' },
+    ]);
+    const lockedAt = new Date();
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed', rosterLockedAt: lockedAt }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    const result = await service.rosterLock(opsAuth, 'reg-1', {});
+    expect(result.rosterLockedAt).toBe(lockedAt.toISOString());
+  });
+
+  it('rosterLock: 비mixed(genderCategory=null) 대회 → 성별 쿼터 검증 스킵(로스터에 성별 미기재여도 잠금 성공)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    prisma.v1Tournament.findUnique.mockResolvedValue({ id: 'tournament-1', teamCount: 8, genderCategory: null });
+    const lockedAt = new Date();
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed', rosterLockedAt: lockedAt }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    const result = await service.rosterLock(opsAuth, 'reg-1', {});
+
+    expect(result.rosterLockedAt).toBe(lockedAt.toISOString());
+    // 성별정책 없는 대회는 로스터 성별 조회 자체를 하지 않는다.
+    expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
   });
 
   it('rosterUnlock: removes rosterLockedAt', async () => {

@@ -52,6 +52,9 @@ export class AdminTournamentListQueryDto {
 export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout'] as const;
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
 
+export const TOURNAMENT_GENDER_CATEGORIES = ['mixed', 'male', 'female'] as const;
+export type TournamentGenderCategory = (typeof TOURNAMENT_GENDER_CATEGORIES)[number];
+
 export class CreateTournamentDto {
   @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
   sportId!: string;
@@ -112,6 +115,38 @@ export class CreateTournamentDto {
   @Min(1, { message: '최대 선수 수는 1명 이상이어야 해요.' })
   @Max(50, { message: '최대 선수 수는 50명을 넘을 수 없어요.' })
   maxPlayers?: number;
+
+  @IsOptional()
+  @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
+  genderCategory?: TournamentGenderCategory;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinMale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxMale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinFemale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxFemale?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -327,6 +362,38 @@ export class UpdateTournamentDto {
   @Min(1, { message: '최대 선수 수는 1명 이상이어야 해요.' })
   @Max(50, { message: '최대 선수 수는 50명을 넘을 수 없어요.' })
   maxPlayers?: number;
+
+  @IsOptional()
+  @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
+  genderCategory?: TournamentGenderCategory;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinMale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxMale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinFemale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxFemale?: number;
 
   @IsOptional()
   @Type(() => Number)

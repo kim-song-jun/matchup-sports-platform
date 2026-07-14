@@ -136,11 +136,11 @@ function TournamentsListContent() {
           }}
         >
           {featuredImageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
-          {/* 배너 이미지가 데스크톱에서 4:1로 커지면서(globals.css) 텍스트 블록이 위쪽에만
-             뭉쳐 있으면 아래쪽 이미지가 그대로 비어 보인다 — 콘텐츠를 상단 그룹(뱃지/제목/
-             부제/facts)과 하단 CTA 행 두 덩어리로 나누고 flex column + space-between으로
-             박스 높이 전체에 분산시켜, 세로 공간이 늘어난 만큼 여백도 함께 늘어나게 한다. */}
-          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+          {/* 콘텐츠는 상단에 한 덩어리로 모아 두고, 박스 높이 전체로 늘리지 않는다 — 상금 문구가
+             없는 대회는 하단 행이 CTA 버튼 하나만 남아 justify-content:space-between으로
+             바닥까지 늘리면 좌측 하단만 텅 비어 보이는 비대칭이 생겼다(실측 확인). 이미지가
+             커진 만큼의 여유는 텍스트 아래로 사진이 넉넉히 보이는 것으로 대신한다. */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
             <div>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
                 <Trophy size={12} strokeWidth={2} aria-hidden="true" />

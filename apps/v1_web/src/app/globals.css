@@ -1539,8 +1539,11 @@ button:disabled {
  * 같은 높이로 늘려도, Card 자신은 콘텐츠 길이만큼만 커지므로(예: 대회 facts 텍스트가
  * 2줄로 랩되면 매치 카드보다 길어짐) 더 짧은 카드의 보더박스가 부모보다 낮게 끝나
  * 두 카드 하단이 어긋나 보인다. Card를 stretch된 부모 높이(100%)까지 채우고,
- * 콘텐츠 영역을 flex column으로 만들어 CTA 버튼을 marginTop:auto로 하단 고정하면
- * 텍스트 길이 차이와 무관하게 두 카드의 바닥 경계가 항상 일치한다. */
+ * 콘텐츠 영역을 flex column으로 만들면(.tm-featured-content) 텍스트 길이 차이와
+ * 무관하게 두 카드의 바닥 테두리(보더박스)가 항상 일치한다. CTA 버튼 자체는
+ * marginTop:auto로 하단 고정하지 않고 고정 간격(.tm-featured-cta, 12px)만 둔다 —
+ * 텍스트가 짧은 카드는 버튼 아래 여백이 카드 padding 안에서 자연스럽게 남고,
+ * 텍스트가 긴 카드는 버튼이 더 아래에 위치하지만 카드 바깥 테두리는 그대로 맞는다. */
 .tm-featured-card {
   height: 100%;
   display: flex;
@@ -1560,7 +1563,13 @@ button:disabled {
 }
 
 .tm-featured-cta {
-  margin-top: auto;
+  /* 텍스트→CTA 간격은 동일 카드군의 다른 버튼(home-page.tsx 로그인/채팅 CTA,
+     marginTop:12)과 통일한 고정값. 이전 marginTop:auto 는 두 히어로 카드 높이를 맞추려는
+     의도였지만, 텍스트가 짧은 카드(대회)에서 텍스트-버튼 사이에 불필요하게 큰 여백을
+     만들었다. 카드 높이 정합은 .tm-featured-card{height:100%} + 부모 flex stretch로 이미
+     보장되므로(칸 하단 여백은 카드 padding 안에서 자연스럽게 흡수됨) 버튼을 고정 간격으로
+     내리는 편이 자연스럽다. */
+  margin-top: 12px;
   width: 100%;
 }
 

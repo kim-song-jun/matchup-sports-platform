@@ -95,9 +95,11 @@ export function TournamentPromoCarousel({
       ) : error ? (
         <div className="tm-tournament-promo-carousel-error" role="alert">
           <span className="tm-text-caption">추천 대회를 불러오지 못했어요.</span>
-          <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry}>
-            다시 불러오기
-          </button>
+          {onRetry ? (
+            <button type="button" className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry}>
+              다시 불러오기
+            </button>
+          ) : null}
         </div>
       ) : (
         <div

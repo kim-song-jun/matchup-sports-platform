@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
 import { NotificationBellLink, buildAriaLabel, formatUnreadCount } from './notification-bell';
@@ -45,6 +45,26 @@ describe('buildAriaLabel', () => {
 describe('NotificationBellLink', () => {
   afterEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  it('does not request the protected unread summary without a stored session', () => {
+    mockUnreadCount(0);
+
+    render(<NotificationBellLink className="bell" />);
+
+    expect(useV1NotificationUnreadSummaryMock).toHaveBeenCalledWith({ enabled: false });
+  });
+
+  it('enables the unread summary after detecting a stored session', async () => {
+    window.localStorage.setItem('teameet.v1.userId', 'user-1');
+    mockUnreadCount(0);
+
+    render(<NotificationBellLink className="bell" />);
+
+    await waitFor(() => {
+      expect(useV1NotificationUnreadSummaryMock).toHaveBeenCalledWith({ enabled: true });
+    });
   });
 
   it('renders the numeric unread badge and includes the count in the aria-label', () => {

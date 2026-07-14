@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { useV1NotificationUnreadSummary } from '@/hooks/use-v1-api';
+import { hasStoredV1Session } from '@/lib/session-storage';
 import { BellIcon } from './icons';
 
 type NotificationBellProps = {
@@ -41,7 +43,13 @@ export function formatUnreadCount(count: number): string {
  * 임의로 1을 지어내지 않고 unknown 상태로 구분한다.
  */
 function useUnreadState(forceUnread?: boolean): { count: number; unknown: boolean } {
-  const summary = useV1NotificationUnreadSummary();
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+
+  const summary = useV1NotificationUnreadSummary({ enabled: hasSessionHint });
   const unreadCount = summary.data?.unreadCount ?? 0;
   if (unreadCount > 0) return { count: unreadCount, unknown: false };
   return { count: 0, unknown: Boolean(forceUnread) };

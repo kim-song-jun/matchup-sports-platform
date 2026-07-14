@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import {
@@ -461,10 +462,18 @@ export function SignupClient() {
 
           {step === 'profile' ? (
             <>
-              <section className="tm-auth-soft-card" style={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 14, alignItems: 'center' }}>
-                <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-                  {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName || normalizedNickname)}</span>}
-                </div>
+              <section className="tm-auth-profile-upload">
+                <label className="tm-auth-profile-preview-trigger" aria-label="프로필 사진 선택">
+                  <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
+                    {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName || normalizedNickname)}</span>}
+                  </div>
+                  {profileImageUrl ? null : (
+                    <span className="tm-auth-profile-preview-badge" aria-hidden="true">
+                      <Camera size={13} strokeWidth={2.4} />
+                    </span>
+                  )}
+                  <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
+                </label>
                 <div>
                   <div className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택</em></div>
                   <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>

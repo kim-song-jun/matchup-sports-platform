@@ -1492,6 +1492,8 @@ export type V1TournamentStatus =
 
 export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout';
 
+export type V1TournamentGenderCategory = 'mixed' | 'male' | 'female';
+
 export type V1PublicTournamentStatus = Extract<
   V1TournamentStatus,
   'open' | 'closed' | 'in_progress' | 'completed'
@@ -1605,6 +1607,11 @@ export type V1Tournament = {
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
+  genderCategory: V1TournamentGenderCategory | null;
+  genderMinMale: number | null;
+  genderMaxMale: number | null;
+  genderMinFemale: number | null;
+  genderMaxFemale: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1761,6 +1768,11 @@ export type V1TournamentDetail = {
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
+  genderCategory: V1TournamentGenderCategory | null;
+  genderMinMale: number | null;
+  genderMaxMale: number | null;
+  genderMinFemale: number | null;
+  genderMaxFemale: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1905,6 +1917,8 @@ export type V1TournamentPlayer = {
   userId: string;
   realName: string;
   birthDateSnapshot: string | null;
+  /** 등록 시점 성별 스냅샷(V1UserProfile.gender) — mixed 대회의 성별 쿼터 집계에 사용 */
+  gender: string | null;
   eligibilityStatus: V1PlayerEligibilityStatus;
   eligibilityNote: string | null;
   addedAt: string;
@@ -2077,6 +2091,11 @@ export type V1CreateTournamentPayload = {
   teamCount?: number;
   minPlayers?: number;
   maxPlayers?: number;
+  genderCategory?: V1TournamentGenderCategory;
+  genderMinMale?: number;
+  genderMaxMale?: number;
+  genderMinFemale?: number;
+  genderMaxFemale?: number;
   entryFee?: number;
   prizePool?: number;
   prizeSummary?: string;

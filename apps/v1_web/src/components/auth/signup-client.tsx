@@ -57,6 +57,7 @@ export function SignupClient() {
   const [displayName, setDisplayName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [requiredTermsAccepted, setRequiredTermsAccepted] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -217,6 +218,7 @@ export function SignupClient() {
         password,
         phone: phoneDigits || undefined,
         birthDate: birthDateDigits || undefined,
+        gender: gender || undefined,
         requiredTermsAccepted,
       });
 
@@ -517,6 +519,38 @@ export function SignupClient() {
                   value={formatBirthDate(birthDateDigits)}
                 />
               </label>
+
+              <div className="tm-auth-field">
+                <span className="tm-text-label" id="signup-gender-label">
+                  성별 <em className="tm-auth-optional">(선택)</em>
+                </span>
+                <div
+                  className="tm-auth-segmented"
+                  role="radiogroup"
+                  aria-labelledby="signup-gender-label"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={gender === 'male'}
+                    className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`}
+                    style={{ minHeight: 44 }}
+                    onClick={() => setGender((prev) => (prev === 'male' ? '' : 'male'))}
+                  >
+                    남성
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={gender === 'female'}
+                    className={`tm-auth-segment ${gender === 'female' ? 'tm-auth-segment-active' : ''}`}
+                    style={{ minHeight: 44 }}
+                    onClick={() => setGender((prev) => (prev === 'female' ? '' : 'female'))}
+                  >
+                    여성
+                  </button>
+                </div>
+              </div>
 
             </>
           ) : null}

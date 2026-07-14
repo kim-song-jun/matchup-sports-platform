@@ -93,8 +93,10 @@ import type {
   V1UpdateTournamentPayload,
   V1TournamentAward,
   V1AdminTournamentReview,
+  V1TournamentGenderCategory,
 } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { V1ApiError } from '@/lib/api-client';
 import { roundRobinRounds, knockoutSeedPairs } from '@/lib/tournament-bracket-gen';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 
@@ -258,6 +260,23 @@ function datetimeLocalValueToIso(value: string): string | null {
   const date = new Date(`${value}:00+09:00`);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
+}
+
+/** `TOURNAMENT_GENDER_QUOTA_NOT_MET` 응답의 `details.male/female`을 구체적인 안내 문구로 변환한다. */
+type GenderQuotaCheck = { count: number; min: number | null; max: number | null; ok: boolean };
+function formatGenderQuotaErrorMessage(details: unknown): string | null {
+  if (!details || typeof details !== 'object') return null;
+  const d = details as { male?: GenderQuotaCheck; female?: GenderQuotaCheck };
+  const parts: string[] = [];
+  for (const [label, check] of [['남성', d.male], ['여성', d.female]] as const) {
+    if (!check || check.ok) continue;
+    if (check.min != null && check.count < check.min) {
+      parts.push(`${label} 최소 ${check.min}명 필요(현재 ${check.count}명)`);
+    } else if (check.max != null && check.count > check.max) {
+      parts.push(`${label} 최대 ${check.max}명 초과(현재 ${check.count}명)`);
+    }
+  }
+  return parts.length > 0 ? `${parts.join(' · ')} — 성별 인원 조건을 확인해 주세요.` : null;
 }
 
 // ── Shared input styles ───────────────────────────────────────────────────
@@ -714,8 +733,14 @@ export function RegistrationsTab({
       { registrationId: reg.id },
       {
         onSuccess: () => showToast('명단을 잠갔어요.', 'success'),
-        onError: (err) =>
-          showToast(extractErrorMessage(err, '명단 잠금에 실패했어요.'), 'error'),
+        onError: (err) => {
+          if (err instanceof V1ApiError && err.code === 'TOURNAMENT_GENDER_QUOTA_NOT_MET') {
+            const detailMessage = formatGenderQuotaErrorMessage(err.details);
+            showToast(detailMessage ?? extractErrorMessage(err, '명단 잠금에 실패했어요.'), 'error');
+            return;
+          }
+          showToast(extractErrorMessage(err, '명단 잠금에 실패했어요.'), 'error');
+        },
       },
     );
   };
@@ -2837,6 +2862,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editTeamCount, setEditTeamCount] = useState('');
   const [editMinPlayers, setEditMinPlayers] = useState('');
   const [editMaxPlayers, setEditMaxPlayers] = useState('');
+  const [editGenderCategory, setEditGenderCategory] = useState<V1TournamentGenderCategory>('mixed');
+  const [editGenderMinMale, setEditGenderMinMale] = useState('');
+  const [editGenderMaxMale, setEditGenderMaxMale] = useState('');
+  const [editGenderMinFemale, setEditGenderMinFemale] = useState('');
+  const [editGenderMaxFemale, setEditGenderMaxFemale] = useState('');
   const [editBankName, setEditBankName] = useState('');
   const [editBankAccount, setEditBankAccount] = useState('');
   const [editBankHolder, setEditBankHolder] = useState('');
@@ -2882,6 +2912,11 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditTeamCount(String(tournament.teamCount));
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
+    setEditGenderCategory(tournament.genderCategory ?? 'mixed');
+    setEditGenderMinMale(tournament.genderMinMale != null ? String(tournament.genderMinMale) : '');
+    setEditGenderMaxMale(tournament.genderMaxMale != null ? String(tournament.genderMaxMale) : '');
+    setEditGenderMinFemale(tournament.genderMinFemale != null ? String(tournament.genderMinFemale) : '');
+    setEditGenderMaxFemale(tournament.genderMaxFemale != null ? String(tournament.genderMaxFemale) : '');
     setEditBankName(tournament.bankName ?? '');
     setEditBankAccount(tournament.bankAccount ?? '');
     setEditBankHolder(tournament.bankHolder ?? '');
@@ -2923,6 +2958,20 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       showToast('대회 종료가 시작보다 빠를 수 없어요.', 'error');
       return;
     }
+    if (editGenderCategory === 'mixed') {
+      const minMale = editGenderMinMale ? Number(editGenderMinMale) : null;
+      const maxMale = editGenderMaxMale ? Number(editGenderMaxMale) : null;
+      const minFemale = editGenderMinFemale ? Number(editGenderMinFemale) : null;
+      const maxFemale = editGenderMaxFemale ? Number(editGenderMaxFemale) : null;
+      if (minMale !== null && maxMale !== null && minMale > maxMale) {
+        showToast('남성 최소 인원은 최대 인원보다 클 수 없어요.', 'error');
+        return;
+      }
+      if (minFemale !== null && maxFemale !== null && minFemale > maxFemale) {
+        showToast('여성 최소 인원은 최대 인원보다 클 수 없어요.', 'error');
+        return;
+      }
+    }
     const payload: V1UpdateTournamentPayload = {};
     if (editTitle.trim()) payload.title = editTitle.trim();
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
@@ -2953,6 +3002,27 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     if (!Number.isNaN(mn) && mn > 0) payload.minPlayers = mn;
     const mx = Number(editMaxPlayers);
     if (!Number.isNaN(mx) && mx > 0) payload.maxPlayers = mx;
+    if (editGenderCategory !== (tournament.genderCategory ?? 'mixed')) {
+      payload.genderCategory = editGenderCategory;
+    }
+    if (editGenderCategory === 'mixed') {
+      if (editGenderMinMale !== '') {
+        const v = Number(editGenderMinMale);
+        if (!Number.isNaN(v)) payload.genderMinMale = v;
+      }
+      if (editGenderMaxMale !== '') {
+        const v = Number(editGenderMaxMale);
+        if (!Number.isNaN(v)) payload.genderMaxMale = v;
+      }
+      if (editGenderMinFemale !== '') {
+        const v = Number(editGenderMinFemale);
+        if (!Number.isNaN(v)) payload.genderMinFemale = v;
+      }
+      if (editGenderMaxFemale !== '') {
+        const v = Number(editGenderMaxFemale);
+        if (!Number.isNaN(v)) payload.genderMaxFemale = v;
+      }
+    }
     if (editBankName.trim()) payload.bankName = editBankName.trim();
     if (editBankAccount.trim()) payload.bankAccount = editBankAccount.trim();
     if (editBankHolder.trim()) payload.bankHolder = editBankHolder.trim();
@@ -3594,7 +3664,86 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                 className={inputCls}
               />
             </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="edit-gender-category" className="text-[13px] text-gray-900">성별 카테고리</label>
+              <select
+                id="edit-gender-category"
+                value={editGenderCategory}
+                onChange={(e) => setEditGenderCategory(e.target.value as V1TournamentGenderCategory)}
+                disabled={updateTournament.isPending}
+                className={inputCls}
+              >
+                <option value="mixed">혼성</option>
+                <option value="male">남성부</option>
+                <option value="female">여성부</option>
+              </select>
+            </div>
           </div>
+
+          {editGenderCategory === 'mixed' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="edit-gender-min-male" className="text-[13px] text-gray-900">남성 최소</label>
+                <input
+                  id="edit-gender-min-male"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={50}
+                  value={editGenderMinMale}
+                  onChange={(e) => setEditGenderMinMale(e.target.value)}
+                  disabled={updateTournament.isPending}
+                  placeholder="제한 없음"
+                  className={inputCls}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="edit-gender-max-male" className="text-[13px] text-gray-900">남성 최대</label>
+                <input
+                  id="edit-gender-max-male"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={50}
+                  value={editGenderMaxMale}
+                  onChange={(e) => setEditGenderMaxMale(e.target.value)}
+                  disabled={updateTournament.isPending}
+                  placeholder="제한 없음"
+                  className={inputCls}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="edit-gender-min-female" className="text-[13px] text-gray-900">여성 최소</label>
+                <input
+                  id="edit-gender-min-female"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={50}
+                  value={editGenderMinFemale}
+                  onChange={(e) => setEditGenderMinFemale(e.target.value)}
+                  disabled={updateTournament.isPending}
+                  placeholder="제한 없음"
+                  className={inputCls}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="edit-gender-max-female" className="text-[13px] text-gray-900">여성 최대</label>
+                <input
+                  id="edit-gender-max-female"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={50}
+                  value={editGenderMaxFemale}
+                  onChange={(e) => setEditGenderMaxFemale(e.target.value)}
+                  disabled={updateTournament.isPending}
+                  placeholder="제한 없음"
+                  className={inputCls}
+                />
+              </div>
+            </div>
+          ) : null}
 
           <p className="text-[12px] text-gray-400 -mb-2">상금·시상 정보는 &quot;대회 정보&quot; 탭에서 수정할 수 있어요.</p>
 

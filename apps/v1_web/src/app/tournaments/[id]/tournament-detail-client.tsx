@@ -34,6 +34,7 @@ import {
 import type {
   V1TournamentDetail,
   V1TournamentFormat,
+  V1TournamentGenderCategory,
   V1TournamentGroup,
   V1TournamentFixture,
   V1TournamentAnnouncement,
@@ -50,6 +51,14 @@ function getFormatLabel(format: V1TournamentFormat): string {
     case 'league': return '리그';
     case 'knockout': return '토너먼트';
     case 'group_knockout': return '조별리그 후 토너먼트';
+  }
+}
+
+function getGenderCategoryLabel(category: V1TournamentGenderCategory): string {
+  switch (category) {
+    case 'mixed': return '혼성';
+    case 'male': return '남성부';
+    case 'female': return '여성부';
   }
 }
 
@@ -459,6 +468,14 @@ export function TournamentDetailView({
           <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
             {getFormatLabel(tournament.format)}
           </span>
+          {tournament.genderCategory ? (
+            <span
+              className="tm-badge tm-badge-grey"
+              aria-label={`성별 카테고리: ${getGenderCategoryLabel(tournament.genderCategory)}`}
+            >
+              {getGenderCategoryLabel(tournament.genderCategory)}
+            </span>
+          ) : null}
           {/* Sport identity chip — color dot + Korean label (color + text, not color-only) */}
           <span
             className="tm-badge"

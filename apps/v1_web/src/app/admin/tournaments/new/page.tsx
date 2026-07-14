@@ -8,7 +8,7 @@ import { useV1CreateTournament, useV1MasterSports, useV1UploadImages } from '@/h
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { extractErrorMessage } from '@/lib/error-message';
 import { publicAssetPath } from '@/lib/assets';
-import type { V1TournamentFormat } from '@/types/api';
+import type { V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
 import {
   AdminPageHeader,
   AdminToasts,
@@ -340,6 +340,11 @@ export default function AdminTournamentsNewPage() {
   const [teamCount, setTeamCount] = useState('');
   const [minPlayers, setMinPlayers] = useState('');
   const [maxPlayers, setMaxPlayers] = useState('');
+  const [genderCategory, setGenderCategory] = useState<V1TournamentGenderCategory>('mixed');
+  const [genderMinMale, setGenderMinMale] = useState('');
+  const [genderMaxMale, setGenderMaxMale] = useState('');
+  const [genderMinFemale, setGenderMinFemale] = useState('');
+  const [genderMaxFemale, setGenderMaxFemale] = useState('');
   const [entryFee, setEntryFee] = useState('0');
   const [bankName, setBankName] = useState('');
   const [bankAccount, setBankAccount] = useState('');
@@ -398,6 +403,24 @@ export default function AdminTournamentsNewPage() {
     return null;
   })();
 
+  const genderMinMaleNum = genderMinMale ? parseInt(genderMinMale, 10) : null;
+  const genderMaxMaleNum = genderMaxMale ? parseInt(genderMaxMale, 10) : null;
+  const genderMinFemaleNum = genderMinFemale ? parseInt(genderMinFemale, 10) : null;
+  const genderMaxFemaleNum = genderMaxFemale ? parseInt(genderMaxFemale, 10) : null;
+  const genderQuotaError: string | null = (() => {
+    if (genderCategory !== 'mixed') return null;
+    if (genderMinMaleNum !== null && genderMaxMaleNum !== null && genderMinMaleNum > genderMaxMaleNum) {
+      return '남성 최소 인원은 최대 인원보다 클 수 없어요.';
+    }
+    if (genderMinFemaleNum !== null && genderMaxFemaleNum !== null && genderMinFemaleNum > genderMaxFemaleNum) {
+      return '여성 최소 인원은 최대 인원보다 클 수 없어요.';
+    }
+    if (maxPlayersNum !== null && (genderMinMaleNum ?? 0) + (genderMinFemaleNum ?? 0) > maxPlayersNum) {
+      return '성별 최소 인원 합이 최대 선수 수를 넘을 수 없어요.';
+    }
+    return null;
+  })();
+
   const scheduleRangeError: string | null = (() => {
     const startIso = datetimeTextToIso(scheduledAt);
     const endIso = datetimeTextToIso(scheduledEndAt);
@@ -423,6 +446,7 @@ export default function AdminTournamentsNewPage() {
     rosterDeadlineError === null &&
     teamCountError === null &&
     playersRangeError === null &&
+    genderQuotaError === null &&
     scheduleRangeError === null;
 
   // ── Submit ───────────────────────────────────────────────────────────
@@ -449,6 +473,15 @@ export default function AdminTournamentsNewPage() {
         teamCount: parseInt(teamCount, 10),
         ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
         ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
+        genderCategory,
+        ...(genderCategory === 'mixed'
+          ? {
+              ...(genderMinMale ? { genderMinMale: parseInt(genderMinMale, 10) } : {}),
+              ...(genderMaxMale ? { genderMaxMale: parseInt(genderMaxMale, 10) } : {}),
+              ...(genderMinFemale ? { genderMinFemale: parseInt(genderMinFemale, 10) } : {}),
+              ...(genderMaxFemale ? { genderMaxFemale: parseInt(genderMaxFemale, 10) } : {}),
+            }
+          : {}),
         entryFee: parseInt(entryFee || '0', 10),
         ...(prizePool.trim() && !Number.isNaN(parseInt(prizePool, 10))
           ? { prizePool: parseInt(prizePool, 10) }
@@ -733,7 +766,90 @@ export default function AdminTournamentsNewPage() {
                   </p>
                 )}
               </FormField>
+
+              <FormField
+                id="gender-category"
+                label="성별 카테고리"
+                required
+                hint="혼성을 선택하면 성별 인원 쿼터를 함께 설정할 수 있어요"
+              >
+                <select
+                  id="gender-category"
+                  value={genderCategory}
+                  onChange={(e) => setGenderCategory(e.target.value as V1TournamentGenderCategory)}
+                  disabled={isPending}
+                  required
+                  aria-required="true"
+                  className={inputCls}
+                >
+                  <option value="mixed">혼성</option>
+                  <option value="male">남성부</option>
+                  <option value="female">여성부</option>
+                </select>
+              </FormField>
             </div>
+
+            {genderCategory === 'mixed' ? (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                <FormField id="gender-min-male" label="남성 최소 인원" hint="비워두면 제한 없음">
+                  <input
+                    id="gender-min-male"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={genderMinMale}
+                    onChange={(e) => setGenderMinMale(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 3"
+                    className={inputCls}
+                  />
+                </FormField>
+                <FormField id="gender-max-male" label="남성 최대 인원" hint="비워두면 제한 없음">
+                  <input
+                    id="gender-max-male"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={genderMaxMale}
+                    onChange={(e) => setGenderMaxMale(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 8"
+                    className={inputCls}
+                  />
+                </FormField>
+                <FormField id="gender-min-female" label="여성 최소 인원" hint="비워두면 제한 없음">
+                  <input
+                    id="gender-min-female"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={genderMinFemale}
+                    onChange={(e) => setGenderMinFemale(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 2"
+                    className={inputCls}
+                  />
+                </FormField>
+                <FormField id="gender-max-female" label="여성 최대 인원" hint="비워두면 제한 없음">
+                  <input
+                    id="gender-max-female"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={genderMaxFemale}
+                    onChange={(e) => setGenderMaxFemale(e.target.value)}
+                    disabled={isPending}
+                    placeholder="예: 5"
+                    className={inputCls}
+                  />
+                </FormField>
+                {genderQuotaError !== null && (
+                  <p role="alert" className="md:col-span-4 text-[var(--font-size-caption)] text-[var(--red500)] -mt-2">
+                    {genderQuotaError}
+                  </p>
+                )}
+              </div>
+            ) : null}
           </section>
 
           {/* ── 참가비 / 계좌 ────────────────────────────────────────── */}

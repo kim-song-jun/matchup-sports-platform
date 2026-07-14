@@ -793,6 +793,65 @@ function PlayerRow({
   );
 }
 
+/** 혼성 대회 성별 인원 집계 칩 — 컬러 점 + 텍스트를 병행해 색맹 사용자도 충족 여부를 알 수 있게 한다. */
+function GenderCountChip({
+  label,
+  count,
+  min,
+  max,
+  ok,
+}: {
+  label: string;
+  count: number;
+  min: number | null;
+  max: number | null;
+  ok: boolean;
+}) {
+  const hasQuota = min != null || max != null;
+  const rangeText =
+    min != null && max != null
+      ? `${min}~${max}명`
+      : min != null
+        ? `최소 ${min}명`
+        : max != null
+          ? `최대 ${max}명`
+          : null;
+
+  return (
+    <span
+      className="tm-text-label"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '6px 10px',
+        borderRadius: 10,
+        background: hasQuota && !ok ? 'var(--red50)' : 'var(--grey50)',
+        color: hasQuota && !ok ? 'var(--red500)' : 'var(--text-strong)',
+      }}
+    >
+      {hasQuota ? (
+        <span
+          aria-hidden="true"
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: '50%',
+            background: ok ? 'var(--green500)' : 'var(--red500)',
+            flexShrink: 0,
+          }}
+        />
+      ) : null}
+      <span className="tab-num">{label} {count}명</span>
+      {rangeText ? (
+        <span className="tm-text-caption" style={{ color: 'inherit' }}>
+          ({rangeText}{!ok ? ' 미충족' : ''})
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 /* ── Main client ── */
 
 export function TournamentRosterPageClient({
@@ -846,6 +905,22 @@ export function TournamentRosterPageClient({
     [players],
   );
   const canAddDraftForm = canEditRoster && players.length + draftForms.length < maxPlayers;
+  const isMixedGenderTournament = tournament?.genderCategory === 'mixed';
+  const genderCounts = useMemo(() => {
+    let male = 0;
+    let female = 0;
+    for (const player of players) {
+      if (player.gender === 'male') male += 1;
+      else if (player.gender === 'female') female += 1;
+    }
+    return { male, female, unknown: players.length - male - female };
+  }, [players]);
+  const genderMaleOk =
+    (tournament?.genderMinMale == null || genderCounts.male >= tournament.genderMinMale) &&
+    (tournament?.genderMaxMale == null || genderCounts.male <= tournament.genderMaxMale);
+  const genderFemaleOk =
+    (tournament?.genderMinFemale == null || genderCounts.female >= tournament.genderMinFemale) &&
+    (tournament?.genderMaxFemale == null || genderCounts.female <= tournament.genderMaxFemale);
 
   const backHref = `/tournaments/${tournamentId}/my`;
 
@@ -1120,6 +1195,43 @@ export function TournamentRosterPageClient({
             </span>
           ) : null}
         </div>
+
+        {/* 혼성 대회 성별 인원 집계 — 강제 검증 없이 표시만(명단 확정은 어드민 화면에서 처리) */}
+        {isMixedGenderTournament ? (
+          <div
+            style={{
+              marginBottom: 14,
+              padding: '12px 14px',
+              borderRadius: 12,
+              border: '1px solid var(--grey100)',
+            }}
+          >
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8 }}>
+              성별 인원 집계 (혼성 대회)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <GenderCountChip
+                label="남성"
+                count={genderCounts.male}
+                min={tournament?.genderMinMale ?? null}
+                max={tournament?.genderMaxMale ?? null}
+                ok={genderMaleOk}
+              />
+              <GenderCountChip
+                label="여성"
+                count={genderCounts.female}
+                min={tournament?.genderMinFemale ?? null}
+                max={tournament?.genderMaxFemale ?? null}
+                ok={genderFemaleOk}
+              />
+            </div>
+            {genderCounts.unknown > 0 ? (
+              <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--orange500)' }}>
+                {`성별 미입력 ${genderCounts.unknown}명 — 회원 프로필에 성별을 등록해야 집계에 반영돼요.`}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {draftForms.length > 0 && canEditRoster ? (
           <div style={{ display: 'grid', gap: 12, marginBottom: 14 }}>

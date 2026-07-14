@@ -144,3 +144,83 @@ describe('AdminService — inquiries null-safety (guest inquiries)', () => {
     await expect(service.getInquiry(adminAuthUser, 'missing')).rejects.toThrow(NotFoundException);
   });
 });
+
+describe('AdminService — updateInquiryReply', () => {
+  let service: AdminService;
+  let prisma: {
+    v1AdminUser: { findUnique: jest.Mock };
+    v1Inquiry: { findUnique: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let tx: {
+    v1InquiryReply: { findUnique: jest.Mock; update: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock };
+  };
+
+  beforeEach(async () => {
+    tx = {
+      v1InquiryReply: { findUnique: jest.fn(), update: jest.fn() },
+      v1AdminActionLog: { create: jest.fn() },
+    };
+    prisma = {
+      v1AdminUser: { findUnique: jest.fn() },
+      v1Inquiry: { findUnique: jest.fn() },
+      $transaction: jest.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [AdminService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+
+    service = module.get(AdminService);
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it('updates the reply body and re-fetches the inquiry', async () => {
+    tx.v1InquiryReply.findUnique.mockResolvedValue({
+      id: 'reply-1',
+      inquiryId: 'inquiry-1',
+      body: '기존 답변',
+    });
+    tx.v1InquiryReply.update.mockResolvedValue({ id: 'reply-1', body: '수정된 답변' });
+    prisma.v1Inquiry.findUnique.mockResolvedValue({
+      ...makeGuestInquiryRow({ id: 'inquiry-1' }),
+      body: '문의 본문',
+      contact: null,
+      replies: [],
+    });
+
+    const result = await service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'reply-1', { body: '수정된 답변' });
+
+    expect(tx.v1InquiryReply.update).toHaveBeenCalledWith({
+      where: { id: 'reply-1' },
+      data: { body: '수정된 답변' },
+    });
+    expect(tx.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ inquiryId: 'inquiry-1' });
+  });
+
+  it('throws NOT_FOUND when the reply does not exist', async () => {
+    tx.v1InquiryReply.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'missing-reply', { body: '수정된 답변' }),
+    ).rejects.toThrow(NotFoundException);
+    expect(tx.v1InquiryReply.update).not.toHaveBeenCalled();
+  });
+
+  it('throws NOT_FOUND when the reply belongs to a different inquiry (prevents cross-inquiry edits)', async () => {
+    tx.v1InquiryReply.findUnique.mockResolvedValue({
+      id: 'reply-1',
+      inquiryId: 'some-other-inquiry',
+      body: '기존 답변',
+    });
+
+    await expect(
+      service.updateInquiryReply(adminAuthUser, 'inquiry-1', 'reply-1', { body: '수정된 답변' }),
+    ).rejects.toThrow(NotFoundException);
+    expect(tx.v1InquiryReply.update).not.toHaveBeenCalled();
+  });
+});

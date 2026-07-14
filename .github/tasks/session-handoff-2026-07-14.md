@@ -24,7 +24,9 @@
 - [x] 전체 단위 테스트: API 46 suites / 602 tests, Web 47 files / 274 tests 통과.
 - [x] production clone과 분리된 일회성 `ulw_v1_integration_*` DB에 50개 migration을 새로 적용하고 API integration 2 tests 통과 후 DB를 즉시 삭제.
 - [x] 양 패키지 `tsc --noEmit` 및 v1 web pattern check 통과.
-- [ ] main↔dev 통합 후 공개 대회 결과·후기·영상과 관리자 팝업·명단 화면 라이브 QA.
+- [x] 현재 committed tree에서 Next production build(75 routes)와 Nest production build 통과 후 유일한 웹 서버를 같은 `3013`에 재기동하고 web/API HTTP 200 확인.
+- [x] 공개 대회 라이브 QA: 2개 목록, 혼성 상세, 비로그인 신청 redirect, 결과 공개 전 상태, 후기 빈 상태, 모바일 overflow, console/network 재검증. 데스크톱 프로모 배너의 좌우 20px 과도한 inset을 실제 geometry로 재현.
+- [x] 관리자 팝업·대회 명단·성별 표시 라이브 QA: owner/ops에서 팝업 목록·상세·수정 진입과 혼성 대회 신청 9팀/명단 12명/CSV affordance 확인, console/network 오류 0. clone에 support 계정이 없어 support 역할만 미검증이며 권한 데이터는 인위적으로 추가하지 않음.
 - [ ] 브라우저 코멘트 4건 구현 및 before/after 시각 QA.
 - [ ] 동적 캠페인 템플릿 설계·구현·마이그레이션·QA.
 - [ ] 전체 테스트·빌드와 committed-tree 검증 후 `dev` push, 기존 PR #69 정리 판단.
@@ -32,6 +34,15 @@
 ### 현재 blocker
 
 - 프로젝트 전역 규칙이 모든 product UI 변경 전에 Lazyweb report 생성을 강제한다. 현재 세션에는 `lazyweb_generate_report` / `lazyweb_get_report` 도구가 노출되지 않았고 설치 후보도 없다. Lazyweb 연결이 복구되기 전에는 UI 구현을 시작하지 않는다. 기능·데이터·테스트 검증은 계속 진행한다.
+
+### 동적 대회 캠페인 최소 계약 (구현 전 분석 완료)
+
+- 범용 CMS나 임의 HTML/CSS 빌더를 만들지 않는다. 코드에 고정된 Teameet 대회 전용 템플릿 1개와 대회별 `V1TournamentCampaign` 1:1 레코드만 추가한다.
+- 새 레코드는 `tournamentId @unique`, 영구 고유 `slug`, `draft | published | archived`, versioned typed JSON content, `publishedAt`/`archivedAt`/timestamps를 가진다.
+- hard delete API는 만들지 않고 archive 후에도 콘텐츠와 slug를 보존한다. 발행된 slug는 변경·재사용하지 않는다.
+- 일정·장소·참가비·정원·상금·규정·환불·협찬은 기존 `V1Tournament`와 sponsor/registration 데이터를 SSOT로 재사용하고 content JSON에 복제하지 않는다.
+- public은 published 캠페인만 `/api/v1/tournaments/campaigns/:slug`로 조회한다. admin active role은 조회, owner/ops만 create/update/status mutation 가능하며 기존 admin action log를 사용한다.
+- 이 기능은 새 enum/table/unique/FK가 필요하므로 migration 파일이 필수다. 기존 대회 backfill은 하지 않고 production에는 직접 적용하지 않는다. disposable 최신 prod clone에서 migration 0-drift와 기존 row count 불변을 검증한다.
 
 > 새 세션에서 이 문서를 그대로 붙여넣고 이어서 진행하면 됩니다. 이 문서는 이전 세션의 전체 대화 맥락·사용자 지시·결정사항·진행상황을 담고 있습니다.
 

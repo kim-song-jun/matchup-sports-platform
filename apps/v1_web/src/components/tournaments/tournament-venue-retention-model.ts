@@ -12,7 +12,15 @@ export type TournamentVenuePrepItem = {
   label: string;
   value: string;
   detail: string;
-  status: HubState;
+  /**
+   * null이면 이 행에 상태 배지를 렌더하지 않는다. venue가 있는 일반 케이스는 항상
+   * null — 장소명·지도 링크가 이미 무조건 노출되는 상태에서 "확인 가능" 배지를
+   * 붙여봐야 그 정보를 다시 확인할 수 있다는 뜻인데 정작 그 정보가 배지 없이도
+   * 전부 보여서 아무 부가 정보가 없었다(사용자 피드백, 배지를 가려도 잃는 정보 없음
+   * 실제 확인). venue가 없는 극히 드문 edge case(아래 폴백 분기)는 공지 유무에 따라
+   * 실제로 값이 달라지므로 배지를 유지한다.
+   */
+  status: HubState | null;
   actionLabel: string | null;
   href: string | null;
   /** true면 href가 외부 링크(지도 검색 등) — target="_blank" + rel="noopener noreferrer"로 열어야 함. */
@@ -69,7 +77,9 @@ export function getTournamentVenuePrepItems({
         label: '장소',
         value: venue,
         detail: '주차와 입장 동선은 지도에서 확인해요.',
-        status: 'available',
+        // 장소명 + 지도 링크가 이 행에 항상 함께 노출되므로 "확인 가능" 배지는
+        // 아무 부가 정보 없이 중복이었다 — 배지 없음(null)으로 제거.
+        status: null,
         actionLabel: hasCoordinates ? null : '지도에서 보기',
         href: hasCoordinates ? null : naverMapSearchUrl(venue),
         hrefExternal: !hasCoordinates,

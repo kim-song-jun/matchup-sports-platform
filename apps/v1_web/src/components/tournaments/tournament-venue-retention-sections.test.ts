@@ -99,6 +99,34 @@ describe('TournamentVenuePrepSection — rendered venue info (regression guard f
     expect(screen.queryByRole('link', { name: '지도에서 보기' })).not.toBeInTheDocument();
   });
 
+  it('shows no "확인 가능" status badge on the venue row — the venue name + map link are already unconditionally visible, so the badge added no information (user feedback fix)', () => {
+    render(
+      createElement(TournamentVenuePrepSection, {
+        venue: '데일리그라운드 청라국제도시점',
+        announcements: [],
+      }),
+    );
+
+    expect(screen.getByText('데일리그라운드 청라국제도시점')).toBeInTheDocument();
+    expect(screen.queryByText('확인 가능')).not.toBeInTheDocument();
+  });
+
+  it('keeps the status badge for the rare no-venue fallback row, where the badge label genuinely varies with notice presence (out of this fix\'s scope)', () => {
+    const { unmount } = render(
+      createElement(TournamentVenuePrepSection, { venue: null, announcements: [] }),
+    );
+    expect(screen.getByText('공지 대기')).toBeInTheDocument();
+    unmount();
+
+    render(
+      createElement(TournamentVenuePrepSection, {
+        venue: null,
+        announcements: [{ id: 'ann-venue', title: '주차 안내', category: 'venue' }],
+      }),
+    );
+    expect(screen.getByText('확인 가능')).toBeInTheDocument();
+  });
+
   it('coordinates present but no Kakao Maps JS key configured → 지도에서 보기 link is dropped, no map renders, but the navigation button still appears (key-less graceful fallback)', () => {
     render(
       createElement(TournamentVenuePrepSection, {

@@ -261,8 +261,20 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
 }
 
 function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
+  // status가 null이면 이 행엔 상태 배지를 렌더하지 않는다(아래 status 필드 주석 참고).
+  // 배지가 없을 땐 3열(72px 1fr auto) 대신 2열(72px 1fr)로 재배치해 값 영역이
+  // 남는 폭을 온전히 쓰도록 한다 — 빈 auto 컬럼만 남기지 않음.
+  const hasBadge = item.status !== null;
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 10, alignItems: 'start' }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: hasBadge ? '72px 1fr auto' : '72px 1fr',
+        gap: 10,
+        alignItems: 'start',
+      }}
+    >
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)', paddingTop: 2 }}>
         {item.label}
       </div>
@@ -305,7 +317,7 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
           </div>
         ) : null}
       </div>
-      <StatusBadge status={item.status} />
+      {hasBadge ? <StatusBadge status={item.status as HubState} /> : null}
     </div>
   );
 }

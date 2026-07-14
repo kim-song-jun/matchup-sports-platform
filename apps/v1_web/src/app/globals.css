@@ -693,12 +693,35 @@ button:disabled {
 .tm-auth-profile-upload {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
-  gap: 12px;
+  gap: 14px;
   align-items: center;
-  padding: 12px;
-  border: 1px solid var(--line);
+  padding: 14px;
+  border: 1px dashed var(--grey300);
   border-radius: 16px;
-  background: var(--bg);
+  background: var(--grey50);
+}
+
+/* 아바타를 감싸는 클릭 가능한 트리거 — 원형 미리보기를 눌러도 파일 선택이 열린다 */
+.tm-auth-profile-preview-trigger {
+  position: relative;
+  display: inline-flex;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.tm-auth-profile-preview-trigger:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.tm-auth-profile-preview-trigger:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .tm-auth-profile-preview-trigger:hover .tm-auth-profile-preview {
+    background: var(--grey200);
+  }
 }
 
 .tm-auth-profile-preview {
@@ -712,6 +735,22 @@ button:disabled {
   background-size: cover;
   color: var(--text-muted);
   overflow: hidden;
+  transition: background-color 0.12s ease;
+}
+
+/* 사진 미선택 상태에서만 노출되는 카메라 배지 — "눌러서 추가" 어포던스 */
+.tm-auth-profile-preview-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue500);
+  color: var(--static-white);
+  border: 2px solid var(--grey50);
 }
 
 .tm-auth-profile-upload-body {

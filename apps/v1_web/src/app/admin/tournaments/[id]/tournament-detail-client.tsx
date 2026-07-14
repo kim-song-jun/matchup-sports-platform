@@ -1645,9 +1645,11 @@ function BracketTab({
       </StepRow>
 
       {/* ── Step 3: 경기 일정 만들기 ────────────────────────────────── */}
-      <StepRow n={3} locked={groups.length === 0} isLast>
+      <StepRow n={3} locked={groups.length === 0 || confirmedRegistrations.length === 0} isLast>
       {groups.length === 0 ? (
         <LockedStepNotice reason="1단계에서 조를 먼저 만들어 주세요." />
+      ) : confirmedRegistrations.length === 0 ? (
+        <LockedStepNotice reason="확정된 참가팀이 아직 없어요." />
       ) : (
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-5">
         <h3 className="text-[15px] font-bold text-gray-900 mb-4">경기 일정 만들기</h3>

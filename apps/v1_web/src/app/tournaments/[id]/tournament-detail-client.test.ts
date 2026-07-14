@@ -183,7 +183,7 @@ describe('getTournamentVenuePrepItems', () => {
   // 기존 "운영진 공지 확인 / 공지 대기" 폴백을 유지한다. 4가지 조합(venue 있음/없음 ×
   // 공지 있음/없음)을 모두 커버한다.
 
-  it('venue 있음 + 공지 없음: 장소명과 네이버 지도 검색 링크를 보여주고 보조 공지는 없다', () => {
+  it('venue 있음 + 공지 없음: 장소명과 네이버 지도 검색 링크를 보여주고 보조 공지는 없다. 장소명·지도 링크가 이미 항상 노출되므로 상태 배지는 없다(status: null)', () => {
     const items = getTournamentVenuePrepItems({ venue: '데일리그라운드 청라국제도시점' });
 
     expect(items).toHaveLength(1);
@@ -191,7 +191,7 @@ describe('getTournamentVenuePrepItems', () => {
       key: 'parking',
       label: '장소',
       value: '데일리그라운드 청라국제도시점',
-      status: 'available',
+      status: null,
       actionLabel: '지도에서 보기',
       href: 'https://map.naver.com/v5/search/' + encodeURIComponent('데일리그라운드 청라국제도시점'),
       hrefExternal: true,
@@ -199,7 +199,7 @@ describe('getTournamentVenuePrepItems', () => {
     });
   });
 
-  it('venue 있음 + 공지 있음: 장소 정보는 그대로 유지되고 공지는 보조 정보로 덧붙는다', () => {
+  it('venue 있음 + 공지 있음: 장소 정보는 그대로 유지되고 공지는 보조 정보로 덧붙는다. 이 경우도 상태 배지는 없다(status: null)', () => {
     const items = getTournamentVenuePrepItems({
       venue: '데일리그라운드 청라국제도시점',
       announcements: [
@@ -214,7 +214,7 @@ describe('getTournamentVenuePrepItems', () => {
     expect(items[0]).toMatchObject({
       label: '장소',
       value: '데일리그라운드 청라국제도시점',
-      status: 'available',
+      status: null,
       actionLabel: '지도에서 보기',
       hrefExternal: true,
       notice: {

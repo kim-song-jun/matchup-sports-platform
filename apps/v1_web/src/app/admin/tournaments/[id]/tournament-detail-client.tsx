@@ -112,6 +112,7 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { TournamentSponsorsTab } from './tournament-sponsors-tab';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
+import { PromoHomePreview, PromoListPreview } from '@/components/admin/promo-card-preview';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -2793,6 +2794,9 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [promoListPrizeText, setPromoListPrizeText] = useState('');
   const [promoListPriority, setPromoListPriority] = useState('0');
   const [promoUploadingSlot, setPromoUploadingSlot] = useState<'home' | 'list' | null>(null);
+  // 홈 히어로 미리보기 폴백 3순위(`${sportName} 대회`)용 — 프로덕션(tournament-hero-card.tsx)과
+  // 동일 계산이지만 어드민 상세 응답에는 sport 객체가 없어 마스터 종목 목록에서 조회한다.
+  const promoFallbackSportName = masterSports?.find((s) => s.id === tournament?.sportId)?.name ?? null;
 
   /** Open edit modal prefilled with current tournament values */
   const openEdit = () => {
@@ -3685,6 +3689,53 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                   />
                   노출
                 </label>
+              </div>
+
+              {/* 라이브 미리보기 — 실제 홈/목록 노출 마크업(tournament-hero-card.tsx, tournaments/page.tsx
+                 배너)과 동일한 컴포넌트를 재사용해, 저장 전에 이미지·문구가 실제로 어떻게
+                 보이는지 확인할 수 있게 한다(관리자가 "이미지가 미리보기에 안 나온다"고 보고한
+                 사안 — 이전엔 폼 입력만 있고 시각 미리보기 자체가 없었다). */}
+              <div className="mt-3">
+                <p className="mb-1.5 text-[11px] font-medium text-gray-500">
+                  미리보기 · {promo.key === 'home' ? '홈 화면 오늘의 추천' : '대회 목록 상단 배너'}
+                </p>
+                {promo.key === 'home' ? (
+                  <PromoHomePreview
+                    fields={{
+                      title: promo.cardTitle,
+                      subtitle: promo.subtitle,
+                      badgeText: promo.badge,
+                      imageUrl: promo.imageUrl,
+                      dateText: promo.dateText,
+                      teamsText: promo.teamsText,
+                      locationText: promo.locationText,
+                      prizeText: promo.prizeText,
+                    }}
+                    fallback={{
+                      title: tournament?.title ?? '',
+                      venue: tournament?.venue ?? null,
+                      sportName: promoFallbackSportName,
+                    }}
+                  />
+                ) : (
+                  <PromoListPreview
+                    fields={{
+                      title: promo.cardTitle,
+                      subtitle: promo.subtitle,
+                      badgeText: promo.badge,
+                      imageUrl: promo.imageUrl,
+                      dateText: promo.dateText,
+                      teamsText: promo.teamsText,
+                      locationText: promo.locationText,
+                      prizeText: promo.prizeText,
+                    }}
+                    fallback={{
+                      title: tournament?.title ?? '',
+                      venue: tournament?.venue ?? null,
+                      sportName: promoFallbackSportName,
+                    }}
+                  />
+                )}
               </div>
 
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">

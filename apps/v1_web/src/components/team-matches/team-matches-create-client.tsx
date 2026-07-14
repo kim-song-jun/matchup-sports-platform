@@ -140,6 +140,10 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     onBack: () => router.push(previousHref(step)),
     onNext: () => router.push(nextHref(step)),
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+      if (createTeamMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload) {
@@ -209,6 +213,10 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     onBack: () => router.push(`/team-matches/${teamMatchId}`),
     onNext: () => undefined,
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+      if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload || !version) {
@@ -224,6 +232,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       );
     },
     onCancel: () => {
+      if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
       cancelTeamMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
         {

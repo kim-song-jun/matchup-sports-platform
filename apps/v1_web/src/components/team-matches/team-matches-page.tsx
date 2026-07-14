@@ -116,9 +116,17 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
 
+  const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string) => {
-    if (!action) return;
-    void Promise.resolve(action())
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
+    // 동기적인 ref 락으로 한 번 더 막는다.
+    if (!action || heroActionBusyRef.current) return;
+    heroActionBusyRef.current = true;
+    // action()을 .then() 콜백 안에서 호출 — 동기 throw도 promise rejection으로 변환되어
+    // .catch/.finally가 항상 실행되고 락이 풀린다(Promise.resolve(action())은 인자 평가가
+    // Promise.resolve 호출보다 먼저라 동기 throw 시 .finally를 건너뛰어 락이 영구 고정됨).
+    void Promise.resolve()
+      .then(() => action())
       .then(() => {
         setHeroMessage(successMessage);
         window.setTimeout(() => setHeroMessage(''), 2000);
@@ -126,6 +134,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       .catch(() => {
         setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 2000);
+      })
+      .finally(() => {
+        heroActionBusyRef.current = false;
       });
   };
 

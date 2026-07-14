@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView } from './teams-page';
 import { getTeamListViewModel } from './teams.view-model';
@@ -179,6 +179,64 @@ describe('TeamDetailPageView', () => {
     introNodes.forEach((node) => {
       expect(node).toHaveStyle({ whiteSpace: 'pre-line' });
     });
+  });
+
+  it('releases the hero action busy lock after a synchronous throw so the CTA stays usable', async () => {
+    const onCta = vi.fn(() => {
+      throw new Error('sync failure');
+    });
+    const model: TeamDetailViewModel = {
+      team: {
+        id: 'team-live-1',
+        name: '라이브 팀',
+        logo: '라',
+        logoUrl: null,
+        coverImageUrl: null,
+        sport: '풋살',
+        sports: ['풋살'],
+        region: '서울 성동구',
+        members: 7,
+        capacity: 12,
+        status: 'open',
+        statusLabel: '가입 신청 가능',
+        tags: [],
+        genderRule: '성별 무관',
+        intro: '',
+        next: '',
+        description: '',
+        activity: '',
+        condition: '',
+        schedule: '',
+        city: '서울',
+        county: '성동구',
+        level: '초보-중수',
+        membersList: [],
+        memberAccess: {
+          canView: false,
+          enabled: false,
+          message: '멤버 목록 비공개',
+        },
+      },
+      mode: 'default',
+      onCta,
+    };
+
+    render(<TeamDetailPageView model={model} />);
+
+    const [ctaButton] = screen.getAllByRole('button', { name: '가입 신청' });
+
+    // Promise.resolve(action())은 action()을 동기 평가하므로 sync throw가 .catch/.finally를
+    // 건너뛰고 heroActionBusyRef를 영구 잠금 상태로 남긴다 — 이 테스트는 그 회귀를 잡는다.
+    fireEvent.click(ctaButton);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    fireEvent.click(ctaButton);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(onCta).toHaveBeenCalledTimes(2);
   });
 });
 

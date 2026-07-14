@@ -104,6 +104,10 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
       return url;
     },
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+      if (createMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
       if (!payload) {
@@ -169,6 +173,10 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       return url;
     },
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+      if (updateMatch.isPending || cancelMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
       if (!payload || !version) {
@@ -184,6 +192,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       );
     },
     onCancel: () => {
+      if (updateMatch.isPending || cancelMatch.isPending) return;
       setError(null);
       cancelMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },

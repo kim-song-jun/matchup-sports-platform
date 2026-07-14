@@ -129,6 +129,10 @@ export function MyInquiryCreateClient() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+    if (createInquiry.isPending) return;
     const nextErrors: InquiryFormErrors = {};
     if (!title.trim()) nextErrors.title = '\ubb38\uc758 \uc81c\ubaa9\uc744 \uc785\ub825\ud574 \uc8fc\uc138\uc694.';
     if (!body.trim()) nextErrors.body = '\ubb38\uc758 \ub0b4\uc6a9\uc744 \uc785\ub825\ud574 \uc8fc\uc138\uc694.';

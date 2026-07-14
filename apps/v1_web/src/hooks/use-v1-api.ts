@@ -1441,6 +1441,7 @@ export function useV1AdminInquiriesPendingCount() {
     queryFn: () => v1Get<V1AdminInquiryPendingCount>('/admin/inquiries/pending-count'),
     staleTime: 15_000,
     refetchInterval: 30_000,
+    retry: false, // refetchInterval과 겹쳐 일시 실패 시 중복 요청 방지 (Copilot 리뷰 지적, PR #63)
   });
 }
 

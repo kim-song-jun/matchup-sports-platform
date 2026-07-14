@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const baseUrl = (process.env.BASE_URL ?? 'http://localhost:13013/v1').replace(/\/$/, '');
+const baseUrl = (process.env.BASE_URL ?? 'http://localhost:3013/v1').replace(/\/$/, '');
 const runId = process.env.RUN_ID ?? `home-notice-popup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const outDir = path.join('output', 'playwright', 'visual-audit', runId);
 const userEmail = process.env.V1_QA_USER_EMAIL ?? 'host@teameet.v1';

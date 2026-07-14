@@ -501,24 +501,17 @@ export function useV1MatchApplications(matchId: string, filters?: ListFilters, o
   });
 }
 
-const EMPTY_MATCH_APPLICATIONS_PAGE: V1MatchApplicationsPage = {
-  matchId: '',
-  items: [],
-  pageInfo: {
-    nextCursor: null,
-    hasNext: false,
-  },
-};
-
 /**
- * queryFn이 malformed/undefined 페이지를 반환해도(네트워크 파싱 실패 등) 안전한 빈 페이지로
- * 정규화한다 — team-members useInfiniteQuery(tournament-roster-client.tsx)와 동일 패턴.
+ * queryFn 응답 shape을 검증한다. 서버가 malformed/undefined 페이지를 반환하면(네트워크 파싱
+ * 실패 등) "신청자 0명"으로 조용히 뭉개지 않고 에러를 던져 react-query의 isError 경로로
+ * 넘긴다 — 목록 화면(client.tsx)이 이미 `applicationsQuery.isError`에서 "신청 목록을
+ * 불러오지 못했어요" 에러 상태를 렌더링하므로, 실패를 빈 상태로 위장하지 않고 그대로 노출한다.
  */
-function normalizeMatchApplicationsPage(
+function assertValidMatchApplicationsPage(
   page: V1MatchApplicationsPage | undefined | null,
 ): V1MatchApplicationsPage {
   if (!page || !Array.isArray(page.items) || !page.pageInfo) {
-    return EMPTY_MATCH_APPLICATIONS_PAGE;
+    throw new Error('Malformed match applications page response');
   }
   return page;
 }
@@ -539,7 +532,7 @@ export function useV1MatchApplicationsInfinite(
       v1Get<V1MatchApplicationsPage>(`/matches/${matchId}/applications`, {
         ...filters,
         ...(pageParam ? { cursor: pageParam } : {}),
-      }).then(normalizeMatchApplicationsPage),
+      }).then(assertValidMatchApplicationsPage),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) =>
       lastPage?.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor : undefined,

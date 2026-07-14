@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toDetailMode } from './matches-client';
+import { toDetailMode } from './matches.mode';
 
 /**
  * 회귀 가드: 참가한 적 없는 뷰어('none')가 마감류 매치를 보면 과거엔 'approved'를

@@ -16,6 +16,7 @@ import {
 import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
+import { toDetailMode } from './matches.mode';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
 import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
@@ -403,17 +404,6 @@ function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1ViewerState
   if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
   if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'full';
   return 'open';
-}
-
-export function toDetailMode(viewerState: V1ViewerState, status: V1MatchApiStatus): MatchDetailViewModel['mode'] {
-  if (viewerState === 'host') return 'mine';
-  if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
-  // 참가한 적 없는 뷰어(viewerState:'none')가 마감류 매치를 보는 경우 — 'approved'를 재사용하면
-  // 실제 승인 참가자와 동일한 초록 배너("참가를 확정했어요")가 잘못 뜬다(never-applied 뷰어에게
-  // 거짓 참가 확정 안내). 별도 'closed' mode로 구분해 중립(회색) 안내로 렌더링한다.
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'closed';
-  return 'default';
 }
 
 function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {

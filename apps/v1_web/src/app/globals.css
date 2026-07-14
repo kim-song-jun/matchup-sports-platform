@@ -720,7 +720,7 @@ button:disabled {
 
 @media (hover: hover) {
   .tm-auth-profile-preview-trigger:hover .tm-auth-profile-preview {
-    background: var(--grey200);
+    background-color: var(--grey200);
   }
 }
 

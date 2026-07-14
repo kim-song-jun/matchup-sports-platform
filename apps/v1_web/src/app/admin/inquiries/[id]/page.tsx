@@ -60,6 +60,19 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
+/**
+ * Prisma @updatedAt은 생성 시점에도 createdAt과 수 밀리초 차이가 날 수 있어(같은 요청
+ * 안에서도 각 필드가 별도로 타임스탬프를 찍음), 엄격한 부등호 비교는 갓 작성된(수정 안 한)
+ * 답변에도 "(수정됨)"을 잘못 표시할 수 있다(Copilot 리뷰 지적, PR #61). 1초 이상 차이날
+ * 때만 실제 수정으로 간주한다.
+ */
+function wasReplyEdited(reply: { createdAt: string; updatedAt: string }) {
+  const created = new Date(reply.createdAt).getTime();
+  const updated = new Date(reply.updatedAt).getTime();
+  if (Number.isNaN(created) || Number.isNaN(updated)) return false;
+  return updated - created > 1000;
+}
+
 function requesterName(inquiry: {
   requesterName: string | null;
   requesterEmail: string | null;
@@ -280,7 +293,7 @@ export default function AdminInquiryDetailPage() {
                         <div className="flex items-center gap-2">
                           <time className="text-xs text-gray-400">
                             {formatDateTime(reply.createdAt)}
-                            {reply.updatedAt !== reply.createdAt ? ' (수정됨)' : ''}
+                            {wasReplyEdited(reply) ? ' (수정됨)' : ''}
                           </time>
                           {canWrite && !isEditing ? (
                             <button
@@ -302,6 +315,7 @@ export default function AdminInquiryDetailPage() {
                             rows={5}
                             maxLength={2000}
                             disabled={updateReplyMutation.isPending}
+                            aria-label="답변 내용 수정"
                             className="resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                           />
                           <div className="flex gap-2">

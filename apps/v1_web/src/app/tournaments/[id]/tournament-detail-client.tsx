@@ -540,7 +540,7 @@ export function TournamentDetailView({
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
             <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
-            <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0 }} />
+            <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
             <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
           {/* 항상 표시 */}
@@ -648,7 +648,7 @@ export function TournamentDetailView({
         </div>
         <Card pad={0}>
           <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
-          <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0 }} />
+          <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
           <InfoRow label="참가팀" value={`${tournament.confirmedCount}/${tournament.teamCount}팀 확정`} />
           <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           {tournament.venue ? (

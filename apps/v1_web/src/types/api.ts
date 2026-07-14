@@ -1320,6 +1320,11 @@ export type V1AdminInquiryStatusPayload = {
   reason?: string;
 };
 
+/** GET /admin/inquiries/pending-count — 미답변(received/reviewing) 문의 건수 */
+export type V1AdminInquiryPendingCount = {
+  count: number;
+};
+
 export type V1AdminUserRow = {
   userId: string;
   nickname: string | null;

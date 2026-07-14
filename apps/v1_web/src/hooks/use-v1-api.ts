@@ -10,6 +10,7 @@ import type {
   CursorPage,
   V1AdminGrantResult,
   V1AdminInquiryDetail,
+  V1AdminInquiryPendingCount,
   V1AdminInquiryReplyPayload,
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
@@ -1430,6 +1431,17 @@ export function useV1AdminInquiry(inquiryId: string) {
     queryKey: v1Keys.adminInquiry(inquiryId),
     queryFn: () => v1Get<V1AdminInquiryDetail>(`/admin/inquiries/${inquiryId}`),
     enabled: !!inquiryId,
+  });
+}
+
+/** 어드민 사이드바 "문의" 배지용 — received/reviewing(미답변) 건수만 가볍게 조회 */
+export function useV1AdminInquiriesPendingCount() {
+  return useQuery({
+    queryKey: v1Keys.adminInquiriesPendingCount(),
+    queryFn: () => v1Get<V1AdminInquiryPendingCount>('/admin/inquiries/pending-count'),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    retry: false, // refetchInterval과 겹쳐 일시 실패 시 중복 요청 방지 (Copilot 리뷰 지적, PR #63)
   });
 }
 

@@ -155,7 +155,7 @@ export class TournamentPlayersService {
         user: {
           select: {
             phone: true,
-            profile: { select: { displayName: true, birthDate: true } },
+            profile: { select: { displayName: true, birthDate: true, gender: true } },
           },
         },
       },
@@ -168,6 +168,7 @@ export class TournamentPlayersService {
     }
     const memberRealName = teamMembership.user.profile?.displayName?.trim();
     const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
+    const memberGender = normalizeGender(teamMembership.user.profile?.gender);
     const memberPhone = teamMembership.user.phone?.trim();
     if (!memberRealName || !memberBirthDate || !memberPhone) {
       throw new BadRequestException({
@@ -196,11 +197,13 @@ export class TournamentPlayersService {
         userId: dto.userId,
         realName: memberRealName,
         birthDateSnapshot: memberBirthDate,
+        genderSnapshot: memberGender,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
       },
       update: {
         realName: memberRealName,
         birthDateSnapshot: memberBirthDate,
+        genderSnapshot: memberGender,
         eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
         eligibilityNote: null,
         removedAt: null,
@@ -271,7 +274,39 @@ export class TournamentPlayersService {
     return this.serializePlayer(updated);
   }
 
-  // ─── 어드민: CSV 다운로드 ──────────────────────────────────────────────────────
+  // ─── 어드민: 명단 조회/CSV 다운로드 ───────────────────────────────────────────
+
+  async listPlayersForAdmin(user: V1AuthUser, registrationId: string) {
+    await this.adminContext.getActiveAdmin(user.id);
+
+    const registration = await this.prisma.v1TournamentRegistration.findUnique({
+      where: { id: registrationId },
+      select: {
+        id: true,
+        teamId: true,
+        rosterLockedAt: true,
+        team: { select: { name: true } },
+        tournament: { select: { minPlayers: true } },
+      },
+    });
+    if (!registration) {
+      throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '신청 내역을 찾을 수 없어요.' });
+    }
+
+    const players = await this.prisma.v1TournamentPlayer.findMany({
+      where: { registrationId, removedAt: null },
+      orderBy: { addedAt: 'asc' },
+    });
+
+    return {
+      registrationId: registration.id,
+      teamId: registration.teamId,
+      teamName: registration.team.name,
+      rosterLockedAt: registration.rosterLockedAt?.toISOString() ?? null,
+      players: players.map((player) => this.serializePlayer(player)),
+      belowMinimum: players.length < registration.tournament.minPlayers,
+    };
+  }
 
   /**
    * PII 포함 — 어드민 게이트 필수.
@@ -296,12 +331,13 @@ export class TournamentPlayersService {
     });
 
     // CSV 생성 — PII 포함
-    const header = 'realName,birthDate,eligibility,nickname';
+    const header = 'realName,birthDate,gender,eligibility,nickname';
     const rows = players.map((p) => {
       const nickname = p.user.profile?.nickname ?? '';
       const cols = [
         this.escapeCsvField(p.realName),
         this.escapeCsvField(p.birthDateSnapshot ?? ''),
+        this.escapeCsvField(p.genderSnapshot ?? ''),
         this.escapeCsvField(p.eligibilityStatus),
         this.escapeCsvField(nickname),
       ];
@@ -362,6 +398,7 @@ export class TournamentPlayersService {
       userId: row.userId,
       realName: row.realName,
       birthDateSnapshot: row.birthDateSnapshot ?? null,
+      genderSnapshot: normalizeGender(row.genderSnapshot),
       eligibilityStatus: row.eligibilityStatus,
       eligibilityNote: row.eligibilityNote ?? null,
       addedAt: row.addedAt.toISOString(),
@@ -381,4 +418,8 @@ export class TournamentPlayersService {
     }
     return sanitized;
   }
+}
+
+function normalizeGender(value: string | null | undefined): 'male' | 'female' | null {
+  return value === 'male' || value === 'female' ? value : null;
 }

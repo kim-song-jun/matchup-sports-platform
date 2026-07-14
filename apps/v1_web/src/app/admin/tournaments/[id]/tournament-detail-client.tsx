@@ -32,7 +32,7 @@ import {
   useV1RosterLock,
   useV1RosterUnlock,
   useV1ExportRosterCsv,
-  useV1TournamentPlayers,
+  useV1AdminTournamentPlayers,
   useV1UpdatePlayerEligibility,
   useV1AdminBracket,
   useV1CreateGroup,
@@ -88,6 +88,11 @@ const ELIGIBILITY_LABEL: Record<string, string> = {
   non_pro: '아마추어',
   pro: '프로',
   needs_review: '검토 필요',
+};
+
+const GENDER_LABEL: Record<string, string> = {
+  male: '남성',
+  female: '여성',
 };
 
 // f9: 결제 상태·수단 한글 라벨 (schema enum=ready|paid|failed|cancelled|refunded, my-registration-client 동일 기준)
@@ -324,21 +329,20 @@ const TABS: { id: TabId; label: string }[] = [
 
 // ── Registration roster modal ─────────────────────────────────────────────
 
-function RosterModal({
+export function RosterModal({
   open,
   onClose,
-  tournamentId,
   registration,
   showToast,
+  canWrite,
 }: {
   open: boolean;
   onClose: () => void;
-  tournamentId: string;
   registration: V1AdminTournamentRegistration | null;
   showToast: (msg: string, v?: 'success' | 'error') => void;
+  canWrite: boolean;
 }) {
-  const { data, isPending } = useV1TournamentPlayers(
-    tournamentId,
+  const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(
     registration?.id ?? '',
   );
   const updateEligibility = useV1UpdatePlayerEligibility();
@@ -364,6 +368,17 @@ function RosterModal({
     >
       {isPending ? (
         <p className="text-sm text-gray-500">불러오는 중…</p>
+      ) : isError ? (
+        <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+          <p>{extractErrorMessage(error, '명단을 불러오지 못했어요.')}</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="mt-3 h-[44px] rounded-lg bg-white px-4 font-semibold text-red-700"
+          >
+            다시 시도
+          </button>
+        </div>
       ) : players.length === 0 ? (
         <p className="text-sm text-gray-500">등록된 선수가 없어요.</p>
       ) : (
@@ -375,14 +390,15 @@ function RosterModal({
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{p.realName}</p>
-                {p.birthDateSnapshot && (
-                  <p className="text-xs text-gray-500">{p.birthDateSnapshot}</p>
-                )}
+                <p className="text-xs text-gray-500">
+                  {p.birthDateSnapshot ?? '생년월일 미등록'} ·{' '}
+                  {p.genderSnapshot ? GENDER_LABEL[p.genderSnapshot] : '성별 미등록'}
+                </p>
               </div>
               <select
                 value={p.eligibilityStatus}
                 onChange={(e) => handleEligibilityChange(p.id, e.target.value)}
-                disabled={updateEligibility.isPending}
+                disabled={!canWrite || updateEligibility.isPending}
                 aria-label={`${p.realName} 자격 상태`}
                 className="h-[44px] px-3 text-[13px] bg-white border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
               >
@@ -451,9 +467,11 @@ function ExportCsvButton({
 function RegistrationsTab({
   tournamentId,
   showToast,
+  canWrite,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
+  canWrite: boolean;
 }) {
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentRegistrations(tournamentId);
   const confirmPayment = useV1ConfirmPayment();
@@ -662,9 +680,9 @@ function RegistrationsTab({
       <RosterModal
         open={rosterOpen}
         onClose={() => setRosterOpen(false)}
-        tournamentId={tournamentId}
         registration={rosterRegistration}
         showToast={showToast}
+        canWrite={canWrite}
       />
 
       {/* 신청 취소 confirm modal */}
@@ -2468,7 +2486,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         hidden={activeTab !== 'registrations'}
       >
         {activeTab === 'registrations' && (
-          <RegistrationsTab tournamentId={id} showToast={showToast} />
+          <RegistrationsTab tournamentId={id} showToast={showToast} canWrite={canWrite} />
         )}
       </div>
 

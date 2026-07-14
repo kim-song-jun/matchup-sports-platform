@@ -112,6 +112,7 @@ import type {
   V1AdminRegistrationListPage,
   V1AdminTournamentRegistration,
   V1AdminTournamentRegistrationWithIdempotent,
+  V1AdminTournamentRosterResponse,
   V1AdminTournamentBracket,
   V1AdminBracketGroup,
   V1AdminBracketGroupTeam,
@@ -2012,6 +2013,16 @@ export function useV1RosterLock() {
   });
 }
 
+export function useV1AdminTournamentPlayers(registrationId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentRoster(registrationId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`),
+    enabled: !!registrationId,
+    retry: false,
+  });
+}
+
 export function useV1RosterUnlock() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2052,6 +2063,9 @@ export function useV1UpdatePlayerEligibility() {
     }: { playerId: string } & V1UpdatePlayerEligibilityPayload) =>
       v1Patch<V1TournamentPlayer>(`/admin/players/${playerId}/eligibility`, body),
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'registrations'],
+      });
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });

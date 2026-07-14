@@ -1770,6 +1770,7 @@ export type V1TournamentPlayer = {
   userId: string;
   realName: string;
   birthDateSnapshot: string | null;
+  genderSnapshot: 'male' | 'female' | null;
   eligibilityStatus: V1PlayerEligibilityStatus;
   eligibilityNote: string | null;
   addedAt: string;
@@ -1779,6 +1780,13 @@ export type V1TournamentPlayer = {
 export type V1TournamentRosterResponse = {
   players: V1TournamentPlayer[];
   belowMinimum: boolean;
+};
+
+export type V1AdminTournamentRosterResponse = V1TournamentRosterResponse & {
+  registrationId: string;
+  teamId: string;
+  teamName: string;
+  rosterLockedAt: string | null;
 };
 
 /** Admin bracket bracket view: TournamentBracketService.getBracket groups item */

@@ -60,6 +60,14 @@ export class TournamentPlayersController {
 export class TournamentPlayersAdminController {
   constructor(private readonly playersService: TournamentPlayersService) {}
 
+  @Get('registrations/:registrationId/players')
+  listPlayers(
+    @CurrentUser() user: V1AuthUser,
+    @Param('registrationId') registrationId: string,
+  ) {
+    return this.playersService.listPlayersForAdmin(user, registrationId);
+  }
+
   /**
    * PII 포함 — 어드민 게이트 필수.
    * 서비스가 {filename, csv} 를 반환하고 전역 TransformInterceptor가 {status,data,timestamp}로 래핑한다.

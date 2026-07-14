@@ -1,14 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
-import { useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
+import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
+import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getSportAccent } from '@/lib/v1-sport-accent';
-import { cssUrl } from '@/lib/assets';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
 
@@ -56,6 +55,10 @@ function TournamentsListContent() {
     limit: 20,
     sportId: activeSportId ?? undefined,
   });
+  const promoTournaments = useV1AllTournaments({
+    status: 'open',
+    sportId: activeSportId ?? undefined,
+  });
 
   // Accumulate pages when cursor is set
   const pageItems = data?.items ?? [];
@@ -64,32 +67,6 @@ function TournamentsListContent() {
     : pageItems;
 
   const hasNext = data?.pageInfo?.hasNext ?? false;
-
-  // Derive featured tournament: admin-enabled promo; priority first, then closest scheduledAt.
-  const promoItems = pageItems.filter(
-    (item) => item.status === 'open' && item.promoListEnabled,
-  );
-  const featured: V1TournamentListItem | null = promoItems.length > 0
-    ? promoItems.reduce((best, cur) => {
-        if (cur.promoListPriority > best.promoListPriority) return cur;
-        if (cur.promoListPriority < best.promoListPriority) return best;
-        const bestDate = best.scheduledAt ? new Date(best.scheduledAt).getTime() : Infinity;
-        const curDate = cur.scheduledAt ? new Date(cur.scheduledAt).getTime() : Infinity;
-        return curDate < bestDate ? cur : best;
-      })
-    : null;
-  const featuredTitle = featured?.promoListTitle?.trim() || featured?.title || '';
-  const featuredSubtitle = featured?.promoListSubtitle?.trim() || '';
-  const featuredBadge = featured?.promoListBadgeText?.trim() || '추천 대회';
-  const featuredImageUrl = featured?.promoListImageUrl?.trim();
-  const featuredFacts = featured
-    ? [
-        featured.promoListDateText?.trim(),
-        featured.promoListTeamsText?.trim(),
-        featured.promoListLocationText?.trim(),
-      ].filter(Boolean).join(' · ')
-    : '';
-  const featuredPrizeText = featured?.promoListPrizeText?.trim() || '';
 
   const handleLoadMore = () => {
     if (!data?.pageInfo?.nextCursor) return;
@@ -111,62 +88,13 @@ function TournamentsListContent() {
   return (
     <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
 
-      {/* ── Compact featured banner — admin-enabled promo tournament ── */}
-      {featured ? (
-        <Link
-          href={`/tournaments/${featured.id}`}
-          aria-label={`${featuredTitle} 자세히 보기`}
-          className="tm-tournament-featured-banner"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            marginTop: 12,
-            padding: '18px 20px',
-            borderRadius: 16,
-            // vertical-position 62% (기본 50% center 대비 살짝 아래) — 대회 배너 사진은
-            // 보통 하단부(경기장 펜스·바닥)에 스폰서 로고/워터마크가 있는 경우가 많아
-            // 사진 중앙보다 살짝 아래를 보여주는 쪽이 일반적으로 더 안전한 기본값
-            // (globals.css --tm-tournament-banner-ratio 4/1과 함께 실측 조정, 특정 사진
-            // 좌표에 하드코딩한 crop이 아니라 photo-agnostic 기본값).
-            background: featuredImageUrl ? `${cssUrl(featuredImageUrl)} center 62%/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
-            color: 'var(--static-white)',
-            textDecoration: 'none',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          {featuredImageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
-          {/* 콘텐츠는 상단에 한 덩어리로 모아 두고, 박스 높이 전체로 늘리지 않는다 — 상금 문구가
-             없는 대회는 하단 행이 CTA 버튼 하나만 남아 justify-content:space-between으로
-             바닥까지 늘리면 좌측 하단만 텅 비어 보이는 비대칭이 생겼다(실측 확인). 이미지가
-             커진 만큼의 여유는 텍스트 아래로 사진이 넉넉히 보이는 것으로 대신한다. */}
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
-                <Trophy size={12} strokeWidth={2} aria-hidden="true" />
-                {featuredBadge}
-              </span>
-              <div className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 12 }}>{featuredTitle}</div>
-              {featuredSubtitle ? (
-                <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 6 }}>
-                  {featuredSubtitle}
-                </div>
-              ) : null}
-              {featuredFacts ? (
-                <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-                  {featuredFacts}
-                </div>
-              ) : null}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: featuredPrizeText ? 'space-between' : 'flex-end', gap: 12, marginTop: 16 }}>
-              {featuredPrizeText ? (
-                <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
-              ) : null}
-              <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
-            </div>
-          </div>
-        </Link>
-      ) : null}
+      {/* ── 홍보 카드뉴스 캐러셀 — 관리자가 리스트 홍보를 켠 open 대회를 우선순위 순으로 노출 ── */}
+      <TournamentPromoCarousel
+        items={promoTournaments.data ?? []}
+        loading={promoTournaments.isLoading}
+        error={promoTournaments.isError}
+        onRetry={() => void promoTournaments.refetch()}
+      />
 
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section" style={{ marginTop: 28 }}>

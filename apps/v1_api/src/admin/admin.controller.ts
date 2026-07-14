@@ -139,6 +139,11 @@ export class AdminController {
     return this.adminService.listNotices(user, query);
   }
 
+  @Get('notices/:noticeId')
+  getNotice(@CurrentUser() user: V1AuthUser, @Param('noticeId') noticeId: string) {
+    return this.adminService.getNotice(user, noticeId);
+  }
+
   @Post('notices')
   createNotice(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminNoticeDto) {
     return this.adminService.createNotice(user, dto);
@@ -151,6 +156,11 @@ export class AdminController {
     @Body() dto: UpdateAdminNoticeDto,
   ) {
     return this.adminService.updateNotice(user, noticeId, dto);
+  }
+
+  @Delete('notices/:noticeId')
+  deleteNotice(@CurrentUser() user: V1AuthUser, @Param('noticeId') noticeId: string) {
+    return this.adminService.deleteNotice(user, noticeId);
   }
 
   // ─── Inquiries ─────────────────────────────────────────────────────────────

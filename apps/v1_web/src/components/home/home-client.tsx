@@ -392,6 +392,7 @@ function toHomeNotice(notice: V1Notice): HomeNotice {
     title: notice.title,
     summary: notice.category ?? notice.audience ?? '공지',
     trailing: formatDate(notice.publishedAt),
+    body: notice.body?.trim() || undefined,
   };
 }
 

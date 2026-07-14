@@ -64,6 +64,9 @@ function changedFilesForRange() {
   for (const file of git(['diff', '--name-only', '--cached']).split(/\r?\n/).filter(Boolean)) {
     files.add(file);
   }
+  for (const file of git(['ls-files', '--others', '--exclude-standard']).split(/\r?\n/).filter(Boolean)) {
+    files.add(file);
+  }
 
   return files;
 }

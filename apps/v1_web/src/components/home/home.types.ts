@@ -27,6 +27,7 @@ export type HomeNotice = {
   title: string;
   summary: string;
   trailing: string;
+  body?: string;
 };
 
 export type HomeChatRoom = {

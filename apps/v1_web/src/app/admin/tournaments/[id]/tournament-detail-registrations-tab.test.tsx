@@ -12,7 +12,7 @@ import {
   useV1RosterDeadlineOverrideRevoke,
   useV1RosterLock,
   useV1RosterUnlock,
-  useV1TournamentPlayers,
+  useV1AdminTournamentPlayers,
   useV1UpdatePlayerEligibility,
 } from '@/hooks/use-v1-api';
 import { RegistrationsTab } from './tournament-detail-client';
@@ -28,7 +28,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1RosterDeadlineOverrideGrant: vi.fn(),
   useV1RosterDeadlineOverrideRevoke: vi.fn(),
   useV1ExportRosterCsv: vi.fn(),
-  useV1TournamentPlayers: vi.fn(),
+  useV1AdminTournamentPlayers: vi.fn(),
   useV1UpdatePlayerEligibility: vi.fn(),
 }));
 
@@ -42,7 +42,7 @@ const useV1RosterUnlockMock = vi.mocked(useV1RosterUnlock);
 const useV1RosterDeadlineOverrideGrantMock = vi.mocked(useV1RosterDeadlineOverrideGrant);
 const useV1RosterDeadlineOverrideRevokeMock = vi.mocked(useV1RosterDeadlineOverrideRevoke);
 const useV1ExportRosterCsvMock = vi.mocked(useV1ExportRosterCsv);
-const useV1TournamentPlayersMock = vi.mocked(useV1TournamentPlayers);
+const useV1AdminTournamentPlayersMock = vi.mocked(useV1AdminTournamentPlayers);
 const useV1UpdatePlayerEligibilityMock = vi.mocked(useV1UpdatePlayerEligibility);
 
 function baseRegistration(
@@ -93,10 +93,10 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
     useV1RosterLockMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterLock>>());
     useV1RosterUnlockMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1RosterUnlock>>());
     useV1ExportRosterCsvMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1ExportRosterCsv>>());
-    useV1TournamentPlayersMock.mockReturnValue({
+    useV1AdminTournamentPlayersMock.mockReturnValue({
       data: { players: [], belowMinimum: false },
       isPending: false,
-    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
     useV1UpdatePlayerEligibilityMock.mockReturnValue(noopMutationHook<ReturnType<typeof useV1UpdatePlayerEligibility>>());
   });
 
@@ -115,7 +115,7 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
       refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
 
-    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} />);
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
 
     const grantButton = screen.getByRole('button', { name: '마감 예외 허용' });
     expect(screen.queryByRole('button', { name: '예외 해제' })).not.toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('RegistrationsTab — 명단 제출 마감 예외 토글', () => {
       refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1AdminTournamentRegistrations>);
 
-    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} />);
+    render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
 
     const revokeButton = screen.getByRole('button', { name: '예외 해제' });
     expect(screen.queryByRole('button', { name: '마감 예외 허용' })).not.toBeInTheDocument();

@@ -71,7 +71,7 @@ describe('HomePage', () => {
       </Providers>,
     );
 
-    expect(screen.getByText('홈 노출 공지 제목')).toBeInTheDocument();
+    expect(screen.getAllByText('홈 노출 공지 제목').length).toBeGreaterThan(0);
     expect(screen.queryByText('홈에서는 이 긴 공지 본문이 그대로 보이면 안 됩니다.')).not.toBeInTheDocument();
   });
 });

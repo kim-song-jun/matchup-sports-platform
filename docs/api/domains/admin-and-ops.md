@@ -18,6 +18,8 @@
 4. `apps/api/src/admin/dto/*.ts`
 5. `apps/web/src/hooks/use-api.ts` (관리자 호출부)
 
+> v1 공지·팝업 관리 계약은 위 legacy 목록이 아니라 `apps/v1_api/src/admin/admin.controller.ts`, `apps/v1_api/src/admin/admin.service.ts`, `apps/v1_api/src/admin/dto/admin.dto.ts`, `apps/v1_web/src/hooks/use-v1-api.ts`를 기준으로 한다.
+
 ## 공통 인증/권한
 
 - 기본적으로 `JwtAuthGuard + AdminGuard`가 함께 걸린다.
@@ -54,6 +56,11 @@
 | `PATCH` | `/api/v1/admin/venues/:id` | 시설 수정 |
 | `DELETE` | `/api/v1/admin/venues/:id` | 시설 삭제 |
 | `GET` | `/api/v1/admin/payments` | 결제 목록 |
+| `GET` | `/api/v1/admin/notices` | 공지·팝업 전체 목록(cursored, `category=고정`이면 팝업만 조회) |
+| `GET` | `/api/v1/admin/notices/:noticeId` | 공지·팝업 상세 조회 |
+| `POST` | `/api/v1/admin/notices` | 공지·팝업 생성(`pinned=true`이면 홈 팝업) |
+| `PATCH` | `/api/v1/admin/notices/:noticeId` | 공지·팝업 수정 및 게시 상태 변경 |
+| `DELETE` | `/api/v1/admin/notices/:noticeId` | 공지·팝업 삭제 및 `notice.delete` 감사 로그 기록 |
 
 ### B. `/admin/disputes`
 
@@ -130,6 +137,7 @@
   - 프론트 훅은 `extractCollection`으로 배열/`items` 모두 수용하고 있음.
 - 사용자 상태 변경, 매치 상태 변경, 강좌 상태 변경은 mutation 후 관련 목록/상세 query invalidation이 필요하다.
 - 분쟁/정산 mutation payload는 현재 `Record<string, unknown>`로 전달된다. 폼 검증은 프론트에서 선행해야 한다.
+- `/admin/popups`는 `category=고정` 목록을 사용하며 목록·상세·생성·수정·삭제를 모두 실제 `/admin/notices` API에 연결한다. 게시된 공개 팝업 가운데 최신 항목이 홈 중앙 팝업으로 노출된다.
 
 ## 엣지 케이스 / 안티패턴
 

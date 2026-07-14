@@ -15,7 +15,7 @@
 ## Owned files
 
 - `apps/v1_api/prisma/schema.prisma`
-- `apps/v1_api/prisma/migrations/20260714000000_v1_tournament_player_gender_snapshot/migration.sql`
+- `apps/v1_api/prisma/migrations/20260714005000_v1_tournament_player_gender_snapshot/migration.sql` (renumbered from `20260714000000` during the main→dev integration merge — dev already had `20260714000000_v1_tournament_geo_integration_settings` at that timestamp)
 - `apps/v1_api/src/tournaments/tournament-players.controller.ts`
 - `apps/v1_api/src/tournaments/tournament-players.service.ts`
 - `apps/v1_api/src/tournaments/tournament-players.service.spec.ts`

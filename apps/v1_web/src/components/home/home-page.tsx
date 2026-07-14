@@ -14,7 +14,6 @@ import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, Weath
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { useV1AllTournaments } from '@/hooks/use-v1-api';
-import { getSortedTournamentPromos } from '@/lib/tournament-promo';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
 import { HomeNoticePopup } from './home-notice-popup';
@@ -24,8 +23,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
   const tournaments = useV1AllTournaments({ status: 'open' });
   const tournamentItems = tournaments.data ?? [];
-  const homePromoItems = getSortedTournamentPromos(tournamentItems, 'home');
-  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || homePromoItems.length > 0;
+  // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
+  // to know whether *any* eligible item exists, to decide the section's visibility.
+  const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
+  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || hasHomePromo;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
 
   return (
@@ -115,7 +116,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   </Card>
                 </div>
               ) : (
-                <TournamentHeroCard items={homePromoItems} loading={tournaments.isLoading} />
+                <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
               )}
             </div>
           </div>

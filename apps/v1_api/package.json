@@ -22,7 +22,7 @@
     "db:generate": "prisma generate",
     "test": "jest --selectProjects unit",
     "test:watch": "jest --selectProjects unit --watch",
-    "test:integration": "jest --selectProjects integration --runInBand --forceExit"
+    "test:integration": "jest --selectProjects integration --runInBand"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.18",

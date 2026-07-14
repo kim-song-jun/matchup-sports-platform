@@ -118,9 +118,10 @@ function TournamentsListContent() {
           aria-label={`${featuredTitle} 자세히 보기`}
           className="tm-tournament-featured-banner"
           style={{
-            display: 'block',
+            display: 'flex',
+            flexDirection: 'column',
             marginTop: 12,
-            padding: '16px 18px',
+            padding: '18px 20px',
             borderRadius: 16,
             // vertical-position 62% (기본 50% center 대비 살짝 아래) — 대회 배너 사진은
             // 보통 하단부(경기장 펜스·바닥)에 스폰서 로고/워터마크가 있는 경우가 많아
@@ -135,24 +136,32 @@ function TournamentsListContent() {
           }}
         >
           {featuredImageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
-              <Trophy size={12} strokeWidth={2} aria-hidden="true" />
-              {featuredBadge}
-            </span>
-            <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featuredTitle}</div>
-            {featuredSubtitle ? (
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-                {featuredSubtitle}
-              </div>
-            ) : null}
-            {featuredFacts ? (
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-                {featuredFacts}
-              </div>
-            ) : null}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12 }}>
-              <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
+          {/* 배너 이미지가 데스크톱에서 4:1로 커지면서(globals.css) 텍스트 블록이 위쪽에만
+             뭉쳐 있으면 아래쪽 이미지가 그대로 비어 보인다 — 콘텐츠를 상단 그룹(뱃지/제목/
+             부제/facts)과 하단 CTA 행 두 덩어리로 나누고 flex column + space-between으로
+             박스 높이 전체에 분산시켜, 세로 공간이 늘어난 만큼 여백도 함께 늘어나게 한다. */}
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+            <div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+                <Trophy size={12} strokeWidth={2} aria-hidden="true" />
+                {featuredBadge}
+              </span>
+              <div className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 12 }}>{featuredTitle}</div>
+              {featuredSubtitle ? (
+                <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 6 }}>
+                  {featuredSubtitle}
+                </div>
+              ) : null}
+              {featuredFacts ? (
+                <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
+                  {featuredFacts}
+                </div>
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: featuredPrizeText ? 'space-between' : 'flex-end', gap: 12, marginTop: 16 }}>
+              {featuredPrizeText ? (
+                <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
+              ) : null}
               <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
             </div>
           </div>

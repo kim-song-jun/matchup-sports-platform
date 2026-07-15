@@ -13,11 +13,27 @@ Tournament list/detail reads are public. Clients may call them without a stored 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+Admin create/update accepts `rulesText` up to 10,000 characters. `refundPolicyText` remains a separate field with a 2,000-character limit.
+
 Tournament schedule stores a start datetime in `scheduledAt` and an optional end datetime in `scheduledEndAt`. Admin create/update rejects `scheduledEndAt` when it is earlier than the final `scheduledAt` with `400 TOURNAMENT_SCHEDULE_RANGE_INVALID`. Public list/detail/admin responses include both fields; clients render a single date when `scheduledEndAt` is empty or the same calendar label, and a range when it spans multiple dates.
 
 Admin-facing prize entry is text-first. `prizeSummary` is the public "상품 및 상금" display string and clients must render that text as entered instead of deriving `총 N원` or `최대 N원` copy from `prizePool`. `prizeBreakdown` remains the comma/dot/newline-delimited breakdown string that public detail renders as separate chips below the main prize card.
 
 Tournament promo cards are separate from prize fields and from the normal tournament edit surface. Admin update/create accepts independent home promo fields (`promoHomeEnabled`, `promoHomeTitle`, `promoHomeSubtitle`, `promoHomeImageUrl`, `promoHomeBadgeText`, `promoHomeDateText`, `promoHomeTeamsText`, `promoHomeLocationText`, `promoHomePrizeText`, `promoHomePriority`) and list promo fields (`promoListEnabled`, `promoListTitle`, `promoListSubtitle`, `promoListImageUrl`, `promoListBadgeText`, `promoListDateText`, `promoListTeamsText`, `promoListLocationText`, `promoListPrizeText`, `promoListPriority`); public list/detail responses include the same fields. `promoHomeEnabled` controls the home "오늘의 추천" tournament card, `promoListEnabled` controls the top featured card on the tournament list, and clients pick the enabled open tournament with the highest priority. Promo images are uploaded through the shared upload endpoint first, then the returned URL is saved in the corresponding promo image field.
+
+## Admin Announcement Endpoints
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/announcements` | active admin, read-only support allowed | path id | `{ items: V1AdminTournamentAnnouncement[] }` |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/announcements` | mutation-capable admin | `CreateAnnouncementDto` | created announcement |
+| `PATCH` | `/api/v1/admin/announcements/:announcementId` | mutation-capable admin | `UpdateAnnouncementDto` | updated announcement |
+| `PATCH` | `/api/v1/admin/announcements/:announcementId/publish` | mutation-capable admin | empty body | updated announcement plus `alreadyPublished` |
+| `DELETE` | `/api/v1/admin/announcements/:announcementId` | mutation-capable admin | path id | `{ id, tournamentId, deleted: true }` |
+
+`UpdateAnnouncementDto` edits `title`, `body`, and `audience`. `publish=true` publishes a draft or keeps a published row published; `publish=false` clears `publishedAt` and removes the announcement from public tournament detail. Update and delete write admin action logs with `targetType=tournament_announcement`.
+
+Tournament announcement `audience` values are `public`, `all_registered`, `confirmed_only`, and `waitlist`. `public` means the announcement is visible on public tournament detail to logged-out users as soon as it is published. Public tournament detail (`GET /api/v1/tournaments/:tournamentId`) returns only announcements where `audience=public` and `publishedAt` is not null; team-scoped announcement values are retained for admin operations and targeted follow-up delivery.
 
 ## Registration Endpoints
 
@@ -52,6 +68,9 @@ Public tournament list/detail responses include both `confirmedCount` and `pendi
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
+| `GET` | `/api/v1/admin/registrations/:registrationId/players` | active admin | path id | admin roster detail including gender snapshot, current phone, `isTeamCaptain`, captain-first ordering, and minimum check |
+| `GET` | `/api/v1/admin/registrations/:registrationId/players/export` | active admin | path id | CSV roster export including gender snapshot |
+| `PATCH` | `/api/v1/admin/players/:playerId/eligibility` | owner/ops admin | `UpdatePlayerEligibilityDto` | updated eligibility and audit log |
 
 ## Player Add Contract
 
@@ -65,6 +84,12 @@ The service reads the selected member's profile and phone from the team membersh
 
 If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`.
 
-The stored roster snapshot uses the server-side member profile values for `realName` and `birthDateSnapshot`; clients must not treat editable form values as the source of truth.
+The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. Missing profile gender does not block roster registration and is returned as `null`/shown as `미등록`.
 
-`PATCH /players/:playerId` is available only before `rosterLockedAt`. It lets team managers correct the player's `eligibilityStatus` only. The already stored roster snapshots (`realName`, `birthDateSnapshot`) are not refreshed by eligibility edits, and the current member profile/phone is not revalidated on this path.
+Admin roster reads use the dedicated `/admin/registrations/:registrationId/players` endpoint. They must not reuse the team-member endpoint because active admins are not necessarily members of the registered team. Owner, ops, and support admins may read the roster; eligibility mutation remains owner/ops-only.
+
+The admin-only roster response also joins the player's current `user.phone` as nullable `phone` for operational contact. This is not a roster-time snapshot and is not exposed by the team-member roster endpoint.
+
+The admin response derives `isTeamCaptain` from the registration team's canonical `ownerUserId`. When that owner is present in the submitted roster, the response places them first; other players retain their existing `addedAt` order. The admin modal renders a `팀장` badge next to that player.
+
+`PATCH /players/:playerId` is available only before `rosterLockedAt`. It lets team managers correct the player's `eligibilityStatus` only. The already stored roster snapshots (`realName`, `birthDateSnapshot`, `genderSnapshot`) are not refreshed by eligibility edits, and the current member profile/phone is not revalidated on this path.

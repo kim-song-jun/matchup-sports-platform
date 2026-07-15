@@ -106,6 +106,10 @@
     padding: 20px;
   }
 
+  .tm-my-desktop-sidebar .tm-my-home-profile-head::before {
+    display: none;
+  }
+
   /* Avatar: slightly larger on desktop for visual weight. */
   .tm-my-desktop-sidebar .tm-my-avatar {
     width: 72px;

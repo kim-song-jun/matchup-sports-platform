@@ -62,11 +62,11 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
         <div className="tm-my-desktop-layout">
           {/* LEFT sticky: profile identity */}
           <div className="tm-my-desktop-sidebar">
-            <section className="tm-my-profile-head">
+            <section className="tm-my-profile-head tm-my-home-profile-head">
               <div className="tm-my-avatar" style={avatarStyle}>{model.user.profileImageUrl ? null : model.user.initials}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-heading">{model.user.name}</div>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.user.handle} · {model.user.region}</div>
+              <div className="tm-my-profile-copy">
+                <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
+                <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region} · {model.user.genderLabel}</div>
                 {model.user.loginMethod ? (
                   <div style={{ marginTop: 6 }}>
                     <span
@@ -91,7 +91,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                   {model.user.intro}
                 </div>
               </div>
-              <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">수정</Link>
+              <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">수정</Link>
             </section>
             {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
             <Card pad={16}>
@@ -352,6 +352,15 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
                 <InfoRow label="로그인 방식" value={model.account.loginMethod} />
                 <InfoRow label="이메일" value={model.account.email} />
                 <InfoRow label="휴대폰" value={model.account.phone} />
+                {model.account.canRequestPasswordChange ? (
+                  <InfoRow
+                    label="비밀번호"
+                    value="비밀번호 변경"
+                    action={() => window.alert('비밀번호 변경은 문의로 요청해 주세요.')}
+                  />
+                ) : (
+                  <InfoRow label="비밀번호" value={model.account.password} />
+                )}
               </Card>
             </section>
           ) : null}
@@ -496,8 +505,19 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return <div className="tm-info-row"><div className="tm-text-caption">{label}</div><div className="tm-text-label" style={{ textAlign: 'right', flex: 1 }}>{value}</div></div>;
+function InfoRow({ label, value, action }: { label: string; value: string; action?: () => void }) {
+  return (
+    <div className="tm-info-row">
+      <div className="tm-text-caption">{label}</div>
+      {action ? (
+        <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" onClick={action}>
+          {value}
+        </button>
+      ) : (
+        <div className="tm-text-label" style={{ textAlign: 'right', flex: 1 }}>{value}</div>
+      )}
+    </div>
+  );
 }
 
 function CreateField({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) {

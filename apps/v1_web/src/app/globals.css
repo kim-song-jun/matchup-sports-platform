@@ -3919,6 +3919,27 @@ button:disabled {
   background: var(--grey50);
 }
 
+.tm-my-home-profile-head {
+  position: relative;
+  margin: -18px 0 0;
+  padding: 20px 0 18px;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.tm-my-home-profile-head::before {
+  content: "";
+  position: absolute;
+  inset: 0 -20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--grey50);
+}
+
+.tm-my-home-profile-head > * {
+  position: relative;
+  z-index: 1;
+}
+
 .tm-my-avatar {
   width: 64px;
   height: 64px;
@@ -3932,6 +3953,29 @@ button:disabled {
   place-items: center;
   font-size: 24px;
   font-weight: 800;
+}
+
+.tm-my-profile-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-my-profile-name,
+.tm-my-profile-meta {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-my-profile-meta {
+  margin-top: 4px;
+}
+
+.tm-my-profile-edit-link {
+  flex-shrink: 0;
 }
 
 .tm-my-chip-row {

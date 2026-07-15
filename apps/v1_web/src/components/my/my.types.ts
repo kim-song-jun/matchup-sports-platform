@@ -2,6 +2,7 @@ export type MyUser = {
   name: string;
   handle: string;
   region: string;
+  genderLabel: string;
   sports: string[];
   intro: string;
   initials: string;
@@ -118,6 +119,8 @@ export type SettingsViewModel = {
     loginMethod: string;
     email: string;
     phone: string;
+    password: string;
+    canRequestPasswordChange: boolean;
   };
   groups: MyMenuSection[];
 };

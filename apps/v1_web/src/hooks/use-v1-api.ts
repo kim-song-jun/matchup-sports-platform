@@ -1,7 +1,7 @@
 'use client';
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { v1Api, v1Delete, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   ApiEnvelope,
@@ -14,8 +14,17 @@ import type {
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
   V1AdminLog,
+  V1AdminPopupCreatePayload,
+  V1AdminPopupCreateResult,
+  V1AdminPopupDeleteResult,
+  V1AdminPopupDetailResult,
+  V1AdminPopupRow,
+  V1AdminPopupUpdatePayload,
+  V1AdminPopupUpdateResult,
   V1AdminNoticeCreatePayload,
   V1AdminNoticeCreateResult,
+  V1AdminNoticeDeleteResult,
+  V1AdminNoticeDetailResult,
   V1AdminNoticeRow,
   V1AdminNoticeUpdatePayload,
   V1AdminNoticeUpdateResult,
@@ -29,6 +38,7 @@ import type {
   V1AdminTeamDetail,
   V1AdminTeamMatchRow,
   V1AdminTeamRow,
+  V1AdminDeleteUserPayload,
   V1AdminUserDetail,
   V1AdminUserRow,
   V1AuthMe,
@@ -109,6 +119,7 @@ import type {
   V1AdminRegistrationListPage,
   V1AdminTournamentRegistration,
   V1AdminTournamentRegistrationWithIdempotent,
+  V1AdminTournamentRosterResponse,
   V1AdminTournamentBracket,
   V1AdminBracketGroup,
   V1AdminBracketGroupTeam,
@@ -137,7 +148,9 @@ import type {
   V1CreateFixturePayload,
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
+  V1DeleteAnnouncementResult,
   V1AdminAnnouncementListResult,
+  V1UpdateAnnouncementPayload,
   V1TeamInvitationSummary,
   V1TeamInvitationsPage,
   V1ReceivedInvitation,
@@ -179,7 +192,7 @@ export function useV1Register() {
       nickname: string;
       email: string;
       password: string;
-      gender?: 'male' | 'female';
+      gender: 'male' | 'female';
       displayName?: string;
       phone?: string;
       birthDate?: string;
@@ -196,7 +209,7 @@ export function useV1CompleteSocialProfile() {
   return useMutation({
     mutationFn: (body: {
       nickname: string;
-      gender?: 'male' | 'female';
+      gender: 'male' | 'female';
       displayName?: string;
       phone?: string;
       birthDate?: string;
@@ -1143,10 +1156,11 @@ export function useV1UpdateProfile() {
     mutationFn: (body: {
       displayName: string;
       nickname: string;
-      email: string;
+      email?: string | null;
       profileImageUrl?: string | null;
       phone?: string | null;
       birthDate?: string | null;
+      gender: 'male' | 'female';
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
     onSuccess: () => {
@@ -1342,10 +1356,32 @@ export function useV1AdminTeam(teamId: string) {
   });
 }
 
+export function useV1AdminPopups(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminPopups(filters as Record<string, unknown>),
+    queryFn: () => v1Get<CursorPage<V1AdminPopupRow>>('/admin/popups', filters),
+  });
+}
+
+export function useV1AdminPopupDetail(popupId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminPopup(popupId),
+    queryFn: () => v1Get<V1AdminPopupDetailResult>(`/admin/popups/${popupId}`),
+    enabled: !!popupId,
+  });
+}
 export function useV1AdminNotices(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
     queryFn: () => v1Get<CursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+  });
+}
+
+export function useV1AdminNoticeDetail(noticeId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminNotice(noticeId),
+    queryFn: () => v1Get<V1AdminNoticeDetailResult>(`/admin/notices/${noticeId}`),
+    enabled: !!noticeId,
   });
 }
 
@@ -1423,6 +1459,19 @@ export function useV1ChangeUserStatus() {
   });
 }
 
+export function useV1DeleteAdminUser(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminDeleteUserPayload) =>
+      v1Delete<V1AdminStatusChangeResult>(`/admin/users/${userId}`, { body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminUser(userId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
 export function useV1ChangeMatchStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1461,13 +1510,49 @@ export function useV1ChangeTeamMatchStatus() {
   });
 }
 
+export function useV1CreateAdminPopup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminPopupCreatePayload) =>
+      v1Post<V1AdminPopupCreateResult>('/admin/popups', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'popups'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+export function useV1UpdateAdminPopup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ popupId, body }: { popupId: string; body: V1AdminPopupUpdatePayload }) =>
+      v1Patch<V1AdminPopupUpdateResult>(`/admin/popups/${popupId}`, body),
+    onSuccess: (data, { popupId }) => {
+      queryClient.setQueryData(v1Keys.adminPopup(popupId), data);
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'popups'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+export function useV1DeleteAdminPopup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (popupId: string) => v1Delete<V1AdminPopupDeleteResult>(`/admin/popups/${popupId}`),
+    onSuccess: (_data, popupId) => {
+      queryClient.removeQueries({ queryKey: v1Keys.adminPopup(popupId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'popups'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
 export function useV1CreateAdminNotice() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1AdminNoticeCreatePayload) =>
       v1Post<V1AdminNoticeCreateResult>('/admin/notices', body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
@@ -1479,8 +1564,23 @@ export function useV1UpdateAdminNotice() {
   return useMutation({
     mutationFn: ({ noticeId, body }: { noticeId: string; body: V1AdminNoticeUpdatePayload }) =>
       v1Patch<V1AdminNoticeUpdateResult>(`/admin/notices/${noticeId}`, body),
-    onSuccess: (_data, { noticeId }) => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
+    onSuccess: (data, { noticeId }) => {
+      queryClient.setQueryData(v1Keys.adminNotice(noticeId), data);
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+    },
+  });
+}
+
+export function useV1DeleteAdminNotice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeId: string) => v1Delete<V1AdminNoticeDeleteResult>(`/admin/notices/${noticeId}`),
+    onSuccess: (_data, noticeId) => {
+      queryClient.removeQueries({ queryKey: v1Keys.adminNotice(noticeId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
@@ -1534,10 +1634,52 @@ type TournamentListFilters = {
   limit?: number;
 };
 
+type AllTournamentListFilters = Pick<TournamentListFilters, 'status' | 'sportId'>;
+
+export async function fetchAllV1Tournaments(
+  params?: AllTournamentListFilters,
+): Promise<V1TournamentListPage['items']> {
+  const items: V1TournamentListPage['items'] = [];
+  const seenItemIds = new Set<string>();
+  const seenCursors = new Set<string>();
+  let cursor: string | undefined;
+
+  while (true) {
+    const page = await v1Get<V1TournamentListPage>('/tournaments', {
+      ...params,
+      cursor,
+      limit: 50,
+    });
+
+    for (const item of page.items) {
+      if (seenItemIds.has(item.id)) continue;
+      seenItemIds.add(item.id);
+      items.push(item);
+    }
+
+    if (!page.pageInfo.hasNext) return items;
+
+    const nextCursor = page.pageInfo.nextCursor;
+    if (!nextCursor || seenCursors.has(nextCursor)) {
+      throw new Error('대회 목록 cursor가 유효하게 진행되지 않아 전체 대회를 불러오지 못했어요.');
+    }
+
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+}
+
 export function useV1Tournaments(params?: TournamentListFilters) {
   return useQuery({
     queryKey: v1Keys.tournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
+  });
+}
+
+export function useV1AllTournaments(params?: AllTournamentListFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.tournaments(params as Record<string, unknown>), 'all'],
+    queryFn: () => fetchAllV1Tournaments(params),
   });
 }
 
@@ -1929,6 +2071,16 @@ export function useV1RosterLock() {
   });
 }
 
+export function useV1AdminTournamentPlayers(registrationId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentRoster(registrationId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`),
+    enabled: !!registrationId,
+    retry: false,
+  });
+}
+
 export function useV1RosterUnlock() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1969,6 +2121,9 @@ export function useV1UpdatePlayerEligibility() {
     }: { playerId: string } & V1UpdatePlayerEligibilityPayload) =>
       v1Patch<V1TournamentPlayer>(`/admin/players/${playerId}/eligibility`, body),
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'registrations'],
+      });
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
@@ -2091,6 +2246,28 @@ export function useV1CreateAnnouncement(tournamentId: string) {
   });
 }
 
+export function useV1UpdateAnnouncement(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      announcementId,
+      body,
+    }: {
+      announcementId: string;
+      body: V1UpdateAnnouncementPayload;
+    }) =>
+      v1Patch<V1AdminTournamentAnnouncement>(
+        `/admin/announcements/${announcementId}`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentAnnouncements(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
 export function useV1PublishAnnouncement(tournamentId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2111,6 +2288,21 @@ export function useV1PublishAnnouncement(tournamentId?: string) {
 // ── Team Invitations ──────────────────────────────────────────────────────────
 
 /** POST /teams/:teamId/invitations — 이메일로 팀원 초대 발송 */
+export function useV1DeleteAnnouncement(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (announcementId: string) =>
+      v1Delete<V1DeleteAnnouncementResult>(
+        `/admin/announcements/${announcementId}`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentAnnouncements(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
 export function useV1SendTeamInvitation(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -373,6 +373,9 @@ export class AuthService {
         onboardingStatus: true,
         createdAt: true,
         updatedAt: true,
+        onboardingProgress: {
+          select: { draftJson: true },
+        },
         authIdentities: {
           where: { provider: V1AuthProvider.kakao, status: 'active' },
           select: { id: true },
@@ -539,7 +542,7 @@ export class AuthService {
         update: {
           nickname,
           displayName,
-          gender: dto.gender ?? null,
+          gender: dto.gender,
           birthDate,
           profileImageUrl,
           visibility: 'public',
@@ -548,7 +551,7 @@ export class AuthService {
           userId,
           nickname,
           displayName,
-          gender: dto.gender ?? null,
+          gender: dto.gender,
           birthDate,
           profileImageUrl,
           visibility: 'public',
@@ -584,6 +587,10 @@ export class AuthService {
           include: { region: true },
         },
         reputationSummary: true,
+        authIdentities: {
+          where: { status: 'active' },
+          select: { provider: true, passwordHash: true },
+        },
         termsConsents: {
           where: {
             revokedAt: null,
@@ -629,6 +636,9 @@ export class AuthService {
         onboardingStatus: user.onboardingStatus,
         lastLoginAt: user.lastLoginAt,
         createdAt: user.createdAt,
+        authProvider: user.authIdentities[0]?.provider ?? null,
+        authProviders: user.authIdentities.map((identity) => identity.provider),
+        hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       },
       verification: {
         emailVerified: Boolean(user.emailVerifiedAt),
@@ -740,7 +750,7 @@ export class AuthService {
     const nickname =
       userData.kakao_account?.profile?.nickname ??
       userData.properties?.nickname ??
-      `kakao_${userData.id}`;
+      `k_${userData.id}`;
 
     return {
       providerUserKey: String(userData.id),
@@ -753,21 +763,6 @@ export class AuthService {
     };
   }
 
-  private async resolveUniqueNickname(base: string) {
-    let candidate = base.trim() || 'Teameet user';
-    let attempt = 0;
-
-    while (true) {
-      const existing = await this.prisma.v1UserProfile.findFirst({
-        where: { nickname: candidate, deletedAt: null },
-        select: { id: true },
-      });
-      if (!existing) return candidate;
-
-      attempt += 1;
-      candidate = `${base}_${attempt}`;
-    }
-  }
 }
 
 function normalizeEmail(email: string) {

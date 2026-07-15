@@ -51,6 +51,7 @@ function completedUserRow(overrides: Record<string, unknown> = {}) {
     regions: [],
     reputationSummary: null,
     termsConsents: [{ id: 'consent-1' }],
+    authIdentities: [{ provider: V1AuthProvider.email, passwordHash: 'hash' }],
     ...overrides,
   };
 }
@@ -64,7 +65,7 @@ function pendingSocialUserRow(overrides: Record<string, unknown> = {}) {
       onboardingProgress: { currentStep: 'terms' },
       termsConsents: [],
     }),
-    authIdentities: [{ id: 'identity-1' }],
+    authIdentities: [{ id: 'identity-1', provider: V1AuthProvider.kakao, passwordHash: null }],
     ...overrides,
   };
 }
@@ -141,6 +142,7 @@ describe('AuthService', () => {
       service.register({
         email: 'new@teameet.v1',
         password: 'Password1!',
+        gender: 'male',
         nickname: '신규유저',
         requiredTermsAccepted: false,
       }),
@@ -160,6 +162,7 @@ describe('AuthService', () => {
       service.register({
         email: 'existing@teameet.v1',
         password: 'Password1!',
+        gender: 'male',
         nickname: '신규유저',
         requiredTermsAccepted: true,
       }),
@@ -180,6 +183,7 @@ describe('AuthService', () => {
       service.register({
         email: 'new@teameet.v1',
         password: 'Password1!',
+        gender: 'male',
         nickname: '중복닉네임',
         requiredTermsAccepted: true,
       }),
@@ -195,6 +199,7 @@ describe('AuthService', () => {
       service.register({
         email: 'new@teameet.v1',
         password: 'Password1!',
+        gender: 'male',
         nickname: '신규',
         requiredTermsAccepted: true,
         birthDate: '20001332',
@@ -222,6 +227,7 @@ describe('AuthService', () => {
     const result = await service.register({
       email: 'new@teameet.v1',
       password: 'Password1!',
+      gender: 'male',
       nickname: '신규',
       requiredTermsAccepted: true,
     });
@@ -251,6 +257,7 @@ describe('AuthService', () => {
     await service.register({
       email: 'new@teameet.v1',
       password: 'Password1!',
+      gender: 'male',
       nickname: '신규',
       requiredTermsAccepted: true,
     });
@@ -397,30 +404,19 @@ describe('AuthService', () => {
     expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
   });
 
-  it('completeSocialTerms: 게시된 필수 약관 문서가 없어도 소셜 프로필 단계로 진행한다', async () => {
+  it('completeSocialTerms: moves the user to the required social profile step without creating a profile', async () => {
     const activeTime = new Date();
     prisma.v1User.findUnique
-      .mockResolvedValueOnce(pendingSocialUserRow({
-        createdAt: activeTime,
-        updatedAt: activeTime,
-      }))
-      .mockResolvedValueOnce(pendingSocialUserRow({
-        onboardingStatus: 'social_profile_required',
-        onboardingProgress: { currentStep: 'signup' },
-        termsConsents: [],
-        createdAt: activeTime,
-        updatedAt: activeTime,
-      }));
+      .mockResolvedValueOnce(pendingSocialUserRow({ createdAt: activeTime, updatedAt: activeTime }))
+      .mockResolvedValueOnce(completedUserRow({ onboardingStatus: 'social_profile_required', onboardingProgress: { currentStep: 'signup' }, termsConsents: [], createdAt: activeTime, updatedAt: activeTime }));
     prisma.v1TermsDocument.findMany.mockResolvedValue([]);
 
     const result = await service.completeSocialTerms('user-1', { requiredTermsAccepted: true });
 
     expect(result.next).toEqual({ route: '/signup/social' });
-    expect(prisma.v1User.update).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
-      data: { onboardingStatus: 'social_profile_required' },
-    });
-    expect(prisma.v1UserTermsConsent.createMany).not.toHaveBeenCalled();
+    expect(prisma.v1UserProfile.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1User.update).toHaveBeenCalledWith({ where: { id: 'user-1' }, data: { onboardingStatus: 'social_profile_required' } });
+    expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({ where: { userId: 'user-1' }, update: { currentStep: 'signup' }, create: { userId: 'user-1', currentStep: 'signup' } });
   });
 
   it('completeSocialProfile: consent row가 없어도 약관 단계 완료 상태면 프로필을 저장한다', async () => {
@@ -442,6 +438,7 @@ describe('AuthService', () => {
 
     const result = await service.completeSocialProfile('user-1', {
       nickname: '소셜유저',
+      gender: 'female',
       displayName: '소셜 유저',
     });
 
@@ -449,7 +446,7 @@ describe('AuthService', () => {
     expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'user-1' },
-        create: expect.objectContaining({ nickname: '소셜유저' }),
+        create: expect.objectContaining({ nickname: '소셜유저', gender: 'female' }),
       }),
     );
   });

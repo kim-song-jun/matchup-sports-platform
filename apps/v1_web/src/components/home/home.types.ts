@@ -27,6 +27,14 @@ export type HomeNotice = {
   title: string;
   summary: string;
   trailing: string;
+  body?: string;
+};
+
+export type HomePopup = {
+  id: string;
+  title: string;
+  body: string;
+  trailing: string;
 };
 
 export type HomeChatRoom = {
@@ -74,5 +82,6 @@ export type HomeViewModel = {
   };
   weatherRefreshing?: boolean;
   refreshWeather?: () => void;
+  popup: HomePopup | null;
   notices: HomeNotice[];
 };

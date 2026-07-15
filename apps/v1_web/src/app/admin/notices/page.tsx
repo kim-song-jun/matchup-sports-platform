@@ -2,7 +2,7 @@
 
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
-import { Clock, Megaphone, Pencil, Pin, Tag, Users, X } from 'lucide-react';
+import { Clock, Pencil, Tag, Users, X } from 'lucide-react';
 import {
   AdminCardList,
   AdminEmpty,
@@ -88,7 +88,6 @@ export default function AdminNoticesPage() {
   const [body, setBody] = useState('');
   const [audience, setAudience] = useState<V1AdminNoticeAudience>('public');
   const [category, setCategory] = useState<V1AdminNoticeCategory>('안내');
-  const [pinned, setPinned] = useState(false);
   const [createStatus, setCreateStatus] = useState<Extract<V1AdminNoticeStatus, 'draft' | 'published'>>('published');
   const [editingNotice, setEditingNotice] = useState<V1AdminNoticeRow | null>(null);
 
@@ -148,7 +147,6 @@ export default function AdminNoticesPage() {
     setBody('');
     setAudience('public');
     setCategory('안내');
-    setPinned(false);
     setCreateStatus('published');
     setEditingNotice(null);
   }
@@ -158,8 +156,7 @@ export default function AdminNoticesPage() {
     setTitle(row.title);
     setBody(row.body);
     setAudience(row.audience);
-    setCategory(row.category === '고정' ? '안내' : row.category);
-    setPinned(row.pinned);
+    setCategory(row.category);
     setCreateStatus(row.status === 'published' ? 'published' : 'draft');
   }
 
@@ -168,7 +165,6 @@ export default function AdminNoticesPage() {
     const payload: V1AdminNoticeCreatePayload = {
       audience,
       category,
-      pinned,
       title: title.trim(),
       body: body.trim(),
       status: createStatus,
@@ -269,12 +265,7 @@ export default function AdminNoticesPage() {
               subtitle: `${audienceLabel[row.audience]} · ${row.category}`,
               statusNode: (
                 <span className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {row.pinned ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-[var(--font-size-micro)] font-semibold text-blue-600">
-                      <Pin size={12} aria-hidden="true" />
-                      고정
-                    </span>
-                  ) : null}
+
                   <AdminStatusPill status={row.status} label={statusLabel[row.status]} />
                 </span>
               ),
@@ -282,7 +273,6 @@ export default function AdminNoticesPage() {
                 { icon: <Users size={14} aria-hidden="true" />, label: audienceLabel[row.audience] },
                 { icon: <Tag size={14} aria-hidden="true" />, label: row.category },
                 { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.publishedAt) },
-                { icon: <Megaphone size={14} aria-hidden="true" />, label: row.pinned ? '고정 공지' : '일반 공지' },
               ],
               description: noticeSummary(row.body),
               tone: row.status === 'archived' ? 'warning' : undefined,
@@ -321,7 +311,7 @@ export default function AdminNoticesPage() {
               ) : null}
             </div>
             <p className="mt-1 text-[var(--font-size-caption)] text-gray-500">
-              {editingNotice ? '선택한 공지의 내용과 노출 상태를 수정해요.' : '고정으로 저장하면 공개 목록에서 고정 공지로 표시돼요.'}
+              {editingNotice ? '선택한 공지의 내용과 발행 상태를 수정해요.' : '공지는 팝업과 별도로 공지 목록에 발행돼요.'}
             </p>
           </div>
 
@@ -373,7 +363,7 @@ export default function AdminNoticesPage() {
               <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value as V1AdminNoticeCategory)}
-                disabled={pinned || !canWrite || isSaving}
+                disabled={!canWrite || isSaving}
                 className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 {CATEGORY_OPTIONS.map((option) => (
@@ -382,16 +372,6 @@ export default function AdminNoticesPage() {
               </select>
             </label>
 
-            <label className="flex min-h-[44px] items-center gap-2 rounded-xl border border-gray-200 px-3 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={pinned}
-                onChange={(event) => setPinned(event.target.checked)}
-                disabled={!canWrite || isSaving}
-                className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
-              />
-              <span className="font-medium">상단 고정 공지로 표시</span>
-            </label>
 
             <label className="flex flex-col gap-1.5">
               <span className="text-[var(--font-size-label)] font-semibold text-gray-700">본문</span>

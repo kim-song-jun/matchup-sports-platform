@@ -4,7 +4,6 @@ export type NoticeModel = {
   title: string;
   summary: string;
   date: string;
-  pinned?: boolean;
   body: string[];
 };
 

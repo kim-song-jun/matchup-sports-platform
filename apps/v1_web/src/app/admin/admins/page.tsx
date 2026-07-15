@@ -36,6 +36,17 @@ function formatDateCompact(dateStr: string | null | undefined): string {
   }
 }
 
+function formatUserTitle(row: {
+  nickname: string | null;
+  displayName: string | null;
+  onboardingStatus?: string | null;
+}): string {
+  if (row.nickname || row.displayName) return row.nickname ?? row.displayName ?? '';
+  if (row.onboardingStatus === 'social_terms_required') return '가입 진행 중 · 약관 미동의';
+  if (row.onboardingStatus === 'social_profile_required') return '가입 진행 중 · 프로필 미완료';
+  return '프로필 없음';
+}
+
 // ── Role badge ─────────────────────────────────────────────────────────────
 function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   if (role === 'owner') {
@@ -239,7 +250,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                 <div className="flex items-center justify-between h-[44px] px-3 bg-blue-50 border border-blue-200 rounded-xl">
                   <div className="flex flex-col">
                     <span className="text-[var(--font-size-label)] font-semibold text-blue-800">
-                      {selectedUser.nickname ?? selectedUser.displayName ?? '(이름 없음)'}
+                      {formatUserTitle(selectedUser)}
                     </span>
                     {selectedUser.email && (
                       <span className="text-[var(--font-size-micro)] text-blue-600">{selectedUser.email}</span>
@@ -360,7 +371,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
                               ].join(' ')}
                             >
                               <span className="text-[var(--font-size-label)] font-semibold text-gray-900">
-                                {user.nickname ?? user.displayName ?? '(이름 없음)'}
+                                {formatUserTitle(user)}
                                 {user.adminRole && (
                                   <span className="ml-1.5 text-[var(--font-size-micro)] text-blue-600 font-medium">
                                     (이미 운영자)
@@ -642,7 +653,7 @@ export default function AdminAdminsPage() {
           rows={rows}
           keyExtractor={(row) => row.adminUserId}
           card={(row) => ({
-            title: row.nickname ?? row.displayName ?? '(이름 없음)',
+            title: formatUserTitle(row),
             subtitle: row.email ?? undefined,
             statusNode: <AdminRoleBadge role={row.adminRole} />,
             meta: [

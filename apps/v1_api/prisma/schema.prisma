@@ -514,13 +514,34 @@ model V1Notice {
   status      V1NoticeStatus   @default(draft)
   publishedAt DateTime?        @map("published_at")
   archivedAt  DateTime?        @map("archived_at")
+  displayStartAt DateTime?     @map("display_start_at")
+  displayEndAt   DateTime?     @map("display_end_at")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
   @@index([audience, status, publishedAt])
+  @@index([category, status, displayStartAt, displayEndAt], map: "v1_notices_popup_display_window_idx")
   @@index([category, status, publishedAt])
   @@index([createdAt])
   @@map("v1_notices")
+}
+
+model V1Popup {
+  id             String           @id @default(uuid())
+  audience       V1NoticeAudience @default(public)
+  title          String
+  body           String
+  status         V1NoticeStatus   @default(draft)
+  publishedAt    DateTime?        @map("published_at")
+  archivedAt     DateTime?        @map("archived_at")
+  displayStartAt DateTime?        @map("display_start_at")
+  displayEndAt   DateTime?        @map("display_end_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@index([audience, status, displayStartAt, displayEndAt, publishedAt], map: "v1_popups_active_window_idx")
+  @@index([createdAt])
+  @@map("v1_popups")
 }
 
 model V1UserSportPreference {
@@ -1234,6 +1255,7 @@ enum V1TournamentFixtureStatus {
 }
 
 enum V1TournamentAnnouncementAudience {
+  public
   all_registered
   confirmed_only
   waitlist
@@ -1343,6 +1365,7 @@ model V1TournamentPlayer {
   userId            String                        @map("user_id")
   realName          String                        @map("real_name")
   birthDateSnapshot String?                       @map("birth_date_snapshot")
+  genderSnapshot    String?                       @map("gender_snapshot")
   eligibilityStatus V1TournamentPlayerEligibility @default(needs_review) @map("eligibility_status")
   eligibilityNote   String?                       @map("eligibility_note")
   addedAt           DateTime                      @default(now()) @map("added_at")

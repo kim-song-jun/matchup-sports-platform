@@ -58,6 +58,9 @@ echo "[INFO] Applying v1 deploy database migrations..."
 echo "[INFO] Recovering known failed v1 tournament registration migration if present..."
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260703000000_v1_tournament_registration_team_unique || true"
+echo "[INFO] Recovering known failed v1 tournament review photos migration if present..."
+${COMPOSE} -f docker-compose.prod.yml --env-file .env \
+  run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260711180000_v1_tournament_review_photos || true"
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 

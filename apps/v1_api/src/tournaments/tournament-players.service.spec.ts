@@ -87,6 +87,7 @@ function playerRow(overrides: Record<string, unknown> = {}) {
     userId: 'player-user-id',
     realName: '홍길동',
     birthDateSnapshot: '1995-03-15',
+    genderSnapshot: 'male',
     eligibilityStatus: 'needs_review',
     eligibilityNote: null,
     addedAt: new Date('2026-06-14T00:00:00Z'),
@@ -106,6 +107,7 @@ function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
       profile: {
         displayName: '홍길동',
         birthDate: '1995-03-15',
+        gender: 'male',
       },
     },
     ...overrides,
@@ -339,6 +341,7 @@ describe('TournamentPlayersService', () => {
           userId: 'player-user-id',
           realName: '홍길동',
           birthDateSnapshot: '1995-03-15',
+          genderSnapshot: 'male',
           eligibilityStatus: 'needs_review',
         }),
       }),
@@ -360,6 +363,34 @@ describe('TournamentPlayersService', () => {
       }),
     ).rejects.toMatchObject({ response: { code: 'PLAYER_REQUIRED_PROFILE_MISSING' } });
     expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
+  it('addPlayer: missing optional gender does not block roster registration', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow({
+        user: {
+          phone: '01012345678',
+          profile: { displayName: '홍길동', birthDate: '1995-03-15', gender: null },
+        },
+      }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ genderSnapshot: null }));
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).resolves.toMatchObject({ genderSnapshot: null });
+    expect(prisma.v1TournamentPlayer.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ genderSnapshot: null }),
+      }),
+    );
   });
 
   // ─── 8. 명단 조회 + belowMinimum ────────────────────────────────────────
@@ -545,6 +576,107 @@ describe('TournamentPlayersService', () => {
 
   // ─── 11. CSV export 어드민 게이트 ─────────────────────────────────────────
 
+  it('listPlayersForAdmin: ops admin can read a roster without team membership', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      teamId: 'team-1',
+      rosterLockedAt: null,
+      team: { name: '번개팀' },
+      tournament: { minPlayers: 2 },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow(), user: { phone: '01012345678' } },
+    ]);
+
+    await expect(service.listPlayersForAdmin(adminUser, 'reg-1')).resolves.toEqual({
+      registrationId: 'reg-1',
+      teamId: 'team-1',
+      teamName: '번개팀',
+      rosterLockedAt: null,
+      players: [
+        expect.objectContaining({
+          realName: '홍길동',
+          genderSnapshot: 'male',
+          phone: '01012345678',
+        }),
+      ],
+      belowMinimum: true,
+    });
+    expect(prisma.v1TournamentPlayer.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: { user: { select: { phone: true } } } }),
+    );
+    expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('listPlayersForAdmin: marks the team owner and sorts them before other players', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      teamId: 'team-1',
+      rosterLockedAt: null,
+      team: { name: '번개팀', ownerUserId: 'owner-user-id' },
+      tournament: { minPlayers: 2 },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      {
+        ...playerRow({ id: 'member-player', userId: 'member-user-id' }),
+        user: { phone: '01011112222' },
+      },
+      {
+        ...playerRow({ id: 'owner-player', userId: 'owner-user-id' }),
+        user: { phone: '01033334444' },
+      },
+    ]);
+
+    const result = await service.listPlayersForAdmin(adminUser, 'reg-1');
+
+    expect(result.players.map((player) => ({
+      id: player.id,
+      isTeamCaptain: player.isTeamCaptain,
+    }))).toEqual([
+      { id: 'owner-player', isTeamCaptain: true },
+      { id: 'member-player', isTeamCaptain: false },
+    ]);
+  });
+  it('listPlayersForAdmin: support admin has read-only roster access', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      teamId: 'team-1',
+      rosterLockedAt: new Date('2026-07-14T00:00:00Z'),
+      team: { name: '번개팀' },
+      tournament: { minPlayers: 1 },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { ...playerRow(), user: { phone: null } },
+    ]);
+
+    await expect(
+      service.listPlayersForAdmin({ ...adminUser, id: 'support-user-id' }, 'reg-1'),
+    ).resolves.toMatchObject({
+      belowMinimum: false,
+      rosterLockedAt: '2026-07-14T00:00:00.000Z',
+      players: [expect.objectContaining({ phone: null })],
+    });
+  });
+
+  it('listPlayersForAdmin: non-admin receives 403 and no roster PII', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+
+    await expect(service.listPlayersForAdmin(nonManager, 'reg-1')).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+  });
+
+  it('listPlayersForAdmin: unknown registration returns 404', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+
+    await expect(service.listPlayersForAdmin(adminUser, 'ghost-reg')).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_NOT_FOUND' },
+    });
+  });
+
   it('exportCsv: non-admin → 403', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(null);
 
@@ -567,8 +699,9 @@ describe('TournamentPlayersService', () => {
     const result = await service.exportCsv(adminUser, 'reg-1');
 
     expect(result.filename).toMatch(/\.csv$/);
-    expect(result.csv).toContain('realName,birthDate,eligibility,nickname');
+    expect(result.csv).toContain('realName,birthDate,gender,eligibility,nickname');
     expect(result.csv).toContain('홍길동');
+    expect(result.csv).toContain('male');
     expect(result.csv).toContain('번개맨');
   });
 

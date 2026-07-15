@@ -27,7 +27,6 @@ export function toNotice(notice: V1Notice): NoticeModel {
     title: notice.title,
     summary: displayBody,
     date: formatDate(notice.publishedAt),
-    pinned: notice.category === '고정',
     body: splitNoticeBody(displayBody),
   };
 }

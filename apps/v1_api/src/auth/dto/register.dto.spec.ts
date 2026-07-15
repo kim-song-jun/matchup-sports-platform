@@ -3,13 +3,14 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { RegisterDto } from './register.dto';
 
-describe('RegisterDto (slim signup contract)', () => {
-  it('accepts a slim signup with only nickname/email/password/requiredTermsAccepted', async () => {
+describe('RegisterDto (signup contract)', () => {
+  it('accepts male or female gender with the required signup fields', async () => {
     const dto = plainToInstance(RegisterDto, {
       nickname: '테스트닉',
       email: 'slim@example.com',
       password: 'password123',
       requiredTermsAccepted: true,
+      gender: 'male',
     });
 
     const errors = await validate(dto);
@@ -17,7 +18,7 @@ describe('RegisterDto (slim signup contract)', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('still rejects an invalid gender value when one is provided', async () => {
+  it('rejects an invalid gender value', async () => {
     const dto = plainToInstance(RegisterDto, {
       nickname: '테스트닉',
       email: 'slim@example.com',
@@ -41,6 +42,7 @@ describe('RegisterDto (slim signup contract)', () => {
       birthDate: '19950115',
       profileImageUrl: 'data:image/png;base64,profile',
       requiredTermsAccepted: true,
+      gender: 'female',
     });
 
     const errors = await validate(dto);
@@ -48,13 +50,12 @@ describe('RegisterDto (slim signup contract)', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('keeps nickname/email/password/requiredTermsAccepted required, but not gender', async () => {
+  it('keeps nickname/email/password/requiredTermsAccepted/gender required', async () => {
     const dto = plainToInstance(RegisterDto, {});
 
     const errors = await validate(dto);
     const failedProps = errors.map((error) => error.property);
 
-    expect(failedProps).toEqual(expect.arrayContaining(['nickname', 'email', 'password', 'requiredTermsAccepted']));
-    expect(failedProps).not.toContain('gender');
+    expect(failedProps).toEqual(expect.arrayContaining(['nickname', 'email', 'password', 'requiredTermsAccepted', 'gender']));
   });
 });

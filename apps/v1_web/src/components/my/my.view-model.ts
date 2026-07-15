@@ -11,6 +11,7 @@ export const myUser = {
   intro: '',
   initials: '—',
   profileImageUrl: null,
+  genderLabel: '성별 미등록',
   stats: [
     { label: '활동', value: '—' },
     { label: '소속 팀', value: '—' },

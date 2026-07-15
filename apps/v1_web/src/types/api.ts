@@ -45,6 +45,9 @@ export type V1AuthMe = {
     onboardingStatus: string;
     lastLoginAt?: string | null;
     createdAt?: string;
+    authProvider?: 'email' | 'kakao' | 'naver' | null;
+    authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+    hasPassword?: boolean;
   };
   profile: {
     displayName: string;
@@ -158,6 +161,13 @@ export type V1Notice = {
   category?: string;
   publishedAt: string;
   body?: string | null;
+};
+
+export type V1Popup = {
+  popupId: string;
+  title: string;
+  body: string;
+  publishedAt: string | null;
 };
 
 export type V1NoticesResponse = {
@@ -626,6 +636,7 @@ export type V1TeamMember = {
   realName: string | null;
   phone: string | null;
   birthDate: string | null;
+  gender: 'male' | 'female' | null;
   profileImageUrl: string | null;
   role: 'owner' | 'manager' | 'member';
   status: string;
@@ -1048,6 +1059,8 @@ export type V1Profile = {
   email: string | null;
   phone?: string | null;
   authProvider: 'email' | 'kakao' | 'naver' | null;
+  authProviders?: Array<'email' | 'kakao' | 'naver' | string>;
+  hasPassword?: boolean;
   onboardingStatus?: 'not_started' | 'terms_done' | 'social_terms_required' | 'social_profile_required' | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
   regionName: string | null;
   sports?: Array<{
@@ -1067,6 +1080,7 @@ export type V1Profile = {
     nickname?: string | null;
     profileImageUrl: string | null;
     birthDate?: string | null;
+    gender: 'male' | 'female' | null;
   };
   reputation: {
     trustState: TrustState;
@@ -1122,6 +1136,7 @@ export type V1Settings = {
     phone: string | null;
     accountStatus: string;
     providers: string[];
+    hasPassword?: boolean;
   };
   profile: {
     displayName: string;
@@ -1174,7 +1189,7 @@ export type V1Home = {
   } | null;
   shortcuts?: V1HomeShortcut[];
   recommendations?: V1HomeRecommendation[];
-  notice?: { noticeId: string; title: string; pinned: boolean } | null;
+  popup?: V1Popup | null;
   notifications?: { unreadCount: number };
   notices?: V1Notice[];
   recommendedMatches?: V1Match[];
@@ -1225,13 +1240,12 @@ export type V1AdminMe = {
 
 export type V1AdminNoticeStatus = 'draft' | 'published' | 'archived';
 export type V1AdminNoticeAudience = 'public' | 'users' | 'admins';
-export type V1AdminNoticeCategory = '고정' | '업데이트' | '안내';
+export type V1AdminNoticeCategory = '업데이트' | '안내';
 
 export type V1AdminNoticeRow = {
   noticeId: string;
   audience: V1AdminNoticeAudience;
   category: V1AdminNoticeCategory;
-  pinned: boolean;
   title: string;
   body: string;
   status: V1AdminNoticeStatus;
@@ -1244,10 +1258,9 @@ export type V1AdminNoticeRow = {
 export type V1AdminNoticeCreatePayload = {
   audience: V1AdminNoticeAudience;
   category: V1AdminNoticeCategory;
-  pinned: boolean;
   title: string;
   body: string;
-  status: Extract<V1AdminNoticeStatus, 'draft' | 'published'>;
+  status: V1AdminNoticeStatus;
 };
 
 export type V1AdminNoticeUpdatePayload = V1AdminNoticeCreatePayload;
@@ -1260,6 +1273,58 @@ export type V1AdminNoticeUpdateResult = {
   notice: V1AdminNoticeRow;
 };
 
+export type V1AdminNoticeDetailResult = {
+  notice: V1AdminNoticeRow;
+};
+
+export type V1AdminNoticeDeleteResult = {
+  noticeId: string;
+  deleted: true;
+};
+
+export type V1AdminPopupStatus = 'draft' | 'published' | 'archived';
+
+export type V1AdminPopupRow = {
+  popupId: string;
+  audience: V1AdminNoticeAudience;
+  title: string;
+  body: string;
+  status: V1AdminPopupStatus;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  displayStartAt: string | null;
+  displayEndAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminPopupCreatePayload = {
+  audience: V1AdminNoticeAudience;
+  title: string;
+  body: string;
+  status: V1AdminPopupStatus;
+  displayStartAt?: string | null;
+  displayEndAt?: string | null;
+};
+
+export type V1AdminPopupUpdatePayload = V1AdminPopupCreatePayload;
+
+export type V1AdminPopupCreateResult = {
+  popup: V1AdminPopupRow;
+};
+
+export type V1AdminPopupUpdateResult = {
+  popup: V1AdminPopupRow;
+};
+
+export type V1AdminPopupDetailResult = {
+  popup: V1AdminPopupRow;
+};
+
+export type V1AdminPopupDeleteResult = {
+  popupId: string;
+  deleted: true;
+};
 export type V1AdminInquiryRow = {
   inquiryId: string;
   userId: string;
@@ -1300,6 +1365,7 @@ export type V1AdminUserRow = {
   nickname: string | null;
   displayName: string | null;
   email: string | null;
+  gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
   lastLoginAt: string | null;
@@ -1307,10 +1373,20 @@ export type V1AdminUserRow = {
   hostedMatchCount: number;
   ownedTeamCount: number;
   membershipCount: number;
+  teamRoleCounts?: {
+    owner: number;
+    manager: number;
+    member: number;
+  };
   adminRole: 'owner' | 'ops' | 'support' | null;
 };
 
 export type V1AdminUserDetail = V1AdminUserRow & {
+  deletedAt: string | null;
+  withdrawalRequest: {
+    reason: string | null;
+    requestedAt: string;
+  } | null;
   reputationSummary: {
     trustState: string;
     mannerScore: string | null;
@@ -1319,6 +1395,19 @@ export type V1AdminUserDetail = V1AdminUserRow & {
   } | null;
   hostedMatches: { matchId: string; title: string; status: string; startAt: string }[];
   ownedTeams: { teamId: string; name: string; status: string; memberCount: number }[];
+  teamMemberships?: {
+    membershipId: string;
+    teamId: string;
+    name: string;
+    status: string;
+    memberCount: number;
+    role: 'owner' | 'manager' | 'member';
+    joinedAt: string | null;
+  }[];
+};
+
+export type V1AdminDeleteUserPayload = {
+  reason: string;
 };
 
 export type V1AdminMatchRow = {
@@ -1468,6 +1557,7 @@ export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 export type V1TournamentGroupPhase = 'group' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
+  | 'public'
   | 'all_registered'
   | 'confirmed_only'
   | 'waitlist';
@@ -1735,6 +1825,7 @@ export type V1TournamentPlayer = {
   userId: string;
   realName: string;
   birthDateSnapshot: string | null;
+  genderSnapshot: 'male' | 'female' | null;
   eligibilityStatus: V1PlayerEligibilityStatus;
   eligibilityNote: string | null;
   addedAt: string;
@@ -1744,6 +1835,19 @@ export type V1TournamentPlayer = {
 export type V1TournamentRosterResponse = {
   players: V1TournamentPlayer[];
   belowMinimum: boolean;
+};
+
+export type V1AdminTournamentPlayer = V1TournamentPlayer & {
+  phone: string | null;
+  isTeamCaptain: boolean;
+};
+
+export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, 'players'> & {
+  players: V1AdminTournamentPlayer[];
+  registrationId: string;
+  teamId: string;
+  teamName: string;
+  rosterLockedAt: string | null;
 };
 
 /** Admin bracket bracket view: TournamentBracketService.getBracket groups item */
@@ -2018,6 +2122,14 @@ export type V1CreateAnnouncementPayload = {
   body: string;
   audience?: V1AnnouncementAudience;
   publish?: boolean;
+};
+
+export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
+
+export type V1DeleteAnnouncementResult = {
+  id: string;
+  tournamentId: string;
+  deleted: boolean;
 };
 
 export type V1AdminAnnouncementListResult = {

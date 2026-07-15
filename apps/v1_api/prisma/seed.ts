@@ -41,7 +41,7 @@ const futureEnd = new Date('2026-06-20T11:00:00.000Z');
 const pastStart = new Date('2026-05-01T10:00:00.000Z');
 const pastEnd = new Date('2026-05-01T11:00:00.000Z');
 const hostAdminEmail = 'host@teameet.v1';
-const hostAdminPassword = process.env.V1_HOST_ADMIN_PASSWORD?.trim() || '11111111';
+const hostAdminPassword = process.env.V1_HOST_ADMIN_PASSWORD?.trim();
 const scrypt = promisify(scryptCallback);
 const passwordKeyLength = 64;
 const passwordScheme = 'scrypt';
@@ -1451,12 +1451,10 @@ async function seedAdmin(userIds: Record<string, string>) {
 }
 
 async function seedHostAdminPassword(userId: string) {
-  if (!hostAdminPassword) {
-    return;
-  }
-
-  if (hostAdminPassword.length < 8) {
-    throw new Error('V1_HOST_ADMIN_PASSWORD must be at least 8 characters.');
+  if (!hostAdminPassword || hostAdminPassword.length < 8) {
+    throw new Error(
+      'V1_HOST_ADMIN_PASSWORD 환경변수를 8자 이상으로 설정해주세요. (demo/coverage/all seed 모드에서 host@teameet.v1 계정 비밀번호로 사용됩니다.)',
+    );
   }
 
   const passwordHash = await hashSeedPassword(hostAdminPassword);
@@ -1682,7 +1680,6 @@ async function seedCoverageTermsAndNotices() {
     ['00000000-0000-4000-8000-000000001102', 'admins', 'published', '안내', '관리자 공지 커버리지'],
     ['00000000-0000-4000-8000-000000001103', 'public', 'draft', '업데이트', '초안 공지 커버리지'],
     ['00000000-0000-4000-8000-000000001104', 'public', 'archived', '안내', '보관 공지 커버리지'],
-    ['00000000-0000-4000-8000-000000001105', 'public', 'published', '고정', '이번 주 고정 공지'],
     ['00000000-0000-4000-8000-000000001106', 'public', 'published', '업데이트', '매너 점수 업데이트'],
     ['00000000-0000-4000-8000-000000001107', 'public', 'published', '안내', '비 예보 경기 안내'],
   ] as const;
@@ -1711,6 +1708,32 @@ async function seedCoverageTermsAndNotices() {
       },
     });
   }
+
+  const popupId = '00000000-0000-4000-8000-000000001105';
+  const popupTitle = '이번 주 고정 공지';
+  await prisma.v1Popup.upsert({
+    where: { id: popupId },
+    update: {
+      audience: 'public',
+      title: popupTitle,
+      body: `${popupTitle} seed data`,
+      status: 'published',
+      publishedAt: seedNow,
+      archivedAt: null,
+      displayStartAt: null,
+      displayEndAt: null,
+    },
+    create: {
+      id: popupId,
+      audience: 'public',
+      title: popupTitle,
+      body: `${popupTitle} seed data`,
+      status: 'published',
+      publishedAt: seedNow,
+      displayStartAt: null,
+      displayEndAt: null,
+    },
+  });
 }
 
 async function seedCoverageTeams(

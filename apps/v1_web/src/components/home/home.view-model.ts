@@ -111,6 +111,7 @@ export function getHomeViewModel(): HomeViewModel {
       cond: '맑음',
       wind: 2,
     },
+    popup: null,
     notices: [
       { id: 'notice-1', title: '이번 주 고정 공지', summary: '주말 경기장 혼잡 시간과 체크인 안내', trailing: '오늘' },
       { id: 'notice-2', title: '매너 점수 업데이트', summary: '경기 후 리뷰 반영 기준 안내', trailing: '어제' },

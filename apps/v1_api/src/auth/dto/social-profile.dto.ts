@@ -10,9 +10,8 @@ export class SocialProfileDto {
   @MinLength(2)
   nickname!: string;
 
-  @IsOptional()
   @IsIn(['male', 'female'])
-  gender?: 'male' | 'female';
+  gender!: 'male' | 'female';
 
   @IsOptional()
   @IsString()

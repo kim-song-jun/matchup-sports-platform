@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Pin } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -85,7 +84,7 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
           />
         ) : (
           <>
-            <span className={`tm-badge ${notice.pinned ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{notice.tag}</span>
+            <span className="tm-badge tm-badge-grey">{notice.tag}</span>
             <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
             <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>
             <div className="tm-notice-body">
@@ -107,19 +106,12 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
 
 function NoticeRow({ notice }: { notice: NoticeModel }) {
   return (
-    <Link className={`tm-card tm-pressable tm-notice-row ${notice.pinned ? 'tm-notice-row-active' : ''}`} href={`/notices/${notice.id}`}>
-      {/* [P0/P1 아이콘+컬러] pinned 여부를 아이콘 + 배지 텍스트로 병행 전달 (컬러만 의존 금지) */}
-      <span className="tm-notice-row-icon" aria-hidden="true" style={{ color: notice.pinned ? 'var(--blue500)' : undefined }}>
+    <Link className="tm-card tm-pressable tm-notice-row" href={"/notices/" + notice.id}>
+      <span className="tm-notice-row-icon" aria-hidden="true">
         <BellIcon size={18} />
       </span>
       <span>
         <span className="tm-text-micro tm-notice-row-meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          {notice.pinned ? (
-                    <span className="tm-badge tm-badge-blue" style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                      <Pin size={10} strokeWidth={2.2} aria-hidden="true" />
-                      고정
-                    </span>
-                  ) : null}
           {notice.tag} · {notice.date}
         </span>
         <span className="tm-text-label tm-notice-row-title">{notice.title}</span>

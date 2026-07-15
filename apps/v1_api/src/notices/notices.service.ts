@@ -11,7 +11,7 @@ export class NoticesService {
       where: {
         status: 'published',
         audience: 'public',
-        ...(query.category ? { category: query.category } : {}),
+        category: query.category ?? { not: '고정' },
       },
       orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
       take: 20,
@@ -26,20 +26,14 @@ export class NoticesService {
     });
 
     return {
-      notices: notices
-        .sort((a, b) => {
-          if (a.category === '고정' && b.category !== '고정') return -1;
-          if (a.category !== '고정' && b.category === '고정') return 1;
-          return 0;
-        })
-        .map((notice) => ({
-          noticeId: notice.id,
-          audience: notice.audience,
-          category: notice.category,
-          title: notice.title,
-          body: notice.body,
-          publishedAt: notice.publishedAt,
-        })),
+      notices: notices.map((notice) => ({
+        noticeId: notice.id,
+        audience: notice.audience,
+        category: notice.category,
+        title: notice.title,
+        body: notice.body,
+        publishedAt: notice.publishedAt,
+      })),
       pageInfo: {
         hasNextPage: false,
         nextCursor: null,
@@ -53,6 +47,7 @@ export class NoticesService {
         id: noticeId,
         status: 'published',
         audience: 'public',
+        category: { not: '고정' },
       },
       select: {
         id: true,

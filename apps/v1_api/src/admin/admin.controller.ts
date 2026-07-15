@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -8,6 +8,7 @@ import {
   AdminInquiryListQueryDto,
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
+  AdminPopupListQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
   AdminNoticeListQueryDto,
@@ -18,9 +19,12 @@ import {
   ChangeTeamStatusDto,
   ChangeUserStatusDto,
   CreateAdminNoticeDto,
+  CreateAdminPopupDto,
+  DeleteAdminUserDto,
   GrantAdminDto,
   ReplyInquiryDto,
   UpdateAdminNoticeDto,
+  UpdateAdminPopupDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { AdminService } from './admin.service';
@@ -98,6 +102,15 @@ export class AdminController {
     return this.adminService.getUser(user, userId);
   }
 
+  @Delete('users/:userId')
+  deleteUser(
+    @CurrentUser() user: V1AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: DeleteAdminUserDto,
+  ) {
+    return this.adminService.deleteUser(user, userId, dto);
+  }
+
   // ─── Matches ──────────────────────────────────────────────────────────────
 
   @Get('matches')
@@ -122,11 +135,46 @@ export class AdminController {
     return this.adminService.getTeam(user, teamId);
   }
 
+  // ─── Popups ───────────────────────────────────────────────────────────────
+
+  @Get('popups')
+  listPopups(@CurrentUser() user: V1AuthUser, @Query() query: AdminPopupListQueryDto) {
+    return this.adminService.listPopups(user, query);
+  }
+
+  @Get('popups/:popupId')
+  getPopup(@CurrentUser() user: V1AuthUser, @Param('popupId') popupId: string) {
+    return this.adminService.getPopup(user, popupId);
+  }
+
+  @Post('popups')
+  createPopup(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminPopupDto) {
+    return this.adminService.createPopup(user, dto);
+  }
+
+  @Patch('popups/:popupId')
+  updatePopup(
+    @CurrentUser() user: V1AuthUser,
+    @Param('popupId') popupId: string,
+    @Body() dto: UpdateAdminPopupDto,
+  ) {
+    return this.adminService.updatePopup(user, popupId, dto);
+  }
+
+  @Delete('popups/:popupId')
+  deletePopup(@CurrentUser() user: V1AuthUser, @Param('popupId') popupId: string) {
+    return this.adminService.deletePopup(user, popupId);
+  }
   // ─── Notices ──────────────────────────────────────────────────────────────
 
   @Get('notices')
   listNotices(@CurrentUser() user: V1AuthUser, @Query() query: AdminNoticeListQueryDto) {
     return this.adminService.listNotices(user, query);
+  }
+
+  @Get('notices/:noticeId')
+  getNotice(@CurrentUser() user: V1AuthUser, @Param('noticeId') noticeId: string) {
+    return this.adminService.getNotice(user, noticeId);
   }
 
   @Post('notices')
@@ -141,6 +189,11 @@ export class AdminController {
     @Body() dto: UpdateAdminNoticeDto,
   ) {
     return this.adminService.updateNotice(user, noticeId, dto);
+  }
+
+  @Delete('notices/:noticeId')
+  deleteNotice(@CurrentUser() user: V1AuthUser, @Param('noticeId') noticeId: string) {
+    return this.adminService.deleteNotice(user, noticeId);
   }
 
   // ─── Inquiries ─────────────────────────────────────────────────────────────

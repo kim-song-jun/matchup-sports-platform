@@ -57,6 +57,7 @@ export function SignupClient() {
   const [displayName, setDisplayName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [requiredTermsAccepted, setRequiredTermsAccepted] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -80,7 +81,7 @@ export function SignupClient() {
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
   const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
-  const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage;
+  const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || !gender;
 
   const runNicknameCheck = () => {
     setNicknameError(null);
@@ -181,6 +182,11 @@ export function SignupClient() {
   const submitAccount = async () => {
     setError(null);
     setProfileError(null);
+    if (!gender) {
+      setProfileError('성별을 선택해 주세요.');
+      return;
+    }
+
 
     if (phoneDigits && phoneDigits.length !== 11) {
       setProfileError('휴대폰 번호는 숫자 11자리로 입력해 주세요.');
@@ -211,6 +217,7 @@ export function SignupClient() {
         displayName: displayName.trim() || normalizedNickname,
         email: normalizedEmail,
         password,
+        gender,
         phone: phoneDigits || undefined,
         birthDate: birthDateDigits || undefined,
         requiredTermsAccepted,
@@ -232,11 +239,12 @@ export function SignupClient() {
           profileImageUrl: uploadedUrl,
           phone: phoneDigits || null,
           birthDate: birthDateDigits || null,
+          gender,
         });
       }
 
       window.sessionStorage.removeItem(onboardingDraftKey);
-      router.replace('/onboarding/sport');
+      router.replace('/signup/complete');
     } catch (nextError) {
       if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
         if (nextError.code === 'NICKNAME_CONFLICT') {
@@ -287,7 +295,9 @@ export function SignupClient() {
           : !passwordLongEnough
             ? '비밀번호는 8자 이상이어야 해요.'
             : '비밀번호 확인이 일치해야 해요.'
-      : uploadingProfileImage
+      : !gender
+        ? '성별을 선택해 주세요.'
+        : uploadingProfileImage
         ? '프로필 사진을 업로드하는 중이에요.'
         : null
     : null;
@@ -478,6 +488,30 @@ export function SignupClient() {
                 </div>
               </section>
 
+
+              <div className="tm-auth-field">
+                <span className="tm-text-label">성별</span>
+                <div className="tm-auth-segmented" role="radiogroup" aria-label="성별">
+                  <button
+                    className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={gender === 'male'}
+                    onClick={() => { setGender('male'); setProfileError(null); }}
+                  >
+                    남
+                  </button>
+                  <button
+                    className={`tm-auth-segment ${gender === 'female' ? 'tm-auth-segment-active' : ''}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={gender === 'female'}
+                    onClick={() => { setGender('female'); setProfileError(null); }}
+                  >
+                    여
+                  </button>
+                </div>
+              </div>
               <label className="tm-auth-field">
                 <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
                 <input

@@ -332,6 +332,7 @@ describe('TeamsService', () => {
               displayName: null,
               profileImageUrl: null,
               birthDate: null,
+              gender: 'female',
             },
           },
         },
@@ -342,6 +343,7 @@ describe('TeamsService', () => {
       expect(result.membersVisibilityEnabled).toBe(false);
       expect(result.viewerRole).toBe('member');
       expect(result.items).toHaveLength(1);
+      expect(result.items[0].gender).toBe('female');
       expect(prisma.v1TeamMembership.findMany).toHaveBeenCalled();
     });
 
@@ -391,6 +393,7 @@ describe('TeamsService', () => {
               displayName: 'Owner',
               profileImageUrl: null,
               birthDate: new Date('1990-01-01'),
+              gender: 'male',
             },
           },
         },
@@ -405,6 +408,7 @@ describe('TeamsService', () => {
         realName: null,
         phone: null,
         birthDate: null,
+        gender: null,
       });
     });
 

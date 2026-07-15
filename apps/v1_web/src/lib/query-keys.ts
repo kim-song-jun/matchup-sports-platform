@@ -38,7 +38,10 @@ export const v1Keys = {
   adminMatch: (id: string) => [...v1Keys.all, 'admin', 'matches', id] as const,
   adminTeams: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'teams', filters ?? {}] as const,
   adminTeam: (id: string) => [...v1Keys.all, 'admin', 'teams', id] as const,
+  adminPopups: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'popups', filters ?? {}] as const,
+  adminPopup: (id: string) => [...v1Keys.all, 'admin', 'popups', id] as const,
   adminNotices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'notices', filters ?? {}] as const,
+  adminNotice: (id: string) => [...v1Keys.all, 'admin', 'notices', id] as const,
   adminInquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'inquiries', filters ?? {}] as const,
   adminInquiry: (id: string) => [...v1Keys.all, 'admin', 'inquiries', id] as const,
   adminTeamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'team-matches', filters ?? {}] as const,
@@ -58,6 +61,8 @@ export const v1Keys = {
   adminTournament: (id: string) => [...v1Keys.all, 'admin', 'tournaments', id] as const,
   adminTournamentRegistrations: (tournamentId: string, filters?: Record<string, unknown>) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'registrations', filters ?? {}] as const,
+  adminTournamentRoster: (registrationId: string) =>
+    [...v1Keys.all, 'admin', 'registrations', registrationId, 'players'] as const,
   adminTournamentBracket: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'bracket'] as const,
   adminTournamentAnnouncements: (tournamentId: string) =>

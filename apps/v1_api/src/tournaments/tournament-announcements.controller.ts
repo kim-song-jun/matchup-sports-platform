@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { CreateAnnouncementDto } from './dto/tournament-read.dto';
+import { CreateAnnouncementDto, UpdateAnnouncementDto } from './dto/tournament-read.dto';
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
 
 @Controller()
@@ -34,6 +34,16 @@ export class TournamentAnnouncementsController {
     return this.announcementsService.create(user, tournamentId, dto);
   }
 
+  /** PATCH /admin/announcements/:announcementId */
+  @Patch('admin/announcements/:announcementId')
+  update(
+    @CurrentUser() user: V1AuthUser,
+    @Param('announcementId') announcementId: string,
+    @Body() dto: UpdateAnnouncementDto,
+  ) {
+    return this.announcementsService.update(user, announcementId, dto);
+  }
+
   /** PATCH /admin/announcements/:announcementId/publish */
   @Patch('admin/announcements/:announcementId/publish')
   publish(
@@ -41,5 +51,14 @@ export class TournamentAnnouncementsController {
     @Param('announcementId') announcementId: string,
   ) {
     return this.announcementsService.publish(user, announcementId);
+  }
+
+  /** DELETE /admin/announcements/:announcementId */
+  @Delete('admin/announcements/:announcementId')
+  remove(
+    @CurrentUser() user: V1AuthUser,
+    @Param('announcementId') announcementId: string,
+  ) {
+    return this.announcementsService.remove(user, announcementId);
   }
 }

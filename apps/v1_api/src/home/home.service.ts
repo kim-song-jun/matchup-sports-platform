@@ -9,12 +9,13 @@ export class HomeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getHome(user: V1AuthUser | null, query: HomeQueryDto) {
-    const [viewer, summary, recommendations, notices, unreadCount, myTeamRoute] =
+    const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute] =
       await Promise.all([
         this.getViewer(user),
         this.getSummary(user),
         this.getRecommendationItems({ ...query, limit: 5 }),
-        this.getPinnedNotices(),
+        this.getActivePopup(),
+        this.getRecentNotices(),
         this.getUnreadCount(user),
         this.getMyTeamRoute(user),
       ]);
@@ -51,7 +52,7 @@ export class HomeService {
         regionName: item.regionName,
         startsAt: item.startsAt,
       })),
-      notice: notices[0] ? { noticeId: notices[0].noticeId, title: notices[0].title, pinned: true } : null,
+      popup,
       notices,
       notifications: { unreadCount },
     };
@@ -168,12 +169,36 @@ export class HomeService {
     }));
   }
 
-  private async getPinnedNotices() {
+  private async getActivePopup() {
+    const now = new Date();
+    const popup = await this.prisma.v1Popup.findFirst({
+      where: {
+        status: 'published',
+        audience: 'public',
+        AND: [
+          { OR: [{ displayStartAt: null }, { displayStartAt: { lte: now } }] },
+          { OR: [{ displayEndAt: null }, { displayEndAt: { gt: now } }] },
+        ],
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      select: { id: true, title: true, body: true, publishedAt: true },
+    });
+
+    return popup
+      ? {
+          popupId: popup.id,
+          title: popup.title,
+          body: popup.body,
+          publishedAt: popup.publishedAt,
+        }
+      : null;
+  }
+
+  private async getRecentNotices() {
     const notices = await this.prisma.v1Notice.findMany({
       where: {
         status: 'published',
         audience: 'public',
-        category: '고정',
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: 3,
@@ -188,7 +213,6 @@ export class HomeService {
       publishedAt: notice.publishedAt,
     }));
   }
-
   private async getUnreadCount(user: V1AuthUser | null) {
     if (!user) {
       return 0;

@@ -34,4 +34,10 @@ ENV NODE_ENV=production
 ENV PORT=3013
 ENV HOSTNAME=0.0.0.0
 EXPOSE 3013
+
+# 고정 UID/GID(1001) — v1-api와 동일 정책.
+RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
+  && chown -R app:app /app
+
+USER app
 CMD ["node", "apps/v1_web/server.js"]

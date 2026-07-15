@@ -54,7 +54,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import type { MyHomeViewModel, MyInvitationItem, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 
-type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'profileImage' | 'form', string>>;
+type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
   status: 'idle' | 'available' | 'taken' | 'error';
   value: string;
@@ -92,6 +92,7 @@ export function MyHomePageClient() {
           region: '—',
           initials: '—',
           profileImageUrl: null,
+          genderLabel: '성별 미등록',
           intro: '',
           sports: [],
           stats: myHomeModel.user.stats.map((stat) => ({ label: stat.label, value: '—' })),
@@ -296,6 +297,7 @@ export function ProfileEditPageClient() {
   const [email, setEmail] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
@@ -310,6 +312,7 @@ export function ProfileEditPageClient() {
     setEmail(profile.data.email ?? '');
     setPhoneDigits(profile.data.phone ?? '');
     setBirthDateDigits(profile.data.profile.birthDate ?? '');
+    setGender(profile.data.profile.gender ?? '');
     setProfileImageUrl(profile.data.profile.profileImageUrl ?? '');
     setProfileImageName('');
     setNicknameCheck({ status: 'idle', value: '' });
@@ -318,13 +321,14 @@ export function ProfileEditPageClient() {
 
   const originalNickname = profile.data?.profile.nickname ?? profile.data?.profile.displayName ?? '';
   const originalEmail = profile.data?.email ?? '';
+  const canEditEmail = Boolean(profile.data?.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
   const nicknameChanged = normalizedNickname !== originalNickname;
-  const emailChanged = normalizedEmail !== originalEmail;
+  const emailChanged = canEditEmail && normalizedEmail !== originalEmail;
   const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
-  const emailVerified = !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
-  const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified;
+  const emailVerified = !canEditEmail || !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
+  const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified || !gender;
 
   const runNicknameCheck = () => {
     setFieldErrors((current) => ({ ...current, nickname: undefined, form: undefined }));
@@ -352,6 +356,9 @@ export function ProfileEditPageClient() {
 
   const runEmailCheck = () => {
     setFieldErrors((current) => ({ ...current, email: undefined, form: undefined }));
+    if (!canEditEmail) {
+      return;
+    }
     if (!emailChanged) {
       setEmailCheck({ status: 'available', value: normalizedEmail });
       return;
@@ -424,7 +431,7 @@ export function ProfileEditPageClient() {
       return;
     }
 
-    if (!normalizedEmail.includes('@')) {
+    if (canEditEmail && !normalizedEmail.includes('@')) {
       setFieldErrors({ email: '이메일 형식을 확인해 주세요.' });
       return;
     }
@@ -449,14 +456,20 @@ export function ProfileEditPageClient() {
       return;
     }
 
+    if (!gender) {
+      setFieldErrors({ gender: '성별을 선택해 주세요.' });
+      return;
+    }
+
     try {
       await update.mutateAsync({
         displayName: displayName.trim(),
         nickname: normalizedNickname,
-        email: normalizedEmail,
+        email: canEditEmail ? normalizedEmail : null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
         birthDate: birthDateDigits || null,
+        gender,
       });
       router.replace('/my');
     } catch (nextError) {
@@ -560,16 +573,18 @@ export function ProfileEditPageClient() {
               className={`tm-input ${fieldErrors.email ? 'tm-auth-input-error' : emailVerified && emailChanged ? 'tm-auth-input-success' : ''}`}
               value={email}
               onChange={(event) => {
+                if (!canEditEmail) return;
                 setEmail(event.target.value);
                 setEmailCheck({ status: 'idle', value: '' });
                 setFieldErrors((current) => ({ ...current, email: undefined }));
               }}
               type="email"
-              required
+              required={canEditEmail}
+              disabled={!canEditEmail}
               aria-invalid={fieldErrors.email ? true : undefined}
               aria-describedby={fieldErrors.email || (emailVerified && emailChanged) ? 'v1-profile-email-helper' : undefined}
             />
-            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={!canEditEmail || checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
               {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
@@ -620,6 +635,33 @@ export function ProfileEditPageClient() {
           />
           {fieldErrors.birthDate ? <span id="profile-birthDate-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.birthDate}</span> : null}
         </label>
+        <div className="tm-create-field">
+          <span className="tm-text-label">성별</span>
+          <div
+            className="tm-auth-segmented"
+            role="radiogroup"
+            aria-label="성별"
+            aria-invalid={fieldErrors.gender ? true : undefined}
+            aria-describedby={fieldErrors.gender ? 'profile-gender-error' : undefined}
+          >
+            <button className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'male'} onClick={() => {
+              setGender('male');
+              setFieldErrors((current) => ({ ...current, gender: undefined }));
+            }}>
+              남
+            </button>
+            <button className={`tm-auth-segment ${gender === 'female' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'female'} onClick={() => {
+              setGender('female');
+              setFieldErrors((current) => ({ ...current, gender: undefined }));
+            }}>
+              여
+            </button>
+          </div>
+          {fieldErrors.gender ? (
+            <span id="profile-gender-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.gender}</span>
+          ) : null}
+        </div>
+
         <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
           <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
@@ -635,7 +677,11 @@ export function ProfileEditPageClient() {
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>
-        {isBlocked && (nicknameChanged || emailChanged) ? <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.</div> : null}
+        {!gender ? (
+          <div className="tm-text-micro tm-auth-fixed-reason">성별을 선택해 주세요.</div>
+        ) : isBlocked && (nicknameChanged || emailChanged) ? (
+          <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.</div>
+        ) : null}
       </div>
     </AppChrome>
   );
@@ -938,6 +984,12 @@ function formatAccountEmail(email: string | null, providers: string[]) {
   return '등록 안 됨';
 }
 
+function formatPasswordAvailability(hasPassword: boolean | undefined, providers: string[]) {
+  if (hasPassword) return '이메일 계정에서 관리';
+  if (providers.includes('kakao')) return '카카오 계정으로 로그인 중';
+  return '비밀번호 없음';
+}
+
 export function SettingsPageClient() {
   const settings = useV1Settings();
 
@@ -950,6 +1002,8 @@ export function SettingsPageClient() {
         loginMethod: formatLoginMethods(settings.data.account.providers),
         email: formatAccountEmail(settings.data.account.email, settings.data.account.providers),
         phone: settings.data.account.phone ?? '등록 안 됨',
+        password: formatPasswordAvailability(settings.data.account.hasPassword, settings.data.account.providers),
+        canRequestPasswordChange: Boolean(settings.data.account.hasPassword),
       }
     : undefined;
 
@@ -1286,10 +1340,11 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
-      name: nickname,
+      name: displayName,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
-      initials: initials(nickname),
+      genderLabel: formatGender(profile.profile.gender),
+      initials: initials(displayName || nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
       loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
       loginMethodProvider: profile.authProvider,
@@ -1375,7 +1430,7 @@ function toMyMember(
     id: member.membershipId,
     name: member.displayName,
     role: roleLabel(member.role),
-    meta: new Date(member.joinedAt).toLocaleDateString('ko-KR'),
+    meta: `${formatGender(member.gender)} · ${new Date(member.joinedAt).toLocaleDateString('ko-KR')}`,
     status: teamMemberStatusLabel(member.status),
     locked: member.role === 'owner',
     actions: itemActions,
@@ -1465,6 +1520,12 @@ function hasPendingReview(data: unknown) {
     return Array.isArray(items) ? items.length > 0 : undefined;
   }
   return undefined;
+}
+
+function formatGender(gender: 'male' | 'female' | null | undefined) {
+  if (gender === 'male') return '남';
+  if (gender === 'female') return '여';
+  return '성별 미등록';
 }
 
 function roleLabel(role: string) {

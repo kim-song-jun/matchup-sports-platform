@@ -385,13 +385,13 @@
 @media (min-width: 1024px) {
   .tm-home-featured-carousel {
     overflow-x: visible;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
 
   .tm-home-featured-carousel > * {
-    /* 캐러셀 고정폭(min(88%, 400px)) 해제 — 그리드 셀 채움 */
-    flex: 1 1 0;
+    /* 캐러셀 고정폭(min(88%, 400px)) 해제 — 2열 그리드 셀 채움 */
     min-width: 0;
   }
 }

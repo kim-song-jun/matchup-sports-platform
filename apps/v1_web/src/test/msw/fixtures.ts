@@ -4,6 +4,7 @@ import type {
   V1AdminInquiryRow,
   V1AdminLog,
   V1AdminNoticeRow,
+  V1AdminPopupRow,
   V1AdminOverview,
   V1ChatMessage,
   V1ChatRoom,
@@ -153,8 +154,8 @@ export function toAdminInquiryDetail(inquiry: V1Inquiry): V1AdminInquiryDetail {
 export const v1NoticesFixture: V1Notice[] = [
   {
     id: 'notice-1',
-    title: '이번 주 고정 공지',
-    category: '고정',
+    title: '이번 주 이용 안내',
+    category: '안내',
     publishedAt: '2026-05-18T00:00:00.000Z',
     body: '주말 경기장 입장 시간과 체크인 안내',
   },
@@ -185,7 +186,6 @@ export const v1AdminNoticesFixture: V1AdminNoticeRow[] = v1NoticesFixture.map((n
   noticeId: notice.id ?? notice.noticeId ?? 'notice',
   audience: (notice.audience ?? 'public') as V1AdminNoticeRow['audience'],
   category: (notice.category ?? '안내') as V1AdminNoticeRow['category'],
-  pinned: notice.category === '고정',
   title: notice.title,
   body: notice.body ?? '',
   status: 'published',
@@ -195,6 +195,19 @@ export const v1AdminNoticesFixture: V1AdminNoticeRow[] = v1NoticesFixture.map((n
   updatedAt: notice.publishedAt,
 }));
 
+export const v1AdminPopupsFixture: V1AdminPopupRow[] = [{
+  popupId: 'popup-1',
+  audience: 'public',
+  title: '이번 주 홈 팝업',
+  body: '주말 경기장 입장 시간과 체크인 안내',
+  status: 'published',
+  publishedAt: '2026-05-18T00:00:00.000Z',
+  archivedAt: null,
+  displayStartAt: null,
+  displayEndAt: null,
+  createdAt: '2026-05-18T00:00:00.000Z',
+  updatedAt: '2026-05-18T00:00:00.000Z',
+}];
 export const v1MatchesFixture: V1Match[] = [
   {
     id: 'match-1',
@@ -665,6 +678,7 @@ export const v1ProfileFixture: V1Profile = {
   email: 'host@teameet.v1',
   authProvider: 'email',
   profile: {
+    gender: 'male',
     displayName: '송준',
     profileImageUrl: null,
   },
@@ -700,6 +714,12 @@ export const v1SettingsFixture: V1Settings = {
 };
 
 export const v1HomeFixture: V1Home = {
+  popup: {
+    popupId: 'popup-1',
+    title: '이번 주 홈 팝업',
+    body: '주말 경기장 입장 시간과 체크인 안내',
+    publishedAt: '2026-05-18T00:00:00.000Z',
+  },
   notices: v1NoticesFixture,
   recommendedMatches: v1MatchesFixture,
   recommendedTeamMatches: v1TeamMatchesFixture,

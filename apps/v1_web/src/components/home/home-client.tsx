@@ -3,10 +3,10 @@
 import { useCallback, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { v1Post } from '@/lib/api-client';
-import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice, V1ResolveLocationResponse } from '@/types/api';
+import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice, V1Popup, V1ResolveLocationResponse } from '@/types/api';
 import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
-import type { HomeChatRoom, HomeMatchCard, HomeNotice, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
+import type { HomeChatRoom, HomeMatchCard, HomeNotice, HomePopup, HomeQuickAction, HomeStats, HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
 
 export function HomePageClient() {
@@ -66,6 +66,7 @@ function withoutHomeContent(model: HomeViewModel): HomeViewModel {
     ...model,
     featuredMatch: null,
     recommendedMatches: [],
+    popup: null,
     notices: [],
   };
 }
@@ -94,6 +95,7 @@ function toHomeModel(
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),
     weather: weather ?? fallback.weather,
+    popup: normalizePopup(home.popup),
     notices: normalizeNotices(home),
   };
 }
@@ -181,20 +183,20 @@ function normalizeMatches(home: V1Home, fallback: HomeViewModel) {
     : [];
 }
 
+function normalizePopup(popup: V1Popup | null | undefined): HomePopup | null {
+  if (!popup) return null;
+
+  return {
+    id: popup.popupId,
+    title: popup.title,
+    body: popup.body,
+    trailing: popup.publishedAt ? formatDate(popup.publishedAt) : '팝업',
+  };
+}
+
 function normalizeNotices(home: V1Home) {
   const notices = Array.isArray(home.notices) ? home.notices : [];
   if (notices.length) return notices.map(toHomeNotice);
-  if (home.notice) {
-    return [
-      {
-        id: home.notice.noticeId,
-        title: home.notice.title,
-        summary: home.notice.pinned ? '고정 공지' : '공지',
-        trailing: '공지',
-      },
-    ];
-  }
-
   return [];
 }
 
@@ -287,8 +289,6 @@ function useCurrentLocationWeather() {
     };
   }, []);
 
-  // Geolocation is requested only on explicit user action (refreshWeather button click).
-  // Auto-triggering on mount would show the browser permission prompt without user intent.
 
   return { weather, refreshing, refresh: () => void refresh() };
 }
@@ -393,6 +393,7 @@ function toHomeNotice(notice: V1Notice): HomeNotice {
     title: notice.title,
     summary: notice.category ?? notice.audience ?? '공지',
     trailing: formatDate(notice.publishedAt),
+    body: notice.body?.trim() || undefined,
   };
 }
 

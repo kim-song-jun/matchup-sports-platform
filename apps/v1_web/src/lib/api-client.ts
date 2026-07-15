@@ -28,8 +28,7 @@ function toErrorMessage(message: unknown) {
 }
 
 function getDefaultBaseUrl() {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') ?? '';
-  return `${basePath}/api/v1`;
+  return '/api/v1';
 }
 
 export function getV1ApiBaseUrl() {

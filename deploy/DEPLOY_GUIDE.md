@@ -1,469 +1,187 @@
-# Teameet EC2 배포 가이드
+# Teameet v1 EC2 배포 가이드
 
-## 1. EC2 인스턴스 생성
+이 문서는 `apps/v1_api`와 `apps/v1_web`으로 구성된 v1 운영 스택만 다룬다.
 
-### 권장 사양
+## 1. 공개 경로 계약
 
-| 항목 | 스펙 | 비용 |
-|------|------|------|
-| **인스턴스** | **t3.small** (2vCPU, 2GB) | ~$15/월 |
-| 스토리지 | gp3 20GB | ~$1.6/월 |
-| 리전 | ap-northeast-2 (서울) | - |
-| OS | Amazon Linux 2023 | - |
-| **총 예상** | | **~$17/월** |
+Nginx는 v1 Web을 별도 브라우저 prefix 없이 루트에 제공한다.
 
-> t3.micro(1GB)는 Docker 빌드 시 메모리 부족. t3.small이 최소 권장.
-> 트래픽이 늘면 t3.medium(4GB, ~$30/월)으로 업그레이드.
+| 공개 경로 | 대상 | 용도 |
+|---|---|---|
+| `/` 및 페이지 경로 | `v1_web:3013` | Next.js Web |
+| `/_next/static/*` | `v1_web:3013` | 정적 빌드 자산 |
+| `/api/v1/*` | `v1_api:8121` | canonical backend API |
+| `/uploads/*` | `v1_api:8121/uploads/*` | 업로드 자산 |
 
-### AWS 콘솔에서 EC2 생성
+브라우저용 API base는 `/api/v1`, 서버 내부 API origin은 `http://v1_api:8121`이다. Web 페이지, 정적 자산, 업로드 자산은 모두 루트 기준 경로를 사용한다.
 
-1. **AWS 콘솔** → EC2 → "인스턴스 시작"
-2. **이름**: `teameet-server`
-3. **AMI**: Amazon Linux 2023 (기본)
-4. **인스턴스 유형**: `t3.small`
-5. **키 페어**: 새로 생성 또는 기존 키 선택 → `.pem` 파일 다운로드
-6. **네트워크 설정**:
-   - "퍼블릭 IP 자동 할당": 활성화
-   - 보안 그룹 아래 참조
-7. **스토리지**: 20GB gp3
-8. **시작**
+## 2. EC2 준비
 
-### 보안 그룹 설정
+권장 최소 사양은 서울 리전의 Amazon Linux 2023, `t3.small`(2 vCPU, 2 GB), gp3 20 GB다. 보안 그룹은 SSH 관리 IP의 22번 포트와 공개 80/443 포트만 연다.
 
-```
-인바운드 규칙:
-┌──────┬──────────┬──────────────────┐
-│ 포트 │ 프로토콜  │ 소스             │
-├──────┼──────────┼──────────────────┤
-│ 22   │ TCP      │ 내 IP (SSH)      │
-│ 80   │ TCP      │ 0.0.0.0/0 (HTTP) │
-│ 443  │ TCP      │ 0.0.0.0/0 (HTTPS)│
-└──────┴──────────┴──────────────────┘
+```text
+22/tcp   관리 IP
+80/tcp   0.0.0.0/0
+443/tcp  0.0.0.0/0
 ```
 
----
+## 3. 초기 배포
 
-## 2. EC2 원클릭 배포
-
-EC2에 SSH 접속 후 아래 한 줄 실행:
-
-```bash
-ssh -i teameet-key.pem ec2-user@<EC2_퍼블릭_IP>
-
-# 원클릭 설치 + 배포
-curl -sL https://raw.githubusercontent.com/kim-song-jun/teameet-sports-platform/main/deploy/setup-ec2.sh | bash
-```
-
-> `setup-ec2.sh`는 `TOSS_*` 값을 주면 `deploy/.env`에 반영합니다. 값을 비워 둬도 배포는 계속되며, 결제 기능만 mock mode로 동작합니다.
-
-이 스크립트가 자동으로 처리하는 것:
-- Docker + Docker Compose 설치
-- `jq` 설치 (healthcheck parser)
-- Git 설치 + 프로젝트 클론
-- DB 비밀번호, JWT Secret 랜덤 생성
-- 선택적 `TOSS_*` 값 `deploy/.env` 반영
-- Docker 이미지 빌드 (~5-10분)
-- PostgreSQL + Redis 시작
-- DB 스키마 적용 (Prisma)
-- Nginx 리버스 프록시 설정
-- 헬스체크
-
-완료 후 출력:
-```
-🎉 Teameet 배포 완료!
-  🌐 웹사이트:  http://<EC2_IP>
-  📚 API 문서:  http://<EC2_IP>/docs
-  🏥 헬스체크:  http://<EC2_IP>/api/v1/health
-```
-
----
-
-## 3. GitHub Actions CI/CD 설정
-
-main 브랜치에 push하면 자동으로 EC2에 배포됩니다.
-
-### GitHub Secrets 등록
-
-GitHub 레포 → Settings → Secrets and variables → Actions → "New repository secret"
-
-| Secret 이름 | 값 | 예시 |
-|-------------|---|------|
-| `EC2_HOST` | EC2 퍼블릭 IP | `3.35.xxx.xxx` |
-| `EC2_USER` | SSH 사용자명 | `ec2-user` |
-| `EC2_SSH_KEY` | SSH 프라이빗 키 전체 내용 | `-----BEGIN RSA...` |
-| `TOSS_SECRET_KEY` | 운영 결제 서버 시크릿, 없으면 mock mode | `live_sk_...` |
-| `TOSS_CLIENT_KEY` | 운영 결제 클라이언트 키, 없으면 mock widget | `live_ck_...` |
-| `TOSS_WEBHOOK_SECRET` | 운영 결제 webhook 서명 시크릿 | `whsec_...` |
-
-### SSH 키 등록 방법
-
-```bash
-# 로컬에서 .pem 파일 내용 복사
-cat teameet-key.pem | pbcopy  # macOS
-# 또는
-cat teameet-key.pem            # 출력 후 전체 복사
-```
-
-이 내용을 `EC2_SSH_KEY` Secret에 붙여넣기.
-
-### CI/CD 흐름
-
-```
-개발자 코드 수정 → git push main
-  ↓
-GitHub Actions 트리거
-  ↓
-1. pnpm install
-2. Prisma generate
-3. lint + type-check + test
-  ↓ (빌드 성공 시)
-4. SSH로 EC2 접속
-5. rsync로 `~/teameet` 작업 트리 동기화 (`deploy/.env` 보호)
-6. GitHub repo secrets의 `TOSS_*` 값을 EC2 `deploy/.env`의 source of truth로 먼저 동기화
-7. `deploy/.env` 필수 값(`DB_PASSWORD`, `JWT_SECRET`) preflight 검증
-8. API / Web Docker 이미지 빌드
-9. Web 이미지는 `deploy/Dockerfile.web`로 직접 빌드하고, browser API base를 `/api/v1`, internal rewrite origin을 `http://api:8100`으로 주입
-10. postgres / redis 선기동
-11. `prisma/bootstrap-deploy-db.ts` 실행
-12. compose 스택 재기동 (`docker compose` 또는 `docker-compose`)
-13. Next standalone `web` runtime은 `HOSTNAME=0.0.0.0`로 bind를 고정해 localhost healthcheck와 nginx dependency gate를 통과시킴
-14. API health + Web internal rewrite + Nginx localhost health 검증
-15. `prisma/seed-mocks.ts --checksum-gate`로 canonical mock dataset checksum 검증 및 필요 시 sync
-16. `prisma/seed-images.ts`로 DB-backed 이미지 보강
-17. 선택적 full seed 실행
-  ↓
-🎉 배포 완료
-```
-
-> 운영 서버의 `~/teameet`는 CI가 동기화한 mirror일 수 있어 `.git`이 없을 수 있습니다. 서버에서 `git pull`이 항상 가능하다고 가정하지 않습니다.
-
----
-
-## 4. 환경변수 설정
-
-`deploy/.env` 파일 (EC2 서버에 자동 생성됨):
-
-```bash
-# Database
-DB_USER=teameet
-DB_PASSWORD=<자동생성된_24자_비밀번호>
-DB_NAME=teameet
-
-# JWT
-JWT_SECRET=<자동생성된_48자_시크릿>
-
-# Internal API origin used when Next.js builds server-side rewrites
-INTERNAL_API_ORIGIN=http://api:8100
-
-# OAuth (서비스 연동 시 수동 설정)
-KAKAO_CLIENT_ID=
-KAKAO_CLIENT_SECRET=
-NAVER_CLIENT_ID=
-NAVER_CLIENT_SECRET=
-
-# Payment (leave blank to keep payments in mock mode)
-TOSS_CLIENT_KEY=
-TOSS_SECRET_KEY=
-TOSS_WEBHOOK_SECRET=
-
-# Deploy-safe canonical mock sync (disable only with literal "false")
-DEPLOY_SYNC_MOCK_DATA=true
-
-# V1 seed sync (disabled by default; enable only for a reviewed base reference upsert)
-DEPLOY_SYNC_V1_SEED_DATA=false
-
-# V1 host admin email login password (8+ chars).
-# If left blank, seed.ts uses 11111111 for host@teameet.v1.
-V1_HOST_ADMIN_PASSWORD=
-```
-
-`TOSS_SECRET_KEY`와 `TOSS_CLIENT_KEY`가 비어 있으면 결제 기능은 mock mode로 남고, 애플리케이션 배포 자체는 계속된다. GitHub Actions deploy는 `TOSS_*` repo secret을 EC2 `deploy/.env`의 source of truth로 취급하므로, secret이 비어 있거나 없으면 해당 runtime 값도 빈 값으로 동기화된다.
-
-`DEPLOY_SYNC_MOCK_DATA`는 기본값이 `true`다. 운영자가 이 값을 정확히 `false`로 넣지 않는 한, 배포 시마다 checksum-gated mock sync가 실행되고 catalog checksum이 바뀌었을 때만 canonical mock dataset을 다시 반영한다. catalog는 KST 날짜 anchor를 포함하므로 날짜가 넘어가면 mock 일정도 다음 배포에서 함께 앞으로 이동한다.
-
-`DEPLOY_SYNC_V1_SEED_DATA`는 기본값이 `false`다. 운영자가 검토된 release에서 base reference upsert가 필요하다고 판단해 이 값을 정확히 `true`로 넣은 경우에만 GitHub Actions 배포의 container restart 단계에서 `teameet_v1_api` health 확인 후 `apps/v1_api/prisma/seed.ts`를 실행한다.
-
-v1 seed는 `host@teameet.v1` 계정을 `owner` 어드민으로 활성화하고 이메일 로그인 비밀번호를 설정한다. `V1_HOST_ADMIN_PASSWORD`가 설정되어 있으면 해당 값을 사용하고, 비어 있으면 기본값 `11111111`을 사용한다. GitHub Actions 배포를 쓰는 경우 repo secret `V1_HOST_ADMIN_PASSWORD`에 값을 등록하면 EC2 `deploy/.env`로 동기화된다.
-
-v1 운영 DB는 배포 시 `prisma migrate deploy`만 실행한다. `prisma db push --skip-generate`는 운영 배포 경로에서 사용하지 않는다. v1 schema 변경은 반드시 `apps/v1_api/prisma/migrations/`에 migration 파일을 만든 뒤 배포한다.
-
-`HOSTNAME`은 운영 compose에서 `0.0.0.0`으로 고정한다. Next standalone가 container IP에만 bind하면 앱은 떠 있어도 `localhost` healthcheck가 실패해 `web`/`nginx` dependency gate가 깨질 수 있다.
-
-`prisma/bootstrap-deploy-db.ts`는 public schema가 비어 있는 운영 DB에서 현재 migration chain을 처음부터 재생하지 않는다. 비어 있는 DB에 `_prisma_migrations`만 남아 있어도 먼저 history를 재설정한 뒤 `prisma db push --skip-generate`로 현재 schema를 만들고, 저장소에 있는 migration 디렉터리를 `resolve --applied`로 기록한 다음 `migrate deploy`를 검증한다. 반대로 public table이 이미 있는데 migration history만 없으면 drift 가능성이 크므로 자동 복구하지 않고 배포를 실패시킨다. GitHub Actions deploy도 이 bootstrap 실패를 더 이상 무시하지 않고 즉시 실패해야 한다.
-
----
-
-## 5. Docker 구성
-
-```
-┌─────────────────────────────────────┐
-│         EC2 (t3.small)              │
-│                                     │
-│  ┌──────────┐                       │
-│  │  Nginx   │ ← :80/:443           │
-│  │  (proxy) │                       │
-│  └────┬─────┘                       │
-│       │                             │
-│  ┌────┴─────┐  ┌──────────────────┐ │
-│  │ Next.js  │  │  NestJS API      │ │
-│  │  (:3000) │  │  (:8100)         │ │
-│  └──────────┘  └──────────────────┘ │
-│                                     │
-│  ┌──────────┐  ┌──────────────────┐ │
-│  │PostgreSQL│  │      Redis       │ │
-│  │  (:5432) │  │     (:6379)      │ │
-│  └──────────┘  └──────────────────┘ │
-└─────────────────────────────────────┘
-
-Nginx 라우팅:
-  / → Next.js (프론트엔드)
-  /api/* → NestJS (백엔드 API)
-  /docs → NestJS (Swagger 문서)
-  /socket.io/* → NestJS (WebSocket)
-```
-
----
-
-## 6. 운영 명령어
-
-### 서버 접속
+EC2에 접속해 초기 설정 스크립트를 실행한다.
 
 ```bash
 ssh -i teameet-key.pem ec2-user@<EC2_IP>
+curl -sL https://raw.githubusercontent.com/kim-song-jun/teameet-sports-platform/main/deploy/setup-ec2.sh | bash
+```
+
+스크립트는 Docker, Docker Compose, Git, `jq`를 준비하고 v1 이미지 빌드, v1 PostgreSQL 기동, Prisma migration, 전체 스택 기동, root Web/API health check를 순서대로 수행한다. `deploy/.env`가 이미 있으면 보존한다.
+
+성공 기준은 다음 세 요청이 모두 성공하는 것이다.
+
+```bash
+curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true'
+curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true'
+curl -fsS http://localhost/landing > /dev/null
+```
+
+## 4. GitHub Actions 배포
+
+`.github/workflows/deploy.yml`은 main push 또는 수동 dispatch에서 테스트가 통과한 뒤 배포한다.
+
+필수 GitHub Actions secret:
+
+| 이름 | 책임 |
+|---|---|
+| `EC2_HOST` | 배포 대상 EC2 주소 |
+| `EC2_SSH_KEY` | EC2 SSH private key |
+| `TOSS_CLIENT_KEY` | 결제 client key, 선택 |
+| `TOSS_SECRET_KEY` | 결제 server key, 선택 |
+| `TOSS_WEBHOOK_SECRET` | 결제 webhook 검증 key, 선택 |
+| `KAKAO_CLIENT_ID` | Kakao OAuth client id, 선택 |
+| `KAKAO_CLIENT_SECRET` | Kakao OAuth client secret, 선택 |
+| `KAKAO_REDIRECT_URI` | Kakao OAuth callback, 선택 |
+| `V1_HOST_ADMIN_PASSWORD` | v1 host admin password |
+
+배포 단계는 다음 계약을 따른다.
+
+1. 저장소를 EC2의 `~/teameet`에 동기화하며 기존 `deploy/.env`를 보호한다.
+2. v1 API와 v1 Web 이미지만 빌드한다.
+3. v1 Web 빌드에는 browser API base `/api/v1`과 internal API origin `http://v1_api:8121`을 주입한다.
+4. `v1_postgres`를 먼저 기동하고 `prisma migrate deploy`를 실행한다.
+5. `deploy/restart-containers.sh`로 v1 스택을 재기동한다.
+6. internal API, root-origin API, root Web을 모두 health check한다.
+
+## 5. 운영 환경 변수
+
+운영 값은 EC2의 `deploy/.env`에서 관리한다. 파일 권한은 `600`으로 유지하고 내용을 로그나 CI 출력에 노출하지 않는다.
+
+주요 변수 책임:
+
+| 이름 | 책임 |
+|---|---|
+| `V1_DB_USER`, `V1_DB_PASSWORD`, `V1_DB_NAME` | v1 PostgreSQL 연결 |
+| `V1_JWT_SECRET` | v1 인증 서명 secret |
+| `V1_INTERNAL_API_ORIGIN` | Next.js server-side API origin; 기본값 `http://v1_api:8121` |
+| `V1_ALLOW_HEADER_AUTH` | 임시 header auth의 production 명시 opt-in |
+| `DEPLOY_SYNC_V1_SEED_DATA` | 검토된 v1 seed sync opt-in; 기본 비활성 |
+| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `KAKAO_REDIRECT_URI` | Kakao OAuth |
+| `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET` | 결제 연동 |
+
+`v1_web`의 브라우저 API URL은 이미지 빌드 시 `/api/v1`로 고정한다. 배포 환경에 별도 Web base path를 설정하지 않는다.
+
+## 6. 컨테이너 구성
+
+```text
+Internet :80/:443
+        |
+      nginx
+       |  \
+       |   +-- /api/v1/*, /uploads/* --> v1_api:8121
+       +------ /, /_next/static/* ------> v1_web:3013
+                                              |
+                                        v1_postgres:5432
+```
+
+호스트에는 API `8121`과 Web `3013`이 loopback으로만 노출된다. 외부 요청은 Nginx를 통해서만 받는다.
+
+## 7. 수동 배포
+
+CI를 사용할 수 없을 때만 아래 순서로 실행한다.
+
+```bash
+cd ~/teameet
+set -a
+. deploy/.env
+set +a
+
+sudo docker build -f deploy/Dockerfile.v1-api -t teameet-v1-api .
+sudo docker build \
+  -f deploy/Dockerfile.v1-web \
+  --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+  --build-arg INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}" \
+  --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
+  --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
+  -t teameet-v1-web .
+
+cd deploy
+if sudo docker compose version >/dev/null 2>&1; then
+  COMPOSE="sudo docker compose"
+else
+  COMPOSE="sudo docker-compose"
+fi
+
+${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
+${COMPOSE} -f docker-compose.prod.yml --env-file .env \
+  run --rm --no-deps -T v1_api sh -c \
+  "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
+${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
+
+curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true'
+curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true'
+curl -fsS http://localhost/landing > /dev/null
+```
+
+## 8. 운영 명령
+
+```bash
 cd ~/teameet/deploy
 
-if docker compose version >/dev/null 2>&1; then
-  export COMPOSE="docker compose"
-else
-  export COMPOSE="docker-compose"
-fi
+sudo docker compose -f docker-compose.prod.yml --env-file .env ps
+sudo docker logs teameet_v1_api -f --tail 100
+sudo docker logs teameet_v1_web -f --tail 100
+sudo docker logs teameet_nginx -f --tail 100
+
+sudo docker compose -f docker-compose.prod.yml --env-file .env restart v1_api
+sudo docker compose -f docker-compose.prod.yml --env-file .env restart v1_web
+sudo docker compose -f docker-compose.prod.yml --env-file .env restart nginx
 ```
 
-### 상태 확인
+DB backup과 복원은 v1 PostgreSQL container와 v1 DB 이름을 명시한다.
 
 ```bash
-# 전체 컨테이너 상태
-$COMPOSE -f docker-compose.prod.yml ps
+docker exec teameet_v1_postgres \
+  pg_dump -U "${V1_DB_USER:-teameet_v1}" "${V1_DB_NAME:-teameet_v1}" \
+  > "v1_backup_$(date +%Y%m%d).sql"
 
-# 로그 확인
-docker logs teameet_api -f --tail 50
-docker logs teameet_web -f --tail 50
-docker logs teameet_nginx -f --tail 50
-
-# 리소스 사용량
-docker stats --no-stream
-
-# 헬스체크
-curl http://localhost:8100/api/v1/health
-curl -I http://localhost/api/v1/health
+cat v1_backup.sql | docker exec -i teameet_v1_postgres \
+  psql -U "${V1_DB_USER:-teameet_v1}" "${V1_DB_NAME:-teameet_v1}"
 ```
 
-### 재시작
+## 9. TLS
+
+DNS A record를 EC2 public IP에 연결한 뒤 Let's Encrypt 인증서를 발급하고 `deploy/nginx.conf`의 인증서 경로와 실제 도메인을 일치시킨다.
 
 ```bash
-# 전체 재시작
-$COMPOSE -f docker-compose.prod.yml restart
-
-# 특정 서비스만
-$COMPOSE -f docker-compose.prod.yml restart api
-$COMPOSE -f docker-compose.prod.yml restart web
+sudo certbot certonly --standalone -d teameet.co.kr -d www.teameet.co.kr
+sudo docker compose -f docker-compose.prod.yml --env-file .env up -d nginx
 ```
 
-### 수동 업데이트
+TLS 적용 후에도 `/`, `/api/v1/*`, `/uploads/*`의 공개 경로 계약은 동일하다.
 
-```bash
-# 권장: GitHub Actions의 workflow_dispatch로 CI / Deploy 재실행
-# 서버의 ~/teameet는 Git worktree가 아닐 수 있으므로 서버 내부 git pull을 기본 절차로 쓰지 않는다.
+## 10. 트러블슈팅
 
-rsync -avz --delete \
-  --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
-  --filter 'protect deploy/.env' \
-  -e "ssh -i teameet-key.pem -o StrictHostKeyChecking=no" \
-  ./ ec2-user@<EC2_IP>:~/teameet/
-
-ssh -i teameet-key.pem ec2-user@<EC2_IP> '
-  set -e
-  cd ~/teameet
-  set -a
-  . deploy/.env
-  set +a
-  sudo docker build -f deploy/Dockerfile.api -t teameet-api .
-  sudo docker build \
-    -f deploy/Dockerfile.web \
-    --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-    --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
-    --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
-    -t teameet-web .
-  # docker-compose.prod.yml is image-only for web/api, so use direct docker build
-  # before compose up when you need a fresh production image.
-  cd deploy
-  if sudo docker compose version >/dev/null 2>&1; then
-    COMPOSE="sudo docker compose"
-  else
-    COMPOSE="sudo docker-compose"
-  fi
-  ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis
-  ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-    run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts
-  ${COMPOSE} -f docker-compose.prod.yml --env-file .env down
-  ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
-  curl -fsS http://localhost:8100/api/v1/health | jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null
-  curl -fsS http://localhost/landing > /dev/null
-  curl -fsSI http://localhost/api/v1/health | grep -qE "^HTTP/[0-9.]+ 301"
-  sudo docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
-  sudo docker exec teameet_api npx ts-node prisma/seed-images.ts
-'
-```
-
-### DB 관리
-
-```bash
-# DB 백업
-docker exec teameet_postgres pg_dump -U teameet teameet > backup_$(date +%Y%m%d).sql
-
-# DB 복원
-cat backup.sql | docker exec -i teameet_postgres psql -U teameet teameet
-
-# Prisma Studio (DB 브라우저)
-docker exec -it teameet_api npx prisma studio
-```
-
-### 시드 데이터 (초기 데이터 입력)
-
-```bash
-docker exec teameet_api npx ts-node prisma/seed.ts
-```
-
-### DB bootstrap / migration (deploy-safe)
-
-```bash
-docker exec teameet_api npx ts-node prisma/bootstrap-deploy-db.ts
-```
-
-빈 DB는 현재 schema bootstrap + migration history 정렬까지 자동 처리하고, migration history가 없는 비어 있지 않은 DB는 drift로 간주해 실패한다.
-
-### checksum-gated canonical mock sync (deploy 기본값)
-
-```bash
-docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
-```
-
-`DEPLOY_SYNC_MOCK_DATA=false`가 아닌 한 배포 시 이 명령이 자동 실행된다. checksum이 같으면 skip되고, catalog 또는 KST 날짜 anchor가 바뀌었을 때만 canonical mock dataset을 다시 sync한다.
-
-### 이미지 데이터 보강 (운영 안전)
-
-```bash
-docker exec teameet_api npx ts-node prisma/seed-images.ts
-```
-
----
-
-## 7. 도메인 + SSL 설정 (선택사항)
-
-### 도메인 연결
-
-1. 도메인 구매 (가비아, Namecheap 등)
-2. DNS 설정: A 레코드 → EC2 퍼블릭 IP
-3. `deploy/nginx.conf`의 `server_name _` → `server_name teameet.kr www.teameet.kr`
-
-### SSL 인증서 (Let's Encrypt)
-
-```bash
-# EC2에서 실행
-sudo yum install -y certbot || sudo apt install -y certbot
-
-# Nginx 중지 후 인증서 발급
-$COMPOSE -f docker-compose.prod.yml stop nginx
-sudo certbot certonly --standalone -d teameet.kr -d www.teameet.kr
-
-# nginx.conf에 SSL 설정 추가 후 재시작
-$COMPOSE -f docker-compose.prod.yml up -d nginx
-```
-
----
-
-## 8. 비용 최적화
-
-| 옵션 | 사양 | 비용 | 권장 |
-|------|------|------|------|
-| t3.micro | 1vCPU, 1GB | ~$8/월 | ❌ 메모리 부족 |
-| **t3.small** | **2vCPU, 2GB** | **~$15/월** | **✅ MVP 권장** |
-| t3.medium | 2vCPU, 4GB | ~$30/월 | 사용자 100+ |
-| t3.large | 2vCPU, 8GB | ~$60/월 | 사용자 500+ |
-
-**절약 팁:**
-- 예약 인스턴스 1년: 최대 40% 할인
-- Spot 인스턴스: 최대 70% 할인 (중단 위험)
-- t3.small로 시작 → 트래픽 보고 스케일업
-
----
-
-## 9. 트러블슈팅
-
-### Docker 빌드 실패
-
-```bash
-# 캐시 클리어 후 재빌드
-docker system prune -f
-$COMPOSE -f docker-compose.prod.yml build --no-cache
-```
-
-### 메모리 부족 (t3.small)
-
-```bash
-# Swap 메모리 추가 (2GB)
-sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
-```
-
-### DB 연결 실패
-
-```bash
-# PostgreSQL 상태 확인
-docker logs teameet_postgres
-docker exec teameet_postgres pg_isready -U teameet
-```
-
-### 포트 충돌
-
-```bash
-# 80번 포트 사용 확인
-sudo lsof -i :80
-sudo fuser -k 80/tcp  # 강제 종료
-```
-
----
-
-## 10. 기능 동작 검증 결과
-
-마지막 검증일: 2026-03-23
-
-### Backend API (21개 엔드포인트)
-
-```
-✅ POST /auth/dev-login — 로그인 성공
-✅ GET  /matches — 20개 매치
-✅ POST /matches — 매치 생성 성공
-✅ GET  /teams — 6개 팀
-✅ GET  /team-matches — 3개 팀 매칭
-✅ GET  /lessons — 12개 강좌
-✅ GET  /marketplace/listings — 12개 매물
-✅ GET  /venues — 16개 시설
-✅ GET  /chat/rooms — 3개 채팅방 (인증)
-✅ GET  /mercenary — 1개 용병 모집
-✅ GET  /badges — 7개 뱃지 타입
-✅ GET  /admin/disputes — 2개 분쟁
-✅ GET  /admin/settlements — 2개 정산
-✅ GET  /admin/stats — 통계 (사용자7, 매치20, 시설16)
-✅ GET  /payments/me — 결제 내역 (인증)
-✅ GET  /notifications — 알림 (인증)
-```
-
-### Frontend (48개 라우트)
-
-```
-✅ 48/48 라우트 — 모두 200 OK
-```
+- Web health가 실패하면 `teameet_v1_web` 로그와 `http://localhost:3013/landing`을 확인한다.
+- API health가 실패하면 `teameet_v1_api` 로그, `v1_postgres` health, Prisma migration 상태를 확인한다.
+- Nginx에서만 실패하면 `nginx -t`, upstream container health, root path proxy 순으로 확인한다.
+- 업로드 쓰기 실패 시 persistent volume의 owner가 v1 API container UID/GID와 일치하는지 확인한다.
+- 이미지 빌드 중 메모리가 부족하면 인스턴스를 확장하거나 swap을 임시로 추가한다.

@@ -122,40 +122,17 @@ set -a
 . ./deploy/.env
 set +a
 
-sudo docker build -f deploy/Dockerfile.api -t teameet-api .
-sudo docker build \
-  -f deploy/Dockerfile.web \
-  --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-  --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
-  --build-arg INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}" \
-  -t teameet-web .
 sudo docker build -f deploy/Dockerfile.v1-api -t teameet-v1-api .
 sudo docker build \
   -f deploy/Dockerfile.v1-web \
-  --build-arg NEXT_PUBLIC_API_URL=/v1/api/v1 \
+  --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
   --build-arg INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}" \
-  --build-arg NEXT_PUBLIC_BASE_PATH=/v1 \
   -t teameet-v1-web .
 
 cd deploy
-$COMPOSE -f docker-compose.prod.yml up -d postgres redis v1_postgres
+$COMPOSE -f docker-compose.prod.yml up -d v1_postgres
 
-# 8. DB 초기화 대기
-echo "⏳ DB 초기화 대기 중..."
-for i in $(seq 1 30); do
-  if $COMPOSE -f docker-compose.prod.yml exec -T postgres pg_isready >/dev/null 2>&1; then
-    echo "✅ postgres 준비 완료"
-    break
-  fi
-  if [ "$i" -eq 30 ]; then
-    echo "❌ postgres가 제시간에 준비되지 않았습니다."
-    exit 1
-  fi
-  sleep 2
-done
-
-# 9. DB bootstrap / migrate deploy
-echo "🗄️ DB bootstrap 적용..."
+echo "🗄️ v1 DB migration 적용..."
 for i in $(seq 1 30); do
   if $COMPOSE -f docker-compose.prod.yml exec -T v1_postgres pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
     echo "v1_postgres ready"
@@ -168,27 +145,10 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-$COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T api npx ts-node prisma/bootstrap-deploy-db.ts
 $COMPOSE -f docker-compose.prod.yml run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
-# 10. 전체 스택 시작
 echo "🚀 애플리케이션 스택 시작..."
 $COMPOSE -f docker-compose.prod.yml up -d
-
-# 11. API 준비 대기 + deploy-safe seed sync
-echo "⏳ API 헬스체크 대기 중..."
-for i in $(seq 1 45); do
-  if curl -fsS http://localhost:8100/api/v1/health | jq -e '.data.checks.db == true and .data.checks.redis == true' >/dev/null 2>&1; then
-    echo "✅ API 준비 완료"
-    break
-  fi
-  if [ "$i" -eq 45 ]; then
-    echo "❌ API가 제시간에 준비되지 않았습니다."
-    sudo docker logs teameet_api --tail 120 || true
-    exit 1
-  fi
-  sleep 2
-done
 
 echo "⏳ V1 API 헬스체크 대기 중..."
 for i in $(seq 1 45); do
@@ -204,13 +164,6 @@ for i in $(seq 1 45); do
   sleep 2
 done
 
-if [ "${DEPLOY_SYNC_MOCK_DATA:-true}" != "false" ]; then
-  echo "🧩 checksum-gated mock sync 실행..."
-  sudo docker exec teameet_api npx ts-node prisma/seed-mocks.ts --checksum-gate
-else
-  echo "🧩 DEPLOY_SYNC_MOCK_DATA=false 이므로 mock sync를 건너뜁니다."
-fi
-
 if [ "${DEPLOY_SYNC_V1_SEED_DATA:-false}" = "true" ]; then
   echo "🧩 v1 seed sync 실행..."
   sudo docker exec teameet_v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed.ts"
@@ -218,10 +171,6 @@ else
   echo "🧩 DEPLOY_SYNC_V1_SEED_DATA=false 이므로 v1 seed sync를 건너뜁니다."
 fi
 
-echo "🖼️ 이미지 backfill sync 실행..."
-sudo docker exec teameet_api npx ts-node prisma/seed-images.ts
-
-# 12. 상태 확인
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📊 배포 상태 확인"
@@ -231,19 +180,12 @@ $COMPOSE -f docker-compose.prod.yml ps
 echo ""
 echo "🏥 헬스체크..."
 sleep 3
-if curl -fsS http://localhost:8100/api/v1/health | jq -e '.data.checks.db == true and .data.checks.redis == true' > /dev/null 2>&1 && \
-   curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true' > /dev/null 2>&1 && \
-   curl -fsS http://localhost/v1/landing > /dev/null 2>&1 && \
-   curl -fsSI http://localhost/api/v1/health | grep -qE '^HTTP/[0-9.]+ 301'; then
-  echo "✅ API 서버 정상"
+if curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true' > /dev/null 2>&1 && \
+   curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true' > /dev/null 2>&1 && \
+   curl -fsS http://localhost/landing > /dev/null 2>&1; then
+  echo "✅ v1 API와 루트 웹 정상"
 else
   echo "⚠️ API 서버 응답 대기 중 (1분 후 다시 확인해주세요)"
-fi
-
-if curl -sf http://localhost/landing > /dev/null 2>&1; then
-  echo "✅ 웹 서버 정상"
-else
-  echo "⚠️ 웹 서버 응답 대기 중"
 fi
 
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "YOUR_EC2_IP")
@@ -255,6 +197,6 @@ echo "  🌐 웹사이트:  http://$PUBLIC_IP"
 echo "  📚 API 문서:  http://$PUBLIC_IP/docs"
 echo "  🏥 헬스체크:  http://$PUBLIC_IP/api/v1/health"
 echo ""
-echo "  📋 로그 확인: docker logs teameet_api -f"
+echo "  📋 로그 확인: docker logs teameet_v1_api -f"
 echo "  📋 전체 상태: $COMPOSE -f docker-compose.prod.yml ps"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

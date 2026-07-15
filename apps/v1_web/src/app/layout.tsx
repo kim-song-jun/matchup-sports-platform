@@ -3,12 +3,18 @@ import type { ReactNode } from 'react';
 import { Providers } from './providers';
 import { RouteProgressBar } from '@/components/v1-ui/route-progress';
 import { publicAssetPath } from '@/lib/assets';
+import { buildPageMetadata } from '@/lib/seo';
 import './globals.css';
 import './desktop/index.css';
 
+const seoBase = buildPageMetadata({ path: '/' });
+
 export const metadata: Metadata = {
-  title: 'Teameet',
-  description: '같이 뛸 사람을 한 번에 — AI 기반 멀티스포츠 소셜 매칭 플랫폼',
+  ...seoBase,
+  title: {
+    default: 'Teameet',
+    template: '%s | Teameet',
+  },
   icons: {
     icon: [
       { url: publicAssetPath('/favicon.png'), type: 'image/png', sizes: '32x32' },
@@ -17,6 +23,7 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: publicAssetPath('/brand/apple-touch-icon.png'), sizes: '180x180' }],
   },
+  manifest: '/manifest.webmanifest',
 };
 
 export default function RootLayout({

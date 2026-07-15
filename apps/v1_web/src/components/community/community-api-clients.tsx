@@ -17,6 +17,7 @@ import type { V1ChatMessage, V1ChatRoom, V1Notification } from '@/types/api';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 import { getChatListViewModel, getChatRoomViewModel } from './community.view-model';
+import { migrateV1NotificationHref, safeNotificationHref } from '@/lib/notification-route';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -217,18 +218,23 @@ function toNotificationModel(notification: V1Notification): NotificationModel {
 function normalizeNotificationHref(route?: string | null, type?: string | null) {
   const normalized = (() => {
     if (!route) return type?.includes('review') ? '/my/reviews' : '/notifications';
-    if (route.startsWith('/chat/rooms/')) return route.replace('/chat/rooms/', '/chat/');
-    if (route === '/reviews' || route.startsWith('/reviews?')) return route.replace('/reviews', '/my/reviews');
-    if (route.startsWith('/reviews/')) return `/my${route}`;
-    if (type?.includes('review') && route === '/my') return '/my/reviews';
-    return route;
+    // Migrate legacy /v1/* paths from the old basePath era.
+    const migrated = migrateV1NotificationHref(route);
+    if (migrated.startsWith('/chat/rooms/')) return migrated.replace('/chat/rooms/', '/chat/');
+    if (migrated === '/reviews' || migrated.startsWith('/reviews?')) return migrated.replace('/reviews', '/my/reviews');
+    if (migrated.startsWith('/reviews/')) return `/my${migrated}`;
+    if (type?.includes('review') && migrated === '/my') return '/my/reviews';
+    return migrated;
   })();
 
-  if (normalized === '/notifications' || normalized.includes('from=notifications')) {
-    return normalized;
+  // Guard: only allow same-origin root-relative paths.
+  const safe = safeNotificationHref(normalized);
+
+  if (safe === '/notifications' || safe.includes('from=notifications')) {
+    return safe;
   }
 
-  return `${normalized}${normalized.includes('?') ? '&' : '?'}from=notifications`;
+  return `${safe}${safe.includes('?') ? '&' : '?'}from=notifications`;
 }
 
 function formatNotificationGroup(value: string) {

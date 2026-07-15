@@ -241,8 +241,7 @@ services:
     environment:
       TZ: Asia/Seoul
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: /v1/api/v1
-      NEXT_PUBLIC_BASE_PATH: /v1
+      NEXT_PUBLIC_API_URL: /api/v1
       NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       NEXT_PUBLIC_KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       INTERNAL_API_ORIGIN: http://v1_api:8121

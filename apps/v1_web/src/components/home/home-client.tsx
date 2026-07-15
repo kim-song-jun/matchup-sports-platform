@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { v1Post } from '@/lib/api-client';
 import type { V1ChatRoom, V1Home, V1HomeRecommendation, V1HomeShortcut, V1Match, V1Notice, V1ResolveLocationResponse } from '@/types/api';
@@ -287,7 +287,8 @@ function useCurrentLocationWeather() {
     };
   }, []);
 
-  useEffect(() => refresh(), [refresh]);
+  // Geolocation is requested only on explicit user action (refreshWeather button click).
+  // Auto-triggering on mount would show the browser permission prompt without user intent.
 
   return { weather, refreshing, refresh: () => void refresh() };
 }

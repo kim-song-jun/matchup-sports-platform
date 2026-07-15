@@ -4,7 +4,6 @@ import bundleAnalyzer from '@next/bundle-analyzer';
 
 const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'true' });
 const isProd = process.env.NODE_ENV === 'production';
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 const defaultInternalApiOrigin = isProd ? 'http://v1_api:8121' : 'http://localhost:8121';
 const internalApiOrigin =
   process.env.INTERNAL_API_ORIGIN ||
@@ -13,7 +12,6 @@ const internalApiOrigin =
 
 const nextConfig: NextConfig = {
   output: isProd ? 'standalone' : undefined,
-  basePath: basePath || undefined,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   experimental: {
     optimizePackageImports: ['@tanstack/react-query'],
@@ -22,7 +20,7 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname, '../..'),
   },
   async rewrites() {
-    const proxyRewrites = [
+    return [
       {
         source: '/api/:path*',
         destination: `${internalApiOrigin}/api/:path*`,
@@ -35,18 +33,6 @@ const nextConfig: NextConfig = {
         destination: `${internalApiOrigin}/uploads/:path*`,
       },
     ];
-
-    if (basePath) return proxyRewrites;
-
-    return {
-      beforeFiles: [
-        {
-          source: '/v1/:path*',
-          destination: '/:path*',
-        },
-      ],
-      afterFiles: proxyRewrites,
-    };
   },
 };
 

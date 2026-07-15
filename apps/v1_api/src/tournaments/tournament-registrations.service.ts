@@ -53,11 +53,22 @@ export class TournamentRegistrationsService {
         role: { in: ['owner', 'manager'] },
         team: { status: 'active', deletedAt: null },
       },
+      select: { team: { select: { sportId: true } } },
     });
     if (!membership) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: '팀장 또는 매니저만 신청을 관리할 수 있어요.',
+      });
+    }
+    return membership.team.sportId;
+  }
+
+  private assertTeamSportMatchesTournament(teamSportId: string, tournamentSportId: string) {
+    if (teamSportId !== tournamentSportId) {
+      throw new ConflictException({
+        code: 'TEAM_SPORT_MISMATCH',
+        message: '대회 종목과 같은 종목의 팀만 신청할 수 있어요.',
       });
     }
   }
@@ -95,7 +106,8 @@ export class TournamentRegistrationsService {
 
   async create(user: V1AuthUser, tournamentId: string, dto: CreateRegistrationDto) {
     const tournament = await this.loadOpenTournament(tournamentId);
-    await this.assertTeamManager(dto.teamId, user.id);
+    const teamSportId = await this.assertTeamManager(dto.teamId, user.id);
+    this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
 
     const existing = await this.prisma.v1TournamentRegistration.findUnique({
       where: { tournamentId_teamId: { tournamentId, teamId: dto.teamId } },
@@ -173,7 +185,7 @@ export class TournamentRegistrationsService {
 
   async submit(user: V1AuthUser, tournamentId: string, registrationId: string, dto: SubmitRegistrationDto) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
-    await this.assertTeamManager(registration.teamId, user.id);
+    const teamSportId = await this.assertTeamManager(registration.teamId, user.id);
 
     if (registration.status !== 'draft') {
       throw new ConflictException({
@@ -196,8 +208,25 @@ export class TournamentRegistrationsService {
 
     // 제출 시점에 대회가 여전히 open·마감 전인지 재확인(draft 보관 중 마감됐을 수 있음).
     const tournament = await this.loadOpenTournament(tournamentId);
+    this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // R17-005: acquire row lock on tournament before the capacity check so that
+      // concurrent submissions read a consistent reservation count and only one
+      // submission can claim the last slot.
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
+
+      // Re-validate tournament state inside the transaction (prevents TOCTOU with status change).
+      const lockedTournament = await tx.v1Tournament.findFirst({
+        where: { id: tournamentId, deletedAt: null },
+      });
+      if (!lockedTournament || lockedTournament.status !== 'open') {
+        throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
+      }
+      if (lockedTournament.registrationDeadlineAt && lockedTournament.registrationDeadlineAt.getTime() < Date.now()) {
+        throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
+      }
+
       const reservedCount = await tx.v1TournamentRegistration.count({
         where: {
           tournamentId,
@@ -321,15 +350,54 @@ export class TournamentRegistrationsService {
     }
 
     const restoredStatus = registration.cancelPreviousStatus ?? 'awaiting_payment';
-    const updated = await this.prisma.v1TournamentRegistration.update({
-      where: { id: registrationId },
-      data: {
-        status: restoredStatus,
-        cancelRequestedAt: null,
-        cancelPreviousStatus: null,
-        cancelReason: null,
-      },
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // R16-001: lock tournament and re-check its status; an admin-cancelled tournament
+      // must not have registrations restored to an active status.
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
+      const tournament = await tx.v1Tournament.findFirst({
+        where: { id: tournamentId, deletedAt: null },
+        select: { id: true, status: true, teamCount: true },
+      });
+      if (!tournament) {
+        throw new ConflictException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      }
+      if (tournament.status === 'cancelled') {
+        throw new ConflictException({
+          code: 'TOURNAMENT_ALREADY_CANCELLED',
+          message: '취소된 대회의 신청 취소 요청은 철회할 수 없어요.',
+        });
+      }
+
+      // R17-006: if the restored status holds a capacity slot, re-check capacity
+      // before restoring so a withdrawal cannot exceed the tournament limit.
+      if (CAPACITY_HOLD_STATUSES.includes(restoredStatus as typeof CAPACITY_HOLD_STATUSES[number])) {
+        const reservedCount = await tx.v1TournamentRegistration.count({
+          where: {
+            tournamentId,
+            id: { not: registrationId },
+            status: { in: CAPACITY_HOLD_STATUSES },
+          },
+        });
+        if (reservedCount >= tournament.teamCount) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_CAPACITY_FULL',
+            message: '정원이 가득 차 취소 요청을 철회할 수 없어요.',
+          });
+        }
+      }
+
+      return tx.v1TournamentRegistration.update({
+        where: { id: registrationId },
+        data: {
+          status: restoredStatus,
+          cancelRequestedAt: null,
+          cancelPreviousStatus: null,
+          cancelReason: null,
+        },
+      });
     });
+
     const [payment, playerCount] = await Promise.all([
       this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
       this.countPlayers(registrationId),

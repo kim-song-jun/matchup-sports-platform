@@ -104,6 +104,7 @@ describe('TeamMatchesService', () => {
     v1Team: { findMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
 
@@ -123,6 +124,7 @@ describe('TeamMatchesService', () => {
       v1Team: { findMany: jest.fn() },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue(undefined),
     };
 
     // Default: $transaction executes the callback with the same prisma proxy
@@ -327,11 +329,10 @@ describe('TeamMatchesService', () => {
     prisma.v1TeamMatchApplication.findFirst.mockResolvedValue(app);
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
 
-    const updatedApp = applicationRow({ status: 'approved' });
     const updatedTm = teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'team-applicant' });
-    prisma.v1TeamMatchApplication.update.mockResolvedValue(updatedApp);
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow());
+    prisma.v1TeamMatchApplication.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
     prisma.v1TeamMatch.update.mockResolvedValue(updatedTm);
-    prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 0 });
     prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 2 });
 
     const result = await service.approveApplication(manager, 'app-1', {});
@@ -343,6 +344,21 @@ describe('TeamMatchesService', () => {
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'matched' }) }),
     );
+  });
+
+  it('approveApplication: 락을 기다리는 동안 다른 상대팀이 매칭되면 두 번째 승인을 거부한다', async () => {
+    const app = applicationWithTeamMatch({ status: 'requested' }, { status: 'recruiting', startAt: FUTURE });
+    prisma.v1TeamMatchApplication.findFirst.mockResolvedValue(app);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(
+      teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'other-team' }),
+    );
+
+    await expect(service.approveApplication(manager, 'app-1', {})).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+    expect(prisma.v1TeamMatchApplication.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
   });
 
   it('approveApplication: 이미 approved 상태 신청 재승인 → 409 STATE_CONFLICT', async () => {

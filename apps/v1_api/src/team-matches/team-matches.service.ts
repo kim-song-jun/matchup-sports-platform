@@ -740,10 +740,27 @@ export class TeamMatchesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const updatedApplication = await tx.v1TeamMatchApplication.update({
-        where: { id: application.id },
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${application.teamMatchId} FOR UPDATE`;
+      const currentTeamMatch = await tx.v1TeamMatch.findFirst({
+        where: { id: application.teamMatchId, deletedAt: null },
+        select: { status: true, startAt: true, approvedApplicantTeamId: true },
+      });
+      if (
+        !currentTeamMatch ||
+        currentTeamMatch.status !== 'recruiting' ||
+        currentTeamMatch.startAt < new Date() ||
+        currentTeamMatch.approvedApplicantTeamId
+      ) {
+        throw stateConflict('Team match is not recruiting');
+      }
+
+      const transition = await tx.v1TeamMatchApplication.updateMany({
+        where: { id: application.id, status: 'requested' },
         data: { status: 'approved', reviewedByUserId: user.id, reviewedAt: new Date() },
       });
+      if (transition.count !== 1) {
+        throw stateConflict('Only requested team match applications can be approved');
+      }
       const updatedTeamMatch = await tx.v1TeamMatch.update({
         where: { id: application.teamMatchId },
         data: {
@@ -781,7 +798,15 @@ export class TeamMatchesService {
           },
         ],
       });
-      return { updatedApplication, updatedTeamMatch };
+      return {
+        updatedApplication: {
+          id: application.id,
+          teamMatchId: application.teamMatchId,
+          applicantTeamId: application.applicantTeamId,
+          status: 'approved' as const,
+        },
+        updatedTeamMatch,
+      };
     });
 
     // 알림: 신청팀 owner/manager에게 승인 안내 (fire-and-forget)

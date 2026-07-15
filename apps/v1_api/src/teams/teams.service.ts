@@ -410,7 +410,7 @@ export class TeamsService {
     const hasNext = memberships.length > limit;
     const viewerIsOwner = viewer.role === 'owner';
     const viewerIsManager = viewer.role === 'manager';
-    const viewerIsTeamMember = viewer.role === 'owner' || viewer.role === 'manager' || viewer.role === 'member';
+    const viewerCanAccessRosterPii = viewerIsOwner || viewerIsManager;
 
     return {
       items: pageItems.map((membership) => {
@@ -419,14 +419,16 @@ export class TeamsService {
           membership.status === 'active' &&
           membership.role !== 'owner' &&
           (viewerIsOwner || (viewerIsManager && membership.role === 'member'));
+        const canAccessPrivateProfile =
+          viewerCanAccessRosterPii || (membership.status === 'active' && membership.userId === user?.id);
         return {
           membershipId: membership.id,
           userId: membership.userId,
           displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
-          realName: viewerIsTeamMember ? membership.user.profile?.displayName ?? null : null,
-          phone: viewerIsTeamMember ? membership.user.phone ?? null : null,
-          birthDate: viewerIsTeamMember ? membership.user.profile?.birthDate ?? null : null,
-          gender: viewerIsTeamMember ? normalizeProfileGender(membership.user.profile?.gender) : null,
+          realName: canAccessPrivateProfile ? membership.user.profile?.displayName ?? null : null,
+          phone: canAccessPrivateProfile ? membership.user.phone ?? null : null,
+          birthDate: canAccessPrivateProfile ? membership.user.profile?.birthDate ?? null : null,
+          gender: canAccessPrivateProfile ? normalizeProfileGender(membership.user.profile?.gender) : null,
           profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
           role: membership.role,
           status: membership.status,
@@ -563,13 +565,18 @@ export class TeamsService {
       }
 
       const result = await this.prisma.$transaction(async (tx) => {
+        // R15-003: re-verify caller is still owner inside the transaction to guard
+        // against concurrent delegations that could otherwise create multiple owners.
+        const ownerCheck = await tx.v1TeamMembership.updateMany({
+          where: { id: currentOwner.id, teamId: target.teamId, role: 'owner', status: 'active' },
+          data: { role: 'manager' },
+        });
+        if (ownerCheck.count !== 1) {
+          throw stateConflict('Ownership has already been transferred', 'CONCURRENT_UPDATE');
+        }
         const delegatedOwner = await tx.v1TeamMembership.update({
           where: { id: target.id },
           data: { role: 'owner' },
-        });
-        await tx.v1TeamMembership.update({
-          where: { id: currentOwner.id },
-          data: { role: 'manager' },
         });
         const team = await tx.v1Team.update({
           where: { id: target.teamId },
@@ -633,15 +640,29 @@ export class TeamsService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // R15-004: atomic cap check — uses conditional increment so concurrent promotions
+      // cannot both pass the cap check and both increment past the limit.
+      if (dto.role === 'manager') {
+        const capGuard = await tx.v1Team.updateMany({
+          where: { id: target.teamId, managerCount: { lt: 5 } },
+          data: { managerCount: { increment: 1 } },
+        });
+        if (capGuard.count !== 1) {
+          throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
+        }
+      }
       const updated = await tx.v1TeamMembership.update({
         where: { id: target.id },
         data: { role: dto.role },
       });
-      const managerDelta = dto.role === 'manager' ? 1 : -1;
-      const team = await tx.v1Team.update({
-        where: { id: target.teamId },
-        data: { managerCount: { increment: managerDelta } },
-      });
+      const managerDelta = dto.role === 'manager' ? 0 : -1; // +1 already applied above for 'manager'
+      const team =
+        dto.role === 'manager'
+          ? await tx.v1Team.findUniqueOrThrow({ where: { id: target.teamId } })
+          : await tx.v1Team.update({
+              where: { id: target.teamId },
+              data: { managerCount: { increment: managerDelta } },
+            });
 
       await tx.v1StatusChangeLog.create({
         data: {
@@ -1350,9 +1371,20 @@ export class TeamsService {
     this.assertTeamHasCapacity(invitation.team);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const updatedInvitation = await tx.v1TeamInvitation.update({
-        where: { id: invitation.id },
+      // R15-002: conditional update — rejects if another actor cancelled the invitation
+      // between the outer read and transaction start.
+      const acceptCount = await tx.v1TeamInvitation.updateMany({
+        where: { id: invitation.id, status: 'pending' },
         data: { status: 'accepted', respondedAt: new Date() },
+      });
+      if (acceptCount.count !== 1) {
+        throw stateConflict(
+          'Invitation was cancelled or already processed before acceptance could be recorded',
+          'STATE_CONFLICT',
+        );
+      }
+      const updatedInvitation = await tx.v1TeamInvitation.findUniqueOrThrow({
+        where: { id: invitation.id },
       });
 
       const existingMembership = await tx.v1TeamMembership.findUnique({

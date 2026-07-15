@@ -8,31 +8,32 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { UploadsService } from './uploads/uploads.service';
+import {
+  assertV1SessionRuntimeConfiguration,
+  currentRuntimeConfiguration,
+} from './auth/v1-session';
+import {
+  createV1MutationOriginMiddleware,
+  requireProductionFrontendOrigin,
+} from './common/security/v1-mutation-origin';
 
 async function bootstrap() {
   const logger = new Logger('V1Bootstrap');
-
   const isProduction = process.env.NODE_ENV === 'production';
-  const allowHeaderAuth = process.env.V1_ALLOW_HEADER_AUTH === 'true';
-  if (isProduction && !allowHeaderAuth) {
-    logger.error(
-      'SECURITY: v1 헤더 신뢰 인증(x-v1-user-*)은 프로덕션에 안전하지 않습니다. ' +
-        '서명 세션 인증으로 전환하거나, 의도적으로 위험을 감수할 경우에만 V1_ALLOW_HEADER_AUTH=true 를 설정하세요. 부팅을 중단합니다.',
-    );
-    throw new Error('V1_HEADER_AUTH_DISABLED_IN_PRODUCTION');
-  }
-  if (isProduction && allowHeaderAuth) {
-    logger.warn(
-      'SECURITY WARNING: 헤더 신뢰 인증이 V1_ALLOW_HEADER_AUTH=true 로 프로덕션에서 활성화되어 있습니다. ' +
-        '검증되지 않은 x-v1-user-* 헤더를 신뢰합니다. 가능한 한 빨리 서명 세션 인증으로 전환하세요.',
-    );
-  }
+
+  assertV1SessionRuntimeConfiguration(currentRuntimeConfiguration());
+  const frontendOrigin = isProduction
+    ? requireProductionFrontendOrigin(process.env.FRONTEND_URL)
+    : null;
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.enableShutdownHooks();
   app.set('trust proxy', 1);
   app.use(compression());
+  if (frontendOrigin) {
+    app.use(createV1MutationOriginMiddleware(frontendOrigin));
+  }
 
   // Serve locally stored upload files at /uploads/*
   // This is a no-op when S3/CDN is configured, as URLs returned by the service
@@ -42,7 +43,7 @@ async function bootstrap() {
   });
   app.setGlobalPrefix('api/v1');
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : true,
+    origin: frontendOrigin ?? true,
     credentials: true,
   });
   app.useGlobalPipes(

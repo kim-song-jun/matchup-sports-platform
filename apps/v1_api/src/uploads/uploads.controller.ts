@@ -6,6 +6,7 @@ import {
   UploadedFiles,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -14,7 +15,9 @@ import {
   ApiCreatedResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
+import type { V1AuthUser } from '../auth/v1-auth-user';
 import { UploadsService } from './uploads.service';
 // Side-effect import: augments global Express.Multer namespace
 import './multer.types';
@@ -33,6 +36,11 @@ export class UploadsController {
 
   @Post()
   @UseGuards(V1AuthGuard)
+  // R05-001: per-connection rate limit guards against unbounded upload volume. A
+  // full per-user daily quota requires an uploads ownership table; that DB schema
+  // change is tracked as a follow-up task. Until then, 20 requests/min limits
+  // opportunistic abuse without blocking legitimate bursts.
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: '이미지 업로드 (최대 5개, 5MB, jpeg/png/webp)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -76,16 +84,19 @@ export class UploadsController {
     }),
   )
   async uploadFiles(
+    @CurrentUser() user: V1AuthUser,
     @UploadedFiles() files: Express.Multer.File[],
   ): Promise<{ urls: string[] }> {
     // Return root-relative URLs (/uploads/...). The web app proxies /uploads to
     // this service (next.config rewrite), so images resolve in dev and prod
     // without depending on the request host.
-    return this.uploadsService.storeFiles(files ?? []);
+    return this.uploadsService.storeFiles(files ?? [], '', 'image', user.id);
   }
 
   @Post('videos')
   @UseGuards(V1AuthGuard)
+  // R05-001: video uploads are expensive in bytes; limit to 3/min per connection.
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: '경기 영상 업로드 (1개, 200MB, mp4/webm/mov)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -108,10 +119,11 @@ export class UploadsController {
     }),
   )
   async uploadVideo(
+    @CurrentUser() user: V1AuthUser,
     @UploadedFiles() files: Express.Multer.File[],
   ): Promise<{ urls: string[] }> {
     // 정적 서빙(express.static)이 Range 요청을 지원하므로 /uploads/* URL 그대로
     // <video> 태그에서 시킹·스트리밍이 동작한다.
-    return this.uploadsService.storeFiles(files ?? [], '', 'video');
+    return this.uploadsService.storeFiles(files ?? [], '', 'video', user.id);
   }
 }

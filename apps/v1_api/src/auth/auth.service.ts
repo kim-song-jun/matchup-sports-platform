@@ -5,6 +5,7 @@ import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { hashPassword, verifyPassword } from './password-hash';
 
@@ -31,12 +32,12 @@ export class AuthService {
 
     const email = normalizeEmail(dto.email);
     const nickname = dto.nickname.trim();
-    const displayName = dto.displayName?.trim() || nickname;
-    const phone = dto.phone?.trim() || null;
-    const birthDate = dto.birthDate?.trim() || null;
+    const displayName = normalizeSignupDisplayName(dto.displayName);
+    const phone = dto.phone.trim();
+    const birthDate = dto.birthDate.trim();
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
 
-    if (birthDate && !isValidBirthDate(birthDate)) {
+    if (!isValidBirthDateDigits(birthDate)) {
       throw new BadRequestException({
         code: 'VALIDATION_ERROR',
         message: 'Birth date must be a valid YYYYMMDD value',
@@ -108,7 +109,7 @@ export class AuthService {
           create: {
             nickname,
             displayName,
-            gender: dto.gender ?? null,
+            gender: dto.gender,
             birthDate,
             profileImageUrl,
             visibility: 'public',
@@ -397,6 +398,13 @@ export class AuthService {
       });
     }
 
+    if (user.onboardingStatus !== 'social_terms_required') {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Social terms can only be completed from the required terms state',
+      });
+    }
+
     if (isExpiredSocialSignup(user)) {
       await this.prisma.v1User.delete({ where: { id: userId } });
       throw new UnauthorizedException({
@@ -405,43 +413,49 @@ export class AuthService {
       });
     }
 
-    const requiredTerms = await this.prisma.v1TermsDocument.findMany({
-      where: { isRequired: true, status: 'published' },
-      select: { id: true },
-    });
-
-    const mutations = [
-      this.prisma.v1User.update({
-        where: { id: userId },
+    await this.prisma.$transaction(async (transaction) => {
+      const transition = await transaction.v1User.updateMany({
+        where: { id: userId, onboardingStatus: 'social_terms_required' },
         data: { onboardingStatus: 'social_profile_required' },
-      }),
-      this.prisma.v1UserOnboardingProgress.upsert({
+      });
+      if (transition.count !== 1) {
+        throw new BadRequestException({
+          code: 'VALIDATION_ERROR',
+          message: 'Social signup state changed before terms completion',
+        });
+      }
+
+      const requiredTerms = await transaction.v1TermsDocument.findMany({
+        where: { isRequired: true, status: 'published' },
+        select: { id: true },
+      });
+      await transaction.v1UserOnboardingProgress.upsert({
         where: { userId },
         update: { currentStep: 'signup' },
         create: { userId, currentStep: 'signup' },
-      }),
-      ...(requiredTerms.length > 0 ? [this.prisma.v1UserTermsConsent.createMany({
-        data: requiredTerms.map((termsDocument) => ({
-          userId,
-          termsDocumentId: termsDocument.id,
-        })),
-        skipDuplicates: true,
-      })] : []),
-    ];
-
-    await this.prisma.$transaction(mutations);
+      });
+      if (requiredTerms.length > 0) {
+        await transaction.v1UserTermsConsent.createMany({
+          data: requiredTerms.map((termsDocument) => ({
+            userId,
+            termsDocumentId: termsDocument.id,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
 
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
   async completeSocialProfile(userId: string, dto: SocialProfileDto) {
     const nickname = dto.nickname.trim();
-    const displayName = dto.displayName?.trim() || nickname;
-    const phone = dto.phone?.trim() || null;
-    const birthDate = dto.birthDate?.trim() || null;
+    const displayName = normalizeSignupDisplayName(dto.displayName);
+    const phone = dto.phone.trim();
+    const birthDate = dto.birthDate.trim();
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
 
-    if (birthDate && !isValidBirthDate(birthDate)) {
+    if (!isValidBirthDateDigits(birthDate)) {
       throw new BadRequestException({
         code: 'VALIDATION_ERROR',
         message: 'Birth date must be a valid YYYYMMDD value',
@@ -488,18 +502,25 @@ export class AuthService {
       });
     }
 
+    if (user.onboardingStatus === 'social_terms_required') {
+      throw new BadRequestException({
+        code: 'TERMS_REQUIRED',
+        message: 'Required terms must be accepted before social profile registration',
+      });
+    }
+
+    if (user.onboardingStatus !== 'social_profile_required') {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'Social profile can only be completed from the required profile state',
+      });
+    }
+
     if (isExpiredSocialSignup(user)) {
       await this.prisma.v1User.delete({ where: { id: userId } });
       throw new UnauthorizedException({
         code: 'SOCIAL_SIGNUP_EXPIRED',
         message: 'Social signup session expired. Please sign in again.',
-      });
-    }
-
-    if (user.onboardingStatus === 'social_terms_required') {
-      throw new BadRequestException({
-        code: 'TERMS_REQUIRED',
-        message: 'Required terms must be accepted before social profile registration',
       });
     }
 
@@ -536,8 +557,19 @@ export class AuthService {
       }
     }
 
-    await this.prisma.$transaction([
-      this.prisma.v1UserProfile.upsert({
+    await this.prisma.$transaction(async (transaction) => {
+      const transition = await transaction.v1User.updateMany({
+        where: { id: userId, onboardingStatus: 'social_profile_required' },
+        data: { onboardingStatus: 'signup_done', phone },
+      });
+      if (transition.count !== 1) {
+        throw new BadRequestException({
+          code: 'VALIDATION_ERROR',
+          message: 'Social signup state changed before profile completion',
+        });
+      }
+
+      await transaction.v1UserProfile.upsert({
         where: { userId },
         update: {
           nickname,
@@ -556,17 +588,13 @@ export class AuthService {
           profileImageUrl,
           visibility: 'public',
         },
-      }),
-      this.prisma.v1User.update({
-        where: { id: userId },
-        data: { onboardingStatus: 'signup_done', phone },
-      }),
-      this.prisma.v1UserOnboardingProgress.upsert({
+      });
+      await transaction.v1UserOnboardingProgress.upsert({
         where: { userId },
         update: { currentStep: 'sport' },
         create: { userId, currentStep: 'sport' },
-      }),
-    ]);
+      });
+    });
 
     return this.sessionResponse(user.id, user.email, { social: true });
   }
@@ -767,19 +795,6 @@ export class AuthService {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
-}
-
-function isValidBirthDate(value: string) {
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(4, 6));
-  const day = Number(value.slice(6, 8));
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
 }
 
 function getAuthNextRoute(onboarding: { status: string; missing: string[]; currentStep: string }, options?: { social?: boolean }) {

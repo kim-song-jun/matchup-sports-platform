@@ -108,6 +108,8 @@ export class ProfileService {
 
     const hasPassword = before?.authIdentities.some((identity) => Boolean(identity.passwordHash)) ?? false;
     const email = requestedEmail ?? before?.email ?? null;
+    const emailChanged = email !== (before?.email ?? null);
+    const phoneChanged = phone !== (before?.phone ?? null);
 
     if (!displayName || !nickname || (hasPassword && !email)) {
       throw validationError('displayName, nickname, and email are required', 'profile');
@@ -170,10 +172,15 @@ export class ProfileService {
     const profile = await this.prisma.$transaction(async (tx) => {
       await tx.v1User.update({
         where: { id: user.id },
-        data: { email, phone },
+        data: {
+          email,
+          phone,
+          ...(emailChanged ? { emailVerifiedAt: null } : {}),
+          ...(phoneChanged ? { phoneVerifiedAt: null } : {}),
+        },
       });
 
-      if (email) {
+      if (email && !emailChanged) {
         await tx.v1AuthIdentity.updateMany({
           where: { userId: user.id, provider: V1AuthProvider.email, status: 'active' },
           data: { email, providerUserKey: email },
@@ -233,20 +240,14 @@ export class ProfileService {
 
   async publicProfile(_viewer: V1AuthUser | null, userId: string) {
     const user = await this.prisma.v1User.findFirst({
-      where: { id: userId, deletedAt: null },
+      where: {
+        id: userId,
+        deletedAt: null,
+        accountStatus: 'active',
+      },
       include: { profile: true, reputationSummary: true },
     });
     if (!user) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-    if (user.accountStatus === 'deleted') {
-      return {
-        userId: user.id,
-        displayName: '탈퇴한 사용자',
-        nickname: null,
-        profileImageUrl: null,
-        reputation: emptyReputation(),
-        activitySummary: emptyPublicActivitySummary(),
-      };
-    }
 
     const activitySummary = await this.getPublicActivitySummary(user.id);
 
@@ -494,7 +495,7 @@ export class ProfileService {
     };
   }
 
-  logout(_user: V1AuthUser) {
+  logout() {
     return { ok: true };
   }
 
@@ -713,17 +714,6 @@ function toReputationPayload(reputation: {
     mannerScore: reputation?.mannerScore ? Number(reputation.mannerScore) : null,
     activityCount: reputation?.reviewCount ?? 0,
     reviewCount: reputation?.reviewCount ?? 0,
-  };
-}
-
-function emptyReputation() {
-  return { trustState: 'none', mannerScore: null, activityCount: 0, reviewCount: 0 };
-}
-
-function emptyPublicActivitySummary() {
-  return {
-    totals: { matchCount: 0, teamCount: 0, reviewCount: 0 },
-    monthly: { matchCount: 0, teamJoinCount: 0, reviewCount: 0 },
   };
 }
 

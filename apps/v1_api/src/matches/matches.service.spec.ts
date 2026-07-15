@@ -238,6 +238,9 @@ describe('MatchesService', () => {
         match: matchRow({ maxParticipants: MAX, status: 'recruiting', startAt: FUTURE }),
       }),
     );
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ maxParticipants: MAX, status: 'recruiting', startAt: FUTURE }),
+    );
     // getActiveParticipantCount → already full
     prisma.v1MatchParticipant.count.mockResolvedValue(MAX);
 
@@ -249,6 +252,28 @@ describe('MatchesService', () => {
     // TOCTOU 방지 락이 정원 재검증보다 먼저, 올바른 matchId로 걸렸는지 확인한다.
     expect(prisma.$queryRaw).toHaveBeenCalled();
     expect(prisma.$queryRaw.mock.calls[0]).toContain('match-1');
+  });
+
+  it('approveApplication: 락 획득 뒤 매치가 취소 상태면 참가자를 만들지 않는다', async () => {
+    prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ status: 'cancelled' }));
+
+    await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+    expect(prisma.v1MatchApplication.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+  });
+
+  it('approveApplication: 철회가 먼저 확정돼 requested 전이가 실패하면 참가자를 만들지 않는다', async () => {
+    prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow());
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.approveApplication(host, 'app-1', {})).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+    expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
   });
 
   // ─── 5. 비-호스트 신청 승인 → 403 PERMISSION_DENIED ─────────────────────
@@ -283,6 +308,16 @@ describe('MatchesService', () => {
       response: { code: 'STATE_CONFLICT' },
     });
     expect(prisma.v1MatchApplication.update).not.toHaveBeenCalled();
+  });
+
+  it('withdrawApplication: 승인이 먼저 확정돼 requested 전이가 실패하면 withdrawn으로 보고하지 않는다', async () => {
+    prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.withdrawApplication(otherUser, 'app-1', {})).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
   });
 
   // ─── 7. 타인 신청 철회 → 403 PERMISSION_DENIED ───────────────────────────

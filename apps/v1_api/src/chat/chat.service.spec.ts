@@ -138,6 +138,7 @@ describe('ChatService', () => {
       v1TeamMatch: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     };
+    prisma.v1MatchParticipant.findFirst.mockResolvedValue({ id: 'active-match-participant' });
 
     // Default $transaction: pass-through (runs the callback with the same prisma stub)
     const p = prisma;
@@ -176,6 +177,16 @@ describe('ChatService', () => {
     prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoomForParticipant(userA.id, 'left'));
 
     await expect(service.sendMessage(userA, 'room-1', { content: '테스트' })).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+  });
+
+  it('sendMessage: 채팅 참가 행이 active여도 현재 매치 참가 자격이 없으면 403', async () => {
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(makeRoomForParticipant(userA.id));
+    prisma.v1MatchParticipant.findFirst.mockResolvedValue(null);
+
+    await expect(service.sendMessage(userA, 'room-1', { content: '권한이 끝난 뒤 메시지' })).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
     });
     expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
@@ -260,6 +271,15 @@ describe('ChatService', () => {
           status: 'active',
           userId: { not: userA.id },
           OR: [{ mutedUntil: null }, { mutedUntil: { lte: expect.any(Date) } }],
+          AND: [
+            {
+              user: {
+                matchParticipants: {
+                  some: { matchId: 'match-1', status: 'active', match: { deletedAt: null } },
+                },
+              },
+            },
+          ],
         }),
       }),
     );

@@ -10,14 +10,16 @@ function buildPrismaMock() {
   prisma.v1VerificationToken = {
     findFirst: jest.fn(),
     update: jest.fn().mockResolvedValue({}),
-    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     create: jest.fn().mockResolvedValue({}),
   };
   prisma.v1User = {
     findUnique: jest.fn(),
     findFirst: jest.fn().mockResolvedValue(null),
     update: jest.fn().mockResolvedValue({}),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   };
+  prisma.v1AuthIdentity = { updateMany: jest.fn().mockResolvedValue({ count: 1 }) };
   prisma.$transaction = jest.fn((arg: unknown) =>
     Array.isArray(arg) ? Promise.all(arg) : (arg as (tx: unknown) => unknown)(prisma),
   );
@@ -68,7 +70,8 @@ describe('VerificationService.confirm', () => {
     const codeHash = await hashPassword('123456');
     const handle = prisma as never as {
       v1VerificationToken: { findFirst: jest.Mock };
-      v1User: { findUnique: jest.Mock; update: jest.Mock };
+      v1User: { findUnique: jest.Mock; updateMany: jest.Mock };
+      v1AuthIdentity: { updateMany: jest.Mock };
     };
     handle.v1VerificationToken.findFirst.mockResolvedValue({ id: 't1', channel: 'email', target: 'a@b.com', codeHash, attemptCount: 0 });
     handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.com', phone: null, emailVerifiedAt: new Date(), phoneVerifiedAt: null });
@@ -77,7 +80,54 @@ describe('VerificationService.confirm', () => {
     const result = await service.confirm(authUser, 'email', '123456');
 
     expect(result).toMatchObject({ verified: true, channel: 'email', verification: { emailVerified: true, phoneVerified: false } });
-    expect(handle.v1User.update).toHaveBeenCalledWith(expect.objectContaining({ data: { emailVerifiedAt: expect.any(Date) } }));
+    expect(handle.v1User.updateMany).toHaveBeenCalledWith({
+      where: { id: 'u1', email: 'a@b.com' },
+      data: { emailVerifiedAt: expect.any(Date) },
+    });
+    expect(handle.v1AuthIdentity.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { email: 'a@b.com', providerUserKey: 'a@b.com' } }),
+    );
+  });
+
+  it('rejects an email code when the profile email changed after the code was issued', async () => {
+    const prisma = buildPrismaMock();
+    const codeHash = await hashPassword('123456');
+    const handle = prisma as never as {
+      v1VerificationToken: { findFirst: jest.Mock; updateMany: jest.Mock };
+      v1User: { updateMany: jest.Mock };
+      v1AuthIdentity: { updateMany: jest.Mock };
+    };
+    handle.v1VerificationToken.findFirst.mockResolvedValue({
+      id: 't1', channel: 'email', target: 'old-target@teameet.test', codeHash, attemptCount: 0,
+    });
+    handle.v1User.updateMany.mockResolvedValue({ count: 0 });
+    const service = new VerificationService(prisma, dispatcher);
+
+    await expect(service.confirm(authUser, 'email', '123456')).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_TARGET_CHANGED' },
+    });
+    expect(handle.v1AuthIdentity.updateMany).not.toHaveBeenCalled();
+    expect(handle.v1VerificationToken.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ id: 't1', consumedAt: null }) }),
+    );
+  });
+
+  it('rejects when another confirmation already consumed the token', async () => {
+    const prisma = buildPrismaMock();
+    const codeHash = await hashPassword('123456');
+    const handle = prisma as never as {
+      v1VerificationToken: { findFirst: jest.Mock; updateMany: jest.Mock };
+      v1User: { updateMany: jest.Mock };
+    };
+    handle.v1VerificationToken.findFirst.mockResolvedValue({
+      id: 't1', channel: 'email', target: 'a@b.com', codeHash, attemptCount: 0,
+    });
+    handle.v1VerificationToken.updateMany.mockResolvedValue({ count: 0 });
+    const service = new VerificationService(prisma, dispatcher);
+
+    await expect(service.confirm(authUser, 'email', '123456')).rejects.toMatchObject({
+      response: { code: 'ALREADY_PROCESSED' },
+    });
   });
 });
 

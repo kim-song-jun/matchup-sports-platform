@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
 import {
   ChatMessagesQueryDto,
   ChatRoomsQueryDto,
@@ -21,7 +22,7 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
   include: {
     match: { select: { id: true; title: true } };
     team: { select: { id: true; name: true } };
-    teamMatch: { select: { id: true; title: true } };
+    teamMatch: { select: { id: true; title: true; hostTeamId: true; approvedApplicantTeamId: true } };
     participants: {
       include: {
         user: { select: { id: true; profile: { select: { nickname: true; displayName: true; profileImageUrl: true } } } };
@@ -44,6 +45,7 @@ export class ChatService {
         ...(query.roomType === 'team' ? { teamId: { not: null } } : {}),
         ...(query.roomType === 'team_match' ? { teamMatchId: { not: null } } : {}),
         participants: { some: { userId: user.id, status: 'active' } },
+        AND: [currentChatEntitlementWhere(user.id)],
       },
       include: this.roomInclude(user.id),
       orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
@@ -147,6 +149,7 @@ export class ChatService {
           status: 'active',
           userId: { not: user.id },
           OR: [{ mutedUntil: null }, { mutedUntil: { lte: new Date() } }],
+          AND: [currentChatRecipientEntitlementWhere(room)],
         },
         select: { userId: true },
       });
@@ -299,7 +302,18 @@ export class ChatService {
     if (room.participants[0].status !== 'active') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room participant is not active' });
     }
+    await this.assertCurrentRoomEntitlement(userId, room);
     return room;
+  }
+
+  private async assertCurrentRoomEntitlement(
+    userId: string,
+    room: { matchId: string | null; teamId: string | null; teamMatchId: string | null },
+  ) {
+    if (room.matchId) return this.assertCanUseMatchChat(userId, room.matchId);
+    if (room.teamId) return this.assertCanUseTeamChat(userId, room.teamId);
+    if (room.teamMatchId) return this.assertCanUseTeamMatchChat(userId, room.teamMatchId);
+    throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Chat room is not linked to an active target' });
   }
 
   private async getRoomParticipant(userId: string, roomId: string) {
@@ -326,7 +340,7 @@ export class ChatService {
     return {
       match: { select: { id: true, title: true } },
       team: { select: { id: true, name: true } },
-      teamMatch: { select: { id: true, title: true } },
+      teamMatch: { select: { id: true, title: true, hostTeamId: true, approvedApplicantTeamId: true } },
       participants: {
         include: {
           user: { select: { id: true, profile: { select: { nickname: true, displayName: true, profileImageUrl: true } } } },

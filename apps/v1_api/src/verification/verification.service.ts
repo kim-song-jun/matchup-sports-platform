@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, V1VerificationChannel } from '@prisma/client';
+import { Prisma, V1AuthProvider, V1VerificationChannel } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
@@ -82,21 +82,45 @@ export class VerificationService {
     const now = new Date();
     try {
       await this.prisma.$transaction(async (tx) => {
-        await tx.v1VerificationToken.update({ where: { id: token.id }, data: { consumedAt: now } });
         if (channel === 'email') {
-          await tx.v1User.update({ where: { id: authUser.id }, data: { emailVerifiedAt: now } });
+          const bound = await tx.v1User.updateMany({
+            where: { id: authUser.id, email: token.target },
+            data: { emailVerifiedAt: now },
+          });
+          if (bound.count !== 1) {
+            throw new BadRequestException({
+              code: 'VERIFICATION_TARGET_CHANGED',
+              message: '인증할 이메일이 변경됐어요. 인증번호를 다시 받아 주세요.',
+            });
+          }
+          await tx.v1AuthIdentity.updateMany({
+            where: { userId: authUser.id, provider: V1AuthProvider.email, status: 'active' },
+            data: { email: token.target, providerUserKey: token.target },
+          });
         } else {
           await tx.v1User.update({
             where: { id: authUser.id },
             data: { phoneVerifiedAt: now, phone: token.target },
           });
         }
+        const consumed = await tx.v1VerificationToken.updateMany({
+          where: { id: token.id, consumedAt: null },
+          data: { consumedAt: now },
+        });
+        if (consumed.count !== 1) {
+          throw new ConflictException({
+            code: 'ALREADY_PROCESSED',
+            message: '이미 사용된 인증번호예요. 인증번호를 다시 받아 주세요.',
+          });
+        }
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException({
-          code: 'PHONE_CONFLICT',
-          message: '이미 다른 계정에서 사용 중인 번호예요.',
+          code: channel === 'email' ? 'EMAIL_CONFLICT' : 'PHONE_CONFLICT',
+          message: channel === 'email'
+            ? '이미 다른 계정에서 사용 중인 이메일이에요.'
+            : '이미 다른 계정에서 사용 중인 번호예요.',
         });
       }
       throw error;

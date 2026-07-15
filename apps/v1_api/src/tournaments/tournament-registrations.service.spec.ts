@@ -16,7 +16,7 @@ import { TournamentRegistrationsService } from './tournament-registrations.servi
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
 function openTournament(overrides: Record<string, unknown> = {}) {
-  return { id: 'tournament-1', status: 'open', entryFee: 120000, teamCount: 8, registrationDeadlineAt: null, deletedAt: null, ...overrides };
+  return { id: 'tournament-1', sportId: 'sport-futsal', status: 'open', entryFee: 120000, teamCount: 8, registrationDeadlineAt: null, deletedAt: null, ...overrides };
 }
 function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -46,6 +46,7 @@ describe('TournamentRegistrationsService', () => {
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock };
 
@@ -57,11 +58,18 @@ describe('TournamentRegistrationsService', () => {
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
+      // R17-005 / R16-001 / R17-006: $queryRaw is called inside transactions for
+      // SELECT FOR UPDATE; a no-op mock is sufficient for unit tests.
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
     // 기본: 매니저 권한 통과
-    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({
+      id: 'mem-1',
+      role: 'manager',
+      team: { sportId: 'sport-futsal' },
+    });
 
     notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
 
@@ -123,6 +131,24 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.create.mockResolvedValue(registrationRow());
     const result = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
     expect(result).toMatchObject({ id: 'reg-1', status: 'draft', playerCount: 0 });
+  });
+
+  it('create: managed team belongs to another sport → 409 TEAM_SPORT_MISMATCH', async () => {
+    // Given: a futsal tournament and a running team managed by the caller.
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({
+      id: 'mem-1',
+      role: 'manager',
+      team: { sportId: 'sport-running' },
+    });
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentRegistration.create.mockResolvedValue(registrationRow());
+
+    // When / Then: the registration boundary rejects the cross-sport team.
+    await expect(service.create(manager, 'tournament-1', { teamId: 'team-1' })).rejects.toMatchObject({
+      response: { code: 'TEAM_SPORT_MISMATCH' },
+    });
+    expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
   });
 
   it('create: capacity full from confirmed plus payment-stage registrations → 409 TOURNAMENT_CAPACITY_FULL', async () => {
@@ -211,6 +237,24 @@ describe('TournamentRegistrationsService', () => {
     await expect(
       service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, depositorName: '   ' }),
     ).rejects.toMatchObject({ response: { code: 'DEPOSITOR_NAME_REQUIRED' } });
+  });
+
+  it('submit: draft team no longer matches the tournament sport → 409 TEAM_SPORT_MISMATCH', async () => {
+    // Given: a draft registration whose managed team belongs to a different sport.
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({
+      id: 'mem-1',
+      role: 'manager',
+      team: { sportId: 'sport-running' },
+    });
+
+    // When / Then: submission rechecks the current team and tournament contract.
+    await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+      response: { code: 'TEAM_SPORT_MISMATCH' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
   });
 
   it('submit: valid bank_transfer → awaiting_payment + payment(ready) created', async () => {
@@ -313,7 +357,7 @@ describe('TournamentRegistrationsService', () => {
     });
   });
 
-  // ─── get ────────────────────────────────────────────────────────────────────────
+  // ─── withdrawCancelRequest ─────────────────────────────────────────────────────
 
   it('withdrawCancelRequest: cancel_requested -> previous status and clears cancel fields', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
@@ -324,6 +368,9 @@ describe('TournamentRegistrationsService', () => {
         cancelReason: '사정',
       }),
     );
+    // R16-001 / R17-006: the function now reads the tournament inside the transaction
+    // to guard against admin cancellation and over-capacity restoration.
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ teamCount: 8 }));
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
     prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({
       method: 'bank_transfer',
@@ -352,6 +399,30 @@ describe('TournamentRegistrationsService', () => {
     await expect(service.withdrawCancelRequest(manager, 'tournament-1', 'reg-1')).rejects.toMatchObject({
       response: { code: 'REGISTRATION_CANCEL_REQUEST_NOT_WITHDRAWABLE' },
     });
+  });
+
+  it('withdrawCancelRequest: R16-001 — tournament cancelled → 409 TOURNAMENT_ALREADY_CANCELLED', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
+    );
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ status: 'cancelled' }));
+    await expect(service.withdrawCancelRequest(manager, 'tournament-1', 'reg-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_ALREADY_CANCELLED' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('withdrawCancelRequest: R17-006 — capacity full → 409 TOURNAMENT_CAPACITY_FULL', async () => {
+    // Restoring 'confirmed' (a CAPACITY_HOLD_STATUS) when already at capacity must fail.
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(
+      registrationRow({ status: 'cancel_requested', cancelPreviousStatus: 'confirmed' }),
+    );
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament({ teamCount: 8 }));
+    prisma.v1TournamentRegistration.count.mockResolvedValue(8); // already at limit (excl. current reg)
+    await expect(service.withdrawCancelRequest(manager, 'tournament-1', 'reg-1')).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
   });
 
   it('get: unknown registration → 404', async () => {

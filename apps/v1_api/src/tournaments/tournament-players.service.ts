@@ -285,7 +285,7 @@ export class TournamentPlayersService {
         id: true,
         teamId: true,
         rosterLockedAt: true,
-        team: { select: { name: true } },
+        team: { select: { name: true, ownerUserId: true } },
         tournament: { select: { minPlayers: true } },
       },
     });
@@ -299,15 +299,20 @@ export class TournamentPlayersService {
       orderBy: { addedAt: 'asc' },
     });
 
+    const serializedPlayers = players
+      .map(({ user: playerUser, ...player }) => ({
+        ...this.serializePlayer(player),
+        phone: playerUser.phone?.trim() || null,
+        isTeamCaptain: player.userId === registration.team.ownerUserId,
+      }))
+      .sort((left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain));
+
     return {
       registrationId: registration.id,
       teamId: registration.teamId,
       teamName: registration.team.name,
       rosterLockedAt: registration.rosterLockedAt?.toISOString() ?? null,
-      players: players.map(({ user: playerUser, ...player }) => ({
-        ...this.serializePlayer(player),
-        phone: playerUser.phone?.trim() || null,
-      })),
+      players: serializedPlayers,
       belowMinimum: players.length < registration.tournament.minPlayers,
     };
   }

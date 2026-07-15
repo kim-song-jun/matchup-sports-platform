@@ -1835,6 +1835,7 @@ export type V1TournamentRosterResponse = {
 
 export type V1AdminTournamentPlayer = V1TournamentPlayer & {
   phone: string | null;
+  isTeamCaptain: boolean;
 };
 
 export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, 'players'> & {

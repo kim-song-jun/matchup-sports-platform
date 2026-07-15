@@ -32,6 +32,7 @@
 - [x] New roster players snapshot profile gender without making missing gender a registration blocker.
 - [x] Existing roster rows are backfilled from the current user profile when gender is available.
 - [x] Admin roster UI renders gender as `남성`, `여성`, or `미등록`.
+- [x] If the registered team owner is in the roster, the admin response and modal place that player first and mark them as 팀장.
 - [x] Admin roster UI shows request failures separately from an empty roster and offers retry.
 - [x] Admin CSV export contains the gender snapshot.
 - [x] Backend/frontend contracts, tests, and docs are synchronized.
@@ -46,8 +47,9 @@
 
 - Current: implementation and code-level validation complete.
 - Follow-up: the admin roster response and modal now include the player's current phone after the active-admin gate; the team-member roster contract remains unchanged.
+- Follow-up: the admin roster response derives isTeamCaptain from the team's canonical ownerUserId; the owner is sorted first while non-owner order remains stable, and the modal renders a 팀장 badge.
 - Validation: API unit 38 suites / 501 tests, Web unit 25 files / 93 tests, API/Web production builds, Web lint/pattern check, Prisma validate, DB guardrail, QA policy contract, and `git diff --check` passed.
-- Runtime follow-up: the local authenticated v1 admin runtime was not running, so browser screenshot/console/network verification remains to be executed after the migration is applied to a QA database.
+- 2026-07-15 validation: focused API 32/32 and Web 4/4 tests passed; API TypeScript and Web lint/pattern checks passed. Authenticated Playwright QA passed on mobile 390x844, tablet 768x1024, and desktop 1440x900 with the team captain first, one `팀장` badge, no overflow, and zero console/page/network errors. Evidence: `output/playwright/visual-audit/admin-roster-captain-2026-07-15T00-03-36-505Z/`.
 
 ## Ambiguity log
 

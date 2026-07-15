@@ -54,6 +54,7 @@ describe('admin tournament roster modal', () => {
             birthDateSnapshot: '1995-03-15',
             genderSnapshot: 'male',
             phone: '01012345678',
+            isTeamCaptain: false,
             eligibilityStatus: 'needs_review',
             eligibilityNote: null,
             addedAt: '2026-07-14T00:00:00.000Z',
@@ -84,6 +85,30 @@ describe('admin tournament roster modal', () => {
     expect(screen.getByText('휴대폰 010-1234-5678')).toBeInTheDocument();
   });
 
+  it('moves the team captain to the top and shows a captain badge', () => {
+    const roster = queryState.data as {
+      players: Array<Record<string, unknown>>;
+    };
+    roster.players = [
+      { ...roster.players[0], id: 'member-player', realName: '일반 선수', isTeamCaptain: false },
+      { ...roster.players[0], id: 'captain-player', realName: '팀장 선수', isTeamCaptain: true },
+    ];
+
+    render(
+      <RosterModal
+        open
+        onClose={() => undefined}
+        registration={registration}
+        showToast={() => undefined}
+        canWrite
+      />,
+    );
+
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('팀장 선수');
+    expect(rows[0]).toHaveTextContent('팀장');
+    expect(rows[1]).toHaveTextContent('일반 선수');
+  });
   it('renders a missing gender without blocking support read access or enabling mutation', () => {
     const roster = queryState.data as {
       players: Array<{ genderSnapshot: 'male' | 'female' | null; phone: string | null }>;

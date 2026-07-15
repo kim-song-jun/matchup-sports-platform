@@ -182,7 +182,7 @@ Notes:
 | TOURN-021 | 참가 확정/대기 | API `PATCH /admin/registrations/:id/confirm` | `ADMIN` | confirm/waitlist, idempotent alreadyProcessed, user `/my` 반영 |
 | TOURN-022 | 관리자 취소 처리 | API `PATCH /admin/registrations/:id/cancel` | `ADMIN` | cancel_requested 포함 허용 상태, 결제 있으면 manual refund copy |
 | TOURN-023 | 명단 잠금/해제 | API `POST`/`DELETE /admin/registrations/:id/roster-lock` | `ADMIN` | confirmed만 잠금, 잠금 후 사용자 수정 제한, 해제 후 정책 복원 |
-| TOURN-023A | 관리자 명단 조회 | `/admin/tournaments/[id]`, API `GET /admin/registrations/:id/players` | `ADMIN`, `SUPPORT`, `USER_A` | 팀 비소속 관리자 조회 성공, support 읽기 성공, 일반 사용자 403, 성별 snapshot/미등록 표시, 실패와 빈 명단 구분 |
+| TOURN-023A | 관리자 명단 조회 | `/admin/tournaments/[id]`, API `GET /admin/registrations/:id/players` | `ADMIN`, `SUPPORT`, `USER_A` | 팀 비소속 관리자 조회 성공, support 읽기 성공, 일반 사용자 403, 성별 snapshot/미등록 표시, 팀장 포함 시 최상단 정렬과 팀장 배지, 실패와 빈 명단 구분 |
 | TOURN-024 | 대회 알림 연동 | `/notifications`, tournament events | `TEAM_OWNER`, `ADMIN` | 신청/입금확인/확정/취소 알림, 딥링크, read state |
 | TOURN-025 | 대회 반응형 | `/tournaments`, `/tournaments/[id]`, apply/my/admin routes | All | 모바일 sticky CTA, 데스크탑 2-column, tablet overflow 없음 |
 

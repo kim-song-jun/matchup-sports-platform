@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy } from 'lucide-react';
+import Link from 'next/link';
+import { ClipboardEdit, Wallet, ListChecks, Grid2x2, GitFork, Trophy, Sparkles } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
@@ -95,6 +96,32 @@ function TournamentsListContent() {
         error={promoTournaments.isError}
         onRetry={() => void promoTournaments.refetch()}
       />
+
+      {/* ── 이벤트 허브 배너 — 캠페인 발견 진입점 ── */}
+      <div style={{ padding: '12px 20px 0' }}>
+        <Link
+          href="/events"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(135deg, var(--blue50) 0%, #e8f0fe 100%)',
+            borderRadius: 14,
+            padding: '12px 16px',
+            textDecoration: 'none',
+          }}
+          aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Sparkles size={18} style={{ color: 'var(--blue500)', flexShrink: 0 }} aria-hidden="true" />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue600, #2563eb)' }}>이벤트 허브</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
+            </div>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue500)', whiteSpace: 'nowrap' }}>바로가기 →</span>
+        </Link>
+      </div>
 
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
       <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section" style={{ marginTop: 28 }}>

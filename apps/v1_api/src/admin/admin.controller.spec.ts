@@ -29,8 +29,10 @@ describe('AdminController', () => {
     listTeams: jest.fn(),
     getTeam: jest.fn(),
     listNotices: jest.fn(),
+    getNotice: jest.fn(),
     createNotice: jest.fn(),
     updateNotice: jest.fn(),
+    deleteNotice: jest.fn(),
     listTeamMatches: jest.fn(),
     listAdmins: jest.fn(),
     grantAdmin: jest.fn(),
@@ -332,6 +334,13 @@ describe('AdminController', () => {
     expect(adminService.createNotice).toHaveBeenCalledWith(user, dto);
   });
 
+  it('gets a notice', async () => {
+    const payload = { notice: { noticeId: 'n-1', title: '팝업 공지', body: '내용' } };
+    adminService.getNotice.mockResolvedValue(payload);
+    await expect(controller.getNotice(user, 'n-1')).resolves.toEqual(payload);
+    expect(adminService.getNotice).toHaveBeenCalledWith(user, 'n-1');
+  });
+
   it('updates a notice', async () => {
     const dto = {
       audience: 'public' as const,
@@ -355,6 +364,13 @@ describe('AdminController', () => {
     adminService.updateNotice.mockResolvedValue(payload);
     await expect(controller.updateNotice(user, 'n-2', dto)).resolves.toEqual(payload);
     expect(adminService.updateNotice).toHaveBeenCalledWith(user, 'n-2', dto);
+  });
+
+  it('deletes a notice', async () => {
+    const payload = { noticeId: 'n-2', deleted: true };
+    adminService.deleteNotice.mockResolvedValue(payload);
+    await expect(controller.deleteNotice(user, 'n-2')).resolves.toEqual(payload);
+    expect(adminService.deleteNotice).toHaveBeenCalledWith(user, 'n-2');
   });
 
   // ─── Team-match list ───────────────────────────────────────────────────────

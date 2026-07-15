@@ -294,6 +294,42 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
     expect(titleError).toBeDefined();
   });
 
+  it('create/update: rulesText accepts 10,000 characters and rejects 10,001', async () => {
+    const { plainToInstance } = await import('class-transformer');
+    const { validate } = await import('class-validator');
+    const { CreateTournamentDto, UpdateTournamentDto } = await import('./dto/admin-tournament.dto');
+
+    const validRulesText = '규'.repeat(10_000);
+    const invalidRulesText = '규'.repeat(10_001);
+    const validCreateDto = plainToInstance(CreateTournamentDto, {
+      sportId: '00000000-0000-4000-8000-000000000001',
+      teamCount: 8,
+      title: '대회명',
+      rulesText: validRulesText,
+    });
+    const invalidCreateDto = plainToInstance(CreateTournamentDto, {
+      sportId: '00000000-0000-4000-8000-000000000001',
+      teamCount: 8,
+      title: '대회명',
+      rulesText: invalidRulesText,
+    });
+    const validUpdateDto = plainToInstance(UpdateTournamentDto, { rulesText: validRulesText });
+    const invalidUpdateDto = plainToInstance(UpdateTournamentDto, { rulesText: invalidRulesText });
+
+    await expect(validate(validCreateDto)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'rulesText' })]),
+    );
+    await expect(validate(validUpdateDto)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'rulesText' })]),
+    );
+    await expect(validate(invalidCreateDto)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'rulesText' })]),
+    );
+    await expect(validate(invalidUpdateDto)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ property: 'rulesText' })]),
+    );
+  });
+
   it('changeTournamentStatus: invalid status value → validation error', async () => {
     const { plainToInstance } = await import('class-transformer');
     const { validate } = await import('class-validator');

@@ -49,7 +49,7 @@ describe('AdminService — notices', () => {
   let service: AdminService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
-    v1Notice: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1Notice: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     $transaction: jest.Mock;
   };
@@ -57,7 +57,7 @@ describe('AdminService — notices', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
-      v1Notice: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1Notice: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1AdminActionLog: { create: jest.fn() },
       $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     };
@@ -121,6 +121,15 @@ describe('AdminService — notices', () => {
         take: 11,
       }),
     );
+  });
+
+  it('getNotice returns the complete notice to active admins', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+    prisma.v1Notice.findUnique.mockResolvedValue(makeNoticeRow());
+
+    await expect(service.getNotice(adminAuthUser, 'notice-1')).resolves.toEqual({
+      notice: expect.objectContaining({ noticeId: 'notice-1', title: '이번 주 고정 공지', body: '체크인 안내' }),
+    });
   });
 
   it('createNotice throws 403 for support admins', async () => {
@@ -236,5 +245,32 @@ describe('AdminService — notices', () => {
         status: 'draft',
       }),
     ).rejects.toThrow('Notice was not found');
+  });
+
+  it('deleteNotice deletes the notice and keeps an admin audit record', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+    prisma.v1Notice.findUnique.mockResolvedValue(makeNoticeRow());
+    prisma.v1AdminActionLog.create.mockResolvedValue({ id: 'log-delete' });
+    prisma.v1Notice.delete.mockResolvedValue(makeNoticeRow());
+
+    await expect(service.deleteNotice(adminAuthUser, 'notice-1')).resolves.toEqual({
+      noticeId: 'notice-1',
+      deleted: true,
+    });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        adminUserId: 'admin-record-id',
+        action: 'notice.delete',
+        targetType: 'notice',
+        targetId: 'notice-1',
+      }),
+    });
+    expect(prisma.v1Notice.delete).toHaveBeenCalledWith({ where: { id: 'notice-1' } });
+  });
+
+  it('deleteNotice denies support admins', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeSupportAdminRecord);
+    await expect(service.deleteNotice(adminAuthUser, 'notice-1')).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1Notice.delete).not.toHaveBeenCalled();
   });
 });

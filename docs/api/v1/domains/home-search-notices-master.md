@@ -12,8 +12,10 @@
 | `GET` | `/api/v1/notices` | public | service-defined list filters | published notice list |
 | `GET` | `/api/v1/notices/:noticeId` | public/user by notice visibility | path id | notice detail |
 | `GET` | `/api/v1/admin/notices` | active admin | `status?`, `category?`, `audience?`, `q?`, `cursor?`, `limit?` | admin notice cursor page including draft/published/archived rows |
+| `GET` | `/api/v1/admin/notices/:noticeId` | active admin | path id | complete admin notice row |
 | `POST` | `/api/v1/admin/notices` | owner/ops admin | `{ audience, category, pinned, title, body, status }` | created notice row |
 | `PATCH` | `/api/v1/admin/notices/:noticeId` | owner/ops admin | `{ audience, category, pinned, title, body, status }` | updated notice row |
+| `DELETE` | `/api/v1/admin/notices/:noticeId` | owner/ops admin | path id | `{ noticeId, deleted: true }` |
 
 ## Contract Notes
 
@@ -23,6 +25,8 @@
 - Admin notice rows expose `pinned`; v1 stores pinned notices through the existing `category === '고정'` contract, so no separate DB column is required.
 - `POST /api/v1/admin/notices` maps `pinned: true` to category `고정`; when `pinned: false`, category must be a non-fixed visible category such as `안내` or `업데이트`.
 - `PATCH /api/v1/admin/notices/:noticeId` uses the same pinned/category mapping as create, records an admin action log, and can save only `draft` or `published` status from the admin UI.
+- `/admin/popups` is the dedicated admin surface for `category === '고정'` rows. It supports list, detail, create, update, and hard delete while reusing `v1_notices` as the single content source.
+- Deleting a notice writes `notice.delete` to the admin action log before removing the row. A deleted published popup disappears from the home response after query invalidation/refetch.
 - Master data is read-only in v1 user APIs.
 
 ## Pending From Frozen Contract

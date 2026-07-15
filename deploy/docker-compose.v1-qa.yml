@@ -1,0 +1,35 @@
+services:
+  v1_api:
+    command: sh -c "cd /app/apps/v1_api && pnpm db:generate && pnpm db:push && pnpm db:seed:demo && pnpm dev"
+    environment:
+      V1_HOST_ADMIN_PASSWORD: ${V1_QA_ADMIN_PASSWORD:-v1-local-admin-qa}
+    ports: !override
+      - "${V1_QA_API_PORT:-18121}:8121"
+
+  v1_web:
+    command: sh -c "cd /app/apps/v1_web && mkdir -p .next && find .next -mindepth 1 -maxdepth 1 -exec rm -rf {} + && pnpm build && pnpm exec next start --hostname 0.0.0.0 --port 3013"
+    environment:
+      NODE_ENV: production
+    ports: !override
+      - "${V1_QA_WEB_PORT:-13013}:3013"
+
+  qa_runner:
+    image: mcr.microsoft.com/playwright:v1.58.2-noble
+    working_dir: /app
+    command: node scripts/qa/v1-home-notice-popup-qa.mjs
+    environment:
+      BASE_URL: http://v1_web:3013/v1
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+      - type: volume
+        source: root_node_modules_v5
+        target: /app/node_modules
+        volume:
+          nocopy: true
+    depends_on:
+      v1_api:
+        condition: service_healthy
+      v1_web:
+        condition: service_started

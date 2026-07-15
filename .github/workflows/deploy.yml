@@ -113,6 +113,7 @@ jobs:
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/prisma migrate deploy
           ./node_modules/.bin/prisma migrate diff \
             --from-url "$MIGRATE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+          DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
       - name: V1 unit tests (parallel)

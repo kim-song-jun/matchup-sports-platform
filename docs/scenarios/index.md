@@ -269,3 +269,33 @@
 2. 해당 기능 문서로 이동해 체크박스를 직접 갱신한다.
 3. 이슈가 생기면 개별 문서에도 적고, 최종 판단/논의는 `Discussion`에 요약한다.
 4. Playwright 구현이 시작되면 시나리오 ID를 테스트 파일명 또는 테스트 제목에 그대로 반영한다.
+
+## 세션 3 — 라우팅·SEO·알림·위치·QA (2026-07-15)
+
+### 작업 완료
+
+| 항목 | 상태 | 커밋 |
+|------|------|------|
+| nginx: /v1/* → 404, /* → v1_web 루트 라우팅 | ✅ Done | `70bf2431` |
+| nginx: /api/v1/auth/* 10r/m, /api/* 60r/m rate limit | ✅ Done | `70bf2431` |
+| next.config.ts: basePath · /v1/:path* alias 제거 | ✅ Done | `70bf2431` |
+| Dockerfile.v1-web: NEXT_PUBLIC_BASE_PATH 제거 | ✅ Done | `70bf2431` |
+| docker-compose.prod.yml: BASE_PATH 제거, API_URL=/api/v1, healthcheck /landing | ✅ Done | `70bf2431` |
+| SEO: robots.ts, sitemap.ts, manifest.ts, seo.ts (+tests) | ✅ Done | `70bf2431` |
+| layout.tsx: canonical/OG metadata, manifest link | ✅ Done | `70bf2431` |
+| notification-route.ts: same-origin guard + /v1/* migration helper | ✅ Done | `70bf2431` |
+| community-api-clients.tsx: normalizeNotificationHref → safeNotificationHref | ✅ Done | `70bf2431` |
+| home-client.tsx: 자동 geolocation useEffect 제거 | ✅ Done | `70bf2431` |
+| app-route.ts: /v1 핸들링 제거, 루트 정규화만 유지 | ✅ Done | `70bf2431` |
+| docs/security/v1-deploy-security-hardening.md: 라우팅 변경 §8 추가 | ✅ Done | `70bf2431` |
+| 25 unit tests pass (app-route, notification-route, seo) | ✅ Done | `70bf2431` |
+
+### 미검증 (CI 담당 또는 다음 세션)
+
+| 항목 | 이유 |
+|------|------|
+| Visual QA 390/768/1440 viewport | 서버 부하로 Playwright 미실시 |
+| /v1/home live 404 확인 | prod 배포 후 확인 필요 |
+| Kakao OAuth /callback/kakao 경로 동작 | 실 OAuth 앱 redirect_uri 수정 필요 (운영자) |
+| notification href DB migration | 기존 DB의 /v1/* route는 runtime migrateV1NotificationHref로 자동 처리됨 |
+| 세션 1 (backend security) · 세션 2 (campaign/tournament) 커밋 | 아직 미커밋 working tree 상태 |

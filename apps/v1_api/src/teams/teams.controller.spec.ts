@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { TeamsController } from './teams.controller';
 import { TeamsService } from './teams.service';
 
@@ -42,6 +43,7 @@ describe('TeamsController', () => {
         { provide: PrismaService, useValue: {} },
         { provide: OptionalV1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
+        { provide: CreatorProfileGuard, useValue: { canActivate: jest.fn(() => true) } },
       ],
     }).compile();
 

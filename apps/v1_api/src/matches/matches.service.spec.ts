@@ -103,6 +103,7 @@ function applicationRow(overrides: Record<string, unknown> = {}) {
 describe('MatchesService', () => {
   let service: MatchesService;
   let prisma: {
+    v1User: { findUnique: jest.Mock };
     v1Match: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
@@ -134,6 +135,7 @@ describe('MatchesService', () => {
 
   beforeEach(async () => {
     prisma = {
+      v1User: { findUnique: jest.fn().mockResolvedValue({ phone: '01012345678', profile: { realName: '호스트 실명', gender: 'male' } }) },
       v1Match: {
         findFirst: jest.fn(),
         findMany: jest.fn(),

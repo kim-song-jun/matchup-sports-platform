@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
+import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
@@ -15,6 +17,7 @@ type TeamDraft = TeamFormViewModel['team'];
 
 export function TeamCreatePageClient() {
   const router = useRouter();
+  const { confirm, ConfirmModal } = useConfirm();
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const createTeam = useV1CreateTeam();
@@ -72,11 +75,30 @@ export function TeamCreatePageClient() {
       }
       void createTeamWithActivityCompatibility(payload, draft)
         .then((result) => router.push(result.detailRoute || `/teams/${result.teamId}`))
-        .catch((err) => setError(err instanceof Error ? err.message : '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'));
+        .catch((err) => {
+          const prompt = getCreatorProfilePrompt(err, '팀');
+          if (prompt) {
+            setError(prompt);
+            void confirm({
+              title: '프로필 정보가 필요해요',
+              message: prompt,
+              confirmLabel: '프로필 수정',
+            }).then((ok) => {
+              if (ok) router.push(profileEditHref('/teams/new'));
+            });
+            return;
+          }
+          setError(err instanceof Error ? err.message : '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+        });
     },
   });
 
-  return <TeamFormPageView model={model} />;
+  return (
+    <>
+      <TeamFormPageView model={model} />
+      {ConfirmModal}
+    </>
+  );
 }
 
 export function TeamEditPageClient({ teamId }: { teamId: string }) {

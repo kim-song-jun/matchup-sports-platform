@@ -58,6 +58,9 @@
 
 ## State And Permissions
 
+- Creating a match requires profile `realName`, phone, and gender; missing fields return `422 PROFILE_COMPLETION_REQUIRED`. Application and management endpoints are exempt.
+
+
 - Create publishes a `recruiting` match and creates/keeps the host participant contract.
 - Detail `participantCount` includes the host participant. `participantsPreview` is limited to the host on the detail surface.
 - `deadlineAt` is persisted and returned on list/detail/edit responses. Once it passes, application eligibility returns `DEADLINE_PASSED` and the display state is treated as closed for CTA purposes.

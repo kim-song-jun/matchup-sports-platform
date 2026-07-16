@@ -2846,8 +2846,8 @@ button:disabled {
 
 .tm-chat-row-swipe {
   display: grid;
-  grid-template-columns: minmax(0, calc(100% - 144px)) 144px;
-  width: calc(100% + 144px);
+  grid-template-columns: minmax(0, calc(100% - 72px)) 72px;
+  width: calc(100% + 72px);
   min-height: 76px;
   transition: transform .18s ease;
   will-change: transform;
@@ -3013,11 +3013,17 @@ button:disabled {
 }
 
 .tm-chat-room {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--grey50);
-  padding-bottom: calc(96px + var(--v1-shell-safe-bottom));
+  padding-bottom: 0;
+}
+
+.tm-scroll-area:has(.tm-chat-room) {
+  overflow-y: hidden;
 }
 
 .tm-chat-context {
@@ -3048,8 +3054,11 @@ button:disabled {
 
 .tm-chat-thread {
   flex: 1;
+  min-height: 0;
   padding: 20px;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
 }
 
 .tm-chat-message-row {
@@ -3068,11 +3077,46 @@ button:disabled {
 }
 
 .tm-chat-read-count {
-  padding-bottom: 2px;
   font-size: 11px;
   line-height: 1;
   font-weight: 700;
   color: var(--orange500);
+}
+
+.tm-chat-message-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  padding-bottom: 2px;
+}
+
+.tm-chat-message-meta time,
+.tm-chat-message-time {
+  color: var(--text-caption);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tm-chat-message-time {
+  padding-bottom: 2px;
+}
+
+.tm-chat-date-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 18px 0 14px;
+  color: var(--text-caption);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tm-chat-date-divider span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--grey100);
 }
 
 .tm-chat-system-message {
@@ -3123,9 +3167,10 @@ button:disabled {
 }
 
 .tm-chat-inputbar {
-  position: absolute;
-  left: 0;
-  bottom: 0;
+  position: relative;
+  left: auto;
+  bottom: auto;
+  flex: 0 0 auto;
   z-index: 34;
   width: 100%;
   padding: 12px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom));

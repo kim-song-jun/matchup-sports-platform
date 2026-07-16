@@ -59,6 +59,7 @@ Common auth errors:
 
 - `401 UNAUTHENTICATED`
 - `403 PERMISSION_DENIED`
+- `403 SIGNUP_INCOMPLETE` for authenticated Kakao sessions that still require social terms or profile completion
 
 ## Pagination
 
@@ -76,6 +77,8 @@ Observed service/guard codes:
 
 - `UNAUTHENTICATED`
 - `PERMISSION_DENIED`
+- `SIGNUP_INCOMPLETE`
+- `PROFILE_COMPLETION_REQUIRED` (422 for gated creator endpoints; inspect `details.missingFields` and `details.next.route`)
 - `VALIDATION_FAILED`
 - `NOT_FOUND`
 - `NOT_FOUND_OR_ARCHIVED`

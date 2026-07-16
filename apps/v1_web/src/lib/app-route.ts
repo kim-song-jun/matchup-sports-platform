@@ -12,3 +12,15 @@ export function appRoute(path: string, currentPathname?: string | null) {
 
   return normalizedPath;
 }
+
+export function browserAppRoute(path: string, currentPathname?: string | null) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const configuredBasePath = getConfiguredBasePath();
+
+  if (configuredBasePath) {
+    const route = stripConfiguredBasePath(normalizedPath);
+    return route === '/' ? configuredBasePath : `${configuredBasePath}${route}`;
+  }
+
+  return appRoute(normalizedPath, currentPathname);
+}

@@ -15,8 +15,9 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1ChatMessage, V1ChatRoom, V1Notification } from '@/types/api';
 import { ChatListPageView, ChatRoomPageView, NotificationsPageView } from './community-page';
+import { formatChatListTimestamp } from './chat-message-time';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
-import { getChatListViewModel, getChatRoomViewModel } from './community.view-model';
+import { getChatRoomViewModel } from './community.view-model';
 
 type ChatCategory = ChatRoomModel['type'] | '전체';
 
@@ -27,11 +28,16 @@ const CHAT_AVATARS = {
 } satisfies Record<ChatRoomModel['type'], string>;
 
 export function ChatListPageClient() {
+  const model = useChatListPageModel();
+
+  return <ChatListPageView model={model} />;
+}
+
+function useChatListPageModel(): ChatListViewModel {
   const [selectedCategory, setSelectedCategory] = useState<ChatCategory>('전체');
   const query = useV1ChatRooms();
   const updateMe = useV1UpdateChatRoomMe();
-  const fallback = getChatListViewModel();
-  const baseRooms = query.data?.items.map(toChatRoomModel) ?? fallback.pinnedRooms.concat(fallback.rooms);
+  const baseRooms = query.data?.items.map(toChatRoomModel) ?? [];
   const rooms = baseRooms.map((room) => ({
     ...room,
     actionPending: updateMe.isPending && updateMe.variables?.roomId === room.id,
@@ -59,10 +65,11 @@ export function ChatListPageClient() {
     onRetry: query.isError ? () => query.refetch() : undefined,
   };
 
-  return <ChatListPageView model={model} />;
+  return model;
 }
 
 export function ChatRoomPageClient({ roomId }: { roomId: string }) {
+  const listModel = useChatListPageModel();
   const room = useV1ChatRoom(roomId);
   const messages = useV1ChatMessages(roomId, { limit: 50 });
   const send = useV1SendChatMessage(roomId);
@@ -115,7 +122,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
       : undefined,
   };
 
-  return <ChatRoomPageView model={model} />;
+  return <ChatRoomPageView model={model} listModel={listModel} roomId={roomId} />;
 }
 
 export function NotificationsPageClient() {
@@ -176,7 +183,7 @@ function toChatRoomModel(room: V1ChatRoom): ChatRoomModel {
     type,
     href: room.linkedTarget.route ?? '/chat',
     last: room.lastMessage?.contentPreview ?? '아직 메시지가 없어요',
-    time: formatRelative(room.lastMessage?.sentAt),
+    time: room.lastMessage ? formatChatListTimestamp(room.lastMessage.sentAt) : '',
     unread: room.unreadCount,
     pinned: room.pinned,
     muted: room.muted,
@@ -198,6 +205,7 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
       who: 'system',
       label: '',
       body: message.content ?? '',
+      sentAt: message.sentAt,
     };
   }
 
@@ -207,6 +215,7 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
     unreadCount: message.mine && message.unreadCount ? message.unreadCount : undefined,
     label: message.mine ? '나' : message.sender.displayName,
     body: message.content ?? '삭제된 메시지예요.',
+    sentAt: message.sentAt,
   };
 }
 

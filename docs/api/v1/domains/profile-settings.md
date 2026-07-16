@@ -19,32 +19,40 @@
 `RegisterDto`:
 
 - Required: `nickname`, `email`, `password`, `gender`, `requiredTermsAccepted`
-- Optional: `displayName?: string`, `phone?: string`, `birthDate?: string`, `profileImageUrl?: string`
+- Optional: `realName?: string`, `phone?: string`, `birthDate?: string`, `profileImageUrl?: string`
 - `phone` is stored as 11 digits only. Signup UI may display `010-0000-0000`, but API payload must be digits.
 - `birthDate` is stored as 8 digits `YYYYMMDD`; API rejects invalid calendar dates.
-- `displayName` is saved to `v1_user_profiles.display_name`; blank values fall back to nickname.
+- `realName` is saved to private `v1_user_profiles.real_name`; blank values remain `null` and never fall back to nickname.
+- During the rolling migration, deprecated `displayName` input is accepted only when `realName` is absent and is persisted as `realName`. New clients must send `realName`.
 - `profileImageUrl` is saved to `v1_user_profiles.profile_image_url`. Current signup uses a single selected image preview value because authenticated upload is not available before account creation.
 
 `SocialProfileDto`:
 
 - Required: `nickname`, `gender` (`male` or `female`)
-- Optional fields match `RegisterDto`: `displayName`, `phone`, `birthDate`, `profileImageUrl`
+- Optional API fields match `RegisterDto`: `realName`, `phone`, `birthDate`, `profileImageUrl`. The current Kakao signup UI submits only nickname and gender.
 - `phone` duplicate checks exclude the current pending social user and return `PHONE_CONFLICT` when another account already owns it.
 - `POST /api/v1/auth/social-terms` moves the user to `/signup/social` without creating a profile. `POST /api/v1/auth/social-profile` must save nickname and gender before sport onboarding.
+- Until social profile completion changes the user to `signup_done`, the session remains authenticated but receives `403 SIGNUP_INCOMPLETE` for unrelated site APIs.
 
 `UpdateProfileDto`:
 
-- `displayName: string`, max 40
+- `realName?: string | null`, max 40; optional when saving the profile
+- Deprecated `displayName?: string | null` remains temporarily accepted for rolling-deploy compatibility and is used only when `realName` is absent.
 - `gender: male | female`, required for every profile save
 - `nickname: string`, min 2, max 40
-- `email?: string | null`, max 320. Email/password accounts still require an email. Social-only accounts may omit email, and clients must not force email/password controls when `hasPassword=false`.
+- `email?: string | null`, max 320. Email/password accounts still require an email. Social-only accounts may edit or clear the contact email without changing the Kakao provider key. Any changed email clears `emailVerifiedAt`.
 - `profileImageUrl?: string | null`
 - Authenticated profile edit uploads selected image files through `POST /api/v1/uploads` first and saves the returned root-relative URL. The edit screen must not persist a local `data:` preview as if it were an uploaded profile image.
 - `phone?: string | null`; when present, 11 digits only; duplicate phone returns `PHONE_CONFLICT`
 - `birthDate?: string | null`; when present, 8 digit `YYYYMMDD` and a valid calendar date
 
-Profile edit UI must keep the same duplicate-check behavior as signup for changed `nickname`. Changed `email` requires duplicate check only for accounts with `hasPassword=true`; Kakao-only accounts show provider account information and do not expose password/email account controls.
+Profile edit UI keeps duplicate checks for changed `nickname` and non-empty changed `email`. Kakao-only users may edit or clear email; this does not change the Kakao login identity.
 
+## Creator Profile Gate
+
+`POST /api/v1/matches`, `POST /api/v1/teams`, and `POST /api/v1/team-matches` require a non-blank `realName`, a saved phone number, and `male` or `female` gender. Missing data returns `422 PROFILE_COMPLETION_REQUIRED` with `details.missingFields` and `details.next.route = "/my/profile/edit"`.
+
+Application, invitation, chat, review, inquiry, profile update, and existing-entity management endpoints do not use this gate.
 `UpdateSettingsDto`:
 
 - `notifications?: { matchEnabled?, teamEnabled?, teamMatchEnabled?, chatEnabled?, noticeEnabled?, marketingEnabled? }`
@@ -61,8 +69,8 @@ Profile edit UI must keep the same duplicate-check behavior as signup for change
 `GET /users/:userId/public-profile` response:
 
 - Optional auth. Public-safe profiles are readable from user-facing surfaces such as team member lists and join request lists.
-- Private fields such as email, phone, birth date, gender, and profile bio are never returned.
-- Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`.
+- Private fields such as real name, email, phone, birth date, gender, and profile bio are never returned.
+- Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`; `displayName` is derived from public nickname and never from `realName`.
 - Returned trust field: `reputation.mannerScore`, `reputation.reviewCount`, `reputation.trustState`.
 - Returned public activity summary:
   - `totals.matchCount`: completed match participation count

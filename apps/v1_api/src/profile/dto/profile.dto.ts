@@ -2,9 +2,16 @@ import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches, MaxLen
 import { Type } from 'class-transformer';
 
 export class UpdateProfileDto {
+  @IsOptional()
   @IsString()
   @MaxLength(40)
-  displayName!: string;
+  realName?: string | null;
+
+  /** @deprecated Rolling-deploy compatibility for clients that predate realName. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  displayName?: string | null;
 
   @IsString()
   @MinLength(2)

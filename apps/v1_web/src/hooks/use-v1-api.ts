@@ -193,7 +193,7 @@ export function useV1Register() {
       email: string;
       password: string;
       gender: 'male' | 'female';
-      displayName?: string;
+      realName?: string;
       phone?: string;
       birthDate?: string;
       profileImageUrl?: string;
@@ -210,13 +210,16 @@ export function useV1CompleteSocialProfile() {
     mutationFn: (body: {
       nickname: string;
       gender: 'male' | 'female';
-      displayName?: string;
+      realName?: string;
       phone?: string;
       birthDate?: string;
       profileImageUrl?: string;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/social-profile', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result);
+      return queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
   });
 }
 
@@ -224,7 +227,10 @@ export function useV1CompleteSocialTerms() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { requiredTermsAccepted: boolean }) => v1Post<V1AuthSessionResponse>('/auth/social-terms', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result);
+      return queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
   });
 }
 
@@ -1154,7 +1160,7 @@ export function useV1UpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: {
-      displayName: string;
+      realName?: string | null;
       nickname: string;
       email?: string | null;
       profileImageUrl?: string | null;

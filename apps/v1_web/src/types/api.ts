@@ -1077,6 +1077,7 @@ export type V1Profile = {
   }>;
   profile: {
     displayName: string;
+    realName: string | null;
     nickname?: string | null;
     profileImageUrl: string | null;
     birthDate?: string | null;
@@ -1365,6 +1366,7 @@ export type V1AdminUserRow = {
   nickname: string | null;
   displayName: string | null;
   email: string | null;
+  authProviders: Array<'kakao' | 'naver' | 'email'>;
   gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;

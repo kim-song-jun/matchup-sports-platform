@@ -371,6 +371,7 @@ model V1UserProfile {
   bio             String?
   visibility      String    @default("public")
   displayName     String?   @map("display_name")
+  realName        String?   @map("real_name")
   displayRegion   String?   @map("display_region")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")

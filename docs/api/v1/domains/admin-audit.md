@@ -27,6 +27,10 @@
 
 ## User Detail Contract
 
+`GET /admin/users` rows keep the compatibility `displayName` response field, but resolve it from private `profile.realName` first and legacy `profile.displayName` only as a fallback. `q` searches nickname, real name, legacy display name, and email. Real name is not added to public profile/chat responses.
+
+`GET /admin/users` and `GET /admin/users/:userId` include `authProviders` from active auth identities. Admin UI renders these as `카카오`, `네이버`, or `이메일`; multiple linked providers are shown together.
+
 `GET /admin/users` rows include `ownedTeamCount`, `membershipCount`, and
 `teamRoleCounts: { owner, manager, member }` so the admin list can show team
 leader/member role distribution without opening detail.

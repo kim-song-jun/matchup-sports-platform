@@ -9,6 +9,7 @@ import { Prisma, V1Match, V1MatchApplication, V1MatchParticipant } from '@prisma
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ApproveMatchApplicationDto,
@@ -155,7 +156,7 @@ export class MatchesService {
       participantId: participant.id,
       userId: participant.userId,
       displayName:
-        participant.user.profile?.displayName ?? participant.user.profile?.nickname ?? '참가자',
+        participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참가자',
       role: participant.role,
       status: participant.status === 'active' ? 'confirmed' : participant.status,
     }));
@@ -185,7 +186,7 @@ export class MatchesService {
       host: {
         userId: match.hostUser.id,
         displayName:
-          match.hostUser.profile?.displayName ?? match.hostUser.profile?.nickname ?? '호스트',
+          match.hostUser.profile?.nickname ?? match.hostUser.profile?.displayName ?? '호스트',
         profileImageUrl: match.hostUser.profile?.profileImageUrl ?? null,
         trustState: match.hostUser.reputationSummary?.trustState ?? 'none',
       },
@@ -225,6 +226,7 @@ export class MatchesService {
 
   async create(user: V1AuthUser, dto: MutateMatchDto) {
     this.assertActiveAccount(user);
+    await assertCreatorProfileComplete(this.prisma, user.id);
     const dates = this.validateMatchDates(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
@@ -549,8 +551,7 @@ export class MatchesService {
         applicationId: application.id,
         applicantUserId: application.applicantUserId,
         displayName:
-          application.applicantUser.profile?.displayName ??
-          application.applicantUser.profile?.nickname ??
+          application.applicantUser.profile?.nickname ?? application.applicantUser.profile?.displayName ??
           '신청자',
         profileImageUrl: application.applicantUser.profile?.profileImageUrl ?? null,
         trustState: application.applicantUser.reputationSummary?.trustState ?? 'none',

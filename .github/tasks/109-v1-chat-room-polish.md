@@ -23,7 +23,7 @@ These are not only UI concerns. Correct behavior requires API and persistence ch
 - Hide pre-entry messages from newly joined or rejoined users.
 - Show unread participant count next to messages sent by the current user.
 - Preserve existing active participants' access to existing chat history after migration.
-- Keep the same policy for match, team, and team-match chat rooms.
+- Start team-chat visibility and history at confirmed team-membership activation, without requiring the member to open the room first.
 
 ## Non-Goals
 
@@ -39,14 +39,13 @@ These are not only UI concerns. Correct behavior requires API and persistence ch
 - New participants see only messages sent at or after their entry visibility timestamp.
 - Rejoined participants see only messages sent at or after the rejoin timestamp.
 - Existing active participants keep access to existing chat history through migration backfill.
-- Same policy applies to all v1 chat room types:
-  - `match`
-  - `team`
-  - `team_match`
+- Team chat uses confirmed membership activation as the visibility boundary.
+- Match and team-match chat keep room entry as the visibility boundary.
 
 ### Join System Notice
 
-- A join notice is created when a user actually opens/enters the chat room screen for the first time in an active participation session.
+- For team chat, a join notice is created in the same transaction that activates a new or returning team membership.
+- For match and team-match chat, a join notice is created when the user first opens/enters the room in an active participation session.
 - Notice copy uses profile display name or nickname:
   - `{displayName}님이 들어왔습니다`
 - The notice is visible to the joining user and existing participants.
@@ -81,8 +80,8 @@ visibleFromAt DateTime? @map("visible_from_at")
 
 Use:
 
-- Initial participant creation: set to `null`; first actual room entry sets the timestamp.
-- Rejoin: reset to `null`; first actual room entry after rejoin sets the timestamp.
+- Team participant creation/reactivation: set to the confirmed membership activation time immediately.
+- Match/team-match participant creation: set to `null`; first actual room entry sets the timestamp.
 - Existing active participants during migration: backfill to a historical value that preserves current room history.
 
 ### `v1_chat_messages`
@@ -115,6 +114,12 @@ Implementation detail to verify:
 - The frontend must use `messageType` to render it as system, not as a sender bubble.
 
 ## API Contract Changes
+
+### Team Membership Activation
+
+- Team creation, join-application approval, and invitation acceptance create/reactivate the team-chat participant in the membership transaction.
+- The same transaction claims a null visibility boundary, writes `visibleFromAt`, creates one joined system message, and updates `lastMessageAt`.
+- Existing active memberships may repair a missing/null chat visibility boundary but do not create a duplicate joined notice.
 
 ### `GET /api/v1/chat/rooms/:roomId`
 
@@ -236,9 +241,9 @@ Validation requirement:
 
 ## Acceptance Criteria
 
-- Given a user joins a chat room for the first time,
-  when they open the room,
-  then they see only messages at or after their entry point.
+- Given a user is newly approved into or accepts an invitation to a team,
+  when the membership transaction completes,
+  then the team chat contains one joined notice and starts collecting messages for that user immediately.
 
 - Given an existing participant opens a room after migration,
   when they load messages,
@@ -303,7 +308,12 @@ pnpm qa:v1-db-guardrails
 
 - Added Prisma fields/enums and migration `20260710000000_v1_chat_room_polish`.
 - Backend service now initializes entry visibility, creates joined system messages, filters visible messages, validates read markers, and computes per-message unread counts.
-- Resolve/member sync now creates or reactivates participants with `visibleFromAt = null`; existing active participants are preserved through migration backfill.
+- Match/team-match resolve still creates or reactivates participants with `visibleFromAt = null`; existing active participants are preserved through migration backfill.
+- Team creation, join approval, and invitation acceptance claim `visibleFromAt` and create the joined system notice during membership activation; opening the team chat is no longer required to start receiving its history.
 - Frontend API types, chat model conversion, and chat thread UI now support centered system notices and own-message unread counts.
+- Chat messages now show hour-and-minute timestamps, with a centered month-and-day divider at the first message and each local date boundary.
+- Chat rooms keep the thread pinned to the latest message, isolate message scrolling from the app shell, and keep the mobile composer fixed below the thread without overlap.
+- Chat room list timestamps show only hour and minute for messages from today, and only month and day for older messages.
 - Targeted polish service tests were added in `apps/v1_api/src/chat/chat.service.polish.spec.ts`.
-- Local validation blocker: `pnpm` scripts fail in this workspace because package binaries such as `jest`/`prisma` resolve to unavailable wrappers (`jest`/`prisma` not recognized; `sh` not recognized). `git diff --check` passed.
+- Added idempotent migration `20260716100000_v1_team_chat_membership_backfill` to create missing active-team rooms/participants without historical join notices and to repair null team visibility boundaries from membership activation time.
+- 2026-07-16 merge-readiness validation: API typecheck/build and 512 unit tests pass; Web typecheck, production build, pattern check, and 113 unit tests pass. Local data rehearsal reduced missing active-team chat participants from 8 to 0, repaired all 16 visibility boundaries, preserved the 10 existing system messages, and made a second migration run a no-op.

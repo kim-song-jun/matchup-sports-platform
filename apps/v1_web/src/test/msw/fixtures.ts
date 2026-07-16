@@ -680,6 +680,7 @@ export const v1ProfileFixture: V1Profile = {
   profile: {
     gender: 'male',
     displayName: '송준',
+    realName: '송준',
     profileImageUrl: null,
   },
   reputation: {

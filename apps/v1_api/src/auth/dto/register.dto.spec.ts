@@ -37,7 +37,7 @@ describe('RegisterDto (signup contract)', () => {
       nickname: 'signup-user',
       email: 'profile@example.com',
       password: 'password123',
-      displayName: 'Signup User',
+      realName: 'Signup User',
       phone: '01012345678',
       birthDate: '19950115',
       profileImageUrl: 'data:image/png;base64,profile',
@@ -50,6 +50,18 @@ describe('RegisterDto (signup contract)', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('temporarily accepts deprecated displayName from a pre-realName client', async () => {
+    const dto = plainToInstance(RegisterDto, {
+      nickname: 'legacy-client',
+      email: 'legacy@example.com',
+      password: 'password123',
+      displayName: 'Legacy User',
+      requiredTermsAccepted: true,
+      gender: 'male',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
   it('keeps nickname/email/password/requiredTermsAccepted/gender required', async () => {
     const dto = plainToInstance(RegisterDto, {});
 

@@ -13,7 +13,6 @@ const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
-  nickname: string;
   profileImageUrl: string | null;
 };
 
@@ -31,7 +30,7 @@ export class AuthService {
 
     const email = normalizeEmail(dto.email);
     const nickname = dto.nickname.trim();
-    const displayName = dto.displayName?.trim() || nickname;
+    const realName = dto.realName?.trim() || dto.displayName?.trim() || null;
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
@@ -107,7 +106,7 @@ export class AuthService {
         profile: {
           create: {
             nickname,
-            displayName,
+            realName,
             gender: dto.gender ?? null,
             birthDate,
             profileImageUrl,
@@ -337,7 +336,6 @@ export class AuthService {
           create: {
             currentStep: 'terms',
             draftJson: {
-              kakaoNickname: profile.nickname,
               kakaoProfileImageUrl: profile.profileImageUrl,
             },
           },
@@ -436,7 +434,7 @@ export class AuthService {
 
   async completeSocialProfile(userId: string, dto: SocialProfileDto) {
     const nickname = dto.nickname.trim();
-    const displayName = dto.displayName?.trim() || nickname;
+    const realName = dto.realName?.trim() || dto.displayName?.trim() || null;
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
     const profileImageUrl = dto.profileImageUrl?.trim() || null;
@@ -541,7 +539,7 @@ export class AuthService {
         where: { userId },
         update: {
           nickname,
-          displayName,
+          realName,
           gender: dto.gender,
           birthDate,
           profileImageUrl,
@@ -550,7 +548,7 @@ export class AuthService {
         create: {
           userId,
           nickname,
-          displayName,
+          realName,
           gender: dto.gender,
           birthDate,
           profileImageUrl,
@@ -645,7 +643,7 @@ export class AuthService {
         phoneVerified: Boolean(user.phoneVerifiedAt),
       },
       profile: {
-        displayName: user.profile?.displayName ?? user.profile?.nickname ?? 'Teameet user',
+        displayName: user.profile?.nickname ?? 'Teameet user',
         nickname: user.profile?.nickname ?? null,
         avatarUrl: user.profile?.profileImageUrl ?? null,
         regionSummary: user.profile?.displayRegion ?? user.regions[0]?.region.name ?? null,
@@ -747,15 +745,10 @@ export class AuthService {
       });
     }
 
-    const nickname =
-      userData.kakao_account?.profile?.nickname ??
-      userData.properties?.nickname ??
-      `k_${userData.id}`;
 
     return {
       providerUserKey: String(userData.id),
       email: userData.kakao_account?.email ?? null,
-      nickname,
       profileImageUrl:
         userData.kakao_account?.profile?.profile_image_url ??
         userData.properties?.profile_image ??

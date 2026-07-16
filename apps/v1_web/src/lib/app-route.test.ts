@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { appRoute } from './app-route';
+import { appRoute, browserAppRoute } from './app-route';
 
 const originalBasePath = process.env.NEXT_PUBLIC_BASE_PATH;
 
@@ -36,5 +36,27 @@ describe('appRoute', () => {
     process.env.NEXT_PUBLIC_BASE_PATH = '/v1';
 
     expect(appRoute('/v1/tournaments/t-1/my', '/v1/home')).toBe('/tournaments/t-1/my');
+  });
+});
+
+describe('browserAppRoute', () => {
+  it('adds the configured basePath for hard browser navigation', () => {
+    process.env.NEXT_PUBLIC_BASE_PATH = '/v1';
+
+    expect(browserAppRoute('/terms?mode=social', '/terms')).toBe('/v1/terms?mode=social');
+  });
+
+  it('does not double-prefix an already-prefixed hard navigation route', () => {
+    process.env.NEXT_PUBLIC_BASE_PATH = '/v1';
+
+    expect(browserAppRoute('/v1/terms?mode=social', '/terms')).toBe('/v1/terms?mode=social');
+  });
+
+  it('preserves the /v1 alias when no configured basePath exists', () => {
+    delete process.env.NEXT_PUBLIC_BASE_PATH;
+
+    expect(browserAppRoute('/terms?mode=social', '/v1/terms')).toBe(
+      '/v1/terms?mode=social',
+    );
   });
 });

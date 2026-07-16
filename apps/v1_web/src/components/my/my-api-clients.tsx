@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
@@ -54,7 +54,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import type { MyHomeViewModel, MyInvitationItem, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 
-type ProfileEditErrors = Partial<Record<'displayName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
+type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
   status: 'idle' | 'available' | 'taken' | 'error';
   value: string;
@@ -287,12 +287,17 @@ export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
 
 export function ProfileEditPageClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedReturnTo = searchParams.get('returnTo');
+  const returnTo = requestedReturnTo?.startsWith('/') && !requestedReturnTo.startsWith('//')
+    ? requestedReturnTo
+    : '/my';
   const profile = useV1Profile();
   const update = useV1UpdateProfile();
   const uploadImages = useV1UploadImages();
   const checkEmail = useV1CheckEmail();
   const checkNickname = useV1CheckNickname();
-  const [displayName, setDisplayName] = useState('');
+  const [realName, setRealName] = useState('');
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -307,8 +312,8 @@ export function ProfileEditPageClient() {
 
   useEffect(() => {
     if (!profile.data) return;
-    setDisplayName(profile.data.profile.displayName);
-    setNickname(profile.data.profile.nickname ?? profile.data.profile.displayName);
+    setRealName(profile.data.profile.realName ?? '');
+    setNickname(profile.data.profile.nickname ?? '');
     setEmail(profile.data.email ?? '');
     setPhoneDigits(profile.data.phone ?? '');
     setBirthDateDigits(profile.data.profile.birthDate ?? '');
@@ -319,15 +324,15 @@ export function ProfileEditPageClient() {
     setEmailCheck({ status: 'idle', value: '' });
   }, [profile.data]);
 
-  const originalNickname = profile.data?.profile.nickname ?? profile.data?.profile.displayName ?? '';
+  const originalNickname = profile.data?.profile.nickname ?? '';
   const originalEmail = profile.data?.email ?? '';
-  const canEditEmail = Boolean(profile.data?.hasPassword);
+  const emailRequired = Boolean(profile.data?.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
   const nicknameChanged = normalizedNickname !== originalNickname;
-  const emailChanged = canEditEmail && normalizedEmail !== originalEmail;
+  const emailChanged = normalizedEmail !== originalEmail;
   const nicknameVerified = !nicknameChanged || (nicknameCheck.status === 'available' && nicknameCheck.value === normalizedNickname);
-  const emailVerified = !canEditEmail || !emailChanged || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
+  const emailVerified = !emailChanged || !normalizedEmail || (emailCheck.status === 'available' && emailCheck.value === normalizedEmail);
   const isBlocked = update.isPending || uploadingProfileImage || checkNickname.isPending || checkEmail.isPending || !nicknameVerified || !emailVerified || !gender;
 
   const runNicknameCheck = () => {
@@ -356,11 +361,16 @@ export function ProfileEditPageClient() {
 
   const runEmailCheck = () => {
     setFieldErrors((current) => ({ ...current, email: undefined, form: undefined }));
-    if (!canEditEmail) {
-      return;
-    }
     if (!emailChanged) {
       setEmailCheck({ status: 'available', value: normalizedEmail });
+      return;
+    }
+    if (!normalizedEmail) {
+      if (emailRequired) {
+        setFieldErrors((current) => ({ ...current, email: '이메일을 입력해 주세요.' }));
+      } else {
+        setEmailCheck({ status: 'available', value: '' });
+      }
       return;
     }
     if (!normalizedEmail.includes('@')) {
@@ -421,17 +431,13 @@ export function ProfileEditPageClient() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFieldErrors({});
-    if (!displayName.trim()) {
-      setFieldErrors({ displayName: '이름을 입력해 주세요.' });
-      return;
-    }
 
     if (normalizedNickname.length < 2) {
       setFieldErrors({ nickname: '닉네임은 2자 이상 입력해 주세요.' });
       return;
     }
 
-    if (canEditEmail && !normalizedEmail.includes('@')) {
+    if ((emailRequired && !normalizedEmail) || (normalizedEmail && !normalizedEmail.includes('@'))) {
       setFieldErrors({ email: '이메일 형식을 확인해 주세요.' });
       return;
     }
@@ -463,15 +469,15 @@ export function ProfileEditPageClient() {
 
     try {
       await update.mutateAsync({
-        displayName: displayName.trim(),
+        realName: realName.trim() || null,
         nickname: normalizedNickname,
-        email: canEditEmail ? normalizedEmail : null,
+        email: normalizedEmail || null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
         birthDate: birthDateDigits || null,
         gender,
       });
-      router.replace('/my');
+      router.replace(returnTo);
     } catch (nextError) {
       if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
         const duplicateField = nextError.code === 'NICKNAME_CONFLICT' ? 'nickname' : nextError.code === 'PHONE_CONFLICT' ? 'phone' : 'email';
@@ -501,7 +507,7 @@ export function ProfileEditPageClient() {
         </div>
         <section className="tm-my-profile-head">
           <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-            {profileImageUrl ? null : <span className="tm-text-caption">{initials(normalizedNickname || nickname || displayName)}</span>}
+            {profileImageUrl ? null : <span className="tm-text-caption">{initials(normalizedNickname || nickname || realName)}</span>}
           </div>
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
@@ -522,17 +528,16 @@ export function ProfileEditPageClient() {
           </div>
         </section>
         <label className="tm-create-field">
-          <span className="tm-text-label">이름</span>
+          <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
           <input
-            className={`tm-input ${fieldErrors.displayName ? 'tm-auth-input-error' : ''}`}
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
+            className={`tm-input ${fieldErrors.realName ? 'tm-auth-input-error' : ''}`}
+            value={realName}
+            onChange={(event) => setRealName(event.target.value)}
             maxLength={40}
-            required
-            aria-invalid={fieldErrors.displayName ? true : undefined}
-            aria-describedby={fieldErrors.displayName ? 'profile-displayName-error' : undefined}
+            aria-invalid={fieldErrors.realName ? true : undefined}
+            aria-describedby={fieldErrors.realName ? 'profile-realName-error' : undefined}
           />
-          {fieldErrors.displayName ? <span id="profile-displayName-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.displayName}</span> : null}
+          {fieldErrors.realName ? <span id="profile-realName-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.realName}</span> : null}
         </label>
         <div className="tm-create-field">
           <label className="tm-text-label" htmlFor="v1-profile-nickname">닉네임</label>
@@ -573,18 +578,16 @@ export function ProfileEditPageClient() {
               className={`tm-input ${fieldErrors.email ? 'tm-auth-input-error' : emailVerified && emailChanged ? 'tm-auth-input-success' : ''}`}
               value={email}
               onChange={(event) => {
-                if (!canEditEmail) return;
                 setEmail(event.target.value);
                 setEmailCheck({ status: 'idle', value: '' });
                 setFieldErrors((current) => ({ ...current, email: undefined }));
               }}
               type="email"
-              required={canEditEmail}
-              disabled={!canEditEmail}
+              required={emailRequired}
               aria-invalid={fieldErrors.email ? true : undefined}
               aria-describedby={fieldErrors.email || (emailVerified && emailChanged) ? 'v1-profile-email-helper' : undefined}
             />
-            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={!canEditEmail || checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
+            <button className="tm-btn tm-btn-md tm-btn-neutral" disabled={checkEmail.isPending || !emailChanged || !normalizedEmail.includes('@')} onClick={runEmailCheck} type="button" aria-label="이메일 중복 확인">
               {checkEmail.isPending ? '확인 중' : emailChanged ? '중복 확인' : '변경 없음'}
             </button>
           </span>
@@ -1305,8 +1308,8 @@ function toMyHomeModel(
   activitySummary?: V1MyActivitySummary,
   hasPendingReviews?: boolean,
 ): MyHomeViewModel {
-  const displayName = profile.profile.displayName;
-  const nickname = profile.profile.nickname?.trim() || displayName;
+  const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
+  const displayName = profile.profile.realName?.trim() || nickname;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';

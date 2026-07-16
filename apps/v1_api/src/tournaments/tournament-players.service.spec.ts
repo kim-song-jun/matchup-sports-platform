@@ -105,7 +105,7 @@ function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
     user: {
       phone: '01012345678',
       profile: {
-        displayName: '홍길동',
+        realName: '홍길동',
         birthDate: '1995-03-15',
         gender: 'male',
       },
@@ -352,7 +352,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
-      .mockResolvedValueOnce(teamPlayerMembershipRow({ user: { phone: null, profile: { displayName: '홍길동', birthDate: '1995-03-15' } } }));
+      .mockResolvedValueOnce(teamPlayerMembershipRow({ user: { phone: null, profile: { realName: '홍길동', birthDate: '1995-03-15' } } }));
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.count.mockResolvedValue(2);
 
@@ -372,7 +372,7 @@ describe('TournamentPlayersService', () => {
       .mockResolvedValueOnce(teamPlayerMembershipRow({
         user: {
           phone: '01012345678',
-          profile: { displayName: '홍길동', birthDate: '1995-03-15', gender: null },
+          profile: { realName: '홍길동', birthDate: '1995-03-15', gender: null },
         },
       }));
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());

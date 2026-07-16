@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Calendar, Clock, Eye, Shield, UserRound } from 'lucide-react';
+import { Activity, Calendar, Clock, Eye, LogIn, Shield, UserRound } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminUsers,
@@ -49,6 +49,12 @@ function formatGender(gender: V1AdminUserRow['gender']) {
   if (gender === 'male') return '남';
   if (gender === 'female') return '여';
   return '성별 미등록';
+}
+
+function formatAuthProviders(providers: V1AdminUserRow['authProviders']) {
+  const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
+  const values = providers ?? [];
+  return values.length > 0 ? values.map((provider) => labels[provider]).join(' · ') : '로그인 수단 없음';
 }
 
 function getTeamRoleCounts(row: V1AdminUserRow) {
@@ -236,6 +242,10 @@ function AdminUsersPageContent() {
                 ...(row.adminRole
                   ? [{ icon: <Shield size={14} aria-hidden="true" />, label: '운영자' }]
                   : []),
+                {
+                  icon: <LogIn size={14} aria-hidden="true" />,
+                  label: formatAuthProviders(row.authProviders),
+                },
                 {
                   icon: <Activity size={14} aria-hidden="true" />,
                   label: `매치 ${row.hostedMatchCount} · 생성/소유 ${row.ownedTeamCount}`,

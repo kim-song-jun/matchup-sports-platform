@@ -9,6 +9,7 @@ import { Prisma, V1TeamMatch, V1TeamMatchApplication } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   CancelTeamMatchDto,
@@ -227,6 +228,7 @@ export class TeamMatchesService {
 
   async create(user: V1AuthUser, dto: MutateTeamMatchDto) {
     this.assertActiveAccount(user);
+    await assertCreatorProfileComplete(this.prisma, user.id);
     await this.assertCanManageTeam(user.id, dto.hostTeamId);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const dates = this.validateDates(dto);
@@ -661,8 +663,7 @@ export class TeamMatchesService {
         appliedBy: {
           userId: application.appliedByUser.id,
           displayName:
-            application.appliedByUser.profile?.displayName ??
-            application.appliedByUser.profile?.nickname ??
+            application.appliedByUser.profile?.nickname ?? application.appliedByUser.profile?.displayName ??
             '신청자',
           profileImageUrl: application.appliedByUser.profile?.profileImageUrl ?? null,
         },

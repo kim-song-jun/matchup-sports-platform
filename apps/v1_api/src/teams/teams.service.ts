@@ -15,6 +15,7 @@ import {
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ChangeTeamMembershipRoleDto,
@@ -154,7 +155,7 @@ export class TeamsService {
       },
       owner: {
         userId: team.ownerUser.id,
-        displayName: team.ownerUser.profile?.displayName ?? team.ownerUser.profile?.nickname ?? '팀장',
+        displayName: team.ownerUser.profile?.nickname ?? team.ownerUser.profile?.displayName ?? '팀장',
         profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
       },
       membersVisibilityEnabled: team.membersVisible,
@@ -162,7 +163,7 @@ export class TeamsService {
       membersPreview: canViewMembers ? team.memberships.slice(0, 8).map((membership) => ({
         membershipId: membership.id,
         userId: membership.userId,
-        displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
+        displayName: membership.user.profile?.nickname ?? membership.user.profile?.displayName ?? '멤버',
         role: membership.role,
       })) : [],
       memberCount: team.memberCount,
@@ -196,6 +197,7 @@ export class TeamsService {
 
   async create(user: V1AuthUser, dto: MutateTeamDto) {
     this.assertActiveAccount(user);
+    await assertCreatorProfileComplete(this.prisma, user.id);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -263,7 +265,7 @@ export class TeamsService {
           },
         ],
       });
-      await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, 'team_created_owner_joined');
+      await this.ensureTeamChatParticipant(tx, team.id, user.id, user.id, true, 'team_created_owner_joined');
 
       return { team, membership };
     });
@@ -400,7 +402,7 @@ export class TeamsService {
         user: {
           select: {
             phone: true,
-            profile: { select: { nickname: true, displayName: true, profileImageUrl: true, birthDate: true, gender: true } },
+            profile: { select: { nickname: true, displayName: true, realName: true, profileImageUrl: true, birthDate: true, gender: true } },
           },
         },
       },
@@ -422,8 +424,8 @@ export class TeamsService {
         return {
           membershipId: membership.id,
           userId: membership.userId,
-          displayName: membership.user.profile?.displayName ?? membership.user.profile?.nickname ?? '멤버',
-          realName: viewerIsTeamMember ? membership.user.profile?.displayName ?? null : null,
+          displayName: membership.user.profile?.nickname ?? membership.user.profile?.displayName ?? '멤버',
+          realName: viewerIsTeamMember ? membership.user.profile?.realName ?? null : null,
           phone: viewerIsTeamMember ? membership.user.phone ?? null : null,
           birthDate: viewerIsTeamMember ? membership.user.profile?.birthDate ?? null : null,
           gender: viewerIsTeamMember ? normalizeProfileGender(membership.user.profile?.gender) : null,
@@ -857,8 +859,7 @@ export class TeamsService {
         applicant: {
           userId: application.applicantUser.id,
           displayName:
-            application.applicantUser.profile?.displayName ??
-            application.applicantUser.profile?.nickname ??
+            application.applicantUser.profile?.nickname ?? application.applicantUser.profile?.displayName ??
             '신청자',
           profileImageUrl: application.applicantUser.profile?.profileImageUrl ?? null,
           trustState: application.applicantUser.reputationSummary?.trustState ?? 'none',
@@ -1017,6 +1018,7 @@ export class TeamsService {
         application.teamId,
         application.applicantUserId,
         user.id,
+        !wasActive,
         'team_join_application_approved',
       );
 
@@ -1204,8 +1206,7 @@ export class TeamsService {
         invitedUser: {
           userId: inv.invitedUser.id,
           displayName:
-            inv.invitedUser.profile?.displayName ??
-            inv.invitedUser.profile?.nickname ??
+            inv.invitedUser.profile?.nickname ?? inv.invitedUser.profile?.displayName ??
             '초대된 사용자',
           profileImageUrl: inv.invitedUser.profile?.profileImageUrl ?? null,
         },
@@ -1288,8 +1289,7 @@ export class TeamsService {
         invitedBy: {
           userId: inv.invitedByUser.id,
           displayName:
-            inv.invitedByUser.profile?.displayName ??
-            inv.invitedByUser.profile?.nickname ??
+            inv.invitedByUser.profile?.nickname ?? inv.invitedByUser.profile?.displayName ??
             '팀 관계자',
           profileImageUrl: inv.invitedByUser.profile?.profileImageUrl ?? null,
         },
@@ -1403,6 +1403,7 @@ export class TeamsService {
         invitation.teamId,
         user.id,
         user.id,
+        !wasActive,
         'team_invitation_accepted',
       );
 
@@ -1480,8 +1481,10 @@ export class TeamsService {
     teamId: string,
     userId: string,
     actorUserId: string,
+    announceJoin: boolean,
     reason: string,
   ) {
+    const joinedChatAt = new Date();
     const room = await tx.v1ChatRoom.upsert({
       where: { teamId },
       update: { status: 'active' },
@@ -1502,6 +1505,36 @@ export class TeamsService {
       create: { chatRoomId: room.id, userId, status: 'active', visibleFromAt: null },
       select: { id: true },
     });
+
+    const activated = await tx.v1ChatRoomParticipant.updateMany({
+      where: { id: participant.id, status: 'active', visibleFromAt: null },
+      data: { visibleFromAt: joinedChatAt },
+    });
+    if (activated.count > 0 && announceJoin) {
+      const joinedUser = await tx.v1User.findUnique({
+        where: { id: userId },
+        select: { profile: { select: { displayName: true, nickname: true } } },
+      });
+      const displayName =
+        joinedUser?.profile?.nickname ?? joinedUser?.profile?.displayName ??
+        '참여자';
+      const notice = await tx.v1ChatMessage.create({
+        data: {
+          chatRoomId: room.id,
+          senderUserId: userId,
+          body: `${displayName}님이 들어왔습니다`,
+          status: 'sent',
+          messageType: 'system',
+          systemEventType: 'joined',
+          sentAt: joinedChatAt,
+        },
+        select: { sentAt: true },
+      });
+      await tx.v1ChatRoom.update({
+        where: { id: room.id },
+        data: { lastMessageAt: notice.sentAt },
+      });
+    }
 
     if (!existingParticipant || existingParticipant.status !== 'active') {
       await tx.v1StatusChangeLog.create({

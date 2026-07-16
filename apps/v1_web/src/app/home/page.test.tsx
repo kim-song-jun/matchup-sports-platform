@@ -7,6 +7,7 @@ import HomePage from './page';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 describe('HomePage', () => {

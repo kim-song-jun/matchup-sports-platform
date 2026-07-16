@@ -83,7 +83,7 @@ export class ChatService {
       me: this.toMe(room, user.id),
       participants: room.participants.slice(0, 20).map((participant) => ({
         userId: participant.userId,
-        displayName: participant.user.profile?.displayName ?? participant.user.profile?.nickname ?? '참여자',
+        displayName: participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참여자',
         role: participant.userId === user.id ? 'participant' : 'viewer',
       })),
     };
@@ -123,7 +123,7 @@ export class ChatService {
         messageId: message.id,
         sender: {
           userId: message.senderUser.id,
-          displayName: message.senderUser.profile?.displayName ?? message.senderUser.profile?.nickname ?? '사용자',
+          displayName: message.senderUser.profile?.nickname ?? message.senderUser.profile?.displayName ?? '사용자',
           profileImageUrl: message.senderUser.profile?.profileImageUrl ?? null,
         },
         messageType: message.messageType,
@@ -354,7 +354,7 @@ export class ChatService {
     if (participant.visibleFromAt) return room;
 
     const enteredAt = new Date();
-    const displayName = participant.user.profile?.displayName ?? participant.user.profile?.nickname ?? '참여자';
+    const displayName = participant.user.profile?.nickname ?? participant.user.profile?.displayName ?? '참여자';
     await this.prisma.$transaction(async (tx) => {
       const entered = await tx.v1ChatRoomParticipant.updateMany({
         where: { id: participant.id, visibleFromAt: null },

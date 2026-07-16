@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
 import {
   useV1CancelMatch,
@@ -12,6 +13,7 @@ import {
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { labelToLevelCode } from '@/lib/v1-levels';
+import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
 import type { V1MatchEdit, V1MatchMutationPayload } from '@/types/api';
@@ -27,6 +29,7 @@ type MatchDraft = MatchCreateViewModel['draft'];
 
 export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep, 'edit'> }) {
   const router = useRouter();
+  const { confirm, ConfirmModal } = useConfirm();
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const createMatch = useV1CreateMatch();
@@ -109,12 +112,31 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
           window.localStorage.removeItem(selectionKey);
           router.push(result.detailRoute || `/matches/${result.matchId}`);
         },
-        onError: (err) => setError(err instanceof Error ? err.message : '매치를 만들지 못했어요. 다시 시도해 주세요.'),
+        onError: (err) => {
+          const prompt = getCreatorProfilePrompt(err, '매치');
+          if (prompt) {
+            setError(prompt);
+            void confirm({
+              title: '프로필 정보가 필요해요',
+              message: prompt,
+              confirmLabel: '프로필 수정',
+            }).then((ok) => {
+              if (ok) router.push(profileEditHref('/matches/new/confirm'));
+            });
+            return;
+          }
+          setError(err instanceof Error ? err.message : '매치를 만들지 못했어요. 다시 시도해 주세요.');
+        },
       });
     },
   });
 
-  return <MatchCreatePageView model={model} />;
+  return (
+    <>
+      <MatchCreatePageView model={model} />
+      {ConfirmModal}
+    </>
+  );
 }
 
 export function MatchEditPageClient({ matchId }: { matchId: string }) {

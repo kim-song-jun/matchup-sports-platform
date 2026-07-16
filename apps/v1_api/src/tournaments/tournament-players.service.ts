@@ -155,7 +155,7 @@ export class TournamentPlayersService {
         user: {
           select: {
             phone: true,
-            profile: { select: { displayName: true, birthDate: true, gender: true } },
+            profile: { select: { realName: true, birthDate: true, gender: true } },
           },
         },
       },
@@ -166,7 +166,7 @@ export class TournamentPlayersService {
         message: '해당 팀의 활성 멤버가 아니에요.',
       });
     }
-    const memberRealName = teamMembership.user.profile?.displayName?.trim();
+    const memberRealName = teamMembership.user.profile?.realName?.trim();
     const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
     const memberGender = normalizeGender(teamMembership.user.profile?.gender);
     const memberPhone = teamMembership.user.phone?.trim();

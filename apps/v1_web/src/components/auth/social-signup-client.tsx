@@ -71,7 +71,7 @@ export function SocialSignupClient() {
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
-          router.replace(result.next?.route ?? '/onboarding/sport');
+          router.replace('/signup/complete');
         },
         onError: (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {

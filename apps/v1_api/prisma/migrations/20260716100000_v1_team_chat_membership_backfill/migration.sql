@@ -22,6 +22,22 @@ WHERE team."status" = 'active'
   )
 ON CONFLICT ("team_id") DO NOTHING;
 
+UPDATE "v1_chat_rooms" AS room
+SET
+  "status" = 'active',
+  "updated_at" = CURRENT_TIMESTAMP
+FROM "v1_teams" AS team
+WHERE room."team_id" = team."id"
+  AND team."status" = 'active'
+  AND team."deleted_at" IS NULL
+  AND room."status" <> 'active'
+  AND EXISTS (
+    SELECT 1
+    FROM "v1_team_memberships" AS membership
+    WHERE membership."team_id" = team."id"
+      AND membership."status" = 'active'
+  );
+
 INSERT INTO "v1_chat_room_participants" (
   "id",
   "chat_room_id",
@@ -36,7 +52,7 @@ SELECT
   room."id",
   membership."user_id",
   'active',
-  membership."joined_at",
+  COALESCE(membership."joined_at", membership."created_at"),
   CURRENT_TIMESTAMP,
   CURRENT_TIMESTAMP
 FROM "v1_team_memberships" AS membership
@@ -47,20 +63,12 @@ JOIN "v1_chat_rooms" AS room
 WHERE membership."status" = 'active'
   AND team."status" = 'active'
   AND team."deleted_at" IS NULL
-ON CONFLICT ("chat_room_id", "user_id") DO NOTHING;
-UPDATE "v1_chat_room_participants" AS participant
+ON CONFLICT ("chat_room_id", "user_id") DO UPDATE
 SET
-  "visible_from_at" = membership."joined_at",
-  "updated_at" = CURRENT_TIMESTAMP
-FROM "v1_chat_rooms" AS room
-JOIN "v1_team_memberships" AS membership
-  ON membership."team_id" = room."team_id"
-JOIN "v1_teams" AS team
-  ON team."id" = membership."team_id"
-WHERE participant."chat_room_id" = room."id"
-  AND participant."user_id" = membership."user_id"
-  AND participant."status" = 'active'
-  AND participant."visible_from_at" IS NULL
-  AND membership."status" = 'active'
-  AND team."status" = 'active'
-  AND team."deleted_at" IS NULL;
+  "status" = 'active',
+  "left_at" = NULL,
+  "visible_from_at" = COALESCE(
+    "v1_chat_room_participants"."visible_from_at",
+    EXCLUDED."visible_from_at"
+  ),
+  "updated_at" = CURRENT_TIMESTAMP;

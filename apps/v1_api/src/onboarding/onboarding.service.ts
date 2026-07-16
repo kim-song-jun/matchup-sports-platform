@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1OnboardingStatus } from '@prisma/client';
+import { getPendingSocialSignupRoute } from '../auth/social-signup-access';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingPreferencesDto } from './dto/update-onboarding-preferences.dto';
 import { V1OnboardingStep, derivePreferenceStatus, getMissing, getOnboardingDetail, hasAcceptedRequiredTerms } from './onboarding-summary';
@@ -227,7 +228,7 @@ export class OnboardingService {
   private async assertUserCanMutate(userId: string) {
     const user = await this.prisma.v1User.findUnique({
       where: { id: userId },
-      select: { accountStatus: true },
+      select: { accountStatus: true, onboardingStatus: true },
     });
 
     if (!user) {
@@ -241,6 +242,15 @@ export class OnboardingService {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: 'Account cannot mutate onboarding',
+      });
+    }
+
+    const pendingSignupRoute = getPendingSocialSignupRoute(user.onboardingStatus);
+    if (pendingSignupRoute) {
+      throw new ForbiddenException({
+        code: 'SIGNUP_INCOMPLETE',
+        message: 'Social signup must be completed before onboarding can be changed',
+        details: { next: { route: pendingSignupRoute } },
       });
     }
   }

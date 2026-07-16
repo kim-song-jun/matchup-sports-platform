@@ -54,7 +54,7 @@ export function SignupClient() {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
-  const [displayName, setDisplayName] = useState('');
+  const [realName, setRealName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
@@ -173,9 +173,6 @@ export function SignupClient() {
     if (!accountReady) return;
     setError(null);
     setProfileError(null);
-    if (!displayName.trim()) {
-      setDisplayName(normalizedNickname);
-    }
     setStep('profile');
   };
 
@@ -198,23 +195,11 @@ export function SignupClient() {
       return;
     }
 
-    const missingTournamentFields = [
-      !displayName.trim() ? '이름' : null,
-      !phoneDigits ? '휴대폰 번호' : null,
-      !birthDateDigits ? '생년월일' : null,
-    ].filter(Boolean);
-
-    if (missingTournamentFields.length > 0) {
-      const confirmed = window.confirm(
-        `대회 참여 시 ${missingTournamentFields.join(', ')}은(는) 개인 확인을 위해 꼭 필요해요.\n지금 입력하지 않으면 대회 신청 전에 다시 입력해야 해요. 그래도 가입을 계속할까요?`,
-      );
-      if (!confirmed) return;
-    }
 
     try {
       const result = await register.mutateAsync({
         nickname: normalizedNickname,
-        displayName: displayName.trim() || normalizedNickname,
+        realName: realName.trim() || undefined,
         email: normalizedEmail,
         password,
         gender,
@@ -233,7 +218,7 @@ export function SignupClient() {
         }
 
         await updateProfile.mutateAsync({
-          displayName: displayName.trim() || normalizedNickname,
+          realName: realName.trim() || undefined,
           nickname: normalizedNickname,
           email: normalizedEmail,
           profileImageUrl: uploadedUrl,
@@ -469,7 +454,7 @@ export function SignupClient() {
             <>
               <section className="tm-auth-soft-card" style={{ display: 'grid', gridTemplateColumns: '72px 1fr', gap: 14, alignItems: 'center' }}>
                 <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-                  {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName || normalizedNickname)}</span>}
+                  {profileImageUrl ? null : <span className="tm-text-caption">{initials(realName || normalizedNickname)}</span>}
                 </div>
                 <div>
                   <div className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택</em></div>
@@ -517,10 +502,10 @@ export function SignupClient() {
                 <input
                   className="tm-input tm-auth-input"
                   maxLength={40}
-                  onChange={(event) => setDisplayName(event.target.value)}
+                  onChange={(event) => setRealName(event.target.value)}
                   placeholder="실명 또는 확인 가능한 이름"
                   type="text"
-                  value={displayName}
+                  value={realName}
                 />
               </label>
 

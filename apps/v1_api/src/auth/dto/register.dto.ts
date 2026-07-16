@@ -19,6 +19,12 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   @MaxLength(40)
+  realName?: string;
+
+  /** @deprecated Rolling-deploy compatibility for clients that predate realName. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
   displayName?: string;
 
   @IsOptional()

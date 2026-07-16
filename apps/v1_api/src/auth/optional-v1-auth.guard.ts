@@ -1,10 +1,15 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  getPendingSocialSignupRoute,
+  isPendingSocialSignupRequestAllowed,
+} from './social-signup-access';
 import { V1AuthUser } from './v1-auth-user';
 
 type V1Request = Request & { v1User?: V1AuthUser };
@@ -38,6 +43,18 @@ export class OptionalV1AuthGuard implements CanActivate {
 
     if (['suspended', 'blocked', 'deleted'].includes(user.accountStatus)) {
       return true;
+    }
+
+    const pendingSignupRoute = getPendingSocialSignupRoute(user.onboardingStatus);
+    if (
+      pendingSignupRoute &&
+      !isPendingSocialSignupRequestAllowed(user.onboardingStatus, request.originalUrl ?? request.url)
+    ) {
+      throw new ForbiddenException({
+        code: 'SIGNUP_INCOMPLETE',
+        message: 'Social signup must be completed before accessing this resource',
+        details: { next: { route: pendingSignupRoute } },
+      });
     }
 
     request.v1User = user;

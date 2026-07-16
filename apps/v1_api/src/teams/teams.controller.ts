@@ -3,6 +3,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
 import {
   ChangeTeamMembershipRoleDto,
@@ -38,7 +39,7 @@ export class TeamsController {
   }
 
   @Post('teams')
-  @UseGuards(V1AuthGuard)
+  @UseGuards(V1AuthGuard, CreatorProfileGuard)
   create(@CurrentUser() user: V1AuthUser, @Body() dto: MutateTeamDto) {
     return this.teamsService.create(user, dto);
   }

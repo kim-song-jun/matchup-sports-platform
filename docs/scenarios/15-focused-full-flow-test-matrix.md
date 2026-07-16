@@ -98,7 +98,7 @@ Notes:
 | AUTH-002 | 회원가입 필수값 검증 | `/signup` | `GUEST` | 빈 값, 잘못된 이메일, 짧은 비밀번호, 비밀번호 불일치, 약관 미동의, 입력값 유지 |
 | AUTH-003 | 이메일/닉네임 중복 확인 | `/signup` | `GUEST` | `GET /auth/check-email`, `GET /auth/check-nickname`, 중복 메시지, 수정 후 재검증 |
 | AUTH-004 | 소셜 회원가입 진입 | `/signup/social`, `/callback/kakao` | `GUEST` | Kakao success, denied, missing email, provider denied, account conflict route |
-| AUTH-005 | 소셜 추가 정보 입력 | `/signup/social`, auth error routes | `GUEST` | `POST /auth/social-profile`, `POST /auth/social-terms`, 약관 누락, 닉네임 중복, 완료 후 진입 |
+| AUTH-005 | 소셜 추가 정보 입력 | `/terms?mode=social`, `/signup/social`, `/signup/complete`, auth error routes | 가입 제한 카카오 세션 | `POST /auth/social-terms` 후 프로필 입력, `POST /auth/social-profile` 후 완료 안내, 약관 누락, 닉네임 중복, `signup_done` 전 사이트/API 접근은 `403 SIGNUP_INCOMPLETE`, 비로그인 `401`과 구분 |
 | AUTH-005A | Required gender contract | `/signup`, `/signup/social`, `/my/profile` | `GUEST`, `USER_A` | male/female only, missing selection blocks submit, legacy null prompts selection before save |
 | AUTH-006 | 이메일 로그인 happy path | `/login`, `/login/email`, `/home` | `GUEST` | 정상 로그인, token 저장, `/auth/me`, 홈 진입, 뒤로가기 시 auth 화면 루프 없음 |
 | AUTH-007 | 로그인 실패 처리 | `/login/email` | `GUEST` | 없는 계정, 틀린 비밀번호, blocked user, 네트워크 실패, 성공처럼 이동 금지 |

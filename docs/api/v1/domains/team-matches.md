@@ -40,6 +40,9 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 
 ## State And Permissions
 
+- Creating a team match requires profile `realName`, phone, and gender; missing fields return `422 PROFILE_COMPLETION_REQUIRED`. Application and management endpoints are exempt.
+
+
 - Team match create immediately publishes `recruiting`.
 - Host owner/manager can close recruiting. Closing moves the team match to `closed`, rejects new applications, and marks pending applications `expired`.
 - Host owner/manager can reopen `closed` team matches before `startAt`; expired applications are not auto-restored.

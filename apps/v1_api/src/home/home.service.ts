@@ -85,7 +85,7 @@ export class HomeService {
 
     return {
       authenticated: true,
-      displayName: profile?.displayName ?? profile?.nickname ?? null,
+      displayName: profile?.nickname ?? profile?.displayName ?? null,
       onboardingStatus: user.onboardingStatus,
     };
   }

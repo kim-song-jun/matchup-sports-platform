@@ -54,6 +54,7 @@ postgres_data/
 redis_data/
 
 # Prisma (migrations tracked — required for production deploy)
+v1_before_team_chat_migration.sql
 
 # Capacitor
 apps/web/ios/

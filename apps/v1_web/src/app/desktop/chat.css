@@ -82,25 +82,26 @@
     justify-content: center;
   }
 
-  /* Swipe actions exist only on touch; on desktop, reset the translateX so
-     actions are never visible (no pointer drag on desktop). The underlying
-     pointer events still work but the actions are collapsed out of view. */
+  /* Desktop uses a fixed trailing pin action and never inherits mobile drag state. */
   .tm-chat-row-swipe {
-    /* Reset to a simple flex row — no hidden overflowing action panel on desktop.
-     * The mobile grid layout (grid-template-columns, overflow-hidden translateX) is
-     * superseded by a plain flex container that fills the full row width. */
-    display: flex;
+    /* Replace the mobile swipe track with an exact content + action grid. */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px;
     width: 100%;
+    min-width: 0;
     min-height: 72px;
+    transform: none !important;
   }
 
-  /* Main link area fills the full width (actions hidden on desktop). */
+  /* The room link owns only the remaining width; long titles must shrink here. */
   .tm-chat-row-main {
-    width: 100%;
+    width: auto;
+    min-width: 0;
     min-height: 72px;
+    overflow: hidden;
     border-radius: 14px;
     transition: background-color 0.12s;
-    grid-column: auto;
+    grid-column: 1;
   }
 
   .tm-chat-row-main:hover {
@@ -124,8 +125,42 @@
     border-radius: 18px;
   }
 
-  /* Hide swipe actions on desktop — they are touch-only affordances. */
+  /* Desktop keeps pinning available as an explicit trailing action. */
   .tm-chat-row-actions {
+    display: flex;
+    width: 56px;
+    min-width: 56px;
+    max-width: 56px;
+    flex: 0 0 56px;
+    align-self: stretch;
+    grid-column: 2;
+  }
+
+  .tm-chat-row-action {
+    width: 56px;
+    min-width: 56px;
+    flex: 0 0 56px;
+    padding: 0;
+    border-left: 1px solid var(--grey100);
+    background: var(--bg);
+    color: var(--grey500);
+  }
+
+  .tm-chat-row-action:hover {
+    background: var(--grey50);
+    color: var(--blue600);
+  }
+
+  .tm-chat-row-action-active {
+    color: var(--blue600);
+    background: var(--blue50);
+  }
+
+  .tm-chat-row-action span {
+    display: none;
+  }
+
+  .tm-chat-pinned-badge {
     display: none;
   }
 
@@ -254,5 +289,158 @@
 
   .tm-chat-room-desktop-head {
     max-width: 840px;
+  }
+}
+
+/* Desktop master-detail workspace. Mobile keeps the existing single-pane flow. */
+.tm-chat-mobile-pane,
+.tm-chat-desktop-workspace,
+.tm-chat-desktop-thread-pane {
+  display: contents;
+}
+
+.tm-chat-desktop-list-pane,
+.tm-chat-desktop-unselected {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .tm-chat-mobile-pane {
+    display: none;
+  }
+
+  .tm-chat-desktop-workspace {
+    width: 100%;
+    height: calc(100dvh - 112px);
+    min-height: 560px;
+    display: grid;
+    grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid var(--grey150);
+    border-radius: 16px;
+    background: var(--bg);
+  }
+
+  .tm-chat-desktop-list-pane {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--grey150);
+    background: var(--bg);
+  }
+
+  .tm-chat-desktop-thread-pane {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--grey50);
+  }
+
+  .tm-chat-desktop-pane-head,
+  .tm-chat-room-desktop-head {
+    width: 100%;
+    max-width: none;
+    min-height: 64px;
+    margin: 0;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--grey150);
+    background: var(--bg);
+  }
+
+  .tm-chat-desktop-pane-head h1,
+  .tm-chat-room-desktop-head h1 {
+    margin: 0;
+  }
+
+  .tm-chat-room-desktop-head .tm-desktop-back {
+    display: none;
+  }
+
+  .tm-chat-desktop-list-pane .tm-chat-list {
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding-bottom: 24px;
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+  .tm-chat-desktop-list-pane .tm-chat-list .tm-sport-chip-row {
+    padding: 12px 14px 10px;
+    flex-wrap: wrap;
+  }
+
+  .tm-chat-desktop-list-pane .tm-chat-section-label {
+    padding: 12px 16px 6px;
+  }
+
+  .tm-chat-desktop-list-pane .tm-chat-row {
+    margin: 0;
+    border-radius: 0;
+    border-bottom: 1px solid var(--grey100);
+  }
+
+  .tm-chat-desktop-list-pane .tm-chat-row-main {
+    min-height: 76px;
+    padding: 12px 16px;
+    border-radius: 0;
+  }
+
+  .tm-chat-desktop-list-pane .tm-chat-row-selected .tm-chat-row-main,
+  .tm-chat-desktop-list-pane .tm-chat-row-selected .tm-chat-row-main:hover {
+    background: var(--blue50);
+  }
+
+  .tm-chat-desktop-list-pane .tm-chat-row-selected .tm-chat-row-title {
+    color: var(--blue600);
+  }
+
+  .tm-chat-desktop-thread-pane .tm-chat-room {
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    height: auto;
+    margin: 0;
+    flex: 1 1 auto;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .tm-chat-desktop-thread-pane .tm-chat-thread {
+    padding: 20px 24px;
+  }
+
+  .tm-chat-desktop-thread-pane .tm-chat-inputbar {
+    border-radius: 0;
+  }
+
+  .tm-chat-desktop-unselected {
+    min-height: 100%;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  .tm-chat-desktop-unselected-icon {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 4px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    background: var(--grey100);
+    color: var(--grey500);
   }
 }

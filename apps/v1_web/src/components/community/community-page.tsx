@@ -2,18 +2,17 @@
 
 import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Pin, Send } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BellIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
+import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
-  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
-
   return (
     <AppChrome
       title="채팅"
@@ -22,9 +21,19 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
       backHref="/home"
       showNotifications={false}
     >
-      {/* Desktop column wrapper — display:contents on mobile, block column on desktop */}
-      <div className="tm-chat-desktop-wrap">
-        <div className="tm-chat-list">
+      <div className="tm-chat-mobile-pane">
+        <ChatListContent model={model} />
+      </div>
+      <ChatDesktopWorkspace listModel={model} />
+    </AppChrome>
+  );
+}
+
+function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; selectedRoomId?: string }) {
+  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
+
+  return (
+    <div className="tm-chat-list">
           <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && !hasRooms ? (
@@ -47,24 +56,43 @@ export function ChatListPageView({ model }: { model: ChatListViewModel }) {
                   pinnedRooms.length === 0이면 빈 "고정 0" 헤더가 불필요하게 렌더되므로 가드. */}
               {model.pinnedRooms.length > 0 ? (
                 <ChatSection title={`고정 ${model.pinnedRooms.length}`}>
-                  {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
+                  {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
                 </ChatSection>
               ) : null}
               <ChatSection title={`채팅방 ${model.rooms.length}`}>
-                {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} />)}
+                {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
               </ChatSection>
             </>
           ) : null}
-        </div>
-      </div>
-    </AppChrome>
+    </div>
   );
 }
 
-export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
+export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoomViewModel; listModel: ChatListViewModel; roomId: string }) {
   /* [P2 마이크로인터랙션] 전송 완료 순간 체크 애니메이션 — sending true→false 전환 감지 */
   const prevSendingRef = useRef(model.sending);
+  const threadRef = useRef<HTMLDivElement>(null);
   const [justSent, setJustSent] = useState(false);
+  const lastMessageId = model.messages.at(-1)?.id;
+
+  useLayoutEffect(() => {
+    const thread = threadRef.current;
+    if (!thread) return;
+    thread.scrollTop = thread.scrollHeight;
+  }, [lastMessageId, model.messages.length, model.status]);
+
+  useEffect(() => {
+    const thread = threadRef.current;
+    if (!thread || typeof ResizeObserver === 'undefined') return undefined;
+
+    const keepAtBottom = () => {
+      thread.scrollTop = thread.scrollHeight;
+    };
+    const observer = new ResizeObserver(keepAtBottom);
+    observer.observe(thread);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     if (prevSendingRef.current && !model.sending && !model.sendError) {
       setJustSent(true);
@@ -77,6 +105,14 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
 
   return (
     <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/chat" showNotifications={false}>
+      <div className="tm-chat-desktop-workspace">
+        <aside className="tm-chat-desktop-list-pane" aria-label="채팅방 목록">
+          <div className="tm-chat-desktop-pane-head">
+            <h1 className="tm-text-heading">채팅</h1>
+          </div>
+          <ChatListContent model={listModel} selectedRoomId={roomId} />
+        </aside>
+        <section className="tm-chat-desktop-thread-pane" aria-label={`${model.title} 채팅방`}>
       {/*
        * Desktop page head: back link + room title.
        * The mobile .tm-topbar (rendered inside AppChrome) is hidden on desktop,
@@ -100,7 +136,7 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
             <ChevronRightIcon size={18} stroke="var(--text-caption)" />
           </Link>
         </div>
-        <div className="tm-chat-thread">
+        <div ref={threadRef} className="tm-chat-thread">
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && model.messages.length === 0 ? (
             <ErrorState
@@ -114,7 +150,40 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
           ) : null}
-          {model.messages.map((message) => <div key={message.id} className={`tm-chat-bubble tm-chat-bubble-${message.who}`}><div className="tm-text-micro">{message.label}</div><div className="tm-text-body">{message.body}</div></div>)}
+          {model.messages.map((message, index) => {
+            const showDate = shouldShowChatDate(message.sentAt, model.messages[index - 1]?.sentAt);
+            const dateLabel = showDate ? formatChatDate(message.sentAt) : '';
+            const timeLabel = formatChatTime(message.sentAt);
+
+            return (
+              <Fragment key={message.id}>
+                {dateLabel ? (
+                  <div className="tm-chat-date-divider" role="separator" aria-label={dateLabel}>
+                    <span>{dateLabel}</span>
+                  </div>
+                ) : null}
+                {message.who === 'system' ? (
+                  <div className="tm-chat-system-message">
+                    <span>{message.body}</span>
+                  </div>
+                ) : (
+                  <div className={`tm-chat-message-row tm-chat-message-row-${message.who}`}>
+                    {message.who === 'me' ? (
+                      <div className="tm-chat-message-meta">
+                        {message.unreadCount ? <span className="tm-chat-read-count">{message.unreadCount}</span> : null}
+                        {timeLabel ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
+                      </div>
+                    ) : null}
+                    <div className={`tm-chat-bubble tm-chat-bubble-${message.who}`}>
+                      <div className="tm-text-micro">{message.label}</div>
+                      <div className="tm-text-body">{message.body}</div>
+                    </div>
+                    {message.who === 'other' && timeLabel ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
+                  </div>
+                )}
+              </Fragment>
+            );
+          })}
         </div>
         {model.sendError ? <div className="tm-text-caption" role="status" style={{ textAlign: 'center', color: 'var(--orange500)', padding: '4px 16px' }}>메시지를 전송하지 못했어요. 다시 시도해 주세요.</div> : null}
         {/* 이미지 첨부는 미구현 상태 — aria-label로 준비 중 안내, title 중복 제거 */}
@@ -138,7 +207,29 @@ export function ChatRoomPageView({ model }: { model: ChatRoomViewModel }) {
           </button>
         </div>
       </div>
+        </section>
+      </div>
     </AppChrome>
+  );
+}
+
+function ChatDesktopWorkspace({ listModel }: { listModel: ChatListViewModel }) {
+  return (
+    <div className="tm-chat-desktop-workspace">
+      <aside className="tm-chat-desktop-list-pane" aria-label="채팅방 목록">
+        <div className="tm-chat-desktop-pane-head">
+          <h1 className="tm-text-heading">채팅</h1>
+        </div>
+        <ChatListContent model={listModel} />
+      </aside>
+      <section className="tm-chat-desktop-thread-pane" aria-label="선택한 채팅방">
+        <div className="tm-chat-desktop-unselected">
+          <div className="tm-chat-desktop-unselected-icon"><ChatIcon size={24} strokeWidth={2} /></div>
+          <div className="tm-text-body-lg">채팅방을 선택해 주세요</div>
+          <div className="tm-text-caption">왼쪽 목록에서 대화를 선택하면 메시지를 확인할 수 있어요.</div>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -239,7 +330,7 @@ function ChatSection({ title, children }: { title: string; children: ReactNode }
 }
 
 
-function ChatRoomRow({ room }: { room: ChatRoomModel }) {
+function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const startXRef = useRef(0);
@@ -249,7 +340,8 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
   const actionWidth = 72;
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('button')) return;
+    if (window.matchMedia('(min-width: 1024px)').matches) return;
+    if ((event.target as HTMLElement).closest('button') && !isOpen) return;
     startXRef.current = event.clientX;
     draggingRef.current = true;
     movedRef.current = false;
@@ -289,10 +381,22 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
     movedRef.current = false;
   };
 
+  const handleTogglePin = (event: MouseEvent<HTMLButtonElement>) => {
+    if (movedRef.current) {
+      event.preventDefault();
+      movedRef.current = false;
+      return;
+    }
+    setIsOpen(false);
+    setDragOffset(0);
+    dragOffsetRef.current = 0;
+    room.onTogglePin?.();
+  };
+
   const offset = draggingRef.current ? dragOffset : isOpen ? -actionWidth : 0;
 
   return (
-    <div className={`tm-chat-row ${room.unread ? 'tm-chat-row-unread' : ''}`}>
+    <div className={`tm-chat-row ${room.unread ? 'tm-chat-row-unread' : ''} ${selected ? 'tm-chat-row-selected' : ''}`}>
       <div
         className="tm-chat-row-swipe"
         style={{
@@ -304,10 +408,10 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
       >
-        <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick}>
+        <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick} aria-current={selected ? 'page' : undefined}>
           <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: cssUrl(room.avatarUrl) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue">고정</span> : null}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}</div>
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>
               <span className="tm-chat-room-type">{room.type}</span>
               <span className={`tm-chat-last-message ${room.unread > 0 ? 'tm-chat-last-message-unread' : ''}`}>{room.last}</span>
@@ -322,7 +426,17 @@ function ChatRoomRow({ room }: { room: ChatRoomModel }) {
           </div>
         </Link>
         <div className="tm-chat-row-actions" aria-label={`${room.title} 채팅방 작업`}>
-          <button className="tm-chat-row-action" type="button" disabled={room.actionPending} onClick={room.onTogglePin}><Pin size={18} strokeWidth={2.1} /><span>{room.pinned ? '고정 해제' : '고정'}</span></button>
+          <button
+            className={`tm-chat-row-action ${room.pinned ? 'tm-chat-row-action-active' : ''}`}
+            type="button"
+            aria-label={room.pinned ? `${room.title} 고정 해제` : `${room.title} 고정`}
+            title={room.pinned ? '고정 해제' : '고정'}
+            disabled={room.actionPending}
+            onClick={handleTogglePin}
+          >
+            <Pin size={18} strokeWidth={2.1} />
+            <span>{room.pinned ? '고정 해제' : '고정'}</span>
+          </button>
           {/*
             앱 알림 등록 전까지 채팅방별 알림 설정은 숨긴다.
             앱 푸시 연동 후 BellOff import와 onToggleMute 버튼을 복구한다.

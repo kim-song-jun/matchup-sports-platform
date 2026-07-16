@@ -42,18 +42,11 @@ Onboarding complete requires the user to have enough sport/level preference data
 
 Email signup must accept required terms before `POST /api/v1/auth/register` creates the account. A successful email signup creates `v1_user_profiles`, sets `onboardingStatus = signup_done`, and sends the client through the signup complete screen before sport onboarding.
 
-Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key is needed first. A new Kakao user is created as `onboardingStatus = social_terms_required` without a profile. If the user leaves here, admin surfaces should treat the row as `가입 진행 중 · 약관 미동의`.
+Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key is needed first. Teameet does not derive, parse, or persist a service nickname from the Kakao provider nickname, and never synthesizes a `k_{providerUserKey}` nickname. A new Kakao user is created as `onboardingStatus = social_terms_required` without a profile. If the user leaves here, admin surfaces should treat the row as `가입 진행 중 · 약관 미동의`.
 
-When `POST /api/v1/auth/social-terms` succeeds, the API now creates a default profile immediately:
+When `POST /api/v1/auth/social-terms` succeeds, the API records required terms consent, sets `onboardingStatus = social_profile_required`, and returns `/signup/social`. The user must then submit a unique nickname and `male` or `female` gender through `POST /api/v1/auth/social-profile`. During rolling deployment, deprecated `displayName` request input remains accepted only as a fallback when `realName` is absent; new clients send `realName`. A successful profile submission creates `v1_user_profiles`, sets `onboardingStatus = signup_done` and `currentStep = sport`, and the frontend shows `/signup/complete` before sport onboarding.
 
-- Uses the Kakao nickname from onboarding draft when available.
-- Falls back to a `k_...` ID-derived nickname when Kakao does not provide a nickname.
-- Keeps the automatically created social nickname within 14 characters, including duplicate suffixes such as `_1`.
-- Resolves nickname conflicts server-side.
-- Stores the Kakao profile image when available.
-- Sets `onboardingStatus = signup_done` and `currentStep = sport`.
-
-`POST /api/v1/auth/social-profile` remains available for compatibility with older incomplete social signup states, but the current Kakao happy path no longer requires a separate profile form.
+`social_terms_required` and `social_profile_required` are authenticated-but-restricted states. They are not guest sessions. The web gate always resumes the exact required route, and API guards reject unrelated protected or optional-auth requests with `403 SIGNUP_INCOMPLETE` and `details.next.route`. The only common authenticated exceptions are `GET /auth/me` and `POST /auth/logout`; each pending state additionally allows only its own completion endpoint.
 
 `GET /api/v1/auth/me` includes account login metadata under `user`: `authProvider`, `authProviders`, and `hasPassword`. Clients must use `hasPassword` to decide whether email/password account controls are applicable.
 

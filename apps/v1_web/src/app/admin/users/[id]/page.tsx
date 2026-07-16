@@ -47,6 +47,12 @@ function formatGender(gender: V1AdminUserDetail['gender']) {
 }
 
 
+function formatAuthProviders(providers: V1AdminUserDetail['authProviders']) {
+  const labels = { kakao: '카카오', naver: '네이버', email: '이메일' } as const;
+  const values = providers ?? [];
+  return values.length > 0 ? values.map((provider) => labels[provider]).join(' · ') : '로그인 수단 없음';
+}
+
 function userTitle(user: V1AdminUserDetail) {
   return user.nickname ?? user.displayName ?? user.email ?? user.userId.slice(0, 8);
 }
@@ -173,6 +179,7 @@ export default function AdminUserDetailPage() {
               <DetailRow label="이름" value={user.displayName} />
               <DetailRow label="닉네임" value={user.nickname} />
               <DetailRow label="성별" value={formatGender(user.gender)} />
+<DetailRow label="로그인 방식" value={formatAuthProviders(user.authProviders)} />
               <DetailRow label="온보딩" value={user.onboardingStatus} />
               <DetailRow label="가입일" value={formatDateTime(user.createdAt)} />
               <DetailRow label="최근 로그인" value={formatDateTime(user.lastLoginAt)} />

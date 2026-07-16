@@ -506,12 +506,24 @@ async function seedUsers() {
     select: { id: true },
   });
 
-  for (const [email, nickname] of users) {
+  for (const [index, [email, nickname]] of users.entries()) {
+    const phone = `0109${String(index + 1).padStart(7, '0')}`;
     const user = await prisma.v1User.upsert({
       where: { email },
-      update: { accountStatus: 'active', onboardingStatus: 'completed' },
+      update: {
+        phone,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+        profile: {
+          upsert: {
+            update: { nickname, realName: nickname, gender: 'male', visibility: 'public' },
+            create: { nickname, realName: nickname, gender: 'male', visibility: 'public' },
+          },
+        },
+      },
       create: {
         email,
+        phone,
         accountStatus: 'active',
         onboardingStatus: 'completed',
         authIdentities: {
@@ -525,8 +537,9 @@ async function seedUsers() {
         profile: {
           create: {
             nickname,
+            realName: nickname,
+            gender: 'male',
             visibility: 'public',
-            displayName: nickname,
           },
         },
         onboardingProgress: {
@@ -1492,6 +1505,7 @@ async function upsertCoverageUser(input: {
   id: string;
   email: string;
   nickname: string;
+  phone: string;
   accountStatus?: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus?:
     | 'not_started'
@@ -1509,10 +1523,11 @@ async function upsertCoverageUser(input: {
   const deletedAt = accountStatus === 'deleted' ? seedNow : null;
   const user = await prisma.v1User.upsert({
     where: { email: input.email },
-    update: { accountStatus, onboardingStatus, deletedAt },
+    update: { phone: input.phone, accountStatus, onboardingStatus, deletedAt },
     create: {
       id: input.id,
       email: input.email,
+      phone: input.phone,
       accountStatus,
       onboardingStatus,
       deletedAt,
@@ -1523,14 +1538,16 @@ async function upsertCoverageUser(input: {
     where: { userId: user.id },
     update: {
       nickname: input.nickname,
-      displayName: input.nickname,
+      realName: input.nickname,
+      gender: 'male',
       visibility: accountStatus === 'deleted' ? 'private' : 'public',
       deletedAt,
     },
     create: {
       userId: user.id,
       nickname: input.nickname,
-      displayName: input.nickname,
+      realName: input.nickname,
+      gender: 'male',
       visibility: accountStatus === 'deleted' ? 'private' : 'public',
       deletedAt,
     },
@@ -1616,8 +1633,16 @@ async function seedCoverageUsers() {
     ['00000000-0000-4000-8000-000000001020', 'coverage-extra-h@teameet.v1', '추가H커버', 'active', 'completed', 'sample'],
   ] as const;
 
-  for (const [id, email, nickname, accountStatus, onboardingStatus, trustState] of coverageUsers) {
-    const user = await upsertCoverageUser({ id, email, nickname, accountStatus, onboardingStatus, trustState });
+  for (const [index, [id, email, nickname, accountStatus, onboardingStatus, trustState]] of coverageUsers.entries()) {
+    const user = await upsertCoverageUser({
+      id,
+      email,
+      nickname,
+      phone: `0108${String(index + 1).padStart(7, '0')}`,
+      accountStatus,
+      onboardingStatus,
+      trustState,
+    });
     result[email] = user.id;
   }
 

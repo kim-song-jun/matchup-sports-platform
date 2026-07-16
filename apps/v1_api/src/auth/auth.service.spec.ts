@@ -446,7 +446,11 @@ describe('AuthService', () => {
     expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 'user-1' },
-        create: expect.objectContaining({ nickname: '소셜유저', gender: 'female' }),
+        create: expect.objectContaining({
+          nickname: '소셜유저',
+          realName: '소셜 유저',
+          gender: 'female',
+        }),
       }),
     );
   });

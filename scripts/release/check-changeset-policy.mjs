@@ -55,13 +55,13 @@ try {
     .filter(Boolean);
   const releaseFiles = changedFiles.filter(affectsRelease);
   if (releaseFiles.length > 0) {
+    const contract = assertReleaseChangeset(repo);
     const changedChangesets = changedFiles.filter(
       (path) => /^\.changeset\/[^/]+\.md$/.test(path) && path !== '.changeset/README.md',
     );
     if (changedChangesets.length === 0) {
       throw new Error('This behavior-affecting change must include its own .changeset/*.md file');
     }
-    const contract = assertReleaseChangeset(repo);
     process.stdout.write(
       `Release changeset accepted (${contract.bump}): ${releaseFiles.length} behavior file(s), ${changedChangesets.length} changed Changeset(s)\n`,
     );

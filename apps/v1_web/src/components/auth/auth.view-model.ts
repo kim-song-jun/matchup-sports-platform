@@ -145,14 +145,6 @@ export function getTermsViewModel(): TermsViewModel {
         checked: true,
         detail: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
       },
-      {
-        title: '위치기반서비스 이용 동의',
-        meta: '선택 · 주변 매치 추천에 사용',
-        required: false,
-        checked: false,
-        locationBased: true,
-        detail: '',
-      },
     ],
     primary: { label: '동의하고 회원가입하기', href: '/signup' },
   };

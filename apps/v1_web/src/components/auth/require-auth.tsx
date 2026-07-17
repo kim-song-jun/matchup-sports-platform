@@ -4,7 +4,12 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { clearStoredV1Session, getCurrentRedirectPath, getLoginPathForRedirect, hasStoredV1Session } from '@/lib/session-storage';
+import {
+  clearStoredV1Session,
+  getCurrentRedirectPath,
+  getLoginPathForRedirect,
+  shouldProbeV1Session,
+} from '@/lib/session-storage';
 import { SessionFallback } from './session-entry-gate';
 
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -13,7 +18,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const authMe = useV1AuthMe({ enabled: hasSessionHint === true, retry: false });
 
   useEffect(() => {
-    const nextHasSessionHint = hasStoredV1Session();
+    const nextHasSessionHint = shouldProbeV1Session();
     setHasSessionHint(nextHasSessionHint);
     if (!nextHasSessionHint) {
       router.replace(getLoginPathForRedirect(getCurrentRedirectPath()));

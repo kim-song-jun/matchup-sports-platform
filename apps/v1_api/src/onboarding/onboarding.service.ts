@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -227,7 +228,7 @@ export class OnboardingService {
   private async assertUserCanMutate(userId: string) {
     const user = await this.prisma.v1User.findUnique({
       where: { id: userId },
-      select: { accountStatus: true },
+      select: { accountStatus: true, onboardingStatus: true },
     });
 
     if (!user) {
@@ -242,6 +243,26 @@ export class OnboardingService {
         code: 'PERMISSION_DENIED',
         message: 'Account cannot mutate onboarding',
       });
+    }
+
+    switch (user.onboardingStatus) {
+      case 'social_terms_required':
+        throw onboardingStepRequired('/terms?mode=social');
+      case 'social_profile_required':
+        throw onboardingStepRequired('/signup/social');
+      case 'not_started':
+      case 'terms_done':
+      case 'signup_done':
+      case 'sport_done':
+      case 'level_done':
+      case 'region_done':
+      case 'completed':
+      case 'deferred':
+        return;
+      default: {
+        const exhaustiveStatus: never = user.onboardingStatus;
+        return exhaustiveStatus;
+      }
     }
   }
 
@@ -346,5 +367,13 @@ function validationError(message: string, field: string) {
     code: 'VALIDATION_FAILED',
     message,
     details: { field },
+  });
+}
+
+function onboardingStepRequired(requiredRoute: '/terms?mode=social' | '/signup/social') {
+  return new ConflictException({
+    code: 'ONBOARDING_STEP_REQUIRED',
+    message: 'Complete the required signup step before continuing onboarding',
+    details: { requiredRoute },
   });
 }

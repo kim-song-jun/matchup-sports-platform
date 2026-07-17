@@ -1,6 +1,7 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
@@ -17,20 +18,29 @@ import { V1ApiError } from '@/lib/api-client';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { readSignupTermsAccepted } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
+import {
+  formatBirthDate,
+  formatPhone,
+  getSignupProfileIssue,
+  isCompleteSignupProfile,
+  normalizeSeparatedDigits,
+  normalizeSignupDisplayName,
+  SIGNUP_PROFILE_ERROR_MESSAGES,
+} from './signup-profile-validation';
 
 type WizardStep = 'account' | 'profile';
 type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
 
 const STEP_ORDER: WizardStep[] = ['account', 'profile'];
 
-const STEP_COPY: Record<WizardStep, { title: string; sub: string }> = {
+const STEP_COPY: Record<WizardStep, { title: string; sub: ReactNode }> = {
   account: {
     title: '가입 정보를\n확인해 주세요',
     sub: '닉네임과 이메일은 먼저 중복 확인이 필요해요. 비밀번호까지 입력하면 프로필 단계로 넘어가요.',
   },
   profile: {
     title: '프로필을\n완성해 주세요',
-    sub: '대회 참여 시 이름, 휴대폰 번호, 생년월일은 본인 확인에 필요해요.',
+    sub: <>대회 참여 시 이름, 휴대폰 번호, 생년월일은 <span style={{ whiteSpace: 'nowrap' }}>본인 확인에 필요해요.</span></>,
   },
 };
 
@@ -82,7 +92,9 @@ export function SignupClient() {
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
   const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
-  const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || !gender;
+  const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
+  const profileIssue = getSignupProfileIssue(profileDraft);
+  const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || profileIssue !== null;
 
   const runNicknameCheck = () => {
     setNicknameError(null);
@@ -174,9 +186,6 @@ export function SignupClient() {
     if (!accountReady) return;
     setError(null);
     setProfileError(null);
-    if (!displayName.trim()) {
-      setDisplayName(normalizedNickname);
-    }
     setStep('profile');
   };
 
@@ -187,44 +196,21 @@ export function SignupClient() {
     if (profileBlocked) return;
     setError(null);
     setProfileError(null);
-    if (!gender) {
-      setProfileError('성별을 선택해 주세요.');
+    if (!isCompleteSignupProfile(profileDraft)) {
+      const nextProfileIssue = getSignupProfileIssue(profileDraft);
+      if (nextProfileIssue) setProfileError(SIGNUP_PROFILE_ERROR_MESSAGES[nextProfileIssue]);
       return;
-    }
-
-
-    if (phoneDigits && phoneDigits.length !== 11) {
-      setProfileError('휴대폰 번호는 숫자 11자리로 입력해 주세요.');
-      return;
-    }
-
-    if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
-      setProfileError('생년월일은 올바른 날짜로 입력해 주세요. 예: 1995-01-15');
-      return;
-    }
-
-    const missingTournamentFields = [
-      !displayName.trim() ? '이름' : null,
-      !phoneDigits ? '휴대폰 번호' : null,
-      !birthDateDigits ? '생년월일' : null,
-    ].filter(Boolean);
-
-    if (missingTournamentFields.length > 0) {
-      const confirmed = window.confirm(
-        `대회 참여 시 ${missingTournamentFields.join(', ')}은(는) 개인 확인을 위해 꼭 필요해요.\n지금 입력하지 않으면 대회 신청 전에 다시 입력해야 해요. 그래도 가입을 계속할까요?`,
-      );
-      if (!confirmed) return;
     }
 
     try {
       const result = await register.mutateAsync({
         nickname: normalizedNickname,
-        displayName: displayName.trim() || normalizedNickname,
+        displayName: normalizeSignupDisplayName(profileDraft.displayName),
         email: normalizedEmail,
         password,
-        gender,
-        phone: phoneDigits || undefined,
-        birthDate: birthDateDigits || undefined,
+        gender: profileDraft.gender,
+        phone: profileDraft.phone,
+        birthDate: profileDraft.birthDate,
         requiredTermsAccepted,
       });
 
@@ -238,13 +224,13 @@ export function SignupClient() {
         }
 
         await updateProfile.mutateAsync({
-          displayName: displayName.trim() || normalizedNickname,
+          displayName: normalizeSignupDisplayName(profileDraft.displayName),
           nickname: normalizedNickname,
           email: normalizedEmail,
           profileImageUrl: uploadedUrl,
-          phone: phoneDigits || null,
-          birthDate: birthDateDigits || null,
-          gender,
+          phone: profileDraft.phone,
+          birthDate: profileDraft.birthDate,
+          gender: profileDraft.gender,
         });
       }
 
@@ -300,8 +286,8 @@ export function SignupClient() {
           : !passwordLongEnough
             ? '비밀번호는 8자 이상이어야 해요.'
             : '비밀번호 확인이 일치해야 해요.'
-      : !gender
-        ? '성별을 선택해 주세요.'
+      : profileIssue
+        ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue]
         : uploadingProfileImage
         ? '프로필 사진을 업로드하는 중이에요.'
         : null
@@ -526,37 +512,39 @@ export function SignupClient() {
                 </div>
               </div>
               <label className="tm-auth-field">
-                <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
+                <span className="tm-text-label">이름</span>
                 <input
                   className="tm-input tm-auth-input"
                   maxLength={40}
-                  onChange={(event) => setDisplayName(event.target.value)}
+                  onChange={(event) => { setDisplayName(event.target.value); setProfileError(null); }}
                   placeholder="실명 또는 확인 가능한 이름"
+                  required
                   type="text"
                   value={displayName}
                 />
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">휴대폰 번호 <em className="tm-auth-optional">(선택)</em></span>
+                <span className="tm-text-label">휴대폰 번호</span>
                 <input
                   className="tm-input tm-auth-input"
                   inputMode="numeric"
-                  maxLength={13}
-                  onChange={(event) => setPhoneDigits(toDigits(event.target.value, 11))}
+                  onChange={(event) => { setPhoneDigits(normalizeSeparatedDigits(event.target.value)); setProfileError(null); }}
                   placeholder="010-0000-0000"
+                  required
                   value={formatPhone(phoneDigits)}
                 />
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">생년월일 <em className="tm-auth-optional">(선택)</em></span>
+                <span className="tm-text-label">생년월일</span>
                 <DatePickerTextInput
                   dateValue={formatBirthDate(birthDateDigits)}
                   inputClassName="tm-auth-input"
-                  onDateChange={(value) => setBirthDateDigits(toDigits(value, 8))}
-                  onTextChange={(value) => setBirthDateDigits(toDigits(value, 8))}
+                  onDateChange={(value) => { setBirthDateDigits(normalizeSeparatedDigits(value)); setProfileError(null); }}
+                  onTextChange={(value) => { setBirthDateDigits(normalizeSeparatedDigits(value)); setProfileError(null); }}
                   placeholder="예: 1995-01-15"
+                  required
                   value={formatBirthDate(birthDateDigits)}
                 />
               </label>
@@ -581,32 +569,6 @@ export function SignupClient() {
       </div>
     </AuthFrame>
   );
-}
-
-function toDigits(value: string, maxLength: number) {
-  return value.replace(/\D/g, '').slice(0, maxLength);
-}
-
-function formatPhone(value: string) {
-  if (value.length <= 3) return value;
-  if (value.length <= 7) return `${value.slice(0, 3)}-${value.slice(3)}`;
-  return `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7)}`;
-}
-
-function formatBirthDate(value: string) {
-  if (value.length <= 4) return value;
-  if (value.length <= 6) return `${value.slice(0, 4)}-${value.slice(4)}`;
-  return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}`;
-}
-
-function isValidBirthDateDigits(value: string) {
-  if (value.length !== 8) return false;
-  const year = Number(value.slice(0, 4));
-  const month = Number(value.slice(4, 6));
-  const day = Number(value.slice(6, 8));
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 function initials(value: string) {

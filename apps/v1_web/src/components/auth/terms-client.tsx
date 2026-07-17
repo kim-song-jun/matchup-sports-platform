@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Button } from '@/components/v1-ui/button';
@@ -38,12 +39,8 @@ export function TermsClient() {
     }));
   };
 
-  const toggleAgreement = (title: string, nextChecked: boolean, locationBased?: boolean) => {
+  const toggleAgreement = (title: string, nextChecked: boolean) => {
     setCheckedByTitle((current) => ({ ...current, [title]: nextChecked }));
-
-    if (locationBased && nextChecked) {
-      setOpenByTitle((current) => ({ ...current, [title]: true }));
-    }
   };
 
   useEffect(() => {
@@ -75,7 +72,7 @@ export function TermsClient() {
       socialTerms.mutate(
         { requiredTermsAccepted: true },
         {
-          onSuccess: () => router.push('/signup/complete'),
+          onSuccess: (result) => router.push(result.next.route),
           onError: (nextError) => {
             if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
               setError('가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.');
@@ -163,14 +160,14 @@ export function TermsClient() {
                   <button
                     aria-pressed={checked}
                     className="tm-auth-check-button tm-pressable"
-                    onClick={() => toggleAgreement(item.title, !checked, item.locationBased)}
+                    onClick={() => toggleAgreement(item.title, !checked)}
                     type="button"
                   >
                     <TermsCheck checked={checked} />
                   </button>
                   <button
                     className="tm-auth-agreement-main tm-pressable"
-                    onClick={() => toggleAgreement(item.title, !checked, item.locationBased)}
+                    onClick={() => toggleAgreement(item.title, !checked)}
                     type="button"
                   >
                     <span
@@ -203,13 +200,22 @@ export function TermsClient() {
                 {open ? (
                   <div className="tm-auth-agreement-detail">
                     <div className="tm-text-caption">{item.detail}</div>
-                    {item.locationBased ? <LocationConsentStatus checked={checked} /> : null}
                   </div>
                 ) : null}
               </div>
             );
           })}
         </div>
+        <Link
+          className="tm-card tm-auth-agree-button tm-pressable"
+          href="/terms?document=location"
+          style={{ width: '100%', textAlign: 'left' }}
+        >
+          <span className="tm-text-body-lg">위치 기능은 사용할 때마다 따로 동의해요</span>
+          <span className="tm-text-caption">
+            회원가입 동의로 저장하지 않으며, 현재 위치 버튼을 누르기 전에 좌표 전송 범위를 안내해요.
+          </span>
+        </Link>
         {legalDialog ? (
           <LegalDocumentDialog
             title={legalDialog.title}
@@ -925,16 +931,4 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
 
 function TermsCheck({ checked }: { checked: boolean }) {
   return <span className={`tm-auth-check ${checked ? 'tm-auth-check-on' : ''}`}>✓</span>;
-}
-
-function LocationConsentStatus({ checked }: { checked: boolean }) {
-  if (!checked) {
-    return null;
-  }
-
-  return (
-    <div className="tm-auth-location-status tm-auth-location-status-allowed tm-text-caption">
-      위치 기반 서비스 약관에 동의했어요. 브라우저 위치 권한은 지역 설정 화면에서 따로 선택할 수 있어요.
-    </div>
-  );
 }

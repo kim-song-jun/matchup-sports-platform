@@ -22,6 +22,8 @@
 - `regions?: { regionId: uuid; primary: boolean }[]`, max 20
 - `currentStep: "sport" | "level" | "region" | "confirm"`
 
+Browser geolocation is resolved immediately to a supported region through `POST /api/v1/master/regions/resolve-location`. The request must include `locationConsentAccepted: true`; the Web UI discloses the one-time coordinate transmission before each current-location action, rather than presenting location access as a signup consent that is silently persisted. `PATCH /api/v1/onboarding/preferences` accepts only the selected region id and never accepts or persists raw latitude, longitude, accuracy, or capture time. The web onboarding draft likewise keeps only the matched region id/name in session storage. Denying location permission must leave manual region selection available.
+
 ## State And Tables
 
 Primary tables:
@@ -38,22 +40,38 @@ Primary tables:
 
 Onboarding complete requires the user to have enough sport/level preference data. Defer moves the user to a limited app state and keeps v1 copy honest about incomplete preferences.
 
+## Required Social Signup Step Barrier
+
+`PATCH /api/v1/onboarding/preferences`, `POST /api/v1/onboarding/complete`, and `POST /api/v1/onboarding/defer` reject incomplete social signup before any write or transaction. Other onboarding statuses keep their existing mutation behavior.
+
+| `onboardingStatus` | HTTP status | `details.requiredRoute` |
+|---|---|---|
+| `social_terms_required` | `409` | `/terms?mode=social` |
+| `social_profile_required` | `409` | `/signup/social` |
+
+The error body is:
+
+```json
+{
+  "code": "ONBOARDING_STEP_REQUIRED",
+  "message": "Complete the required signup step before continuing onboarding",
+  "details": {
+    "requiredRoute": "/terms?mode=social"
+  }
+}
+```
+
+For `social_profile_required`, only `details.requiredRoute` changes to `/signup/social`.
+
 ## Signup Flow
 
-Email signup must accept required terms before `POST /api/v1/auth/register` creates the account. A successful email signup creates `v1_user_profiles`, sets `onboardingStatus = signup_done`, and sends the client through the signup complete screen before sport onboarding.
+Email signup must accept required terms and submit `displayName`, an 11-digit `phone`, a real-calendar `birthDate` in `YYYYMMDD` format, and `gender = male | female` before `POST /api/v1/auth/register` creates the account. `displayName` is trimmed and cannot be blank. A successful email signup creates `v1_user_profiles`, sets `onboardingStatus = signup_done`, and sends the client through the signup complete screen before sport onboarding. `profileImageUrl` remains optional and nullable.
 
 Kakao signup starts with `POST /api/v1/auth/kakao` because the provider user key is needed first. A new Kakao user is created as `onboardingStatus = social_terms_required` without a profile. If the user leaves here, admin surfaces should treat the row as `가입 진행 중 · 약관 미동의`.
 
-When `POST /api/v1/auth/social-terms` succeeds, the API now creates a default profile immediately:
+When `POST /api/v1/auth/social-terms` succeeds, the API does not create a profile. It sets `onboardingStatus = social_profile_required`, sets `currentStep = signup`, and returns `next.route = /signup/social`. The client must navigate to the returned route.
 
-- Uses the Kakao nickname from onboarding draft when available.
-- Falls back to a `k_...` ID-derived nickname when Kakao does not provide a nickname.
-- Keeps the automatically created social nickname within 14 characters, including duplicate suffixes such as `_1`.
-- Resolves nickname conflicts server-side.
-- Stores the Kakao profile image when available.
-- Sets `onboardingStatus = signup_done` and `currentStep = sport`.
-
-`POST /api/v1/auth/social-profile` remains available for compatibility with older incomplete social signup states, but the current Kakao happy path no longer requires a separate profile form.
+`POST /api/v1/auth/social-profile` then requires `nickname`, trimmed non-blank `displayName`, an 11-digit `phone`, a real-calendar `birthDate` in `YYYYMMDD` format, and `gender = male | female`. It stores those values, sets `onboardingStatus = signup_done` and `currentStep = sport`, and returns the sport-onboarding route. `profileImageUrl` remains optional and nullable.
 
 `GET /api/v1/auth/me` includes account login metadata under `user`: `authProvider`, `authProviders`, and `hasPassword`. Clients must use `hasPassword` to decide whether email/password account controls are applicable.
 

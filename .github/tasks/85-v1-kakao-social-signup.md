@@ -1,5 +1,7 @@
 # 85 — V1 Kakao Social Signup
 
+> Superseded on 2026-07-14 by Task 94 for the first-profile field contract. Kakao identity, terms ordering, provider binding, and pending-account cleanup remain valid here; the current social profile boundary requires display name, phone, birth date, and gender, with an optional profile image.
+
 ## Scope
 
 - Backend: `apps/v1_api` auth, Prisma schema/migration, focused tests.
@@ -10,9 +12,9 @@
 - Kakao login identifies users by Kakao `/v2/user/me` top-level `id`, not email.
 - Email signup still requires email/password.
 - Kakao users can be created without Kakao email.
-- First-time Kakao users enter Teameet nickname and gender, then continue to the existing sport/level/region onboarding.
+- First-time Kakao users enter Teameet display name, phone, birth date, and gender, then continue to the existing sport/level/region onboarding. Profile image is optional.
 - Existing Kakao users can log in again by the same provider user key.
-- First-time social users accept Teameet terms before entering nickname and gender.
+- First-time social users accept Teameet terms before entering the required profile fields defined by Task 94.
 - Social signup screens do not expose a back button after the provider account has been bound.
 - Expired incomplete social signup accounts are cleaned up on provider re-login.
 
@@ -21,3 +23,4 @@
 - 2026-05-26: Started implementation after confirming Kakao Service user ID is the canonical per-app login identifier.
 - 2026-05-26: Updated flow to `social_terms_required -> social_profile_required -> signup_done` with `/terms?mode=social`, `/signup/social`, and 24h server-side pending TTL.
 - 2026-05-26: Fixed social next-route priority so Kakao sessions with both missing terms and missing profile go to `/terms?mode=social` before `/signup/social`.
+- 2026-07-14: Task 94 superseded the old nickname/gender-only profile boundary; the shared email/social required-profile DTO and Web validation now own the current contract.

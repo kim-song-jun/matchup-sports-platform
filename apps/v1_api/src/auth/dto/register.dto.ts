@@ -1,6 +1,7 @@
-import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsString, MinLength } from 'class-validator';
+import { RequiredSignupProfileDto } from './required-signup-profile.dto';
 
-export class RegisterDto {
+export class RegisterDto extends RequiredSignupProfileDto {
   @IsString()
   @MinLength(2)
   nickname!: string;
@@ -12,28 +13,6 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   password!: string;
-
-  @IsIn(['male', 'female'])
-  gender!: 'male' | 'female';
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  displayName?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d{11}$/)
-  phone?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d{8}$/)
-  birthDate?: string;
-
-  @IsOptional()
-  @IsString()
-  profileImageUrl?: string;
 
   @IsBoolean()
   requiredTermsAccepted!: boolean;

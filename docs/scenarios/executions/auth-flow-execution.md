@@ -73,6 +73,8 @@ v1_web (port 3013): **미가동** — Playwright 브라우저 테스트 전체 B
 Unit 테스트: `apps/v1_api` — 4 suites (auth.controller.spec, auth.service.spec, register.dto.spec, onboarding.controller.spec), **27 tests all PASS**  
 E2E (visitor-onboarding): v1_web 미가동으로 TimeoutError — BLOCKED
 
+> 2026-07-15 contract supersession: 아래 실행 로그는 당시 historical evidence다. 최신 신규 가입 계약은 `displayName`, 11-digit `phone`, real-calendar `birthDate`, `gender`를 모두 요구하므로 AUTH-001의 과거 register payload는 더 이상 유효하지 않다. 최신 재실행은 `docs/scenarios/15-focused-full-flow-test-matrix.md`의 AUTH-001/002/005/005A와 Task 94를 따른다.
+
 ## Result Log
 
 | ID | Mobile | Desktop | Result | Evidence | Notes |
@@ -101,4 +103,3 @@ E2E (visitor-onboarding): v1_web 미가동으로 TimeoutError — BLOCKED
 | ISSUE-2 | 낮음 | seed 사용자(`host@teameet.v1`) 이메일 로그인 실패 — `V1_HOST_ADMIN_PASSWORD` 환경변수 미설정 or DB와 다른 hash | `POST /auth/login {email:"host@teameet.v1", password:"11111111"}` → 401 |
 | ISSUE-3 | 낮음 | 소셜 로그인(Kakao) dev env 미설정 — `OAUTH_NOT_CONFIGURED` | `POST /auth/kakao {code,redirectUri}` → 404/error |
 | ISSUE-4 | 낮음 | `docs/scenarios/15-focused-full-flow-test-matrix.md` 파일 미존재 — 이 PR의 선행 PR #22가 merge되지 않은 상태 | `ls docs/scenarios/` |
-

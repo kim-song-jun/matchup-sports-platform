@@ -130,7 +130,7 @@ describe('AuthController', () => {
     const controller = moduleRef.get(AuthController);
     const dto = {
       code: 'kakao-code',
-      redirectUri: 'https://teameet.co.kr/v1/callback/kakao',
+      redirectUri: 'https://teameet.co.kr/callback/kakao',
     };
 
     await expect(controller.kakaoLogin(dto)).resolves.toEqual({

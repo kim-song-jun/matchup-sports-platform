@@ -1,5 +1,6 @@
 export const V1_USER_ID_KEY = 'teameet.v1.userId';
 export const V1_USER_EMAIL_KEY = 'teameet.v1.userEmail';
+export const V1_SESSION_HINT_KEY = 'teameet.v1.session';
 
 export type StoredV1Session = {
   userId: string | null;
@@ -16,11 +17,26 @@ export function getStoredV1Session(): StoredV1Session {
 }
 
 export function hasStoredV1Session() {
+  if (typeof window === 'undefined') return false;
+  if (process.env.NODE_ENV === 'production') {
+    return window.localStorage.getItem(V1_SESSION_HINT_KEY) === 'active';
+  }
   const session = getStoredV1Session();
   return Boolean(session.userId || session.userEmail);
 }
 
+export function shouldProbeV1Session() {
+  return process.env.NODE_ENV === 'production' || hasStoredV1Session();
+}
+
 export function saveStoredV1Session(session: { userId: string; userEmail?: string | null }) {
+  window.localStorage.setItem(V1_SESSION_HINT_KEY, 'active');
+  if (process.env.NODE_ENV === 'production') {
+    window.localStorage.removeItem(V1_USER_ID_KEY);
+    window.localStorage.removeItem(V1_USER_EMAIL_KEY);
+    return;
+  }
+
   window.localStorage.setItem(V1_USER_ID_KEY, session.userId);
   if (session.userEmail) {
     window.localStorage.setItem(V1_USER_EMAIL_KEY, session.userEmail);
@@ -31,6 +47,7 @@ export function saveStoredV1Session(session: { userId: string; userEmail?: strin
 
 export function clearStoredV1Session() {
   if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(V1_SESSION_HINT_KEY);
   window.localStorage.removeItem(V1_USER_ID_KEY);
   window.localStorage.removeItem(V1_USER_EMAIL_KEY);
 }
@@ -40,28 +57,8 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
   if (!value.startsWith('/') || value.startsWith('//')) return null;
   if (value.includes('://')) return null;
 
-  const path = stripConfiguredBasePath(value);
-  if (path.startsWith('//')) return null;
-  if (path.startsWith('/login')) return null;
-  return path;
-}
-
-export function getConfiguredBasePath() {
-  const raw = process.env.NEXT_PUBLIC_BASE_PATH?.trim().replace(/\/+$/, '') ?? '';
-  if (!raw || raw === '/') return '';
-  return raw.startsWith('/') ? raw : `/${raw}`;
-}
-
-export function stripConfiguredBasePath(path: string) {
-  const basePath = getConfiguredBasePath();
-  if (!basePath) return path;
-
-  let nextPath = path;
-  while (nextPath === basePath || nextPath.startsWith(`${basePath}/`)) {
-    nextPath = nextPath.slice(basePath.length) || '/';
-  }
-
-  return nextPath.startsWith('/') ? nextPath : `/${nextPath}`;
+  if (value.startsWith('/login')) return null;
+  return value;
 }
 
 export function getCurrentRedirectPath() {

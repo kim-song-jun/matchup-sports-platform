@@ -24,16 +24,12 @@ type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level
 type OnboardingDraft = {
   sports: Array<{ sportId: string; levelId: string | null }>;
   regions: Array<{ regionId: string; primary: boolean }>;
-  currentLocation?: CurrentLocationDraft | null;
+  detectedRegion?: DetectedRegionDraft | null;
 };
 
-type CurrentLocationDraft = {
-  latitude: number;
-  longitude: number;
-  accuracy?: number | null;
-  capturedAt: string;
-  matchedRegionId?: string | null;
-  matchedRegionName?: string | null;
+type DetectedRegionDraft = {
+  regionId: string;
+  regionName: string;
 };
 
 type LocationStatus = 'idle' | 'requesting' | 'allowed' | 'denied' | 'unsupported' | 'unmatched';
@@ -104,7 +100,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     const initial = stored ?? {
       sports: onboarding.data.sports.map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })),
       regions: onboarding.data.regions.map((region) => ({ regionId: region.regionId, primary: region.primary })),
-      currentLocation: null,
+      detectedRegion: null,
     };
     setDraft(initial);
     setHydrated(true);
@@ -170,15 +166,6 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         })),
         regions: payloadDraft.regions,
         currentStep,
-        currentLocation: payloadDraft.currentLocation
-          ? {
-              latitude: payloadDraft.currentLocation.latitude,
-              longitude: payloadDraft.currentLocation.longitude,
-              accuracy: payloadDraft.currentLocation.accuracy,
-              capturedAt: payloadDraft.currentLocation.capturedAt,
-              matchedRegionId: payloadDraft.currentLocation.matchedRegionId ?? null,
-            }
-          : null,
       },
       {
         onSuccess: () => router.push(href),
@@ -222,14 +209,12 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     setLocationStatus('requesting');
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const nextLocation = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
-          capturedAt: new Date().toISOString(),
-        };
         resolveLocation.mutate(
-          { latitude: nextLocation.latitude, longitude: nextLocation.longitude },
+          {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            locationConsentAccepted: true,
+          },
           {
             onSuccess: (result) => {
               const matchedRegionId = result.region?.id ?? null;
@@ -241,24 +226,14 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
 
               setDraft((current) => ({
                 ...upsertPrimaryRegion(current, matchedRegionId),
-                currentLocation: {
-                  ...nextLocation,
-                  matchedRegionId,
-                  matchedRegionName,
-                },
+                detectedRegion: matchedRegionId && matchedRegionName
+                  ? { regionId: matchedRegionId, regionName: matchedRegionName }
+                  : null,
               }));
               setSelectedRegionGroupId(findRegionGroupId(regionGroups, matchedRegionId));
               setLocationStatus(matchedRegionId ? 'allowed' : 'unmatched');
             },
             onError: () => {
-              setDraft((current) => ({
-                ...current,
-                currentLocation: {
-                  ...nextLocation,
-                  matchedRegionId: null,
-                  matchedRegionName: null,
-                },
-              }));
               setLocationStatus('unmatched');
             },
           },
@@ -375,7 +350,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
             <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" disabled={locationStatus === 'requesting'} onClick={requestCurrentLocation} type="button">
               {locationStatus === 'requesting' ? '현재 위치 확인 중' : '현재 위치로 찾기'}
             </button>
-            <LocationNotice location={draft.currentLocation ?? null} status={locationStatus} />
+            <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+              버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
+              좌표 자체는 저장하지 않아요.
+            </p>
+            <LocationNotice detectedRegion={draft.detectedRegion ?? null} status={locationStatus} />
             <div className="tm-auth-stack">
               <Card pad={15}>
                 <div className="tm-text-label">시/도</div>
@@ -519,11 +498,11 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
       {/* P1 tabular-nums: 숫자가 포함될 수 있는 요약 텍스트 */}
       <Card pad={16}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{sportSummary || '미설정'}</div></Card>
       <Card pad={16}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '미설정'}</div></Card>
-      {draft.currentLocation ? (
+      {draft.detectedRegion ? (
         <Card pad={16} className="tm-onboarding-confirm-full">
-          <div className="tm-text-caption">현재 위치</div>
+          <div className="tm-text-caption">현재 위치로 찾은 지역</div>
           <div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>
-            {formatLocation(draft.currentLocation)}
+            {draft.detectedRegion.regionName}
           </div>
         </Card>
       ) : null}
@@ -533,7 +512,7 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
   );
 }
 
-function LocationNotice({ location, status }: { location: CurrentLocationDraft | null; status: LocationStatus }) {
+function LocationNotice({ detectedRegion, status }: { detectedRegion: DetectedRegionDraft | null; status: LocationStatus }) {
   if (status === 'requesting') {
     return <Notice title="현재 위치 확인 중" body="위치 권한을 확인하고 있어요." />;
   }
@@ -546,12 +525,12 @@ function LocationNotice({ location, status }: { location: CurrentLocationDraft |
     return <Notice title="위치 확인 불가" body="이 브라우저에서는 현재 위치 확인을 지원하지 않아요. 지역을 직접 선택해 주세요." tone="orange" />;
   }
 
-  if (status === 'unmatched' && location) {
-    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · 지원 지역과 거리가 멀어 자동 선택하지 않았어요.`} tone="orange" />;
+  if (status === 'unmatched') {
+    return <Notice title="가까운 지역을 찾지 못했어요" body="현재 위치의 좌표는 저장하지 않았어요. 아래에서 활동 지역을 직접 선택해 주세요." tone="orange" />;
   }
 
-  if (location) {
-    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · ${location.matchedRegionName ?? '가까운 지역'}을 선택했어요.`} tone="green" />;
+  if (detectedRegion) {
+    return <Notice title="현재 위치 확인 완료" body={`${detectedRegion.regionName}을 활동 지역으로 선택했어요. 좌표는 저장하지 않아요.`} tone="green" />;
   }
 
   return <Notice title="현재 위치 사용하기" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택해요. 거부해도 직접 선택할 수 있어요." />;
@@ -611,11 +590,6 @@ function upsertPrimaryRegion(draft: OnboardingDraft, regionId: string | null): O
   };
 }
 
-function formatLocation(location: CurrentLocationDraft) {
-  const accuracy = location.accuracy ? ` · 오차 약 ${Math.round(location.accuracy)}m` : '';
-  return `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}${accuracy}`;
-}
-
 function getBackHref(step: OnboardingRouteStep) {
   if (step === 'sport') return '/signup/complete';
   if (step === 'level') return '/onboarding/sport';
@@ -665,24 +639,15 @@ function sanitizeDraft(raw: Partial<OnboardingDraft> | null | undefined): Onboar
         }))
     : [];
 
-  const location = raw?.currentLocation;
-  const currentLocation =
-    location &&
-    Number.isFinite(location.latitude) &&
-    Number.isFinite(location.longitude) &&
-    typeof location.capturedAt === 'string' &&
-    location.capturedAt.trim()
-      ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: Number.isFinite(location.accuracy) ? location.accuracy : null,
-          capturedAt: location.capturedAt,
-          matchedRegionId: isUuid(location.matchedRegionId) ? location.matchedRegionId : null,
-          matchedRegionName: location.matchedRegionName ?? null,
-        }
-      : null;
+  const detectedRegion = raw?.detectedRegion;
+  const sanitizedDetectedRegion = detectedRegion
+    && isUuid(detectedRegion.regionId)
+    && typeof detectedRegion.regionName === 'string'
+    && detectedRegion.regionName.trim()
+    ? { regionId: detectedRegion.regionId, regionName: detectedRegion.regionName.trim() }
+    : null;
 
-  return { sports, regions, currentLocation };
+  return { sports, regions, detectedRegion: sanitizedDetectedRegion };
 }
 
 function isUuid(value: unknown): value is string {

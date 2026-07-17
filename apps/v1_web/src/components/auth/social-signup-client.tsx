@@ -2,12 +2,21 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
+import {
+  formatBirthDate,
+  formatPhone,
+  getSignupProfileIssue,
+  isCompleteSignupProfile,
+  normalizeSeparatedDigits,
+  normalizeSignupDisplayName,
+  SIGNUP_PROFILE_ERROR_MESSAGES,
+} from './signup-profile-validation';
 
 type FieldErrors = Partial<Record<'nickname' | 'gender', string>>;
 type DuplicateCheckState = {
@@ -20,16 +29,21 @@ export function SocialSignupClient() {
   const completeProfile = useV1CompleteSocialProfile();
   const checkNickname = useV1CheckNickname();
   const [nickname, setNickname] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
+  const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
 
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
-  const isBlocked = completeProfile.isPending || checkNickname.isPending || !nicknameVerified || !gender;
+  const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
+  const profileIssue = getSignupProfileIssue(profileDraft);
+  const isBlocked = completeProfile.isPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
   const disabledReason = !nicknameVerified ? '닉네임 중복 확인이 필요해요.' : null;
 
-  const actionReason = disabledReason ?? (!gender ? '성별을 선택해 주세요.' : null);
+  const actionReason = disabledReason ?? (profileIssue ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue] : null);
   const runNicknameCheck = () => {
     const nextNickname = nickname.trim();
     setError(null);
@@ -65,17 +79,26 @@ export function SocialSignupClient() {
       return;
     }
 
-    if (!gender) {
-      setFieldErrors({ gender: '성별을 선택해 주세요.' });
+    if (!isCompleteSignupProfile(profileDraft)) {
+      const nextProfileIssue = getSignupProfileIssue(profileDraft);
+      if (nextProfileIssue) {
+        setError(SIGNUP_PROFILE_ERROR_MESSAGES[nextProfileIssue]);
+      }
       return;
     }
 
     completeProfile.mutate(
-      { nickname, gender },
+      {
+        nickname: nickname.trim(),
+        displayName: normalizeSignupDisplayName(profileDraft.displayName),
+        phone: profileDraft.phone,
+        birthDate: profileDraft.birthDate,
+        gender: profileDraft.gender,
+      },
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
-          router.replace(result.next?.route ?? '/onboarding/sport');
+          router.replace(result.next.route);
         },
         onError: (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
@@ -112,7 +135,7 @@ export function SocialSignupClient() {
         <>
           <Button
             block
-            disabled={isBlocked && !completeProfile.isPending}
+            disabled={isBlocked}
             form="v1-social-signup-form"
             loading={completeProfile.isPending}
             size="lg"
@@ -126,8 +149,8 @@ export function SocialSignupClient() {
       }
     >
       <form className="tm-auth-body" id="v1-social-signup-form" onSubmit={submit}>
-        <h1 className="tm-text-heading tm-auth-heading">닉네임만 정하면 끝나요</h1>
-        <p className="tm-text-body tm-auth-sub">카카오 계정 확인이 됐어요. 사용할 닉네임만 정해 주세요. 프로필과 본인 인증은 나중에 내 설정에서 채울 수 있어요.</p>
+        <h1 className="tm-text-heading tm-auth-heading">프로필을 완성해 주세요</h1>
+        <p className="tm-text-body tm-auth-sub">카카오 계정 확인이 됐어요. 가입에 필요한 프로필 정보를 입력해 주세요.</p>
         <div className="tm-auth-form tm-auth-signup-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">닉네임</span>
@@ -187,6 +210,41 @@ export function SocialSignupClient() {
               </span>
             ) : null}
           </div>
+          <label className="tm-auth-field">
+            <span className="tm-text-label">이름</span>
+            <input
+              className="tm-input tm-auth-input"
+              maxLength={40}
+              onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="실명 또는 확인 가능한 이름"
+              required
+              type="text"
+              value={displayName}
+            />
+          </label>
+          <label className="tm-auth-field">
+            <span className="tm-text-label">휴대폰 번호</span>
+            <input
+              className="tm-input tm-auth-input"
+              inputMode="numeric"
+              onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
+              placeholder="010-0000-0000"
+              required
+              value={formatPhone(phoneDigits)}
+            />
+          </label>
+          <label className="tm-auth-field">
+            <span className="tm-text-label">생년월일</span>
+            <DatePickerTextInput
+              dateValue={formatBirthDate(birthDateDigits)}
+              inputClassName="tm-auth-input"
+              onDateChange={(value) => setBirthDateDigits(normalizeSeparatedDigits(value))}
+              onTextChange={(value) => setBirthDateDigits(normalizeSeparatedDigits(value))}
+              placeholder="예: 1995-01-15"
+              required
+              value={formatBirthDate(birthDateDigits)}
+            />
+          </label>
         </div>
         {error ? (
           <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">

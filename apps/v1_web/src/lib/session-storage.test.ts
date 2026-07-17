@@ -1,47 +1,60 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { sanitizeRedirectPath, stripConfiguredBasePath } from './session-storage';
-
-const originalBasePath = process.env.NEXT_PUBLIC_BASE_PATH;
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  V1_SESSION_HINT_KEY,
+  V1_USER_EMAIL_KEY,
+  V1_USER_ID_KEY,
+  clearStoredV1Session,
+  hasStoredV1Session,
+  sanitizeRedirectPath,
+  saveStoredV1Session,
+  shouldProbeV1Session,
+} from './session-storage';
 
 afterEach(() => {
-  if (originalBasePath === undefined) {
-    delete process.env.NEXT_PUBLIC_BASE_PATH;
-  } else {
-    process.env.NEXT_PUBLIC_BASE_PATH = originalBasePath;
-  }
+  window.localStorage.clear();
+  vi.unstubAllEnvs();
 });
 
 describe('sanitizeRedirectPath', () => {
-  it('keeps v1 alias redirects when no configured basePath exists', () => {
-    delete process.env.NEXT_PUBLIC_BASE_PATH;
-
-    expect(sanitizeRedirectPath('/v1/my')).toBe('/v1/my');
+  it('keeps safe root redirects', () => {
+    expect(sanitizeRedirectPath('/my?tab=teams')).toBe('/my?tab=teams');
   });
 
-  it('strips the configured basePath before handing the path to Next router', () => {
-    process.env.NEXT_PUBLIC_BASE_PATH = '/v1';
-
-    expect(sanitizeRedirectPath('/v1/my')).toBe('/my');
-    expect(sanitizeRedirectPath('/v1/v1/my')).toBe('/my');
+  it('rejects login redirect loops', () => {
+    expect(sanitizeRedirectPath('/login?redirect=%2Fmy')).toBeNull();
   });
 
-  it('rejects login redirects after basePath normalization', () => {
-    process.env.NEXT_PUBLIC_BASE_PATH = '/v1';
-
-    expect(sanitizeRedirectPath('/v1/login?redirect=%2Fmy')).toBeNull();
-  });
-
-  it('rejects protocol-relative redirects after basePath normalization', () => {
-    process.env.NEXT_PUBLIC_BASE_PATH = '/v1';
-
-    expect(sanitizeRedirectPath('/v1//example.com')).toBeNull();
+  it('rejects protocol-relative redirects', () => {
+    expect(sanitizeRedirectPath('//example.com')).toBeNull();
   });
 });
 
-describe('stripConfiguredBasePath', () => {
-  it('does not strip similar prefixes', () => {
-    process.env.NEXT_PUBLIC_BASE_PATH = '/v1';
+describe('production session hint', () => {
+  it('does not persist the user id or email outside development persona mode', () => {
+    vi.stubEnv('NODE_ENV', 'production');
 
-    expect(stripConfiguredBasePath('/v10/my')).toBe('/v10/my');
+    saveStoredV1Session({ userId: 'user-1', userEmail: 'user@example.com' });
+
+    expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBe('active');
+    expect(window.localStorage.getItem(V1_USER_ID_KEY)).toBeNull();
+    expect(window.localStorage.getItem(V1_USER_EMAIL_KEY)).toBeNull();
+    expect(hasStoredV1Session()).toBe(true);
+  });
+
+  it('clears the non-sensitive hint together with development persona keys', () => {
+    window.localStorage.setItem(V1_SESSION_HINT_KEY, 'active');
+    window.localStorage.setItem(V1_USER_ID_KEY, 'user-1');
+    window.localStorage.setItem(V1_USER_EMAIL_KEY, 'user@example.com');
+
+    clearStoredV1Session();
+
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  it('still probes the HttpOnly cookie when browser storage was cleared', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    expect(hasStoredV1Session()).toBe(false);
+    expect(shouldProbeV1Session()).toBe(true);
   });
 });

@@ -51,6 +51,7 @@ import {
   MyTeamsPageView,
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import type { MyHomeViewModel, MyInvitationItem, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 
@@ -319,9 +320,30 @@ export function ProfileEditPageClient() {
     setEmailCheck({ status: 'idle', value: '' });
   }, [profile.data]);
 
-  const originalNickname = profile.data?.profile.nickname ?? profile.data?.profile.displayName ?? '';
-  const originalEmail = profile.data?.email ?? '';
-  const canEditEmail = Boolean(profile.data?.hasPassword);
+  if (profile.isPending) {
+    return (
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+        <PageSkeleton variant="detail" />
+      </AppChrome>
+    );
+  }
+
+  if (profile.isError || !profile.data) {
+    return (
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+        <div className="tm-my-shell">
+          <ErrorState
+            message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            onRetry={() => void profile.refetch()}
+          />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const originalNickname = profile.data.profile.nickname ?? profile.data.profile.displayName ?? '';
+  const originalEmail = profile.data.email ?? '';
+  const canEditEmail = Boolean(profile.data.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
   const nicknameChanged = normalizedNickname !== originalNickname;
@@ -1038,6 +1060,7 @@ export function LocationSettingsPageClient() {
           {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
+            locationConsentAccepted: true,
           },
           {
             onSuccess: (result) => {
@@ -1060,9 +1083,18 @@ export function LocationSettingsPageClient() {
           },
         );
       },
-      () => {
-        setStatus('denied');
-        setMessage('위치 접근이 거부됐어요. 아래에서 지역을 직접 선택해 주세요.');
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setStatus('denied');
+          setMessage('위치 접근이 거부됐어요. 아래에서 지역을 직접 선택해 주세요.');
+          return;
+        }
+        setStatus('unmatched');
+        setMessage(
+          error.code === error.TIMEOUT
+            ? '위치 확인 시간이 초과됐어요. 다시 시도하거나 아래에서 지역을 직접 선택해 주세요.'
+            : '현재 위치를 확인할 수 없어요. 아래에서 지역을 직접 선택해 주세요.',
+        );
       },
       { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 },
     );
@@ -1107,7 +1139,8 @@ export function LocationSettingsPageClient() {
           <Card pad={16}>
             <div className="tm-text-body-lg">현재 위치로 찾기</div>
             <div className="tm-text-caption" style={{ marginTop: 5 }}>
-              좌표는 저장하지 않고 지역을 찾을 때만 사용해요.
+              버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
+              좌표 자체는 저장하지 않아요.
             </div>
             <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" onClick={requestCurrentLocation} disabled={status === 'requesting' || resolveLocation.isPending}>
               {status === 'requesting' || resolveLocation.isPending ? '현재 위치 확인 중' : '현재 위치로 지역 찾기'}
@@ -1194,6 +1227,12 @@ export function NotificationSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">앱 안 알림</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              아래 설정은 팀밋 알림함에 적용돼요. 브라우저·휴대폰 푸시 알림은 아직 제공하지 않아요.
+            </div>
+          </Card>
           {toggleError ? (
             <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>

@@ -4,7 +4,11 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { clearStoredV1Session, hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import {
+  clearStoredV1Session,
+  sanitizeRedirectPath,
+  shouldProbeV1Session,
+} from '@/lib/session-storage';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 
 type SessionEntryGateProps = {
@@ -18,7 +22,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
   const authMe = useV1AuthMe({ enabled: hasSessionHint === true, retry: false });
 
   useEffect(() => {
-    setHasSessionHint(hasStoredV1Session());
+    setHasSessionHint(shouldProbeV1Session());
   }, []);
 
   useEffect(() => {

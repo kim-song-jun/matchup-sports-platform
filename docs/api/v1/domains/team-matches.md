@@ -47,7 +47,7 @@ Optional fields include `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addr
 - Applicant is a team, not a user.
 - Applicant team must be managed by the acting user.
 - Host team cannot apply to itself.
-- Approval moves the selected application to `approved` and the team match to `matched`; only one applicant team can be approved.
+- Approval locks and re-reads the team match before conditionally moving a still-`requested` application to `approved` and the team match to `matched`; concurrent approvals cannot approve more than one applicant team.
 - Applicant team owner/manager can withdraw only `requested` applications.
 - Host owner/manager can complete only `matched` team matches with an approved applicant team. Completion records `completedAt` and unlocks review surfaces.
 - Team match chat is available only after an applicant team has been approved/matched.

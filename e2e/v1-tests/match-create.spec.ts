@@ -17,7 +17,7 @@ test.describe('[host] 매치 생성 위저드 — 종목 선택 영속', () => {
   test('non-first 종목(수영) 선택이 step 재마운트 후에도 유지된다', async ({ page }) => {
     const sportsReady = page.waitForResponse((response) => response.url().includes('/api/v1/master/sports') && response.status() === 200, { timeout: 45000 });
     const regionsReady = page.waitForResponse((response) => response.url().includes('/api/v1/master/regions') && response.status() === 200, { timeout: 45000 });
-    await page.goto('/v1/matches/new/sport', { waitUntil: 'domcontentloaded' });
+    await page.goto('/matches/new/sport', { waitUntil: 'domcontentloaded' });
     await Promise.all([sportsReady, regionsReady]);
     await expect(page.getByRole('heading', { name: /종목/ })).toBeVisible({ timeout: 30000 });
 

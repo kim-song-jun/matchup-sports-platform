@@ -46,14 +46,16 @@ Global `ValidationPipe` settings:
 
 Frontend submit payloads must remove UI-only fields before calling the API. Unknown body/query fields can produce `400`.
 
-## Development Auth
+## Authentication
 
-V1 currently uses temporary headers instead of the old app auth storage:
+Production authentication uses the signed `teameet_v1_session` HttpOnly cookie issued by successful email registration/login and Kakao authentication responses. The cookie is `Secure` in production, `SameSite=Lax`, scoped to `/api/v1`, and expires after seven days. Guards validate its HMAC signature and expiry, then reload the current account status before installing `request.v1User`.
+
+Temporary persona headers remain development/test-only:
 
 - `x-v1-user-id`
 - `x-v1-user-email`
 
-`V1AuthGuard` requires one of these headers and rejects deleted accounts. `OptionalV1AuthGuard` allows guests, hydrates a user when a valid header is present, and rejects deleted accounts.
+Production Web does not send these identity headers, nginx strips them, and both guards ignore them even if supplied. `V1AuthGuard` requires a valid signed session in production. `OptionalV1AuthGuard` allows guests and hydrates a user only when a valid signed session is present. Development/test may use either the signed cookie or the temporary persona headers.
 
 Common auth errors:
 

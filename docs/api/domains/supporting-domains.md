@@ -22,7 +22,7 @@
 | `inquiries` | `/api/v1/inquiries`, `/api/v1/inquiries/:id`, `/api/v1/admin/inquiries`, `/api/v1/admin/inquiries/:id`, `/api/v1/admin/inquiries/:id/replies`, `/api/v1/admin/inquiries/:id/status` |
 | `badges` | `/api/v1/badges`, `/api/v1/badges/team/:teamId` |
 | `users/blocks` | `/api/v1/users/blocks`, `/api/v1/users/blocks/:blockedId` |
-| `tournaments` | `/api/v1/tournaments`, `/api/v1/tournaments/:id`, `/api/v1/tournaments/:tournamentId/registrations`, `/api/v1/admin/tournaments/:tournamentId/sponsors` |
+| `tournaments` | `/api/v1/tournaments`, `/api/v1/tournaments/:id`, `/api/v1/tournaments/campaigns/:slug`, `/api/v1/tournaments/:tournamentId/registrations`, `/api/v1/admin/tournaments/:tournamentId/campaign`, `/api/v1/admin/tournaments/:tournamentId/sponsors` |
 | `health` | `/api/v1/health` |
 | `venue reviews` | `/api/v1/venues/:id/reviews` |
 
@@ -178,11 +178,16 @@
 |---|---|---|---|
 | `GET` | `/api/v1/tournaments` | Public | 대회 목록(cursor) |
 | `GET` | `/api/v1/tournaments/:id` | Public | 대회 상세 |
+| `GET` | `/api/v1/tournaments/campaigns/:slug` | Public | 공개 캠페인과 safe 대회 정보 |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations` | Required | 팀 단위 신청 draft 생성 |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registration` | Required | 내 신청 조회 |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId` | Required | 신청 상세 조회 |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/submit` | Required | 신청 제출 + 결제 대기 전환 |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | Required | 신청 취소 요청 |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/campaign` | Required + Active Admin | 캠페인 상태 무관 조회 |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/campaign` | Required + Owner/Ops | 영구 캠페인 draft 생성 |
+| `PATCH` | `/api/v1/admin/tournaments/:tournamentId/campaign` | Required + Owner/Ops | slug/content 수정 |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/campaign/status` | Required + Owner/Ops | 캠페인 상태 전환 |
 | `GET` | `/api/v1/admin/tournaments/:tournamentId/sponsors` | Required + Admin | 대회 협찬/이벤트 목록 |
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/sponsors` | Required + Admin | 대회 협찬/이벤트 생성 |
 | `PATCH` | `/api/v1/admin/tournaments/:tournamentId/sponsors/:sponsorId` | Required + Admin | 대회 협찬/이벤트 수정 |
@@ -198,6 +203,12 @@
 - 기본 상태 필터:
   - status 미지정 시 `open | closed | in_progress | completed`만 노출
   - `draft | cancelled` 대회는 public read에서 404/목록 제외
+- public list/detail의 `campaignSlug`는 연결된 캠페인이 `published`일 때만 문자열이며, 그 외에는 `null`이다.
+- 캠페인 content version `1`은 `hero`, `intro`, `highlights(max 8)`, `faq(max 12)`만 허용한다. nested unknown field, missing nested object, whitespace-only text, raw HTML/CSS/JavaScript marker는 strict DTO validation으로 거절한다. 이미지는 canonical `/uploads/...` 또는 public HTTPS URL만 허용한다.
+- 캠페인 slug는 전역 unique lowercase kebab-case(`3~80`)다. 최초 publish 뒤에는 draft/archived 상태에서도 변경할 수 없고, archived slug를 유지하며 delete/backfill 경로는 없다.
+- 캠페인 상태 전이는 `draft -> published|archived`, `published -> draft|archived`, `archived -> draft`다. publish는 non-deleted `open|closed|in_progress|completed` 대회만 가능하다. archive 진입은 `archivedAt`을 설정하고 draft 복귀는 이를 지우며, 모든 상태 변경에는 audit reason이 필수다.
+- public campaign 응답은 규정/환불/active sponsors/confirmed count/confirmed·waitlisted team summary를 기존 tournament SSOT에서 투영한다. bank/선수 연락처/admin identity는 포함하지 않는다.
+- update/status는 serializable compare-and-swap과 같은 transaction의 admin audit log를 사용한다. empty/no-op patch는 400, stale concurrent mutation은 409다.
 - `CreateRegistrationDto`
   - `teamId`: UUID
 - `SubmitRegistrationDto`
@@ -258,6 +269,7 @@
 - 선수 명단은 등록 범위(`minPlayers~maxPlayers`)와 로스터 잠금 상태를 서버에서 검증한다.
 - 운영자 결제 확인/확정/대기/취소/로스터 잠금은 `/api/v1/admin/...` tournament registration endpoints에서 처리한다.
 - 운영자 협찬/이벤트 생성은 mutation admin만 가능하다. support admin은 `/admin/tournaments/:tournamentId/sponsors` 읽기만 가능하고, 생성 시 `PERMISSION_DENIED`를 받는다.
+- 캠페인도 support admin은 조회만 가능하고 owner/ops만 생성·수정·상태 전환할 수 있다. 모든 mutation은 `tournament_campaign.*` admin action log와 같은 transaction에서 저장된다.
 
 ## 6) Health (`/health`)
 
@@ -293,13 +305,10 @@
 ## Source References
 
 - `apps/v1_api/src/reviews/reviews.controller.ts`, `reviews.service.ts`, `tournament-fixture-reviews.service.ts`
-- `apps/api/src/reports/reports.controller.ts`, `reports.service.ts`, `reports/dto/report.dto.ts`
-- `apps/api/src/badges/badges.controller.ts`, `badges.service.ts`
-- `apps/api/src/user-blocks/user-blocks.controller.ts`, `user-blocks.service.ts`, `user-blocks/dto/user-block.dto.ts`
 - `apps/v1_api/src/tournaments/tournaments-read.controller.ts`, `tournaments-read.service.ts`, `dto/tournament-read.dto.ts`
+- `apps/v1_api/src/tournaments/tournament-campaigns.controller.ts`, `tournament-campaign-read.service.ts`, `tournament-campaign-admin.service.ts`, `dto/tournament-campaign.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-sponsors.controller.ts`, `tournament-sponsors.service.ts`, `dto/tournament-sponsor.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-registrations.controller.ts`, `tournament-registrations.service.ts`, `dto/tournament-registration.dto.ts`
-- `apps/v1_api/src/tournaments/tournament-players.controller.ts`, `tournament-roster.service.ts`
-- `apps/api/src/health/health.controller.ts`
-- `apps/api/src/venues/venues.controller.ts`
-- `apps/web/src/hooks/use-api.ts`
+- `apps/v1_api/src/tournaments/tournament-players.controller.ts`, `tournament-players.service.ts`
+- `apps/v1_api/src/health/health.controller.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`, `apps/v1_web/src/types/api.ts`

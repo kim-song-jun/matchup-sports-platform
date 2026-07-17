@@ -26,7 +26,9 @@ Chat v1 is linked-room and text-only. Match, team match, and team detail entry r
 
 ## Navigation Contract
 
-Notification rows may carry a deep link target. Frontend must use explicit read-and-navigate handling so read mutation, list invalidation, and route navigation do not race.
+Notification rows may carry a deep link target. Frontend must use explicit read-and-navigate handling so read mutation, list invalidation, and route navigation do not race. The web client accepts only same-origin root-relative paths beginning with one `/`; absolute URLs, protocol-relative URLs, backslash paths, and non-path schemes resolve to `/notifications` instead of being passed to the router.
+
+These are in-app database notifications. Browser Push API, service-worker delivery, VAPID subscriptions, and browser notification permission prompts are not part of the active v1 runtime contract.
 
 ## Primary Tables
 

@@ -16,7 +16,7 @@ test.describe('반응형 레이아웃 회귀 스모크', () => {
   });
 
   test('/home — main이 렌더되고 nav 요소가 존재한다', async ({ page }) => {
-    await page.goto('/v1/home');
+    await page.goto('/home');
     await expect(page.getByRole('main')).toBeVisible();
 
     // desktop(1440): .tm-desktop-nav-brand 존재 (CSS로 visible)
@@ -41,7 +41,7 @@ test.describe('반응형 레이아웃 회귀 스모크', () => {
   });
 
   test('/matches — desktop nav brand와 본문이 정렬된다', async ({ page }) => {
-    await page.goto('/v1/matches');
+    await page.goto('/matches');
     await expect(page.getByRole('main')).toBeVisible();
 
     const desktopBrand = page.locator('.tm-desktop-nav-brand');

@@ -8,12 +8,12 @@ Report contract: the canonical manifest, coverage, findings, 21 detailed write-u
 
 This ledger separates source changes from verified closure. `Patched, unverified` never means fixed: the focused contract test, runtime proof where applicable, and final changed-scope gate must still pass.
 
-## Current Status (updated 2026-07-15)
+## Current Status (updated 2026-07-16)
 
 | Finding | Severity | Risk | Status | Evidence or next action |
 |---|---:|---|---|---|
 | R04-001 | Critical | Production header identity impersonation | **Verified** | `v1-session.spec.ts`: 8/8 tests green — signed HttpOnly session issued, forged production headers rejected, idempotent cookie clear; `pnpm jest v1-session.spec` ✓ |
-| R05-001 | Medium | Unbounded retained upload bytes | **Partially patched** | Rate limit added: images 20 req/min, videos 3 req/min via `@Throttle` in `uploads.controller.ts`; `userId` forwarded for audit log; full per-user DB quota requires uploads ownership table (schema change, tracked as follow-up). `uploads.service.spec.ts`: 2/2 ✓ |
+| R05-001 | Medium | Unbounded retained upload bytes | **Runtime verified, focused test pending** | `V1UploadAsset` ownership ledger, rolling 24-hour image/video limits, 2GB retained cap, per-user row lock, actual filesystem byte accounting, and rollback cleanup implemented. Existing dev DB migration/status is green; a real PNG returned 201 with an exact ledger byte count, a MIME-spoofed PNG returned 400, and exact QA cleanup left no row/file/temp. Focused service test remains in the final host-gated run. |
 | R11-001 | Medium | Stale chat entitlement and preview/message leakage | **Verified** | `chat.service.spec.ts`: 13/13 tests green — entitlement filters cover room list, detail/history/write, notification recipients; match/team/team-match entitlement boundaries tested |
 | R14-001 | Medium | Verified email and login-key rebinding | **Verified** | `verification.service.spec.ts`: 7/7 green — `updateMany` with `where.email = token.target` atomically binds email; profile changes clear `emailVerifiedAt` |
 | R14-002 | Medium | Verified phone rebinding | **Verified** | Same spec suite — phone confirmation binds `token.target` atomically; profile changes clear `phoneVerifiedAt` |
@@ -36,7 +36,7 @@ This ledger separates source changes from verified closure. `Patched, unverified
 
 ## Residual Risk
 
-- **R05-001 (upload quota)**: Per-user daily upload quota requires a `V1UploadRecord` table (or similar) to track bytes/count per user per day. The current rate-limit (20 img/min, 3 video/min per connection) limits opportunistic abuse; full quota tracking is a follow-up schema task.
+- **R05-001 (upload quota)**: Prisma generation, existing-dev migration, and live accepted/rejected upload proof are complete. Closure still requires the focused service test in the final host-gated run. Public upload URLs remain unsuitable for private documents by design.
 
 ## Verification Order
 
@@ -50,15 +50,16 @@ This ledger separates source changes from verified closure. `Patched, unverified
 ## Additional Edge Hardening
 
 - Production nginx strips caller-supplied v1 identity headers before proxying.
+- Next.js와 production nginx 모두 `X-Frame-Options: DENY`를 사용해 upstream/downstream 중복 헤더가 충돌하지 않도록 통일했다.
+- Anonymous `GET /tournaments/:id` responses exclude `bankName`, `bankAccount`, and `bankHolder`. Bank-transfer instructions are returned only inside a guarded, team-scoped registration response while its payment is in the `ready` state.
 - Production browser mutations with an `Origin` header must match the canonical HTTPS `FRONTEND_URL`; cross-origin requests are rejected before controller execution, while non-browser server-to-server requests remain supported.
 - The production CSP no longer permits `unsafe-eval`; inline scripts remain limited to the same-origin Next.js bootstrap contract.
 - The obsolete browser XSS auditor is explicitly disabled with `X-XSS-Protection: 0`, leaving script enforcement to CSP.
 - Notification navigation accepts only root-relative same-origin routes and falls back to `/notifications` for external, protocol-relative, JavaScript, or backslash-based targets.
-- Browser geolocation is called only from explicit user actions on home, onboarding, and location settings. Open-Meteo receives coordinates rounded to two decimals; onboarding stores only the resolved region identity, not raw coordinates.
+- Browser geolocation is called only from explicit user actions on home, onboarding, and location settings. Exact-coordinate region resolution requires `locationConsentAccepted: true` at the API boundary and the UI discloses the one-time Teameet/Kakao transmission before each action. Open-Meteo receives coordinates rounded to two decimals; onboarding stores only the resolved region identity, not raw coordinates.
 - SEO canonical/sitemap fallback now matches the production nginx host (`https://teameet.co.kr`) and rejects non-HTTP schemes or insecure production overrides.
 - Public-profile reads expose active accounts only; withdrawal-pending, suspended, blocked, deleted, and soft-deleted accounts return a uniform 404.
 
 ## Closure Rule
 
 A finding moves to `Verified` only when its source contract, focused automated proof, and applicable runtime proof are all green. The final report must keep blocked and residual risks visible rather than treating a partial patch as closure.
-

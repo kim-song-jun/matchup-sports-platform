@@ -12,7 +12,7 @@ test.describe('[applicant] 팀 탐색 및 가입 플로우', () => {
   });
 
   test('/teams — 팀 목록이 렌더되고 팀 카드가 존재한다', async ({ page }) => {
-    await page.goto('/v1/teams');
+    await page.goto('/teams');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // AppChrome title="팀" — 팀 목록 헤딩
@@ -25,7 +25,7 @@ test.describe('[applicant] 팀 탐색 및 가입 플로우', () => {
   });
 
   test('/teams → 팀 상세 — 가입 관련 CTA가 렌더된다', async ({ page }) => {
-    await page.goto('/v1/teams');
+    await page.goto('/teams');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
 

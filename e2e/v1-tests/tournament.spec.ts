@@ -12,7 +12,7 @@ test.describe('[applicant] 대회 탐색 및 신청 플로우', () => {
   });
 
   test('/tournaments — 대회 목록 페이지가 렌더된다', async ({ page }) => {
-    await page.goto('/v1/tournaments');
+    await page.goto('/tournaments');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // AppChrome title="대회" — 대회 페이지 핵심 텍스트
@@ -20,7 +20,7 @@ test.describe('[applicant] 대회 탐색 및 신청 플로우', () => {
   });
 
   test('/tournaments → 대회 상세 → 신청 페이지 도달', async ({ page }) => {
-    await page.goto('/v1/tournaments');
+    await page.goto('/tournaments');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
 
@@ -48,7 +48,7 @@ test.describe('[applicant] 대회 탐색 및 신청 플로우', () => {
       const detailUrl = page.url();
       const idMatch = detailUrl.match(/\/tournaments\/([a-f0-9-]{8,})/);
       if (!idMatch) throw new Error(`대회 상세 URL에서 id를 찾지 못했어요: ${detailUrl}`);
-      await page.goto(`/v1/tournaments/${idMatch[1]}/apply`);
+      await page.goto(`/tournaments/${idMatch[1]}/apply`);
       await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]{8,}\/apply/);
       await expect(page.getByRole('main')).toBeVisible();
     } else {

@@ -50,7 +50,7 @@
 
 ## Master Checklist
 
-- [x] [01-auth-and-session.md](./01-auth-and-session.md)
+- [x] [01-auth-and-session.md](./01-auth-and-session.md) - Verified: 기존 session/auth wall/admin matrix와 신규 가입 required-profile, social required-step 409/no-write contract가 focused/live evidence로 갱신됨
 - [ ] [02-home-and-discovery.md](./02-home-and-discovery.md)
 - [x] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002/003` verified, restart-persistence follow-up remains
 - [x] [04-team-and-membership.md](./04-team-and-membership.md) - `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` verified
@@ -65,6 +65,8 @@
 - [x] [13-v1-open-design-recovery-from-zero.md](./13-v1-open-design-recovery-from-zero.md) - Verified: Open Design Recovery From Zero completed for 109-page export, current 87-route feature implementation audit, Task 11 full parity evidence, and 2026-06-05 ULW full visual QA with 522/522 live captures plus 348/348 wide desktop captures passing
 - [x] [14-policy-hardening-rules.md](./14-policy-hardening-rules.md) - Verified: POSCO MDS-derived QA policy hardening rules, GREEN contract test, CLI manual evidence, and tmux unavailable error record captured on 2026-06-07
 - [ ] [15-focused-full-flow-test-matrix.md](./15-focused-full-flow-test-matrix.md) - drafted: 회원가입/로그인, 팀, 마이페이지, 대회, 채팅/알림을 번호형 PR/QA 실행 단위로 분해한 focused full-flow matrix
+- [ ] [16-tournament-campaigns.md](./16-tournament-campaigns.md) - Partial: API/DB/role/migration, 기존 dev lifecycle/public-admin UI/real 404/exact cleanup, 390/768/1440 final visual capture verified; safe host 상태에서 focus/scroll/console/network 재확인만 남음
+- [ ] [17-tournament-gender-wizard.md](./17-tournament-gender-wizard.md) - Implemented: 성별 카테고리·혼성 쿼터와 4단계 생성/공용 편집 계약 구현, host-gated focused/live/visual verification pending
 - [x] [native-route-parity-contract.md](./native-route-parity-contract.md) - Verified: Task 100 Wave 0 native parity contract covers all 87 current v1 web routes, backend ownership, native surface target, web reference, and implementation wave
 - [x] [native-backend-contract-audit.md](./native-backend-contract-audit.md) - Verified: Task 100 Wave 1 backend/native owner contract maps every native route `backendOwner` token to v1 API runtime, docs, or explicit native-local/deferred decision
 - [x] [native-mobile-foundation.md](./native-mobile-foundation.md) - Verified: Task 100 Wave 2 Expo SDK 56 `apps/v1_mobile` foundation exists with 87-route manifest, native API/auth/design boundaries, and no WebView dependency
@@ -106,7 +108,7 @@
 
 | Scenario File | Primary Spec | Status |
 |---------------|--------------|--------|
-| `01-auth-and-session.md` | `e2e/tests/auth-session-matrix.spec.ts` | Verified (`Desktop Chrome 7/7`, `Mobile Chrome 7/7`) |
+| `01-auth-and-session.md` | `e2e/tests/auth-session-matrix.spec.ts`, API/Web focused signup/onboarding suites | Verified: 기존 session matrix `Desktop Chrome 7/7`, `Mobile Chrome 7/7`; required signup API 55/55, Web 28/28, MSW 14/14; onboarding required-step/no-write 14/14; signup 390/768/1440 live evidence |
 | `02-home-and-discovery.md` | `e2e/tests/home.spec.ts`, `e2e/tests/match-discovery.spec.ts` | Home smoke passed (`Desktop Chrome`, `Mobile Chrome`), discovery deep-link/url persistence `Desktop Chrome 3/3`, `HOME-002` pending |
 | `03-match-flows.md` | `e2e/tests/match-join-flow.spec.ts` | Verified: `MATCH-001/002/003` covered (`Desktop Chrome 13/13`, `Mobile Chrome deep 2/2`) with restart-persistence follow-up |
 | `04-team-and-membership.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts` | TDD pack verified: `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` passed. `TEAM-003` and `TEAM-004-B/TEAM-005-C` are planned. `TM-SMOKE-001` skip lives in the same spec file but belongs to `05-team-match-flows.md`. |
@@ -119,6 +121,8 @@
 | `11-team-and-venue-hubs.md` | Manual API/runtime smoke + targeted unit/typecheck | Partial: `/teams/:id/hub`, `/venues/:id/hub`, `/tournaments`, `/teams/:id`, `/venues/:id`, `/venues/:id/edit` runtime smoke and targeted tests passed on 2026-04-11, but owner/admin interactive browser flow is still follow-up |
 | `13-v1-open-design-recovery-from-zero.md` | `scripts/qa/v1-open-design-route-matrix.test.mjs`, `scripts/qa/v1-open-design-parity.mjs`, `scripts/qa/v1-open-design-desktop-visual.mjs` | Verified: `evidence/task-11-full-parity.json`, `evidence/task-11-feature-audit.json`, `output/playwright/visual-audit/task-11-open-design-full/`, focused `/home` remake evidence, 2026-06-05 recheck evidence under `evidence/open-design-recheck-20260605/`, and ULW full visual QA under `evidence/ulw-full-visual-qa-20260605/` with 522/522 live PASS and 348/348 wide desktop PASS |
 | `15-focused-full-flow-test-matrix.md` | Manual route/API matrix first; targeted Playwright specs to be mapped by ID | Drafted: focused numbered cases for `AUTH-*`, `TEAM-*`, `MY-*`, `TOURN-*`, `CHAT-*`, `NOTI-*`, and cross-domain regressions |
+| `16-tournament-campaigns.md` | focused campaign suites + existing dev API/DB/browser lifecycle | Partial: API/DB/role/retention/concurrency, public/admin UI, reload persistence, proxy GET/HEAD real 404, exact QA cleanup verified; final 390/768/1440 visual revision/re-capture pending |
+| `17-tournament-gender-wizard.md` | focused tournament admin/player suites + existing dev API/DB/browser lifecycle | Implemented: schema/API/wizard/shared editing and Pretendard default landed; serial focused tests and 390/768/1440 live evidence pending |
 | `native-route-parity-contract.md` | `scripts/qa/native-route-parity-contract.test.mjs`, `scripts/qa/native-architecture-contract.test.mjs` | Verified: Task 100 Wave 0 contract covers 87/87 current v1 routes and locks backend/app/web/macOS architecture references before Expo implementation starts |
 | `native-backend-contract-audit.md` | `scripts/qa/native-backend-contract-audit.test.mjs` | Verified: Task 100 Wave 1 contract covers all native route backend owner tokens, search/reviews docs drift, and deferred native backend boundaries |
 | `native-mobile-foundation.md` | `scripts/qa/native-mobile-foundation.test.mjs`, `corepack pnpm --filter v1_mobile test` | Verified: Task 100 Wave 2 Expo SDK 56 app foundation covers 87-route manifest and compiles with strict TypeScript |
@@ -215,6 +219,9 @@
 | 2026-07-13 | Task 109 tournament promo surfaces | Passed with runtime follow-up | 홈과 대회 전체 조회가 첫 홍보 대회만 고르던 로직을 제거했다. 공개 cursor pagination 전체를 수집해 홈은 모든 `promoHomeEnabled` 대회를 우선순위 순으로 노출하고, 대회 목록은 모든 `promoListEnabled` 대회를 카드뉴스 캐러셀로 제공한다. Web unit 23 files / 88 tests, typecheck, pattern check가 통과했다. | Node 22 환경에서 `/home`, `/tournaments` mobile/tablet/desktop screenshot, carousel swipe/buttons, console/network를 재검증 |
 | 2026-07-14 | Task 110 admin tournament roster access | Passed with runtime follow-up | 팀 비소속 관리자와 support가 읽을 수 있는 관리자 전용 명단 API를 추가하고, 일반 사용자의 PII 접근은 403 전에 차단했다. 성별 snapshot 저장·기존 행 backfill·UI/CSV 표시와 오류/빈 상태 분리를 구현했다. API 501 tests, Web 93 tests, 양쪽 build, Web lint, Prisma/DB guardrail이 통과했다. | QA DB에 migration 적용 후 owner/ops/support 실제 브라우저 screenshot·console·network 재검증 |
 | 2026-07-14 | Task 87 required profile gender | Passed | DB remains nullable for legacy rows; email/social signup and profile save require male/female. Self, authorized team member, admin user, and tournament roster surfaces display gender. API 121 focused tests, Web 95 tests, both builds, and 6 desktop/mobile browser checks passed. | Existing null users must choose gender on their next profile save; public profiles remain gender-private. |
+| 2026-07-15 | Task 94 required signup profile | Passed with final integration gate pending | Email/social signup requires trimmed visible name, 11-digit phone, real `YYYYMMDD` birth date, and male/female gender; image remains optional. Focused API 55/55, Web 28/28, MSW 14/14, onboarding barrier 14/14, signup 390/768/1440 live QA, overlength email/social 390/768 checks passed. | Repository-wide typecheck/full tests/build run once at the final integration gate. |
+| 2026-07-15 | Browser root promotion | Passed | Existing Web/API returned `/home` 200, legacy browser `/v1/home` 404, and `/api/v1/health` 200. Web pages/assets/uploads use root paths while backend `/api/v1` remains canonical. | Deployment health contract must retain the negative `/v1/*` 404 check. |
+| 2026-07-15 | Dynamic tournament campaign lifecycle | Partial: final visual revision | Existing dev Web/API/PostgreSQL only: create draft, preview, edit/reload, publish, public page/CTA, archive retention, proxy GET/HEAD 404, republish and exact cleanup passed. Cleanup removed QA status logs 5, action logs 8, campaign 1; post-state campaign/actions/statuses 0 and tournaments 2. Lazyweb report completed without degradation. | Initial 390/768/1440 captures are not final PASS; CTA capture, hero bleed, CJK wrapping, and 404 CTA revision/re-capture remain. Production header-auth boundary also remains a separate release blocker. |
 
 ## Historical Run Summary
 

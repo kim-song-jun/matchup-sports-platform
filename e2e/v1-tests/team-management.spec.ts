@@ -13,7 +13,7 @@ test.describe('[owner] 팀 관리 플로우', () => {
   });
 
   test('/my/teams — owner 소속 팀 목록이 렌더된다', async ({ page }) => {
-    await page.goto('/v1/my/teams');
+    await page.goto('/my/teams');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // 내 팀 페이지 — 상태 무관하게 main이 렌더되면 OK (seed 팀 존재)
@@ -22,7 +22,7 @@ test.describe('[owner] 팀 관리 플로우', () => {
   });
 
   test('/my/teams/[id] — owner는 멤버 관리 운영 메뉴를 볼 수 있다', async ({ page }) => {
-    await page.goto('/v1/my/teams');
+    await page.goto('/my/teams');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
 
@@ -40,7 +40,7 @@ test.describe('[owner] 팀 관리 플로우', () => {
   });
 
   test('/my/teams/[id]/members — 멤버 탭·가입신청 탭이 렌더된다', async ({ page }) => {
-    await page.goto('/v1/my/teams');
+    await page.goto('/my/teams');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
 

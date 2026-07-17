@@ -21,16 +21,27 @@
 
 ## Member Response Contract
 
-`GET /api/v1/teams/:teamId/members` returns every visible team member for the caller's role, including members that cannot currently be used in tournament roster registration.
+`GET /api/v1/teams/:teamId/members` returns every directory row visible under the team's member-list policy, including rows that cannot currently be used in tournament roster registration. Member-list visibility and private-profile visibility are separate decisions: permission to see the directory never implies permission to see every member's PII.
 
 Each member item includes:
 
 - `displayName`: UI display name, falling back to nickname/member label.
-- `realName`: nullable profile real name snapshot source.
-- `birthDate`: nullable profile birth date snapshot source.
-- `phone`: nullable account phone source.
+- `realName`: private nullable profile real-name source.
+- `phone`: private nullable account phone source.
+- `birthDate`: private nullable full birth-date source.
+- `gender`: private nullable profile gender source, normalized to `male | female` when visible.
 
-Tournament roster clients must keep members with missing `realName`, `birthDate`, or `phone` visible, but disable selection and explain the missing fields.
+Private fields follow this response matrix:
+
+| Viewer | `realName`, `phone`, full `birthDate`, `gender` |
+|---|---|
+| Anonymous or non-member | `null` for every returned row, even when `membersVisible=true` allows the directory itself to be read |
+| Ordinary active member | visible only on the viewer's own `userId` row; `null` on every other member row |
+| Active owner or manager | explicit roster-management response may include the stored values for every returned member row; an absent source value remains `null` |
+
+`displayName`, `profileImageUrl`, role, status, and join metadata are directory/presentation fields and are not promoted to private roster data by this matrix. Clients must not infer a hidden `realName`, phone, birth date, or gender from display fields.
+
+Tournament roster management is an owner/manager surface. Its client must keep rows with missing `realName`, `birthDate`, or `phone` visible, but disable selection and explain the missing fields. An ordinary member's self-only private data does not authorize that member to inspect or assemble other members' roster PII.
 
 ## DTO Highlights
 

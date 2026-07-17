@@ -12,11 +12,11 @@ test.describe('[applicant] 매치 탐색 플로우', () => {
   });
 
   test('홈 → 매치 목록 → 매치 상세 도달', async ({ page }) => {
-    await page.goto('/v1/home');
+    await page.goto('/home');
     await expect(page.getByRole('main')).toBeVisible();
 
     const matchesReady = page.waitForResponse((response) => response.url().includes('/api/v1/matches') && response.status() === 200, { timeout: 60000 });
-    await page.goto('/v1/matches');
+    await page.goto('/matches');
     await matchesReady;
     await expect(page.locator('main').first()).toContainText(/개인 매치/);
 
@@ -35,7 +35,7 @@ test.describe('[applicant] 매치 탐색 플로우', () => {
   });
 
   test('매치 목록 종목 필터 칩이 렌더되고 active 표시가 존재한다', async ({ page }) => {
-    await page.goto('/v1/matches');
+    await page.goto('/matches');
     await expect(page.locator('main').first()).toContainText(/개인 매치/);
     // 종목 칩 행이 렌더되고, active 칩이 최소 1개 존재(전체) — UI 회귀 방지
     const chips = page.locator('.tm-chip');

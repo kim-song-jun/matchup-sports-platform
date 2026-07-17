@@ -15,7 +15,7 @@ test.describe('[host] 팀매치 목록 플로우', () => {
   });
 
   test('모바일: /team-matches 목록이 렌더되고 FAB이 존재한다', async ({ page }) => {
-    await page.goto('/v1/team-matches');
+    await page.goto('/team-matches');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
     // 팀매치 목록 — 종목 칩 또는 summary row 렌더
@@ -28,7 +28,7 @@ test.describe('[host] 팀매치 목록 플로우', () => {
   test('데스크톱: /team-matches 헤더에 "팀매치 만들기" CTA가 노출된다', async ({ page }, testInfo) => {
     // 이 테스트는 --project=desktop(1440px)으로 실행될 때 의미 있음
     // mobile viewport에서도 DOM에는 존재(CSS 표시만 다름) → DOM 존재 확인
-    await page.goto('/v1/team-matches');
+    await page.goto('/team-matches');
     const main = page.getByRole('main');
     await expect(main).toBeVisible();
 

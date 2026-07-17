@@ -1,0 +1,86 @@
+name: Prepare Main Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      alpha_release:
+        description: Verified alpha SemVer prerelease
+        required: true
+        type: string
+      alpha_sha:
+        description: Full commit SHA verified on alpha
+        required: true
+        type: string
+      confirmation:
+        description: Type CREATE_RELEASE_PR after alpha QA approval
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: prepare-main-release
+  cancel-in-progress: false
+
+jobs:
+  release-pr:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      inputs.confirmation == 'CREATE_RELEASE_PR'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify alpha QA release ancestry and identity
+        id: release
+        env:
+          ALPHA_RELEASE: ${{ inputs.alpha_release }}
+          ALPHA_SHA: ${{ inputs.alpha_sha }}
+        run: |
+          set -Eeuo pipefail
+          if [[ ! "${ALPHA_RELEASE}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-alpha\.[0-9]{8}\.g[0-9a-f]{12}$ ]]; then
+            echo "alpha_release is not a Teameet alpha SemVer prerelease" >&2
+            exit 1
+          fi
+          if [[ ! "${ALPHA_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "alpha_sha must be a full lowercase commit SHA" >&2
+            exit 1
+          fi
+          git cat-file -e "${ALPHA_SHA}^{commit}"
+          git merge-base --is-ancestor "${ALPHA_SHA}" HEAD
+
+          headers="$(curl -fsSI --retry 6 --retry-delay 5 https://alpha.teameet.co.kr/landing)"
+          deployed_version="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+          deployed_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+          test "${deployed_version}" = "${ALPHA_RELEASE}"
+          test "${deployed_sha}" = "${ALPHA_SHA}"
+
+          release_date="$(git show -s --format=%cs "${ALPHA_SHA}")"
+          metadata="$(node scripts/release/resolve-changeset-version.mjs \
+            --repo . \
+            --sha "${ALPHA_SHA}" \
+            --date "${release_date}")"
+          test "$(jq -er '.prereleaseVersion' <<< "${metadata}")" = "${ALPHA_RELEASE}"
+          echo "stable=$(jq -er '.stableVersion' <<< "${metadata}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Create draft Changesets release PR
+        uses: changesets/action@63a615b9cd06ba9a3e6d13796c7fbcb080a60a0b # v1.8.0
+        with:
+          version: pnpm dlx @changesets/cli@2.30.0 version
+          title: "chore(release): prepare Teameet ${{ steps.release.outputs.stable }}"
+          commit: "chore(release): version Teameet ${{ steps.release.outputs.stable }}"
+          createGithubReleases: false
+          prDraft: create
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

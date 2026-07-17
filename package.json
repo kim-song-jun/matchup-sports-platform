@@ -34,6 +34,7 @@
     "v1:db:seed": "pnpm --filter v1_api db:seed",
     "v1:db:seed:demo": "pnpm --filter v1_api db:seed:demo",
     "v1:db:seed:all": "pnpm --filter v1_api db:seed:all",
+    "v1:db:seed:event-campaigns": "pnpm --filter v1_api db:seed:event-campaigns",
     "v1:db:cleanup:demo": "pnpm --filter v1_api db:cleanup:demo",
     "v1:test": "pnpm --filter v1_api test && pnpm --filter v1_web test",
     "test:e2e:v1": "pnpm exec playwright test --config=e2e/v1.config.ts",

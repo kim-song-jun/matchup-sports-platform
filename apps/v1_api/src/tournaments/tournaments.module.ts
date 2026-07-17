@@ -24,6 +24,13 @@ import { TournamentSponsorsService } from './tournament-sponsors.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
 import { KakaoGeocodingService } from './kakao-geocoding.service';
+import {
+  TournamentCampaignsAdminController,
+  TournamentCampaignsPublicController,
+} from './tournament-campaigns.controller';
+import { TournamentCampaignAdminService } from './tournament-campaign-admin.service';
+import { TournamentCampaignReadService } from './tournament-campaign-read.service';
+import { TournamentCampaignStatusService } from './tournament-campaign-status.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -36,6 +43,8 @@ import { KakaoGeocodingService } from './kakao-geocoding.service';
 @Module({
   imports: [AdminContextModule, NotificationsModule, IntegrationsModule],
   controllers: [
+    TournamentCampaignsPublicController,
+    TournamentCampaignsAdminController,
     TournamentsAdminController,
     AdminRegistrationsController,
     TournamentBracketController,
@@ -59,6 +68,9 @@ import { KakaoGeocodingService } from './kakao-geocoding.service';
     TournamentPaymentExpiryService,
     TournamentReviewsService,
     KakaoGeocodingService,
+    TournamentCampaignReadService,
+    TournamentCampaignAdminService,
+    TournamentCampaignStatusService,
     OptionalV1AuthGuard,
     V1AuthGuard,
   ],

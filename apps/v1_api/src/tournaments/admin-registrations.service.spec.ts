@@ -74,10 +74,11 @@ describe('AdminRegistrationsService', () => {
     v1Tournament: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
-    v1TournamentPlayer: { count: jest.Mock };
+    v1TournamentPlayer: { count: jest.Mock; findMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -86,10 +87,14 @@ describe('AdminRegistrationsService', () => {
       v1Tournament: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentPlayer: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
@@ -335,6 +340,69 @@ describe('AdminRegistrationsService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'registration.roster_lock' }) }),
     );
+  });
+
+  it('rosterLock: mixed quota failure returns counts and does not lock', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed' }),
+    );
+    prisma.v1Tournament.findUnique.mockResolvedValue({
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 4,
+      genderMinFemale: 2,
+      genderMaxFemale: 4,
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+    ]);
+
+    await expect(service.rosterLock(opsAuth, 'reg-1', {})).rejects.toMatchObject({
+      response: {
+        code: 'TOURNAMENT_GENDER_QUOTA_NOT_MET',
+        details: {
+          male: { count: 5, min: 2, max: 4, ok: false },
+          female: { count: 1, min: 2, max: 4, ok: false },
+        },
+      },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('rosterLock: mixed quota success locks inside the serialized transaction', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed' }),
+    );
+    prisma.v1Tournament.findUnique.mockResolvedValue({
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 4,
+      genderMinFemale: 2,
+      genderMaxFemale: 4,
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+      { genderSnapshot: 'female' },
+    ]);
+    const lockedAt = new Date();
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterLockedAt: lockedAt }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    await expect(service.rosterLock(opsAuth, 'reg-1', {})).resolves.toMatchObject({
+      rosterLockedAt: lockedAt.toISOString(),
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalled();
   });
 
   it('rosterUnlock: removes rosterLockedAt', async () => {

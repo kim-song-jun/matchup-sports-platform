@@ -244,6 +244,11 @@ enum V1InquiryRelatedType {
   user
 }
 
+enum V1UploadKind {
+  image
+  video
+}
+
 model V1RuntimeCheck {
   id        String   @id @default(uuid())
   key       String   @unique
@@ -303,11 +308,29 @@ model V1User {
   tournamentReviews              V1TournamentReview[]       @relation("V1TournamentReviewAuthor")
   verificationTokens             V1VerificationToken[]
   inquiries                      V1Inquiry[]
+  uploadAssets                   V1UploadAsset[]
 
   @@index([accountStatus])
   @@index([onboardingStatus])
   @@index([createdAt])
   @@map("v1_users")
+}
+
+model V1UploadAsset {
+  id           String       @id @default(uuid())
+  ownerUserId  String       @map("owner_user_id")
+  kind         V1UploadKind
+  mimeType     String       @map("mime_type")
+  byteSize     BigInt       @map("byte_size")
+  url          String       @unique
+  storagePath  String       @unique @map("storage_path")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  ownerUser V1User @relation(fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  @@index([ownerUserId, createdAt])
+  @@index([ownerUserId, kind, createdAt])
+  @@map("v1_upload_assets")
 }
 
 model V1AuthIdentity {
@@ -1197,10 +1220,22 @@ enum V1TournamentStatus {
   cancelled
 }
 
+enum V1TournamentCampaignStatus {
+  draft
+  published
+  archived
+}
+
 enum V1TournamentFormat {
   league
   knockout
   group_knockout
+}
+
+enum V1TournamentGenderCategory {
+  mixed
+  male
+  female
 }
 
 enum V1TournamentRegistrationStatus {
@@ -1283,6 +1318,11 @@ model V1Tournament {
   teamCount              Int                @default(8) @map("team_count")
   minPlayers             Int                @default(6) @map("min_players")
   maxPlayers             Int                @default(10) @map("max_players")
+  genderCategory         V1TournamentGenderCategory? @map("gender_category")
+  genderMinMale          Int?               @map("gender_min_male")
+  genderMaxMale          Int?               @map("gender_max_male")
+  genderMinFemale        Int?               @map("gender_min_female")
+  genderMaxFemale        Int?               @map("gender_max_female")
   entryFee               Int                @default(0) @map("entry_fee")
   // 상금: prizeSummary=대표 상품/상금 문구, prizeBreakdown=순위별 안내 텍스트(예: "1위 100만원 · 2위 50만원"). prizePool은 하위 호환용 숫자 필드.
   prizePool              Int?               @map("prize_pool")
@@ -1327,10 +1367,28 @@ model V1Tournament {
   sponsors       V1TournamentSponsor[]
   reviews        V1TournamentReview[]
   awards         V1TournamentAward[]
+  campaign       V1TournamentCampaign?
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
   @@map("v1_tournaments")
+}
+
+model V1TournamentCampaign {
+  id           String                     @id @default(uuid())
+  tournamentId String                     @unique @map("tournament_id")
+  slug         String                     @unique
+  status       V1TournamentCampaignStatus @default(draft)
+  content      Json
+  publishedAt  DateTime?                  @map("published_at")
+  archivedAt   DateTime?                  @map("archived_at")
+  createdAt    DateTime                   @default(now()) @map("created_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+
+  tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@map("v1_tournament_campaigns")
 }
 
 /// 대회 참가팀 후기 (status=completed 이후, 확정 등록된 팀만 작성 가능)

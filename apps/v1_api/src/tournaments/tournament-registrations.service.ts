@@ -35,6 +35,11 @@ const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
   'confirmed',
 ];
 
+type TournamentPaymentInstructionSource = Pick<
+  V1Tournament,
+  'entryFee' | 'bankName' | 'bankAccount' | 'bankHolder'
+>;
+
 @Injectable()
 export class TournamentRegistrationsService {
   constructor(
@@ -69,6 +74,23 @@ export class TournamentRegistrationsService {
       throw new ConflictException({
         code: 'TEAM_SPORT_MISMATCH',
         message: '대회 종목과 같은 종목의 팀만 신청할 수 있어요.',
+      });
+    }
+  }
+
+  private assertPaymentInstructions(
+    tournament: Pick<V1Tournament, 'entryFee' | 'bankName' | 'bankAccount' | 'bankHolder'>,
+    paymentMethod: SubmitRegistrationDto['paymentMethod'],
+  ) {
+    if (paymentMethod !== 'bank_transfer' || tournament.entryFee <= 0) return;
+    if (
+      !tournament.bankName?.trim() ||
+      !tournament.bankAccount?.trim() ||
+      !tournament.bankHolder?.trim()
+    ) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_MISSING',
+        message: '대회 입금 계좌가 준비되지 않아 신청할 수 없어요. 운영팀에 문의해 주세요.',
       });
     }
   }
@@ -115,13 +137,13 @@ export class TournamentRegistrationsService {
     if (existing && existing.status !== 'cancelled') {
       if (existing.status === 'draft') {
         await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
-        return this.serialize(existing, null, await this.countPlayers(existing.id));
+        return this.serialize(existing, null, await this.countPlayers(existing.id), tournament);
       }
       const [payment, playerCount] = await Promise.all([
         this.prisma.v1TournamentPayment.findUnique({ where: { registrationId: existing.id } }),
         this.countPlayers(existing.id),
       ]);
-      return this.serialize(existing, payment, playerCount);
+      return this.serialize(existing, payment, playerCount, tournament);
     }
     await this.assertCapacityAvailable(tournamentId, tournament.teamCount);
 
@@ -153,7 +175,12 @@ export class TournamentRegistrationsService {
           where: { tournamentId_teamId: { tournamentId, teamId: dto.teamId } },
         });
         if (racedRegistration) {
-          return this.serialize(racedRegistration, null, await this.countPlayers(racedRegistration.id));
+          return this.serialize(
+            racedRegistration,
+            null,
+            await this.countPlayers(racedRegistration.id),
+            tournament,
+          );
         }
         throw new ConflictException({
           code: 'TOURNAMENT_REGISTRATION_UNIQUE_SCOPE_MISMATCH',
@@ -163,7 +190,7 @@ export class TournamentRegistrationsService {
       throw error;
     }
 
-    return this.serialize(registration, null, 0);
+    return this.serialize(registration, null, 0, tournament);
   }
 
   private async assertTeamMember(teamId: string, userId: string) {
@@ -209,6 +236,7 @@ export class TournamentRegistrationsService {
     // 제출 시점에 대회가 여전히 open·마감 전인지 재확인(draft 보관 중 마감됐을 수 있음).
     const tournament = await this.loadOpenTournament(tournamentId);
     this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
+    this.assertPaymentInstructions(tournament, dto.paymentMethod);
 
     const result = await this.prisma.$transaction(async (tx) => {
       // R17-005: acquire row lock on tournament before the capacity check so that
@@ -226,6 +254,7 @@ export class TournamentRegistrationsService {
       if (lockedTournament.registrationDeadlineAt && lockedTournament.registrationDeadlineAt.getTime() < Date.now()) {
         throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
       }
+      this.assertPaymentInstructions(lockedTournament, dto.paymentMethod);
 
       const reservedCount = await tx.v1TournamentRegistration.count({
         where: {
@@ -233,7 +262,7 @@ export class TournamentRegistrationsService {
           status: { in: CAPACITY_HOLD_STATUSES },
         },
       });
-      if (reservedCount >= tournament.teamCount) {
+      if (reservedCount >= lockedTournament.teamCount) {
         throw new ConflictException({
           code: 'TOURNAMENT_CAPACITY_FULL',
           message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
@@ -257,13 +286,13 @@ export class TournamentRegistrationsService {
         create: {
           registrationId,
           method: dto.paymentMethod,
-          amount: tournament.entryFee,
+          amount: lockedTournament.entryFee,
           status: 'ready',
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
         },
         update: {
           method: dto.paymentMethod,
-          amount: tournament.entryFee,
+          amount: lockedTournament.entryFee,
           status: 'ready',
           provider: dto.paymentMethod === 'pg' ? 'toss' : null,
           paidAt: null,
@@ -271,7 +300,7 @@ export class TournamentRegistrationsService {
           refundedAt: null,
         },
       });
-      return { updated, payment };
+      return { updated, payment, tournament: lockedTournament };
     });
 
     // 알림: 신청자에게 접수 안내 (fire-and-forget — 트랜잭션 실패와 무관)
@@ -284,7 +313,7 @@ export class TournamentRegistrationsService {
     const playerCount = await this.prisma.v1TournamentPlayer.count({
       where: { registrationId, removedAt: null },
     });
-    return this.serialize(result.updated, result.payment, playerCount);
+    return this.serialize(result.updated, result.payment, playerCount, result.tournament);
   }
 
   async cancelRequest(
@@ -398,22 +427,24 @@ export class TournamentRegistrationsService {
       });
     });
 
-    const [payment, playerCount] = await Promise.all([
+    const [payment, playerCount, tournament] = await Promise.all([
       this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
       this.countPlayers(registrationId),
+      this.loadPaymentInstructionSource(tournamentId),
     ]);
-    return this.serialize(updated, payment, playerCount);
+    return this.serialize(updated, payment, playerCount, tournament);
   }
 
   async get(user: V1AuthUser, tournamentId: string, registrationId: string) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamMember(registration.teamId, user.id);
-    const [payment, playerCount] = await Promise.all([
+    const [payment, playerCount, tournament] = await Promise.all([
       this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
       this.countPlayers(registrationId),
+      this.loadPaymentInstructionSource(tournamentId),
     ]);
     const expiry = await this.paymentExpiry.expireIfOverdue(registration, payment ?? null);
-    return this.serialize(expiry.registration, expiry.payment, playerCount);
+    return this.serialize(expiry.registration, expiry.payment, playerCount, tournament);
   }
 
   /**
@@ -433,12 +464,13 @@ export class TournamentRegistrationsService {
       });
     }
     const registrationId = registration.id;
-    const [payment, playerCount] = await Promise.all([
+    const [payment, playerCount, tournament] = await Promise.all([
       this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } }),
       this.countPlayers(registrationId),
+      this.loadPaymentInstructionSource(tournamentId),
     ]);
     const expiry = await this.paymentExpiry.expireIfOverdue(registration, payment ?? null);
-    return this.serialize(expiry.registration, expiry.payment, playerCount);
+    return this.serialize(expiry.registration, expiry.payment, playerCount, tournament);
   }
 
   /**
@@ -485,14 +517,32 @@ export class TournamentRegistrationsService {
     const countByRegistrationId = new Map(
       playerCounts.map((row) => [row.registrationId, row._count.registrationId]),
     );
+    const tournament = registrations.some(
+      (registration) => registration.payment?.method === 'bank_transfer',
+    )
+      ? await this.loadPaymentInstructionSource(tournamentId)
+      : null;
 
     return registrations.map((registration) =>
       this.serialize(
         registration,
         registration.payment,
         countByRegistrationId.get(registration.id) ?? 0,
+        tournament,
       ),
     );
+  }
+
+  private loadPaymentInstructionSource(tournamentId: string) {
+    return this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: {
+        entryFee: true,
+        bankName: true,
+        bankAccount: true,
+        bankHolder: true,
+      },
+    });
   }
 
   private async loadRegistration(tournamentId: string, registrationId: string): Promise<V1TournamentRegistration> {
@@ -513,8 +563,22 @@ export class TournamentRegistrationsService {
     row: V1TournamentRegistration,
     payment: V1TournamentPayment | null,
     playerCount: number,
+    tournament?: TournamentPaymentInstructionSource | null,
   ) {
     const rowWithTeam = row as V1TournamentRegistration & { team?: { name?: string | null } | null };
+    const paymentInstructions =
+      payment?.method === 'bank_transfer' &&
+      payment.status === 'ready' &&
+      (tournament?.entryFee ?? 0) > 0 &&
+      tournament?.bankName?.trim() &&
+      tournament.bankAccount?.trim() &&
+      tournament.bankHolder?.trim()
+        ? {
+            bankName: tournament.bankName,
+            bankAccount: tournament.bankAccount,
+            bankHolder: tournament.bankHolder,
+          }
+        : null;
     return {
       id: row.id,
       tournamentId: row.tournamentId,
@@ -542,6 +606,7 @@ export class TournamentRegistrationsService {
             paymentDueAt: getTournamentPaymentDueAt(payment).toISOString(),
           }
         : null,
+      paymentInstructions,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

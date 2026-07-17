@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { publicAssetPath } from '@/lib/assets';
 import type { V1TournamentListItem } from '@/types/api';
@@ -18,6 +18,7 @@ function buildItem(overrides: Partial<V1TournamentListItem> = {}): V1TournamentL
     venue: null,
     coverImageUrl: null,
     teamCount: 16,
+    genderCategory: 'mixed',
     entryFee: 0,
     prizePool: null,
     prizeSummary: null,
@@ -63,8 +64,6 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     );
 
     const img = container.querySelector('img');
-    // publicAssetPath()를 거쳐 렌더링되므로 원본 문자열을 그대로 하드코딩하지 않고
-    // 같은 함수로 기대값을 계산한다(NEXT_PUBLIC_BASE_PATH가 설정된 환경에서도 안전).
     expect(img).toHaveAttribute('src', publicAssetPath('/uploads/cover-real.jpg'));
   });
 
@@ -100,5 +99,15 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
 
     expect(container.querySelector('img')).not.toBeInTheDocument();
     expect(container.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('shows the tournament gender category without guessing for legacy rows', () => {
+    const { rerender } = render(
+      <TournamentCard item={buildItem({ genderCategory: 'female' })} />,
+    );
+
+    expect(screen.getByLabelText('성별 카테고리: 여성부')).toBeInTheDocument();
+    rerender(<TournamentCard item={buildItem({ genderCategory: null })} />);
+    expect(screen.getByLabelText('성별 카테고리: 성별 구분 없음')).toBeInTheDocument();
   });
 });

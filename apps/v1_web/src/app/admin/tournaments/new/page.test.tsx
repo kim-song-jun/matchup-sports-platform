@@ -1,36 +1,96 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
-import { useV1CreateTournament, useV1MasterSports, useV1UploadImages } from '@/hooks/use-v1-api';
-import { publicAssetPath } from '@/lib/assets';
+import {
+  useV1AdminTournaments,
+  useV1CreateTournament,
+  useV1MasterSports,
+  useV1UploadImages,
+} from '@/hooks/use-v1-api';
 import AdminTournamentsNewPage from './page';
+import {
+  INITIAL_TOURNAMENT_CREATE_STATE,
+  buildTournamentCreatePayload,
+  tournamentCreateReducer,
+  validateTournamentCreateStep,
+} from './tournament-create-model';
+import type { V1Tournament } from '@/types/api';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1AdminTournaments: vi.fn(),
   useV1CreateTournament: vi.fn(),
   useV1MasterSports: vi.fn(),
   useV1UploadImages: vi.fn(),
 }));
 
-const useV1CreateTournamentMock = vi.mocked(useV1CreateTournament);
-const useV1MasterSportsMock = vi.mocked(useV1MasterSports);
-const useV1UploadImagesMock = vi.mocked(useV1UploadImages);
+const useV1AdminTournamentsMock = vi.mocked(useV1AdminTournaments, { partial: true });
+const useV1CreateTournamentMock = vi.mocked(useV1CreateTournament, { partial: true });
+const useV1MasterSportsMock = vi.mocked(useV1MasterSports, { partial: true });
+const useV1UploadImagesMock = vi.mocked(useV1UploadImages, { partial: true });
+const createMutate = vi.fn();
+const uploadMutateAsync = vi.fn();
 
-// SectionStepper(작성 단계 스크롤스파이)가 IntersectionObserver를 사용한다 —
-// jsdom엔 구현체가 없으므로 렌더가 깨지지 않도록 최소 스텁만 제공한다(불가피한 브라우저 API mock).
-class IntersectionObserverStub {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+function previousTournament(): V1Tournament {
+  return {
+    id: 'previous-tournament',
+    sportId: 'sport-futsal',
+    title: '직전 대회',
+    status: 'completed',
+    format: 'group_knockout',
+    registrationDeadlineAt: null,
+    rosterDeadlineAt: null,
+    scheduledAt: '2026-07-01T09:00:00.000Z',
+    scheduledEndAt: null,
+    venue: '서울 풋살장',
+    latitude: null,
+    longitude: null,
+    coverImageUrl: null,
+    teamCount: 8,
+    minPlayers: 6,
+    maxPlayers: 10,
+    genderCategory: 'mixed',
+    genderMinMale: null,
+    genderMaxMale: null,
+    genderMinFemale: null,
+    genderMaxFemale: null,
+    entryFee: 50000,
+    prizePool: null,
+    prizeSummary: null,
+    prizeBreakdown: null,
+    promoHomeEnabled: false,
+    promoHomeTitle: null,
+    promoHomeSubtitle: null,
+    promoHomeImageUrl: null,
+    promoHomeBadgeText: null,
+    promoHomeDateText: null,
+    promoHomeTeamsText: null,
+    promoHomeLocationText: null,
+    promoHomePrizeText: null,
+    promoHomePriority: 0,
+    promoListEnabled: false,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    promoListPriority: 0,
+    bankName: '국민은행',
+    bankAccount: '123-456',
+    bankHolder: '티밋',
+    rulesText: null,
+    refundPolicyText: null,
+    registrationCount: 8,
+    createdAt: '2026-06-01T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+  };
 }
-
-beforeAll(() => {
-  (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver =
-    IntersectionObserverStub;
-});
 
 function renderPage() {
   return render(
@@ -40,191 +100,246 @@ function renderPage() {
   );
 }
 
-describe('AdminTournamentsNewPage — 명단 제출 마감일', () => {
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
+function fillBasicStep() {
+  fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
+  fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
+}
 
+function goToScheduleStep() {
+  fillBasicStep();
+  fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+}
+
+function fillScheduleStep() {
+  fireEvent.change(screen.getByLabelText(/대회 시작/), {
+    target: { value: '2026-08-15T09:00' },
+  });
+}
+
+function goToParticipationStep() {
+  goToScheduleStep();
+  fillScheduleStep();
+  fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+}
+
+describe('AdminTournamentsNewPage four-step wizard', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useV1MasterSportsMock.mockReturnValue({
       data: [{ id: 'sport-futsal', name: '풋살', levels: [] }],
       isPending: false,
-    } as unknown as ReturnType<typeof useV1MasterSports>);
+    });
+    useV1AdminTournamentsMock.mockReturnValue({
+      data: {
+        items: [previousTournament()],
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isPending: false,
+    });
     useV1CreateTournamentMock.mockReturnValue({
-      mutate: vi.fn(),
+      mutate: createMutate,
       isPending: false,
-    } as unknown as ReturnType<typeof useV1CreateTournament>);
+    });
+    uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });
     useV1UploadImagesMock.mockReturnValue({
-      mutateAsync: vi.fn().mockResolvedValue({ urls: ['/uploads/cover-test.jpg'] }),
+      mutateAsync: uploadMutateAsync,
       isPending: false,
-    } as unknown as ReturnType<typeof useV1UploadImages>);
+    });
   });
 
-  it('auto-fills the roster deadline to 7 days before the tournament start at 23:59', () => {
+  it('T1 keeps basic fields after moving forward and back', () => {
     renderPage();
+    goToScheduleStep();
 
-    const scheduledAtInput = screen.getByLabelText('대회 시작');
-    fireEvent.change(scheduledAtInput, { target: { value: '2026-05-15 09:00' } });
+    fireEvent.click(screen.getByRole('button', { name: /이전/ }));
 
-    const rosterDeadlineInput = screen.getByLabelText(/명단 제출 마감일/);
-    expect(rosterDeadlineInput).toHaveValue('2026-05-08 23:59');
+    expect(screen.getByLabelText(/종목/)).toHaveValue('sport-futsal');
+    expect(screen.getByLabelText(/대회명/)).toHaveValue('2026 서울 풋살 오픈');
+    expect(screen.getByLabelText('혼성')).toBeChecked();
   });
 
-  it('stops auto-filling once the admin edits the roster deadline directly, even if the start date changes again', () => {
+  it('T2 proposes D-3 registration and D-7 roster deadlines without overwriting manual edits', () => {
     renderPage();
+    goToScheduleStep();
 
-    const scheduledAtInput = screen.getByLabelText('대회 시작');
-    fireEvent.change(scheduledAtInput, { target: { value: '2026-05-15 09:00' } });
+    const start = screen.getByLabelText(/대회 시작/);
+    fireEvent.change(start, { target: { value: '2026-08-15T09:00' } });
 
-    const rosterDeadlineInput = screen.getByLabelText(/명단 제출 마감일/);
-    expect(rosterDeadlineInput).toHaveValue('2026-05-08 23:59');
+    expect(screen.getByLabelText(/신청 마감/)).toHaveValue('2026-08-12T23:59');
+    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('2026-08-08T23:59');
 
-    fireEvent.change(rosterDeadlineInput, { target: { value: '2026-05-01 10:00' } });
-    expect(rosterDeadlineInput).toHaveValue('2026-05-01 10:00');
+    fireEvent.change(screen.getByLabelText(/신청 마감/), {
+      target: { value: '2026-08-10T20:00' },
+    });
+    fireEvent.change(start, { target: { value: '2026-08-22T09:00' } });
 
-    fireEvent.change(scheduledAtInput, { target: { value: '2026-06-20 09:00' } });
-    expect(rosterDeadlineInput).toHaveValue('2026-05-01 10:00');
+    expect(screen.getByLabelText(/신청 마감/)).toHaveValue('2026-08-10T20:00');
+    expect(screen.getByLabelText(/명단 제출 마감/)).toHaveValue('2026-08-15T23:59');
   });
 
-  it('does not auto-fill when the start date is left empty or invalid', () => {
+  it('T3 preserves mixed gender quota values across step navigation', () => {
     renderPage();
+    goToParticipationStep();
 
-    const scheduledAtInput = screen.getByLabelText('대회 시작');
-    fireEvent.change(scheduledAtInput, { target: { value: '2026-05-15' } }); // missing time — invalid format
+    fireEvent.change(screen.getByLabelText('남성 최소'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('여성 최소'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
 
-    const rosterDeadlineInput = screen.getByLabelText(/명단 제출 마감일/);
-    expect(rosterDeadlineInput).toHaveValue('');
+    expect(screen.getByLabelText('남성 최소')).toHaveValue(3);
+    expect(screen.getByLabelText('여성 최소')).toHaveValue(2);
   });
 
-  it('shows a required error when the roster deadline is empty, and clears it once a value is entered', () => {
+  it('T4 copies only the previous tournament bank fields', () => {
     renderPage();
+    goToParticipationStep();
 
-    expect(screen.getByText('명단 제출 마감일을 입력해 주세요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /직전 대회 불러오기/ }));
 
-    const rosterDeadlineInput = screen.getByLabelText(/명단 제출 마감일/);
-    fireEvent.change(rosterDeadlineInput, { target: { value: '2026-05-01 10:00' } });
-
-    expect(screen.queryByText('명단 제출 마감일을 입력해 주세요.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('은행명')).toHaveValue('국민은행');
+    expect(screen.getByLabelText('계좌번호')).toHaveValue('123-456');
+    expect(screen.getByLabelText('예금주')).toHaveValue('티밋');
   });
 
-  it('keeps the submit button disabled while the roster deadline is missing, even when other required fields are filled', () => {
-    renderPage();
+  it('T5 keeps uploaded cover and prize rows in the parent reducer state', async () => {
+    const afterCover = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'set-field',
+      field: 'coverImageUrl',
+      value: '/uploads/cover-test.webp',
+    });
+    const afterPrize = tournamentCreateReducer(afterCover, {
+      type: 'set-prize-rows',
+      rows: [{ id: 'winner', label: '1위', value: '600000' }],
+    });
+    const afterNavigation = tournamentCreateReducer(
+      tournamentCreateReducer(afterPrize, { type: 'set-step', step: 3 }),
+      { type: 'set-step', step: 1 },
+    );
 
-    fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
-    fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '8' } });
+    expect(afterNavigation.coverImageUrl).toBe('/uploads/cover-test.webp');
+    expect(afterNavigation.prizeRows).toEqual([
+      { id: 'winner', label: '1위', value: '600000' },
+    ]);
+  });
 
-    const submitButton = screen.getByRole('button', { name: '대회 만들기' });
-    expect(submitButton).toBeDisabled();
-
-    fireEvent.change(screen.getByLabelText(/명단 제출 마감일/), {
-      target: { value: '2026-05-01 10:00' },
+  it('patches only the uploaded promo image without restoring stale text', () => {
+    const edited = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'set-promo',
+      slot: 'promoHome',
+      value: {
+        ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome,
+        title: '업로드 중 수정한 제목',
+        subtitle: '업로드 중 수정한 설명',
+      },
     });
 
-    expect(submitButton).not.toBeDisabled();
+    const afterUpload = tournamentCreateReducer(edited, {
+      type: 'patch-promo',
+      slot: 'promoHome',
+      patch: { imageUrl: '/uploads/promo.webp' },
+    });
+
+    expect(afterUpload.promoHome).toMatchObject({
+      title: '업로드 중 수정한 제목',
+      subtitle: '업로드 중 수정한 설명',
+      imageUrl: '/uploads/promo.webp',
+    });
   });
 
-  it('rejects an impossible-but-shape-matching roster deadline (e.g. month 99) without crashing, keeping submit disabled', () => {
+  it('T6 serializes wizard values, gender quota, cover, prize and promo into the create payload', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: '2026 서울 풋살 오픈',
+      scheduledAt: '2026-08-15T09:00',
+      registrationDeadlineAt: '2026-08-12T23:59',
+      rosterDeadlineAt: '2026-08-08T23:59',
+      genderMinMale: '3',
+      genderMinFemale: '2',
+      coverImageUrl: '/uploads/cover-test.webp',
+      prizePool: '600000',
+      prizeRows: [{ id: 'winner', label: '1위', value: '600000' }],
+      promoHome: {
+        ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome,
+        enabled: true,
+        title: '이번 주 추천 대회',
+      },
+    };
+
+    const payload = buildTournamentCreatePayload(state);
+
+    expect(payload).toMatchObject({
+      sportId: 'sport-futsal',
+      genderCategory: 'mixed',
+      genderMinMale: 3,
+      genderMinFemale: 2,
+      coverImageUrl: '/uploads/cover-test.webp',
+      prizePool: 600000,
+      prizeBreakdown: '1위 600,000원',
+      promoHomeEnabled: true,
+      promoHomeTitle: '이번 주 추천 대회',
+    });
+  });
+
+  it('blocks moving forward and shows the current step validation error', async () => {
     renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
 
-    fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
-    fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '8' } });
-
-    const rosterDeadlineInput = screen.getByLabelText(/명단 제출 마감일/);
-    fireEvent.change(rosterDeadlineInput, { target: { value: '2026-99-99 99:99' } });
-
-    const submitButton = screen.getByRole('button', { name: '대회 만들기' });
-    expect(submitButton).toBeDisabled();
-
-    // Submitting via a disabled/invalid form must not throw (previously
-    // datetimeTextToIso called Date(...).toISOString() on an Invalid Date,
-    // which raises RangeError uncaught).
-    expect(() => fireEvent.click(submitButton)).not.toThrow();
-    expect(useV1CreateTournamentMock.mock.results[0]?.value.mutate).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText('종목을 선택해 주세요.')).toBeInTheDocument();
+      expect(screen.getByText('대회명을 입력해 주세요.')).toBeInTheDocument();
+    });
+    expect(screen.getByText('기본 정보', { selector: 'h2' })).toBeInTheDocument();
   });
 
-  it('does not crash and skips the field when the tournament start date is impossible-but-shape-matching', () => {
-    renderPage();
+  it('rejects a mixed gender maximum above the roster capacity', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      maxPlayers: '10',
+      genderMaxFemale: '11',
+    };
 
-    fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
-    fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '8' } });
-    fireEvent.change(screen.getByLabelText(/명단 제출 마감일/), { target: { value: '2026-05-01 10:00' } });
-
-    expect(() =>
-      fireEvent.change(screen.getByLabelText('대회 시작'), { target: { value: '2026-13-40 25:99' } }),
-    ).not.toThrow();
-
-    const submitButton = screen.getByRole('button', { name: '대회 만들기' });
-    expect(submitButton).toBeDisabled();
-  });
-});
-
-describe('AdminTournamentsNewPage — 커버 이미지 업로드', () => {
-  afterEach(() => {
-    vi.clearAllMocks();
+    expect(validateTournamentCreateStep(state, 2)).toMatchObject({
+      genderQuota: '성별 최대 인원은 대회 최대 선수 수를 넘을 수 없어요.',
+    });
   });
 
-  beforeEach(() => {
-    useV1MasterSportsMock.mockReturnValue({
-      data: [{ id: 'sport-futsal', name: '풋살', levels: [] }],
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1MasterSports>);
-    useV1CreateTournamentMock.mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1CreateTournament>);
+  it('rejects negative and fractional mixed gender quotas before submit', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      genderMinMale: '-1',
+      genderMaxFemale: '2.5',
+    };
+
+    expect(validateTournamentCreateStep(state, 2)).toMatchObject({
+      genderMinMale: '남성 최소 인원은 0~50명 사이의 정수여야 해요.',
+      genderMaxFemale: '여성 최대 인원은 0~50명 사이의 정수여야 해요.',
+    });
   });
 
-  it('uploads the selected file and shows a preview thumbnail', async () => {
-    useV1UploadImagesMock.mockReturnValue({
-      mutateAsync: vi.fn().mockResolvedValue({ urls: ['/uploads/cover-test.jpg'] }),
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1UploadImages>);
+  it('requires complete payment instructions for a paid tournament', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      entryFee: '50000',
+    };
 
-    renderPage();
-
-    const file = new File(['cover'], 'cover.png', { type: 'image/png' });
-    const fileInput = screen.getByLabelText('커버 이미지 파일 선택');
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    const preview = await screen.findByAltText('');
-    // publicAssetPath()를 거쳐 렌더링되므로 원본 문자열을 그대로 하드코딩하지 않고
-    // 같은 함수로 기대값을 계산한다(NEXT_PUBLIC_BASE_PATH가 설정된 환경에서도 안전).
-    expect(preview).toHaveAttribute('src', publicAssetPath('/uploads/cover-test.jpg'));
-    expect(screen.getByRole('button', { name: '이미지 변경' })).toBeInTheDocument();
+    expect(validateTournamentCreateStep(state, 2)).toMatchObject({
+      bankName: '유료 대회는 은행명이 필요해요.',
+      bankAccount: '유료 대회는 계좌번호가 필요해요.',
+      bankHolder: '유료 대회는 예금주가 필요해요.',
+    });
   });
 
-  it('includes coverImageUrl in the submit payload once an upload succeeds', async () => {
-    const mutate = vi.fn();
-    useV1CreateTournamentMock.mockReturnValue({
-      mutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1CreateTournament>);
-    useV1UploadImagesMock.mockReturnValue({
-      mutateAsync: vi.fn().mockResolvedValue({ urls: ['/uploads/cover-test.jpg'] }),
-      isPending: false,
-    } as unknown as ReturnType<typeof useV1UploadImages>);
+  it('rejects promo priorities outside the API integer range', () => {
+    const state = {
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      promoHome: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoHome, priority: '-1' },
+      promoList: { ...INITIAL_TOURNAMENT_CREATE_STATE.promoList, priority: '2.5' },
+    };
 
-    renderPage();
-
-    fireEvent.change(screen.getByLabelText(/종목/), { target: { value: 'sport-futsal' } });
-    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '2026 서울 풋살 오픈' } });
-    fireEvent.change(screen.getByLabelText(/참가 팀 수/), { target: { value: '8' } });
-    fireEvent.change(screen.getByLabelText(/명단 제출 마감일/), { target: { value: '2026-05-01 10:00' } });
-
-    const file = new File(['cover'], 'cover.png', { type: 'image/png' });
-    fireEvent.change(screen.getByLabelText('커버 이미지 파일 선택'), { target: { files: [file] } });
-    await screen.findByAltText('');
-
-    const submitButton = screen.getByRole('button', { name: '대회 만들기' });
-    await waitFor(() => expect(submitButton).not.toBeDisabled());
-    fireEvent.click(submitButton);
-
-    expect(mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ coverImageUrl: '/uploads/cover-test.jpg' }),
-      expect.anything(),
-    );
+    expect(validateTournamentCreateStep(state, 3)).toMatchObject({
+      promoHomePriority: '홈 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
+      promoListPriority: '목록 홍보 우선순위는 0~9999 사이의 정수여야 해요.',
+    });
   });
 });

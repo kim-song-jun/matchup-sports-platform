@@ -60,7 +60,9 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
           <Link
             key={featured.id}
             className="tm-featured-link tm-pressable"
-            href={`/tournaments/${featured.id}`}
+            href={featured.campaignSlug
+              ? `/tournaments/campaigns/${featured.campaignSlug}`
+              : `/tournaments/${featured.id}`}
             aria-label={`대회 상세 — ${cardTitle}`}
           >
             <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>

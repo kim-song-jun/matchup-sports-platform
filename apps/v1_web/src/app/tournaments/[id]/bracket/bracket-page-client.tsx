@@ -222,6 +222,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
+      <h1 className="sr-only">{tournament.title} 순위와 대진표</h1>
       {/* 진행 단계 */}
       <div className="tm-tourn-sub-header">
         {stages.length > 0 && (

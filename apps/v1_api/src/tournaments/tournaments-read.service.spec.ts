@@ -30,8 +30,12 @@ function tournamentCard(overrides: Record<string, unknown> = {}) {
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
     scheduledEndAt: null,
     venue: '서울 풋살장',
+    coverImageUrl: '/uploads/tournaments/spring-cup.webp',
     teamCount: 8,
     entryFee: 60000,
+    bankName: '국민은행',
+    bankAccount: '123-456-789',
+    bankHolder: '팀밋',
     prizePool: null,
     prizeSummary: null,
     prizeBreakdown: null,
@@ -75,6 +79,7 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
     scheduledEndAt: null,
     venue: '서울 풋살장',
+    coverImageUrl: '/uploads/tournaments/spring-cup.webp',
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
@@ -342,9 +347,13 @@ describe('TournamentsReadService', () => {
       id: 'tournament-1',
       sportId: 'sport-1',
       sport: { code: 'futsal', name: '풋살' },
+      coverImageUrl: '/uploads/tournaments/spring-cup.webp',
       confirmedCount: 4,
       pendingPaymentCount: 1,
     });
+    expect(result).not.toHaveProperty('bankName');
+    expect(result).not.toHaveProperty('bankAccount');
+    expect(result).not.toHaveProperty('bankHolder');
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0].groupTeams[0]).toMatchObject({
       teamName: 'FC 서울',

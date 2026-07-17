@@ -1,4 +1,12 @@
 import { http, HttpResponse } from 'msw';
+import {
+  getSignupProfileIssue,
+  SIGNUP_PROFILE_ERROR_MESSAGES,
+} from '@/components/auth/signup-profile-validation';
+import type {
+  SignupProfileDraft,
+  SignupProfileField,
+} from '@/components/auth/signup-profile-validation';
 import type { V1AdminNoticeRow, V1AdminPopupRow, V1Inquiry } from '@/types/api';
 import {
   v1AdminLogsFixture,
@@ -33,6 +41,16 @@ import {
 
 const api = '*/api/v1';
 
+type RegisterField = SignupProfileField | 'nickname' | 'email' | 'password' | 'requiredTermsAccepted';
+
+const REGISTER_ERROR_MESSAGES: Readonly<Record<RegisterField, string>> = {
+  ...SIGNUP_PROFILE_ERROR_MESSAGES,
+  nickname: '닉네임은 2자 이상 입력해 주세요.',
+  email: '이메일을 입력해 주세요.',
+  password: '비밀번호는 8자 이상 입력해 주세요.',
+  requiredTermsAccepted: '필수 약관에 동의해 주세요.',
+};
+
 function ok<T>(data: T) {
   return HttpResponse.json({
     status: 'success',
@@ -52,6 +70,47 @@ function notFound(message: string) {
     },
     { status: 404 },
   );
+}
+
+function validationError(field: RegisterField) {
+  return HttpResponse.json(
+    {
+      status: 'error',
+      statusCode: 400,
+      code: 'VALIDATION_ERROR',
+      message: '입력값을 다시 확인해 주세요.',
+      details: [{ field, messages: [REGISTER_ERROR_MESSAGES[field]] }],
+      timestamp: '2026-05-18T00:00:00.000Z',
+    },
+    { status: 400 },
+  );
+}
+
+function toSignupProfileDraft(value: unknown): SignupProfileDraft {
+  const body = typeof value === 'object' && value !== null ? value : {};
+  const displayName = 'displayName' in body && typeof body.displayName === 'string' ? body.displayName : '';
+  const phone = 'phone' in body && typeof body.phone === 'string' ? body.phone : '';
+  const birthDate = 'birthDate' in body && typeof body.birthDate === 'string' ? body.birthDate : '';
+  const gender = 'gender' in body && (body.gender === 'male' || body.gender === 'female') ? body.gender : '';
+
+  return { displayName, phone, birthDate, gender };
+}
+
+function getRegisterIssue(value: unknown): RegisterField | null {
+  const profileIssue = getSignupProfileIssue(toSignupProfileDraft(value));
+  if (profileIssue) return profileIssue;
+
+  const body = typeof value === 'object' && value !== null ? value : {};
+  const nickname = 'nickname' in body && typeof body.nickname === 'string' ? body.nickname : '';
+  const email = 'email' in body && typeof body.email === 'string' ? body.email : '';
+  const password = 'password' in body && typeof body.password === 'string' ? body.password : '';
+  const requiredTermsAccepted = 'requiredTermsAccepted' in body && body.requiredTermsAccepted === true;
+
+  if (nickname.length < 2) return 'nickname';
+  if (email.length < 3) return 'email';
+  if (password.length < 8) return 'password';
+  if (!requiredTermsAccepted) return 'requiredTermsAccepted';
+  return null;
 }
 
 function page<T>(items: T[]) {
@@ -108,7 +167,12 @@ function teamDetail(teamId: string) {
 export const v1MswHandlers = [
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
-  http.post(`${api}/auth/register`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
+  http.post(`${api}/auth/register`, async ({ request }) => {
+    const body = await request.json();
+    const issue = getRegisterIssue(body);
+    if (issue) return validationError(issue);
+    return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture });
+  }),
   http.get(`${api}/onboarding`, () => ok({ status: 'signup_done', currentStep: 'sport', canResume: true, missing: ['sports'], sports: [], regions: [], regionOptional: true })),
   http.patch(`${api}/onboarding/preferences`, async ({ request }) => ok(await request.json())),
   http.post(`${api}/onboarding/complete`, () => ok({ completed: true })),

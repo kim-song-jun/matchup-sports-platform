@@ -353,18 +353,73 @@ export class AdminRegistrationsService {
 
   async rosterLock(user: V1AuthUser, registrationId: string, dto: AdminRosterLockDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const registration = await this.loadRegistration(registrationId);
-
-    if (registration.status !== 'confirmed') {
-      // 경고: confirmed 아닌 상태에서도 잠금을 기술적으로 막지는 않으나 권장하지 않음.
-      // 여기서는 confirmed 상태에서만 허용하는 엄격 정책 적용.
-      throw new ConflictException({
-        code: 'REGISTRATION_NOT_CONFIRMED',
-        message: '확정된 신청만 명단을 잠글 수 있어요.',
-      });
-    }
-
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id
+        FROM "v1_tournament_registrations"
+        WHERE id = ${registrationId}
+        FOR UPDATE
+      `;
+      const registration = await tx.v1TournamentRegistration.findUnique({
+        where: { id: registrationId },
+      });
+      if (!registration) {
+        throw new NotFoundException({
+          code: 'REGISTRATION_NOT_FOUND',
+          message: '신청 내역을 찾을 수 없어요.',
+        });
+      }
+      if (registration.status !== 'confirmed') {
+        throw new ConflictException({
+          code: 'REGISTRATION_NOT_CONFIRMED',
+          message: '확정된 신청만 명단을 잠글 수 있어요.',
+        });
+      }
+
+      const tournament = await tx.v1Tournament.findUnique({
+        where: { id: registration.tournamentId },
+        select: {
+          genderCategory: true,
+          genderMinMale: true,
+          genderMaxMale: true,
+          genderMinFemale: true,
+          genderMaxFemale: true,
+        },
+      });
+      if (!tournament) {
+        throw new NotFoundException({
+          code: 'TOURNAMENT_NOT_FOUND',
+          message: '대회를 찾을 수 없어요.',
+        });
+      }
+
+      if (tournament.genderCategory === 'mixed') {
+        const roster = await tx.v1TournamentPlayer.findMany({
+          where: { registrationId, removedAt: null },
+          select: { genderSnapshot: true },
+        });
+        const maleCount = roster.filter((player) => player.genderSnapshot === 'male').length;
+        const femaleCount = roster.filter((player) => player.genderSnapshot === 'female').length;
+        const male = this.genderQuotaVerdict(
+          maleCount,
+          tournament.genderMinMale,
+          tournament.genderMaxMale,
+        );
+        const female = this.genderQuotaVerdict(
+          femaleCount,
+          tournament.genderMinFemale,
+          tournament.genderMaxFemale,
+        );
+
+        if (!male.ok || !female.ok) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_GENDER_QUOTA_NOT_MET',
+            message: '성별 인원 조건을 충족하지 않아 명단을 확정할 수 없어요.',
+            details: { male, female },
+          });
+        }
+      }
+
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: { rosterLockedAt: new Date() },
@@ -381,11 +436,20 @@ export class AdminRegistrationsService {
         tx,
       );
       return updated;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
     const playerCount = await this.countPlayers(registrationId);
     return this.serialize(result, payment ?? null, playerCount);
+  }
+
+  private genderQuotaVerdict(count: number, min: number | null, max: number | null) {
+    return {
+      count,
+      min,
+      max,
+      ok: (min === null || count >= min) && (max === null || count <= max),
+    };
   }
 
   async rosterUnlock(user: V1AuthUser, registrationId: string) {

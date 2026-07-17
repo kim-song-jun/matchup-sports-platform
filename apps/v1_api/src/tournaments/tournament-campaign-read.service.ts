@@ -178,7 +178,7 @@ export class TournamentCampaignReadService {
     limit?: number;
     sportCode?: string;
   }): Promise<{ items: CampaignListItem[]; nextCursor: string | null }> {
-    const limit = Math.min(params.limit ?? 20, 50);
+    const limit = Math.min(Math.max(params.limit ?? 20, 1), 50);
     const rows = await this.prisma.v1TournamentCampaign.findMany({
       where: {
         status: 'published',
@@ -192,7 +192,7 @@ export class TournamentCampaignReadService {
       },
       ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
       take: limit + 1,
-      orderBy: { publishedAt: 'desc' },
+      orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
       ...CAMPAIGN_LIST_PROJECTION,
     });
 

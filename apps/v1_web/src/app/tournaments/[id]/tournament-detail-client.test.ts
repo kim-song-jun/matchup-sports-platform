@@ -114,9 +114,15 @@ function makeTournament(
     venue: null,
     latitude: null,
     longitude: null,
+    coverImageUrl: null,
     teamCount: 8,
     minPlayers: 5,
     maxPlayers: 10,
+    genderCategory: null,
+    genderMinMale: null,
+    genderMaxMale: null,
+    genderMinFemale: null,
+    genderMaxFemale: null,
     entryFee: 0,
     prizePool: null,
     prizeSummary: null,
@@ -141,9 +147,7 @@ function makeTournament(
     promoListLocationText: null,
     promoListPrizeText: null,
     promoListPriority: 0,
-    bankName: null,
-    bankAccount: null,
-    bankHolder: null,
+    campaignSlug: null,
     rulesText: null,
     refundPolicyText: null,
     confirmedCount: 0,
@@ -686,6 +690,20 @@ describe('getCompletedChampionName', () => {
 });
 
 describe('TournamentDetailView — completed vs non-completed section rendering', () => {
+  it('exposes exactly one page-level heading for the tournament title', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      title: '팀밋 풋살컵',
+      status: 'open',
+      format: 'league',
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: '팀밋 풋살컵' })).toBeInTheDocument();
+  });
+
   it('hides the application guide, flow explainer, and inline standings/fixtures sections when completed', () => {
     const group = makeGroup({ id: 'g1', phase: 'group', standings: [] });
     const tournament = makeTournament({

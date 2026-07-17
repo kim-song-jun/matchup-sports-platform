@@ -7,6 +7,8 @@ import {
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
 
 /** 업로드 종류별 허용 MIME → 확장자, 크기 한도 */
 export type UploadKind = 'image' | 'video';
@@ -45,18 +47,23 @@ interface UploadedFile {
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
 
+  constructor(private readonly prisma: PrismaService) {}
+
   /** Absolute base directory for uploaded files (relative to app cwd) */
   static readonly UPLOAD_BASE = path.join(process.cwd(), 'uploads');
   /** URL path prefix used when serving files via express.static */
   static readonly SERVE_PREFIX = '/uploads';
+  static readonly RETAINED_QUOTA_BYTES = 2 * 1024 * 1024 * 1024;
+  static readonly DAILY_QUOTA_BYTES: Record<UploadKind, number> = {
+    image: 50 * 1024 * 1024,
+    video: 500 * 1024 * 1024,
+  };
 
   async storeFiles(
     files: UploadedFile[],
+    userId: string,
     baseUrl = '',
     kind: UploadKind = 'image',
-    /** userId is used for audit logging only; full per-user quota requires an
-     *  uploads ownership table (schema change tracked as follow-up). */
-    userId?: string,
   ): Promise<{ urls: string[] }> {
     if (!files || files.length === 0) {
       throw new BadRequestException({
@@ -69,6 +76,7 @@ export class UploadsService {
 
     // 1. Validate ALL files before moving any, so a later validation failure never
     //    leaves earlier files orphaned on disk. On failure, unlink every temp file.
+    const validatedFiles: Array<{ file: UploadedFile; byteSize: number }> = [];
     for (const file of files) {
       if (!(file.mimetype in rules.mimeToExt)) {
         await this.unlinkTemps(files);
@@ -77,7 +85,17 @@ export class UploadsService {
           message: `허용되지 않는 파일 형식이에요. (${file.mimetype}). ${rules.typeLabel}만 허용돼요.`,
         });
       }
-      if (file.size > rules.maxBytes) {
+      let byteSize: number;
+      try {
+        byteSize = (await fs.stat(file.path)).size;
+      } catch (err) {
+        await this.unlinkTemps(files);
+        this.logger.error(
+          `업로드 파일 크기 확인 실패 (${file.originalname}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+        throw new InternalServerErrorException('파일을 확인하지 못했어요. 다시 시도해주세요.');
+      }
+      if (byteSize > rules.maxBytes) {
         await this.unlinkTemps(files);
         throw new BadRequestException({
           code: 'UPLOAD_FILE_TOO_LARGE',
@@ -102,6 +120,7 @@ export class UploadsService {
           message: `파일 내용과 형식이 일치하지 않아요. (${file.originalname})`,
         });
       }
+      validatedFiles.push({ file, byteSize });
     }
 
     // 2. Move all validated files. If any move fails, clean up everything already
@@ -109,47 +128,70 @@ export class UploadsService {
     const urls: string[] = [];
     const movedPaths: string[] = [];
     try {
-      for (const file of files) {
-        const ext = rules.mimeToExt[file.mimetype] ?? 'bin';
-        const now = new Date();
-        const year = now.getFullYear().toString();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`
+          SELECT id
+          FROM "v1_users"
+          WHERE id = ${userId}
+          FOR UPDATE
+        `;
 
-        const destDir = path.join(UploadsService.UPLOAD_BASE, year, month);
-        await fs.mkdir(destDir, { recursive: true });
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const retained = await tx.v1UploadAsset.aggregate({
+          where: { ownerUserId: userId },
+          _sum: { byteSize: true },
+        });
+        const daily = await tx.v1UploadAsset.aggregate({
+          where: { ownerUserId: userId, kind, createdAt: { gte: since } },
+          _sum: { byteSize: true },
+        });
+        const incomingBytes = validatedFiles.reduce((sum, item) => sum + item.byteSize, 0);
+        this.assertQuota(
+          kind,
+          Number(retained._sum.byteSize ?? 0n),
+          Number(daily._sum.byteSize ?? 0n),
+          incomingBytes,
+        );
 
-        const newFilename = `${randomUUID()}.${ext}`;
-        const destPath = path.join(destDir, newFilename);
+        const assets: Array<{
+          ownerUserId: string;
+          kind: UploadKind;
+          mimeType: string;
+          byteSize: bigint;
+          url: string;
+          storagePath: string;
+        }> = [];
+        for (const { file, byteSize } of validatedFiles) {
+          const ext = rules.mimeToExt[file.mimetype] ?? 'bin';
+          const now = new Date();
+          const year = now.getFullYear().toString();
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const storagePath = path.posix.join(year, month, `${randomUUID()}.${ext}`);
+          const destPath = path.join(UploadsService.UPLOAD_BASE, storagePath);
+          const rootRelativeUrl = `${UploadsService.SERVE_PREFIX}/${storagePath}`;
 
-        try {
-          await fs.rename(file.path, destPath);
-        } catch (err) {
-          // Cross-device rename (e.g. tmpdir → uploads on different mount) → copy + unlink
-          if (
-            err !== null &&
-            typeof err === 'object' &&
-            'code' in err &&
-            (err as { code?: string }).code === 'EXDEV'
-          ) {
-            await fs.copyFile(file.path, destPath);
-            await this.safeUnlink(file.path);
-          } else {
-            throw err;
-          }
+          await fs.mkdir(path.dirname(destPath), { recursive: true });
+          await this.moveFile(file.path, destPath);
+          movedPaths.push(destPath);
+          urls.push(`${baseUrl}${rootRelativeUrl}`);
+          assets.push({
+            ownerUserId: userId,
+            kind,
+            mimeType: file.mimetype,
+            byteSize: BigInt(byteSize),
+            url: rootRelativeUrl,
+            storagePath,
+          });
         }
 
-        movedPaths.push(destPath);
-        urls.push(
-          `${baseUrl}${UploadsService.SERVE_PREFIX}/${year}/${month}/${newFilename}`,
-        );
-      }
+        await tx.v1UploadAsset.createMany({ data: assets });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (err) {
       // Roll back: remove already-moved files + any remaining temps.
       await Promise.all(movedPaths.map((p) => this.safeUnlink(p)));
       await this.unlinkTemps(files);
-      this.logger.error(
-        `업로드 이동 실패 — 이동된 ${movedPaths.length}개 정리: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      if (err instanceof BadRequestException) throw err;
+      this.logger.error(`업로드 저장 실패 — 이동된 ${movedPaths.length}개 정리: ${err instanceof Error ? err.message : String(err)}`);
       // 형식/크기 검증 실패는 위에서 400으로 끝났고, 여기 도달하는 건 디스크/권한/마운트
       // 등 서버 내부 오류 → 클라이언트 입력 문제가 아니므로 500으로 분리.
       throw new InternalServerErrorException('파일 저장에 실패했어요. 다시 시도해주세요.');
@@ -159,6 +201,49 @@ export class UploadsService {
       `Stored ${urls.length} ${kind} file(s)${userId ? ` for user ${userId}` : ''}: ${urls.join(', ')}`,
     );
     return { urls };
+  }
+
+  private assertQuota(
+    kind: UploadKind,
+    retainedBytes: number,
+    dailyBytes: number,
+    incomingBytes: number,
+  ) {
+    const dailyLimit = UploadsService.DAILY_QUOTA_BYTES[kind];
+    const retainedLimit = UploadsService.RETAINED_QUOTA_BYTES;
+    const scope =
+      dailyBytes + incomingBytes > dailyLimit
+        ? 'daily'
+        : retainedBytes + incomingBytes > retainedLimit
+          ? 'retained'
+          : null;
+    if (!scope) return;
+
+    const usedBytes = scope === 'daily' ? dailyBytes : retainedBytes;
+    const limitBytes = scope === 'daily' ? dailyLimit : retainedLimit;
+    throw new BadRequestException({
+      code: 'UPLOAD_STORAGE_QUOTA_EXCEEDED',
+      message: '업로드 저장 한도를 초과했어요. 잠시 후 다시 시도하거나 운영팀에 문의해주세요.',
+      details: { scope, kind, usedBytes, incomingBytes, limitBytes },
+    });
+  }
+
+  private async moveFile(sourcePath: string, destinationPath: string) {
+    try {
+      await fs.rename(sourcePath, destinationPath);
+    } catch (err) {
+      if (
+        err !== null &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code?: string }).code === 'EXDEV'
+      ) {
+        await fs.copyFile(sourcePath, destinationPath);
+        await this.safeUnlink(sourcePath);
+        return;
+      }
+      throw err;
+    }
   }
 
   /** Best-effort cleanup of all multer temp files (e.g. on a validation failure). */

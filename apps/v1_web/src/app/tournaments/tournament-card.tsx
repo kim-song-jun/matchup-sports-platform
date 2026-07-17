@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Trophy } from 'lucide-react';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
@@ -22,6 +23,13 @@ function getPendingPaymentCount(item: Pick<V1TournamentListItem, 'pendingPayment
 
 function getReservedTeamCount(item: Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount' | 'teamCount'>): number {
   return Math.min(item.teamCount, item.confirmedCount + getPendingPaymentCount(item));
+}
+
+function getGenderCategoryLabel(category: V1TournamentListItem['genderCategory']): string {
+  if (category === 'male') return '남성부';
+  if (category === 'female') return '여성부';
+  if (category === 'mixed') return '혼성';
+  return '성별 구분 없음';
 }
 
 function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
@@ -75,9 +83,13 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
               aria-hidden="true"
               style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'var(--grey100)' }}
             >
-              <img
+              <Image
                 src={publicAssetPath(thumbnailImageUrl)}
                 alt=""
+                width={56}
+                height={56}
+                sizes="56px"
+                unoptimized
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
@@ -151,6 +163,13 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
                 >
                   {sportAccent.label}
                 </span>
+              </span>
+
+              <span
+                className="tm-badge tm-badge-grey"
+                aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}
+              >
+                {getGenderCategoryLabel(item.genderCategory)}
               </span>
 
               {/* Date + venue */}

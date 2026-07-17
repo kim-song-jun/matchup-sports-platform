@@ -207,9 +207,9 @@ export function useV1Register() {
       email: string;
       password: string;
       gender: 'male' | 'female';
-      displayName?: string;
-      phone?: string;
-      birthDate?: string;
+      displayName: string;
+      phone: string;
+      birthDate: string;
       profileImageUrl?: string;
       requiredTermsAccepted: boolean;
     }) =>
@@ -224,12 +224,12 @@ export function useV1CompleteSocialProfile() {
     mutationFn: (body: {
       nickname: string;
       gender: 'male' | 'female';
-      displayName?: string;
-      phone?: string;
-      birthDate?: string;
+      displayName: string;
+      phone: string;
+      birthDate: string;
       profileImageUrl?: string;
     }) =>
-      v1Post<V1AuthSessionResponse>('/auth/social-profile', body),
+      v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-profile', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -237,7 +237,8 @@ export function useV1CompleteSocialProfile() {
 export function useV1CompleteSocialTerms() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { requiredTermsAccepted: boolean }) => v1Post<V1AuthSessionResponse>('/auth/social-terms', body),
+    mutationFn: (body: { requiredTermsAccepted: boolean }) =>
+      v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-terms', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -318,7 +319,11 @@ export function useV1MasterRegions() {
 
 export function useV1ResolveLocation() {
   return useMutation({
-    mutationFn: (body: { latitude: number; longitude: number }) =>
+    mutationFn: (body: {
+      latitude: number;
+      longitude: number;
+      locationConsentAccepted: true;
+    }) =>
       v1Post<V1ResolveLocationResponse>('/master/regions/resolve-location', body),
   });
 }
@@ -1027,10 +1032,11 @@ export function useV1SubmitReview() {
   });
 }
 
-export function useV1ChatRooms() {
+export function useV1ChatRooms(options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms'),
+    enabled: options?.enabled ?? true,
   });
 }
 

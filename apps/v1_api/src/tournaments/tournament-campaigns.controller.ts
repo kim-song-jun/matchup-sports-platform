@@ -5,6 +5,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import {
   ChangeTournamentCampaignStatusDto,
   CreateTournamentCampaignDto,
+  ListTournamentCampaignsQueryDto,
   UpdateTournamentCampaignDto,
 } from './dto/tournament-campaign.dto';
 import { TournamentCampaignAdminService } from './tournament-campaign-admin.service';
@@ -15,16 +16,8 @@ export class TournamentCampaignsPublicController {
   constructor(private readonly campaignReadService: TournamentCampaignReadService) {}
 
   @Get()
-  listPublished(
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
-    @Query('sportCode') sportCode?: string,
-  ) {
-    return this.campaignReadService.listPublished({
-      cursor,
-      limit: limit ? Number(limit) : undefined,
-      sportCode,
-    });
+  listPublished(@Query() query: ListTournamentCampaignsQueryDto) {
+    return this.campaignReadService.listPublished(query);
   }
 
   @Head(':slug/availability')

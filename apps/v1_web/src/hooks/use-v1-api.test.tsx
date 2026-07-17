@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { v1Api, v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import {
   useV1AdminTournamentReviews,
+  useV1ChatRooms,
   useV1HideReview,
   useV1MyRegistration,
   useV1RosterDeadlineOverrideGrant,
@@ -88,6 +89,25 @@ describe('useV1MyRegistration', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(v1GetMock).toHaveBeenCalledWith('/tournaments/tournament-1/registrations/my-registration');
+  });
+});
+
+describe('useV1ChatRooms', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not call the protected chat endpoint when the viewer is signed out', () => {
+    // Given: the public home response identified the viewer as signed out.
+    const { result } = renderHook(() => useV1ChatRooms({ enabled: false }), {
+      wrapper: createWrapper(),
+    });
+
+    // When: React Query settles the disabled chat query.
+
+    // Then: no protected request is made and the query remains idle.
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(v1GetMock).not.toHaveBeenCalled();
   });
 });
 

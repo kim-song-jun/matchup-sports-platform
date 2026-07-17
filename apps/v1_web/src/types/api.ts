@@ -135,13 +135,6 @@ export type V1OnboardingPreferencePayload = {
   sports?: Array<{ sportId: string; levelId?: string | null }>;
   regions?: Array<{ regionId: string; primary: boolean }>;
   currentStep: Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
-  currentLocation?: {
-    latitude: number;
-    longitude: number;
-    accuracy?: number | null;
-    capturedAt: string;
-    matchedRegionId?: string | null;
-  } | null;
 };
 
 export type V1OnboardingMutationResult = {
@@ -1551,6 +1544,7 @@ export type V1TournamentStatus =
   | 'cancelled';
 
 export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout';
+export type V1TournamentGenderCategory = 'mixed' | 'male' | 'female';
 
 export type V1PublicTournamentStatus = Extract<
   V1TournamentStatus,
@@ -1615,6 +1609,7 @@ export type V1TournamentListItem = {
   venue: string | null;
   coverImageUrl: string | null;
   teamCount: number;
+  genderCategory: V1TournamentGenderCategory | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1639,6 +1634,7 @@ export type V1TournamentListItem = {
   promoListLocationText: string | null;
   promoListPrizeText: string | null;
   promoListPriority: number;
+  campaignSlug: string | null;
   confirmedCount: number;
   pendingPaymentCount: number;
   createdAt: string;
@@ -1665,6 +1661,11 @@ export type V1Tournament = {
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
+  genderCategory: V1TournamentGenderCategory | null;
+  genderMinMale: number | null;
+  genderMaxMale: number | null;
+  genderMinFemale: number | null;
+  genderMaxFemale: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1818,9 +1819,15 @@ export type V1TournamentDetail = {
   /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
   latitude: number | null;
   longitude: number | null;
+  coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
+  genderCategory: V1TournamentGenderCategory | null;
+  genderMinMale: number | null;
+  genderMaxMale: number | null;
+  genderMinFemale: number | null;
+  genderMaxFemale: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1845,9 +1852,7 @@ export type V1TournamentDetail = {
   promoListLocationText: string | null;
   promoListPrizeText: string | null;
   promoListPriority: number;
-  bankName: string | null;
-  bankAccount: string | null;
-  bankHolder: string | null;
+  campaignSlug: string | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
@@ -1921,6 +1926,12 @@ export type V1TournamentPaymentSummary = {
   paymentDueAt: string | null;
 };
 
+export type V1TournamentPaymentInstructions = {
+  bankName: string;
+  bankAccount: string;
+  bankHolder: string;
+};
+
 /** Serialized by TournamentRegistrationsService.serialize (consumer-facing) */
 export type V1TournamentRegistration = {
   id: string;
@@ -1942,12 +1953,16 @@ export type V1TournamentRegistration = {
   cancelReason: string | null;
   playerCount: number;
   payment: V1TournamentPaymentSummary | null;
+  paymentInstructions: V1TournamentPaymentInstructions | null;
   createdAt: string;
   updatedAt: string;
 };
 
 /** Serialized by AdminRegistrationsService.serialize — admin view (extra confirmedByAdminUserId) */
-export type V1AdminTournamentRegistration = V1TournamentRegistration & {
+export type V1AdminTournamentRegistration = Omit<
+  V1TournamentRegistration,
+  'paymentInstructions'
+> & {
   confirmedByAdminUserId: string | null;
   // 목록 응답에만 포함(team join). mutation 응답에는 없음 → optional.
   teamName?: string | null;
@@ -2151,6 +2166,11 @@ export type V1CreateTournamentPayload = {
   teamCount?: number;
   minPlayers?: number;
   maxPlayers?: number;
+  genderCategory?: V1TournamentGenderCategory;
+  genderMinMale?: number;
+  genderMaxMale?: number;
+  genderMinFemale?: number;
+  genderMaxFemale?: number;
   entryFee?: number;
   prizePool?: number;
   prizeSummary?: string;
@@ -2182,7 +2202,36 @@ export type V1CreateTournamentPayload = {
   refundPolicyText?: string;
 };
 
-export type V1UpdateTournamentPayload = Partial<V1CreateTournamentPayload>;
+export type V1UpdateTournamentPayload = Omit<
+  Partial<V1CreateTournamentPayload>,
+  | 'genderMinMale'
+  | 'genderMaxMale'
+  | 'genderMinFemale'
+  | 'genderMaxFemale'
+  | 'registrationDeadlineAt'
+  | 'rosterDeadlineAt'
+  | 'scheduledAt'
+  | 'venue'
+  | 'bankName'
+  | 'bankAccount'
+  | 'bankHolder'
+  | 'rulesText'
+  | 'refundPolicyText'
+> & {
+  genderMinMale?: number | null;
+  genderMaxMale?: number | null;
+  genderMinFemale?: number | null;
+  genderMaxFemale?: number | null;
+  registrationDeadlineAt?: string | null;
+  rosterDeadlineAt?: string | null;
+  scheduledAt?: string | null;
+  venue?: string | null;
+  bankName?: string | null;
+  bankAccount?: string | null;
+  bankHolder?: string | null;
+  rulesText?: string | null;
+  refundPolicyText?: string | null;
+};
 
 export type V1ChangeTournamentStatusPayload = {
   status: V1TournamentStatus;

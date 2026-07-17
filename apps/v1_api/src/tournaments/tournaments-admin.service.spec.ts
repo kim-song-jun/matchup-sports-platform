@@ -33,6 +33,11 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    genderCategory: null,
+    genderMinMale: null,
+    genderMaxMale: null,
+    genderMinFemale: null,
+    genderMaxFemale: null,
     entryFee: 120000,
     bankName: null,
     bankAccount: null,
@@ -172,6 +177,23 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
   });
 
+  it('create: paid tournament without complete bank details is rejected', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: '유료 대회',
+        teamCount: 8,
+        entryFee: 50000,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED' },
+    });
+    expect(prisma.v1Sport.findUnique).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
   it('create: owner with valid input → returns draft tournament + writes audit log', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
@@ -182,6 +204,9 @@ describe('TournamentsAdminService', () => {
       title: '테스트 대회',
       teamCount: 12,
       entryFee: 120000,
+      bankName: '국민은행',
+      bankAccount: '123-456',
+      bankHolder: '팀밋',
       scheduledAt: '2026-08-15T09:00:00.000Z',
       scheduledEndAt: '2026-08-16T18:00:00.000Z',
     });
@@ -259,7 +284,7 @@ describe('TournamentsAdminService', () => {
 
   it('changeStatus: draft → open succeeds and records previous/next', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft' }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', entryFee: 0 }));
     prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'open' }));
 
     const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' });
@@ -268,6 +293,18 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ fromStatus: 'draft', toStatus: 'open' }) }),
     );
+  });
+
+  it('changeStatus: paid tournament without bank details cannot be opened', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft' }));
+
+    await expect(
+      service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
   });
 
   it('changeStatus: open → completed (skipping in_progress) → 409 TRANSITION_INVALID', async () => {
@@ -368,6 +405,48 @@ describe('TournamentsAdminService', () => {
     const updateCallData = prisma.v1Tournament.update.mock.calls[0][0].data;
     expect(updateCallData).not.toHaveProperty('latitude');
     expect(updateCallData).not.toHaveProperty('longitude');
+  });
+
+  it('update: clearing venue and editable text fields persists null without geocoding', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({
+      venue: '기존 장소',
+      latitude: 5,
+      longitude: 5,
+      entryFee: 0,
+      bankName: '기존 은행',
+      rulesText: '기존 규정',
+    });
+    const updated = tournamentRow({
+      venue: null,
+      latitude: null,
+      longitude: null,
+      bankName: null,
+      rulesText: null,
+    });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(updated);
+
+    await service.update(ownerAuthUser, 'tournament-1', {
+      venue: null,
+      bankName: null,
+      rulesText: null,
+    });
+
+    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          venue: null,
+          latitude: null,
+          longitude: null,
+          bankName: null,
+          rulesText: null,
+        }),
+      }),
+    );
   });
 
   it('update: venue not included in dto → does not re-geocode or touch coordinates', async () => {
@@ -473,5 +552,94 @@ describe('TournamentsAdminService', () => {
         }),
       }),
     );
+  });
+
+  it('create: rejects an impossible mixed gender quota', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: '혼성 대회',
+        teamCount: 8,
+        maxPlayers: 10,
+        genderCategory: 'mixed',
+        genderMinMale: 6,
+        genderMinFemale: 5,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
+    });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: persists a valid mixed gender quota', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 2,
+        genderMaxMale: 6,
+        genderMinFemale: 2,
+        genderMaxFemale: 6,
+      }),
+    );
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '혼성 대회',
+      teamCount: 8,
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 6,
+      genderMinFemale: 2,
+      genderMaxFemale: 6,
+    });
+
+    expect(result).toMatchObject({
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 6,
+      genderMinFemale: 2,
+      genderMaxFemale: 6,
+    });
+  });
+
+  it('update: changing maxPlayers revalidates the retained mixed quota', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        maxPlayers: 10,
+        genderCategory: 'mixed',
+        genderMinMale: 5,
+        genderMinFemale: 4,
+      }),
+    );
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { maxPlayers: 8 }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('create: rejects a gender maximum above the roster capacity', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: '혼성 대회',
+        teamCount: 8,
+        maxPlayers: 10,
+        genderCategory: 'mixed',
+        genderMaxFemale: 11,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
+    });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,7 @@ import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
   CreateTournamentDto,
+  TournamentGenderCategory,
   TournamentStatus,
   UpdateTournamentDto,
 } from './dto/admin-tournament.dto';
@@ -100,6 +101,20 @@ export class TournamentsAdminService {
       dto.scheduledAt ? new Date(dto.scheduledAt) : null,
       dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
     );
+    this.assertPaidTournamentPaymentInstructions({
+      entryFee: dto.entryFee ?? 0,
+      bankName: dto.bankName,
+      bankAccount: dto.bankAccount,
+      bankHolder: dto.bankHolder,
+    });
+    const genderQuota = this.normalizeGenderQuota({
+      genderCategory: dto.genderCategory,
+      genderMinMale: dto.genderMinMale,
+      genderMaxMale: dto.genderMaxMale,
+      genderMinFemale: dto.genderMinFemale,
+      genderMaxFemale: dto.genderMaxFemale,
+      maxPlayers: dto.maxPlayers ?? 10,
+    });
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
     if (!sport) {
@@ -127,6 +142,8 @@ export class TournamentsAdminService {
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
+          genderCategory: dto.genderCategory ?? null,
+          ...genderQuota,
           entryFee: dto.entryFee ?? 0,
           bankName: dto.bankName ?? null,
           bankAccount: dto.bankAccount ?? null,
@@ -189,6 +206,31 @@ export class TournamentsAdminService {
     const nextMin = dto.minPlayers ?? existing.minPlayers;
     const nextMax = dto.maxPlayers ?? existing.maxPlayers;
     this.assertPlayerRange(nextMin, nextMax);
+    const nextGenderCategory =
+      dto.genderCategory !== undefined
+        ? dto.genderCategory
+        : (existing.genderCategory as TournamentGenderCategory | null);
+    const genderConfigChanged =
+      dto.maxPlayers !== undefined ||
+      dto.genderCategory !== undefined ||
+      dto.genderMinMale !== undefined ||
+      dto.genderMaxMale !== undefined ||
+      dto.genderMinFemale !== undefined ||
+      dto.genderMaxFemale !== undefined;
+    const genderQuota = genderConfigChanged
+      ? this.normalizeGenderQuota({
+          genderCategory: nextGenderCategory,
+          genderMinMale:
+            dto.genderMinMale !== undefined ? dto.genderMinMale : existing.genderMinMale,
+          genderMaxMale:
+            dto.genderMaxMale !== undefined ? dto.genderMaxMale : existing.genderMaxMale,
+          genderMinFemale:
+            dto.genderMinFemale !== undefined ? dto.genderMinFemale : existing.genderMinFemale,
+          genderMaxFemale:
+            dto.genderMaxFemale !== undefined ? dto.genderMaxFemale : existing.genderMaxFemale,
+          maxPlayers: nextMax,
+        })
+      : null;
     const nextScheduledAt =
       dto.scheduledAt !== undefined
         ? dto.scheduledAt
@@ -202,6 +244,19 @@ export class TournamentsAdminService {
           : null
         : existing.scheduledEndAt;
     this.assertScheduleRange(nextScheduledAt, nextScheduledEndAt);
+    if (
+      dto.entryFee !== undefined ||
+      dto.bankName !== undefined ||
+      dto.bankAccount !== undefined ||
+      dto.bankHolder !== undefined
+    ) {
+      this.assertPaidTournamentPaymentInstructions({
+        entryFee: dto.entryFee ?? existing.entryFee,
+        bankName: dto.bankName !== undefined ? dto.bankName : existing.bankName,
+        bankAccount: dto.bankAccount !== undefined ? dto.bankAccount : existing.bankAccount,
+        bankHolder: dto.bankHolder !== undefined ? dto.bankHolder : existing.bankHolder,
+      });
+    }
 
     // 종목 변경: 존재하는 종목인지 검증 후 relation 연결
     if (dto.sportId !== undefined && dto.sportId !== existing.sportId) {
@@ -214,7 +269,7 @@ export class TournamentsAdminService {
     // venue가 새로 설정되거나 기존 값과 달라질 때만 재지오코딩(불필요한 외부 호출 방지).
     // 트랜잭션 밖에서 먼저 수행 — 네트워크 호출로 트랜잭션을 붙잡아두지 않는다.
     const venueChanged = dto.venue !== undefined && dto.venue !== existing.venue;
-    const coordinates = venueChanged ? await this.geocodeVenueSafe(dto.venue!) : null;
+    const coordinates = venueChanged && dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
 
     const data: Prisma.V1TournamentUpdateInput = {};
     if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
@@ -237,6 +292,13 @@ export class TournamentsAdminService {
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
     if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
+    if (dto.genderCategory !== undefined) data.genderCategory = dto.genderCategory;
+    if (genderQuota) {
+      data.genderMinMale = genderQuota.genderMinMale;
+      data.genderMaxMale = genderQuota.genderMaxMale;
+      data.genderMinFemale = genderQuota.genderMinFemale;
+      data.genderMaxFemale = genderQuota.genderMaxFemale;
+    }
     if (dto.entryFee !== undefined) data.entryFee = dto.entryFee;
     if (dto.bankName !== undefined) data.bankName = dto.bankName;
     if (dto.bankAccount !== undefined) data.bankAccount = dto.bankAccount;
@@ -307,6 +369,9 @@ export class TournamentsAdminService {
         message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
       });
     }
+    if (to === 'open') {
+      this.assertPaidTournamentPaymentInstructions(existing);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.v1Tournament.update({ where: { id: tournamentId }, data: { status: to } });
@@ -350,6 +415,74 @@ export class TournamentsAdminService {
     }
   }
 
+  private assertPaidTournamentPaymentInstructions(input: {
+    entryFee: number;
+    bankName?: string | null;
+    bankAccount?: string | null;
+    bankHolder?: string | null;
+  }) {
+    if (input.entryFee <= 0) return;
+    if (
+      !input.bankName?.trim() ||
+      !input.bankAccount?.trim() ||
+      !input.bankHolder?.trim()
+    ) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED',
+        message: '유료 대회는 은행명, 계좌번호, 예금주를 모두 입력해야 해요.',
+      });
+    }
+  }
+
+  private normalizeGenderQuota(input: {
+    genderCategory?: TournamentGenderCategory | null;
+    genderMinMale?: number | null;
+    genderMaxMale?: number | null;
+    genderMinFemale?: number | null;
+    genderMaxFemale?: number | null;
+    maxPlayers: number;
+  }) {
+    if (input.genderCategory !== 'mixed') {
+      return {
+        genderMinMale: null,
+        genderMaxMale: null,
+        genderMinFemale: null,
+        genderMaxFemale: null,
+      };
+    }
+
+    const quota = {
+      genderMinMale: input.genderMinMale ?? null,
+      genderMaxMale: input.genderMaxMale ?? null,
+      genderMinFemale: input.genderMinFemale ?? null,
+      genderMaxFemale: input.genderMaxFemale ?? null,
+    };
+    const invalidRange =
+      (quota.genderMinMale !== null &&
+        quota.genderMaxMale !== null &&
+        quota.genderMinMale > quota.genderMaxMale) ||
+      (quota.genderMinFemale !== null &&
+        quota.genderMaxFemale !== null &&
+        quota.genderMinFemale > quota.genderMaxFemale);
+    const minimumTotal = (quota.genderMinMale ?? 0) + (quota.genderMinFemale ?? 0);
+    const maximumExceedsRoster =
+      (quota.genderMaxMale !== null && quota.genderMaxMale > input.maxPlayers) ||
+      (quota.genderMaxFemale !== null && quota.genderMaxFemale > input.maxPlayers);
+
+    if (invalidRange || minimumTotal > input.maxPlayers || maximumExceedsRoster) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID',
+        message: invalidRange
+          ? '성별 최소 인원은 최대 인원보다 클 수 없어요.'
+          : maximumExceedsRoster
+            ? '성별 최대 인원은 대회 최대 선수 수를 넘을 수 없어요.'
+            : '성별 최소 인원 합이 대회 최대 선수 수를 넘을 수 없어요.',
+      });
+    }
+
+    return quota;
+  }
+
   private assertScheduleRange(start: Date | null, end: Date | null) {
     if (!end) return;
     if (!start || end.getTime() < start.getTime()) {
@@ -378,6 +511,11 @@ export class TournamentsAdminService {
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
+      genderCategory: row.genderCategory,
+      genderMinMale: row.genderMinMale,
+      genderMaxMale: row.genderMaxMale,
+      genderMinFemale: row.genderMinFemale,
+      genderMaxFemale: row.genderMaxFemale,
       entryFee: row.entryFee,
       bankName: row.bankName,
       bankAccount: row.bankAccount,

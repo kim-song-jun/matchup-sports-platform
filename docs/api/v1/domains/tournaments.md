@@ -40,9 +40,15 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+Paid tournaments (`entryFee > 0`) require `bankName`, `bankAccount`, and `bankHolder`. Create/update rejects incomplete payment instructions with `400 TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED`, and a draft cannot transition to `open` until the same invariant is satisfied. The four-step Web wizard validates this before submission so applicants are never placed on a payment-expiry clock without usable transfer instructions.
+
 Admin create/update accepts `rulesText` up to 10,000 characters. `refundPolicyText` remains a separate field with a 2,000-character limit.
 
 Tournament schedule stores a start datetime in `scheduledAt` and an optional end datetime in `scheduledEndAt`. Admin create/update rejects `scheduledEndAt` when it is earlier than the final `scheduledAt` with `400 TOURNAMENT_SCHEDULE_RANGE_INVALID`. Public list/detail/admin responses include both fields; clients render a single date when `scheduledEndAt` is empty or the same calendar label, and a range when it spans multiple dates.
+
+Tournament gender classification uses the enum `genderCategory = mixed | male | female`. Existing tournaments may retain `null` as an honest “unclassified” state until an operator chooses a category. The four nullable mixed-roster bounds are `genderMinMale`, `genderMaxMale`, `genderMinFemale`, and `genderMaxFemale`. Bounds are stored only for `mixed`; changing a tournament to `male` or `female` clears them. Create/update rejects a minimum above its matching maximum, a combined minimum above `maxPlayers`, or an individual maximum above `maxPlayers` with `400 TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID`. Public list items expose the category, while public/admin detail responses expose the category and all four bounds.
+
+The admin creation surface is a four-step controlled wizard: basic information, schedule/location, participation requirements, then prize/rules/promotion. It uses native `datetime-local` inputs, suggests registration deadline D-3 23:59 and roster deadline D-7 23:59 until the operator manually edits each value, and preserves every field while navigating between steps. Tournament edit reuses the same date, cover, prize-breakdown, and promotion-card components. On update, clearing an optional schedule, venue, bank, rules, or refund field sends `null` and persists the cleared state instead of silently omitting the field.
 
 Admin-facing prize entry is text-first. `prizeSummary` is the public "상품 및 상금" display string and clients must render that text as entered instead of deriving `총 N원` or `최대 N원` copy from `prizePool`. `prizeBreakdown` remains the comma/dot/newline-delimited breakdown string that public detail renders as separate chips below the main prize card.
 
@@ -85,7 +91,9 @@ Registration uniqueness is `tournamentId + teamId`. If the database still has an
 
 Tournament registration ownership is team-scoped, not user-singleton. A user can belong to multiple teams, so `my-registrations` is the canonical frontend entry point for "내 신청 보기"; it returns every registration for the tournament where the caller has active membership on the registered team. `my-registration?scope=teams` remains an equivalent compatibility route, and plain `my-registration` remains for backward compatibility with one caller-created registration. Create, submit, cancel, and roster mutations remain owner/manager-only.
 
-For bank-transfer submissions, the user-facing `/tournaments/:id/my` surface must combine the registration/payment response with `GET /tournaments/:id` account fields. A `bank_transfer` payment in `ready` status still needs the tournament `bankName`, `bankAccount`, and `bankHolder` shown in the application detail, even though the registration already has a `payment` object.
+`GET /tournaments/:id` is anonymous and never returns bank account fields. For a bank-transfer registration whose payment is still `ready`, the guarded registration response includes `paymentInstructions: { bankName, bankAccount, bankHolder }`. The field is `null` for drafts, PG payments, completed/cancelled/refunded payments, and registrations the caller cannot access. The apply and `/tournaments/:id/my` surfaces must render account details only from this authorized registration contract.
+
+Submission repeats the paid-tournament account invariant under the tournament row lock. A paid `bank_transfer` submission with missing bank details is rejected with `409 TOURNAMENT_PAYMENT_INSTRUCTIONS_MISSING` before the registration enters `awaiting_payment`, so the two-hour payment-expiry clock never starts without usable instructions.
 
 Public tournament list/detail responses include both `confirmedCount` and `pendingPaymentCount`. `pendingPaymentCount` counts registrations in payment-stage statuses (`awaiting_payment`, `payment_checking`, `paid`) so clients can show predicted capacity as confirmed + payment-pending teams. `POST /registrations` and `POST /registrations/:registrationId/submit` reject with `409 TOURNAMENT_CAPACITY_FULL` when confirmed + payment-stage registrations already reaches `teamCount`; draft registrations do not reserve capacity.
 
@@ -113,7 +121,9 @@ The service reads the selected member's profile and phone from the team membersh
 
 If any required source field is missing, the API rejects the request with `400 PLAYER_REQUIRED_PROFILE_MISSING`.
 
-The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. Missing profile gender does not block roster registration and is returned as `null`/shown as `미등록`.
+The stored roster snapshot uses the server-side member profile values for `realName`, `birthDateSnapshot`, and nullable `genderSnapshot`; clients must not treat editable form values as the source of truth. Gender accepts the profile contract values `male` and `female`. A `mixed` tournament requires a profile gender when a player is added; missing gender is rejected with `400 PLAYER_REQUIRED_PROFILE_MISSING`. Legacy or non-mixed roster snapshots may still be `null` and are shown as `미등록`.
+
+`POST /api/v1/admin/registrations/:registrationId/roster-lock` locks the registration row and validates a mixed tournament's active-player `genderSnapshot` counts in the same serializable transaction. A violated minimum or maximum returns `409 TOURNAMENT_GENDER_QUOTA_NOT_MET` with `details.male` and `details.female`, each containing `count`, `min`, `max`, and `ok`; the roster remains unlocked. Male/female tournament categories are labels only and do not enforce a player-gender match.
 
 Admin roster reads use the dedicated `/admin/registrations/:registrationId/players` endpoint. They must not reuse the team-member endpoint because active admins are not necessarily members of the registered team. Owner, ops, and support admins may read the roster; eligibility mutation remains owner/ops-only.
 

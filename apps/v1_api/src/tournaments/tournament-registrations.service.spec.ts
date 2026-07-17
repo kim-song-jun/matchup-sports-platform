@@ -16,7 +16,19 @@ import { TournamentRegistrationsService } from './tournament-registrations.servi
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
 function openTournament(overrides: Record<string, unknown> = {}) {
-  return { id: 'tournament-1', sportId: 'sport-futsal', status: 'open', entryFee: 120000, teamCount: 8, registrationDeadlineAt: null, deletedAt: null, ...overrides };
+  return {
+    id: 'tournament-1',
+    sportId: 'sport-futsal',
+    status: 'open',
+    entryFee: 120000,
+    bankName: '국민은행',
+    bankAccount: '123-456',
+    bankHolder: '팀밋',
+    teamCount: 8,
+    registrationDeadlineAt: null,
+    deletedAt: null,
+    ...overrides,
+  };
 }
 function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -239,6 +251,21 @@ describe('TournamentRegistrationsService', () => {
     ).rejects.toMatchObject({ response: { code: 'DEPOSITOR_NAME_REQUIRED' } });
   });
 
+  it('submit: paid bank transfer without account instructions is rejected before the payment clock starts', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      openTournament({ bankName: null, bankAccount: null, bankHolder: null }),
+    );
+
+    await expect(
+      service.submit(manager, 'tournament-1', 'reg-1', validSubmit),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_MISSING' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+  });
+
   it('submit: draft team no longer matches the tournament sport → 409 TEAM_SPORT_MISMATCH', async () => {
     // Given: a draft registration whose managed team belongs to a different sport.
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
@@ -273,10 +300,32 @@ describe('TournamentRegistrationsService', () => {
         amount: 120000,
         paymentDueAt: '2026-06-14T02:00:00.000Z',
       },
+      paymentInstructions: {
+        bankName: '국민은행',
+        bankAccount: '123-456',
+        bankHolder: '팀밋',
+      },
     });
     expect(prisma.v1TournamentPayment.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ create: expect.objectContaining({ method: 'bank_transfer', amount: 120000, status: 'ready' }) }),
     );
+  });
+
+  it('submit: returns the account instructions re-read under the tournament lock', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(openTournament({ bankAccount: 'before-lock' }))
+      .mockResolvedValueOnce(openTournament({ bankAccount: 'after-lock' }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'awaiting_payment', depositorName: '홍길동' }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    const result = await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(result.paymentInstructions).toMatchObject({
+      bankAccount: 'after-lock',
+    });
   });
 
   it('submit: confirmed plus payment-stage registrations fill capacity → 409 TOURNAMENT_CAPACITY_FULL', async () => {
@@ -436,12 +485,18 @@ describe('TournamentRegistrationsService', () => {
     const row = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(row);
     prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     const result = await service.getMyRegistration(manager, 'tournament-1');
     expect(result).toMatchObject({
       id: 'reg-1',
       appliedByUserId: manager.id,
       status: 'awaiting_payment',
       payment: { method: 'bank_transfer', status: 'ready', amount: 120000 },
+      paymentInstructions: {
+        bankName: '국민은행',
+        bankAccount: '123-456',
+        bankHolder: '팀밋',
+      },
     });
     // Must query by tournamentId AND appliedByUserId — not by a different user's id
     expect(prisma.v1TournamentRegistration.findFirst).toHaveBeenCalledWith(
@@ -534,6 +589,7 @@ describe('TournamentRegistrationsService', () => {
       },
     ];
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(rows);
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
     prisma.v1TournamentPlayer.groupBy.mockResolvedValue([
       { registrationId: 'reg-team-1', _count: { registrationId: 1 } },
       { registrationId: 'reg-team-2', _count: { registrationId: 3 } },
@@ -543,7 +599,17 @@ describe('TournamentRegistrationsService', () => {
 
     expect(result).toEqual([
       expect.objectContaining({ id: 'reg-team-1', teamId: 'team-1', teamName: '1번 팀', playerCount: 1 }),
-      expect.objectContaining({ id: 'reg-team-2', teamId: 'team-2', teamName: '2번 팀', playerCount: 3 }),
+      expect.objectContaining({
+        id: 'reg-team-2',
+        teamId: 'team-2',
+        teamName: '2번 팀',
+        playerCount: 3,
+        paymentInstructions: {
+          bankName: '국민은행',
+          bankAccount: '123-456',
+          bankHolder: '팀밋',
+        },
+      }),
     ]);
     expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -20,9 +20,15 @@ function makeTournament(
     venue: null,
     latitude: null,
     longitude: null,
+    coverImageUrl: null,
     teamCount: 8,
     minPlayers: 5,
     maxPlayers: 10,
+    genderCategory: null,
+    genderMinMale: null,
+    genderMaxMale: null,
+    genderMinFemale: null,
+    genderMaxFemale: null,
     entryFee: 0,
     prizePool: null,
     prizeSummary: null,
@@ -47,9 +53,7 @@ function makeTournament(
     promoListLocationText: null,
     promoListPrizeText: null,
     promoListPriority: 0,
-    bankName: null,
-    bankAccount: null,
-    bankHolder: null,
+    campaignSlug: null,
     rulesText: null,
     refundPolicyText: null,
     confirmedCount: 0,
@@ -107,5 +111,45 @@ describe('public tournament QA regressions', () => {
     );
 
     expect(screen.getByRole('link', { name: '순위·브래킷으로 이동' })).toBeInTheDocument();
+  });
+
+  it('lets keyboard users replay the mobile champion celebration', () => {
+    const tournament = makeTournament({
+      format: 'knockout',
+      status: 'completed',
+      fixtures: [
+        {
+          id: 'final-1',
+          groupId: null,
+          round: 'final',
+          fixtureNumber: 1,
+          legNumber: 1,
+          scheduledAt: null,
+          venue: null,
+          homeTeamName: '서울 유나이티드',
+          homeRegistrationId: 'registration-home',
+          awayTeamName: '부산 FC',
+          awayRegistrationId: 'registration-away',
+          status: 'completed',
+          result: {
+            homeScore: 2,
+            awayScore: 1,
+            hasPenalty: false,
+            homePenaltyScore: null,
+            awayPenaltyScore: null,
+            note: null,
+            recordedAt: '2026-07-16T00:00:00.000Z',
+          },
+          videos: [],
+        },
+      ],
+    });
+
+    render(<ResultsPageContent tournament={tournament} />);
+    const champion = screen.getByRole('button', { name: /우승팀: 서울 유나이티드/ });
+
+    fireEvent.keyDown(champion, { key: 'Enter' });
+
+    expect(champion).toHaveAttribute('tabindex', '0');
   });
 });

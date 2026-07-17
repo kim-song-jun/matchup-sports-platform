@@ -138,7 +138,12 @@ export class TournamentPlayersService {
 
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      select: { maxPlayers: true, minPlayers: true, rosterDeadlineAt: true },
+      select: {
+        maxPlayers: true,
+        minPlayers: true,
+        rosterDeadlineAt: true,
+        genderCategory: true,
+      },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -184,10 +189,13 @@ export class TournamentPlayersService {
       const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
       const memberGender = normalizeGender(teamMembership.user.profile?.gender);
       const memberPhone = teamMembership.user.phone?.trim();
-      if (!memberRealName || !memberBirthDate || !memberPhone) {
+      const requiresGender = current.tournament.genderCategory === 'mixed';
+      if (!memberRealName || !memberBirthDate || !memberPhone || (requiresGender && !memberGender)) {
         throw new BadRequestException({
           code: 'PLAYER_REQUIRED_PROFILE_MISSING',
-          message: '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+          message: requiresGender
+            ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
+            : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
         });
       }
 
@@ -457,7 +465,12 @@ export class TournamentPlayersService {
     }
     const tournament = await tx.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      select: { maxPlayers: true, minPlayers: true, rosterDeadlineAt: true },
+      select: {
+        maxPlayers: true,
+        minPlayers: true,
+        rosterDeadlineAt: true,
+        genderCategory: true,
+      },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });

@@ -18,6 +18,7 @@
     "db:seed": "ts-node prisma/seed.ts --mode=base",
     "db:seed:demo": "ts-node prisma/seed.ts --mode=demo",
     "db:seed:all": "ts-node prisma/seed.ts --mode=all",
+    "db:seed:event-campaigns": "ts-node prisma/seed-event-campaigns.ts",
     "db:cleanup:demo": "ts-node prisma/cleanup-demo-data.ts",
     "db:generate": "prisma generate",
     "test": "jest --selectProjects unit",

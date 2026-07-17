@@ -78,6 +78,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     maxPlayers: 10,
     deletedAt: null,
     rosterDeadlineAt: null,
+    genderCategory: null,
     ...overrides,
   };
 }
@@ -572,6 +573,37 @@ describe('TournamentPlayersService', () => {
         create: expect.objectContaining({ genderSnapshot: null }),
       }),
     );
+  });
+
+  it('addPlayer: mixed tournament requires a gender snapshot source', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(
+        teamPlayerMembershipRow({
+          user: {
+            phone: '01012345678',
+            profile: { displayName: '홍길동', birthDate: '1995-03-15', gender: null },
+          },
+        }),
+      );
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({ genderCategory: 'mixed' }),
+    );
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'PLAYER_REQUIRED_PROFILE_MISSING',
+        message: expect.stringContaining('성별'),
+      },
+    });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
   });
 
   // ─── 8. 명단 조회 + belowMinimum ────────────────────────────────────────

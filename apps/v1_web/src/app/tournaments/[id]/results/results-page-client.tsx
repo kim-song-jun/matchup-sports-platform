@@ -241,8 +241,16 @@ function MobileChampionBanner({
   return (
     <div
       className={`tm-hide-desktop tm-res-hero${played ? ' tm-res-hero-in' : ''}`}
-      aria-label={`우승팀: ${champion}`}
+      aria-label={`우승팀: ${champion}. 축하 효과 다시 재생`}
+      role="button"
+      tabIndex={0}
       onClick={replay}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          replay();
+        }
+      }}
       style={{ cursor: 'pointer' }}
     >
       {played && <Confetti count={32} />}
@@ -628,6 +636,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
+      <h1 className="sr-only">{tournament.title} 최종 결과</h1>
       {/* ── 챔피언 섹션 ── */}
       {isCompleted && championName && (
         <div style={{ padding: '16px 20px 0' }}>

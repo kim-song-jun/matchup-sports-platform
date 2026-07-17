@@ -625,6 +625,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
 
   return (
     <div className="tm-tourn-sub-page">
+      <h1 className="sr-only">{tournament.title} 시상과 리뷰</h1>
       {!isCompleted && (
         <div style={{ padding: '20px 20px 0' }}>
           <NotCompletedNotice status={tournament.status} />

@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, SectionTitle } from '@/components/v1-ui/primitives';
-import { ChevronRight } from 'lucide-react';
+import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
+import { ChevronRight, UsersRound } from 'lucide-react';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
@@ -20,6 +20,10 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatEntryFee } from '@/lib/date-utils';
+import {
+  filterTournamentTeamsBySport,
+  getTournamentTeamEmptyState,
+} from '@/lib/tournament-team-eligibility';
 import type {
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
@@ -221,8 +225,7 @@ function RegistrationPass({
   belowMinimum: boolean;
 }) {
   const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
-  const pathname = usePathname();
-  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`, pathname);
+  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`);
 
   /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
   if (status === 'awaiting_payment') {
@@ -607,16 +610,12 @@ function RegistrationDetailView({
     scheduledAt: string | null;
     scheduledEndAt: string | null;
     venue: string | null;
-    bankName: string | null;
-    bankAccount: string | null;
-    bankHolder: string | null;
   };
   registration: V1TournamentRegistration;
   canManageRegistration: boolean;
 }) {
-  const pathname = usePathname();
-  const tournamentHref = appRoute(`/tournaments/${tournamentId}`, pathname);
-  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registration.id}/roster`, pathname);
+  const tournamentHref = appRoute(`/tournaments/${tournamentId}`);
+  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registration.id}/roster`);
   const { data: rosterData } = useV1TournamentPlayers(tournamentId, registration.id);
   const cancelRequest = useV1CancelRegistrationRequest(tournamentId, registration.id);
   const withdrawCancelRequest = useV1WithdrawCancelRegistrationRequest(tournamentId, registration.id);
@@ -625,6 +624,8 @@ function RegistrationDetailView({
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [withdrawCancelError, setWithdrawCancelError] = useState<string | null>(null);
+  const cancelBusyRef = useRef(false);
+  const withdrawCancelBusyRef = useRef(false);
 
   const statusConfig = registrationStatusConfig(registration.status);
   const players = rosterData?.players ?? [];
@@ -663,44 +664,50 @@ function RegistrationDetailView({
    * card only renders for states without a pass (e.g. awaiting_payment). */
   const passShowsRoster =
     registration.status === 'confirmed' || registration.status === 'paid';
+  const paymentInstructions = registration.paymentInstructions;
   const shouldShowBankTransferAccount = shouldShowBankTransferAccountInfo({
     paymentMethod: registration.payment?.method,
     paymentStatus: registration.payment?.status,
-    bankName: tournament.bankName,
-    bankAccount: tournament.bankAccount,
-    bankHolder: tournament.bankHolder,
+    bankName: paymentInstructions?.bankName,
+    bankAccount: paymentInstructions?.bankAccount,
+    bankHolder: paymentInstructions?.bankHolder,
   });
   const paymentDetailMessage =
-    registration.status === 'payment_checking'
-      ? '입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
-      : registration.status === 'awaiting_payment'
-        ? tournament.bankName
-          ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.'
-          : '계좌 정보는 확인 후 알림으로 안내드릴게요. 입금 완료 후 상태가 변경돼요.'
-        : null;
+    registration.status === 'cancel_requested'
+      ? '취소 요청을 검토 중이에요. 처리 결과를 안내받기 전에는 추가 입금을 하지 마세요.'
+      : registration.status === 'payment_checking'
+        ? '입금이 확인됐어요. 운영자가 선수 명단과 참가 조건을 확인하고 있어요.'
+        : registration.status === 'awaiting_payment'
+          ? paymentInstructions
+            ? '위 계좌로 참가비를 입금해 주세요. 입금 확인 후 상태가 변경돼요.'
+            : '입금 안내를 불러오지 못했어요. 새로고침 후에도 보이지 않으면 운영팀에 문의해 주세요.'
+          : null;
   const showAwaitingPaymentNotice = registration.status === 'awaiting_payment';
 
   async function handleCancelConfirm(reason: string) {
-    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
-    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
-    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-    if (cancelRequest.isPending) return;
+    if (cancelBusyRef.current || cancelRequest.isPending) return;
+    cancelBusyRef.current = true;
     setCancelError(null);
     try {
       await cancelRequest.mutateAsync({ reason: reason || undefined });
       setShowCancelModal(false);
     } catch (err) {
       setCancelError(extractErrorMessage(err, '취소 요청 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
+    } finally {
+      cancelBusyRef.current = false;
     }
   }
 
   async function handleWithdrawCancelRequest() {
-    if (withdrawCancelRequest.isPending) return;
+    if (withdrawCancelBusyRef.current || withdrawCancelRequest.isPending) return;
+    withdrawCancelBusyRef.current = true;
     setWithdrawCancelError(null);
     try {
       await withdrawCancelRequest.mutateAsync();
     } catch (err) {
       setWithdrawCancelError(extractErrorMessage(err, '취소 요청 철회 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
+    } finally {
+      withdrawCancelBusyRef.current = false;
     }
   }
 
@@ -973,9 +980,9 @@ function RegistrationDetailView({
                       ) : null}
                       {shouldShowBankTransferAccount ? (
                         <>
-                          <InfoRow label="은행" value={tournament.bankName ?? ''} />
-                          <InfoRow label="계좌번호" value={tournament.bankAccount ?? ''} />
-                          <InfoRow label="예금주" value={tournament.bankHolder ?? ''} isLast />
+                          <InfoRow label="은행" value={paymentInstructions?.bankName ?? ''} />
+                          <InfoRow label="계좌번호" value={paymentInstructions?.bankAccount ?? ''} />
+                          <InfoRow label="예금주" value={paymentInstructions?.bankHolder ?? ''} isLast />
                           <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
                             {paymentDetailMessage ?? '입금이 확인됐어요. 운영자가 신청 상태를 확인하고 있어요.'}
                           </div>
@@ -1002,11 +1009,11 @@ function RegistrationDetailView({
                         />
                       ) : null}
                       {/* awaiting_payment 상태이고 계좌 정보가 있으면 입금 안내 렌더 */}
-                      {registration.status === 'awaiting_payment' && tournament.bankName ? (
+                      {registration.status === 'awaiting_payment' && paymentInstructions ? (
                         <>
-                          <InfoRow label="은행" value={tournament.bankName} />
-                          <InfoRow label="계좌번호" value={tournament.bankAccount ?? ''} />
-                          <InfoRow label="예금주" value={tournament.bankHolder ?? ''} isLast />
+                          <InfoRow label="은행" value={paymentInstructions.bankName} />
+                          <InfoRow label="계좌번호" value={paymentInstructions.bankAccount} />
+                          <InfoRow label="예금주" value={paymentInstructions.bankHolder} isLast />
                         </>
                       ) : null}
                       <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, paddingTop: 4 }}>
@@ -1139,8 +1146,6 @@ function MyRegistrationsList({
   tournamentId: string;
   registrations: V1TournamentRegistration[];
 }) {
-  const pathname = usePathname();
-
   return (
     <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
       <div style={{ marginLeft: -20, marginRight: -20 }}>
@@ -1149,7 +1154,7 @@ function MyRegistrationsList({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
         {registrations.map((registration) => {
           const status = registrationStatusConfig(registration.status);
-          const href = appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname);
+          const href = appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`);
           const teamName = registration.teamName ?? `팀 ${registration.teamId.slice(0, 8)}`;
           const primaryAction = registration.status === 'draft' ? '이어서 작성' : '상세 보기';
           return (
@@ -1195,17 +1200,21 @@ function MyRegistrationsList({
 
 function TeamRegistrationHub({
   tournamentId,
+  tournamentSportId,
   teams,
+  hasAnyTeam,
   registrations,
   canStartNewRegistration,
 }: {
   tournamentId: string;
+  tournamentSportId: string | null;
   teams: V1MyTeam[];
+  hasAnyTeam: boolean;
   registrations: V1TournamentRegistration[];
   canStartNewRegistration: boolean;
 }) {
-  const pathname = usePathname();
   const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
+  const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
 
   return (
     <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
@@ -1213,28 +1222,28 @@ function TeamRegistrationHub({
         <SectionTitle title="팀별 대회 신청" />
       </div>
       <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
-        팀마다 별도로 신청할 수 있어요. 신청한 팀은 상세를 관리하고, 미신청 팀은 바로 신청을 시작하세요.
+        팀별로 신청하고 내역을 관리하세요.
       </p>
 
       {teams.length === 0 ? (
-        <Card pad={24} style={{ marginTop: 14, textAlign: 'center' }}>
-          <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
-            소속된 팀이 없어요
-          </div>
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 8 }}>
-            팀을 만든 뒤 대회에 참가 신청할 수 있어요.
-          </p>
-          <Link href="/teams/new" className="tm-btn tm-btn-lg tm-btn-primary" style={{ marginTop: 18, display: 'inline-flex' }}>
-            팀 만들기
-          </Link>
-        </Card>
+        <div className="tm-tournament-registration-empty">
+          <EmptyState
+            title={emptyState.title}
+            sub={emptyState.description}
+            cta="팀 만들기"
+            onCta={() => { window.location.href = '/teams/new'; }}
+            icon={<UsersRound size={36} strokeWidth={1.5} />}
+          />
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
           {teams.map((team) => {
             const registration = registrationByTeamId.get(team.teamId);
             const canManageTeam = team.role === 'owner' || team.role === 'manager';
+            const matchesTournamentSport = team.sport.sportId === tournamentSportId;
             const canResumeRegistration =
               canManageTeam &&
+              matchesTournamentSport &&
               Boolean(registration) &&
               (registration?.status === 'draft' || registration?.status === 'cancelled') &&
               canStartNewRegistration;
@@ -1251,10 +1260,11 @@ function TeamRegistrationHub({
                     ? '상세 관리'
                     : '신청 시작';
             const href = registration && registration.status !== 'draft' && registration.status !== 'cancelled'
-              ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname)
-              : appRoute(`/tournaments/${tournamentId}/apply?team=${team.teamId}`, pathname);
+              ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`)
+              : appRoute(`/tournaments/${tournamentId}/apply?team=${team.teamId}`);
             const actionDisabled =
               !canManageTeam ||
+              !matchesTournamentSport ||
               ((!registration || registration.status === 'cancelled') && !canStartNewRegistration);
             const displayActionLabel = registration
               ? canResumeRegistration
@@ -1264,7 +1274,7 @@ function TeamRegistrationHub({
                   : '\uC0C1\uC138 \uBCF4\uAE30'
               : actionLabel;
             const displayHref = registration && !canResumeRegistration
-              ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname)
+              ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`)
               : href;
             const displayActionDisabled = registration ? false : actionDisabled;
             const meta = registration
@@ -1385,7 +1395,9 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
       <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
         <TeamRegistrationHub
           tournamentId={tournamentId}
+          tournamentSportId={null}
           teams={teams}
+          hasAnyTeam={teams.length > 0}
           registrations={registrations}
           canStartNewRegistration={false}
         />
@@ -1394,11 +1406,18 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   }
 
   if (!selectedRegistration) {
+    const registrationTeamIds = new Set(registrations.map((registration) => registration.teamId));
+    const eligibleTeams = filterTournamentTeamsBySport(teams, tournament.sportId);
+    const visibleTeams = teams.filter(
+      (team) => eligibleTeams.includes(team) || registrationTeamIds.has(team.teamId),
+    );
     return (
       <AppChrome title="내 신청" backHref={pageBackHref} bottomNav={false} activeTab="tournaments">
         <TeamRegistrationHub
           tournamentId={tournamentId}
-          teams={teams}
+          tournamentSportId={tournament.sportId}
+          teams={visibleTeams}
+          hasAnyTeam={teams.length > 0}
           registrations={registrations}
           canStartNewRegistration={
             tournament.status === 'open' &&
@@ -1425,9 +1444,6 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           scheduledAt: tournament.scheduledAt,
           scheduledEndAt: tournament.scheduledEndAt,
           venue: tournament.venue,
-          bankName: tournament.bankName,
-          bankAccount: tournament.bankAccount,
-          bankHolder: tournament.bankHolder,
         }}
         registration={selectedRegistration}
         canManageRegistration={canManageSelectedRegistration}

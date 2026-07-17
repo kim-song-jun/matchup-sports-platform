@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type {
@@ -15,21 +15,41 @@ import type {
 const adminTournamentCampaignPreviewKey = (id: string) =>
   [...v1Keys.adminTournamentCampaign(id), 'preview'] as const;
 
-export function useV1TournamentCampaigns(params?: {
+type PublicCampaignListParams = {
   cursor?: string;
   limit?: number;
   sportCode?: string;
-}) {
+};
+
+function publicCampaignListPath(params?: PublicCampaignListParams): string {
   const searchParams = new URLSearchParams();
   if (params?.cursor) searchParams.set('cursor', params.cursor);
   if (params?.limit) searchParams.set('limit', String(params.limit));
   if (params?.sportCode) searchParams.set('sportCode', params.sportCode);
   const qs = searchParams.toString();
+  return `/tournaments/campaigns${qs ? `?${qs}` : ''}`;
+}
+
+export function useV1TournamentCampaigns(params?: PublicCampaignListParams) {
   return useQuery({
     queryKey: v1Keys.tournamentCampaigns(params ?? {}),
-    queryFn: () => v1Get<V1TournamentCampaignList>(
-      `/tournaments/campaigns${qs ? `?${qs}` : ''}`,
-    ),
+    queryFn: () => v1Get<V1TournamentCampaignList>(publicCampaignListPath(params)),
+    staleTime: 60_000,
+  });
+}
+
+export function useV1TournamentCampaignsInfinite(params?: {
+  limit?: number;
+  sportCode?: string;
+}) {
+  return useInfiniteQuery({
+    queryKey: [...v1Keys.tournamentCampaigns(params ?? {}), 'infinite'] as const,
+    queryFn: ({ pageParam }) =>
+      v1Get<V1TournamentCampaignList>(
+        publicCampaignListPath({ ...params, cursor: pageParam ?? undefined }),
+      ),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 60_000,
   });
 }
@@ -50,13 +70,13 @@ export function useV1AdminTournamentCampaign(id: string) {
   });
 }
 
-export function useV1AdminTournamentCampaignPreview(id: string) {
+export function useV1AdminTournamentCampaignPreview(id: string, enabled = true) {
   return useQuery({
     queryKey: adminTournamentCampaignPreviewKey(id),
     queryFn: () => v1Get<V1AdminTournamentCampaignPreview>(
       `/admin/tournaments/${id}/campaign/preview`,
     ),
-    enabled: !!id,
+    enabled: Boolean(id) && enabled,
   });
 }
 

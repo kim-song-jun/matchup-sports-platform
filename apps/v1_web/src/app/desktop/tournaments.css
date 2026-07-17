@@ -1336,7 +1336,17 @@
   border: 1px solid var(--border);
 }
 
+.tm-tournament-registration-empty {
+  width: 100%;
+  max-width: 520px;
+  margin: 14px auto 0;
+}
+
 @media (min-width: 1024px) {
+  .tm-tournament-promo-carousel {
+    margin-inline: 0;
+  }
+
   .tm-tournament-promo-card,
   .tm-tournament-promo-card-content {
     min-height: 210px;

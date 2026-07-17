@@ -148,7 +148,9 @@ export function TournamentPromoCarousel({
                 aria-label={`${index + 1} / ${promos.length}: ${title}`}
               >
                 <Link
-                  href={`/tournaments/${promo.id}`}
+                  href={promo.campaignSlug
+                    ? `/tournaments/campaigns/${promo.campaignSlug}`
+                    : `/tournaments/${promo.id}`}
                   className="tm-tournament-promo-card tm-pressable"
                   aria-label={`${title} 자세히 보기`}
                   style={{

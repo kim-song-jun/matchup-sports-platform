@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CalendarDays, MapPin, Users, Trophy, Sparkles } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -11,11 +11,18 @@ import {
   formatTournamentDateRangeShort,
   formatEntryFee,
 } from '@/lib/date-utils';
-import { publicAssetPath } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
-import { useV1TournamentCampaigns } from '@/hooks/use-v1-tournament-campaign';
+import { useV1TournamentCampaignsInfinite } from '@/hooks/use-v1-tournament-campaign';
 import { useV1MasterSports } from '@/hooks/use-v1-api';
 import type { V1TournamentCampaignListItem } from '@/types/tournament-campaign';
+import { TournamentCampaignMedia } from '@/components/tournaments/tournament-campaign-media';
+
+const TRANSPORT_ERROR_MESSAGE = /^(failed to fetch|load failed|network(?: error| request failed| unavailable)?)$/i;
+
+function getEventErrorMessage(error: unknown, fallback: string) {
+  const message = extractErrorMessage(error, fallback).trim();
+  return TRANSPORT_ERROR_MESSAGE.test(message) ? fallback : message;
+}
 
 export default function EventsPage() {
   return (
@@ -27,11 +34,28 @@ export default function EventsPage() {
 
 function EventsContent() {
   const [activeSportCode, setActiveSportCode] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const sportCode = new URLSearchParams(window.location.search).get('sport');
+    if (sportCode && /^[a-z0-9-]{1,40}$/i.test(sportCode)) {
+      setActiveSportCode(sportCode);
+    }
+  }, []);
   const { data: sportsData } = useV1MasterSports();
-  const { data, isLoading, isError, error } = useV1TournamentCampaigns({
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    refetch,
+  } = useV1TournamentCampaignsInfinite({
     sportCode: activeSportCode,
     limit: 30,
   });
+  const items = data?.pages.flatMap((page) => page.items) ?? [];
 
   const filterSports = (sportsData ?? []).filter((s) => s.code).map((s) => ({
     code: s.code as string,
@@ -54,7 +78,7 @@ function EventsContent() {
       {/* 종목 필터 */}
       {filterSports.length > 0 ? (
         <div
-          role="tablist"
+          role="group"
           aria-label="종목 필터"
           style={{
             display: 'flex',
@@ -65,8 +89,7 @@ function EventsContent() {
           }}
         >
           <button
-            role="tab"
-            aria-selected={activeSportCode === undefined}
+            aria-pressed={activeSportCode === undefined}
             type="button"
             onClick={() => setActiveSportCode(undefined)}
             className="tm-chip"
@@ -81,8 +104,7 @@ function EventsContent() {
           {filterSports.map((s) => (
             <button
               key={s.code}
-              role="tab"
-              aria-selected={activeSportCode === s.code}
+              aria-pressed={activeSportCode === s.code}
               type="button"
               onClick={() => setActiveSportCode((prev) => prev === s.code ? undefined : s.code)}
               className="tm-chip"
@@ -102,36 +124,63 @@ function EventsContent() {
       <div style={{ padding: '16px 20px 0' }}>
         {isLoading ? (
           <EventListSkeleton />
-        ) : isError ? (
+        ) : isError && !data ? (
           <ErrorState
             title="이벤트를 불러오지 못했어요"
-            message={extractErrorMessage(error, '잠시 후 다시 시도해 주세요.')}
+            message={getEventErrorMessage(error, '잠시 후 다시 시도해 주세요.')}
+            onRetry={() => void refetch()}
           />
-        ) : !data || data.items.length === 0 ? (
+        ) : items.length === 0 ? (
           <EmptyState
             icon={<Sparkles size={36} />}
             title="등록된 이벤트가 없어요"
             sub="진행 예정 대회가 캠페인으로 등록되면 여기에 나타나요."
           />
         ) : (
-          <ul
-            role="list"
-            style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}
-            aria-label={`이벤트 목록, ${data.items.length}개`}
-          >
-            {data.items.map((item) => (
-              <li key={item.id} role="listitem">
-                <EventCard item={item} />
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul
+              role="list"
+              style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}
+              aria-label={`이벤트 목록, ${items.length}개`}
+            >
+              {items.map((item) => (
+                <li key={item.id} role="listitem">
+                  <EventCard item={item} activeSportCode={activeSportCode} />
+                </li>
+              ))}
+            </ul>
+            {isFetchNextPageError ? (
+              <div role="alert" className="tm-card" style={{ marginTop: 12 }}>
+                <p className="tm-text-caption" style={{ margin: 0 }}>
+                  {getEventErrorMessage(error, '다음 이벤트를 불러오지 못했어요.')}
+                </p>
+              </div>
+            ) : null}
+            {hasNextPage ? (
+              <button
+                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                type="button"
+                disabled={isFetchingNextPage}
+                onClick={() => void fetchNextPage()}
+                style={{ marginTop: 16 }}
+              >
+                {isFetchingNextPage ? '불러오는 중…' : '더 보기'}
+              </button>
+            ) : null}
+          </>
         )}
       </div>
     </div>
   );
 }
 
-function EventCard({ item }: { readonly item: V1TournamentCampaignListItem }) {
+function EventCard({
+  item,
+  activeSportCode,
+}: {
+  readonly item: V1TournamentCampaignListItem;
+  readonly activeSportCode?: string;
+}) {
   const sportAccent = getSportAccent(item.tournament.sport.code);
   const status = getTournamentStatusConfig(item.tournament.status);
   const dateLabel = formatTournamentDateRangeShort(
@@ -142,7 +191,9 @@ function EventCard({ item }: { readonly item: V1TournamentCampaignListItem }) {
 
   return (
     <Link
-      href={`/tournaments/campaigns/${item.slug}`}
+      href={`/tournaments/campaigns/${item.slug}?from=events${
+        activeSportCode ? `&sport=${encodeURIComponent(activeSportCode)}` : ''
+      }`}
       className="tm-card tm-pressable"
       style={{ display: 'flex', flexDirection: 'column', gap: 12, textDecoration: 'none', overflow: 'hidden' }}
       aria-label={`${item.heroTitle} — ${item.tournament.sport.name} — ${status.label}`}
@@ -158,10 +209,11 @@ function EventCard({ item }: { readonly item: V1TournamentCampaignListItem }) {
             background: 'var(--grey100)',
           }}
         >
-          <img
-            src={publicAssetPath(item.heroImageUrl)}
+          <TournamentCampaignMedia
+            src={item.heroImageUrl}
+            sportCode={item.tournament.sport.code}
             alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            className="h-full w-full object-cover"
           />
         </div>
       ) : (

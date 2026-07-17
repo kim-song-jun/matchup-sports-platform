@@ -76,4 +76,24 @@ describe('TournamentPromoCarousel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('추천 대회를 불러오지 못했어요.');
     expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeInTheDocument();
   });
+
+  it('links a promoted tournament to its published campaign when a campaign slug exists', () => {
+    render(
+      <TournamentPromoCarousel
+        items={[
+          { ...promo('campaign-tournament', 0), campaignSlug: 'summer-futsal-cup' },
+          promo('detail-tournament', 1),
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: '홍보 campaign-tournament 자세히 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/campaigns/summer-futsal-cup',
+    );
+    expect(screen.getByRole('link', { name: '홍보 detail-tournament 자세히 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/detail-tournament',
+    );
+  });
 });

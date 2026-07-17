@@ -183,6 +183,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
       activeTab="tournaments"
     >
       <div className="tm-tourn-sub-page">
+        <h1 className="sr-only">대회 참가팀 후기</h1>
         <div className="tm-reviews-body" style={{ padding: '20px 20px 40px' }}>
           <label className="tm-reviews-searchbar">
             <Search size={16} aria-hidden="true" />

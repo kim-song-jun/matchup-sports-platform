@@ -1,108 +1,351 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, Check } from 'lucide-react';
-import { useV1CreateTournament, useV1MasterSports, useV1UploadImages } from '@/hooks/use-v1-api';
-import { onlyDigits, formatWithComma } from '@/lib/number-format';
-import { extractErrorMessage } from '@/lib/error-message';
-import { publicAssetPath } from '@/lib/assets';
-import type { V1TournamentFormat } from '@/types/api';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy } from 'lucide-react';
+import { useReducer, useState } from 'react';
 import {
-  AdminPageHeader,
-  AdminToasts,
-  useAdminToast,
-} from '@/components/admin';
+  useV1AdminTournaments,
+  useV1CreateTournament,
+  useV1MasterSports,
+  useV1UploadImages,
+} from '@/hooks/use-v1-api';
+import { extractErrorMessage } from '@/lib/error-message';
+import { formatWithComma, onlyDigits } from '@/lib/number-format';
+import type { V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
+import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
+import {
+  PrizeBreakdownEditor,
+  type TournamentPrizeRow,
+} from '@/components/admin/tournaments/prize-breakdown-editor';
+import {
+  PromoCardFields,
+  type TournamentPromoCardValue,
+} from '@/components/admin/tournaments/promo-card-fields';
+import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
+import {
+  INITIAL_TOURNAMENT_CREATE_STATE,
+  TOURNAMENT_CREATE_STEPS,
+  buildTournamentCreatePayload,
+  canSubmitTournamentCreate,
+  tournamentCreateReducer,
+  validateTournamentCreateStep,
+  type TournamentCreateAction,
+  type TournamentCreateState,
+} from './tournament-create-model';
 
-// ── 작성 단계 스태퍼 (스크롤스파이) ─────────────────────────────────────────
+const inputClass =
+  'h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+const textareaClass =
+  'w-full resize-none rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
-const FORM_SECTIONS = [
-  { id: 'tsec-basic', label: '기본 정보' },
-  { id: 'tsec-team', label: '팀·선수 설정' },
-  { id: 'tsec-fee', label: '참가비·계좌' },
-  { id: 'tsec-prize', label: '상금·시상' },
-  { id: 'tsec-rules', label: '규정·환불 정책' },
-] as const;
+export default function AdminTournamentsNewPage() {
+  const router = useRouter();
+  const { toasts, showToast } = useAdminToast();
+  const [state, dispatch] = useReducer(
+    tournamentCreateReducer,
+    INITIAL_TOURNAMENT_CREATE_STATE,
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [promoUploadingSlot, setPromoUploadingSlot] = useState<'promoHome' | 'promoList' | null>(
+    null,
+  );
+  const { data: sports, isPending: sportsPending } = useV1MasterSports();
+  const { data: previousTournaments } = useV1AdminTournaments({ limit: 50 });
+  const createTournament = useV1CreateTournament();
+  const uploadImages = useV1UploadImages();
+  const pending = createTournament.isPending;
+  const selectedSport = sports?.find((sport) => sport.id === state.sportId);
+  const previousWithBank = previousTournaments?.items.find(
+    (tournament) => tournament.bankName || tournament.bankAccount || tournament.bankHolder,
+  );
 
-function SectionStepper({ sections }: { sections: ReadonlyArray<{ id: string; label: string }> }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const clearError = (field: string) => {
+    setErrors((current) => {
+      if (!(field in current)) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  };
 
-  useEffect(() => {
-    const els = sections
-      .map((section) => document.getElementById(section.id))
-      .filter((el): el is HTMLElement => el !== null);
-    if (els.length === 0) return;
+  const setField = (
+    field: Exclude<
+      keyof TournamentCreateState,
+      'step' | 'prizeRows' | 'promoHome' | 'promoList'
+    >,
+    value: string | boolean | null,
+  ) => {
+    dispatch({ type: 'set-field', field, value } as TournamentCreateAction);
+    clearError(field);
+  };
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length === 0) return;
-        const idx = sections.findIndex((section) => section.id === visible[0].target.id);
-        if (idx >= 0) setActiveIndex(idx);
+  const goToStep = (nextStep: number) => {
+    if (nextStep < state.step) {
+      dispatch({ type: 'set-step', step: nextStep });
+      setErrors({});
+      return;
+    }
+    for (let step = 0; step < nextStep; step += 1) {
+      const stepErrors = validateTournamentCreateStep(state, step);
+      if (Object.keys(stepErrors).length > 0) {
+        dispatch({ type: 'set-step', step });
+        setErrors(stepErrors);
+        return;
+      }
+    }
+    dispatch({ type: 'set-step', step: nextStep });
+    setErrors({});
+  };
+
+  const goNext = () => {
+    const stepErrors = validateTournamentCreateStep(state);
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors);
+      return;
+    }
+    dispatch({ type: 'set-step', step: state.step + 1 });
+    setErrors({});
+  };
+
+  const handleCoverUpload = async (file: File) => {
+    try {
+      const uploaded = await uploadImages.mutateAsync([file]);
+      const url = uploaded.urls[0];
+      if (!url) throw new Error('이미지 업로드 결과가 비어 있어요.');
+      setField('coverImageUrl', url);
+    } catch (error) {
+      showToast(extractErrorMessage(error, '커버 이미지 업로드에 실패했어요.'), 'error');
+    }
+  };
+
+  const handlePromoUpload = async (
+    slot: 'promoHome' | 'promoList',
+    file: File,
+  ) => {
+    setPromoUploadingSlot(slot);
+    try {
+      const uploaded = await uploadImages.mutateAsync([file]);
+      const url = uploaded.urls[0];
+      if (!url) throw new Error('이미지 업로드 결과가 비어 있어요.');
+      dispatch({
+        type: 'patch-promo',
+        slot,
+        patch: { imageUrl: url },
+      });
+    } catch (error) {
+      showToast(extractErrorMessage(error, '홍보 이미지 업로드에 실패했어요.'), 'error');
+    } finally {
+      setPromoUploadingSlot(null);
+    }
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const allErrors = Object.assign(
+      {},
+      ...[0, 1, 2, 3].map((step) => validateTournamentCreateStep(state, step)),
+    ) as Record<string, string>;
+    if (!canSubmitTournamentCreate(state)) {
+      setErrors(allErrors);
+      const firstInvalidStep = [0, 1, 2, 3].find(
+        (step) => Object.keys(validateTournamentCreateStep(state, step)).length > 0,
+      );
+      if (firstInvalidStep !== undefined) {
+        dispatch({ type: 'set-step', step: firstInvalidStep });
+      }
+      return;
+    }
+
+    createTournament.mutate(buildTournamentCreatePayload(state), {
+      onSuccess: (tournament) => {
+        showToast('대회를 만들었어요.', 'success');
+        router.push(`/admin/tournaments/${tournament.id}`);
       },
-      { rootMargin: '-40% 0px -55% 0px', threshold: 0 },
-    );
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [sections]);
-
-  const jumpTo = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      onError: (error) => {
+        showToast(extractErrorMessage(error, '대회 생성에 실패했어요.'), 'error');
+      },
+    });
   };
 
   return (
-    <nav
-      aria-label="작성 단계"
-      className="max-w-3xl mx-auto sticky top-[52px] lg:top-0 z-20 mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 py-3"
-    >
-      <ol className="flex items-start">
-        {sections.map((section, index) => {
-          const completed = index < activeIndex;
-          const isActive = index === activeIndex;
-          const stepLabel = completed
-            ? `${section.label} (완료)`
-            : isActive
-              ? `${section.label} (현재 단계)`
-              : section.label;
-          return (
-            <li key={section.id} className="relative flex flex-1 flex-col items-center">
-              {index < sections.length - 1 ? (
-                <span
-                  aria-hidden="true"
-                  className={`absolute left-1/2 top-[13px] h-[2px] w-full ${completed ? 'bg-[var(--blue500)]' : 'bg-[var(--border)]'}`}
-                />
-              ) : null}
+    <>
+      <div className="mb-3">
+        <Link
+          href="/admin/tournaments"
+          className="inline-flex min-h-[44px] items-center gap-1 rounded text-sm text-[var(--text-caption)] hover:text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500"
+        >
+          <ChevronLeft size={16} aria-hidden="true" />
+          대회 목록으로
+        </Link>
+      </div>
+
+      <AdminPageHeader
+        eyebrow="대회 관리"
+        title="새 대회 만들기"
+        description="필요한 내용을 네 단계로 나눠 입력하고, 마지막에 공개 화면을 확인하세요."
+      />
+
+      <form onSubmit={handleSubmit} noValidate className="pb-28">
+        <WizardStepper currentStep={state.step} onSelect={goToStep} />
+
+        <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-white">
+          <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
+            <p className="text-xs font-bold text-blue-600">
+              STEP {state.step + 1} / {TOURNAMENT_CREATE_STEPS.length}
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-[var(--text-strong)]">
+              {TOURNAMENT_CREATE_STEPS[state.step].title}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-caption)]">
+              {TOURNAMENT_CREATE_STEPS[state.step].description}
+            </p>
+          </div>
+
+          <div className="px-5 py-6 sm:px-7">
+            {state.step === 0 ? (
+              <BasicStep
+                state={state}
+                sports={sports ?? []}
+                sportsPending={sportsPending}
+                pending={pending}
+                errors={errors}
+                dispatch={dispatch}
+                setField={setField}
+              />
+            ) : null}
+            {state.step === 1 ? (
+              <ScheduleStep
+                state={state}
+                pending={pending}
+                errors={errors}
+                dispatch={dispatch}
+                setField={setField}
+                clearError={clearError}
+              />
+            ) : null}
+            {state.step === 2 ? (
+              <ParticipationStep
+                state={state}
+                pending={pending}
+                errors={errors}
+                setField={setField}
+                previousWithBank={previousWithBank}
+                dispatch={dispatch}
+                showToast={showToast}
+              />
+            ) : null}
+            {state.step === 3 ? (
+              <PresentationStep
+                state={state}
+                pending={pending}
+                uploadPending={uploadImages.isPending}
+                promoUploadingSlot={promoUploadingSlot}
+                errors={errors}
+                dispatch={dispatch}
+                setField={setField}
+                onCoverUpload={handleCoverUpload}
+                onPromoUpload={handlePromoUpload}
+                fallback={{
+                  title: state.title.trim() || '새 대회',
+                  venue: state.venue.trim() || null,
+                  sportName: selectedSport?.name ?? null,
+                }}
+              />
+            ) : null}
+          </div>
+        </div>
+
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+            {state.step === 0 ? (
+              <Link
+                href="/admin/tournaments"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[var(--border)] px-5 text-sm font-semibold text-[var(--text-body)]"
+              >
+                취소
+              </Link>
+            ) : (
               <button
                 type="button"
-                onClick={() => jumpTo(section.id)}
-                aria-current={isActive ? 'step' : undefined}
-                aria-label={stepLabel}
-                className="relative z-10 flex flex-col items-center gap-1.5 rounded focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                onClick={() => goToStep(state.step - 1)}
+                disabled={pending}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] px-5 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50"
+              >
+                <ArrowLeft size={16} aria-hidden="true" />
+                이전
+              </button>
+            )}
+
+            {state.step < TOURNAMENT_CREATE_STEPS.length - 1 ? (
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={pending}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-blue-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+              >
+                다음
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={pending || uploadImages.isPending || promoUploadingSlot !== null}
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-blue-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+              >
+                <Check size={16} aria-hidden="true" />
+                {pending ? '만드는 중…' : '대회 만들기'}
+              </button>
+            )}
+          </div>
+        </div>
+      </form>
+
+      <AdminToasts toasts={toasts} />
+    </>
+  );
+}
+
+function WizardStepper({
+  currentStep,
+  onSelect,
+}: {
+  currentStep: number;
+  onSelect: (step: number) => void;
+}) {
+  return (
+    <nav aria-label="대회 생성 단계" className="mx-auto max-w-4xl">
+      <ol className="grid grid-cols-4 gap-1 rounded-2xl border border-[var(--border)] bg-white p-2 sm:gap-2">
+        {TOURNAMENT_CREATE_STEPS.map((step, index) => {
+          const active = index === currentStep;
+          const complete = index < currentStep;
+          return (
+            <li key={step.title}>
+              <button
+                type="button"
+                onClick={() => onSelect(index)}
+                aria-current={active ? 'step' : undefined}
+                className={[
+                  'flex min-h-[64px] w-full items-center gap-2 rounded-xl px-2 text-left transition-colors sm:px-3',
+                  active ? 'bg-blue-50 text-blue-700' : 'text-[var(--text-caption)] hover:bg-[var(--grey50)]',
+                ].join(' ')}
               >
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-[var(--font-size-caption)] font-bold ${
-                    isActive
-                      ? 'bg-[var(--blue500)] text-[var(--static-white)]'
-                      : completed
-                        ? 'bg-[var(--blue100)] text-[var(--blue500)]'
-                        : 'bg-[var(--grey100)] text-[var(--text-caption)]'
-                  }`}
+                  className={[
+                    'grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold',
+                    active
+                      ? 'bg-blue-500 text-white'
+                      : complete
+                        ? 'bg-blue-100 text-blue-600'
+                        : 'bg-[var(--grey100)] text-[var(--text-caption)]',
+                  ].join(' ')}
                 >
-                  {completed ? (
-                    <Check size={13} aria-hidden="true" strokeWidth={2.5} />
-                  ) : (
-                    index + 1
-                  )}
+                  {complete ? <Check size={14} aria-hidden="true" /> : index + 1}
                 </span>
-                <span
-                  className={`text-[var(--font-size-micro)] leading-tight break-keep ${
-                    isActive ? 'font-semibold text-[var(--text-strong)]' : 'text-[var(--text-caption)]'
-                  }`}
-                >
-                  {section.label}
+                <span className="hidden min-w-0 sm:block">
+                  <span className="block truncate text-xs font-bold">{step.title}</span>
+                  <span className="mt-0.5 block truncate text-[11px]">{step.description}</span>
                 </span>
               </button>
             </li>
@@ -113,812 +356,620 @@ function SectionStepper({ sections }: { sections: ReadonlyArray<{ id: string; la
   );
 }
 
-// ── Form field component (shared within this file) ─────────────────────────
+type SetField = (
+  field: Exclude<
+    keyof TournamentCreateState,
+    'step' | 'prizeRows' | 'promoHome' | 'promoList'
+  >,
+  value: string | boolean | null,
+) => void;
 
-function FormField({
+type SportOption = {
+  id: string;
+  name: string;
+};
+
+function BasicStep({
+  state,
+  sports,
+  sportsPending,
+  pending,
+  errors,
+  dispatch,
+  setField,
+}: {
+  state: TournamentCreateState;
+  sports: SportOption[];
+  sportsPending: boolean;
+  pending: boolean;
+  errors: Record<string, string>;
+  dispatch: React.Dispatch<TournamentCreateAction>;
+  setField: SetField;
+}) {
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field id="sport-id" label="종목" required error={errors.sportId}>
+          <select
+            id="sport-id"
+            value={state.sportId}
+            onChange={(event) => setField('sportId', event.target.value)}
+            disabled={pending || sportsPending}
+            className={inputClass}
+          >
+            <option value="">종목 선택</option>
+            {sports.map((sport) => (
+              <option key={sport.id} value={sport.id}>
+                {sport.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field id="title" label="대회명" required error={errors.title}>
+          <input
+            id="title"
+            value={state.title}
+            onChange={(event) => setField('title', event.target.value)}
+            disabled={pending}
+            maxLength={120}
+            placeholder="예: 2026 서울 풋살 오픈"
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      <fieldset>
+        <legend className="text-sm font-semibold text-[var(--text-body)]">대회 형식</legend>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {([
+            ['group_knockout', '조별리그 + 토너먼트', '예선 순위 후 결선'],
+            ['knockout', '토너먼트', '패하면 탈락'],
+            ['league', '리그', '모든 팀이 순위 경쟁'],
+          ] as const).map(([value, label, description]) => (
+            <label
+              key={value}
+              className={[
+                'cursor-pointer rounded-xl border p-3 transition-colors',
+                state.format === value
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-[var(--border)] hover:border-[var(--border-strong)]',
+              ].join(' ')}
+            >
+              <input
+                type="radio"
+                name="format"
+                value={value}
+                checked={state.format === value}
+                onChange={() => setField('format', value as V1TournamentFormat)}
+                className="sr-only"
+              />
+              <span className="block text-sm font-bold text-[var(--text-strong)]">{label}</span>
+              <span className="mt-1 block text-xs text-[var(--text-caption)]">{description}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="text-sm font-semibold text-[var(--text-body)]">성별 카테고리</legend>
+        <p className="mt-1 text-xs text-[var(--text-caption)]">
+          혼성 대회는 3단계에서 남녀 최소·최대 인원을 설정할 수 있어요.
+        </p>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {([
+            ['mixed', '혼성'],
+            ['male', '남성부'],
+            ['female', '여성부'],
+          ] as const).map(([value, label]) => (
+            <label
+              key={value}
+              className={[
+                'grid min-h-[52px] cursor-pointer place-items-center rounded-xl border text-sm font-bold transition-colors',
+                state.genderCategory === value
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-[var(--border)] text-[var(--text-body)]',
+              ].join(' ')}
+            >
+              <input
+                type="radio"
+                name="gender-category"
+                checked={state.genderCategory === value}
+                onChange={() => {
+                  dispatch({
+                    type: 'set-field',
+                    field: 'genderCategory',
+                    value: value as V1TournamentGenderCategory,
+                  });
+                }}
+                className="sr-only"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </div>
+  );
+}
+
+function ScheduleStep({
+  state,
+  pending,
+  errors,
+  dispatch,
+  setField,
+  clearError,
+}: {
+  state: TournamentCreateState;
+  pending: boolean;
+  errors: Record<string, string>;
+  dispatch: React.Dispatch<TournamentCreateAction>;
+  setField: SetField;
+  clearError: (field: string) => void;
+}) {
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-4 md:grid-cols-2">
+        <TournamentDatetimeField
+          id="scheduled-at"
+          label="대회 시작"
+          value={state.scheduledAt}
+          onChange={(value) => {
+            dispatch({ type: 'set-scheduled-at', value });
+            clearError('scheduledAt');
+          }}
+          required
+          disabled={pending}
+          error={errors.scheduledAt}
+        />
+        <TournamentDatetimeField
+          id="scheduled-end-at"
+          label="대회 종료"
+          value={state.scheduledEndAt}
+          onChange={(value) => setField('scheduledEndAt', value)}
+          disabled={pending}
+          min={state.scheduledAt || undefined}
+          error={errors.scheduledEndAt}
+          hint="하루 대회라면 비워 둘 수 있어요."
+        />
+        <TournamentDatetimeField
+          id="registration-deadline-at"
+          label="신청 마감"
+          value={state.registrationDeadlineAt}
+          onChange={(value) => {
+            dispatch({ type: 'set-registration-deadline', value });
+            clearError('registrationDeadlineAt');
+          }}
+          required
+          disabled={pending}
+          error={errors.registrationDeadlineAt}
+          hint="대회 시작 D-3 23:59를 자동 제안해요. 직접 바꾸면 이후에는 덮어쓰지 않아요."
+        />
+        <TournamentDatetimeField
+          id="roster-deadline-at"
+          label="명단 제출 마감"
+          value={state.rosterDeadlineAt}
+          onChange={(value) => {
+            dispatch({ type: 'set-roster-deadline', value });
+            clearError('rosterDeadlineAt');
+          }}
+          required
+          disabled={pending}
+          error={errors.rosterDeadlineAt}
+          hint="대회 시작 D-7 23:59를 자동 제안해요."
+        />
+      </div>
+      <Field id="venue" label="장소" hint="입력한 장소는 서버에서 지도 좌표를 찾아 저장해요.">
+        <input
+          id="venue"
+          value={state.venue}
+          onChange={(event) => setField('venue', event.target.value)}
+          disabled={pending}
+          maxLength={200}
+          placeholder="예: 서울월드컵경기장 보조구장"
+          className={inputClass}
+        />
+      </Field>
+    </div>
+  );
+}
+
+function ParticipationStep({
+  state,
+  pending,
+  errors,
+  setField,
+  previousWithBank,
+  dispatch,
+  showToast,
+}: {
+  state: TournamentCreateState;
+  pending: boolean;
+  errors: Record<string, string>;
+  setField: SetField;
+  previousWithBank:
+    | {
+        bankName: string | null;
+        bankAccount: string | null;
+        bankHolder: string | null;
+      }
+    | undefined;
+  dispatch: React.Dispatch<TournamentCreateAction>;
+  showToast: (message: string, variant?: 'success' | 'error') => void;
+}) {
+  return (
+    <div className="grid gap-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <NumberField
+          id="team-count"
+          label="참가 팀 수"
+          value={state.teamCount}
+          onChange={(value) => setField('teamCount', value)}
+          min={2}
+          max={64}
+          disabled={pending}
+          error={errors.teamCount}
+          required
+        />
+        <NumberField
+          id="min-players"
+          label="최소 선수 수"
+          value={state.minPlayers}
+          onChange={(value) => setField('minPlayers', value)}
+          min={1}
+          max={50}
+          disabled={pending}
+          error={errors.minPlayers}
+          required
+        />
+        <NumberField
+          id="max-players"
+          label="최대 선수 수"
+          value={state.maxPlayers}
+          onChange={(value) => setField('maxPlayers', value)}
+          min={1}
+          max={50}
+          disabled={pending}
+          error={errors.maxPlayers}
+          required
+        />
+      </div>
+
+      {state.genderCategory === 'mixed' ? (
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
+          <h3 className="text-sm font-bold text-[var(--text-strong)]">혼성 명단 쿼터</h3>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-caption)]">
+            선수 추가는 막지 않고, 운영자가 명단을 확정할 때 이 조건을 검사해요.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <NumberField
+              id="gender-min-male"
+              label="남성 최소"
+              value={state.genderMinMale}
+              onChange={(value) => setField('genderMinMale', value)}
+              min={0}
+              max={50}
+              disabled={pending}
+              error={errors.genderMinMale}
+            />
+            <NumberField
+              id="gender-max-male"
+              label="남성 최대"
+              value={state.genderMaxMale}
+              onChange={(value) => setField('genderMaxMale', value)}
+              min={0}
+              max={50}
+              disabled={pending}
+              error={errors.genderMaxMale}
+            />
+            <NumberField
+              id="gender-min-female"
+              label="여성 최소"
+              value={state.genderMinFemale}
+              onChange={(value) => setField('genderMinFemale', value)}
+              min={0}
+              max={50}
+              disabled={pending}
+              error={errors.genderMinFemale}
+            />
+            <NumberField
+              id="gender-max-female"
+              label="여성 최대"
+              value={state.genderMaxFemale}
+              onChange={(value) => setField('genderMaxFemale', value)}
+              min={0}
+              max={50}
+              disabled={pending}
+              error={errors.genderMaxFemale}
+            />
+          </div>
+          {errors.genderQuota ? (
+            <p role="alert" className="mt-3 text-xs font-semibold text-[var(--red500)]">
+              {errors.genderQuota}
+            </p>
+          ) : null}
+        </section>
+      ) : (
+        <div className="rounded-xl bg-[var(--grey50)] p-4 text-sm text-[var(--text-caption)]">
+          {state.genderCategory === 'male' ? '남성부' : '여성부'}는 별도 쿼터 없이 카테고리만
+          표시해요.
+        </div>
+      )}
+
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-[var(--text-strong)]">참가비·정산 계좌</h3>
+            <p className="mt-1 text-xs text-[var(--text-caption)]">
+              참가비가 0원이면 무료 대회로 표시돼요.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!previousWithBank || pending}
+            onClick={() => {
+              if (!previousWithBank) return;
+              dispatch({
+                type: 'copy-bank',
+                bankName: previousWithBank.bankName ?? '',
+                bankAccount: previousWithBank.bankAccount ?? '',
+                bankHolder: previousWithBank.bankHolder ?? '',
+              });
+              showToast('직전 대회의 계좌 정보를 불러왔어요.', 'success');
+            }}
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-45"
+          >
+            <Copy size={15} aria-hidden="true" />
+            직전 대회 불러오기
+          </button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field id="entry-fee" label="참가비" error={errors.entryFee}>
+            <input
+              id="entry-fee"
+              inputMode="numeric"
+              value={formatWithComma(state.entryFee)}
+              onChange={(event) => setField('entryFee', onlyDigits(event.target.value))}
+              disabled={pending}
+              aria-invalid={Boolean(errors.entryFee)}
+              className={inputClass}
+            />
+          </Field>
+          <Field id="bank-name" label="은행명" error={errors.bankName}>
+            <input
+              id="bank-name"
+              value={state.bankName}
+              onChange={(event) => setField('bankName', event.target.value)}
+              disabled={pending}
+              maxLength={60}
+              aria-invalid={Boolean(errors.bankName)}
+              className={inputClass}
+            />
+          </Field>
+          <Field id="bank-account" label="계좌번호" error={errors.bankAccount}>
+            <input
+              id="bank-account"
+              value={state.bankAccount}
+              onChange={(event) => setField('bankAccount', event.target.value)}
+              disabled={pending}
+              maxLength={60}
+              aria-invalid={Boolean(errors.bankAccount)}
+              className={inputClass}
+            />
+          </Field>
+          <Field id="bank-holder" label="예금주" error={errors.bankHolder}>
+            <input
+              id="bank-holder"
+              value={state.bankHolder}
+              onChange={(event) => setField('bankHolder', event.target.value)}
+              disabled={pending}
+              maxLength={60}
+              aria-invalid={Boolean(errors.bankHolder)}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PresentationStep({
+  state,
+  pending,
+  uploadPending,
+  promoUploadingSlot,
+  errors,
+  dispatch,
+  setField,
+  onCoverUpload,
+  onPromoUpload,
+  fallback,
+}: {
+  state: TournamentCreateState;
+  pending: boolean;
+  uploadPending: boolean;
+  promoUploadingSlot: 'promoHome' | 'promoList' | null;
+  errors: Record<string, string>;
+  dispatch: React.Dispatch<TournamentCreateAction>;
+  setField: SetField;
+  onCoverUpload: (file: File) => Promise<void>;
+  onPromoUpload: (slot: 'promoHome' | 'promoList', file: File) => Promise<void>;
+  fallback: { title: string; venue: string | null; sportName: string | null };
+}) {
+  return (
+    <div className="grid gap-6">
+      <CoverImageUploader
+        value={state.coverImageUrl}
+        onSelectFile={(file) => void onCoverUpload(file)}
+        onClear={() => setField('coverImageUrl', null)}
+        uploading={uploadPending && promoUploadingSlot === null}
+        disabled={pending}
+        eager
+      />
+
+      <section className="grid gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-[var(--text-strong)]">상금·시상</h3>
+          <p className="mt-1 text-xs text-[var(--text-caption)]">
+            배분 합계를 확인하면서 실제 공개 카드 형태로 미리 볼 수 있어요.
+          </p>
+        </div>
+        <PrizeBreakdownEditor
+          rows={state.prizeRows}
+          onChange={(rows: TournamentPrizeRow[]) => dispatch({ type: 'set-prize-rows', rows })}
+          prizePool={state.prizePool}
+          onPrizePoolChange={(value) => setField('prizePool', value)}
+          disabled={pending}
+        />
+        <Field id="prize-summary" label="상품 및 상금 요약">
+          <textarea
+            id="prize-summary"
+            value={state.prizeSummary}
+            onChange={(event) => setField('prizeSummary', event.target.value)}
+            disabled={pending}
+            maxLength={500}
+            rows={2}
+            placeholder="예: 우승팀 현금 100만원 + 트로피"
+            className={textareaClass}
+          />
+        </Field>
+      </section>
+
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Field id="rules-text" label="대회 규정">
+          <textarea
+            id="rules-text"
+            value={state.rulesText}
+            onChange={(event) => setField('rulesText', event.target.value)}
+            disabled={pending}
+            maxLength={10_000}
+            rows={5}
+            className={textareaClass}
+          />
+        </Field>
+        <Field id="refund-policy-text" label="환불 정책">
+          <textarea
+            id="refund-policy-text"
+            value={state.refundPolicyText}
+            onChange={(event) => setField('refundPolicyText', event.target.value)}
+            disabled={pending}
+            maxLength={2_000}
+            rows={5}
+            className={textareaClass}
+          />
+        </Field>
+      </section>
+
+      <section className="grid gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-[var(--text-strong)]">홍보 카드</h3>
+          <p className="mt-1 text-xs text-[var(--text-caption)]">
+            생성과 동시에 홈·대회 목록 홍보를 준비할 수 있어요. 노출은 각 카드에서 켜세요.
+          </p>
+        </div>
+        <PromoCardFields
+          variant="home"
+          value={state.promoHome}
+          onChange={(value: TournamentPromoCardValue) =>
+            dispatch({ type: 'set-promo', slot: 'promoHome', value })
+          }
+          fallback={fallback}
+          onSelectImage={(file) => void onPromoUpload('promoHome', file)}
+          uploading={promoUploadingSlot === 'promoHome'}
+          disabled={pending}
+          priorityError={errors.promoHomePriority}
+        />
+        <PromoCardFields
+          variant="list"
+          value={state.promoList}
+          onChange={(value: TournamentPromoCardValue) =>
+            dispatch({ type: 'set-promo', slot: 'promoList', value })
+          }
+          fallback={fallback}
+          onSelectImage={(file) => void onPromoUpload('promoList', file)}
+          uploading={promoUploadingSlot === 'promoList'}
+          disabled={pending}
+          priorityError={errors.promoListPriority}
+        />
+      </section>
+    </div>
+  );
+}
+
+function NumberField({
   id,
   label,
-  required,
+  value,
+  onChange,
+  min,
+  max,
+  disabled,
+  error,
+  required = false,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  min: number;
+  max: number;
+  disabled: boolean;
+  error?: string;
+  required?: boolean;
+}) {
+  return (
+    <Field id={id} label={label} required={required} error={error}>
+      <input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+        aria-invalid={Boolean(error)}
+        className={inputClass}
+      />
+    </Field>
+  );
+}
+
+function Field({
+  id,
+  label,
+  required = false,
   hint,
+  error,
   children,
 }: {
   id: string;
   label: string;
   required?: boolean;
   hint?: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
+    <div className="grid gap-1.5">
+      <label htmlFor={id} className="text-sm font-semibold text-[var(--text-body)]">
         {label}
-        {required && (
+        {required ? (
           <>
-            <span className="text-[var(--red500)] ml-0.5" aria-hidden="true">*</span>
-            <span className="sr-only">(필수)</span>
+            <span aria-hidden="true" className="ml-0.5 text-[var(--red500)]">*</span>
+            <span className="sr-only"> (필수)</span>
           </>
-        )}
+        ) : null}
       </label>
       {children}
-      {hint && <p className="text-[var(--font-size-caption)] text-[var(--text-caption)]">{hint}</p>}
-    </div>
-  );
-}
-
-// ── Input class ───────────────────────────────────────────────────────────
-
-const inputCls = [
-  'h-[44px] px-3 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)]',
-  'placeholder:text-[var(--text-caption)]',
-  'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
-  'transition-colors disabled:opacity-50 w-full',
-].join(' ');
-
-const textareaCls = [
-  'px-3 py-2.5 text-[var(--font-size-label)] bg-white border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
-  'placeholder:text-[var(--text-caption)]',
-  'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
-  'transition-colors disabled:opacity-50 w-full',
-].join(' ');
-
-// ── Datetime text input helpers ───────────────────────────────────────────
-
-/**
- * Parses "YYYY-MM-DD HH:MM" → Date, or null for empty/malformed/impossible
- * values (e.g. "2026-99-99 99:99" matches the shape regex but is not a real
- * calendar date — Date(...) yields Invalid Date, which we reject here rather
- * than let it reach .toISOString() later and throw RangeError).
- */
-function parseDatetimeText(value: string): Date | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(trimmed)) return null;
-  const date = new Date(trimmed.replace(' ', 'T'));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-/** Accepts "YYYY-MM-DD HH:MM" — returns true if it looks valid (empty counts as valid/optional) */
-function isValidDatetimeText(value: string): boolean {
-  if (!value.trim()) return true; // empty is valid (optional field)
-  return parseDatetimeText(value) !== null;
-}
-
-/** Converts "YYYY-MM-DD HH:MM" → ISO string, or returns null for empty/invalid */
-function datetimeTextToIso(value: string): string | null {
-  const date = parseDatetimeText(value);
-  return date ? date.toISOString() : null;
-}
-
-/**
- * 대회 시작일("YYYY-MM-DD HH:MM")로부터 명단 제출 마감일 기본값(시작 7일 전 23:59)을 계산한다.
- * scheduledAt 이 비어있거나 형식이 유효하지 않으면 null을 반환 — 자동 채움을 하지 않는다.
- */
-function suggestRosterDeadline(scheduledAt: string): string | null {
-  const trimmed = scheduledAt.trim();
-  if (!trimmed || !isValidDatetimeText(trimmed)) return null;
-  const start = new Date(trimmed.replace(' ', 'T'));
-  if (Number.isNaN(start.getTime())) return null;
-  const suggested = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const yyyy = suggested.getFullYear();
-  const mm = String(suggested.getMonth() + 1).padStart(2, '0');
-  const dd = String(suggested.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd} 23:59`;
-}
-
-// ── Styled datetime text input ────────────────────────────────────────────
-
-function DatetimeTextInput({
-  id,
-  value,
-  onChange,
-  disabled,
-  placeholder = '예: 2026-08-15 09:00',
-}: {
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
-}) {
-  const invalid = value.trim().length > 0 && !isValidDatetimeText(value);
-  return (
-    <>
-      <input
-        id={id}
-        type="text"
-        inputMode="numeric"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-        maxLength={16}
-        aria-invalid={invalid}
-        aria-describedby={invalid ? `${id}-err` : undefined}
-        className={[
-          inputCls,
-          invalid
-            ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
-            : '',
-        ]
-          .join(' ')
-          .trim()}
-      />
-      {invalid && (
-        <p id={`${id}-err`} role="alert" className="text-[var(--font-size-caption)] text-[var(--red500)] mt-0.5">
-          날짜 형식이 맞지 않아요 (예: 2026-08-15 09:00)
+      {error ? (
+        <p role="alert" className="text-xs font-medium text-[var(--red500)]">
+          {error}
         </p>
-      )}
-    </>
-  );
-}
-
-// ── Cover image upload field ──────────────────────────────────────────────
-
-function CoverImageUploadField({
-  coverImageUrl,
-  uploading,
-  onSelectFile,
-  onClear,
-}: {
-  coverImageUrl: string | null;
-  uploading: boolean;
-  onSelectFile: (file: File) => void;
-  onClear: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <div className="flex items-center gap-3 flex-wrap">
-      {coverImageUrl ? (
-        <img
-          src={publicAssetPath(coverImageUrl)}
-          alt=""
-          className="w-20 h-20 rounded-xl object-cover border border-[var(--border)] flex-shrink-0"
-        />
+      ) : hint ? (
+        <p className="text-xs leading-5 text-[var(--text-caption)]">{hint}</p>
       ) : null}
-      <div className="flex items-center gap-2 flex-wrap">
-        <label htmlFor="cover-image-input" className="sr-only">
-          커버 이미지 파일 선택
-        </label>
-        <input
-          id="cover-image-input"
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          className="hidden"
-          disabled={uploading}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onSelectFile(file);
-            e.target.value = '';
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="inline-flex items-center justify-center h-[38px] px-4 rounded-lg text-[var(--font-size-caption)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-        >
-          {uploading ? '업로드 중…' : coverImageUrl ? '이미지 변경' : '이미지 선택'}
-        </button>
-        {coverImageUrl ? (
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={uploading}
-            className="inline-flex items-center justify-center h-[38px] px-4 rounded-lg text-[var(--font-size-caption)] font-semibold text-[var(--text-caption)] hover:text-[var(--red500)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            제거
-          </button>
-        ) : null}
-      </div>
     </div>
-  );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────
-
-export default function AdminTournamentsNewPage() {
-  const router = useRouter();
-  const { toasts, showToast } = useAdminToast();
-  const { data: sports, isPending: sportsPending } = useV1MasterSports();
-  const createMutation = useV1CreateTournament();
-  const uploadImages = useV1UploadImages();
-
-  // ── Form state ──────────────────────────────────────────────────────
-  const [sportId, setSportId] = useState('');
-  const [title, setTitle] = useState('');
-  const [format, setFormat] = useState<V1TournamentFormat>('knockout');
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [scheduledEndAt, setScheduledEndAt] = useState('');
-  const [registrationDeadlineAt, setRegistrationDeadlineAt] = useState('');
-  const [rosterDeadlineAt, setRosterDeadlineAt] = useState('');
-  // 사용자가 명단 제출 마감일을 직접 수정하면 true로 전환 — 이후 대회 시작일 변경에 따른 자동 제안을 멈춘다
-  const [rosterDeadlineTouched, setRosterDeadlineTouched] = useState(false);
-  const [venue, setVenue] = useState('');
-  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
-  const [teamCount, setTeamCount] = useState('');
-  const [minPlayers, setMinPlayers] = useState('');
-  const [maxPlayers, setMaxPlayers] = useState('');
-  const [entryFee, setEntryFee] = useState('0');
-  const [bankName, setBankName] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
-  const [bankHolder, setBankHolder] = useState('');
-  const [prizePool, setPrizePool] = useState('');
-  const [prizeSummary, setPrizeSummary] = useState('');
-  const [prizeBreakdown, setPrizeBreakdown] = useState('');
-  const [rulesText, setRulesText] = useState('');
-  const [refundPolicyText, setRefundPolicyText] = useState('');
-
-  const isPending = createMutation.isPending;
-
-  // 커버 이미지는 선택 즉시 업로드하고 반환된 URL만 폼 상태에 보관한다 —
-  // 팀 생성 폼(teams-form-client.tsx)과 동일한 "생성 전 업로드" 패턴.
-  const handleCoverFileSelect = async (file: File) => {
-    try {
-      const result = await uploadImages.mutateAsync([file]);
-      const url = result.urls[0];
-      if (!url) throw new Error('이미지를 올리지 못했어요. 다시 시도해 주세요.');
-      setCoverImageUrl(url);
-    } catch (err) {
-      showToast(extractErrorMessage(err, '이미지 업로드에 실패했어요.'), 'error');
-    }
-  };
-
-  // 대회 시작일이 바뀌면 명단 제출 마감일을 자동으로 제안한다(시작 7일 전 23:59) —
-  // 사용자가 이미 직접 수정했다면(rosterDeadlineTouched) 값을 덮어쓰지 않는다.
-  useEffect(() => {
-    if (rosterDeadlineTouched) return;
-    const suggested = suggestRosterDeadline(scheduledAt);
-    if (!suggested) return;
-    setRosterDeadlineAt(suggested);
-  }, [scheduledAt, rosterDeadlineTouched]);
-
-  // ── Inline validation errors ────────────────────────────────────────
-  const teamCountNum = teamCount ? parseInt(teamCount, 10) : null;
-  const teamCountError =
-    teamCount.trim().length === 0
-      ? '참가 팀 수를 입력해 주세요.'
-      : teamCountNum === null || teamCountNum < 2 || teamCountNum > 64
-        ? '참가 팀 수는 2~64개여야 해요.'
-      : null;
-
-  const minPlayersNum = minPlayers ? parseInt(minPlayers, 10) : null;
-  const maxPlayersNum = maxPlayers ? parseInt(maxPlayers, 10) : null;
-  const playersRangeError: string | null = (() => {
-    if (minPlayersNum !== null && (minPlayersNum < 1 || minPlayersNum > 50)) {
-      return '선수 수는 1~50명이어야 해요.';
-    }
-    if (maxPlayersNum !== null && (maxPlayersNum < 1 || maxPlayersNum > 50)) {
-      return '선수 수는 1~50명이어야 해요.';
-    }
-    if (minPlayersNum !== null && maxPlayersNum !== null && minPlayersNum > maxPlayersNum) {
-      return '최소 선수 수는 최대 선수 수보다 클 수 없어요.';
-    }
-    return null;
-  })();
-
-  const scheduleRangeError: string | null = (() => {
-    const startIso = datetimeTextToIso(scheduledAt);
-    const endIso = datetimeTextToIso(scheduledEndAt);
-    if (scheduledEndAt.trim() && !startIso) return '종료 일시는 시작 일시와 함께 입력해 주세요.';
-    if (startIso && endIso && new Date(endIso).getTime() < new Date(startIso).getTime()) {
-      return '종료 일시는 시작 일시 이후여야 해요.';
-    }
-    return null;
-  })();
-
-  const rosterDeadlineError: string | null =
-    rosterDeadlineAt.trim().length === 0 ? '명단 제출 마감일을 입력해 주세요.' : null;
-
-  // ── Validation ───────────────────────────────────────────────────────
-  const canSubmit =
-    !isPending &&
-    sportId.trim().length > 0 &&
-    title.trim().length > 0 &&
-    isValidDatetimeText(scheduledAt) &&
-    isValidDatetimeText(scheduledEndAt) &&
-    isValidDatetimeText(registrationDeadlineAt) &&
-    isValidDatetimeText(rosterDeadlineAt) &&
-    rosterDeadlineError === null &&
-    teamCountError === null &&
-    playersRangeError === null &&
-    scheduleRangeError === null;
-
-  // ── Submit ───────────────────────────────────────────────────────────
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-
-    const scheduledAtIso = datetimeTextToIso(scheduledAt);
-    const scheduledEndAtIso = datetimeTextToIso(scheduledEndAt);
-    const registrationDeadlineAtIso = datetimeTextToIso(registrationDeadlineAt);
-    const rosterDeadlineAtIso = datetimeTextToIso(rosterDeadlineAt);
-
-    createMutation.mutate(
-      {
-        sportId: sportId.trim(),
-        title: title.trim(),
-        format,
-        ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
-        ...(scheduledEndAtIso ? { scheduledEndAt: scheduledEndAtIso } : {}),
-        ...(registrationDeadlineAtIso ? { registrationDeadlineAt: registrationDeadlineAtIso } : {}),
-        ...(rosterDeadlineAtIso ? { rosterDeadlineAt: rosterDeadlineAtIso } : {}),
-        ...(venue.trim() ? { venue: venue.trim() } : {}),
-        ...(coverImageUrl ? { coverImageUrl } : {}),
-        teamCount: parseInt(teamCount, 10),
-        ...(minPlayers ? { minPlayers: parseInt(minPlayers, 10) } : {}),
-        ...(maxPlayers ? { maxPlayers: parseInt(maxPlayers, 10) } : {}),
-        entryFee: parseInt(entryFee || '0', 10),
-        ...(prizePool.trim() && !Number.isNaN(parseInt(prizePool, 10))
-          ? { prizePool: parseInt(prizePool, 10) }
-          : {}),
-        ...(prizeSummary.trim() ? { prizeSummary: prizeSummary.trim() } : {}),
-        ...(prizeBreakdown.trim() ? { prizeBreakdown: prizeBreakdown.trim() } : {}),
-        ...(bankName.trim() ? { bankName: bankName.trim() } : {}),
-        ...(bankAccount.trim() ? { bankAccount: bankAccount.trim() } : {}),
-        ...(bankHolder.trim() ? { bankHolder: bankHolder.trim() } : {}),
-        ...(rulesText.trim() ? { rulesText: rulesText.trim() } : {}),
-        ...(refundPolicyText.trim() ? { refundPolicyText: refundPolicyText.trim() } : {}),
-      },
-      {
-        onSuccess: (data) => {
-          showToast('대회를 만들었어요.', 'success');
-          router.push(`/admin/tournaments/${data.id}`);
-        },
-        onError: (err) => {
-          showToast(extractErrorMessage(err, '대회를 만들지 못했어요.'), 'error');
-        },
-      },
-    );
-  };
-
-  return (
-    <>
-      <div className="mb-4">
-        <Link
-          href="/admin/tournaments"
-          className="inline-flex items-center gap-1 min-h-[44px] text-[var(--font-size-label)] text-[var(--text-caption)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-        >
-          <ChevronLeft size={14} aria-hidden="true" />
-          대회 목록으로
-        </Link>
-      </div>
-
-      <AdminPageHeader
-        eyebrow="대회 관리"
-        title="새 대회 만들기"
-        description="대회 기본 정보를 입력하면 초안 상태로 생성돼요."
-      />
-
-      <form onSubmit={handleSubmit} noValidate>
-        <SectionStepper sections={FORM_SECTIONS} />
-        <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
-
-          {/* ── 기본 정보 ────────────────────────────────────────────── */}
-          <section id="tsec-basic" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">기본 정보</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              <FormField id="sport-id" label="종목" required>
-                <select
-                  id="sport-id"
-                  value={sportId}
-                  onChange={(e) => setSportId(e.target.value)}
-                  disabled={isPending || sportsPending}
-                  required
-                  aria-required="true"
-                  className={inputCls}
-                >
-                  <option value="">종목 선택</option>
-                  {(sports ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField id="title" label="대회명" required>
-                <input
-                  id="title"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  disabled={isPending}
-                  required
-                  aria-required="true"
-                  placeholder="예: 2026 서울 풋살 오픈"
-                  maxLength={100}
-                  className={inputCls}
-                />
-              </FormField>
-
-              <FormField
-                id="format"
-                label="대회 형식"
-                required
-                hint="리그: 모든 팀이 순위를 겨루는 방식 / 토너먼트: 탈락 대진 방식 / 조별리그+토너먼트: 혼합 방식"
-              >
-                <select
-                  id="format"
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value as V1TournamentFormat)}
-                  disabled={isPending}
-                  required
-                  aria-required="true"
-                  className={inputCls}
-                >
-                  <option value="league">리그 (순위전)</option>
-                  <option value="knockout">토너먼트 (녹아웃)</option>
-                  <option value="group_knockout">조별리그 + 토너먼트</option>
-                </select>
-              </FormField>
-
-              <FormField id="scheduled-at" label="대회 시작" hint="예: 2026-08-15 09:00">
-                <DatetimeTextInput
-                  id="scheduled-at"
-                  value={scheduledAt}
-                  onChange={setScheduledAt}
-                  disabled={isPending}
-                  placeholder="예: 2026-08-15 09:00"
-                />
-              </FormField>
-
-              <FormField id="scheduled-end-at" label="대회 종료" hint="2일 이상 진행할 때 입력해 주세요. 예: 2026-08-16 18:00">
-                <DatetimeTextInput
-                  id="scheduled-end-at"
-                  value={scheduledEndAt}
-                  onChange={setScheduledEndAt}
-                  disabled={isPending}
-                  placeholder="예: 2026-08-16 18:00"
-                />
-                {scheduleRangeError ? (
-                  <p className="mt-1 text-[var(--font-size-caption)] text-red-600" role="alert">
-                    {scheduleRangeError}
-                  </p>
-                ) : null}
-              </FormField>
-
-              <div className="md:col-span-2">
-                <FormField id="registration-deadline-at" label="신청 마감일" hint="예: 2026-08-01 23:59">
-                  <DatetimeTextInput
-                    id="registration-deadline-at"
-                    value={registrationDeadlineAt}
-                    onChange={setRegistrationDeadlineAt}
-                    disabled={isPending}
-                    placeholder="예: 2026-08-01 23:59"
-                  />
-                </FormField>
-              </div>
-
-              <div className="md:col-span-2">
-                <FormField
-                  id="roster-deadline-at"
-                  label="명단 제출 마감일"
-                  required
-                  hint="기본값은 대회 시작 7일 전 23:59예요. 필요하면 직접 수정해 주세요. 예: 2026-08-08 23:59"
-                >
-                  <DatetimeTextInput
-                    id="roster-deadline-at"
-                    value={rosterDeadlineAt}
-                    onChange={(v) => {
-                      setRosterDeadlineAt(v);
-                      setRosterDeadlineTouched(true);
-                    }}
-                    disabled={isPending}
-                    placeholder="예: 2026-08-08 23:59"
-                  />
-                  {rosterDeadlineError ? (
-                    <p role="alert" className="mt-1 text-[var(--font-size-caption)] text-red-600">
-                      {rosterDeadlineError}
-                    </p>
-                  ) : null}
-                </FormField>
-              </div>
-
-              <div className="md:col-span-2">
-                <FormField id="venue" label="장소">
-                  <input
-                    id="venue"
-                    type="text"
-                    value={venue}
-                    onChange={(e) => setVenue(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 서울월드컵경기장 보조구장"
-                    maxLength={200}
-                    className={inputCls}
-                  />
-                </FormField>
-              </div>
-
-              <div className="md:col-span-2 flex flex-col gap-1.5">
-                <span className="text-[var(--font-size-label)] font-semibold text-[var(--text-body)]">
-                  커버 이미지 <span className="font-medium text-[var(--text-caption)]">(선택)</span>
-                </span>
-                <CoverImageUploadField
-                  coverImageUrl={coverImageUrl}
-                  uploading={uploadImages.isPending}
-                  onSelectFile={(file) => void handleCoverFileSelect(file)}
-                  onClear={() => setCoverImageUrl(null)}
-                />
-                <p className="text-[var(--font-size-caption)] text-[var(--text-caption)]">
-                  대회 목록·상세 상단에 표시돼요. JPG, PNG, WebP, GIF
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* ── 팀 / 선수 설정 ───────────────────────────────────────── */}
-          <section id="tsec-team" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">팀 · 선수 설정</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField id="team-count" label="참가 팀 수" required hint="대회별 모집 정원을 입력해 주세요">
-                <input
-                  id="team-count"
-                  type="number"
-                  min="2"
-                  max="64"
-                  value={teamCount}
-                  onChange={(e) => setTeamCount(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 16"
-                  required
-                  aria-required="true"
-                  aria-invalid={teamCountError !== null}
-                  aria-describedby={teamCountError !== null ? 'team-count-err' : undefined}
-                  className={[
-                    inputCls,
-                    teamCountError !== null
-                      ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
-                      : '',
-                  ]
-                    .join(' ')
-                    .trim()}
-                />
-                {teamCountError !== null && (
-                  <p id="team-count-err" role="alert" className="text-[var(--font-size-caption)] text-[var(--red500)] mt-0.5">
-                    {teamCountError}
-                  </p>
-                )}
-              </FormField>
-
-              <FormField id="min-players" label="최소 선수 수">
-                <input
-                  id="min-players"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={minPlayers}
-                  onChange={(e) => setMinPlayers(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 5"
-                  aria-invalid={playersRangeError !== null}
-                  aria-describedby={playersRangeError !== null ? 'players-range-err' : undefined}
-                  className={[
-                    inputCls,
-                    playersRangeError !== null
-                      ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
-                      : '',
-                  ]
-                    .join(' ')
-                    .trim()}
-                />
-              </FormField>
-
-              <FormField id="max-players" label="최대 선수 수">
-                <input
-                  id="max-players"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={maxPlayers}
-                  onChange={(e) => setMaxPlayers(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 11"
-                  aria-invalid={playersRangeError !== null}
-                  aria-describedby={playersRangeError !== null ? 'players-range-err' : undefined}
-                  className={[
-                    inputCls,
-                    playersRangeError !== null
-                      ? 'border-[var(--red500)] focus:border-[var(--red500)] focus:ring-[color:var(--red500)]/20'
-                      : '',
-                  ]
-                    .join(' ')
-                    .trim()}
-                />
-                {playersRangeError !== null && (
-                  <p id="players-range-err" role="alert" className="text-[var(--font-size-caption)] text-[var(--red500)] mt-0.5">
-                    {playersRangeError}
-                  </p>
-                )}
-              </FormField>
-            </div>
-          </section>
-
-          {/* ── 참가비 / 계좌 ────────────────────────────────────────── */}
-          <section id="tsec-fee" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">참가비 · 계좌</h2>
-            <div className="flex flex-col gap-4">
-              {/* 참가비 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField id="entry-fee" label="참가비 (원)" hint="0원이면 무료 대회로 표시돼요">
-                  <input
-                    id="entry-fee"
-                    type="text"
-                    value={formatWithComma(entryFee)}
-                    onChange={(e) => setEntryFee(onlyDigits(e.target.value))}
-                    disabled={isPending}
-                    placeholder="0"
-                    className={inputCls}
-                  />
-                </FormField>
-              </div>
-
-              {/* 은행/계좌/예금주 — 3열 한 행 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField id="bank-name" label="은행명">
-                  <input
-                    id="bank-name"
-                    type="text"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 국민은행"
-                    maxLength={20}
-                    className={inputCls}
-                  />
-                </FormField>
-
-                <FormField id="bank-account" label="계좌번호">
-                  <input
-                    id="bank-account"
-                    type="text"
-                    value={bankAccount}
-                    onChange={(e) => setBankAccount(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 123-456-789012"
-                    maxLength={30}
-                    className={inputCls}
-                  />
-                </FormField>
-
-                <FormField id="bank-holder" label="예금주">
-                  <input
-                    id="bank-holder"
-                    type="text"
-                    value={bankHolder}
-                    onChange={(e) => setBankHolder(e.target.value)}
-                    disabled={isPending}
-                    placeholder="예: 티밋 주식회사"
-                    maxLength={30}
-                    className={inputCls}
-                  />
-                </FormField>
-              </div>
-            </div>
-          </section>
-
-          {/* ── 상금 / 시상 ──────────────────────────────────────────── */}
-          <section id="tsec-prize" className="px-5 py-6 border-b border-[var(--border)] scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-1">
-              상금 · 시상 <span className="font-medium text-[var(--text-caption)]">(선택)</span>
-            </h2>
-            <p className="text-[var(--font-size-caption)] text-[var(--text-caption)] mb-4">
-              현금 상금 없이 트로피·상품권 같은 물품만으로도 구성할 수 있어요.
-            </p>
-            <div className="flex flex-col gap-4">
-              {/* 총상금 — 숫자 */}
-              <FormField
-                id="prize-pool"
-                label="총상금 (원)"
-                hint="현금 상금 합계예요. 물품만 있다면 비워 두세요 — 시상·리뷰 페이지의 '총 상금' 카드에 표시돼요"
-              >
-                <input
-                  id="prize-pool"
-                  type="text"
-                  inputMode="numeric"
-                  value={formatWithComma(prizePool)}
-                  onChange={(e) => setPrizePool(onlyDigits(e.target.value))}
-                  disabled={isPending}
-                  placeholder="예: 1000000"
-                  className={inputCls}
-                />
-              </FormField>
-
-              {/* 상품 및 상금 안내 — 전체 너비 */}
-              <FormField
-                id="prize-summary"
-                label="상품 및 상금"
-                hint="상단 상품 및 상금 칸에 그대로 표시돼요"
-              >
-                <textarea
-                  id="prize-summary"
-                  value={prizeSummary}
-                  onChange={(e) => setPrizeSummary(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 우승팀 현금 100만원 + 트로피"
-                  maxLength={200}
-                  rows={2}
-                  className={textareaCls}
-                />
-              </FormField>
-
-              <FormField
-                id="prize-breakdown"
-                label="상금 배분"
-                hint="슬래시(/) 또는 줄바꿈으로 구분한 항목이 하단 박스로 표시돼요. 금액이 아닌 물품도 그대로 적을 수 있어요"
-              >
-                <textarea
-                  id="prize-breakdown"
-                  value={prizeBreakdown}
-                  onChange={(e) => setPrizeBreakdown(e.target.value)}
-                  disabled={isPending}
-                  placeholder="예: 1위 1,000,000원 / 2위 500,000원 / MVP 축구화"
-                  maxLength={200}
-                  rows={3}
-                  className={textareaCls}
-                />
-              </FormField>
-            </div>
-          </section>
-
-          {/* ── 규정 / 환불 ──────────────────────────────────────────── */}
-          <section id="tsec-rules" className="px-5 py-6 scroll-mt-[108px] lg:scroll-mt-24">
-            <h2 className="text-[var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">규정 · 환불 정책</h2>
-            <div className="flex flex-col gap-4">
-              <FormField id="rules-text" label="대회 규정">
-                <textarea
-                  id="rules-text"
-                  value={rulesText}
-                  onChange={(e) => setRulesText(e.target.value)}
-                  disabled={isPending}
-                  maxLength={10000}
-                  rows={4}
-                  placeholder="대회 참가 규정을 입력해 주세요."
-                  className={textareaCls}
-                />
-              </FormField>
-
-              <FormField id="refund-policy-text" label="환불 정책">
-                <textarea
-                  id="refund-policy-text"
-                  value={refundPolicyText}
-                  onChange={(e) => setRefundPolicyText(e.target.value)}
-                  disabled={isPending}
-                  rows={3}
-                  placeholder="환불 정책을 입력해 주세요."
-                  className={textareaCls}
-                />
-              </FormField>
-            </div>
-          </section>
-        </div>
-
-        {/* ── Footer actions ───────────────────────────────────────────── */}
-        <div className="max-w-3xl mx-auto flex items-center gap-3 mt-5">
-          <Link
-            href="/admin/tournaments"
-            className="inline-flex items-center justify-center h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold text-[var(--text-muted)] bg-white border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            취소
-          </Link>
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className={[
-              'inline-flex items-center justify-center h-[44px] px-8 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
-              'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-              'bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed',
-            ].join(' ')}
-            aria-disabled={!canSubmit}
-          >
-            {isPending ? '만드는 중…' : '대회 만들기'}
-          </button>
-        </div>
-      </form>
-
-      <AdminToasts toasts={toasts} />
-    </>
   );
 }

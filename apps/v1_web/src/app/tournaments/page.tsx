@@ -88,6 +88,7 @@ function TournamentsListContent() {
 
   return (
     <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
+      <h1 className="sr-only">스포츠 대회</h1>
 
       {/* ── 홍보 카드뉴스 캐러셀 — 관리자가 리스트 홍보를 켠 open 대회를 우선순위 순으로 노출 ── */}
       <TournamentPromoCarousel

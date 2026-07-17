@@ -53,6 +53,38 @@ function getFormatLabel(format: V1TournamentFormat): string {
   }
 }
 
+function getGenderCategoryLabel(category: V1TournamentDetail['genderCategory']) {
+  if (category === 'mixed') return '혼성';
+  if (category === 'male') return '남성부';
+  if (category === 'female') return '여성부';
+  return null;
+}
+
+function getGenderQuotaLabel(
+  tournament: Pick<
+    V1TournamentDetail,
+    | 'genderCategory'
+    | 'genderMinMale'
+    | 'genderMaxMale'
+    | 'genderMinFemale'
+    | 'genderMaxFemale'
+  >,
+) {
+  if (tournament.genderCategory !== 'mixed') return null;
+  const formatRange = (label: string, min: number | null, max: number | null) => {
+    if (min === null && max === null) return null;
+    if (min !== null && max !== null) return `${label} ${min}~${max}명`;
+    if (min !== null) return `${label} 최소 ${min}명`;
+    return `${label} 최대 ${max}명`;
+  };
+  return [
+    formatRange('남성', tournament.genderMinMale, tournament.genderMaxMale),
+    formatRange('여성', tournament.genderMinFemale, tournament.genderMaxFemale),
+  ]
+    .filter((value): value is string => value !== null)
+    .join(' · ');
+}
+
 /**
  * 완료 대회 결과 히어로용 우승팀명 — 결선(final) 픽스처 승자(knockout·group_knockout) 또는
  * 단일 그룹 1위 팀(league)만 계산한다. 결선 미기록 등으로 간단히 확정되지 않으면 null을 반환해
@@ -370,6 +402,8 @@ export function TournamentDetailView({
   const reservedTeamCount = getReservedTeamCount(tournament);
   const isFull = reservedTeamCount >= tournament.teamCount;
   const prizeText = tournament.prizeSummary?.trim() ?? '';
+  const genderCategoryLabel = getGenderCategoryLabel(tournament.genderCategory);
+  const genderQuotaLabel = getGenderQuotaLabel(tournament);
   const hasPrize = prizeText.length > 0;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
@@ -459,6 +493,11 @@ export function TournamentDetailView({
           <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
             {getFormatLabel(tournament.format)}
           </span>
+          {genderCategoryLabel ? (
+            <span className="tm-badge tm-badge-grey" aria-label={`성별 카테고리: ${genderCategoryLabel}`}>
+              {genderCategoryLabel}
+            </span>
+          ) : null}
           {/* Sport identity chip — color dot + Korean label (color + text, not color-only) */}
           <span
             className="tm-badge"
@@ -553,8 +592,11 @@ export function TournamentDetailView({
           <InfoRow
             label="선수단 규모"
             value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
-            isLast
+            isLast={!genderQuotaLabel}
           />
+          {genderQuotaLabel ? (
+            <InfoRow label="혼성 명단 조건" value={genderQuotaLabel} isLast />
+          ) : null}
         </Card>
       </section>
 
@@ -657,8 +699,11 @@ export function TournamentDetailView({
           <InfoRow
             label="선수단 규모"
             value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
-            isLast
+            isLast={!genderQuotaLabel}
           />
+          {genderQuotaLabel ? (
+            <InfoRow label="혼성 명단 조건" value={genderQuotaLabel} isLast />
+          ) : null}
         </Card>
       </section>
 
@@ -975,7 +1020,7 @@ export function TournamentDetailView({
         >
           <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>
-        <h1 className="tm-text-heading" style={{ margin: 0 }}>대회 상세</h1>
+        <div className="tm-text-heading" style={{ margin: 0 }} aria-hidden="true">대회 상세</div>
       </div>
 
       {/* ── Desktop 2-column layout: left=body, right=sticky CTA rail ──

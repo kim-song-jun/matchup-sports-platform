@@ -1,5 +1,4 @@
 # 구(legacy) 루트 스택(postgres/redis/api/web)은 2026-07 아카이빙됨.
-# nginx가 루트 경로를 전부 /v1으로 308 얼라이어스하므로 v1 스택만 기동한다.
 # 구 스택 데이터 볼륨(postgres_data, uploads_data)은 도커 호스트에 그대로 남아 있다
 # (compose 정의에서 제외했으므로 `down -v`로도 삭제되지 않음 — 복구 시 수동 재연결).
 services:
@@ -38,13 +37,14 @@ services:
     environment:
       DATABASE_URL: postgresql://${V1_DB_USER:-teameet_v1}:${V1_DB_PASSWORD:-${DB_PASSWORD}}@v1_postgres:5432/${V1_DB_NAME:-teameet_v1}
       JWT_SECRET: ${V1_JWT_SECRET:-${JWT_SECRET}}
+      V1_SESSION_SECRET: ${V1_SESSION_SECRET:-${V1_JWT_SECRET:-${JWT_SECRET}}}
+      FRONTEND_URL: ${FRONTEND_URL:-https://teameet.co.kr}
       V1_HOST_ADMIN_PASSWORD: ${V1_HOST_ADMIN_PASSWORD:-}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       API_PORT: 8121
       NODE_ENV: production
-      V1_ALLOW_HEADER_AUTH: ${V1_ALLOW_HEADER_AUTH:-}
     healthcheck:
       test:
         [
@@ -72,8 +72,7 @@ services:
     container_name: teameet_v1_web
     restart: always
     environment:
-      NEXT_PUBLIC_API_URL: /v1/api/v1
-      NEXT_PUBLIC_BASE_PATH: /v1
+      NEXT_PUBLIC_API_URL: /api/v1
       NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       NEXT_PUBLIC_KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       INTERNAL_API_ORIGIN: ${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}
@@ -89,7 +88,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3013/v1/landing').then((res) => { if (!res.ok) throw new Error('v1 web health ' + res.status); }).catch(() => process.exit(1));",
+          "fetch('http://127.0.0.1:3013/landing').then((res) => { if (!res.ok) throw new Error('v1 web health ' + res.status); }).catch(() => process.exit(1));",
         ]
       interval: 10s
       timeout: 5s

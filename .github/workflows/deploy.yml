@@ -46,6 +46,42 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify release changeset
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            BASE_SHA="$(git merge-base origin/main "${HEAD_SHA}")"
+          fi
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > /tmp/teameet-changed-files.txt
+          node scripts/release/check-changeset-policy.mjs \
+            --repo . \
+            --changed-files-file /tmp/teameet-changed-files.txt
+
+      - name: Validate planned SemVer
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        env:
+          RELEASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          if find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md -print -quit | grep -q .; then
+            release_date="$(git show -s --format=%cs "${RELEASE_SHA}")"
+            node scripts/release/resolve-changeset-version.mjs \
+              --repo . \
+              --sha "${RELEASE_SHA}" \
+              --date "${release_date}" |
+              jq -e '.stableVersion and .prereleaseVersion'
+          else
+            echo "No unreleased Changesets; planned release validation skipped"
+          fi
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -77,19 +113,17 @@ jobs:
       - name: Lint (all packages)
         run: pnpm lint
 
-      - name: Type-check (parallel)
+      - name: Type-check (sequential)
         run: |
-          (cd apps/api && npx tsc --noEmit) & pid1=$!
-          (cd apps/web && npx tsc --noEmit) & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
+          cd apps/api
+          npx tsc --noEmit
+          cd ../web
+          npx tsc --noEmit
 
-      - name: Unit tests (parallel)
+      - name: Unit tests (sequential)
         run: |
-          pnpm --filter api test & pid1=$!
-          pnpm --filter web test & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
+          pnpm --filter api test
+          pnpm --filter web test
 
       - name: Prisma DB push (integration test schema)
         run: cd apps/api && pnpm prisma db push
@@ -116,12 +150,10 @@ jobs:
           DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
-      - name: V1 unit tests (parallel)
+      - name: V1 unit tests (sequential)
         run: |
-          pnpm --filter v1_api test & pid1=$!
-          pnpm --filter v1_web test & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
+          pnpm --filter v1_api test
+          pnpm --filter v1_web test
 
       # Next.js 빌드 캐시 — build check를 가볍게 (incremental compile 재사용)
       - name: Cache Next.js build cache (v1_web)
@@ -132,12 +164,10 @@ jobs:
           restore-keys: |
             nextjs-v1web-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
-      - name: V1 build checks (parallel)
+      - name: V1 build checks (sequential)
         run: |
-          pnpm --filter v1_api build & pid1=$!
-          pnpm --filter v1_web build & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
+          pnpm --filter v1_api build
+          pnpm --filter v1_web build
 
   # ── Deploy job: runs on push to main or manual dispatch, after tests pass ──
   deploy:
@@ -278,9 +308,8 @@ jobs:
           sudo docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
           sudo docker build --no-cache \
             -f deploy/Dockerfile.v1-web \
-            --build-arg NEXT_PUBLIC_API_URL=/v1/api/v1 \
+            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
             --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \
-            --build-arg NEXT_PUBLIC_BASE_PATH=/v1 \
             --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
             --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
             -t teameet-v1-web .
@@ -324,12 +353,11 @@ jobs:
           for i in $(seq 1 12); do
             if ssh ec2 'curl -fsS --connect-timeout 5 --max-time 15 http://localhost:8121/api/v1/health | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/v1/landing 2>/dev/null | \
+                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/landing 2>/dev/null | \
                         grep -qx 200 && \
-                        curl -sSI --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/ 2>/dev/null | \
-                        grep -qx 308 && \
-                        curl -sSI --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/api/v1/health 2>/dev/null | \
-                        grep -qx 308'; then
+                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/api/v1/health 2>/dev/null | \
+                        jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
+                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "404"'; then
               echo "Deploy OK"
               exit 0
             fi

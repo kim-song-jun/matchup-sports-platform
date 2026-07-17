@@ -90,7 +90,7 @@ fi
 
 echo "[INFO] Waiting for teameet_v1_web routing..."
 for i in $(seq 1 45); do
-  if curl -fsS http://localhost:3013/v1/landing >/dev/null 2>&1; then
+  if curl -fsS http://localhost:3013/landing >/dev/null 2>&1; then
     echo "[INFO] teameet_v1_web routing is healthy (attempt $i)"
     break
   fi

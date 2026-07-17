@@ -1,0 +1,13 @@
+services:
+  v1_api:
+    image: teameet-v1-api:${ALPHA_RELEASE_VERSION:-alpha}
+
+  v1_web:
+    image: teameet-v1-web:${ALPHA_RELEASE_VERSION:-alpha}
+
+  nginx:
+    volumes:
+      - ./nginx.alpha.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx.security-headers.conf:/etc/nginx/snippets/teameet-security-headers.conf:ro
+      - ./nginx.proxy-hide-security-headers.conf:/etc/nginx/snippets/teameet-proxy-hide-security-headers.conf:ro
+      - ./release-metadata.alpha.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro

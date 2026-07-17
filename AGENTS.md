@@ -158,6 +158,9 @@ Active task가 불명확하면 새 작업을 시작하기 전에 관련 task doc
 
 - No useless fallback: 실패를 성공처럼 숨기는 fallback, mock 완료, silent success, dead-end navigation은 만들지 않는다. 실패하면 실제 에러와 원인을 노출한다.
 - No fake tests: 실제 route/API/action/user-visible contract가 깨져도 통과하는 테스트는 검증으로 인정하지 않는다. 가능한 경우 RED -> GREEN 증거를 남긴다.
+- Minimal validation load: 이 규칙은 코드 분석·수정·리팩토링을 중단시키는 규칙이 아니다. 구현은 계속 진행하고, 변경 계약을 증명하는 가장 좁은 검증을 1회 실행한다. typecheck·build·전체 test·lint 같은 고부하 검증은 커밋 직전 변경 범위에 한해 1회만 실행하며, CI가 수행할 반복 전체 검증을 로컬에서 중복하지 않는다.
+- Host load preflight: 자동 테스트·typecheck·build·lint 전에 CPU/load, 메모리·swap, Node/브라우저 프로세스 수, Docker·대상 서비스 상태를 확인한다. 압박이 보이면 새 부하 작업을 시작하지 않고 상태를 먼저 보고하며, 실행 시 직렬·최소 worker를 사용하고 내가 만든 프로세스만 정리한다.
+- Headed Playwright MCP only: Playwright MCP로 수동 UI/클릭 QA를 수행할 때는 실제 브라우저 창이 보이는 headed 세션만 사용한다. `--headless` MCP를 시작하거나 백그라운드에 상시 유지하지 않으며, 시작한 MCP·브라우저의 PID/PPID를 기록하고 QA 종료 시 해당 트리만 정리한다. CI 전용 비대화형 브라우저 검증은 이 MCP 수명주기 규칙과 별도로 관리한다.
 - Visual verification before completion: UI/레이아웃/반응형/admin surface 변경은 tests pass is not completion이다. Playwright screenshot, console/network 확인, before/after screenshot evidence, viewport별 verdict가 필요하다.
 - Layout rebalance: UI 요소 제거/재배치 뒤에는 spacing, scroll, sticky chrome, focus order, desktop/tablet/mobile 레이아웃을 다시 맞춘다.
 - No scope retreat: `전체`, `모든 라우트`, `모든 페이지`, 고정 agent 수, comprehensive QA 요청은 전체 수를 확정하고 processed M/N으로 보고한다.

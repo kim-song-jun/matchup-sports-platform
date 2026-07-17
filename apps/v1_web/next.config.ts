@@ -4,16 +4,48 @@ import bundleAnalyzer from '@next/bundle-analyzer';
 
 const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'true' });
 const isProd = process.env.NODE_ENV === 'production';
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
 const defaultInternalApiOrigin = isProd ? 'http://v1_api:8121' : 'http://localhost:8121';
 const internalApiOrigin =
   process.env.INTERNAL_API_ORIGIN ||
   process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ||
   defaultInternalApiOrigin;
 
+const browserSecurityHeaders = [
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
+];
+
+const noIndexRoutes = [
+  '/admin/:path*',
+  '/auth/:path*',
+  '/callback/:path*',
+  '/chat/:path*',
+  '/home',
+  '/login/:path*',
+  '/matches/new/:path*',
+  '/matches/:id/applications',
+  '/matches/:id/edit',
+  '/my/:path*',
+  '/notifications',
+  '/onboarding/:path*',
+  '/search/:path*',
+  '/signup/:path*',
+  '/team-matches/new/:path*',
+  '/team-matches/:id/edit',
+  '/teams/new',
+  '/teams/:id/edit',
+  '/teams/:id/members',
+  '/terms',
+  '/tournaments/:id/apply',
+  '/tournaments/:id/my',
+  '/tournaments/:id/registrations/:path*',
+  '/users/:path*',
+];
+
 const nextConfig: NextConfig = {
   output: isProd ? 'standalone' : undefined,
-  basePath: basePath || undefined,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   experimental: {
     optimizePackageImports: ['@tanstack/react-query'],
@@ -21,8 +53,17 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname, '../..'),
   },
+  async headers() {
+    return [
+      { source: '/:path*', headers: browserSecurityHeaders },
+      ...noIndexRoutes.map((source) => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
+      })),
+    ];
+  },
   async rewrites() {
-    const proxyRewrites = [
+    return [
       {
         source: '/api/:path*',
         destination: `${internalApiOrigin}/api/:path*`,
@@ -35,18 +76,6 @@ const nextConfig: NextConfig = {
         destination: `${internalApiOrigin}/uploads/:path*`,
       },
     ];
-
-    if (basePath) return proxyRewrites;
-
-    return {
-      beforeFiles: [
-        {
-          source: '/v1/:path*',
-          destination: '/:path*',
-        },
-      ],
-      afterFiles: proxyRewrites,
-    };
   },
 };
 

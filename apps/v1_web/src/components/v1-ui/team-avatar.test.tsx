@@ -4,12 +4,27 @@ import { publicAssetPath } from '@/lib/assets';
 import { TeamAvatar } from './team-avatar';
 
 describe('TeamAvatar', () => {
+  it.each(['sm', 'md', 'lg', 'xl'] as const)(
+    'renders seam-free identicon SVG attributes at the %s size',
+    (size) => {
+      // Given: a team without an uploaded logo at a supported avatar size.
+      const { container } = render(
+        <TeamAvatar seed={`team-${size}`} name={`${size} 테스트 팀`} logoUrl={null} size={size} />,
+      );
+
+      // When: the generated identicon SVG is rendered.
+      const svg = container.querySelector('svg');
+
+      // Then: adjacent cells use pixel-crisp, stroke-free rendering at every size.
+      expect(svg).toHaveAttribute('shape-rendering', 'crispEdges');
+      expect(svg).toHaveAttribute('stroke', 'none');
+    },
+  );
+
   it('shows the uploaded logo image when logoUrl is set', () => {
     const { container } = render(<TeamAvatar seed="team-1" name="성수 러너스" logoUrl="/uploads/logo.png" />);
     const img = container.querySelector('img');
     expect(img).not.toBeNull();
-    // publicAssetPath()를 거쳐 렌더링되므로 원본 문자열을 그대로 하드코딩하지 않고
-    // 같은 함수로 기대값을 계산한다(NEXT_PUBLIC_BASE_PATH가 설정된 환경에서도 안전).
     expect(img).toHaveAttribute('src', publicAssetPath('/uploads/logo.png'));
   });
 

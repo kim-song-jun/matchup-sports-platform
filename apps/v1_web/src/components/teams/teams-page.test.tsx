@@ -179,6 +179,8 @@ describe('TeamDetailPageView', () => {
     introNodes.forEach((node) => {
       expect(node).toHaveStyle({ whiteSpace: 'pre-line' });
     });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: '라이브 팀' })).toBeInTheDocument();
   });
 
   it('releases the hero action busy lock after a synchronous throw so the CTA stays usable', async () => {

@@ -9,17 +9,15 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
   return (
     <AppChrome title="공지사항" activeTab="home" bottomNav={false} backHref="/home">
       <div className="tm-notice-page">
+        <h1 className="sr-only">공지사항</h1>
         {/* Desktop: inline page heading replaces hidden mobile topbar */}
         <div className="tm-desktop-page-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
             <ChevronLeftIcon size={22} strokeWidth={2.2} />
           </Link>
-          <h1 className="tm-text-heading">공지사항</h1>
+          <div className="tm-text-heading" style={{ margin: '0.67em 0' }} aria-hidden="true">공지사항</div>
         </div>
-        {/* Mobile heading (hidden on desktop by CSS). The AppChrome topBar title
-            renders as a <div>, not a heading element, so this h1 must stay in the
-            a11y tree to give mobile screen-reader users the page's main heading. */}
-        <h1 className="tm-text-heading tm-hide-desktop">공지사항</h1>
+        <div className="tm-text-heading tm-hide-desktop" style={{ margin: '0.67em 0' }} aria-hidden="true">공지사항</div>
         <p className="tm-text-caption tm-notice-lead">
           팀밋의 주요 소식과 서비스 운영 안내를 확인할 수 있어요.
         </p>

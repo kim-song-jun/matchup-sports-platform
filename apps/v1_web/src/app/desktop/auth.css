@@ -58,6 +58,10 @@
     /* Slightly increase padding for more breathing room */
     padding: 16px 24px 24px;
   }
+
+  .tm-auth-frame:has(.tm-auth-signup-form) .tm-auth-fixed-cta {
+    position: static;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

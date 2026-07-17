@@ -333,12 +333,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
 
   return (
     <AppChrome title="팀 상세" activeTab="teams" bottomNav={false} backHref="/teams">
+      <h1 className="sr-only">{team.name}</h1>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
         </Link>
-        <h1 className="tm-text-heading">{team.name}</h1>
+        <div className="tm-text-heading" style={{ margin: '0.67em 0' }} aria-hidden="true">{team.name}</div>
       </div>
 
       {/* Desktop 2-column layout */}
@@ -456,7 +457,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <ShareIcon size={20} />
           </button>
           <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-          <h1 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 14 }}>{team.name}</h1>
+          <div className="tm-text-heading" style={{ color: 'var(--static-white)', margin: '14px 0 0' }} aria-hidden="true">{team.name}</div>
           <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
             <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>

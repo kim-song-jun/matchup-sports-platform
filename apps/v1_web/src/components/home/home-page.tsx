@@ -39,6 +39,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         hasNewNotification={model.hasNewNotification && !model.network}
         floatingSlot={<HomeChatFloatingButton model={model} />}
       >
+      <h1 className="sr-only">Teameet 홈</h1>
       {/*
        * .tm-home-desktop: display:contents on mobile → transparent to layout.
        * display:grid on desktop → 2-column dashboard (main | sidebar).
@@ -157,14 +158,19 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           <div className="tm-home-sidebar-weather-wrap">
             {/* 인라인 style 제거 → home.css .tm-home-weather-head 규칙으로 이전 */}
             <div className="tm-home-weather-head">
-              <div className="tm-text-label">현재 위치 날씨</div>
+              <div>
+                <div className="tm-text-label">현재 위치 날씨</div>
+                <div className="tm-text-caption" style={{ marginTop: 2 }}>
+                  새로고침하면 현재 좌표를 날씨·지역 확인에 1회 전송해요.
+                </div>
+              </div>
               <button
                 className="tm-btn tm-btn-icon tm-btn-neutral"
                 type="button"
                 onClick={model.refreshWeather}
                 disabled={!model.refreshWeather || model.weatherRefreshing}
-                aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 위치 날씨 새로고침'}
-                title={model.weatherRefreshing ? '확인 중' : '새로고침'}
+                aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 좌표 전송에 동의하고 날씨 새로고침'}
+                title={model.weatherRefreshing ? '확인 중' : '현재 좌표를 1회 전송해 날씨 확인'}
               >
                 <RefreshIcon size={18} strokeWidth={2.1} />
               </button>

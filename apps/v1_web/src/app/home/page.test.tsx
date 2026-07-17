@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('HomePage', () => {
-  it('renders the home shell without showing sample home content while API data is empty', () => {
+  it('renders a signed-out home shell without sample identity or content while API data is empty', () => {
     const fallback = getHomeViewModel();
 
     render(
@@ -22,8 +22,11 @@ describe('HomePage', () => {
     );
 
     expect(screen.getAllByText('teameet').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Teameet 홈' })).toBeInTheDocument();
     expect(screen.getByLabelText('채팅')).toBeInTheDocument();
-    expect(document.body.textContent).toContain(fallback.viewerName);
+    expect(document.body.textContent).not.toContain(fallback.viewerName);
+    expect(screen.getByText('로그인하면 매치와 팀 채팅을 이어볼 수 있어요.')).toBeInTheDocument();
     expect(screen.getAllByText('공지사항').length).toBeGreaterThan(0);
     expect(screen.getByText('새 공지사항이 없어요.')).toBeInTheDocument();
 

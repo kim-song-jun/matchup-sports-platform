@@ -135,6 +135,8 @@ export function TeamAvatar({ seed, name, logoUrl, size = 'md', className }: Team
         width={px}
         height={px}
         viewBox={`0 0 ${px} ${px}`}
+        shapeRendering="crispEdges"
+        stroke="none"
         style={{ position: 'absolute', inset: 0, display: imgLoaded ? 'none' : undefined }}
       >
         {cells.flatMap((rowCells, row) =>

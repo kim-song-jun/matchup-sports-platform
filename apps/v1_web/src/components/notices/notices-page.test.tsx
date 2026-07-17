@@ -2,8 +2,8 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { NoticeDetailPageView } from './notices-page';
-import type { NoticeDetailViewModel } from './notices.types';
+import { NoticeDetailPageView, NoticeListPageView } from './notices-page';
+import type { NoticeDetailViewModel, NoticeListViewModel } from './notices.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/notices/notice-1',
@@ -47,5 +47,20 @@ describe('NoticeDetailPageView', () => {
     renderWithClient(<NoticeDetailPageView model={{ ...baseModel, relatedHref: '/matches' }} />);
 
     expect(screen.getByText('관련 매치 확인')).toBeInTheDocument();
+  });
+});
+
+describe('NoticeListPageView', () => {
+  it('exposes one page-level heading across responsive layouts', () => {
+    const model: NoticeListViewModel = {
+      filters: [{ label: '전체', active: true }],
+      notices: [],
+      status: 'ready',
+    };
+
+    renderWithClient(<NoticeListPageView model={model} />);
+
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: '공지사항' })).toBeInTheDocument();
   });
 });

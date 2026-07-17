@@ -1,8 +1,12 @@
-/* [P1 Pretendard] DESIGN.md 브랜드 폰트 — CDN variable font.
- * ★ @import 는 tailwindcss 확장보다 먼저여야 함: Tailwind v4 의 @import "tailwindcss" 가
- *   인라인 확장되면 그 뒤 @import 가 모든 규칙 뒤로 밀려 "@import must precede all rules" 빌드 에러. */
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 @import "tailwindcss";
+
+@font-face {
+  font-family: "Pretendard Variable";
+  src: url("/fonts/PretendardVariable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 45 920;
+  font-display: swap;
+}
 
 :root {
   color-scheme: light;
@@ -143,6 +147,8 @@
     Arial,
     Helvetica,
     sans-serif;
+  --font-sans: var(--font);
+  --font-mono: var(--font);
   /* ── [P1 Component 토큰] Base→Semantic→Component 3계층 완성 ──────────────────
    * 컴포넌트는 이 계층을 참조 — Base(--blue500) 직접 참조 금지(R-X4).
    * 테마/다크모드 파생 시 이 계층만 오버라이드하면 전파됨(System-of-System).
@@ -189,15 +195,8 @@
   --v1-shell-cta-bottom-pad: 22px;
   --v1-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
 
-  /* 홈 "오늘의 추천" 히어로(.tm-featured-media) 커버 사진 crop 비율 — 모바일/데스크톱
-     이전엔 height(146px→220px→260px)만 breakpoint별로 늘고 카드 폭은 독립적으로 변해
-     같은 사진이 뷰포트마다 다른 비율로 잘려 보였다. aspect-ratio 단일 토큰으로 통일해
-     폭이 커지면 높이도 비례해서 커지도록(=같은 crop 유지) 고정.
-     2/1(와이드·짧음) → 4/3 로 조정 — 사진이 카드 안에서 텍스트 콘텐츠 영역(~130-140px
-     고정)보다 확실히 우세한 비중(약 62-64%)을 갖도록 세로 비중을 키웠다. 카드 폭 기준
-     308px에서 이전 154px→약 231px, 카드 전체 높이는 296px→약 355px로 커지지만 과도하게
-     세로로 길어지는 지점(1:1 이하)까지는 가지 않았다. */
-  --tm-featured-media-ratio: 4 / 3;
+  /* 홈 공유 추천 미디어(.tm-featured-media)는 모든 소비자와 뷰포트에서 2:1 crop을 유지한다. */
+  --tm-featured-media-ratio: 2 / 1;
 
   /* /tournaments 목록 상단 추천 배너(.tm-tournament-featured-banner) 데스크톱 사진 crop
      비율 — 이전엔 height가 없어 오버레이 텍스트 길이(부제/일정/장소 텍스트 유무)에 따라
@@ -216,12 +215,14 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html:has(.tm-app-frame),
@@ -238,8 +239,17 @@ a {
 button,
 input,
 textarea,
-select {
+select,
+option {
   font: inherit;
+  font-family: var(--font);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font);
 }
 
 button {

@@ -1,6 +1,13 @@
 import Link from 'next/link';
 import { BellIcon, HomeIcon, MatchIcon, TeamsIcon, TeamMatchIcon, SearchIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
+import { buildPublicMetadata } from '@/lib/seo';
+
+export const metadata = buildPublicMetadata({
+  title: '같이 뛸 사람을 가장 빠르게 찾는 방법',
+  description: '축구·풋살·러닝·수영 매치와 팀을 찾고, 대회까지 한곳에서 참여하는 AI 기반 멀티스포츠 플랫폼 Teameet입니다.',
+  path: '/landing',
+});
 
 export default function LandingPage() {
   return (

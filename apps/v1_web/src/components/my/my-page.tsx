@@ -58,6 +58,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
 
   return (
     <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
+      <h1 className="sr-only">마이페이지</h1>
       <div className="tm-my-shell">
         {/* Mobile layout: flat stack (unchanged) */}
         {/* Desktop layout: 2-column via tm-my-desktop-layout */}

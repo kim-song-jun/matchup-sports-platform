@@ -28,8 +28,7 @@ function toErrorMessage(message: unknown) {
 }
 
 function getDefaultBaseUrl() {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') ?? '';
-  return `${basePath}/api/v1`;
+  return '/api/v1';
 }
 
 export function getV1ApiBaseUrl() {
@@ -41,12 +40,16 @@ export function getV1ApiBaseUrl() {
 export function getV1DevAuthHeaders(): HeadersInit {
   if (typeof window === 'undefined') return {};
 
-  const { userId, userEmail } = getStoredV1Session();
+  const searchSessionHeader = {
+    'x-v1-search-session-id': getV1SearchSessionId(),
+  };
+  if (process.env.NODE_ENV === 'production') return searchSessionHeader;
 
+  const { userId, userEmail } = getStoredV1Session();
   return {
     ...(userId ? { 'x-v1-user-id': userId } : {}),
     ...(userEmail ? { 'x-v1-user-email': userEmail } : {}),
-    'x-v1-search-session-id': getV1SearchSessionId(),
+    ...searchSessionHeader,
   };
 }
 

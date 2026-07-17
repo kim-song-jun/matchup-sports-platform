@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { useV1CreateInquiry, useV1Inquiries, useV1Inquiry } from '@/hooks/use-v1-api';
@@ -120,7 +120,6 @@ export function MyInquiriesListClient() {
 
 export function MyInquiryCreateClient() {
   const router = useRouter();
-  const pathname = usePathname();
   const createInquiry = useV1CreateInquiry();
   const [category, setCategory] = useState<V1InquiryCategory>('account');
   const [title, setTitle] = useState('');
@@ -150,7 +149,7 @@ export function MyInquiryCreateClient() {
 
     createInquiry.mutate(payload, {
       onSuccess: (inquiry) => {
-        router.replace(appRoute(`/my/inquiries/${inquiry.inquiryId}`, pathname));
+        router.replace(appRoute(`/my/inquiries/${inquiry.inquiryId}`));
       },
       onError: (error) => {
         setErrors({ form: errorMessage(error) });

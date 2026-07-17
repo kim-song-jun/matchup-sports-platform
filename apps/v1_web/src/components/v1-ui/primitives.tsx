@@ -154,7 +154,6 @@ export function DatePickerTextInput({
         {...inputProps}
         className={`tm-input ${inputClassName}`.trim()}
         inputMode={inputProps.inputMode ?? 'numeric'}
-        maxLength={inputProps.maxLength ?? 10}
         type="text"
         value={value}
         onChange={(event) => onTextChange(event.target.value)}

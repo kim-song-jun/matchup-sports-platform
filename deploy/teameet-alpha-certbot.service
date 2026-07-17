@@ -8,4 +8,3 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/bin/docker run --rm -v /home/ec2-user/teameet/deploy/certbot/conf:/etc/letsencrypt -v /home/ec2-user/teameet/deploy/certbot/www:/var/www/certbot certbot/certbot@sha256:34ee91d2f43008eb78a007d22f23ed4b2eaa9a454cb27ca2c042b49527a695b4 renew --webroot --webroot-path /var/www/certbot --quiet
 ExecStartPost=/usr/bin/docker exec teameet_nginx nginx -s reload
-

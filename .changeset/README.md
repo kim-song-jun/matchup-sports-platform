@@ -18,4 +18,3 @@
 - 테스트·문서만 바뀌는 PR은 Changeset 없이 통과한다.
 - `dev` 배포는 다음 정식 버전에 `-alpha.YYYYMMDD.g<sha12>`를 붙인다.
 - 정식 버전·태그는 alpha QA 승인 뒤 release PR이 `main`에 병합될 때만 만든다.
-

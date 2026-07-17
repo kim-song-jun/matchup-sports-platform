@@ -1,7 +1,7 @@
 # Teameet v1 이벤트 허브·대회 사용자 시나리오 QA 보고서
 
-대상 독자: 서비스 기획·디자인·운영  
-검증 환경: local `dev` Web `3013` / API `8121` / 기존 local dev PostgreSQL  
+대상 독자: 서비스 기획·디자인·운영
+검증 환경: local `dev` Web `3013` / API `8121` / 기존 local dev PostgreSQL
 상태: 브라우저 시나리오·22개 화면 증거·순차 코드 검증 완료, 최종 리뷰·main 통합 진행 중
 
 ## 1. 이번 검증에서 확인할 것

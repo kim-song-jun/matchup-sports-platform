@@ -828,6 +828,7 @@ export class TeamsService {
         ).map((m) => m.userId),
       'team_join_application_received',
       team.id,
+      `"${team.name}" 팀 가입 신청을 확인해 주세요.`,
     );
 
     return {
@@ -1051,6 +1052,7 @@ export class TeamsService {
       application.applicantUserId,
       'team_join_application_accepted',
       application.teamId,
+      `"${application.team.name}" 팀 가입이 승인됐어요.`,
     );
 
     return {
@@ -1106,6 +1108,7 @@ export class TeamsService {
       application.applicantUserId,
       'team_join_application_rejected',
       application.teamId,
+      `"${application.team.name}" 팀 가입 신청이 거절됐어요.`,
     );
 
     return {
@@ -1188,7 +1191,12 @@ export class TeamsService {
         });
 
     // 알림: 초대받은 사용자에게 안내 (fire-and-forget)
-    void this.notifications.emitNotification(invitedUser.id, 'team_invitation_received', teamId);
+    void this.notifications.emitNotification(
+      invitedUser.id,
+      'team_invitation_received',
+      teamId,
+      `"${team.name}" 팀의 초대를 확인해 보세요.`,
+    );
 
     return {
       invitationId: invitation.id,
@@ -1447,6 +1455,7 @@ export class TeamsService {
       invitation.invitedByUserId,
       'team_invitation_accepted',
       invitation.teamId,
+      `"${invitation.team.name}" 팀 초대를 수락했어요.`,
     );
 
     return {

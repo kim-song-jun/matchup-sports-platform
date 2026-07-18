@@ -161,7 +161,7 @@ export class AdminRegistrationsService {
       registration.appliedByUserId,
       'tournament_payment_confirmed',
       registration.tournamentId,
-      '운영진 확정을 기다려 주세요.',
+      `"${registration.tournament.title}" 대회 운영진 확정을 기다려 주세요.`,
     );
 
     const playerCount = await this.countPlayers(registrationId);
@@ -237,6 +237,9 @@ export class AdminRegistrationsService {
         ? 'tournament_registration_confirmed'
         : 'tournament_registration_waitlisted',
       registration.tournamentId,
+      dto.decision === 'confirm'
+        ? `"${registration.tournament.title}" 대회 참가가 확정됐어요.`
+        : `"${registration.tournament.title}" 대회 대기자 명단에 등록됐어요.`,
     );
 
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
@@ -297,6 +300,7 @@ export class AdminRegistrationsService {
       registration.appliedByUserId,
       'tournament_registration_cancelled',
       registration.tournamentId,
+      `"${registration.tournament.title}" 대회 참가 신청이 취소됐어요.`,
     );
 
     const playerCount = await this.countPlayers(registrationId);
@@ -538,9 +542,12 @@ export class AdminRegistrationsService {
     return this.serialize(result, payment ?? null, playerCount);
   }
 
-  private async loadRegistration(registrationId: string): Promise<V1TournamentRegistration> {
+  private async loadRegistration(
+    registrationId: string,
+  ): Promise<V1TournamentRegistration & { tournament: { title: string } }> {
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
+      include: { tournament: { select: { title: true } } },
     });
     if (!registration) {
       throw new NotFoundException({

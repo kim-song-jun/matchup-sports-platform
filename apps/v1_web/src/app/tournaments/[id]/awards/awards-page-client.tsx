@@ -13,6 +13,7 @@ import {
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { hasStoredV1Session } from '@/lib/session-storage';
+import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
@@ -577,11 +578,13 @@ function RetentionSection({ tournamentId }: { tournamentId: string }) {
             style={{ flex: '1 1 auto', minWidth: 100 }}
             onClick={() => {
               if (navigator.share) {
+                trackEvent('tournament_share', { channel: 'native_share' });
                 void navigator.share({
                   title: '티밋 대회 결과',
                   url: window.location.href,
                 });
               } else {
+                trackEvent('tournament_share', { channel: 'clipboard' });
                 void navigator.clipboard.writeText(window.location.href);
               }
             }}

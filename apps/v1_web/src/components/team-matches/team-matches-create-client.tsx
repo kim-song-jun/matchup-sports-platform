@@ -13,6 +13,7 @@ import {
   useV1UpdateTeamMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { labelToLevelCode } from '@/lib/v1-levels';
@@ -157,6 +158,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
         onSuccess: (result) => {
           window.localStorage.removeItem(storageKey);
           window.localStorage.removeItem(selectionKey);
+          trackEvent('team_match_create_complete', {});
           router.push(result.detailRoute || `/team-matches/${result.teamMatchId}`);
         },
         onError: (err) => {

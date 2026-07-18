@@ -18,6 +18,7 @@ import {
   useV1CreateRegistration,
   useV1SubmitRegistration,
 } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { appRoute } from '@/lib/app-route';
 import { formatEntryFee } from '@/lib/date-utils';
@@ -1756,6 +1757,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       });
       setPaymentDueAt(submittedRegistration.payment?.paymentDueAt ?? null);
       setSubmittedPaymentInstructions(submittedRegistration.paymentInstructions);
+      trackEvent('tournament_apply_complete', { tournamentId });
       setStep('payment');
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '신청 제출 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));

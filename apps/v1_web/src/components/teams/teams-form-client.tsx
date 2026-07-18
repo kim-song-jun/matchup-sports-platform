@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { labelToLevelCode } from '@/lib/v1-levels';
@@ -74,7 +75,11 @@ export function TeamCreatePageClient() {
       }
       submitLockRef.current = true;
       void createTeamWithActivityCompatibility(payload, draft)
-        .then((result) => router.push(result.detailRoute || `/teams/${result.teamId}`))
+        .then((result) => {
+          const sportType = sports.data?.find((sport) => sport.id === selectedSportId)?.code ?? selectedSportId;
+          trackEvent('team_create_complete', { sportType });
+          router.push(result.detailRoute || `/teams/${result.teamId}`);
+        })
         .catch((err) => {
           const prompt = getCreatorProfilePrompt(err, '팀');
           if (prompt) {

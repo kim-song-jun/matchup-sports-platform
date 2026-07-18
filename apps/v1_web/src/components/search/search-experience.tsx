@@ -2,11 +2,12 @@
 
 import { Search, X, ChevronLeft, Clock, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useV1Matches, useV1RecentSearches, useV1RecordSearch, useV1TeamMatches, useV1Teams } from '@/hooks/use-v1-api';
 import type { V1Match, V1Team, V1TeamMatch } from '@/types/api';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { trackEvent } from '@/lib/analytics';
 
 type SearchState = 'results' | 'new' | 'empty' | 'error' | 'stale';
 
@@ -67,6 +68,17 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     setQuery(next);
     setSubmittedQuery(next);
   }, [state]);
+
+  // 통합 검색(매치/팀매치/팀)이 실제로 완료된 시점에만 1회 기록한다 — 같은 검색어로
+  // 로딩 상태가 재렌더링되는 동안 중복 발화되지 않도록 마지막으로 기록한 검색어를 ref로 추적.
+  const trackedSearchRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!shouldSearch || loading || errored) return;
+    const trimmedQuery = submittedQuery.trim();
+    if (!trimmedQuery || trackedSearchRef.current === trimmedQuery) return;
+    trackedSearchRef.current = trimmedQuery;
+    trackEvent('search', { query: trimmedQuery, resultCount: apiResults.length, domain: 'all' });
+  }, [apiResults.length, errored, loading, shouldSearch, submittedQuery]);
 
   function goBack() {
     if (window.history.length > 1) {

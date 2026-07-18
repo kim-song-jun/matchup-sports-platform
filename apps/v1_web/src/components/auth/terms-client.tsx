@@ -7,6 +7,7 @@ import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Button } from '@/components/v1-ui/button';
 import { useV1CompleteSocialTerms } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import { saveSignupTermsAccepted } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
@@ -86,6 +87,7 @@ export function TermsClient() {
       return;
     }
 
+    trackEvent('sign_up_start', { method: 'email' });
     saveSignupTermsAccepted(true);
     router.push('/signup');
   };

@@ -15,6 +15,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { readSignupTermsAccepted } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
@@ -226,6 +227,7 @@ export function SignupClient() {
       });
 
       saveStoredV1Session(result.session);
+      trackEvent('sign_up_complete', { method: 'email' });
 
       if (profileImageFile) {
         const uploadResult = await uploadImages.mutateAsync([profileImageFile]);

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
+import { trackEvent } from '@/lib/analytics';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
 import {
   useV1CompleteOnboarding,
@@ -168,7 +169,17 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         currentStep,
       },
       {
-        onSuccess: () => router.push(href),
+        onSuccess: () => {
+          // 'sport' 단계에서만 선택한 종목 코드를 함께 남긴다 — 다른 단계는 종목과 무관.
+          const sportType = currentStep === 'sport'
+            ? payloadDraft.sports
+                .map((sport) => sports.find((candidate) => candidate.id === sport.sportId)?.code)
+                .filter((code): code is string => Boolean(code))
+                .join(',')
+            : '';
+          trackEvent('onboarding_step_complete', sportType ? { step: currentStep, sportType } : { step: currentStep });
+          router.push(href);
+        },
         onError: (nextError) => setError(getErrorMessage(nextError)),
       },
     );
@@ -191,6 +202,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     setError(null);
     completeOnboarding.mutate(undefined, {
       onSuccess: (result) => {
+        trackEvent('onboarding_complete', {});
         clearDraft();
         router.replace(result.next?.route ?? '/home');
       },

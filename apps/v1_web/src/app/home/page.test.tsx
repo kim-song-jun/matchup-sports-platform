@@ -1,9 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { HomePageView } from '@/components/home/home-page';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHomeViewModel } from '@/components/home/home.view-model';
 import { Providers } from '../providers';
 import HomePage from './page';
+
+const analytics = vi.hoisted(() => ({
+  trackEvent: vi.fn(),
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
@@ -11,7 +15,26 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
 }));
 
+vi.mock('@/lib/analytics', () => ({
+  trackEvent: analytics.trackEvent,
+  getGaMeasurementId: () => undefined,
+}));
+
 describe('HomePage', () => {
+  beforeEach(() => {
+    analytics.trackEvent.mockClear();
+  });
+
+  it('tracks a home_view event on mount', async () => {
+    render(
+      <Providers>
+        <HomePage />
+      </Providers>,
+    );
+
+    await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('home_view', {}));
+  });
+
   it('renders a signed-out home shell without sample identity or content while API data is empty', () => {
     const fallback = getHomeViewModel();
 

@@ -5,7 +5,7 @@ import { buildPublicMetadata } from '@/lib/seo';
 
 export const metadata = buildPublicMetadata({
   title: '같이 뛸 사람을 가장 빠르게 찾는 방법',
-  description: '축구·풋살·러닝·수영 매치와 팀을 찾고, 대회까지 한곳에서 참여하는 AI 기반 멀티스포츠 플랫폼 Teameet입니다.',
+  description: '축구·풋살·러닝·수영 매치와 팀을 찾고, 대회까지 한곳에서 참여하는 AI 기반 멀티스포츠 플랫폼 Teameet이에요.',
   path: '/landing',
 });
 

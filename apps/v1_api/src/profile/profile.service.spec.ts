@@ -344,4 +344,31 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       jest.useRealTimers();
     }
   });
+
+  it('reputation.mannerScore/reviewCount는 캐시(reputationSummary) 값이 아니라 reveal 필터를 통과한 live 재계산 값을 반환한다', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      // baseUser.reputationSummary(캐시)는 reviewCount: 5, mannerScore: null — 이번 테스트는 이 캐시값이
+      // 무시되고 live 재계산 결과(revealed 리뷰 1건, 평점 5)가 반환되는지 검증한다.
+      const revealedByPartner = {
+        sourceId: 'source-a',
+        reviewerUserId: 'reviewer-a',
+        targetUserId,
+        rating: 5,
+        submittedAt: now,
+      };
+      const reverse = [{ sourceId: 'source-a', reviewerUserId: targetUserId, targetUserId: 'reviewer-a' }];
+      const prisma = buildPrisma({ allTimeCandidates: [revealedByPartner], reverse });
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.publicProfile(null, targetUserId);
+
+      expect(result.reputation.reviewCount).toBe(1);
+      expect(result.reputation.mannerScore).toBe(5);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

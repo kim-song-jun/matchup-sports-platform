@@ -254,19 +254,28 @@ export class ProfileService {
     });
     if (!user) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
 
-    const activitySummary = await this.getPublicActivitySummary(user.id);
+    // reputation.mannerScore/reviewCount도 캐시가 아니라 매 요청마다 live로 재계산한다 —
+    // 캐시(V1UserReputationSummary)는 72시간 경과 단독으로는 갱신되지 않아 헤드라인 평점 배지가
+    // activitySummary.totals.reviewCount와 어긋날 수 있었다(trustState만 캐시값 유지, 코스한 버킷이라 영향 적음).
+    const liveReputation = await this.computeRevealedUserReputation(user.id);
+    const activitySummary = await this.getPublicActivitySummary(user.id, liveReputation);
 
     return {
       userId: user.id,
       displayName: user.profile?.nickname ?? '사용자',
       nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
-      reputation: toReputationPayload(user.reputationSummary),
+      reputation: {
+        ...toReputationPayload(user.reputationSummary),
+        mannerScore: liveReputation.mannerScore,
+        activityCount: liveReputation.reviewCount,
+        reviewCount: liveReputation.reviewCount,
+      },
       activitySummary,
     };
   }
 
-  private async getPublicActivitySummary(userId: string) {
+  private async getPublicActivitySummary(userId: string, precomputedReputation?: { reviewCount: number; mannerScore: number | null }) {
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
@@ -296,7 +305,8 @@ export class ProfileService {
       // 리뷰를 원본 count()로 재집계하지 않아 비공개(reveal 안 된) 리뷰의 존재/시점이 새어나가지 않도록 reveal 필터를 태운다.
       // 캐시(V1UserReputationSummary)는 리뷰 제출 이벤트에서만 갱신되고 72시간 경과만으로 갱신되는 cron이 없어(사용자 결정:
       // cron 추가 안 함) 매 GET마다 live로 재계산한다 — activitySummary()의 computeRevealedUserReputation()과 동일.
-      this.computeRevealedUserReputation(userId),
+      // publicProfile()이 reputation 배지용으로 이미 계산해뒀으면(precomputedReputation) 중복 쿼리 없이 재사용한다.
+      precomputedReputation ? Promise.resolve(precomputedReputation) : this.computeRevealedUserReputation(userId),
       this.prisma.v1MatchParticipant.count({
         where: {
           userId,

@@ -7,7 +7,8 @@ export async function recalculateTournamentFixtureTeamTrust(
 ) {
   const [aggregate, teamMatchCount, tournamentFixtureCount] = await Promise.all([
     tx.v1PostEventReview.aggregate({
-      where: { targetTeamId, targetType: 'team', status: 'submitted' },
+      // sourceType 필터 — 대회후기(tournament_fixture)만 이 집계에 반영(team_match는 recalculateTeamTrust가 별도 관리)
+      where: { targetTeamId, targetType: 'team', status: 'submitted', sourceType: 'tournament_fixture' },
       _avg: { rating: true },
       _count: { _all: true },
     }),

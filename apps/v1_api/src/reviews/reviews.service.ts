@@ -569,25 +569,35 @@ export class ReviewsService {
   }
 
   private async recalculateUserReputation(tx: PrismaTx, targetUserId: string) {
-    const aggregate = await tx.v1PostEventReview.aggregate({
+    const now = new Date();
+    const candidates = await tx.v1PostEventReview.findMany({
       where: { targetUserId, targetType: 'user', status: 'submitted' },
-      _avg: { rating: true },
-      _count: { _all: true },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
-    const reviewCount = aggregate._count._all;
+    const reverseReviews = candidates.length
+      ? await tx.v1PostEventReview.findMany({
+          where: { reviewerUserId: targetUserId, sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, status: 'submitted' },
+          select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+        })
+      : [];
+    const revealed = candidates.filter((review) => isReviewRevealed(review, reverseReviews, now));
+    const reviewCount = revealed.length;
+    const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
+
     await tx.v1UserReputationSummary.upsert({
       where: { userId: targetUserId },
-      update: reputationData(reviewCount, aggregate._avg.rating, '완료 경기 리뷰 기반'),
-      create: { userId: targetUserId, ...reputationData(reviewCount, aggregate._avg.rating, '완료 경기 리뷰 기반') },
+      update: reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'),
+      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반') },
     });
   }
 
   private async recalculateTeamTrust(tx: PrismaTx, targetTeamId: string) {
-    const [aggregate, completedMatchCount] = await Promise.all([
-      tx.v1PostEventReview.aggregate({
-        where: { targetTeamId, targetType: 'team', status: 'submitted' },
-        _avg: { rating: true },
-        _count: { _all: true },
+    const now = new Date();
+    const [candidates, completedMatchCount] = await Promise.all([
+      tx.v1PostEventReview.findMany({
+        // sourceType 필터 추가 — team_match 리뷰만 팀신뢰점수에 반영(대회후기는 별도 경로에서 집계)
+        where: { targetTeamId, targetType: 'team', status: 'submitted', sourceType: 'team_match' },
+        select: { sourceId: true, reviewerTeamId: true, targetTeamId: true, rating: true, submittedAt: true },
       }),
       tx.v1TeamMatch.count({
         where: {
@@ -596,12 +606,26 @@ export class ReviewsService {
         },
       }),
     ]);
-    const reviewCount = aggregate._count._all;
+    const teamIds = [...new Set(candidates.map((review) => review.reviewerTeamId).filter((id): id is string => Boolean(id)))];
+    const reverseReviews = teamIds.length
+      ? (
+          await tx.v1PostEventReview.findMany({
+            where: { reviewerTeamId: { in: teamIds }, sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, sourceType: 'team_match', status: 'submitted' },
+            select: { sourceId: true, reviewerTeamId: true, targetTeamId: true },
+          })
+        ).map((review) => ({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId }))
+      : [];
+    const revealed = candidates.filter((review) =>
+      isReviewRevealed({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId, submittedAt: review.submittedAt }, reverseReviews, now),
+    );
+    const reviewCount = revealed.length;
+    const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
+
     await tx.v1TeamTrustScore.upsert({
       where: { teamId: targetTeamId },
       update: {
         trustState: trustStateForReviewCount(reviewCount),
-        mannerScore: decimalScore(aggregate._avg.rating),
+        mannerScore: decimalScore(avgRating),
         matchCount: completedMatchCount,
         sourceLabel: '완료 팀매치 리뷰 기반',
         calculatedAt: new Date(),
@@ -609,7 +633,7 @@ export class ReviewsService {
       create: {
         teamId: targetTeamId,
         trustState: trustStateForReviewCount(reviewCount),
-        mannerScore: decimalScore(aggregate._avg.rating),
+        mannerScore: decimalScore(avgRating),
         matchCount: completedMatchCount,
         sourceLabel: '완료 팀매치 리뷰 기반',
         calculatedAt: new Date(),

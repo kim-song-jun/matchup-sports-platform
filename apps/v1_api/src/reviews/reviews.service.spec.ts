@@ -120,7 +120,7 @@ describe('ReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: {
           create: createMock,
-          aggregate: jest.fn().mockResolvedValue({ _avg: { rating: 5 }, _count: { _all: 1 } }),
+          findMany: jest.fn().mockResolvedValue([]),
         },
         v1UserReputationSummary: {
           upsert: jest.fn().mockResolvedValue({}),
@@ -191,7 +191,7 @@ describe('ReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: {
           create: createMock,
-          aggregate: jest.fn().mockResolvedValue({ _avg: { rating: 5 }, _count: { _all: 1 } }),
+          findMany: jest.fn().mockResolvedValue([]),
         },
         v1TeamMatch: {
           count: jest.fn().mockResolvedValue(1),
@@ -228,6 +228,86 @@ describe('ReviewsService', () => {
         }),
       }),
     );
+  });
+
+  describe('recalculateUserReputation', () => {
+    it('공개되지 않은(상대 미제출+72시간 미경과) 리뷰는 mannerScore 집계에서 제외한다', async () => {
+      const now = new Date('2026-07-19T00:00:00Z');
+      jest.useFakeTimers().setSystemTime(now);
+
+      try {
+        const findManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            { sourceId: 'm1', reviewerUserId: 'a', targetUserId: 'x', rating: 5, submittedAt: new Date('2026-07-18T00:00:00Z') }, // 상대 미제출, 24시간 경과 — 비공개
+            { sourceId: 'm2', reviewerUserId: 'b', targetUserId: 'x', rating: 1, submittedAt: new Date('2026-07-19T00:00:00Z') }, // 상대 제출됨 — 공개
+          ])
+          .mockResolvedValueOnce([{ sourceId: 'm2', reviewerUserId: 'x', targetUserId: 'b' }]);
+        const upsertMock = jest.fn().mockResolvedValue({});
+        const prisma = {
+          v1PostEventReview: { findMany: findManyMock },
+          v1UserReputationSummary: { upsert: upsertMock },
+        };
+        const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+        await service['recalculateUserReputation'](prisma as never, 'x');
+
+        expect(upsertMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            update: expect.objectContaining({ reviewCount: 1, mannerScore: expect.objectContaining({}) }),
+          }),
+        );
+        const upsertCall = upsertMock.mock.calls[0][0];
+        // Prisma.Decimal#toString()은 후행 0을 제거하므로(예: "1") toFixed(2)로 정밀도를 검증한다
+        expect(upsertCall.update.mannerScore.toFixed(2)).toBe('1.00'); // m2 리뷰(1점)만 반영
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('recalculateTeamTrust', () => {
+    it('sourceType=team_match 리뷰만 팀신뢰점수 집계에 반영한다(대회후기는 별도 경로에서 집계)', async () => {
+      const now = new Date('2026-07-19T00:00:00Z');
+      jest.useFakeTimers().setSystemTime(now);
+
+      try {
+        const findManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            { sourceId: 'tm1', reviewerTeamId: 'team-a', targetTeamId: 'team-x', rating: 5, submittedAt: new Date('2026-07-19T00:00:00Z') },
+          ])
+          .mockResolvedValueOnce([{ sourceId: 'tm1', reviewerTeamId: 'team-x', targetTeamId: 'team-a' }]);
+        const upsertMock = jest.fn().mockResolvedValue({});
+        const prisma = {
+          v1PostEventReview: { findMany: findManyMock },
+          v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
+          v1TeamTrustScore: { upsert: upsertMock },
+        };
+        const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+        await service['recalculateTeamTrust'](prisma as never, 'team-x');
+
+        expect(findManyMock).toHaveBeenNthCalledWith(
+          1,
+          expect.objectContaining({
+            where: expect.objectContaining({
+              targetTeamId: 'team-x',
+              targetType: 'team',
+              status: 'submitted',
+              sourceType: 'team_match',
+            }),
+          }),
+        );
+        const upsertCall = upsertMock.mock.calls[0][0];
+        expect(upsertCall.update.mannerScore.toFixed(2)).toBe('5.00');
+        expect(upsertCall.update.trustState).toBe('estimated');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('receivedSummary', () => {

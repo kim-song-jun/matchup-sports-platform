@@ -113,7 +113,9 @@ export function isExistingReviewResult(review: ReviewWithIncludes): review is Ex
 export function teamTrustData(reviewCount: number, avgRating: number | null, matchCount: number) {
   return {
     trustState: trustStateForReviewCount(reviewCount),
-    mannerScore: decimalScore(avgRating),
+    // mannerScore(team_match 전용)와 컬럼을 분리 — 대회후기 평점은 tournamentMannerScore/tournamentReviewCount에 기록한다
+    tournamentMannerScore: decimalScore(avgRating),
+    tournamentReviewCount: reviewCount,
     matchCount,
     sourceLabel: '완료 팀매치·대회 경기 리뷰 기반',
     calculatedAt: new Date(),

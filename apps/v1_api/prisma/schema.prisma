@@ -852,15 +852,18 @@ model V1TeamInvitation {
 }
 
 model V1TeamTrustScore {
-  id           String       @id @default(uuid())
-  teamId       String       @unique @map("team_id")
-  trustState   V1TrustState @default(sample) @map("trust_state")
-  mannerScore  Decimal?     @map("manner_score") @db.Decimal(4, 2)
-  matchCount   Int          @default(0) @map("match_count")
-  sourceLabel  String?      @map("source_label")
-  calculatedAt DateTime?    @map("calculated_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id                     String       @id @default(uuid())
+  teamId                 String       @unique @map("team_id")
+  trustState             V1TrustState @default(sample) @map("trust_state")
+  mannerScore            Decimal?     @map("manner_score") @db.Decimal(4, 2)
+  matchCount             Int          @default(0) @map("match_count")
+  // 대회후기(tournament_fixture) 전용 평점 — team_match 전용 mannerScore와 소스 분리(두 recalculate 함수가 같은 컬럼을 덮어쓰는 문제 방지)
+  tournamentMannerScore  Decimal?     @map("tournament_manner_score") @db.Decimal(4, 2)
+  tournamentReviewCount  Int          @default(0) @map("tournament_review_count")
+  sourceLabel            String?      @map("source_label")
+  calculatedAt           DateTime?    @map("calculated_at")
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
 
   team V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 

@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   ApiEnvelope,
@@ -1055,13 +1056,17 @@ export function useV1SubmitReview() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1ReviewSubmitPayload) => v1Post<V1ReviewSubmitResponse>('/reviews', body),
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.reviews() });
       queryClient.invalidateQueries({ queryKey: v1Keys.reviewsReceived() });
       queryClient.invalidateQueries({ queryKey: v1Keys.reviewSource(variables.sourceType, variables.sourceId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       if (variables.targetTeamId) queryClient.invalidateQueries({ queryKey: v1Keys.team(variables.targetTeamId) });
+      // 멱등 재제출(alreadySubmitted)은 실제 신규 제출이 아니므로 이벤트에서 제외
+      if (!data.alreadySubmitted) {
+        trackEvent('review_submit', { targetType: variables.targetType });
+      }
     },
   });
 }
@@ -1095,8 +1100,12 @@ export function useV1ResolveChatRoom() {
   return useMutation({
     mutationFn: (body: { targetType: 'match' | 'team' | 'team_match'; targetId: string }) =>
       v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+      // 신규 채팅방이 실제로 시작될 때만 기록 (기존 방을 다시 여는 경우는 "시작"이 아님)
+      if (data.created) {
+        trackEvent('chat_room_start', { type: data.roomType });
+      }
     },
   });
 }

@@ -1,4 +1,9 @@
+'use client';
+
+import Image from 'next/image';
+import { useState } from 'react';
 import type { V1TournamentSponsor } from '@/types/api';
+import styles from './tournament-sponsor-logo-strip.module.css';
 
 /**
  * 참가 신청 페이지 최하단용 후원사 로고 축약 노출.
@@ -11,7 +16,10 @@ export function SponsorLogoStrip({
   sponsors: V1TournamentSponsor[];
 }) {
   const logoSponsors = sponsors
-    .filter((sponsor) => sponsor.logoUrl)
+    .filter(
+      (sponsor): sponsor is V1TournamentSponsor & { logoUrl: string } =>
+        Boolean(sponsor.logoUrl?.trim()),
+    )
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -20,49 +28,66 @@ export function SponsorLogoStrip({
   }
 
   return (
-    <section
-      aria-label="후원사"
-      style={{
-        marginTop: 32,
-        paddingTop: 20,
-        borderTop: '1px solid var(--border)',
-      }}
-    >
-      <div
-        className="tm-text-caption"
-        style={{ color: 'var(--text-muted)', marginBottom: 12, textAlign: 'center' }}
-      >
+    <section aria-label="후원사" className={styles.section}>
+      <div className={`tm-text-caption ${styles.caption}`}>
         함께하는 후원사
       </div>
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 20,
-        }}
-      >
+      <div className={styles.logoList}>
         {logoSponsors.map((sponsor) => (
-          <img
-            key={sponsor.id}
-            src={sponsor.logoUrl ?? ''}
-            alt={sponsor.name}
-            width={72}
-            height={40}
-            loading="lazy"
-            style={{
-              height: 40,
-              width: 'auto',
-              maxWidth: 120,
-              objectFit: 'contain',
-            }}
-            onError={(event) => {
-              event.currentTarget.hidden = true;
-            }}
+          <SponsorLogo
+            key={`${sponsor.id}:${sponsor.logoUrl}`}
+            logoUrl={sponsor.logoUrl.trim()}
+            name={sponsor.name}
           />
         ))}
       </div>
     </section>
   );
+}
+
+function SponsorLogo({ logoUrl, name }: { logoUrl: string; name: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div
+        role="img"
+        aria-label={`${name} 로고`}
+        className={`${styles.logoFrame} ${styles.logoFallback}`}
+      >
+        <span aria-hidden="true" className="tm-text-label">
+          {getSponsorInitials(name)}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.logoFrame}>
+      <Image
+        src={logoUrl}
+        alt={`${name} 로고`}
+        width={112}
+        height={40}
+        unoptimized
+        loading="lazy"
+        className={styles.logoImage}
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
+
+function getSponsorInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+
+  if (words.length > 1) {
+    return words
+      .slice(0, 2)
+      .map((word) => Array.from(word)[0])
+      .join('')
+      .toUpperCase();
+  }
+
+  return Array.from(words[0] ?? '후원').slice(0, 2).join('').toUpperCase();
 }

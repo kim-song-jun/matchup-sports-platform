@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentBracket } from '@/types/api';
 import {
   useV1AdminBracket,
+  useV1AdminTournamentPlayers,
   useV1AssignGroupTeam,
   useV1CreateFixture,
   useV1CreateGroup,
@@ -27,6 +28,7 @@ import { BracketTab } from './tournament-detail-client';
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminBracket: vi.fn(),
+  useV1AdminTournamentPlayers: vi.fn(),
   useV1CreateGroup: vi.fn(),
   useV1AssignGroupTeam: vi.fn(),
   useV1CreateFixture: vi.fn(),
@@ -59,6 +61,13 @@ describe('BracketTab — 대진표 전체 공개', () => {
       error: null,
       refetch: vi.fn(),
     } as unknown as ReturnType<typeof useV1AdminBracket>);
+    vi.mocked(useV1AdminTournamentPlayers).mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1AdminTournamentPlayers>);
     vi.mocked(useV1CreateGroup).mockReturnValue(noopMutationHook());
     vi.mocked(useV1AssignGroupTeam).mockReturnValue(noopMutationHook());
     vi.mocked(useV1CreateFixture).mockReturnValue(noopMutationHook());

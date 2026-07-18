@@ -460,6 +460,12 @@ async function createScenario(
       format: 'group_knockout',
       registrationDeadlineAt,
       rosterDeadlineAt: scenarioDate(now, scenario.startsInDays - 3, 14),
+      bracketPublishedAt:
+        scenario.status === V1TournamentStatus.closed ||
+        scenario.status === V1TournamentStatus.in_progress ||
+        scenario.status === V1TournamentStatus.completed
+          ? registrationDeadlineAt
+          : null,
       scheduledAt,
       scheduledEndAt,
       venue: '서울 송파 풋살파크',

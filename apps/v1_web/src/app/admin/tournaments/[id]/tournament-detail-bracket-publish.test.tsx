@@ -111,7 +111,7 @@ describe('BracketTab — 대진표 전체 공개', () => {
     fireEvent.click(screen.getByRole('button', { name: '대진표 전체 공개' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/접수 마감 전입니다. 그래도 공개할까요\?/)).toBeInTheDocument();
+      expect(screen.getByText(/접수 마감 전이에요. 그래도 공개할까요\?/)).toBeInTheDocument();
     });
 
     // 확인(전체 공개) 클릭 → publishBracket.mutate 호출 (confirm()이 Promise를 resolve하므로 비동기 대기)
@@ -147,7 +147,7 @@ describe('BracketTab — 대진표 전체 공개', () => {
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
-    expect(screen.queryByText(/접수 마감 전입니다/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/접수 마감 전이에요/)).not.toBeInTheDocument();
   });
 
   it('bracketPublishedAt이 이미 있으면 버튼 대신 공개 시각 안내만 노출한다', () => {

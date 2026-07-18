@@ -1382,6 +1382,7 @@ model V1Tournament {
   reviews        V1TournamentReview[]
   awards         V1TournamentAward[]
   campaign       V1TournamentCampaign?
+  popups         V1TournamentPopup[]
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
@@ -1699,6 +1700,26 @@ model V1TournamentSponsor {
 
   @@index([tournamentId, isActive, sortOrder])
   @@map("v1_tournament_sponsors")
+}
+
+/// 대회 상세 페이지 전용 공지/홍보 팝업. 기존 V1Popup(홈 전역 팝업, audience 타겟팅)과는 별개 모델 —
+/// 특정 대회에만 연결되는 팝업이라 의미가 다르다(Task 109 Track 8).
+model V1TournamentPopup {
+  id             String         @id @default(uuid())
+  tournamentId   String         @map("tournament_id")
+  title          String
+  body           String
+  imageUrl       String?        @map("image_url")
+  status         V1NoticeStatus @default(draft)
+  displayStartAt DateTime?      @map("display_start_at")
+  displayEndAt   DateTime?      @map("display_end_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([tournamentId, status, displayStartAt, displayEndAt], map: "v1_tournament_popups_active_window_idx")
+  @@map("v1_tournament_popups")
 }
 
 /**

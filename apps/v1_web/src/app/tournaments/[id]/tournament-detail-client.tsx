@@ -24,6 +24,7 @@ import {
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
+import { TournamentPopupDialog } from '@/components/tournaments/tournament-popup-dialog';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import {
   formatTournamentDateShort,
@@ -369,15 +370,18 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   }
 
   return (
-    <AppChrome
-      title={data.title}
-      backHref="/tournaments"
-      bottomNav={false}
-      activeTab="tournaments"
-      floatingSlot={<ApplyCTA tournament={data} myRegistration={myRegistration} />}
-    >
-      <TournamentDetailView tournament={data} myRegistration={myRegistration} />
-    </AppChrome>
+    <>
+      <TournamentPopupDialog popup={data.popup} />
+      <AppChrome
+        title={data.title}
+        backHref="/tournaments"
+        bottomNav={false}
+        activeTab="tournaments"
+        floatingSlot={<ApplyCTA tournament={data} myRegistration={myRegistration} />}
+      >
+        <TournamentDetailView tournament={data} myRegistration={myRegistration} />
+      </AppChrome>
+    </>
   );
 }
 

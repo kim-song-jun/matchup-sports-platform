@@ -21,6 +21,8 @@ import { TournamentAnnouncementsService } from './tournament-announcements.servi
 import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
+import { TournamentPopupController } from './tournament-popup.controller';
+import { TournamentPopupService } from './tournament-popup.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
 import { KakaoGeocodingService } from './kakao-geocoding.service';
@@ -53,6 +55,7 @@ import { TournamentCampaignStatusService } from './tournament-campaign-status.se
     TournamentRegistrationsController,
     TournamentAnnouncementsController,
     TournamentSponsorsController,
+    TournamentPopupController,
     TournamentReviewsController,
     TournamentsReadController,
   ],
@@ -65,6 +68,7 @@ import { TournamentCampaignStatusService } from './tournament-campaign-status.se
     TournamentsReadService,
     TournamentAnnouncementsService,
     TournamentSponsorsService,
+    TournamentPopupService,
     TournamentPaymentExpiryService,
     TournamentReviewsService,
     KakaoGeocodingService,

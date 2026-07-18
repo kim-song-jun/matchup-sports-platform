@@ -112,6 +112,7 @@ import type { AdminTableColumn } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { TournamentSponsorsTab } from './tournament-sponsors-tab';
+import { TournamentPopupTab } from './tournament-popup-tab';
 import { TournamentCampaignTab } from './tournament-campaign-tab';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
@@ -497,7 +498,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'campaign' | 'reviews' | 'awards';
+type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'popups' | 'campaign' | 'reviews' | 'awards';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'info', label: '대회 정보' },
@@ -505,6 +506,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'bracket', label: '대진 관리' },
   { id: 'announcements', label: '공지' },
   { id: 'sponsors', label: '협찬' },
+  { id: 'popups', label: '팝업' },
   { id: 'campaign', label: '캠페인' },
   { id: 'reviews', label: '리뷰 관리' },
   { id: 'awards', label: '개인 어워드' },
@@ -3589,6 +3591,16 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       >
         {activeTab === 'sponsors' && (
           <TournamentSponsorsTab tournamentId={id} showToast={showToast} />
+        )}
+      </div>
+
+      <div
+        id="panel-popups"
+        aria-labelledby="tab-popups"
+        hidden={activeTab !== 'popups'}
+      >
+        {activeTab === 'popups' && (
+          <TournamentPopupTab tournamentId={id} showToast={showToast} />
         )}
       </div>
 

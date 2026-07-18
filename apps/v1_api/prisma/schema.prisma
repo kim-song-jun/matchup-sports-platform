@@ -860,6 +860,12 @@ model V1TeamTrustScore {
   // 대회후기(tournament_fixture) 전용 평점 — team_match 전용 mannerScore와 소스 분리(두 recalculate 함수가 같은 컬럼을 덮어쓰는 문제 방지)
   tournamentMannerScore  Decimal?     @map("tournament_manner_score") @db.Decimal(4, 2)
   tournamentReviewCount  Int          @default(0) @map("tournament_review_count")
+  // trustState/matchCount/sourceLabel과 마찬가지로, 대회후기(tournament_fixture) 전용 컬럼을 분리한다 —
+  // 두 컬럼군을 공유하면 recalculateTeamTrust(team_match)와 recalculateTournamentFixtureTeamTrust(tournament_fixture)가
+  // 서로 다른 모집단을 계산하면서도 같은 row를 last-write-wins로 덮어써 버린다.
+  tournamentTrustState   V1TrustState @default(sample) @map("tournament_trust_state")
+  tournamentMatchCount   Int          @default(0) @map("tournament_match_count")
+  tournamentSourceLabel  String?      @map("tournament_source_label")
   sourceLabel            String?      @map("source_label")
   calculatedAt           DateTime?    @map("calculated_at")
   createdAt              DateTime     @default(now()) @map("created_at")

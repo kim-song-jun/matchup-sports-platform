@@ -606,7 +606,10 @@ export class ReviewsService {
         },
       }),
     ]);
-    const teamIds = [...new Set(candidates.map((review) => review.reviewerTeamId).filter((id): id is string => Boolean(id)))];
+    // reverse-lookup 대상은 상대팀(review.reviewerTeamId)이 아니라 targetTeamId 자기 자신 —
+    // candidates는 이미 targetTeamId로 필터링되어 있으므로, "targetTeamId가 상대에게 보낸 리뷰"를 찾으려면
+    // reviewerTeamId=targetTeamId로 조회해야 한다 (reverseTeamReviews()의 review.targetTeamId 패턴과 동일)
+    const teamIds = [...new Set(candidates.map((review) => review.targetTeamId).filter((id): id is string => Boolean(id)))];
     const reverseReviews = teamIds.length
       ? (
           await tx.v1PostEventReview.findMany({

@@ -301,8 +301,59 @@ describe('ReviewsService', () => {
             }),
           }),
         );
+        // reverse-lookup은 candidates.reviewerTeamId(상대팀)가 아니라 targetTeamId(자기 자신, 'team-x')로 조회해야 한다.
+        // 이 assertion이 없으면 reviewerTeamId를 잘못 사용하는 회귀(regression)를 잡지 못한다(두 번째 findMany mock이
+        // where 인자와 무관하게 고정값을 반환하므로).
+        expect(findManyMock).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({
+            where: expect.objectContaining({
+              reviewerTeamId: { in: ['team-x'] },
+            }),
+          }),
+        );
         const upsertCall = upsertMock.mock.calls[0][0];
         expect(upsertCall.update.mannerScore.toFixed(2)).toBe('5.00');
+        expect(upsertCall.update.trustState).toBe('estimated');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('공개되지 않은(상대 미제출+72시간 미경과) team_match 리뷰는 팀신뢰점수 집계에서 제외한다', async () => {
+      const now = new Date('2026-07-19T00:00:00Z');
+      jest.useFakeTimers().setSystemTime(now);
+
+      try {
+        const findManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            { sourceId: 'tm1', reviewerTeamId: 'team-a', targetTeamId: 'team-x', rating: 5, submittedAt: new Date('2026-07-18T00:00:00Z') }, // 상대(team-x) 미제출, 24시간 경과 — 비공개
+            { sourceId: 'tm2', reviewerTeamId: 'team-b', targetTeamId: 'team-x', rating: 1, submittedAt: new Date('2026-07-19T00:00:00Z') }, // 상대(team-x) 제출됨 — 공개
+          ])
+          .mockResolvedValueOnce([{ sourceId: 'tm2', reviewerTeamId: 'team-x', targetTeamId: 'team-b' }]);
+        const upsertMock = jest.fn().mockResolvedValue({});
+        const prisma = {
+          v1PostEventReview: { findMany: findManyMock },
+          v1TeamMatch: { count: jest.fn().mockResolvedValue(2) },
+          v1TeamTrustScore: { upsert: upsertMock },
+        };
+        const tournamentFixtureReviews = { pending: jest.fn(), source: jest.fn(), submit: jest.fn(), sourceSummaries: jest.fn() };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+        await service['recalculateTeamTrust'](prisma as never, 'team-x');
+
+        expect(findManyMock).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({
+            where: expect.objectContaining({
+              reviewerTeamId: { in: ['team-x'] },
+            }),
+          }),
+        );
+        const upsertCall = upsertMock.mock.calls[0][0];
+        // tm1(상대 미제출·72시간 미경과)은 제외되고 tm2(1점)만 반영되어야 한다
+        expect(upsertCall.update.mannerScore.toFixed(2)).toBe('1.00');
         expect(upsertCall.update.trustState).toBe('estimated');
       } finally {
         jest.useRealTimers();

@@ -1,4 +1,4 @@
-# Task 117 — V1 tournament bracket layout
+# Task 118 — V1 tournament bracket layout
 
 ## Scope
 

@@ -8,7 +8,12 @@ vi.mock('@/lib/api-client', () => ({
   v1Delete: vi.fn(),
 }));
 
+vi.mock('@/lib/client-error-reporter', () => ({
+  reportClientError: vi.fn(),
+}));
+
 import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
+import { reportClientError } from '@/lib/client-error-reporter';
 
 const subscription = {
   endpoint: 'https://push.example/abc',
@@ -88,5 +93,38 @@ describe('useV1PushRegistration', () => {
 
     expect(v1Delete).toHaveBeenCalledWith('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' });
     expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+
+  it('unsubscribe still unsubscribes the browser and reports the error when the server call fails', async () => {
+    pushManager.getSubscription.mockResolvedValue(subscription);
+    (v1Delete as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+    expect(reportClientError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'push-unsubscribe-server' }) }),
+    );
+  });
+
+  it('subscribe swallows and reports a rejection instead of throwing (no unhandled rejection)', async () => {
+    (v1Post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('server exploded'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await expect(result.current.subscribe()).resolves.toBeUndefined();
+    });
+
+    expect(reportClientError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'push-subscribe' }) }),
+    );
+    expect(result.current.isSubscribed).toBe(false);
   });
 });

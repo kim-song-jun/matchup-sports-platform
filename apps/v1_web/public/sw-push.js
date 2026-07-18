@@ -1,5 +1,10 @@
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // 페이로드가 비어있거나 JSON이 아니면 기본값으로 폴백 — 알림 자체는 항상 표시한다.
+  }
   const title = data.title || 'Teameet';
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -13,6 +18,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
-  event.waitUntil(self.clients.openWindow(url));
+  const url = event.notification.data?.url;
+  const target = typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') ? url : '/';
+  event.waitUntil(self.clients.openWindow(target));
 });

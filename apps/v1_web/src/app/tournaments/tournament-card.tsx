@@ -123,7 +123,14 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
               <div
                 className="tm-text-body-lg"
-                style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0, lineHeight: 1.35 }}
+                style={{
+                  color: 'var(--text-strong)',
+                  flex: 1,
+                  minWidth: 0,
+                  lineHeight: 1.35,
+                  overflowWrap: 'break-word',
+                  wordBreak: 'keep-all',
+                }}
               >
                 {item.title}
               </div>

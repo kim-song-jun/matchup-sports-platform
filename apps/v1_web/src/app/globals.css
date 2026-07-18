@@ -2859,6 +2859,18 @@ button:disabled {
   gap: 10px;
 }
 
+@media (max-width: 767px) {
+  .tm-team-list .tm-team-card-action-row {
+    padding-right: 64px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) .tm-team-card-action-row {
+    padding-right: 64px;
+  }
+}
+
 .tm-team-image-slot {
   border-radius: 14px;
   border: 1px solid var(--grey100);

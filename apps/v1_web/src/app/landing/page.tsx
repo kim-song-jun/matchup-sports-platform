@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BellIcon, HomeIcon, MatchIcon, TeamsIcon, TeamMatchIcon, SearchIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
+import { LandingCtaLink } from '@/components/landing/landing-cta-link';
 import { buildPublicMetadata } from '@/lib/seo';
 
 export const metadata = buildPublicMetadata({
@@ -30,8 +31,8 @@ export default function LandingPage() {
             <Link className="tm-landing-nav-link" href="#how">이용 방법</Link>
           </nav>
           <div className="tm-landing-nav-ctas">
-            <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/login">로그인</Link>
-            <Link className="tm-btn tm-btn-sm tm-btn-primary" href="/login">시작하기</Link>
+            <LandingCtaLink className="tm-btn tm-btn-sm tm-btn-ghost" href="/login" cta="nav_login">로그인</LandingCtaLink>
+            <LandingCtaLink className="tm-btn tm-btn-sm tm-btn-primary" href="/login" cta="nav_signup">시작하기</LandingCtaLink>
           </div>
         </div>
       </header>
@@ -51,12 +52,12 @@ export default function LandingPage() {
                 지금 내 주변 매치를 찾아보세요.
               </p>
               <div className="tm-landing-hero-actions">
-                <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/login">
+                <LandingCtaLink className="tm-btn tm-btn-lg tm-btn-primary" href="/login" cta="hero_signup">
                   무료로 시작하기
-                </Link>
-                <Link className="tm-btn tm-btn-lg tm-btn-ghost" href="/matches">
+                </LandingCtaLink>
+                <LandingCtaLink className="tm-btn tm-btn-lg tm-btn-ghost" href="/matches" cta="hero_browse_matches">
                   매치 둘러보기
-                </Link>
+                </LandingCtaLink>
               </div>
               <p className="tm-landing-hero-disclaimer">
                 회원가입 없이도 매치를 둘러볼 수 있어요
@@ -264,9 +265,9 @@ export default function LandingPage() {
             <p className="tm-landing-cta-sub">
               오늘도 전국 곳곳에서 새로운 매치가 열리고 있어요
             </p>
-            <Link className="tm-btn tm-btn-lg tm-btn-primary" href="/login">
+            <LandingCtaLink className="tm-btn tm-btn-lg tm-btn-primary" href="/login" cta="bottom_signup">
               무료로 시작하기
-            </Link>
+            </LandingCtaLink>
           </div>
         </section>
       </main>

@@ -8,6 +8,7 @@ import {
   ReadAllNotificationsDto,
   UpdateNotificationPreferencesDto,
 } from './dto/notifications.dto';
+import { WebPushService } from './web-push.service';
 
 /** Notification event types emitted by domain services. */
 export type NotificationEventType =
@@ -223,6 +224,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly webPushService: WebPushService,
   ) {}
 
   /**
@@ -343,6 +345,9 @@ export class NotificationsService {
     });
 
     this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
+    void this.webPushService
+      .sendToUser(userId, { title, body: body ?? undefined, url: deepLink ?? undefined })
+      .catch(() => {});
   }
 
   async list(user: V1AuthUser, query: NotificationsQueryDto) {

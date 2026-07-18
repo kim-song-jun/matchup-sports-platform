@@ -10,6 +10,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
+import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   CancelTeamMatchDto,
@@ -84,6 +85,15 @@ export class TeamMatchesService {
 
     const pageItems = teamMatches.slice(0, limit);
     const hasNext = teamMatches.length > limit;
+
+    // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
+    // hostTeam들의 신뢰점수를 배치 1회 호출로 live 재계산해 덮어쓴다 (N+1 방지, computeRevealedTeamTrustBatch 참조).
+    const hostTeamIds = [...new Set(pageItems.map((teamMatch) => teamMatch.hostTeamId))];
+    const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, hostTeamIds);
+    for (const teamMatch of pageItems) {
+      const trust = trustByHostTeam.get(teamMatch.hostTeamId);
+      teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+    }
 
     return {
       items: pageItems.map((teamMatch) => this.toListItem(teamMatch, user)),
@@ -649,9 +659,17 @@ export class TeamMatchesService {
     const pageItems = applications.slice(0, limit);
     const hasNext = applications.length > limit;
 
+    // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지의 applicantTeam들의
+    // 신뢰점수를 배치 1회 호출로 live 재계산한다. matchCount는 이번 스코프 밖(리뷰 reveal과 무관한 별개
+    // 집계)이라 기존 캐시값을 그대로 쓴다.
+    const applicantTeamIds = [...new Set(pageItems.map((application) => application.applicantTeamId))];
+    const trustByApplicantTeam = await computeRevealedTeamTrustBatch(this.prisma, applicantTeamIds);
+
     return {
       teamMatchId: teamMatch.id,
-      items: pageItems.map((application) => ({
+      items: pageItems.map((application) => {
+        const trust = trustByApplicantTeam.get(application.applicantTeamId);
+        return {
         applicationId: application.id,
         status: application.status,
         message: application.message,
@@ -661,10 +679,8 @@ export class TeamMatchesService {
           teamId: application.applicantTeam.id,
           name: application.applicantTeam.name,
           logoUrl: application.applicantTeam.profile?.logoUrl ?? null,
-          trustState: application.applicantTeam.trustScore?.trustState ?? 'none',
-          score: application.applicantTeam.trustScore?.mannerScore
-            ? Number(application.applicantTeam.trustScore.mannerScore)
-            : null,
+          trustState: trust?.trustState ?? 'none',
+          score: trust?.mannerScore ?? null,
           matchCount: application.applicantTeam.trustScore?.matchCount ?? 0,
         },
         appliedBy: {
@@ -676,7 +692,8 @@ export class TeamMatchesService {
         },
         canApprove: application.status === 'requested' && teamMatch.status === 'recruiting',
         canReject: application.status === 'requested',
-      })),
+        };
+      }),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
   }
@@ -1009,6 +1026,13 @@ export class TeamMatchesService {
       include: this.teamMatchInclude(user),
     });
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+
+    // 단일 조회라 N+1 걱정은 없지만, list()/applications()와 일관성을 위해 hostTeam 신뢰점수도
+    // 캐시 대신 live 재계산으로 덮어쓴다 (teamIds가 1개뿐이어도 같은 배치 함수를 재사용).
+    const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, [teamMatch.hostTeamId]);
+    const trust = trustByHostTeam.get(teamMatch.hostTeamId);
+    teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+
     return teamMatch;
   }
 

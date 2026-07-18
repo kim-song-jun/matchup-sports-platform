@@ -47,6 +47,7 @@ function previousTournament(): V1Tournament {
     format: 'group_knockout',
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
+    bracketPublishedAt: null,
     scheduledAt: '2026-07-01T09:00:00.000Z',
     scheduledEndAt: null,
     venue: '서울 풋살장',

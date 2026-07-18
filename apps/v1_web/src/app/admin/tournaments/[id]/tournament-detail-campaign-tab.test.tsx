@@ -53,6 +53,7 @@ const tournament: V1Tournament = {
   format: 'group_knockout',
   registrationDeadlineAt: '2026-08-01T00:00:00.000Z',
   rosterDeadlineAt: '2026-08-05T00:00:00.000Z',
+  bracketPublishedAt: null,
   scheduledAt: '2026-08-10T00:00:00.000Z',
   scheduledEndAt: '2026-08-11T00:00:00.000Z',
   venue: '서울 풋살장',

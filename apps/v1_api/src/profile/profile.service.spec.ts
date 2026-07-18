@@ -69,6 +69,47 @@ describe('ProfileService identity binding', () => {
   });
 });
 
+describe('ProfileService activitySummary', () => {
+  it('mannerScore를 v1PostEventReview 직접 재집계 대신 V1UserReputationSummary 캐시에서 읽는다', async () => {
+    const prisma = {
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-1' }]) },
+      v1UserReputationSummary: {
+        findUnique: jest.fn().mockResolvedValue({ mannerScore: { toString: () => '4.20', valueOf: () => 4.2 } }),
+      },
+      v1PostEventReview: { aggregate: jest.fn() },
+      v1MatchParticipant: {
+        count: jest.fn().mockResolvedValueOnce(7).mockResolvedValueOnce(2),
+      },
+    };
+    const service = new ProfileService(prisma as never);
+
+    const result = await service.activitySummary(user);
+
+    expect(prisma.v1UserReputationSummary.findUnique).toHaveBeenCalledWith({
+      where: { userId: user.id },
+      select: { mannerScore: true },
+    });
+    expect(prisma.v1PostEventReview.aggregate).not.toHaveBeenCalled();
+    expect(result.totals).toEqual({ activityCount: 7, teamCount: 1, mannerScore: 4.2 });
+    expect(result.monthly).toEqual({ matchCount: 2, mannerScore: 4.2, winRate: null });
+  });
+
+  it('평판 요약이 없는 신규 사용자는 mannerScore를 null로 반환한다', async () => {
+    const prisma = {
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1PostEventReview: { aggregate: jest.fn() },
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new ProfileService(prisma as never);
+
+    const result = await service.activitySummary(user);
+
+    expect(result.totals.mannerScore).toBeNull();
+    expect(result.monthly.mannerScore).toBeNull();
+  });
+});
+
 describe('ProfileService public profile moderation', () => {
   it('queries only publicly available account states', async () => {
     const prisma = {

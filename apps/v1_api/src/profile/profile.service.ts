@@ -34,13 +34,14 @@ export class ProfileService {
     const teamIds = activeMemberships.map((membership) => membership.teamId);
 
     const [
-      receivedReviewAggregate,
+      reputationSummary,
       personalActivityCount,
       monthlyPersonalMatchCount,
     ] = await Promise.all([
-      this.prisma.v1PostEventReview.aggregate({
-        where: { targetUserId: user.id, targetType: 'user', status: 'submitted' },
-        _avg: { rating: true },
+      // 리뷰를 직접 재집계하지 않고 캐시된 요약(공개된 리뷰만 반영됨, ReviewsService.recalculateUserReputation 참조)을 읽는다
+      this.prisma.v1UserReputationSummary.findUnique({
+        where: { userId: user.id },
+        select: { mannerScore: true },
       }),
       this.prisma.v1MatchParticipant.count({
         where: {
@@ -57,9 +58,7 @@ export class ProfileService {
         },
       }),
     ]);
-    const mannerScore = receivedReviewAggregate._avg.rating === null
-      ? null
-      : Number(receivedReviewAggregate._avg.rating.toFixed(2));
+    const mannerScore = reputationSummary?.mannerScore ? Number(reputationSummary.mannerScore) : null;
 
     return {
       totals: {

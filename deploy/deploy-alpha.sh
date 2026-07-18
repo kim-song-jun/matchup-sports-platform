@@ -81,7 +81,7 @@ printf '[alpha-deploy] preflight cpu=%s load=%s mem_available_kib=%s swap_free_k
   "${browser_count}" \
   "${container_count}"
 
-if ! awk -v load="${load_average}" -v cpu="${cpu_count}" 'BEGIN { exit !(load <= cpu * 1.5) }'; then
+if ! awk -v current_load="${load_average}" -v cpu="${cpu_count}" 'BEGIN { exit !(current_load <= cpu * 1.5) }'; then
   echo "[alpha-deploy] Host load is too high for a sequential image build" >&2
   exit 1
 fi

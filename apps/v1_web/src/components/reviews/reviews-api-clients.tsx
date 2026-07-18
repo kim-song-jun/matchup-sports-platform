@@ -10,8 +10,10 @@ import { toReviewSourcePageModel, toReviewsPageModel, toReviewsReceivedPageModel
 
 export function ReviewsPageClient({ initialTab }: { initialTab: ReviewsTab }) {
   const [tab, setTab] = useState<ReviewsTab>(initialTab);
+  const [period, setPeriod] = useState<string | null>(null);
   const reviewsQuery = useV1Reviews({ tab: tab === 'received' ? 'pending' : tab }, { enabled: tab !== 'received' });
   const receivedQuery = useV1ReceivedReviews(undefined, { enabled: tab === 'received' });
+  const summaryQuery = useV1ReceivedReviewSummary('user', period ?? undefined, { enabled: tab === 'received' });
   const model = useMemo(() => toReviewsPageModel(reviewsQuery.data, tab), [reviewsQuery.data, tab]);
   const receivedModel = useMemo(() => toReviewsReceivedPageModel(receivedQuery.data), [receivedQuery.data]);
   const activeQuery = tab === 'received' ? receivedQuery : reviewsQuery;
@@ -21,9 +23,13 @@ export function ReviewsPageClient({ initialTab }: { initialTab: ReviewsTab }) {
       errorMessage={activeQuery.error instanceof Error ? activeQuery.error.message : null}
       loading={activeQuery.isLoading}
       model={model}
+      onPeriodChange={setPeriod}
       onRetry={() => void activeQuery.refetch()}
       onTabChange={setTab}
+      period={period}
       receivedModel={receivedModel}
+      summary={summaryQuery.data}
+      summaryLoading={summaryQuery.isLoading}
     />
   );
 }

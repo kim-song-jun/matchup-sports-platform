@@ -18,27 +18,47 @@ export function ReviewsPageView({
   errorMessage,
   loading,
   model,
+  onPeriodChange,
   onRetry,
   onTabChange,
+  period,
   receivedModel,
+  summary,
+  summaryLoading,
 }: QueryStateProps & {
   model: ReviewsPageModel;
+  onPeriodChange: (period: string | null) => void;
   onTabChange: (tab: ReviewsTab) => void;
+  period: string | null;
   receivedModel: ReviewsReceivedPageModel;
+  summary: V1ReviewReceivedSummaryResponse | undefined;
+  summaryLoading: boolean;
 }) {
   const isReceivedTab = model.tab === 'received';
+  // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
+  // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
+  const hasLegacyContent = loading || Boolean(errorMessage) || receivedModel.userGroups.length > 0 || receivedModel.teamGroups.length > 0;
 
   return (
     <AppChrome title="리뷰" activeTab="my" backHref="/my">
       <div className="tm-review-shell">
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
-          <ReviewsReceivedContent
-            errorMessage={errorMessage}
-            loading={loading}
-            model={receivedModel}
-            onRetry={onRetry}
-          />
+          <>
+            <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
+            {hasLegacyContent ? (
+              <div style={{ marginTop: 24 }}>
+                <div className="tm-my-section-label">이전 리뷰</div>
+                <div className="tm-text-caption" style={{ marginBottom: 10 }}>이 기능이 도입되기 전에 받은 리뷰예요.</div>
+                <ReviewsReceivedContent
+                  errorMessage={errorMessage}
+                  loading={loading}
+                  model={receivedModel}
+                  onRetry={onRetry}
+                />
+              </div>
+            ) : null}
+          </>
         ) : (
           <>
             <ReviewStats stats={model.stats} />

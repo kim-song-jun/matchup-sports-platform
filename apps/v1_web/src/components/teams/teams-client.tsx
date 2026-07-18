@@ -26,6 +26,7 @@ import {
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
@@ -245,7 +246,10 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
             router.push(chatRoomHref(result.roomId, result.route));
           },
-          join: () => join.mutateAsync({ message: null }),
+          join: () => join.mutateAsync({ message: null }).then((result) => {
+            trackEvent('team_apply_complete', { teamId });
+            return result;
+          }),
           withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
         ctaSuccessMessage: query.data.viewer.role === 'none'
@@ -404,8 +408,14 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     requests: requestItems.map((application) =>
       toRequestModel(application, {
         actionPending,
-        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
-        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' })),
+        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate(
+          { applicationId: application.applicationId, note: null },
+          { onSuccess: () => trackEvent('team_application_accept', { teamId }) },
+        )),
+        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate(
+          { applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' },
+          { onSuccess: () => trackEvent('team_application_reject', { teamId }) },
+        )),
       }),
     ),
     invitations: canManageInvitations

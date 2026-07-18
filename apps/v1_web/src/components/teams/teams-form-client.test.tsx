@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import type { TeamFormViewModel } from './teams.types';
 import { TeamCreatePageClient, TeamEditPageClient } from './teams-form-client';
 
@@ -16,6 +17,10 @@ const {
   updateTeamMutateAsync: vi.fn(),
   useV1MasterSportsMock: vi.fn(),
   useV1TeamDetailMock: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  trackEvent: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -79,8 +84,8 @@ describe('Team form client contracts', () => {
     vi.clearAllMocks();
     useV1MasterSportsMock.mockReturnValue({
       data: [
-        { id: 'sport-soccer', name: '축구', levels: [] },
-        { id: 'sport-futsal', name: '풋살', levels: [] },
+        { id: 'sport-soccer', code: 'soccer', name: '축구', levels: [] },
+        { id: 'sport-futsal', code: 'futsal', name: '풋살', levels: [] },
       ],
       isPending: false,
     });
@@ -138,6 +143,18 @@ describe('Team form client contracts', () => {
       expect(createTeamMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({ sportId: 'sport-futsal' }),
       );
+    });
+  });
+
+  it('tracks team_create_complete with the sport code on successful creation', async () => {
+    render(<TeamCreatePageClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '풋살' }));
+    fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '풋살 테스트 팀' } });
+    fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
+
+    await waitFor(() => {
+      expect(trackEvent).toHaveBeenCalledWith('team_create_complete', { sportType: 'futsal' });
     });
   });
 

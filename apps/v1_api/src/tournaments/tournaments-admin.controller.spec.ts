@@ -73,6 +73,7 @@ describe('TournamentsAdminController (service stub)', () => {
     create: jest.fn(),
     update: jest.fn(),
     changeStatus: jest.fn(),
+    publishBracket: jest.fn(),
   };
 
   let controller: TournamentsAdminController;
@@ -127,6 +128,13 @@ describe('TournamentsAdminController (service stub)', () => {
     tournamentsAdminService.changeStatus.mockResolvedValue(payload);
     await expect(controller.changeStatus(ownerAuthUser, 'tournament-1', dto)).resolves.toEqual(payload);
     expect(tournamentsAdminService.changeStatus).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1', dto);
+  });
+
+  it('publishBracket: delegates to service and returns result', async () => {
+    const payload = { tournamentId: 'tournament-1', bracketPublishedAt: '2026-07-18T00:00:00.000Z', alreadyPublished: false };
+    tournamentsAdminService.publishBracket.mockResolvedValue(payload);
+    await expect(controller.publishBracket(ownerAuthUser, 'tournament-1')).resolves.toEqual(payload);
+    expect(tournamentsAdminService.publishBracket).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1');
   });
 });
 

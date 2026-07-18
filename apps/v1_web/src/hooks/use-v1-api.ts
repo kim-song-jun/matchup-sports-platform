@@ -135,7 +135,13 @@ import type {
   V1AdminTournamentAnnouncementWithIdempotent,
   V1AdminTournamentSponsor,
   V1AdminTournamentSponsorListResult,
+  V1AdminTournamentPopup,
+  V1AdminTournamentPopupListResult,
+  V1CreateTournamentPopupPayload,
+  V1UpdateTournamentPopupPayload,
+  V1DeleteTournamentPopupResult,
   V1AdminTournamentStatusChangeResult,
+  V1PublishBracketResult,
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
   V1Tournament,
@@ -2220,6 +2226,19 @@ export function useV1ChangeTournamentStatus(id: string) {
   });
 }
 
+/** Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개. 성공 시 어드민 상세 + 공개 상세를 모두 invalidate. */
+export function useV1PublishTournamentBracket(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<V1PublishBracketResult>(`/admin/tournaments/${id}/publish-bracket`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
 type AdminRegistrationListFilters = {
   status?: string;
   cursor?: string;
@@ -2695,6 +2714,58 @@ export function useV1DeactivateTournamentSponsor(tournamentId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentSponsors(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+// ── Tournament popups (Task 109 Track 8) ────────────────────────────────────
+
+export function useV1AdminTournamentPopups(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentPopups(tournamentId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentPopupListResult>(`/admin/tournaments/${tournamentId}/popups`),
+    enabled: !!tournamentId,
+  });
+}
+
+export function useV1CreateTournamentPopup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateTournamentPopupPayload) =>
+      v1Post<V1AdminTournamentPopup>(`/admin/tournaments/${tournamentId}/popups`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentPopups(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1UpdateTournamentPopup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { popupId: string; body: V1UpdateTournamentPopupPayload }) =>
+      v1Patch<V1AdminTournamentPopup>(
+        `/admin/tournaments/${tournamentId}/popups/${input.popupId}`,
+        input.body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentPopups(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1DeleteTournamentPopup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (popupId: string) =>
+      v1Delete<V1DeleteTournamentPopupResult>(
+        `/admin/tournaments/${tournamentId}/popups/${popupId}`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentPopups(tournamentId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
     },
   });

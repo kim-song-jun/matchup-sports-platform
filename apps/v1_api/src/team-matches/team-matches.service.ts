@@ -395,6 +395,7 @@ export class TeamMatchesService {
           ).map((m) => m.userId),
         'team_match_cancelled',
         teamMatch.id,
+        `"${teamMatch.title}" 팀매치가 취소됐어요.`,
       );
     }
 
@@ -442,7 +443,7 @@ export class TeamMatchesService {
     this.emitTeamMatchNotificationToApplicantManagers(
       teamMatch.id,
       'team_match_closed',
-      '모집이 마감되어 대기 중인 신청이 종료됐어요.',
+      `"${teamMatch.title}" 팀매치 모집이 마감되어 대기 중인 신청이 종료됐어요.`,
     );
 
     return {
@@ -521,7 +522,12 @@ export class TeamMatchesService {
       return nextTeamMatch;
     });
 
-    this.emitNotificationToTeamManagers([teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId], 'team_match_completed', teamMatch.id);
+    this.emitNotificationToTeamManagers(
+      [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId],
+      'team_match_completed',
+      teamMatch.id,
+      `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`,
+    );
 
     return {
       teamMatchId: updated.id,
@@ -594,6 +600,7 @@ export class TeamMatchesService {
         ).map((m) => m.userId),
       'team_match_application_received',
       teamMatch.id,
+      `"${teamMatch.title}" 팀매치 신청을 확인해 주세요.`,
     );
 
     return {
@@ -713,7 +720,7 @@ export class TeamMatchesService {
       [application.teamMatch.hostTeamId],
       'team_match_application_withdrawn',
       application.teamMatchId,
-      '상대팀 신청이 취소됐어요.',
+      `"${application.teamMatch.title}" 팀매치 상대팀 신청이 취소됐어요.`,
     );
 
     return {
@@ -815,6 +822,7 @@ export class TeamMatchesService {
       [application.applicantTeamId],
       'team_match_application_approved',
       application.teamMatchId,
+      `"${application.teamMatch.title}" 팀매치 신청이 승인됐어요.`,
     );
 
     return {
@@ -864,6 +872,7 @@ export class TeamMatchesService {
       [application.applicantTeamId],
       'team_match_application_rejected',
       application.teamMatchId,
+      `"${application.teamMatch.title}" 팀매치 신청이 거절됐어요.`,
     );
 
     return {

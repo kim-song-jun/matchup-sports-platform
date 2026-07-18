@@ -1657,6 +1657,8 @@ export type V1Tournament = {
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
   rosterDeadlineAt: string | null;
+  /** null이면 대진표(조/픽스처) 비공개 — 공개 상세 API는 이 값이 채워질 때까지 groups/fixtures를 숨긴다 */
+  bracketPublishedAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -1738,6 +1740,15 @@ export type V1TournamentGroup = {
   standings: V1TournamentStanding[];
 };
 
+/** 경기 득점자 — 명단에 있으면 playerId, 비회원/대타는 playerId=null + playerName만 */
+export type V1TournamentFixtureGoal = {
+  id: string;
+  team: 'home' | 'away';
+  playerId: string | null;
+  playerName: string;
+  minute: number | null;
+};
+
 export type V1TournamentFixtureResult = {
   homeScore: number;
   awayScore: number;
@@ -1746,6 +1757,7 @@ export type V1TournamentFixtureResult = {
   awayPenaltyScore: number | null;
   note: string | null;
   recordedAt: string;
+  goals: V1TournamentFixtureGoal[];
 };
 
 /** 경기 하이라이트/중계 영상 — 경기당 여러 개 */
@@ -1819,6 +1831,8 @@ export type V1TournamentDetail = {
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
   rosterDeadlineAt: string | null;
+  /** null이면 groups/fixtures가 빈 배열로 내려온다(대진표 비공개). 관리자가 일괄 공개하면 타임스탬프가 채워진다. */
+  bracketPublishedAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -1872,6 +1886,8 @@ export type V1TournamentDetail = {
   reviews: V1TournamentReview[];
   /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
   awards: V1TournamentAward[];
+  /** 대회 상세 진입 시 노출할 활성 팝업(published + 노출 기간 내) 1건. 없으면 null. */
+  popup: V1TournamentDetailPopup | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -2067,6 +2083,7 @@ export type V1AdminBracketResult = {
   recordedAt: string;
   createdAt: string;
   updatedAt: string;
+  goals: V1TournamentFixtureGoal[];
 };
 
 export type V1AdminBracketStanding = {
@@ -2120,6 +2137,13 @@ export type V1AdminTournamentStatusChangeResult = {
   previousStatus: V1TournamentStatus;
   status: V1TournamentStatus;
   alreadyInStatus: boolean;
+};
+
+/** Task 109 Track 6 — 대진표 일괄 공개 응답 */
+export type V1PublishBracketResult = {
+  tournamentId: string;
+  bracketPublishedAt: string;
+  alreadyPublished: boolean;
 };
 
 export type V1StandingsRecalculateResult = {
@@ -2332,6 +2356,8 @@ export type V1RecordResultPayload = {
   note?: string;
   /** 전달 시 replace-all — 생략하면 기존 영상 목록 유지 */
   videos?: { title?: string; url: string }[];
+  /** 전달 시 replace-all — 생략하면 기존 득점 기록 유지 */
+  goals?: { team: 'home' | 'away'; playerId?: string; playerName: string; minute?: number }[];
 };
 
 export type V1CreateAnnouncementPayload = {
@@ -2358,6 +2384,50 @@ export type V1CreateTournamentSponsorPayload = {
 };
 
 export type V1UpdateTournamentSponsorPayload = Partial<V1CreateTournamentSponsorPayload>;
+
+/** 대회 상세 공개 응답에 포함되는 활성 팝업 1건(published + 노출 기간 내) */
+export type V1TournamentDetailPopup = {
+  popupId: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+};
+
+export type V1AdminTournamentPopup = {
+  id: string;
+  tournamentId: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  status: V1TournamentPopupStatus;
+  displayStartAt: string | null;
+  displayEndAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** V1TournamentPopup 상태 — 기존 V1AdminPopupStatus(홈 팝업)와 동일 값, 별도 타입으로 유지 */
+export type V1TournamentPopupStatus = 'draft' | 'published' | 'archived';
+
+export type V1CreateTournamentPopupPayload = {
+  title: string;
+  body: string;
+  imageUrl?: string;
+  status: V1TournamentPopupStatus;
+  displayStartAt?: string | null;
+  displayEndAt?: string | null;
+};
+
+export type V1UpdateTournamentPopupPayload = V1CreateTournamentPopupPayload;
+
+export type V1AdminTournamentPopupListResult = {
+  items: V1AdminTournamentPopup[];
+};
+
+export type V1DeleteTournamentPopupResult = {
+  popupId: string;
+  deleted: boolean;
+};
 
 export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
 

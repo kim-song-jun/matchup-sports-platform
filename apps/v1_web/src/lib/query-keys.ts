@@ -74,6 +74,8 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'announcements'] as const,
   adminTournamentSponsors: (tournamentId: string) =>
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'sponsors'] as const,
+  adminTournamentPopups: (tournamentId: string) =>
+    [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'popups'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,

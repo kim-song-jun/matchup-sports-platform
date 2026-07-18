@@ -52,7 +52,7 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
       awayRegistration: {
         include: { team: { select: { id: true, name: true } } },
       },
-      result: true,
+      result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
       videos: { orderBy: { sortOrder: 'asc' } },
     },
   },

@@ -96,6 +96,7 @@ function makeFixtureResult(overrides: Partial<V1TournamentFixtureResult> = {}): 
     awayPenaltyScore: null,
     note: null,
     recordedAt: '2026-01-01T00:00:00.000Z',
+    goals: [],
     ...overrides,
   };
 }
@@ -109,6 +110,7 @@ function makeTournament(
     title: '테스트 대회',
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
+    bracketPublishedAt: null,
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,
@@ -159,6 +161,7 @@ function makeTournament(
     sponsors: [],
     reviews: [],
     awards: [],
+    popup: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,

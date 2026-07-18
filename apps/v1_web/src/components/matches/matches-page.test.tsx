@@ -2,8 +2,8 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MatchDetailPageView } from './matches-page';
-import { getMatchDetailViewModel } from './matches.view-model';
+import { MatchDetailPageView, MatchListPageView } from './matches-page';
+import { getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/matches/match-4',
@@ -55,5 +55,16 @@ describe('MatchDetailPageView — approved mode (실제 참가 확정자)', () =
     render(<MatchDetailPageView model={model} />);
 
     expect(screen.getAllByText('참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요.').length).toBeGreaterThan(0);
+  });
+});
+
+describe('MatchListPageView — 매치 카드 종목 배지', () => {
+  it('실제 추천 로직 없이 첫 카드에도 가짜 "추천" 배지를 붙이지 않고 실제 종목명을 보여준다', () => {
+    const model = getMatchListViewModel();
+    render(<MatchListPageView model={model} />);
+
+    // 첫 번째 매치 카드(match-1)는 풋살 — index===0이라는 이유만으로 "추천"으로 덮이면 안 된다.
+    expect(screen.queryByText('추천')).not.toBeInTheDocument();
+    expect(screen.getAllByText('풋살').length).toBeGreaterThan(0);
   });
 });

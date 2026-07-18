@@ -76,6 +76,9 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     title: '봄 풋살 대회',
     status: 'open',
     registrationDeadlineAt: null,
+    // 기본값: 대진표 공개 완료 상태(대부분 테스트가 groups/fixtures 노출을 검증하므로).
+    // 비공개 게이트 자체를 검증하는 테스트는 bracketPublishedAt: null로 override.
+    bracketPublishedAt: new Date('2026-06-20T00:00:00.000Z'),
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
     scheduledEndAt: null,
     venue: '서울 풋살장',
@@ -129,6 +132,9 @@ describe('TournamentsReadService', () => {
       findMany: jest.Mock;
       findFirst: jest.Mock;
     };
+    v1TournamentPopup: {
+      findFirst: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -136,6 +142,9 @@ describe('TournamentsReadService', () => {
       v1Tournament: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+      },
+      v1TournamentPopup: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
     };
 
@@ -375,6 +384,75 @@ describe('TournamentsReadService', () => {
     });
   });
 
+  // ─── bracket publish gate (Task 109 Track 6) ────────────────────────────────
+
+  it('get: bracketPublishedAt=null → groups/fixtures hidden, other fields still returned', async () => {
+    const row = fullTournamentRow({
+      bracketPublishedAt: null,
+      groups: [
+        {
+          id: 'group-1',
+          name: 'A조',
+          phase: 'group',
+          sortOrder: 0,
+          groupTeams: [],
+          standings: [],
+        },
+      ],
+      fixtures: [
+        {
+          id: 'fixture-1',
+          groupId: 'group-1',
+          round: 'group',
+          fixtureNumber: 1,
+          legNumber: 1,
+          scheduledAt: null,
+          venue: null,
+          status: 'scheduled',
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: null,
+          homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
+          awayRegistration: null,
+          videos: [],
+          result: null,
+        },
+      ],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.groups).toEqual([]);
+    expect(result.fixtures).toEqual([]);
+    expect(result.bracketPublishedAt).toBeNull();
+    // 대진표만 게이트 — 나머지 대회 정보는 그대로 노출.
+    expect(result).toMatchObject({ id: 'tournament-1', title: '봄 풋살 대회', confirmedCount: 4 });
+  });
+
+  it('get: bracketPublishedAt set → groups/fixtures included and ISO-serialized', async () => {
+    const publishedAt = new Date('2026-06-20T00:00:00.000Z');
+    const row = fullTournamentRow({
+      bracketPublishedAt: publishedAt,
+      groups: [
+        {
+          id: 'group-1',
+          name: 'A조',
+          phase: 'group',
+          sortOrder: 0,
+          groupTeams: [],
+          standings: [],
+        },
+      ],
+      fixtures: [],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.bracketPublishedAt).toBe(publishedAt.toISOString());
+    expect(result.groups).toHaveLength(1);
+  });
+
   it('get: returns public participant teams and filters to active registration statuses', async () => {
     const row = fullTournamentRow({
       registrations: [
@@ -511,6 +589,10 @@ describe('TournamentsReadService', () => {
             awayPenaltyScore: null,
             note: '명승부',
             recordedAt: new Date('2026-07-01T17:30:00Z'),
+            goals: [
+              { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
+              { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+            ],
           },
         },
       ],
@@ -527,6 +609,10 @@ describe('TournamentsReadService', () => {
         awayScore: 2,
         hasPenalty: false,
         note: '명승부',
+        goals: [
+          { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
+          { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+        ],
       },
     });
   });
@@ -542,5 +628,41 @@ describe('TournamentsReadService', () => {
     expect(result.scheduledAt).toBe(scheduledDate.toISOString());
     expect(result.scheduledEndAt).toBe(scheduledEndDate.toISOString());
     expect(result.createdAt).toBe(new Date('2026-06-01T00:00:00.000Z').toISOString());
+  });
+
+  // ─── get — tournament popup (Task 109 Track 8) ───────────────────────────────
+
+  it('get: includes null popup when no active tournament popup exists', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow());
+    prisma.v1TournamentPopup.findFirst.mockResolvedValue(null);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.popup).toBeNull();
+  });
+
+  it('get: includes the active published popup within its display window', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow());
+    prisma.v1TournamentPopup.findFirst.mockResolvedValue({
+      id: 'popup-1',
+      title: '얼리버드 신청 안내',
+      body: '7/31까지 신청하면 참가비 할인!',
+      imageUrl: '/uploads/tournaments/popup.webp',
+    });
+
+    const result = await service.get('tournament-1');
+
+    expect(result.popup).toEqual({
+      popupId: 'popup-1',
+      title: '얼리버드 신청 안내',
+      body: '7/31까지 신청하면 참가비 할인!',
+      imageUrl: '/uploads/tournaments/popup.webp',
+    });
+
+    const callArgs = prisma.v1TournamentPopup.findFirst.mock.calls[0][0];
+    expect(callArgs.where).toMatchObject({
+      tournamentId: 'tournament-1',
+      status: 'published',
+    });
   });
 });

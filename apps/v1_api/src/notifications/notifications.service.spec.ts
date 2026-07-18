@@ -137,6 +137,43 @@ describe('NotificationsService', () => {
     expect(prisma.v1Notification.create).not.toHaveBeenCalled();
   });
 
+  it('body를 넘기지 않으면 이벤트 기본 body(EVENT_BODIES)로 채워진다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification('user-1', 'match_application_received', 'match-1');
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          body: '매치 신청을 확인해 주세요.',
+        }),
+      }),
+    );
+  });
+
+  it('호출부가 body를 명시하면 기본값 대신 그 값이 저장된다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification());
+
+    await service.emitNotification(
+      'user-1',
+      'match_application_received',
+      'match-1',
+      '"주말 풋살 모임" 매치 신청을 확인해 주세요.',
+    );
+    await new Promise(setImmediate);
+
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          body: '"주말 풋살 모임" 매치 신청을 확인해 주세요.',
+        }),
+      }),
+    );
+  });
+
   it('team join application received notifications deep-link to team member management', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification());

@@ -40,6 +40,7 @@ import {
   useV1MasterSports,
   useV1AdminMe,
   useV1ChangeTournamentStatus,
+  useV1PublishTournamentBracket,
   useV1UpdateTournament,
   useV1AdminTournamentRegistrations,
   useV1ConfirmPayment,
@@ -112,6 +113,7 @@ import type { AdminTableColumn } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { TournamentSponsorsTab } from './tournament-sponsors-tab';
+import { TournamentPopupTab } from './tournament-popup-tab';
 import { TournamentCampaignTab } from './tournament-campaign-tab';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
@@ -497,7 +499,7 @@ function SimpleModal({ open, title, onClose, pending = false, children }: Simple
 
 // ── Tab type ──────────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'campaign' | 'reviews' | 'awards';
+type TabId = 'info' | 'registrations' | 'bracket' | 'announcements' | 'sponsors' | 'popups' | 'campaign' | 'reviews' | 'awards';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'info', label: '대회 정보' },
@@ -505,6 +507,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'bracket', label: '대진 관리' },
   { id: 'announcements', label: '공지' },
   { id: 'sponsors', label: '협찬' },
+  { id: 'popups', label: '팝업' },
   { id: 'campaign', label: '캠페인' },
   { id: 'reviews', label: '리뷰 관리' },
   { id: 'awards', label: '개인 어워드' },
@@ -1181,14 +1184,20 @@ function ActionButton({
 
 // ── Tab: Bracket ──────────────────────────────────────────────────────────
 
-function BracketTab({
+export function BracketTab({
   tournamentId,
   showToast,
   registrations,
+  registrationDeadlineAt,
+  bracketPublishedAt,
+  canWrite,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
   registrations: V1AdminTournamentRegistration[];
+  registrationDeadlineAt: string | null | undefined;
+  bracketPublishedAt: string | null | undefined;
+  canWrite: boolean;
 }) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const createGroup = useV1CreateGroup(tournamentId);
@@ -1201,6 +1210,7 @@ function BracketTab({
   const deleteFixtureResult = useV1DeleteFixtureResult(tournamentId);
   const updateGroup = useV1UpdateGroup(tournamentId);
   const deleteGroup = useV1DeleteGroup(tournamentId);
+  const publishBracket = useV1PublishTournamentBracket(tournamentId);
   const removeGroupTeam = useV1RemoveGroupTeam(tournamentId);
 
   // ── 경기 수정 모달 상태 ─────────────────────────────────────────────
@@ -1248,6 +1258,18 @@ function BracketTab({
   const uploadVideo = useV1UploadVideo();
   const [uploadPercent, setUploadPercent] = useState<number | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
+  // 득점자 목록 편집 상태 — 저장 시 replace-all 로 전송한다
+  const [resultGoals, setResultGoals] = useState<
+    { team: 'home' | 'away'; playerId: string; playerName: string; minute: string }[]
+  >([]);
+  const { data: resultHomeRoster } = useV1AdminTournamentPlayers(
+    resultOpen ? resultFixture?.homeRegistrationId ?? '' : '',
+  );
+  const { data: resultAwayRoster } = useV1AdminTournamentPlayers(
+    resultOpen ? resultFixture?.awayRegistrationId ?? '' : '',
+  );
+  const resultHomePlayers = resultHomeRoster?.players ?? [];
+  const resultAwayPlayers = resultAwayRoster?.players ?? [];
 
   const confirmedRegistrations = registrations.filter((r) => r.status === 'confirmed');
   // EntityPicker 어댑터 — 팀 select 자리에 쓸 아이템 목록(제출 payload는 계속 registrationId 문자열)
@@ -1540,6 +1562,15 @@ function BracketTab({
         videos: resultVideos
           .filter((v) => v.url.trim().length > 0)
           .map((v) => ({ ...(v.title.trim() ? { title: v.title.trim() } : {}), url: v.url.trim() })),
+        // 편집기가 목록의 단일 소스 — 빈 배열이면 기존 득점 기록 전체 삭제 (replace-all)
+        goals: resultGoals
+          .filter((g) => g.playerName.trim().length > 0)
+          .map((g) => ({
+            team: g.team,
+            ...(g.playerId ? { playerId: g.playerId } : {}),
+            playerName: g.playerName.trim(),
+            ...(g.minute.trim() ? { minute: parseInt(g.minute, 10) } : {}),
+          })),
       },
       {
         onSuccess: () => {
@@ -1598,10 +1629,58 @@ function BracketTab({
 
   const hasData = groups.length > 0 || fixtures.length > 0;
 
+  // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
+  const isBracketPublished = !!bracketPublishedAt;
+  const deadlinePassed = registrationDeadlineAt
+    ? new Date(registrationDeadlineAt).getTime() < Date.now()
+    : false;
+  const handlePublishBracket = async () => {
+    const warningLine = deadlinePassed
+      ? ''
+      : '접수 마감 전이에요. 그래도 공개할까요?\n\n';
+    const ok = await confirmModal({
+      title: '대진표 전체 공개',
+      message: `${warningLine}공개하면 참가팀·방문자가 조/일정/대진표를 볼 수 있어요. 이후에는 비공개로 되돌릴 수 없어요.`,
+      confirmLabel: '전체 공개',
+      tone: deadlinePassed ? 'default' : 'danger',
+    });
+    if (!ok) return;
+    publishBracket.mutate(undefined, {
+      onSuccess: (res) => {
+        showToast(res.alreadyPublished ? '이미 공개된 대진표예요.' : '대진표를 공개했어요.', 'success');
+      },
+      onError: (err) =>
+        showToast(extractErrorMessage(err, '대진표 공개에 실패했어요.'), 'error'),
+    });
+  };
+
   return (
     <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
+
+      {/* ── 대진표 일괄 공개 ──────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-1">대진표 전체 공개</h3>
+          <p className="text-xs text-gray-500">
+            {isBracketPublished
+              ? `${formatDate(bracketPublishedAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
+              : '아직 비공개예요. 공개 전까지 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요.'}
+          </p>
+        </div>
+        {canWrite && !isBracketPublished && (
+          <button
+            type="button"
+            onClick={handlePublishBracket}
+            disabled={publishBracket.isPending}
+            className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+          >
+            대진표 전체 공개
+          </button>
+        )}
+      </div>
+
     <div className={[
       'flex flex-col gap-6',
       /* 우측 컬럼(브래킷)에 minmax(0,640px) 상한 추가 — 1920+에서 과폭 방지 */
@@ -2182,6 +2261,14 @@ function BracketTab({
                       setHomePenalty(String(f.result?.homePenaltyScore ?? 0));
                       setAwayPenalty(String(f.result?.awayPenaltyScore ?? 0));
                       setResultVideos(f.videos.map((v) => ({ title: v.title ?? '', url: v.url })));
+                      setResultGoals(
+                        (f.result?.goals ?? []).map((g) => ({
+                          team: g.team,
+                          playerId: g.playerId ?? '',
+                          playerName: g.playerName,
+                          minute: g.minute != null ? String(g.minute) : '',
+                        })),
+                      );
                       setResultOpen(true);
                     }}
                     disabled={!bothAssigned}
@@ -2441,6 +2528,115 @@ function BracketTab({
               )}
             </div>
           )}
+
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] text-gray-900">득점자 (선택 · 최대 50명)</span>
+            {resultGoals.map((g, i) => {
+              const roster = g.team === 'home' ? resultHomePlayers : resultAwayPlayers;
+              const isFreeText = g.playerId === '';
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <select
+                    value={g.team}
+                    onChange={(e) =>
+                      setResultGoals((prev) =>
+                        prev.map((row, j) =>
+                          j === i
+                            ? { ...row, team: e.target.value as 'home' | 'away', playerId: '', playerName: '' }
+                            : row,
+                        ),
+                      )
+                    }
+                    disabled={recordResult.isPending}
+                    aria-label={`득점자 ${i + 1} 팀`}
+                    className={inputCls + ' w-[84px] shrink-0'}
+                  >
+                    <option value="home">{resultFixture?.homeTeamName ?? '홈'}</option>
+                    <option value="away">{resultFixture?.awayTeamName ?? '어웨이'}</option>
+                  </select>
+                  <select
+                    value={g.playerId}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selected = roster.find((p) => p.id === selectedId);
+                      setResultGoals((prev) =>
+                        prev.map((row, j) =>
+                          j === i
+                            ? {
+                                ...row,
+                                playerId: selectedId,
+                                playerName: selected ? selected.realName : row.playerName,
+                              }
+                            : row,
+                        ),
+                      );
+                    }}
+                    disabled={recordResult.isPending}
+                    aria-label={`득점자 ${i + 1} 명단 선택`}
+                    className={inputCls + ' flex-1 min-w-0'}
+                  >
+                    <option value="">명단에 없음 (직접 입력)</option>
+                    {roster.map((p) => (
+                      <option key={p.id} value={p.id}>{p.realName}</option>
+                    ))}
+                  </select>
+                  {isFreeText && (
+                    <input
+                      type="text"
+                      value={g.playerName}
+                      onChange={(e) =>
+                        setResultGoals((prev) =>
+                          prev.map((row, j) => (j === i ? { ...row, playerName: e.target.value } : row)),
+                        )
+                      }
+                      disabled={recordResult.isPending}
+                      maxLength={60}
+                      placeholder="선수 이름"
+                      aria-label={`득점자 ${i + 1} 이름 직접 입력`}
+                      className={inputCls + ' flex-1 min-w-0'}
+                    />
+                  )}
+                  <input
+                    type="number"
+                    min="0"
+                    max="200"
+                    value={g.minute}
+                    onChange={(e) =>
+                      setResultGoals((prev) =>
+                        prev.map((row, j) => (j === i ? { ...row, minute: e.target.value } : row)),
+                      )
+                    }
+                    disabled={recordResult.isPending}
+                    placeholder="분"
+                    aria-label={`득점자 ${i + 1} 득점 시각(분)`}
+                    className={inputCls + ' w-[64px] shrink-0'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setResultGoals((prev) => prev.filter((_, j) => j !== i))}
+                    disabled={recordResult.isPending}
+                    aria-label={`득점자 ${i + 1} 삭제`}
+                    className="inline-flex items-center justify-center w-[36px] h-[36px] shrink-0 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    <X size={15} aria-hidden="true" />
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() =>
+                setResultGoals((prev) => [...prev, { team: 'home', playerId: '', playerName: '', minute: '' }])
+              }
+              disabled={recordResult.isPending || resultGoals.length >= 50}
+              className="inline-flex items-center gap-1 self-start min-h-[36px] px-3 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            >
+              <Plus size={13} aria-hidden="true" /> 득점자 추가
+            </button>
+            <p className="text-[11px] text-gray-400">
+              팀 명단에 없는 선수(비회원·대타 등)는 &quot;명단에 없음&quot;을 선택하고 이름을 직접 입력해요. 저장 시 목록 전체가 반영돼요.
+            </p>
+          </div>
 
           <div className="flex flex-col gap-2">
             <span className="text-[13px] text-gray-900">경기 영상 (선택 · 최대 10개)</span>
@@ -3565,7 +3761,14 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         hidden={activeTab !== 'bracket'}
       >
         {activeTab === 'bracket' && (
-          <BracketTab tournamentId={id} showToast={showToast} registrations={registrations} />
+          <BracketTab
+            tournamentId={id}
+            showToast={showToast}
+            registrations={registrations}
+            registrationDeadlineAt={tournament?.registrationDeadlineAt}
+            bracketPublishedAt={tournament?.bracketPublishedAt}
+            canWrite={canWrite}
+          />
         )}
       </div>
 
@@ -3589,6 +3792,16 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       >
         {activeTab === 'sponsors' && (
           <TournamentSponsorsTab tournamentId={id} showToast={showToast} />
+        )}
+      </div>
+
+      <div
+        id="panel-popups"
+        aria-labelledby="tab-popups"
+        hidden={activeTab !== 'popups'}
+      >
+        {activeTab === 'popups' && (
+          <TournamentPopupTab tournamentId={id} showToast={showToast} />
         )}
       </div>
 

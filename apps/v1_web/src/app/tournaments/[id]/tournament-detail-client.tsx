@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
@@ -342,10 +343,17 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
     myRegistrations.find((registration) => registration.status !== 'cancelled') ??
     myRegistrations[0] ??
     null;
+  const trackedViewRef = useRef<string | null>(null);
 
   useEffect(() => {
     setHasSessionHint(hasStoredV1Session());
   }, []);
+
+  useEffect(() => {
+    if (!data || trackedViewRef.current === tournamentId) return;
+    trackedViewRef.current = tournamentId;
+    trackEvent('tournament_view', { tournamentId });
+  }, [data, tournamentId]);
 
   if (isLoading) {
     return (

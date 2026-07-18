@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
 import {
   useV1ChatMessages,
@@ -166,6 +167,7 @@ export function NotificationsPageClient() {
         },
       ),
     onOpen: (notification) => {
+      trackEvent('notification_click', { type: notification.type });
       if (!notification.unread) {
         router.push(notification.href);
         return;
@@ -229,6 +231,7 @@ function toNotificationModel(notification: V1Notification): NotificationModel {
   const href = normalizeNotificationHref(notification.target?.route, notification.type);
   return {
     id: notification.notificationId,
+    type: notification.type,
     group: formatNotificationGroup(notification.createdAt),
     title: notification.title,
     body: notification.body ?? '',

@@ -44,6 +44,8 @@ export type ChatRoomViewModel = {
 
 export type NotificationModel = {
   id: string;
+  /** 원본 알림 타입(예: chat, team_application_accepted). GA 이벤트 파라미터 용도. */
+  type: string;
   group: string;
   title: string;
   body: string;

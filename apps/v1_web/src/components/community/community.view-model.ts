@@ -1,4 +1,4 @@
-import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationsViewModel } from './community.types';
+import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel } from './community.types';
 
 const CHAT_AVATARS = {
   개인매치: '/mock/profile/profile-01.svg',
@@ -46,19 +46,5 @@ export function getChatRoomViewModel(): ChatRoomViewModel {
       { id: 'm3', who: 'other', senderId: 'user-opponent', label: '상대', body: '참가가 승인됐어요. 현장 준비 내용도 확인해 주세요.', sentAt: '2026-05-18T03:00:00.000Z' },
       { id: 'm4', who: 'system', senderId: 'system', label: '시스템', body: '수아님이 참가 승인됐어요', sentAt: '2026-05-18T03:01:00.000Z' },
     ],
-  };
-}
-
-export function getNotificationsViewModel(readAll = false): NotificationsViewModel {
-  const notifications = [
-    { id: 'n1', group: '오늘' as const, title: '매치 참가 확정', body: '성수 풋살파크 · 10명 · 준비물 있음', time: '방금 전', unread: !readAll, href: '/matches', actionLabel: '매치 보기' },
-    { id: 'n2', group: '오늘' as const, title: '팀 초대', body: '성수 러너스 FC · 풋살 · 신입 환영', time: '10분 전', unread: !readAll, href: '/teams', actionLabel: '팀 보기' },
-    { id: 'n3', group: '어제' as const, title: '리뷰 요청', body: '지난 경기 후기를 남겨 주세요', time: '어제', unread: false, href: '/my/reviews', actionLabel: '리뷰 확인' },
-    { id: 'n4', group: '어제' as const, title: '새 메시지', body: '강동 위클리 풋살에서 메시지를 보냈어요.', time: '어제', unread: false, href: '/chat', actionLabel: '채팅 열기' },
-  ];
-
-  return {
-    unreadCount: notifications.filter((notification) => notification.unread).length,
-    notifications,
   };
 }

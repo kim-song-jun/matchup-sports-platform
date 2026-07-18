@@ -3,13 +3,16 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { v1Api, v1Get, v1Patch, v1Post } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import {
   useV1AdminTournamentReviews,
   useV1ChatRooms,
   useV1HideReview,
   useV1MyRegistration,
+  useV1ResolveChatRoom,
   useV1RosterDeadlineOverrideGrant,
   useV1RosterDeadlineOverrideRevoke,
+  useV1SubmitReview,
   useV1UnhideReview,
 } from './use-v1-api';
 
@@ -24,10 +27,15 @@ vi.mock('@/lib/api-client', async () => {
   };
 });
 
+vi.mock('@/lib/analytics', () => ({
+  trackEvent: vi.fn(),
+}));
+
 const v1GetMock = vi.mocked(v1Get);
 const v1PatchMock = vi.mocked(v1Patch);
 const v1PostMock = vi.mocked(v1Post);
 const v1ApiMock = vi.mocked(v1Api);
+const trackEventMock = vi.mocked(trackEvent);
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -236,5 +244,91 @@ describe('useV1RosterDeadlineOverrideRevoke', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['v1', 'tournaments', 'tournament-1'],
     });
+  });
+});
+
+describe('useV1ResolveChatRoom', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('tracks chat_room_start with the resolved room type when a new room is created', async () => {
+    v1PostMock.mockResolvedValue({ roomId: 'room-1', roomType: 'team_match', created: true, route: '/chat/room-1' });
+    const { wrapper } = createWrapperWithClient();
+
+    const { result } = renderHook(() => useV1ResolveChatRoom(), { wrapper });
+
+    result.current.mutate({ targetType: 'team_match', targetId: 'tm-1' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(trackEventMock).toHaveBeenCalledWith('chat_room_start', { type: 'team_match' });
+  });
+
+  it('does not track chat_room_start when an existing room is merely reopened', async () => {
+    v1PostMock.mockResolvedValue({ roomId: 'room-1', roomType: 'match', created: false, route: '/chat/room-1' });
+    const { wrapper } = createWrapperWithClient();
+
+    const { result } = renderHook(() => useV1ResolveChatRoom(), { wrapper });
+
+    result.current.mutate({ targetType: 'match', targetId: 'm-1' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useV1SubmitReview', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('tracks review_submit with the target type on a fresh submission', async () => {
+    v1PostMock.mockResolvedValue({
+      review: { reviewId: 'review-1' },
+      alreadySubmitted: false,
+    });
+    const { wrapper } = createWrapperWithClient();
+
+    const { result } = renderHook(() => useV1SubmitReview(), { wrapper });
+
+    result.current.mutate({
+      sourceType: 'match',
+      sourceId: 'match-1',
+      targetType: 'user',
+      targetUserId: 'user-1',
+      targetTeamId: null,
+      rating: 5,
+      tagCodes: ['friendly'],
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(trackEventMock).toHaveBeenCalledWith('review_submit', { targetType: 'user' });
+  });
+
+  it('does not track review_submit for an idempotent re-submission', async () => {
+    v1PostMock.mockResolvedValue({
+      review: { reviewId: 'review-1' },
+      alreadySubmitted: true,
+    });
+    const { wrapper } = createWrapperWithClient();
+
+    const { result } = renderHook(() => useV1SubmitReview(), { wrapper });
+
+    result.current.mutate({
+      sourceType: 'match',
+      sourceId: 'match-1',
+      targetType: 'team',
+      targetUserId: null,
+      targetTeamId: 'team-1',
+      rating: 5,
+      tagCodes: ['friendly'],
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(trackEventMock).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,10 @@ const campaignStyles = readFileSync(
   'src/components/tournaments/tournament-campaign-template.module.css',
   'utf8',
 );
+const sponsorStyles = readFileSync(
+  'src/components/tournaments/tournament-sponsor-section.module.css',
+  'utf8',
+);
 
 function campaign(status: V1PublicTournamentStatus): V1PublicTournamentCampaign {
   return {
@@ -122,6 +126,10 @@ describe('TournamentCampaignTemplate', () => {
   it('keeps campaign content visible by default and limits motion to progressive enhancement', () => {
     expect(campaignStyles).not.toContain('content-visibility');
     expect(campaignStyles).toContain('@supports (animation-timeline: view())');
+    expect(campaignStyles).toContain('animation: campaign-section-reveal linear;');
+    expect(sponsorStyles).toContain('animation: sponsor-section-reveal linear;');
+    expect(campaignStyles).not.toContain('campaign-section-reveal linear both');
+    expect(sponsorStyles).not.toContain('sponsor-section-reveal linear both');
     expect(campaignStyles).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.heroImage,[\s\S]*animation:\s*none;[\s\S]*transform:\s*none;/,
     );

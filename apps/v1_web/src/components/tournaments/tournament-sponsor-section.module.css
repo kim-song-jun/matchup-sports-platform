@@ -175,7 +175,7 @@
 
 @supports (animation-timeline: view()) {
   .section {
-    animation: sponsor-section-reveal linear both;
+    animation: sponsor-section-reveal linear;
     animation-timeline: view();
     animation-range: entry 0% entry 28%;
   }

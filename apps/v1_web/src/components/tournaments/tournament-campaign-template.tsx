@@ -161,10 +161,12 @@ export function TournamentCampaignTemplate({
               <dl className={styles.prizeBreakdown} aria-label="상금 및 상품 구성">
                 {prizeRows.map((row, index) => (
                   <div key={`${row.label}:${row.amount}:${index}`}>
-                    <span className={styles.prizeRankIcon} aria-hidden="true">
-                      <PrizeRankIcon label={row.label} />
-                    </span>
-                    <dt>{row.label}</dt>
+                    <dt>
+                      <span className={styles.prizeRankIcon} aria-hidden="true">
+                        <PrizeRankIcon label={row.label} />
+                      </span>
+                      {row.label}
+                    </dt>
                     <dd>{formatPrizeRowValue(row.amount)}</dd>
                   </div>
                 ))}

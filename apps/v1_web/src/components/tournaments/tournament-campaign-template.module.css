@@ -334,7 +334,7 @@
 
 .prizeBreakdown > div {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) minmax(96px, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -356,6 +356,10 @@
 }
 
 .prizeBreakdown dt {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
   color: var(--text-caption);
   font-size: var(--font-size-caption);
   font-weight: 700;
@@ -544,9 +548,14 @@
   }
 
   .prizeBreakdown > div {
-    grid-template-columns: 24px minmax(0, 1fr) minmax(80px, auto);
+    grid-template-columns: minmax(0, 1fr) minmax(80px, auto);
     gap: 10px;
     padding: 13px 14px;
+  }
+
+  .prizeBreakdown dt {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 10px;
   }
 
   .actions {
@@ -626,7 +635,7 @@
   .section,
   .prize,
   .actions {
-    animation: campaign-section-reveal linear both;
+    animation: campaign-section-reveal linear;
     animation-timeline: view();
     animation-range: entry 0% entry 28%;
   }

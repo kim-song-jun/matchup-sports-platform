@@ -20,13 +20,27 @@ export type V1ActiveAdmin = {
 export class AdminContextService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** active 어드민만 통과. 아니면 403 PERMISSION_DENIED. */
+  /** 관리자 권한과 연결된 사용자 계정이 모두 active일 때만 통과. */
   async getActiveAdmin(userId: string): Promise<V1ActiveAdmin> {
-    const admin = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
-    if (!admin || admin.status !== 'active') {
+    const admin = await this.prisma.v1AdminUser.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        adminRole: true,
+        status: true,
+        user: { select: { accountStatus: true } },
+      },
+    });
+    if (!admin || admin.status !== 'active' || admin.user.accountStatus !== 'active') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Active admin access is required' });
     }
-    return admin as V1ActiveAdmin;
+    return {
+      id: admin.id,
+      userId: admin.userId,
+      adminRole: admin.adminRole,
+      status: 'active',
+    };
   }
 
   /** support 등급은 mutation(생성/수정/상태변경) 불가 — ops·owner만 허용. */

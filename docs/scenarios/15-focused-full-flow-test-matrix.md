@@ -233,3 +233,13 @@ Notes:
 | 5 | `qa(v1): MY flow execution` | `MY-001~014` | 마이 홈, 프로필, 내 매치/팀, 리뷰, 설정, 알림 설정, 탈퇴 요청 | 팀 membership service, tournament registration service |
 | 6 | `qa(v1): CHAT/NOTI flow execution` | `CHAT-001~010`, `NOTI-001~006` | 채팅 목록/방/메시지/나가기, 알림 목록/읽음/딥링크/설정 | 팀/대회 핵심 mutation 구현 |
 | 7 | `qa(v1): cross-flow regression execution` | `X-001~006` | 큰 도메인 간 연결 지점만 재검증 | 신규 기능 구현, 대규모 리팩토링 |
+
+## Current Alpha Execution Cursor — 2026-07-19
+
+Task 122 (`.github/tasks/122-alpha-profile-tournament-persona-e2e.md`) narrows the next live run to `MY-001~003`, `TOURN-003~025`, and the alpha-only completed media/award fixture. Static and low-load HTTP discovery established the following starting point:
+
+- v1 profile routes are `/my` and `/my/profile/edit`; there is no canonical v1 `/profile` route.
+- `e2e/v1-tests` has no profile spec. The existing tournament spec proves only list/detail/apply reachability and does not cover persistence, permission, duplicate submit, completed results, videos, awards, or admin lifecycle.
+- Alpha fixture visibility is correct at the API boundary: draft/cancelled return 404; open/closed/in-progress/completed return their exact status.
+- Completed fixture `aa100000-0000-4000-8000-000000000005` currently returns 1 group, 7 fixtures, 2 videos, 3 awards, and 2 reviews. Its detail, bracket, results, and awards Web routes return 200.
+- These HTTP checks are readiness evidence, not a UI PASS. Profile mutation, upload, role enforcement, responsive layout, media interaction, console/network, and cleanup remain pending until the Codex app is restarted and MCP process growth is no longer observed.

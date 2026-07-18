@@ -57,6 +57,37 @@ describe('computeRevealedTeamTrustBatch', () => {
     expect(result.get(teamC)).toEqual({ trustState: 'none', mannerScore: null, reviewCount: 0 });
   });
 
+  it('동시에 쿼리된 두 팀이 각각 2건 이상의 공개된 리뷰를 가질 때 평균이 서로 섞이지 않는다 (배치 크로스토크 방지)', async () => {
+    const now = new Date('2026-07-19T00:10:00Z'); // 상호제출 즉시공개 경로, 72시간 미경과
+    const candidates = [
+      makeCandidate({ targetTeamId: teamA, sourceId: 'src-a1', reviewerTeamId: teamC, rating: 5 }),
+      makeCandidate({ targetTeamId: teamA, sourceId: 'src-a2', reviewerTeamId: teamC, rating: 3 }),
+      makeCandidate({ targetTeamId: teamB, sourceId: 'src-b1', reviewerTeamId: teamC, rating: 1 }),
+      makeCandidate({ targetTeamId: teamB, sourceId: 'src-b2', reviewerTeamId: teamC, rating: 2 }),
+    ];
+    // 4건 전부 상호제출로 공개
+    const reverse = [
+      { sourceId: 'src-a1', reviewerTeamId: teamA, targetTeamId: teamC },
+      { sourceId: 'src-a2', reviewerTeamId: teamA, targetTeamId: teamC },
+      { sourceId: 'src-b1', reviewerTeamId: teamB, targetTeamId: teamC },
+      { sourceId: 'src-b2', reviewerTeamId: teamB, targetTeamId: teamC },
+    ];
+
+    const findMany = jest.fn()
+      .mockResolvedValueOnce(candidates)
+      .mockResolvedValueOnce(reverse);
+    const prisma = { v1PostEventReview: { findMany } };
+
+    jest.useFakeTimers().setSystemTime(now);
+    const result = await computeRevealedTeamTrustBatch(prisma as never, [teamA, teamB]);
+    jest.useRealTimers();
+
+    // teamA: rating 5,3 -> 평균 4, 2건. teamB의 1,2가 섞이면 평균/건수가 달라진다.
+    expect(result.get(teamA)).toEqual({ trustState: 'estimated', mannerScore: 4, reviewCount: 2 });
+    // teamB: rating 1,2 -> 평균 1.5, 2건. teamA의 5,3이 섞이면 평균/건수가 달라진다.
+    expect(result.get(teamB)).toEqual({ trustState: 'estimated', mannerScore: 1.5, reviewCount: 2 });
+  });
+
   it('상호제출(reverse 있음)과 72시간 경과(reverse 없음) 둘 다 공개로 집계한다', async () => {
     const submittedAt = new Date('2026-07-10T00:00:00Z');
     const now = new Date('2026-07-19T00:00:00Z'); // 9일 경과 > 72시간

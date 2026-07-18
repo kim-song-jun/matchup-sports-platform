@@ -110,6 +110,7 @@ Personas: guest, ordinary team member, owner/manager, admin
 - The current upload API has only `POST /uploads` and `POST /uploads/videos`; it has no owner deletion endpoint. Restoring `profileImageUrl` alone does not clean the retained file, ledger row, or quota usage.
 - Until an authenticated owner-delete contract exists, the valid-upload live scenario must record the returned URL and use an exact alpha-only operator cleanup for that single owned asset after restoring the original profile URL. It must delete the file and ledger row together and then prove both are absent. Non-image and 2–5 MB client-rejection scenarios must show zero upload request and need no asset cleanup.
 - This missing owner cleanup contract is a product/security lifecycle gap, not a reason to claim the upload scenario complete. A future implementation must reject deletion of referenced assets and assets owned by another user; no broad filesystem cleanup is allowed.
+- Decision gate: [`teameet-upload-lifecycle-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/19/teameet-upload-lifecycle-decision.html). Static schema audit found active upload URL consumers in profile, match, team, tournament promo/campaign JSON, sponsor, popup, and fixture-video surfaces, so a generic filesystem delete is unsafe. Option B (asset-reference registration plus owner deletion only at zero active references) is recommended; no schema/API/product mutation starts before the user selects A, B, or C.
 
 ### TOURN-ALPHA-004 — Admin lifecycle and permissions
 

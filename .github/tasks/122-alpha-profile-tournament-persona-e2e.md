@@ -1,9 +1,9 @@
 # Task 122 — Alpha Profile and Tournament Persona E2E
 
-Owner: codex  
-Status: In progress  
-Priority: P0  
-Target: both  
+Owner: codex
+Status: In progress
+Priority: P0
+Target: both
 Mode: CODE + QA
 
 ## Purpose

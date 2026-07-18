@@ -153,6 +153,8 @@ function normalizePopup(popup: V1Popup | null | undefined): HomePopup | null {
     title: popup.title,
     body: popup.body,
     trailing: popup.publishedAt ? formatDate(popup.publishedAt) : '팝업',
+    linkUrl: popup.linkUrl,
+    linkLabel: popup.linkLabel,
   };
 }
 

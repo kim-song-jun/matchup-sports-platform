@@ -9,11 +9,21 @@ const popup: HomePopup = {
   title: '서비스 이용 안내',
   trailing: '7월 13일 (월)',
   body: '이번 주 경기장 이용 시간을 확인해 주세요.',
+  linkUrl: null,
+  linkLabel: null,
 };
 
 describe('HomePopupDialog', () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  it('renders an internal CTA link when configured', async () => {
+    render(<HomePopupDialog popup={{ ...popup, linkUrl: '/matches', linkLabel: '매치 보기' }} />);
+
+    const link = await screen.findByRole('link', { name: '매치 보기' });
+    expect(link).toHaveAttribute('href', '/matches');
+    expect(screen.queryByRole('button', { name: '닫기' })).not.toBeInTheDocument();
   });
 
   it('shows independent popup content with close actions', async () => {

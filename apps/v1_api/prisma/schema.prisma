@@ -557,6 +557,9 @@ model V1Popup {
   audience       V1NoticeAudience @default(public)
   title          String
   body           String
+  targetScreens  String[]         @default(["home"]) @map("target_screens")
+  linkUrl        String?          @map("link_url")
+  linkLabel      String?          @map("link_label")
   status         V1NoticeStatus   @default(draft)
   publishedAt    DateTime?        @map("published_at")
   archivedAt     DateTime?        @map("archived_at")
@@ -567,6 +570,7 @@ model V1Popup {
 
   @@index([audience, status, displayStartAt, displayEndAt, publishedAt], map: "v1_popups_active_window_idx")
   @@index([createdAt])
+  @@index([targetScreens], type: Gin, map: "v1_popups_target_screens_idx")
   @@map("v1_popups")
 }
 

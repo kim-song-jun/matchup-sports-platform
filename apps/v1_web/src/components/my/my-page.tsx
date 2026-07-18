@@ -94,7 +94,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                   {model.user.intro}
                 </div>
               </div>
-              <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">수정</Link>
+              <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
             </section>
             {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
             <Card pad={16}>

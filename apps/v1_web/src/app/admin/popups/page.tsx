@@ -23,12 +23,14 @@ import {
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { isSafePopupLink, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
 import type {
   AdminListFilters,
   CursorPage,
   V1AdminPopupCreatePayload,
   V1AdminPopupRow,
   V1AdminPopupStatus,
+  V1PopupTargetScreen,
 } from '@/types/api';
 import { noticeSummary } from '../notices/notice-summary';
 
@@ -87,6 +89,10 @@ function formatDisplayWindow(start: string | null | undefined, end: string | nul
   return `${start ? formatDateTime(start) : '즉시'} ~ ${end ? formatDateTime(end) : '종료 없음'}`;
 }
 
+function formatTargetScreens(targetScreens: V1PopupTargetScreen[]) {
+  return targetScreens.map((screen) => POPUP_TARGET_LABELS[screen]).join(', ');
+}
+
 export default function AdminPopupsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -99,6 +105,9 @@ export default function AdminPopupsPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [status, setStatus] = useState<V1AdminPopupStatus>('published');
+  const [targetScreens, setTargetScreens] = useState<V1PopupTargetScreen[]>(['home']);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkLabel, setLinkLabel] = useState('');
   const [displayStartAt, setDisplayStartAt] = useState('');
   const [displayEndAt, setDisplayEndAt] = useState('');
 
@@ -162,6 +171,9 @@ export default function AdminPopupsPage() {
     setTitle('');
     setBody('');
     setStatus('published');
+    setTargetScreens(['home']);
+    setLinkUrl('');
+    setLinkLabel('');
     setDisplayStartAt('');
     setDisplayEndAt('');
     setMode('create');
@@ -172,6 +184,9 @@ export default function AdminPopupsPage() {
     setTitle(row.title);
     setBody(row.body);
     setStatus(row.status);
+    setTargetScreens(row.targetScreens);
+    setLinkUrl(row.linkUrl ?? '');
+    setLinkLabel(row.linkLabel ?? '');
     setDisplayStartAt(toDateTimeLocal(row.displayStartAt));
     setDisplayEndAt(toDateTimeLocal(row.displayEndAt));
     setMode('edit');
@@ -191,12 +206,27 @@ export default function AdminPopupsPage() {
       audience: 'public',
       title: title.trim(),
       body: body.trim(),
+      targetScreens,
+      linkUrl: linkUrl.trim() || null,
+      linkLabel: linkLabel.trim() || null,
       status,
       displayStartAt: toIsoOrNull(displayStartAt),
       displayEndAt: toIsoOrNull(displayEndAt),
     };
     if (!payload.title || !payload.body) {
       showToast('제목과 본문을 입력해 주세요.', 'error');
+      return;
+    }
+    if (targetScreens.length === 0) {
+      showToast('노출할 화면을 하나 이상 선택해 주세요.', 'error');
+      return;
+    }
+    if (payload.linkLabel && !payload.linkUrl) {
+      showToast('버튼 문구를 사용하려면 이동 링크를 입력해 주세요.', 'error');
+      return;
+    }
+    if (payload.linkUrl && !isSafePopupLink(payload.linkUrl)) {
+      showToast('내부 링크는 /로 시작하고 외부 링크는 https:// 주소만 사용할 수 있어요.', 'error');
       return;
     }
     if (displayStartAt && displayEndAt && new Date(displayEndAt) <= new Date(displayStartAt)) {
@@ -250,7 +280,7 @@ export default function AdminPopupsPage() {
       <AdminPageHeader
         eyebrow="콘텐츠 운영"
         title="팝업 관리"
-        description="홈 중앙에 노출되는 팝업을 조회하고 게시 상태를 관리해요."
+        description="팝업의 노출 화면, 이동 링크, 게시 기간을 관리해요."
         action={(
           <button
             type="button"
@@ -282,7 +312,7 @@ export default function AdminPopupsPage() {
             loading={listQuery.isPending && rows.length === 0}
             error={errorMessage}
             onRetry={() => void listQuery.refetch()}
-            empty={<AdminEmpty title="팝업이 없어요" description="새 팝업을 만들어 홈에 공지를 안내해 보세요." />}
+            empty={<AdminEmpty title="팝업이 없어요" description="새 팝업을 만들어 필요한 화면에 안내해 보세요." />}
             skeletonCards={6}
             renderActions={(row) => (
               <>
@@ -299,10 +329,10 @@ export default function AdminPopupsPage() {
             )}
             card={(row) => ({
               title: row.title,
-              subtitle: `홈 중앙 팝업 · ${formatDisplayWindow(row.displayStartAt, row.displayEndAt)}`,
+              subtitle: `${formatTargetScreens(row.targetScreens)} · ${formatDisplayWindow(row.displayStartAt, row.displayEndAt)}`,
               statusNode: <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
               meta: [
-                { icon: <MonitorUp size={14} aria-hidden="true" />, label: row.status === 'published' ? '공개 설정' : '홈 미노출' },
+                { icon: <MonitorUp size={14} aria-hidden="true" />, label: row.status === 'published' ? `${row.targetScreens.length}개 화면 노출` : '미노출' },
                 { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.updatedAt) },
               ],
               description: noticeSummary(row.body),
@@ -334,6 +364,9 @@ export default function AdminPopupsPage() {
               title={title}
               body={body}
               status={status}
+              targetScreens={targetScreens}
+              linkUrl={linkUrl}
+              linkLabel={linkLabel}
               displayStartAt={displayStartAt}
               displayEndAt={displayEndAt}
               canWrite={canWrite}
@@ -341,6 +374,9 @@ export default function AdminPopupsPage() {
               onTitleChange={setTitle}
               onBodyChange={setBody}
               onStatusChange={setStatus}
+              onTargetScreensChange={setTargetScreens}
+              onLinkUrlChange={setLinkUrl}
+              onLinkLabelChange={setLinkLabel}
               onDisplayStartAtChange={setDisplayStartAt}
               onDisplayEndAtChange={setDisplayEndAt}
               onCancel={closeEditor}
@@ -384,6 +420,8 @@ function PopupDetail({
         <div><dt className="text-xs text-gray-400">게시일</dt><dd className="mt-1 text-gray-700">{formatDateTime(popup.publishedAt)}</dd></div>
         <div><dt className="text-xs text-gray-400">수정일</dt><dd className="mt-1 text-gray-700">{formatDateTime(popup.updatedAt)}</dd></div>
         <div className="col-span-2"><dt className="text-xs text-gray-400">노출 기간</dt><dd className="mt-1 text-gray-700">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">노출 화면</dt><dd className="mt-1 text-gray-700">{formatTargetScreens(popup.targetScreens)}</dd></div>
+        <div className="col-span-2"><dt className="text-xs text-gray-400">이동 링크</dt><dd className="mt-1 break-all text-gray-700">{popup.linkUrl ? `${popup.linkLabel ?? '자세히 보기'} · ${popup.linkUrl}` : '없음'}</dd></div>
       </dl>
       <div className="mt-4 max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-gray-100 p-4 text-sm leading-7 text-gray-700">{popup.body}</div>
       {canWrite && onEdit ? (
@@ -400,6 +438,9 @@ function PopupForm({
   title,
   body,
   status,
+  targetScreens,
+  linkUrl,
+  linkLabel,
   displayStartAt,
   displayEndAt,
   canWrite,
@@ -407,6 +448,9 @@ function PopupForm({
   onTitleChange,
   onBodyChange,
   onStatusChange,
+  onTargetScreensChange,
+  onLinkUrlChange,
+  onLinkLabelChange,
   onDisplayStartAtChange,
   onDisplayEndAtChange,
   onCancel,
@@ -416,6 +460,9 @@ function PopupForm({
   title: string;
   body: string;
   status: V1AdminPopupStatus;
+  targetScreens: V1PopupTargetScreen[];
+  linkUrl: string;
+  linkLabel: string;
   displayStartAt: string;
   displayEndAt: string;
   canWrite: boolean;
@@ -423,6 +470,9 @@ function PopupForm({
   onTitleChange: (value: string) => void;
   onBodyChange: (value: string) => void;
   onStatusChange: (value: V1AdminPopupStatus) => void;
+  onTargetScreensChange: (value: V1PopupTargetScreen[]) => void;
+  onLinkUrlChange: (value: string) => void;
+  onLinkLabelChange: (value: string) => void;
   onDisplayStartAtChange: (value: string) => void;
   onDisplayEndAtChange: (value: string) => void;
   onCancel: () => void;
@@ -431,7 +481,7 @@ function PopupForm({
   return (
     <div>
       <div className="flex items-start justify-between gap-3">
-        <div><p className="text-xs font-semibold text-blue-600">홈 중앙 팝업</p><h2 className="mt-1 text-lg font-bold text-gray-900">{mode === 'create' ? '새 팝업 생성' : '팝업 수정'}</h2></div>
+        <div><p className="text-xs font-semibold text-blue-600">화면 안내 팝업</p><h2 className="mt-1 text-lg font-bold text-gray-900">{mode === 'create' ? '새 팝업 생성' : '팝업 수정'}</h2></div>
         <button type="button" onClick={onCancel} disabled={saving} aria-label="편집 닫기" className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500">
           <X size={19} aria-hidden="true" />
         </button>
@@ -439,12 +489,42 @@ function PopupForm({
       <form className="mt-4 flex flex-col gap-3" onSubmit={onSubmit}>
         <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">제목</span><input value={title} onChange={(event) => onTitleChange(event.target.value)} maxLength={120} disabled={!canWrite || saving} required className="h-[44px] rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="팝업 제목" /></label>
         <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">공개 상태</span><select value={status} onChange={(event) => onStatusChange(event.target.value as V1AdminPopupStatus)} disabled={!canWrite || saving} className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50">{EDITABLE_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <fieldset className="rounded-xl border border-gray-200 p-3">
+          <legend className="px-1 text-sm font-semibold text-gray-700">노출 화면</legend>
+          <p className="mb-3 text-xs leading-5 text-gray-500">팝업을 보여줄 화면을 하나 이상 선택해 주세요. 상세·등록 화면도 해당 영역에 포함돼요.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {POPUP_TARGET_OPTIONS.map((option) => {
+              const checked = targetScreens.includes(option.value);
+              return (
+                <label key={option.value} className="flex min-h-[48px] cursor-pointer items-start gap-2 rounded-lg border border-gray-100 px-3 py-2 hover:border-blue-200">
+                  <input
+                    type="checkbox"
+                    value={option.value}
+                    checked={checked}
+                    disabled={!canWrite || saving}
+                    onChange={() => onTargetScreensChange(
+                      checked
+                        ? targetScreens.filter((screen) => screen !== option.value)
+                        : [...targetScreens, option.value],
+                    )}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                  />
+                  <span><span className="block text-sm font-medium text-gray-700">{option.label}</span><span className="block text-xs text-gray-400">{option.description}</span></span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">이동 링크 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkUrl} onChange={(event) => onLinkUrlChange(event.target.value)} maxLength={500} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="/matches 또는 https://..." /></label>
+          <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">버튼 문구 <span className="font-normal text-gray-400">(선택)</span></span><input value={linkLabel} onChange={(event) => onLinkLabelChange(event.target.value)} maxLength={40} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="자세히 보기" /></label>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 시작</span><input type="datetime-local" value={displayStartAt} onChange={(event) => onDisplayStartAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
           <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 종료</span><input type="datetime-local" value={displayEndAt} min={displayStartAt || undefined} onChange={(event) => onDisplayEndAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
         </div>
-        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">본문</span><textarea value={body} onChange={(event) => onBodyChange(event.target.value)} maxLength={5000} rows={10} disabled={!canWrite || saving} required className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-6 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="홈 팝업에 표시할 내용을 입력해 주세요." /></label>
-        <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">공개 상태이며 노출 기간 안에 있는 팝업 가운데 가장 최근 항목이 홈 중앙에 노출돼요. 기간을 비우면 시작 또는 종료 제한 없이 노출돼요.</p>
+        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">본문</span><textarea value={body} onChange={(event) => onBodyChange(event.target.value)} maxLength={5000} rows={10} disabled={!canWrite || saving} required className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-6 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="선택한 화면에 표시할 내용을 입력해 주세요." /></label>
+        <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">각 화면에서는 공개 상태이고 노출 기간 안에 있는 팝업 중 가장 최근 항목 하나를 보여줘요. 내부 링크는 /로 시작하고 외부 링크는 https://만 사용할 수 있어요.</p>
         <button type="submit" disabled={!canWrite || saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">{saving ? '저장 중...' : mode === 'create' ? '팝업 생성' : '수정 저장'}</button>
       </form>
     </div>

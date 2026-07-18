@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
+  useV1ActivePopup,
   useV1AdminTournaments,
   useV1CreateTournament,
   useV1MasterSports,
@@ -18,6 +19,7 @@ import type { V1Tournament } from '@/types/api';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => '/admin/tournaments/new',
 }));
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -25,12 +27,14 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1ActivePopup: vi.fn(),
   useV1AdminTournaments: vi.fn(),
   useV1CreateTournament: vi.fn(),
   useV1MasterSports: vi.fn(),
   useV1UploadImages: vi.fn(),
 }));
 
+const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
 const useV1AdminTournamentsMock = vi.mocked(useV1AdminTournaments, { partial: true });
 const useV1CreateTournamentMock = vi.mocked(useV1CreateTournament, { partial: true });
 const useV1MasterSportsMock = vi.mocked(useV1MasterSports, { partial: true });
@@ -130,6 +134,7 @@ function goToParticipationStep() {
 describe('AdminTournamentsNewPage four-step wizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false });
     useV1MasterSportsMock.mockReturnValue({
       data: [{ id: 'sport-futsal', name: '풋살', levels: [] }],
       isPending: false,

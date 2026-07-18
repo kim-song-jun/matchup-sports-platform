@@ -436,6 +436,7 @@ export class MatchesService {
       result.notifyUserIds,
       'match_cancelled',
       match.id,
+      `"${match.title}" 매치가 취소됐어요.`,
     );
 
     return {
@@ -509,6 +510,7 @@ export class MatchesService {
       match.hostUserId,
       'match_application_received',
       match.id,
+      `"${match.title}" 매치 신청을 확인해 주세요.`,
     );
 
     return {
@@ -726,6 +728,7 @@ export class MatchesService {
       application.applicantUserId,
       'match_application_approved',
       application.matchId,
+      `"${application.match.title}" 매치 참가가 확정됐어요.`,
     );
 
     return {
@@ -776,6 +779,7 @@ export class MatchesService {
       application.applicantUserId,
       'match_application_rejected',
       application.matchId,
+      `"${application.match.title}" 매치 신청이 거절됐어요.`,
     );
 
     return {

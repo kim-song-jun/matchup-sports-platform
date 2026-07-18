@@ -229,7 +229,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                   <button
                     className="tm-btn tm-btn-sm tm-btn-primary"
                     type="button"
-                    disabled={model.actionPending}
+                    disabled={invitation.actionPending}
                     onClick={() => model.onAccept(invitation.invitationId)}
                     aria-label={`${invitation.teamName} 초대 수락`}
                   >
@@ -238,13 +238,18 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                   <button
                     className="tm-btn tm-btn-sm tm-btn-ghost"
                     type="button"
-                    disabled={model.actionPending}
+                    disabled={invitation.actionPending}
                     onClick={() => model.onDecline(invitation.invitationId)}
                     aria-label={`${invitation.teamName} 초대 거절`}
                   >
                     거절
                   </button>
                 </div>
+                {invitation.actionPending ? (
+                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 6 }}>
+                    처리 중…
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

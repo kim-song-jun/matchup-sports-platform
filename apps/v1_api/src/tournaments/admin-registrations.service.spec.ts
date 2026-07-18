@@ -26,6 +26,7 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'reg-1',
     tournamentId: 'tournament-1',
+    tournament: { title: '테스트대회' },
     teamId: 'team-1',
     appliedByUserId: 'manager-user',
     status: 'awaiting_payment',
@@ -541,6 +542,7 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_confirmed',
       'tournament-1',
+      expect.any(String),
     );
   });
 
@@ -560,6 +562,7 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_waitlisted',
       'tournament-1',
+      expect.any(String),
     );
   });
 
@@ -578,6 +581,7 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_cancelled',
       'tournament-1',
+      expect.any(String),
     );
   });
 

@@ -70,6 +70,7 @@ export function SignupClient() {
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [requiredTermsAccepted, setRequiredTermsAccepted] = useState(false);
+  const [termsReady, setTermsReady] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -78,8 +79,16 @@ export function SignupClient() {
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
 
   useEffect(() => {
-    setRequiredTermsAccepted(readSignupTermsAccepted());
-  }, []);
+    const accepted = readSignupTermsAccepted();
+    if (!accepted) {
+      router.replace('/terms');
+      return;
+    }
+    setRequiredTermsAccepted(true);
+    setTermsReady(true);
+  }, [router]);
+
+  if (!termsReady) return null;
 
   const stepIndex = STEP_ORDER.indexOf(step);
   const copy = STEP_COPY[step];

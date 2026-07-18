@@ -330,6 +330,65 @@ describe('TournamentsAdminService', () => {
     await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'in_progress' })).rejects.toThrow(ConflictException);
   });
 
+  // ─── bracket publish (Task 109 Track 6) ────────────────────────────────────────
+
+  it('publishBracket: not-yet-published tournament → sets bracketPublishedAt + writes audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: null }));
+    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ bracketPublishedAt: new Date() }));
+
+    const result = await service.publishBracket(ownerAuthUser, 'tournament-1');
+
+    expect(result.alreadyPublished).toBe(false);
+    expect(result.bracketPublishedAt).toEqual(expect.any(String));
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'tournament-1' },
+        data: { bracketPublishedAt: expect.any(Date) },
+      }),
+    );
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.bracket_publish' }) }),
+    );
+    // 대진표 공개는 대회 status와 무관한 이벤트라 status-change 로그는 남기지 않는다.
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: already published → idempotent no-op (no write)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const publishedAt = new Date('2026-07-01T00:00:00.000Z');
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: publishedAt }));
+
+    const result = await service.publishBracket(ownerAuthUser, 'tournament-1');
+
+    expect(result).toEqual({
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: publishedAt.toISOString(),
+      alreadyPublished: true,
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: non-admin → 403', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(service.publishBracket(nonAdminAuthUser, 'tournament-1')).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1Tournament.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: support admin cannot mutate → 403', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+    await expect(service.publishBracket(supportAuthUser, 'tournament-1')).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
+
+  it('publishBracket: unknown tournament → 404', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+    await expect(service.publishBracket(ownerAuthUser, 'ghost')).rejects.toThrow(NotFoundException);
+  });
+
   // ─── not found ────────────────────────────────────────────────────────────────
 
   it('get: unknown id → 404 TOURNAMENT_NOT_FOUND', async () => {

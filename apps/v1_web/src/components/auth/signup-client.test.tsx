@@ -63,6 +63,15 @@ describe('SignupClient required profile contract', () => {
     });
   });
 
+  it('redirects direct signup entry to terms before accepting account input', async () => {
+    window.sessionStorage.clear();
+
+    render(<SignupClient />);
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms'));
+    expect(screen.queryByRole('heading', { name: '가입 정보를 확인해 주세요' })).not.toBeInTheDocument();
+  });
+
   it('keeps the identity-verification phrase together', async () => {
     // Given
     render(<SignupClient />);

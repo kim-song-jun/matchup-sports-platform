@@ -18,6 +18,7 @@ const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'act
 function openTournament(overrides: Record<string, unknown> = {}) {
   return {
     id: 'tournament-1',
+    title: '테스트대회',
     sportId: 'sport-futsal',
     status: 'open',
     entryFee: 120000,
@@ -364,6 +365,7 @@ describe('TournamentRegistrationsService', () => {
       'original-applicant',
       'tournament_registration_submitted',
       'tournament-1',
+      expect.any(String),
     );
   });
 

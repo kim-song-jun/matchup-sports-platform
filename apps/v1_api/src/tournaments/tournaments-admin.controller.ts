@@ -47,4 +47,9 @@ export class TournamentsAdminController {
   ) {
     return this.tournamentsAdminService.changeStatus(user, tournamentId, dto);
   }
+
+  @Post(':tournamentId/publish-bracket')
+  publishBracket(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {
+    return this.tournamentsAdminService.publishBracket(user, tournamentId);
+  }
 }

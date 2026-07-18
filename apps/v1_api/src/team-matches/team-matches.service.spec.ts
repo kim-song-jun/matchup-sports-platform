@@ -290,7 +290,7 @@ describe('TeamMatchesService', () => {
       expect.any(Function),
       'team_match_completed',
       'tm-1',
-      undefined,
+      '"풋살 상대팀 모집" 팀매치 리뷰를 남겨보세요.',
     );
   });
 

@@ -191,5 +191,8 @@ export type TeamMembersViewModel = {
       onCancel: () => void;
     }>;
     listLoading: boolean;
+    /** 목록 조회 실패 여부 — true면 EmptyState 대신 에러+재시도 UI로 분기 */
+    listError: boolean;
+    onRetry: () => void;
   };
 };

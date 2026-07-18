@@ -193,6 +193,43 @@ export class RecordResultDto {
   @ValidateNested({ each: true })
   @Type(() => FixtureVideoDto)
   videos?: FixtureVideoDto[];
+
+  /**
+   * 득점자 목록 (옵션) — 전달 시 replace-all.
+   * undefined 로 생략하면 기존 득점 기록을 유지한다.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => FixtureGoalDto)
+  goals?: FixtureGoalDto[];
+}
+
+export const TOURNAMENT_GOAL_TEAMS = ['home', 'away'] as const;
+export type TournamentGoalTeam = (typeof TOURNAMENT_GOAL_TEAMS)[number];
+
+export class FixtureGoalDto {
+  @IsIn(TOURNAMENT_GOAL_TEAMS)
+  team!: TournamentGoalTeam;
+
+  /** 명단(V1TournamentPlayer)에서 선택한 경우 세팅. 자유 입력 시 null/undefined. */
+  @IsOptional()
+  @IsUUID()
+  playerId?: string;
+
+  /** 비회원/대타 등 명단에 없는 득점자도 이름은 항상 필수 */
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(60)
+  playerName!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  minute?: number;
 }
 
 export class FixtureVideoDto {

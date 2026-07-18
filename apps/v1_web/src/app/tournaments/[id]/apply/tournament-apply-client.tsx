@@ -9,6 +9,7 @@ import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/componen
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
+import { SponsorLogoStrip } from '@/components/tournaments/tournament-sponsor-logo-strip';
 import {
   useV1Tournament,
   useV1MyTeams,
@@ -1860,6 +1861,8 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             />
           </aside>
         </div>
+
+        <SponsorLogoStrip sponsors={tournament.sponsors} />
 
         {/* Full-screen creating overlay */}
         {isCreating ? (

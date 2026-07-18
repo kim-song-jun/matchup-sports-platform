@@ -1090,7 +1090,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
 }
 
 function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembersViewModel['invitations']> }) {
-  const { form, items, listLoading } = invitations;
+  const { form, items, listLoading, listError, onRetry } = invitations;
 
   return (
     <section className="tm-member-section">
@@ -1172,6 +1172,13 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
             <div key={i} className="tm-review-skeleton" style={{ height: 64, borderRadius: 14 }} aria-hidden="true" />
           ))}
         </div>
+      ) : listError ? (
+        <EmptyState
+          title="초대 목록을 불러오지 못했어요"
+          sub="잠시 후 다시 시도해 주세요."
+          cta="다시 시도"
+          onCta={onRetry}
+        />
       ) : items.length === 0 ? (
         <EmptyState title="보낸 초대가 없어요" sub="이메일로 팀원을 초대하면 여기에 표시돼요." />
       ) : (
@@ -1202,9 +1209,9 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
                   <span className="tm-invitation-meta-name">{item.displayName}</span>
                   <span className="tm-invitation-meta-date">{formatInvitationDate(item.createdAt)} 초대</span>
                 </div>
-                {/* 비색상 지표: 텍스트 '초대중' 병기 */}
-                <span className="tm-invitation-status tm-invitation-status-pending" aria-label="초대 상태: 초대중">
-                  초대중
+                {/* 비색상 지표: 텍스트 '초대 중' 병기 */}
+                <span className="tm-invitation-status tm-invitation-status-pending" aria-label="초대 상태: 초대 중">
+                  초대 중
                 </span>
               </div>
               {item.message ? (

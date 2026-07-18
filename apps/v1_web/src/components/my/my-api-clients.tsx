@@ -142,9 +142,11 @@ export function MyInvitationsPageClient() {
   const { confirm, ConfirmModal } = useConfirm();
   const router = useRouter();
 
-  const actionPending = accept.isPending || decline.isPending;
+  // 처리 중인 초대 1건만 추적 — 아이템별 pending 상태(전역 boolean이면 무관한 카드도 함께 비활성화됨)
+  const [pendingInvitationId, setPendingInvitationId] = useState<string | null>(null);
 
   const onAccept = (invitationId: string) => {
+    setPendingInvitationId(invitationId);
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
@@ -153,6 +155,7 @@ export function MyInvitationsPageClient() {
           void query.refetch();
         }
       },
+      onSettled: () => setPendingInvitationId(null),
     });
   };
 
@@ -166,15 +169,15 @@ export function MyInvitationsPageClient() {
       tone: 'danger',
     }).then((ok) => {
       if (ok) {
-        decline.mutate({ invitationId });
+        setPendingInvitationId(invitationId);
+        decline.mutate({ invitationId }, { onSettled: () => setPendingInvitationId(null) });
       }
     });
   };
 
   const model = {
-    invitations: (query.data?.items ?? []).map(toMyInvitationItem),
+    invitations: (query.data?.items ?? []).map((item) => toMyInvitationItem(item, pendingInvitationId === item.invitationId)),
     error: query.isError,
-    actionPending,
     onAccept,
     onDecline,
     onRetry: () => void query.refetch(),
@@ -1529,7 +1532,7 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
   };
 }
 
-function toMyInvitationItem(invitation: V1ReceivedInvitation): MyInvitationItem {
+function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boolean): MyInvitationItem {
   return {
     invitationId: invitation.invitationId,
     teamId: invitation.team.teamId,
@@ -1538,6 +1541,7 @@ function toMyInvitationItem(invitation: V1ReceivedInvitation): MyInvitationItem 
     invitedByName: invitation.invitedBy.displayName,
     message: invitation.message,
     dateLabel: new Date(invitation.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
+    actionPending,
   };
 }
 

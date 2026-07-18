@@ -182,6 +182,39 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_invitation_accepted: '팀 초대를 수락했어요',
 };
 
+/**
+ * 알림 본문(body) 기본값 — 호출부가 body를 넘기지 않아도 항상 title+body 구조를 보장하는 fallback.
+ * 문체 규칙: 상태 통보성 이벤트(신청 승인/거절/취소 등 이미 벌어진 일을 알림)는 평서형("~됐어요.")을,
+ * 사용자 행동이 필요한 이벤트(입금 확인 대기, 신청 검토, 공지 확인 등)는 청유형("~해주세요."/"~해 보세요.")을
+ * 쓴다. 초대한 팀 이름·상대팀명·대회명처럼 의미 있는 변수가 있으면 호출부에서 `"${value}" ...` 형태로
+ * 따옴표에 감싸 본문 앞에 삽입한 문자열을 명시적으로 전달해 이 기본값을 오버라이드한다.
+ */
+const EVENT_BODIES: Record<NotificationEventType, string> = {
+  match_application_received: '매치 신청을 확인해 주세요.',
+  match_application_approved: '매치 참가가 확정됐어요.',
+  match_application_rejected: '매치 신청이 거절됐어요.',
+  match_cancelled: '매치가 취소됐어요.',
+  match_completed: '함께한 매치의 리뷰를 남겨보세요.',
+  team_join_application_received: '팀 가입 신청을 확인해 주세요.',
+  team_join_application_accepted: '팀 가입이 승인됐어요.',
+  team_join_application_rejected: '팀 가입 신청이 거절됐어요.',
+  team_match_application_received: '팀매치 신청을 확인해 주세요.',
+  team_match_application_withdrawn: '상대팀 신청이 취소됐어요.',
+  team_match_application_approved: '팀매치 신청이 승인됐어요.',
+  team_match_application_rejected: '팀매치 신청이 거절됐어요.',
+  team_match_closed: '모집이 마감되어 대기 중인 신청이 종료됐어요.',
+  team_match_cancelled: '팀매치가 취소됐어요.',
+  team_match_completed: '팀매치 리뷰를 남겨보세요.',
+  tournament_registration_confirmed: '대회 참가가 확정됐어요.',
+  tournament_registration_waitlisted: '대기자 명단에 등록됐어요.',
+  tournament_registration_cancelled: '대회 참가 신청이 취소됐어요.',
+  tournament_registration_submitted: '입금 안내를 확인해 주세요.',
+  tournament_payment_confirmed: '운영진 확정을 기다려 주세요.',
+  tournament_announcement_published: '공지를 확인해 보세요.',
+  team_invitation_received: '팀 초대를 확인해 보세요.',
+  team_invitation_accepted: '팀 초대를 수락했어요.',
+};
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -204,7 +237,15 @@ export class NotificationsService {
     const title = EVENT_TITLES[type];
     const prefField = preferenceFieldForEvent(type);
 
-    this.emitNotificationFireAndForget(userId, targetType, targetId, title, body ?? null, deepLink, prefField);
+    this.emitNotificationFireAndForget(
+      userId,
+      targetType,
+      targetId,
+      title,
+      body ?? EVENT_BODIES[type],
+      deepLink,
+      prefField,
+    );
   }
 
   /**
@@ -223,7 +264,7 @@ export class NotificationsService {
         targetTypeForEvent(type),
         targetId,
         EVENT_TITLES[type],
-        body ?? null,
+        body ?? EVENT_BODIES[type],
         deepLinkForEvent(type, targetTypeForEvent(type), targetId),
         preferenceFieldForEvent(type),
       );

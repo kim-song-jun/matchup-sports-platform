@@ -119,6 +119,15 @@ describe('TournamentCampaignTemplate', () => {
     );
   });
 
+  it('pins the actions bar to the bottom of the viewport with an opaque background', () => {
+    expect(campaignStyles).toMatch(
+      /\.actions\s*{[^}]*position:\s*sticky;[^}]*bottom:\s*0;[^}]*background:\s*var\(--bg\);[^}]*}/,
+    );
+    expect(campaignStyles).toMatch(
+      /\.actions\s*{[^}]*border-top:\s*1px solid var\(--border\);[^}]*}/,
+    );
+  });
+
   it('renders loaded campaign content with its required section headings', () => {
     render(<TournamentCampaignTemplate campaign={campaign('open')} />);
 

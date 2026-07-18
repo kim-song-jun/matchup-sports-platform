@@ -71,6 +71,38 @@ export class TournamentsReadService {
       });
     }
 
-    return presentTournamentDetail(row);
+    const popup = await this.getActivePopup(tournamentId);
+
+    return { ...presentTournamentDetail(row), popup };
+  }
+
+  /**
+   * 대회 상세용 활성 팝업 1건.
+   * - status=published + displayStartAt~displayEndAt 범위 내(둘 다 null이면 상시 노출)
+   * - 여러 건이면 최신순(createdAt desc) 1건만 노출
+   */
+  private async getActivePopup(tournamentId: string) {
+    const now = new Date();
+    const popup = await this.prisma.v1TournamentPopup.findFirst({
+      where: {
+        tournamentId,
+        status: 'published',
+        AND: [
+          { OR: [{ displayStartAt: null }, { displayStartAt: { lte: now } }] },
+          { OR: [{ displayEndAt: null }, { displayEndAt: { gt: now } }] },
+        ],
+      },
+      orderBy: [{ createdAt: 'desc' }],
+      select: { id: true, title: true, body: true, imageUrl: true },
+    });
+
+    return popup
+      ? {
+          popupId: popup.id,
+          title: popup.title,
+          body: popup.body,
+          imageUrl: popup.imageUrl,
+        }
+      : null;
   }
 }

@@ -42,6 +42,7 @@ const suspended = {
 function teamRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'team-1',
+    name: '테스트팀',
     status: 'active',
     joinPolicy: 'approval_required',
     memberCount: 5,
@@ -1053,6 +1054,7 @@ describe('TeamsService', () => {
       application.applicantUserId,
       'team_join_application_accepted',
       application.teamId,
+      '"테스트팀" 팀 가입이 승인됐어요.',
     );
   });
 
@@ -1201,6 +1203,7 @@ describe('TeamsService', () => {
       expect.any(Function),
       'team_join_application_received',
       'team-1',
+      '"테스트팀" 팀 가입 신청을 확인해 주세요.',
     );
 
     prisma.v1TeamMembership.findMany.mockResolvedValueOnce([

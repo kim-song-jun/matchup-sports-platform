@@ -24,6 +24,7 @@ import {
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
+import { TournamentPopupDialog } from '@/components/tournaments/tournament-popup-dialog';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import {
   formatTournamentDateShort,
@@ -369,15 +370,18 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   }
 
   return (
-    <AppChrome
-      title={data.title}
-      backHref="/tournaments"
-      bottomNav={false}
-      activeTab="tournaments"
-      floatingSlot={<ApplyCTA tournament={data} myRegistration={myRegistration} />}
-    >
-      <TournamentDetailView tournament={data} myRegistration={myRegistration} />
-    </AppChrome>
+    <>
+      <TournamentPopupDialog popup={data.popup} />
+      <AppChrome
+        title={data.title}
+        backHref="/tournaments"
+        bottomNav={false}
+        activeTab="tournaments"
+        floatingSlot={<ApplyCTA tournament={data} myRegistration={myRegistration} />}
+      >
+        <TournamentDetailView tournament={data} myRegistration={myRegistration} />
+      </AppChrome>
+    </>
   );
 }
 
@@ -1646,10 +1650,12 @@ function FixtureStatusBadge({ status }: { status: string }) {
   );
 }
 
-function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
+export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const hasResult = fixture.result !== null;
   const homeScore = hasResult ? fixture.result!.homeScore : null;
   const awayScore = hasResult ? fixture.result!.awayScore : null;
+  const homeGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'home') : [];
+  const awayGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'away') : [];
   // 라운드 라벨: tournament-bracket.tsx ROUND_LABELS 맵과 동일하게 '4강' 사용
   const roundLabel = fixture.round
     ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
@@ -1744,6 +1750,48 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
           </div>
         </div>
       </div>
+
+      {/* Goals */}
+      {homeGoals.length > 0 || awayGoals.length > 0 ? (
+        <div
+          role="list"
+          aria-label="득점자"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            gap: 8,
+            marginTop: 6,
+          }}
+        >
+          <div style={{ textAlign: 'right' }}>
+            {homeGoals.map((g) => (
+              <div
+                key={g.id}
+                role="listitem"
+                className="tm-text-micro"
+                style={{ color: 'var(--text-caption)' }}
+              >
+                {g.playerName}
+                {g.minute != null ? ` ${g.minute}′` : ''}
+              </div>
+            ))}
+          </div>
+          <div aria-hidden="true" />
+          <div style={{ textAlign: 'left' }}>
+            {awayGoals.map((g) => (
+              <div
+                key={g.id}
+                role="listitem"
+                className="tm-text-micro"
+                style={{ color: 'var(--text-caption)' }}
+              >
+                {g.playerName}
+                {g.minute != null ? ` ${g.minute}′` : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {/* Penalty */}
       {hasResult && fixture.result!.hasPenalty ? (

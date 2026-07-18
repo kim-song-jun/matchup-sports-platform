@@ -294,6 +294,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  // 취소 중인 초대 1건만 추적 — 아이템별 pending 상태(전역 boolean이면 무관한 카드도 함께 비활성화됨)
+  const [cancellingInvitationId, setCancellingInvitationId] = useState<string | null>(null);
 
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
@@ -426,15 +428,23 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             displayName: inv.invitedUser.displayName,
             createdAt: inv.createdAt,
             message: inv.message,
-            cancelPending: cancelInvitation.isPending,
+            cancelPending: cancellingInvitationId === inv.invitationId,
             onCancel: () =>
               confirmAction(
                 confirm,
                 { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '취소', tone: 'danger' },
-                () => cancelInvitation.mutate({ invitationId: inv.invitationId }),
+                () => {
+                  setCancellingInvitationId(inv.invitationId);
+                  cancelInvitation.mutate(
+                    { invitationId: inv.invitationId },
+                    { onSettled: () => setCancellingInvitationId(null) },
+                  );
+                },
               ),
           })),
           listLoading: invitationsQuery.isLoading,
+          listError: invitationsQuery.isError,
+          onRetry: () => void invitationsQuery.refetch(),
         }
       : undefined,
   };

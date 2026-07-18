@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Trophy } from 'lucide-react';
 import { MatchVideos } from '@/components/tournaments/match-videos';
@@ -227,15 +227,27 @@ function MobileChampionBanner({
   const [played, setPlayed] = useState(false);
   const rec = computeTeamRecord(champion, tournament.fixtures);
   const diff = rec.gf - rec.ga;
+  const rafRef = useRef<number | null>(null);
+  const replayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setPlayed(true), 80);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      // replay()가 예약한 RAF/setTimeout도 언마운트 시 함께 취소한다 —
+      // 안 그러면 테스트 환경 정리 이후 콜백이 실행돼 "window is not defined"로 죽는다.
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (replayTimeoutRef.current !== null) clearTimeout(replayTimeoutRef.current);
+    };
   }, []);
 
   const replay = () => {
     setPlayed(false);
-    requestAnimationFrame(() => { setTimeout(() => setPlayed(true), 30); });
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    if (replayTimeoutRef.current !== null) clearTimeout(replayTimeoutRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      replayTimeoutRef.current = setTimeout(() => setPlayed(true), 30);
+    });
   };
 
   return (

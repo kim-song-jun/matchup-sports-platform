@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingClient } from './onboarding-client';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 
 const router = vi.hoisted(() => ({
   push: vi.fn(),
@@ -42,6 +43,10 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
 }));
 
+vi.mock('@/hooks/use-v1-push-registration', () => ({
+  useV1PushRegistration: vi.fn(),
+}));
+
 type SaveCallbacks = { readonly onSuccess: () => void; readonly onError: (error: unknown) => void };
 type CompleteCallbacks = {
   readonly onSuccess: (result: { readonly next?: { readonly route: string } }) => void;
@@ -56,6 +61,12 @@ describe('OnboardingClient GA events', () => {
     hooks.completeOnboardingMutate.mockImplementation((_arg: unknown, callbacks: CompleteCallbacks) =>
       callbacks.onSuccess({ next: { route: '/home' } }),
     );
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+    });
   });
 
   it('tracks onboarding_step_complete with the selected sport code on the sport step', async () => {
@@ -85,5 +96,24 @@ describe('OnboardingClient GA events', () => {
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('onboarding_complete', {}));
+  });
+
+  it('triggers a push subscription prompt after onboarding completes', async () => {
+    const subscribe = vi.fn();
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe,
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+    });
+    window.sessionStorage.setItem(
+      'teameet.v1.onboardingDraft',
+      JSON.stringify({ sports: [{ sportId: FUTSAL_SPORT_ID, levelId: null }], regions: [] }),
+    );
+    render(<OnboardingClient step="confirm" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '홈으로 시작하기' }));
+
+    await waitFor(() => expect(subscribe).toHaveBeenCalled());
   });
 });

@@ -1614,7 +1614,7 @@ export function BracketTab({
   const handlePublishBracket = async () => {
     const warningLine = deadlinePassed
       ? ''
-      : '접수 마감 전입니다. 그래도 공개할까요?\n\n';
+      : '접수 마감 전이에요. 그래도 공개할까요?\n\n';
     const ok = await confirmModal({
       title: '대진표 전체 공개',
       message: `${warningLine}공개하면 참가팀·방문자가 조/일정/대진표를 볼 수 있어요. 이후에는 비공개로 되돌릴 수 없어요.`,

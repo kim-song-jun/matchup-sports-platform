@@ -40,9 +40,9 @@
 ## Completion Evidence
 
 - 구현 경계: `a93ac9242`(스토리·상금 재구성) 이후 모바일/태블릿 CTA·본문 가시성 보정과 `8c588487b`(CTA overlay 제거)까지 반영했다.
-- 현재 알파 identity: release `0.1.0-alpha.20260719.g89adaeae2677`, commit `89adaeae267706f9e023e9e106959ac0e4201555`.
-- CI: [CI / Deploy #29655632182](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29655632182) 성공.
-- Alpha deploy: [Deploy Alpha #29655632180](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29655632180) 성공; 공개 release/commit header 일치, `/api/v1/health`의 `checks.db=true` 확인.
+- 현재 알파 identity: release `0.1.0-alpha.20260719.g6d9d4dec1f9e`, commit `6d9d4dec1f9e50570789c92115c60b3d37edf778`.
+- CI: [CI / Deploy #29656131450](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29656131450) 성공.
+- Alpha deploy: [Deploy Alpha #29656131436](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29656131436) 성공; 공개 release/commit header 일치, `/api/v1/health`의 `checks.db=true` 확인.
 - 최종 상금 구간:
   - `output/playwright/visual-audit/task-120/campaign-375-prize-overlay-final.png`
   - `output/playwright/visual-audit/task-120/campaign-768-prize-overlay-final.png`

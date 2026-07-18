@@ -6,8 +6,8 @@
 
 - `dev`를 `origin/dev a34d2e627`로 fast-forward한 뒤 `origin/main f3fe42423`을 병합했다. merge commit은 `3a5dfb1c92946c81ccd45d154bcfd225b4cfa0c1`이다.
 - 병합 과정의 중복 `v1_uploads_init`를 `01cf1989f`에서 제거하고, conflict-only import/CRLF noise를 `89adaeae2`에서 정리했다. `origin/main`은 현재 `dev`의 ancestor다.
-- 현재 alpha identity는 release `0.1.0-alpha.20260719.g89adaeae2677`, commit `89adaeae267706f9e023e9e106959ac0e4201555`다.
-- [CI / Deploy #29655632182](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29655632182)와 [Deploy Alpha #29655632180](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29655632180)이 같은 SHA에서 성공했다. 공개 release/commit header가 일치하고 `/api/v1/health`는 `checks.db=true`다.
+- 현재 alpha identity는 release `0.1.0-alpha.20260719.g6d9d4dec1f9e`, commit `6d9d4dec1f9e50570789c92115c60b3d37edf778`다.
+- [CI / Deploy #29656131450](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29656131450)와 [Deploy Alpha #29656131436](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29656131436)이 같은 SHA에서 성공했다. 공개 release/commit header가 일치하고 `/api/v1/health`는 `checks.db=true`다.
 
 ### 이번 UI 증거
 

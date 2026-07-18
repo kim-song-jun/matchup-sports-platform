@@ -152,6 +152,7 @@ done
   v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
 "${compose[@]}" up -d
+"${compose[@]}" up -d --force-recreate --no-deps nginx
 
 for attempt in $(seq 1 36); do
   if curl -fsS --connect-timeout 3 --max-time 10 \

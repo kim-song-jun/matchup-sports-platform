@@ -209,3 +209,12 @@ test('alpha deploy consumes a supplied SemVer prerelease instead of incrementing
   assert.match(deployScript, /readonly release_version="\$\{ALPHA_RELEASE_VERSION\}"/);
   assert.match(deployScript, /printf 'release=%s\\nsha=%s\\ndeployed_at=%s\\n'/);
 });
+
+test('alpha deploy recreates nginx after replacing the release metadata bind mount', () => {
+  const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
+  const metadataReplacement = deployScript.indexOf('mv "${metadata_tmp}" "${metadata_snippet}"');
+  const nginxRecreate = deployScript.indexOf('up -d --force-recreate --no-deps nginx');
+
+  assert.notEqual(metadataReplacement, -1);
+  assert.ok(nginxRecreate > metadataReplacement);
+});

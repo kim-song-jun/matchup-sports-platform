@@ -70,43 +70,121 @@ describe('ProfileService identity binding', () => {
 });
 
 describe('ProfileService activitySummary', () => {
-  it('mannerScore를 v1PostEventReview 직접 재집계 대신 V1UserReputationSummary 캐시에서 읽는다', async () => {
-    const prisma = {
-      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-1' }]) },
-      v1UserReputationSummary: {
-        findUnique: jest.fn().mockResolvedValue({ mannerScore: { toString: () => '4.20', valueOf: () => 4.2 } }),
-      },
-      v1PostEventReview: { aggregate: jest.fn() },
-      v1MatchParticipant: {
-        count: jest.fn().mockResolvedValueOnce(7).mockResolvedValueOnce(2),
-      },
-    };
-    const service = new ProfileService(prisma as never);
+  it('mannerScore를 V1UserReputationSummary 캐시 대신 v1PostEventReview를 매번 live로 재집계한다 (reveal 필터 적용)', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
 
-    const result = await service.activitySummary(user);
+    try {
+      // revealed: 상대(reviewer-a)가 반대 방향 리뷰를 이미 제출해서 즉시 공개됨
+      const revealedReview = {
+        sourceId: 'source-a',
+        reviewerUserId: 'reviewer-a',
+        targetUserId: user.id,
+        rating: 5,
+        submittedAt: now,
+      };
+      // hidden: 방금 제출됐고(72시간 미경과) 상대도 아직 제출 안 함 — 아직 비공개, 평균 계산에서 제외돼야 함
+      const hiddenReview = {
+        sourceId: 'source-b',
+        reviewerUserId: 'reviewer-b',
+        targetUserId: user.id,
+        rating: 1,
+        submittedAt: now,
+      };
+      const reverseReview = { sourceId: 'source-a', reviewerUserId: user.id, targetUserId: 'reviewer-a' };
 
-    expect(prisma.v1UserReputationSummary.findUnique).toHaveBeenCalledWith({
-      where: { userId: user.id },
-      select: { mannerScore: true },
-    });
-    expect(prisma.v1PostEventReview.aggregate).not.toHaveBeenCalled();
-    expect(result.totals).toEqual({ activityCount: 7, teamCount: 1, mannerScore: 4.2 });
-    expect(result.monthly).toEqual({ matchCount: 2, mannerScore: 4.2, winRate: null });
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([revealedReview, hiddenReview])
+        .mockResolvedValueOnce([reverseReview]);
+
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-1' }]) },
+        v1PostEventReview: { findMany },
+        v1MatchParticipant: {
+          count: jest.fn().mockResolvedValueOnce(7).mockResolvedValueOnce(2),
+        },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.activitySummary(user);
+
+      expect(findMany).toHaveBeenNthCalledWith(1, {
+        where: { targetUserId: user.id, targetType: 'user', status: 'submitted' },
+        select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
+      });
+      expect(findMany).toHaveBeenNthCalledWith(2, {
+        where: { reviewerUserId: user.id, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+      });
+      expect(result.totals).toEqual({ activityCount: 7, teamCount: 1, mannerScore: 5 });
+      expect(result.monthly).toEqual({ matchCount: 2, mannerScore: 5, winRate: null });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
-  it('평판 요약이 없는 신규 사용자는 mannerScore를 null로 반환한다', async () => {
-    const prisma = {
-      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
-      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
-      v1PostEventReview: { aggregate: jest.fn() },
-      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-    };
-    const service = new ProfileService(prisma as never);
+  it('상대가 반대 방향 리뷰를 제출하지 않았고 72시간도 경과하지 않은 리뷰는 제외한다 (전부 비공개)', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
 
-    const result = await service.activitySummary(user);
+    try {
+      const hiddenReview = {
+        sourceId: 'source-c',
+        reviewerUserId: 'reviewer-c',
+        targetUserId: user.id,
+        rating: 3,
+        submittedAt: now,
+      };
+      const findMany = jest.fn().mockResolvedValueOnce([hiddenReview]).mockResolvedValueOnce([]);
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+        v1PostEventReview: { findMany },
+        v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      };
+      const service = new ProfileService(prisma as never);
 
-    expect(result.totals.mannerScore).toBeNull();
-    expect(result.monthly.mannerScore).toBeNull();
+      const result = await service.activitySummary(user);
+
+      expect(result.totals.mannerScore).toBeNull();
+      expect(result.monthly.mannerScore).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('72시간이 경과했지만 그 이후 새 리뷰 이벤트가 전혀 없었던 리뷰도 캐시 갱신 트리거 없이 매 요청마다 포함된다', async () => {
+    // 이번 수정의 핵심 시나리오: 캐시(V1UserReputationSummary)는 submitPersonalReview/submitTeamReview
+    // 안에서만 갱신되므로, 리뷰 R 하나를 받은 뒤 새 리뷰가 전혀 없으면 R이 72시간 경과로 reveal 가능해져도
+    // 캐시는 영원히 갱신 안 될 수 있다. 이 메서드는 캐시를 읽지 않고 매번 live로 재계산하므로 정상 반영돼야 한다.
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    const now = new Date('2026-08-15T12:00:00Z'); // submittedAt으로부터 72시간 훨씬 이상 경과
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      const staleRevealedReview = {
+        sourceId: 'source-stale',
+        reviewerUserId: 'reviewer-stale',
+        targetUserId: user.id,
+        rating: 4,
+        submittedAt,
+      };
+      // reverse 조회 결과는 비어있음 — 상대가 끝까지 반대 방향 리뷰를 제출하지 않았지만, 시간 경과만으로 공개됨
+      const findMany = jest.fn().mockResolvedValueOnce([staleRevealedReview]).mockResolvedValueOnce([]);
+      const prisma = {
+        v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+        v1PostEventReview: { findMany },
+        v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      };
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.activitySummary(user);
+
+      expect(result.totals.mannerScore).toBe(4);
+      expect(result.monthly.mannerScore).toBe(4);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -141,31 +219,88 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
     reputationSummary: { trustState: 'sample', mannerScore: null, reviewCount: 5 },
   };
 
-  function buildPrisma(overrides: { v1PostEventReview?: { findMany: jest.Mock } } = {}) {
+  // where.targetType 존재 여부로 candidates 쿼리(전체 기간 또는 이번 달 한정)와 reverse 쿼리를 구분하고,
+  // candidates 쿼리는 where.submittedAt 존재 여부로 "전체 기간(totals)"과 "이번 달(monthly)"을 구분한다.
+  // 각 테스트는 한쪽 candidates를 빈 배열로 둬서 그쪽의 reverse 호출 자체가 발생하지 않도록 해 순서 의존을 없앤다.
+  function buildPrisma(config: {
+    allTimeCandidates?: unknown[];
+    monthlyCandidates?: unknown[];
+    reverse?: unknown[];
+  } = {}) {
+    const allTimeCandidates = config.allTimeCandidates ?? [];
+    const monthlyCandidates = config.monthlyCandidates ?? [];
+    const reverse = config.reverse ?? [];
+
+    const findMany = jest.fn().mockImplementation((args: { where: Record<string, unknown> }) => {
+      const { where } = args;
+      if ('targetType' in where) {
+        return Promise.resolve(where.submittedAt ? monthlyCandidates : allTimeCandidates);
+      }
+      return Promise.resolve(reverse);
+    });
+
     return {
       v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
       v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
       v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
-      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue({ reviewCount: 5 }) },
-      v1PostEventReview: overrides.v1PostEventReview ?? { findMany: jest.fn().mockResolvedValue([]) },
+      v1PostEventReview: { findMany },
     };
   }
 
-  it('totals.reviewCount는 원본 count() 대신 캐시된 V1UserReputationSummary.reviewCount(공개된 리뷰만 반영)를 반환한다', async () => {
+  it('totals.reviewCount는 캐시(V1UserReputationSummary) 대신 reveal 필터를 통과한 리뷰만 live로 재계산해 반환한다', async () => {
     const now = new Date('2026-08-15T12:00:00Z');
     jest.useFakeTimers().setSystemTime(now);
 
     try {
-      const prisma = buildPrisma();
+      // revealed-by-partner: 상대가 반대 방향 리뷰를 제출해서 즉시 공개됨
+      const revealedByPartner = {
+        sourceId: 'source-a',
+        reviewerUserId: 'reviewer-a',
+        targetUserId,
+        rating: 5,
+        submittedAt: now,
+      };
+      // hidden: 방금 제출됐고 상대도 아직 제출 안 함 — 72시간 미경과라 아직 비공개, count에서 제외돼야 함
+      const hidden = {
+        sourceId: 'source-b',
+        reviewerUserId: 'reviewer-b',
+        targetUserId,
+        rating: 1,
+        submittedAt: now,
+      };
+      const reverse = [{ sourceId: 'source-a', reviewerUserId: targetUserId, targetUserId: 'reviewer-a' }];
+
+      const prisma = buildPrisma({ allTimeCandidates: [revealedByPartner, hidden], reverse });
       const service = new ProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
-      expect(prisma.v1UserReputationSummary.findUnique).toHaveBeenCalledWith({
-        where: { userId: targetUserId },
-        select: { reviewCount: true },
-      });
-      expect(result.activitySummary.totals.reviewCount).toBe(5);
+      expect(result.activitySummary.totals.reviewCount).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('72시간이 경과했지만 그 이후 새 리뷰 이벤트가 전혀 없었던 리뷰도 totals.reviewCount에 포함된다 (캐시 갱신 트리거 부재 대응)', async () => {
+    const submittedAt = new Date('2026-08-01T00:00:00Z');
+    const now = new Date('2026-08-15T12:00:00Z'); // 72시간 훨씬 이상 경과
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      const staleRevealed = {
+        sourceId: 'source-stale',
+        reviewerUserId: 'reviewer-stale',
+        targetUserId,
+        rating: 4,
+        submittedAt,
+      };
+      // reverse가 비어있어도(상대가 끝까지 반대 방향 리뷰를 제출하지 않아도) 시간 경과만으로 공개돼야 한다
+      const prisma = buildPrisma({ allTimeCandidates: [staleRevealed], reverse: [] });
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.publicProfile(null, targetUserId);
+
+      expect(result.activitySummary.totals.reviewCount).toBe(1);
     } finally {
       jest.useRealTimers();
     }
@@ -192,18 +327,16 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       };
       const reverseReview = { sourceId: 'source-a', reviewerUserId: targetUserId, targetUserId: 'reviewer-a' };
 
-      const findMany = jest
-        .fn()
-        .mockResolvedValueOnce([revealedReview, hiddenReview])
-        .mockResolvedValueOnce([reverseReview]);
-
-      const prisma = buildPrisma({ v1PostEventReview: { findMany } });
+      const prisma = buildPrisma({
+        monthlyCandidates: [revealedReview, hiddenReview],
+        reverse: [reverseReview],
+      });
       const service = new ProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
       expect(result.activitySummary.monthly.reviewCount).toBe(1);
-      expect(findMany).toHaveBeenNthCalledWith(2, {
+      expect(prisma.v1PostEventReview.findMany).toHaveBeenCalledWith({
         where: { reviewerUserId: targetUserId, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });

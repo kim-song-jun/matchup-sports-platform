@@ -392,7 +392,7 @@ describe('TournamentsAdminService', () => {
         expect.objectContaining({ alreadyPublished: true }),
       ]),
     );
-    expect(new Set(results.map((result) => result.bracketPublishedAt))).toHaveSize(1);
+    expect(new Set(results.map((result) => result.bracketPublishedAt)).size).toBe(1);
     expect(prisma.v1Tournament.updateMany).toHaveBeenCalledTimes(2);
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
   });

@@ -244,6 +244,7 @@ describe('AuthService', () => {
             create: {
               nickname: '신규유저',
               displayName: '신규 사용자',
+              realName: '신규 사용자',
               gender: 'female',
               birthDate: '20000229',
               profileImageUrl: '/mock/profile-email.jpg',

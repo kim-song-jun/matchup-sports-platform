@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TermsClient } from './terms-client';
 
 const router = vi.hoisted(() => ({
-  push: vi.fn(),
+  replace: vi.fn(),
 }));
 
 const hooks = vi.hoisted(() => ({
@@ -48,6 +48,6 @@ describe('TermsClient social navigation contract', () => {
     fireEvent.click(continueButton);
 
     // Then
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/signup/social'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/social'));
   });
 });

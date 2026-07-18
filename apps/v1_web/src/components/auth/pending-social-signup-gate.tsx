@@ -46,7 +46,7 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!requiredRoute || routeAllowed) return;
     if (pathname === '/terms' && requiredRoute.startsWith('/terms?')) {
-      window.location.replace(browserAppRoute(requiredRoute, pathname));
+      window.location.replace(browserAppRoute(requiredRoute));
       return;
     }
     router.replace(requiredRoute);

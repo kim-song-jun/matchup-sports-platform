@@ -9,7 +9,7 @@ const user = {
 };
 
 describe('ProfileService identity binding', () => {
-  it('clears stale verification assertions and defers login-key rebinding when email or phone changes', async () => {
+  it('clears stale verification assertions and synchronizes the password login key when email changes', async () => {
     const profile = {
       displayName: '테스트 사용자',
       nickname: '테스트닉',
@@ -62,7 +62,10 @@ describe('ProfileService identity binding', () => {
         phoneVerifiedAt: null,
       },
     });
-    expect(prisma.v1AuthIdentity.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AuthIdentity.updateMany).toHaveBeenCalledWith({
+      where: { userId: user.id, provider: 'email', status: 'active' },
+      data: { email: 'new@teameet.test', providerUserKey: 'new@teameet.test' },
+    });
   });
 });
 

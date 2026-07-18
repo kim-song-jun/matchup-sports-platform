@@ -442,6 +442,7 @@ describe('TeamsService', () => {
             profile: {
               nickname: 'viewer',
               displayName: 'Viewer Real Name',
+              realName: 'Viewer Real Name',
               profileImageUrl: null,
               birthDate: new Date('1995-04-03'),
               gender: 'female',
@@ -455,6 +456,7 @@ describe('TeamsService', () => {
             profile: {
               nickname: 'other',
               displayName: 'Other Real Name',
+              realName: 'Other Real Name',
               profileImageUrl: null,
               birthDate: new Date('1990-01-02'),
               gender: 'male',
@@ -506,6 +508,7 @@ describe('TeamsService', () => {
             profile: {
               nickname: 'roster',
               displayName: 'Roster Real Name',
+              realName: 'Roster Real Name',
               profileImageUrl: null,
               birthDate: new Date('1993-07-08'),
               gender: 'male',

@@ -43,6 +43,7 @@ describe('ChatService room polish', () => {
   let service: ChatService;
   let prisma: {
     v1ChatRoom: { findFirst: jest.Mock; update: jest.Mock };
+    v1MatchParticipant: { findFirst: jest.Mock };
     v1ChatMessage: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; count: jest.Mock };
     v1ChatRoomParticipant: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1Notification: { createMany: jest.Mock };
@@ -53,6 +54,7 @@ describe('ChatService room polish', () => {
   beforeEach(async () => {
     prisma = {
       v1ChatRoom: { findFirst: jest.fn(), update: jest.fn() },
+      v1MatchParticipant: { findFirst: jest.fn().mockResolvedValue({ id: 'match-participant-a' }) },
       v1ChatMessage: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), count: jest.fn() },
       v1ChatRoomParticipant: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       v1Notification: { createMany: jest.fn() },

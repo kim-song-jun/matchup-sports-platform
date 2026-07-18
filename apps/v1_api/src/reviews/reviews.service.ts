@@ -99,7 +99,7 @@ export class ReviewsService {
 
     const candidates = await this.prisma.v1PostEventReview.findMany({
       where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
-      select: { sourceId: true, reviewerUserId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
+      select: { sourceId: true, reviewerUserId: true, reviewerTeamId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
     });
 
     const reverseReviews = query.targetType === 'team'
@@ -108,7 +108,12 @@ export class ReviewsService {
 
     const revealed = candidates.filter((review) =>
       isReviewRevealed(
-        { sourceId: review.sourceId, reviewerUserId: review.reviewerUserId, targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId, submittedAt: review.submittedAt },
+        {
+          sourceId: review.sourceId,
+          reviewerUserId: query.targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
+          targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId,
+          submittedAt: review.submittedAt,
+        },
         reverseReviews,
         now,
       ),

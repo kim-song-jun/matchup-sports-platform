@@ -275,5 +275,49 @@ describe('ReviewsService', () => {
         jest.useRealTimers();
       }
     });
+
+    it('team 타깃: 상대 팀이 이미 반대 방향 리뷰를 제출했으면 72시간 이내여도 즉시 공개한다', async () => {
+      const submittedAt = new Date('2026-08-01T00:00:00Z');
+      const now = new Date('2026-08-01T01:00:00Z'); // 72시간 미경과
+      jest.useFakeTimers().setSystemTime(now);
+
+      try {
+        const reviewFindManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            // team-a(개인 user-p가 제출)가 team-x로부터 받은 리뷰
+            { sourceId: 'tm1', reviewerUserId: 'user-p', reviewerTeamId: 'team-a', targetUserId: null, targetTeamId: 'team-x', rating: 5, sportId: 'futsal', submittedAt, tags: [] },
+          ])
+          .mockResolvedValueOnce([
+            // team-x가 team-a에게 이미 제출한 반대 방향 리뷰(reverseTeamReviews select 형태)
+            { sourceId: 'tm1', reviewerTeamId: 'team-x', targetTeamId: 'team-a' },
+          ]);
+
+        const prisma = {
+          v1PostEventReview: { findMany: reviewFindManyMock },
+          v1TeamMembership: {
+            findMany: jest.fn().mockResolvedValue([{ teamId: 'team-a' }]),
+          },
+        };
+        const tournamentFixtureReviews = {
+          pending: jest.fn(),
+          source: jest.fn(),
+          submit: jest.fn(),
+          sourceSummaries: jest.fn(),
+        };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+        const result = await service.receivedSummary(
+          { id: 'user-p', email: 'user-p@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
+          { targetType: 'team' },
+        );
+
+        expect(result.bySport).toEqual([
+          { sportId: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [] },
+        ]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

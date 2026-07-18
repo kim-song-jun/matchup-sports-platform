@@ -147,7 +147,13 @@ describe('TournamentCampaignTemplate', () => {
   it('omits incomplete prize breakdown rows without a value', () => {
     render(
       <TournamentCampaignTemplate
-        campaign={{ ...campaign('open'), prizeBreakdown: '우승 30만원 / 경품' }}
+        campaign={{
+          ...campaign('open'),
+          tournament: {
+            ...campaign('open').tournament,
+            prizeBreakdown: '우승 30만원 / 경품',
+          },
+        }}
       />,
     );
 

@@ -33,9 +33,22 @@
 - [x] 알파 전체 화면·상금 구간 캡처
 - [x] 코드·디자인 병렬 감사
 - [x] Lazyweb 리포트 생성
-- [ ] 구현 및 좁은 테스트
-- [ ] dev 배포
-- [ ] 알파 반응형 시각 QA
+- [x] 구현 및 좁은 테스트
+- [x] dev 배포
+- [x] 알파 반응형 시각 QA
+
+## Completion Evidence
+
+- 구현 경계: `a93ac9242`(스토리·상금 재구성) 이후 모바일/태블릿 CTA·본문 가시성 보정과 `8c588487b`(CTA overlay 제거)까지 반영했다.
+- 현재 알파 identity: release `0.1.0-alpha.20260719.g89adaeae2677`, commit `89adaeae267706f9e023e9e106959ac0e4201555`.
+- CI: [CI / Deploy #29655632182](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29655632182) 성공.
+- Alpha deploy: [Deploy Alpha #29655632180](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29655632180) 성공; 공개 release/commit header 일치, `/api/v1/health`의 `checks.db=true` 확인.
+- 최종 상금 구간:
+  - `output/playwright/visual-audit/task-120/campaign-375-prize-overlay-final.png`
+  - `output/playwright/visual-audit/task-120/campaign-768-prize-overlay-final.png`
+  - `output/playwright/visual-audit/task-120/campaign-1280-prize-overlay-final.png`
+- 최종 상단·CTA·FAQ 캡처도 같은 `output/playwright/visual-audit/task-120/` 아래 `*-overlay-final.png`로 남겼다. 중간 `*-final-sha.png`에서 발견된 sticky CTA 가림은 `8c588487b`에서 제거했고, 후속 clone-fidelity 재검토 결과 blocking finding 0 / APPROVE였다.
+- 사용자 코멘트에 첨부된 중첩 카드형 상금 그리드는 위 배포보다 이전 화면이다. 현재 알파는 요약과 행 기반 breakdown으로 교체되어 동일 문제를 다시 구현하지 않는다.
 
 ## Ambiguity Log
 

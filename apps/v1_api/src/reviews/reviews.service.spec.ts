@@ -78,4 +78,70 @@ describe('ReviewsService', () => {
       where: { reviewerUserId: user.id, sourceType: 'match', sourceId, targetUserId },
     }));
   });
+
+  it('submitPersonalReview: 리뷰 생성 시 매치의 sportId를 스냅샷으로 저장한다', async () => {
+    const createMock = jest.fn().mockResolvedValue({
+      id: 'review-2',
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUser: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } },
+      targetTeam: null,
+      reviewerUser: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } },
+      reviewerTeam: null,
+      rating: 5,
+      sportId: 'sport-futsal',
+      tags: [],
+      status: 'submitted',
+      submittedAt,
+    });
+    const prisma = {
+      v1Match: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: sourceId,
+          title: '성수 풋살파크 개인 매치',
+          status: 'completed',
+          completedAt: submittedAt,
+          startAt: submittedAt,
+          sportId: 'sport-futsal',
+          participants: [
+            { userId: user.id, user: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } } },
+            { userId: targetUserId, user: { id: targetUserId, profile: { nickname: '민준', profileImageUrl: null } } },
+          ],
+        }),
+      },
+      v1PostEventReview: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
+        v1PostEventReview: {
+          create: createMock,
+          aggregate: jest.fn().mockResolvedValue({ _avg: { rating: 5 }, _count: { _all: 1 } }),
+        },
+        v1UserReputationSummary: {
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      })),
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+    await service.submit(user, {
+      sourceType: 'match',
+      sourceId,
+      targetType: 'user',
+      targetUserId,
+      rating: 5,
+      tagCodes: ['manner'],
+    });
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ sportId: 'sport-futsal' }) }),
+    );
+  });
 });

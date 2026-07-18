@@ -251,6 +251,7 @@ export class ReviewsService {
         status: true,
         completedAt: true,
         startAt: true,
+        sportId: true,
         participants: {
           where: { status: { in: ELIGIBLE_PARTICIPANT_STATUSES } },
           select: {
@@ -279,6 +280,7 @@ export class ReviewsService {
 
     return {
       source: sourceSummary('match', match.id, match.title, match.completedAt ?? match.startAt),
+      sportId: match.sportId,
       reviewerTeam: null,
       targets: match.participants
         .filter((participant) => participant.userId !== user.id)
@@ -309,6 +311,7 @@ export class ReviewsService {
         status: true,
         completedAt: true,
         startAt: true,
+        sportId: true,
         hostTeamId: true,
         approvedApplicantTeamId: true,
         hostTeam: { select: teamSelect() },
@@ -335,6 +338,7 @@ export class ReviewsService {
 
     return {
       source: sourceSummary('team_match', teamMatch.id, teamMatch.title, teamMatch.completedAt ?? teamMatch.startAt),
+      sportId: teamMatch.sportId,
       reviewerTeam,
       targets: [{
         targetType: 'team' as const,
@@ -369,6 +373,7 @@ export class ReviewsService {
           targetType: 'user',
           targetUserId,
           rating: dto.rating,
+          sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
         },
         include: reviewInclude(),
@@ -403,6 +408,7 @@ export class ReviewsService {
           targetType: 'team',
           targetTeamId,
           rating: dto.rating,
+          sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
         },
         include: reviewInclude(),

@@ -8,7 +8,7 @@ import {
 
 const ALPHA_QA_ORIGIN = 'https://alpha.teameet.co.kr';
 const ALPHA_QA_DATABASE_HOST = 'v1_postgres';
-const ALPHA_QA_DATABASE_NAME = 'teameet_v1';
+const ALPHA_QA_DATABASE_NAME = 'teameet_alpha';
 const COVER_IMAGE_URL = '/mock/generated/futsal-rooftop.webp';
 const TEAM_IMAGE_URL = '/mock/generated/team-huddle.webp';
 const HIGHLIGHT_VIDEO_URL = '/mock/generated/tournament-highlight.webm';

@@ -56,7 +56,7 @@ Route 53 레코드의 대상은 EC2에 연결된 Elastic IP다. 인스턴스를 
 
 ### 대회 lifecycle QA 데이터
 
-alpha 배포는 migration과 결제 안내 비식별화 뒤 `prisma/seed-alpha-tournament-qa.ts`를 실행한다. 이 seed는 `V1_ALPHA_QA_SEED=true`, 정확한 alpha origin, `v1_postgres/teameet_v1` 조합이 모두 맞을 때만 실행되며, 고정 `aa1...` 대회 ID와 `[ALPHA QA]` 제목으로 식별되는 관리 대상만 교체한다. 프로덕션에서 복제한 기존 대회·사용자·업로드는 수정하거나 삭제하지 않는다.
+alpha 배포는 migration과 결제 안내 비식별화 뒤 `prisma/seed-alpha-tournament-qa.ts`를 실행한다. 이 seed는 `V1_ALPHA_QA_SEED=true`, 정확한 alpha origin, `v1_postgres/teameet_alpha` 조합이 모두 맞을 때만 실행되며, 고정 `aa1...` 대회 ID와 `[ALPHA QA]` 제목으로 식별되는 관리 대상만 교체한다. 프로덕션에서 복제한 기존 대회·사용자·업로드는 수정하거나 삭제하지 않는다.
 
 | 상태 | 대표 데이터 | 확인할 화면 |
 |---|---|---|

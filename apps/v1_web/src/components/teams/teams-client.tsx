@@ -8,6 +8,7 @@ import {
   useV1CancelTeamInvitation,
   useV1ChangeTeamMembershipRole,
   useV1CreateTeamJoinApplication,
+  useV1LeaveTeam,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
@@ -264,11 +265,13 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
 }
 
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
   const viewerRole = team.data?.viewer.role;
+  const viewerMembershipId = team.data?.viewer.membershipId ?? null;
   const canManageMembers = isTeamOperatorRole(viewerRole);
   const canDelegateOwner = viewerRole === 'owner';
   const canManageInvitations = canManageMembers;
@@ -281,6 +284,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const sendInvitation = useV1SendTeamInvitation(teamId);
   const cancelInvitation = useV1CancelTeamInvitation(teamId);
   const invitationsQuery = useV1TeamInvitations(teamId, { enabled: canManageInvitations });
+  const leaveTeam = useV1LeaveTeam(teamId);
   const { confirm, ConfirmModal } = useConfirm();
   const fallback = getTeamMembersViewModel();
 
@@ -294,6 +298,15 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const requestItems = applications.data?.items ?? [];
   const invitationItems = invitationsQuery.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
+
+  function handleLeaveTeam() {
+    leaveTeam.mutate(
+      { reason: 'left_from_v1_web_member_page' },
+      {
+        onSuccess: () => router.push('/teams'),
+      },
+    );
+  }
 
   function handleSendInvitation() {
     const email = inviteEmail.trim();
@@ -359,6 +372,18 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
             demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
             remove: () => confirmAction(confirm, { title: '멤버 내보내기', message: `${member.displayName}님을 팀에서 내보낼까요?`, tone: 'danger' }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
+            selfLeave:
+              viewerMembershipId && member.membershipId === viewerMembershipId
+                ? {
+                    pending: leaveTeam.isPending,
+                    onSelect: () =>
+                      confirmAction(
+                        confirm,
+                        { title: '팀 나가기', message: '정말 이 팀을 나가시겠어요? 다시 가입하려면 새로 신청해야 해요.', confirmLabel: '나가기', tone: 'danger' },
+                        handleLeaveTeam,
+                      ),
+                  }
+                : undefined,
           }),
         )
       : fallback.members,
@@ -694,6 +719,8 @@ function toMemberModel(
     delegateOwner: () => void;
     demote: () => void;
     remove: () => void;
+    /** 본인 행에만 설정 — 나머지 멤버 행은 undefined */
+    selfLeave?: { pending: boolean; onSelect: () => void };
   },
 ): TeamMembersViewModel['members'][number] {
   const itemActions: TeamMembersViewModel['members'][number]['actions'] = [];
@@ -716,6 +743,14 @@ function toMemberModel(
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions.actionPending,
+    selfLeave: actions.selfLeave
+      ? {
+          disabled: member.role === 'owner',
+          disabledReason: member.role === 'owner' ? '소유권을 먼저 이전해주세요' : undefined,
+          pending: actions.selfLeave.pending,
+          onSelect: actions.selfLeave.onSelect,
+        }
+      : undefined,
   };
 }
 

@@ -824,6 +824,22 @@ export function useV1RemoveTeamMembership(teamId: string) {
   });
 }
 
+// 본인이 스스로 팀을 나가는 self-service 경로. removeMembership(관리자가 타인을 강제 추방)과
+// 별도 엔드포인트 — /teams/:teamId/leave (V1AuthGuard만, membershipId 불필요).
+export function useV1LeaveTeam(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<V1TeamMembershipMutationResult>(`/teams/${teamId}/leave`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
+    },
+  });
+}
+
 export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.teamMatches(filters),

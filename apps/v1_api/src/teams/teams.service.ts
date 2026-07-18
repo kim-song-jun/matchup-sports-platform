@@ -19,6 +19,7 @@ import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ChangeTeamMembershipRoleDto,
+  LeaveTeamDto,
   MutateTeamDto,
   RemoveTeamMembershipDto,
   TeamMembersQueryDto,
@@ -761,6 +762,68 @@ export class TeamsService {
       teamId: result.updated.teamId,
       status: result.updated.status,
       removedAt,
+      memberCount: result.team.memberCount,
+      managerCount: result.team.managerCount,
+    };
+  }
+
+  // 본인이 스스로 팀을 나가는 self-service 경로.
+  // removeMembership(owner/manager가 타인을 강제 추방)과 달리 getManagementActor를 거치지 않고
+  // 호출자 본인의 active membership만 조회한다. 상태는 'removed'가 아닌 'left'로 구분한다.
+  async leaveTeam(user: V1AuthUser, teamId: string, dto: LeaveTeamDto) {
+    this.assertActiveAccount(user);
+    const { membership } = await this.getActiveTeamMembership(user, teamId);
+
+    if (membership.role === 'owner') {
+      const otherActiveOwnerCount = await this.prisma.v1TeamMembership.count({
+        where: { teamId, role: 'owner', status: 'active', id: { not: membership.id } },
+      });
+      if (otherActiveOwnerCount === 0) {
+        throw stateConflict(
+          '마지막 소유자는 팀을 나갈 수 없어요. 소유권을 먼저 이전해주세요.',
+          'LAST_OWNER_CANNOT_LEAVE',
+        );
+      }
+    }
+
+    const leftAt = new Date();
+    const reason = dto.reason ?? 'team_membership_self_leave';
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TeamMembership.update({
+        where: { id: membership.id },
+        data: { status: 'left', leftAt },
+      });
+      // NOTE: 본인이 팀의 유일한 active 멤버였던 경우에도 팀을 자동 archive/delete 하지 않는다.
+      // memberCount=0 상태로 그대로 남기며, 0명 팀에 대한 정리(archival) 정책은 후속 과제로 남긴다.
+      const updatedTeam = await tx.v1Team.update({
+        where: { id: teamId },
+        data: {
+          memberCount: { decrement: 1 },
+          ...(membership.role === 'manager' ? { managerCount: { decrement: 1 } } : {}),
+        },
+      });
+
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'team_membership',
+          targetId: membership.id,
+          fromStatus: 'active',
+          toStatus: 'left',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason,
+        },
+      });
+      await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
+
+      return { updated, team: updatedTeam };
+    });
+
+    return {
+      membershipId: result.updated.id,
+      teamId: result.updated.teamId,
+      status: result.updated.status,
+      leftAt,
       memberCount: result.team.memberCount,
       managerCount: result.team.managerCount,
     };

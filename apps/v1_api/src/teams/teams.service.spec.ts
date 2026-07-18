@@ -116,7 +116,7 @@ describe('TeamsService', () => {
   let prisma: {
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
-    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; updateMany: jest.Mock };
+    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; updateMany: jest.Mock; count: jest.Mock };
     v1TeamJoinApplication: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1User: { findUnique: jest.Mock };
@@ -142,6 +142,7 @@ describe('TeamsService', () => {
         upsert: jest.fn(),
         findUnique: jest.fn(),
         updateMany: jest.fn(),
+        count: jest.fn(),
       },
       v1TeamJoinApplication: {
         findFirst: jest.fn(),
@@ -684,6 +685,96 @@ describe('TeamsService', () => {
 
     await expect(
       service.removeMembership(manager, 'mem-1', {}),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // ─── leaveTeam: 본인 self-leave ────────────────────────────────────────────
+
+  it('leaveTeam: 마지막 active owner는 나갈 수 없다 → 409 LAST_OWNER_CANNOT_LEAVE', async () => {
+    const ownerMembership = membershipRow({ role: 'owner', userId: owner.id, status: 'active' });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [ownerMembership],
+    });
+    prisma.v1TeamMembership.count.mockResolvedValueOnce(0); // no other active owner
+
+    await expect(
+      service.leaveTeam(owner, 'team-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LAST_OWNER_CANNOT_LEAVE' }),
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('leaveTeam: 다른 active owner가 있으면 owner도 나갈 수 있다', async () => {
+    const ownerMembership = membershipRow({ id: 'mem-owner', role: 'owner', userId: owner.id, status: 'active' });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [ownerMembership],
+    });
+    prisma.v1TeamMembership.count.mockResolvedValueOnce(1); // another active owner exists
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null); // no chat room
+    prisma.v1TeamMembership.update.mockResolvedValueOnce({
+      id: 'mem-owner',
+      teamId: 'team-1',
+      status: 'left',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 1 });
+
+    const result = await service.leaveTeam(owner, 'team-1', {});
+
+    expect(prisma.v1TeamMembership.update).toHaveBeenCalledWith({
+      where: { id: 'mem-owner' },
+      data: { status: 'left', leftAt: expect.any(Date) },
+    });
+    expect(result).toMatchObject({ membershipId: 'mem-owner', status: 'left', memberCount: 4 });
+  });
+
+  it('leaveTeam: 일반 멤버는 나가면 status=left + memberCount decrement + 채팅 참가자 정리', async () => {
+    const memberMembership = membershipRow({
+      id: 'mem-member',
+      role: 'member',
+      userId: member.id,
+      status: 'active',
+    });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [memberMembership],
+    });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce({ id: 'room-1' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce({ id: 'participant-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.update.mockResolvedValueOnce({ id: 'participant-1' });
+    prisma.v1TeamMembership.update.mockResolvedValueOnce({
+      id: 'mem-member',
+      teamId: 'team-1',
+      status: 'left',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 1 });
+
+    const result = await service.leaveTeam(member, 'team-1', {});
+
+    // owner-only 확인 경로(count)는 member에게는 호출되지 않는다
+    expect(prisma.v1TeamMembership.count).not.toHaveBeenCalled();
+    expect(prisma.v1Team.update).toHaveBeenCalledWith({
+      where: { id: 'team-1' },
+      data: { memberCount: { decrement: 1 } },
+    });
+    expect(prisma.v1ChatRoomParticipant.update).toHaveBeenCalledWith({
+      where: { id: 'participant-1' },
+      data: { status: 'left', leftAt: expect.any(Date) },
+      select: { id: true },
+    });
+    expect(result).toMatchObject({ membershipId: 'mem-member', status: 'left', memberCount: 4 });
+  });
+
+  it('leaveTeam: 팀에 소속되지 않은 사용자는 403', async () => {
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [],
+    });
+
+    await expect(
+      service.leaveTeam(member, 'team-1', {}),
     ).rejects.toThrow(ForbiddenException);
   });
 

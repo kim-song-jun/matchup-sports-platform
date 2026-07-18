@@ -2,9 +2,9 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TeamDetailPageView, TeamFormPageView, TeamListPageView } from './teams-page';
-import { getTeamListViewModel } from './teams.view-model';
-import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel } from './teams.types';
+import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView } from './teams-page';
+import { getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
+import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel } from './teams.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/edit',
@@ -290,5 +290,61 @@ describe('TeamFormPageView', () => {
     fireEvent.click(screen.getByRole('button', { name: '가입 닫힘' }));
 
     expect(onJoinPolicyChange).toHaveBeenCalledWith('closed');
+  });
+});
+
+describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
+  it('본인 행에만 "팀 나가기" 버튼이 보이고 클릭 시 onSelect가 호출된다', () => {
+    const onSelect = vi.fn();
+    const base = getTeamMembersViewModel();
+    const model: TeamMembersViewModel = {
+      ...base,
+      members: [
+        { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', locked: true, actions: [] },
+        {
+          name: '이하나',
+          role: '멤버',
+          meta: 'MF · 최근 4경기',
+          actions: [],
+          selfLeave: { disabled: false, pending: false, onSelect },
+        },
+      ],
+    };
+
+    render(<TeamMembersPageView model={model} />);
+
+    const leaveButtons = screen.getAllByRole('button', { name: '팀 나가기' });
+    // 본인(이하나) 행에만 1개만 렌더된다 — 김도윤 행에는 selfLeave가 없으므로 버튼 없음
+    expect(leaveButtons).toHaveLength(1);
+
+    fireEvent.click(leaveButtons[0]);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('본인이 owner인 경우 "팀 나가기" 버튼이 비활성화되고 이전 안내 툴팁을 노출한다', () => {
+    const onSelect = vi.fn();
+    const base = getTeamMembersViewModel();
+    const model: TeamMembersViewModel = {
+      ...base,
+      members: [
+        {
+          name: '김도윤',
+          role: '팀장',
+          meta: 'FW · 가입 2024.03',
+          locked: true,
+          actions: [],
+          selfLeave: { disabled: true, disabledReason: '소유권을 먼저 이전해주세요', pending: false, onSelect },
+        },
+      ],
+    };
+
+    render(<TeamMembersPageView model={model} />);
+
+    const button = screen.getByRole('button', { name: /팀 나가기/ });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', '소유권을 먼저 이전해주세요');
+
+    fireEvent.click(button);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

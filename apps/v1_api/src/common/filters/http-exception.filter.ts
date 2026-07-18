@@ -30,13 +30,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
       userId: request.v1User?.id,
     };
 
-    if (exception instanceof HttpException) {
-      this.logger.warn(logContext, `HTTP ${status} ${logContext.method} ${logContext.route}`);
-    } else {
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         { ...logContext, stack: exception instanceof Error ? exception.stack : String(exception) },
         `Unhandled exception at ${logContext.method} ${logContext.route}`,
       );
+    } else {
+      this.logger.warn(logContext, `HTTP ${status} ${logContext.method} ${logContext.route}`);
     }
 
     response.status(status).json({

@@ -1,4 +1,4 @@
-import { ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, HttpException, HttpStatus, InternalServerErrorException } from '@nestjs/common';
 import { AllExceptionsFilter } from './http-exception.filter';
 
 function buildHost(request: Record<string, unknown>) {
@@ -70,6 +70,25 @@ describe('AllExceptionsFilter', () => {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         userId: undefined,
         stack: expect.stringContaining('db connection lost'),
+      }),
+      expect.any(String),
+    );
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+  });
+
+  it('logs 5xx HttpException subclasses (e.g. InternalServerErrorException) at error level with stack, not warn', () => {
+    const request = { id: 'req-3', method: 'POST', originalUrl: '/api/v1/uploads' };
+    const { host, response } = buildHost(request);
+    const exception = new InternalServerErrorException('upload verification failed');
+
+    filter.catch(exception, host);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: 'req-3',
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        stack: expect.stringContaining('InternalServerErrorException'),
       }),
       expect.any(String),
     );

@@ -2,10 +2,10 @@ import { BadRequestException, Logger, ValidationError, ValidationPipe } from '@n
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Logger as PinoNestLogger } from 'nestjs-pino';
 import * as compression from 'compression';
 import * as path from 'path';
 import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { UploadsService } from './uploads/uploads.service';
 import {
@@ -26,7 +26,8 @@ async function bootstrap() {
     ? requireProductionFrontendOrigin(process.env.FRONTEND_URL)
     : null;
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(PinoNestLogger));
 
   app.enableShutdownHooks();
   app.set('trust proxy', 1);
@@ -67,7 +68,6 @@ async function bootstrap() {
       },
     }),
   );
-  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
 
   const config = new DocumentBuilder()

@@ -17,6 +17,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ChatService } from './chat.service';
 
 // ─── shared test fixtures ──────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ function makeRoomForParticipant(userId: string, participantStatus = 'active', ro
 
 describe('ChatService', () => {
   let service: ChatService;
+  const realtimeGateway = { emitToUser: jest.fn() };
   let prisma: {
     v1ChatRoom: {
       findFirst: jest.Mock;
@@ -156,6 +158,7 @@ describe('ChatService', () => {
       providers: [
         ChatService,
         { provide: PrismaService, useValue: prisma },
+        { provide: RealtimeGateway, useValue: realtimeGateway },
       ],
     }).compile();
 
@@ -332,6 +335,45 @@ describe('ChatService', () => {
   });
 
   // ─── 7. resolve(match): get-or-create 멱등성 ─────────────────────────────────
+
+  // ─── 10. sendMessage: chat:message + notification:new 실시간 emit ───────────
+
+  it('sendMessage: emits chat:message and notification:new to every other active recipient', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-1', chatRoomId: 'room-1', senderUserId: userA.id, body: 'hello', status: 'sent', sentAt };
+    const roomWithThreeParticipants = {
+      ...makeRoom(),
+      participants: [
+        { id: 'part-a', chatRoomId: 'room-1', userId: userA.id, status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userA.id, profile: { nickname: 'A', displayName: null, profileImageUrl: null } } },
+        { id: 'part-b', chatRoomId: 'room-1', userId: 'user-2', status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: 'user-2', profile: { nickname: 'B', displayName: null, profileImageUrl: null } } },
+        { id: 'part-c', chatRoomId: 'room-1', userId: 'user-3', status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: 'user-3', profile: { nickname: 'C', displayName: null, profileImageUrl: null } } },
+      ],
+    };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithThreeParticipants);
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
+
+    await service.sendMessage(userA, 'room-1', { content: 'hello' });
+
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      'user-2',
+      'chat:message',
+      expect.objectContaining({ roomId: 'room-1', content: 'hello' }),
+    );
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      'user-2',
+      'notification:new',
+      expect.objectContaining({ targetType: 'chat', targetId: 'room-1' }),
+    );
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      'user-3',
+      'chat:message',
+      expect.objectContaining({ roomId: 'room-1', content: 'hello' }),
+    );
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalledWith(userA.id, expect.anything(), expect.anything());
+  });
 
   it('resolve(match): 첫 호출 시 created=true, 두 번째 호출 시 created=false (멱등성)', async () => {
     // Simulate user being an active match participant

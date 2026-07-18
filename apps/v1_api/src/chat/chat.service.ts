@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
 import {
   ChatMessagesQueryDto,
@@ -34,7 +35,10 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeGateway: RealtimeGateway,
+  ) {}
 
   async rooms(user: V1AuthUser, query: ChatRoomsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -146,7 +150,7 @@ export class ChatService {
     const room = await this.getActiveParticipantRoom(user.id, roomId);
     if (room.status !== 'active') throw stateConflict('Chat room is not active');
 
-    const message = await this.prisma.$transaction(async (tx) => {
+    const { message, recipientUserIds } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1ChatMessage.create({
         data: { chatRoomId: room.id, senderUserId: user.id, body: content, status: 'sent' },
       });
@@ -176,16 +180,26 @@ export class ChatService {
           })),
         });
       }
-      return created;
+      return { message: created, recipientUserIds: recipients.map((participant) => participant.userId) };
     });
 
-    return {
+    const chatMessagePayload = {
       messageId: message.id,
       roomId: room.id,
       content: message.body,
       status: message.status,
       sentAt: message.sentAt,
+      senderUserId: user.id,
     };
+    for (const recipientUserId of recipientUserIds) {
+      this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', chatMessagePayload);
+      this.realtimeGateway.emitToUser(recipientUserId, 'notification:new', {
+        targetType: 'chat',
+        targetId: room.id,
+      });
+    }
+
+    return chatMessagePayload;
   }
 
   async updateMe(user: V1AuthUser, roomId: string, dto: UpdateMyChatRoomDto) {

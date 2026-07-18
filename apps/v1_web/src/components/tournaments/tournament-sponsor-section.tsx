@@ -1,5 +1,8 @@
-import { Card } from '@/components/v1-ui/primitives';
+'use client';
+
 import type { V1TournamentSponsor } from '@/types/api';
+import { TournamentCampaignMedia } from './tournament-campaign-media';
+import styles from './tournament-sponsor-section.module.css';
 
 type SponsorFact = {
   label: string;
@@ -54,21 +57,21 @@ export function TournamentSponsorSection({
   const cards = getTournamentSponsorCards(sponsors);
 
   return (
-    <section id="tournament-sponsors" aria-labelledby="sponsor-heading" style={{ marginTop: 24 }}>
-      <div id="sponsor-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+    <section id="tournament-sponsors" aria-labelledby="sponsor-heading" className={styles.section}>
+      <div id="sponsor-heading" className={`tm-text-body-lg ${styles.heading}`}>
         협찬·이벤트
       </div>
-      <div style={{ display: 'grid', gap: 8 }}>
+      <div className={styles.cardList}>
         {cards.map((sponsor) => (
-          <Card key={sponsor.id} pad={16}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div key={sponsor.id} className={`tm-card ${styles.card}`}>
+            <div className={styles.summary}>
               <SponsorLogo name={sponsor.name} logoUrl={sponsor.logoUrl} />
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
+              <div className={styles.details}>
+                <div className={`tm-text-label ${styles.name}`}>
                   {sponsor.name}
                 </div>
                 {sponsor.description ? (
-                  <p className="tm-text-caption" style={{ margin: '3px 0 0', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+                  <p className={`tm-text-caption ${styles.description}`}>
                     {sponsor.description}
                   </p>
                 ) : null}
@@ -76,13 +79,13 @@ export function TournamentSponsorSection({
             </div>
 
             {sponsor.facts.length > 0 ? (
-              <dl style={{ display: 'grid', gap: 8, margin: '14px 0 0' }}>
+              <dl className={styles.factList}>
                 {sponsor.facts.map((fact) => (
-                  <div key={fact.label} style={{ display: 'grid', gridTemplateColumns: '76px minmax(0, 1fr)', gap: 10 }}>
-                    <dt className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+                  <div key={fact.label} className={styles.fact}>
+                    <dt className={`tm-text-caption ${styles.factLabel}`}>
                       {fact.label}
                     </dt>
-                    <dd className="tm-text-caption" style={{ color: 'var(--text-body)', lineHeight: 1.55, margin: 0 }}>
+                    <dd className={`tm-text-caption ${styles.factValue}`}>
                       {fact.value}
                     </dd>
                   </div>
@@ -91,7 +94,7 @@ export function TournamentSponsorSection({
             ) : null}
 
             {sponsor.links.length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+              <div className={styles.links}>
                 {sponsor.links.map((link) => (
                   <a
                     key={link.label}
@@ -105,7 +108,7 @@ export function TournamentSponsorSection({
                 ))}
               </div>
             ) : null}
-          </Card>
+          </div>
         ))}
       </div>
     </section>
@@ -122,33 +125,14 @@ function makeLink(label: string, href: string | null): SponsorLink | null {
 
 function SponsorLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
   return (
-    <div
-      aria-hidden="true"
-      style={{
-        position: 'relative',
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        background: 'var(--blue50)',
-        color: 'var(--blue600)',
-        display: 'grid',
-        placeItems: 'center',
-        flexShrink: 0,
-        overflow: 'hidden',
-      }}
-    >
+    <div aria-hidden="true" className={styles.logo}>
       <span className="tm-text-label">{name.slice(0, 2)}</span>
       {logoUrl ? (
-        <img
+        <TournamentCampaignMedia
           src={logoUrl}
           alt=""
-          width={44}
-          height={44}
-          loading="lazy"
-          onError={(event) => {
-            event.currentTarget.hidden = true;
-          }}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          sportCode="sponsor"
+          className={styles.logoImage}
         />
       ) : null}
     </div>

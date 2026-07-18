@@ -1,0 +1,87 @@
+.section {
+  margin-top: 24px;
+}
+
+.heading {
+  margin-bottom: 8px;
+}
+
+.cardList {
+  display: grid;
+  gap: 8px;
+}
+
+.card {
+  padding: 16px;
+}
+
+.summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.logo {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--blue50);
+  color: var(--blue600);
+}
+
+.logoImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.details {
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  color: var(--text-strong);
+}
+
+.description {
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.factList {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.factLabel {
+  color: var(--text-caption);
+}
+
+.factValue {
+  margin: 0;
+  color: var(--text-body);
+  line-height: 1.55;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}

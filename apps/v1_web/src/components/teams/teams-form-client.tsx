@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
@@ -33,7 +33,9 @@ export function TeamCreatePageClient() {
   const [regionId, setRegionId] = useState('');
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
   const [error, setError] = useState<string | null>(null);
+  const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
+  const selectedSportId = sportId || sports.data?.[0]?.id || '';
   const createTeamWithActivityCompatibility = async (payload: V1TeamMutationPayload, draft: TeamDraft) => {
     try {
       return await createTeam.mutateAsync(payload);
@@ -44,10 +46,6 @@ export function TeamCreatePageClient() {
   };
 
   useEffect(() => {
-    if (!sportId && sports.data?.[0]) setSportId(sports.data[0].id);
-  }, [sportId, sports.data]);
-
-  useEffect(() => {
     if (!regionId && regionOptions[0]) setRegionId(regionOptions[0].id);
   }, [regionId, regionOptions]);
 
@@ -55,7 +53,7 @@ export function TeamCreatePageClient() {
     mode: 'create',
     uploadImage,
     draft,
-    sportId,
+    sportId: selectedSportId,
     regionId,
     joinPolicy,
     sports: sports.data?.map((sport) => ({ id: sport.id, name: sport.name })) ?? [],
@@ -67,16 +65,14 @@ export function TeamCreatePageClient() {
     setRegionId,
     setJoinPolicy,
     onSubmit: () => {
-      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
-      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
-      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-      if (createTeam.isPending) return;
+      if (submitLockRef.current || createTeam.isPending) return;
       setError(null);
-      const payload = buildPayload(draft, sportId, regionId, joinPolicy);
+      const payload = buildPayload(draft, selectedSportId, regionId, joinPolicy);
       if (!payload) {
         setError('팀 이름, 종목, 지역을 모두 입력해 주세요.');
         return;
       }
+      submitLockRef.current = true;
       void createTeamWithActivityCompatibility(payload, draft)
         .then((result) => router.push(result.detailRoute || `/teams/${result.teamId}`))
         .catch((err) => {
@@ -93,13 +89,16 @@ export function TeamCreatePageClient() {
             return;
           }
           setError(err instanceof Error ? err.message : '팀을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+        })
+        .finally(() => {
+          submitLockRef.current = false;
         });
     },
   });
 
   return (
     <>
-      <TeamFormPageView model={model} />
+      <TeamFormPageView model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model} />
       {ConfirmModal}
     </>
   );
@@ -131,6 +130,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const [membersVisibilityEnabled, setMembersVisibilityEnabled] = useState(false);
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
   const updateTeamWithActivityCompatibility = async (
     payload: V1TeamMutationPayload & { version: string; membersVisibilityEnabled?: boolean },
@@ -202,24 +202,30 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     setJoinPolicy,
     setMembersVisibilityEnabled,
     onSubmit: () => {
-      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
-      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
-      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-      if (updateTeam.isPending) return;
+      if (submitLockRef.current || updateTeam.isPending) return;
       setError(null);
       const payload = buildPayload(draft, sportId, regionId, joinPolicy);
       if (!payload || !version) {
         setError('팀 정보를 다시 확인하고 저장해 주세요.');
         return;
       }
+      submitLockRef.current = true;
       void updateTeamWithActivityCompatibility({ ...payload, version, membersVisibilityEnabled }, draft)
         // #16: from=my이면 저장 후 canonical /teams/[id]로 복귀, 아니면 API 응답 경로 사용
         .then((result) => router.push(successHref ?? result.detailRoute ?? `/teams/${teamId}`))
-        .catch((err) => setError(err instanceof Error ? err.message : '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+        .catch((err) => setError(err instanceof Error ? err.message : '팀 정보를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'))
+        .finally(() => {
+          submitLockRef.current = false;
+        });
     },
   });
 
-  return <TeamFormPageView model={model} cancelHref={cancelHref} />;
+  return (
+    <TeamFormPageView
+      model={sports.isPending && sports.data === undefined && !query.data ? { ...model, form: undefined } : model}
+      cancelHref={cancelHref}
+    />
+  );
 }
 
 function buildModel({
@@ -259,9 +265,13 @@ function buildModel({
   setMembersVisibilityEnabled?: (enabled: boolean) => void;
   onSubmit: () => void;
 }): TeamFormViewModel {
+  const selectedSport = sports.find((sport) => sport.id === sportId);
+
   return {
     mode,
-    team: draft,
+    team: selectedSport
+      ? { ...draft, sport: selectedSport.name, sports: [selectedSport.name] }
+      : { ...draft, sports: [] },
     form: {
       sportId,
       regionId,
@@ -270,11 +280,7 @@ function buildModel({
       joinPolicy,
       membersVisibilityEnabled,
       onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-      onSportChange: (nextSportId) => {
-        const sport = sports.find((item) => item.id === nextSportId);
-        setSportId(nextSportId);
-        if (sport) setDraft((current) => ({ ...current, sport: sport.name, sports: [sport.name] }));
-      },
+      onSportChange: setSportId,
       onRegionChange: (nextRegionId) => {
         const region = regions.find((item) => item.id === nextRegionId);
         setRegionId(nextRegionId);

@@ -1297,6 +1297,11 @@ enum V1TournamentFixtureStatus {
   cancelled
 }
 
+enum V1TournamentGoalTeam {
+  home
+  away
+}
+
 enum V1TournamentAnnouncementAudience {
   public
   all_registered
@@ -1502,6 +1507,7 @@ model V1TournamentPlayer {
 
   registration V1TournamentRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
   user         V1User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  goals        V1TournamentFixtureGoal[]
 
   @@unique([registrationId, userId])
   @@index([registrationId, removedAt])
@@ -1616,8 +1622,27 @@ model V1TournamentFixtureResult {
 
   fixture         V1TournamentFixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
   recordedByAdmin V1AdminUser?        @relation("V1TournamentFixtureResultRecordedByAdmin", fields: [recordedByAdminUserId], references: [id], onDelete: SetNull)
+  goals           V1TournamentFixtureGoal[]
 
   @@map("v1_tournament_fixture_results")
+}
+
+model V1TournamentFixtureGoal {
+  id              String                @id @default(uuid())
+  fixtureResultId String                @map("fixture_result_id")
+  team            V1TournamentGoalTeam
+  playerId        String?               @map("player_id")
+  /// 비회원/대타 등 명단에 없는 득점자를 위해 이름은 항상 필수 — playerId 유무와 무관.
+  playerName      String                @map("player_name")
+  minute          Int?
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  fixtureResult V1TournamentFixtureResult @relation(fields: [fixtureResultId], references: [id], onDelete: Cascade)
+  player        V1TournamentPlayer?       @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([fixtureResultId])
+  @@index([playerId])
+  @@map("v1_tournament_fixture_goals")
 }
 
 /// 경기 하이라이트/중계 영상 — 경기당 여러 개 (유튜브 링크 또는 업로드 파일 URL)

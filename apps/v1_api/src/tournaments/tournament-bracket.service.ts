@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   V1TournamentFixture,
+  V1TournamentFixtureGoal,
   V1TournamentFixtureResult,
   V1TournamentFixtureVideo,
   V1TournamentGroup,
@@ -531,6 +532,33 @@ export class TournamentBracketService {
       });
     }
 
+    // goals에서 playerId가 지정된 경우, 해당 선수가 실제로 이 경기의 팀(홈/원정) 명단에
+    // 속해 있는지 검증한다 — 다른 팀·다른 대회 선수를 오기록하는 사고를 원천 차단.
+    if (dto.goals !== undefined && dto.goals.length > 0) {
+      const playerIds = dto.goals
+        .map((g) => g.playerId)
+        .filter((id): id is string => id != null);
+      if (playerIds.length > 0) {
+        const players = await this.prisma.v1TournamentPlayer.findMany({
+          where: { id: { in: playerIds } },
+          select: { id: true, registrationId: true },
+        });
+        const playerById = new Map(players.map((p) => [p.id, p]));
+        for (const goal of dto.goals) {
+          if (!goal.playerId) continue;
+          const player = playerById.get(goal.playerId);
+          const expectedRegistrationId =
+            goal.team === 'home' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
+          if (!player || player.registrationId !== expectedRegistrationId) {
+            throw new BadRequestException({
+              code: 'GOAL_PLAYER_NOT_IN_TEAM',
+              message: '득점자가 해당 팀 명단에 없어요.',
+            });
+          }
+        }
+      }
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
       // V1TournamentFixtureResult upsert (fixtureId unique)
       const fixtureResult = await tx.v1TournamentFixtureResult.upsert({
@@ -574,6 +602,25 @@ export class TournamentBracketService {
         }
       }
 
+      // 득점자 목록은 replace-all — dto.goals 생략(undefined) 시 기존 기록 유지
+      if (dto.goals !== undefined) {
+        await tx.v1TournamentFixtureGoal.deleteMany({
+          where: { fixtureResultId: fixtureResult.id },
+        });
+        const goalRows = dto.goals
+          .map((g) => ({
+            fixtureResultId: fixtureResult.id,
+            team: g.team,
+            playerId: g.playerId ?? null,
+            playerName: g.playerName.trim(),
+            minute: g.minute ?? null,
+          }))
+          .filter((g) => g.playerName.length > 0);
+        if (goalRows.length > 0) {
+          await tx.v1TournamentFixtureGoal.createMany({ data: goalRows });
+        }
+      }
+
       // fixture.status → completed
       await tx.v1TournamentFixture.update({
         where: { id: fixtureId },
@@ -600,11 +647,21 @@ export class TournamentBracketService {
       return fixtureResult;
     });
 
-    const videos = await this.prisma.v1TournamentFixtureVideo.findMany({
-      where: { fixtureId },
-      orderBy: { sortOrder: 'asc' },
-    });
-    return { ...this.serializeResult(result), videos: videos.map((v) => this.serializeVideo(v)) };
+    const [videos, goals] = await Promise.all([
+      this.prisma.v1TournamentFixtureVideo.findMany({
+        where: { fixtureId },
+        orderBy: { sortOrder: 'asc' },
+      }),
+      this.prisma.v1TournamentFixtureGoal.findMany({
+        where: { fixtureResultId: result.id },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+    return {
+      ...this.serializeResult(result),
+      videos: videos.map((v) => this.serializeVideo(v)),
+      goals: goals.map((g) => this.serializeGoal(g)),
+    };
   }
 
   // ─── standings recalculate ────────────────────────────────────────────────
@@ -794,7 +851,7 @@ export class TournamentBracketService {
       this.prisma.v1TournamentFixture.findMany({
         where: { tournamentId },
         include: {
-          result: true,
+          result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
           videos: { orderBy: { sortOrder: 'asc' } },
           homeRegistration: {
             include: { team: { select: { name: true } } },
@@ -828,7 +885,12 @@ export class TournamentBracketService {
         ...this.serializeFixture(f),
         homeTeamName: f.homeRegistration?.team.name ?? 'TBD',
         awayTeamName: f.awayRegistration?.team.name ?? 'TBD',
-        result: f.result ? this.serializeResult(f.result) : null,
+        result: f.result
+          ? {
+              ...this.serializeResult(f.result),
+              goals: f.result.goals.map((g) => this.serializeGoal(g)),
+            }
+          : null,
         videos: f.videos.map((v) => this.serializeVideo(v)),
       })),
       standings: standings.map((s) => ({
@@ -904,6 +966,16 @@ export class TournamentBracketService {
       title: row.title,
       url: row.url,
       sortOrder: row.sortOrder,
+    };
+  }
+
+  private serializeGoal(row: V1TournamentFixtureGoal) {
+    return {
+      id: row.id,
+      team: row.team,
+      playerId: row.playerId,
+      playerName: row.playerName,
+      minute: row.minute,
     };
   }
 

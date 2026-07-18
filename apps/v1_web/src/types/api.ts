@@ -1738,6 +1738,15 @@ export type V1TournamentGroup = {
   standings: V1TournamentStanding[];
 };
 
+/** 경기 득점자 — 명단에 있으면 playerId, 비회원/대타는 playerId=null + playerName만 */
+export type V1TournamentFixtureGoal = {
+  id: string;
+  team: 'home' | 'away';
+  playerId: string | null;
+  playerName: string;
+  minute: number | null;
+};
+
 export type V1TournamentFixtureResult = {
   homeScore: number;
   awayScore: number;
@@ -1746,6 +1755,7 @@ export type V1TournamentFixtureResult = {
   awayPenaltyScore: number | null;
   note: string | null;
   recordedAt: string;
+  goals: V1TournamentFixtureGoal[];
 };
 
 /** 경기 하이라이트/중계 영상 — 경기당 여러 개 */
@@ -2067,6 +2077,7 @@ export type V1AdminBracketResult = {
   recordedAt: string;
   createdAt: string;
   updatedAt: string;
+  goals: V1TournamentFixtureGoal[];
 };
 
 export type V1AdminBracketStanding = {
@@ -2332,6 +2343,8 @@ export type V1RecordResultPayload = {
   note?: string;
   /** 전달 시 replace-all — 생략하면 기존 영상 목록 유지 */
   videos?: { title?: string; url: string }[];
+  /** 전달 시 replace-all — 생략하면 기존 득점 기록 유지 */
+  goals?: { team: 'home' | 'away'; playerId?: string; playerName: string; minute?: number }[];
 };
 
 export type V1CreateAnnouncementPayload = {

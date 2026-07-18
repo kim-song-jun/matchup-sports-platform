@@ -120,6 +120,13 @@ export function presentTournamentDetail(row: TournamentDetailRow) {
             awayPenaltyScore: fixture.result.awayPenaltyScore,
             note: fixture.result.note,
             recordedAt: fixture.result.recordedAt.toISOString(),
+            goals: fixture.result.goals.map((goal) => ({
+              id: goal.id,
+              team: goal.team,
+              playerId: goal.playerId,
+              playerName: goal.playerName,
+              minute: goal.minute,
+            })),
           }
         : null,
       videos: fixture.videos.map((video) => ({

@@ -139,6 +139,10 @@ describe('public tournament QA regressions', () => {
             awayPenaltyScore: null,
             note: null,
             recordedAt: '2026-07-16T00:00:00.000Z',
+            goals: [
+              { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 23 },
+              { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: 67 },
+            ],
           },
           videos: [],
         },

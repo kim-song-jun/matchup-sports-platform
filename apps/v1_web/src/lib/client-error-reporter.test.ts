@@ -45,4 +45,28 @@ describe('reportClientError', () => {
 
     expect(() => reportClientError({ message: 'unique-message-for-failure-test' })).not.toThrow();
   });
+
+  it('never sends the query string or hash, so OAuth codes/CSRF state in the URL cannot leak', () => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        ...originalLocation,
+        pathname: '/callback/kakao',
+        search: '?code=super-secret-auth-code&state=csrf-token',
+        hash: '',
+        href: 'https://teameet.co.kr/callback/kakao?code=super-secret-auth-code&state=csrf-token',
+      },
+    });
+
+    reportClientError({ message: 'oauth-callback-failed' });
+
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.url).toBe('/callback/kakao');
+    expect(body.url).not.toContain('super-secret-auth-code');
+    expect(body.url).not.toContain('csrf-token');
+
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+  });
 });

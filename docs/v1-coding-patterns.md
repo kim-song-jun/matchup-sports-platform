@@ -52,6 +52,11 @@
 - v1_web=Vitest+TL+MSW, v1_api=Jest(PrismaService mock). 서비스 계약·상태전이·가드·멱등·계산 검증.
 - e2e: `e2e/v1-tests/` + `e2e/v1.config.ts` (`pnpm test:e2e:v1`, Playwright, :3013, 헤더 dev-auth fixture) — 실제 사용자 플로우. (구앱 `:3003` 스위트와 별도)
 
+## 9. 관측성 — 에러 로깅 / GA 이벤트 유틸 (2026-07-18 관측성 스켈레톤 추가)
+- 사용자에게 노출되는 에러는 `lib/client-error-reporter.ts`의 `reportClientError({ message, stack?, level?, context? })`가 BE `POST /logs/client-error`(pino 구조화 로그)에 적재한다. `v1Api()` 실패·`window.onerror`/`unhandledrejection`·`global-error.tsx` 3곳에 이미 연결돼 있으니 신규 진입점을 또 만들 필요는 거의 없다 — 필요하면 이 3곳과 동일하게 fire-and-forget으로 호출.
+- 의미 있는 사용자 행동(가입/로그인/매치·팀·대회 신청 등)에는 `lib/analytics.ts`의 `trackEvent(name, params?)`를 mutation 성공 콜백/클릭 핸들러에 부수효과로 추가한다. `NEXT_PUBLIC_GA_MEASUREMENT_ID` 미설정 시 완전 no-op이라 항상 안전하게 호출 가능. 이벤트 카탈로그·네이밍 컨벤션(snake_case, `_click`/`_complete` 구분)은 `docs/superpowers/specs/2026-07-18-logging-ga-analytics-design.md` 참조.
+- `context`/이벤트 파라미터에 PII(이메일·실명·전화번호·메시지 본문) 절대 포함 금지 — id/sportType/method/step 같은 식별자만.
+
 ---
 > 이 문서는 이번 배포 준비(2026-06-23) 세션에서 확립·적용한 패턴을 codify한 것이다.
 > 진행·결정 ledger: `docs/ops/deploy-2026-06-23-readiness.md`. 화면 감사 backlog: `docs/ops/ws11-audit-findings.md`.

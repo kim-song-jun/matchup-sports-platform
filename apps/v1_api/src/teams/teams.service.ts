@@ -811,11 +811,14 @@ export class TeamsService {
       });
       // NOTE: 본인이 팀의 유일한 active 멤버였던 경우에도 팀을 자동 archive/delete 하지 않는다.
       // memberCount=0 상태로 그대로 남기며, 0명 팀에 대한 정리(archival) 정책은 후속 과제로 남긴다.
+      // managerCount 감소는 tx 밖에서 읽은 membership.role이 아니라 updated.role(같은 tx 내
+      // updateMany 직후 재조회)을 사용한다 — 동시에 역할 위임이 이 사용자를 건드렸다면
+      // 바깥에서 읽은 role이 stale할 수 있어 managerCount가 어긋날 수 있다.
       const updatedTeam = await tx.v1Team.update({
         where: { id: teamId },
         data: {
           memberCount: { decrement: 1 },
-          ...(membership.role === 'manager' ? { managerCount: { decrement: 1 } } : {}),
+          ...(updated.role === 'manager' ? { managerCount: { decrement: 1 } } : {}),
         },
       });
 

@@ -667,7 +667,7 @@ export function TournamentDetailView({
         <FormatLeftSections tournament={tournament} />
       </div>
 
-      <TournamentInquirySection tournamentId={tournament.id} />
+      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
     </>
   );
 
@@ -770,7 +770,7 @@ export function TournamentDetailView({
         </AccordionSection>
       </div>
 
-      <TournamentInquirySection tournamentId={tournament.id} />
+      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
     </>
   );
 

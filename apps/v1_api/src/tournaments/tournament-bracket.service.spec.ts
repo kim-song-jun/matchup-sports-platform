@@ -515,6 +515,22 @@ describe('TournamentBracketService', () => {
   });
 
   // Track 5: 득점자 등록
+  it('recordResult: whitespace-only goal name is rejected before stored goals are replaced', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());
+
+    await expect(
+      service.recordResult(ownerUser, 'fixture-1', {
+        homeScore: 1,
+        awayScore: 0,
+        goals: [{ team: 'home', playerName: '   ' }],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'GOAL_PLAYER_NAME_REQUIRED' } });
+
+    expect(prisma.v1TournamentFixtureResult.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentFixtureGoal.deleteMany).not.toHaveBeenCalled();
+  });
+
   it('recordResult: goals with playerId in home team roster → persists goal rows', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());

@@ -532,6 +532,13 @@ export class TournamentBracketService {
       });
     }
 
+    if (dto.goals?.some((goal) => goal.playerName.trim().length === 0)) {
+      throw new BadRequestException({
+        code: 'GOAL_PLAYER_NAME_REQUIRED',
+        message: '득점자 이름을 입력해 주세요.',
+      });
+    }
+
     // goals에서 playerId가 지정된 경우, 해당 선수가 실제로 이 경기의 팀(홈/원정) 명단에
     // 속해 있는지 검증한다 — 다른 팀·다른 대회 선수를 오기록하는 사고를 원천 차단.
     if (dto.goals !== undefined && dto.goals.length > 0) {
@@ -614,8 +621,7 @@ export class TournamentBracketService {
             playerId: g.playerId ?? null,
             playerName: g.playerName.trim(),
             minute: g.minute ?? null,
-          }))
-          .filter((g) => g.playerName.length > 0);
+          }));
         if (goalRows.length > 0) {
           await tx.v1TournamentFixtureGoal.createMany({ data: goalRows });
         }

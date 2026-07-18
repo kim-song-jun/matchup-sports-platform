@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -219,6 +219,7 @@ export class FixtureGoalDto {
   playerId?: string;
 
   /** 비회원/대타 등 명단에 없는 득점자도 이름은 항상 필수 */
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @IsNotEmpty()
   @MaxLength(60)

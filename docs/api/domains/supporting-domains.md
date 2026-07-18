@@ -22,7 +22,7 @@
 | `inquiries` | `/api/v1/inquiries`, `/api/v1/inquiries/:id`, `/api/v1/admin/inquiries`, `/api/v1/admin/inquiries/:id`, `/api/v1/admin/inquiries/:id/replies`, `/api/v1/admin/inquiries/:id/status` |
 | `badges` | `/api/v1/badges`, `/api/v1/badges/team/:teamId` |
 | `users/blocks` | `/api/v1/users/blocks`, `/api/v1/users/blocks/:blockedId` |
-| `tournaments` | `/api/v1/tournaments`, `/api/v1/tournaments/:id`, `/api/v1/tournaments/campaigns/:slug`, `/api/v1/tournaments/:tournamentId/registrations`, `/api/v1/admin/tournaments/:tournamentId/campaign`, `/api/v1/admin/tournaments/:tournamentId/sponsors` |
+| `tournaments` | `/api/v1/tournaments`, `/api/v1/tournaments/:id`, `/api/v1/tournaments/campaigns/:slug`, `/api/v1/tournaments/:tournamentId/registrations`, `/api/v1/admin/tournaments/:tournamentId/campaign`, `/api/v1/admin/tournaments/:tournamentId/sponsors`, `/api/v1/admin/tournaments/:tournamentId/popups`, `/api/v1/admin/tournaments/:tournamentId/publish-bracket`, `/api/v1/admin/tournaments/:tournamentId/bracket`, `/api/v1/admin/fixtures/:fixtureId/result` |
 | `health` | `/api/v1/health` |
 | `venue reviews` | `/api/v1/venues/:id/reviews` |
 
@@ -192,6 +192,13 @@
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/sponsors` | Required + Admin | 대회 협찬/이벤트 생성 |
 | `PATCH` | `/api/v1/admin/tournaments/:tournamentId/sponsors/:sponsorId` | Required + Admin | 대회 협찬/이벤트 수정 |
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/sponsors/:sponsorId/deactivate` | Required + Admin | 대회 협찬/이벤트 비공개 전환 |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/popups` | Required + Active Admin | 대회 팝업 전체 목록 |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/popups` | Required + Owner/Ops | 대회 팝업 생성 |
+| `PATCH` | `/api/v1/admin/tournaments/:tournamentId/popups/:popupId` | Required + Owner/Ops | 대회 팝업 전체 필드 수정 |
+| `DELETE` | `/api/v1/admin/tournaments/:tournamentId/popups/:popupId` | Required + Owner/Ops | 대회 팝업 삭제 |
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/publish-bracket` | Required + Owner/Ops | 공개 상세에 대진표 일괄 공개 |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/bracket` | Required + Active Admin | 조/경기/순위 운영 데이터 조회 |
+| `POST` | `/api/v1/admin/fixtures/:fixtureId/result` | Required + Owner/Ops | 경기 결과와 득점자/영상 기록 |
 
 ### 쿼리/DTO 계약
 
@@ -232,10 +239,34 @@
   - `isActive=false` 또는 deactivate endpoint는 public detail의 `sponsors` 노출에서 제외한다.
 - Admin sponsor mutation은 `getMutationAdmin` 권한 게이트를 사용하고, `tournament_sponsor.create|update|deactivate` admin action log를 남긴다.
 
+### 대회 팝업 계약
+
+- `CreateTournamentPopupDto`와 `UpdateTournamentPopupDto`는 같은 전체 입력 계약을 사용한다. `PATCH`도 partial patch가 아니므로 아래 필드를 모두 보내야 한다.
+  - `title`: trim 후 비어 있지 않은 문자열, max 120
+  - `body`: trim 후 비어 있지 않은 문자열, max 5000
+  - `imageUrl?`: protocol이 있는 URL, max 1000. 빈 문자열 또는 미전송은 `null`로 저장한다.
+  - `status`: `draft | published | archived`
+  - `displayStartAt?`, `displayEndAt?`: ISO date string 또는 `null`
+- 시작/종료가 모두 있으면 종료 시각이 시작 시각보다 늦어야 한다. 그렇지 않으면 `400 INVALID_DISPLAY_WINDOW`다.
+- admin 목록 응답은 `{ items }`이며 최신 생성순이다. 생성/수정 item 필드는 `id`, `tournamentId`, `title`, `body`, `imageUrl`, `status`, `displayStartAt`, `displayEndAt`, `createdAt`, `updatedAt`이다. 삭제 응답은 `{ popupId, deleted: true }`다.
+- 다른 대회에 속하거나 존재하지 않는 popup ID는 `404 TOURNAMENT_POPUP_NOT_FOUND`, 존재하지 않는 대회는 `404 TOURNAMENT_NOT_FOUND`다. 생성/수정/삭제는 삭제되지 않은 대회만 허용하고 admin action log를 같은 transaction에서 남긴다.
+- 공개 `GET /api/v1/tournaments/:id` 응답에는 `popup`이 추가된다. 현재 시각에 `status=published`, `displayStartAt <= now`(또는 null), `displayEndAt > now`(또는 null)를 모두 만족하는 최신 생성 popup 1건만 `{ popupId, title, body, imageUrl }`로 반환하며, 없으면 `null`이다. admin용 상태·기간·timestamp는 공개 popup 응답에 포함하지 않는다.
+
+### 대진표 공개와 경기 결과 계약
+
+- `POST /api/v1/admin/tournaments/:tournamentId/publish-bracket` 응답은 `{ tournamentId, bracketPublishedAt, alreadyPublished }`다. 최초 성공은 `alreadyPublished=false`이며 `tournament.bracket_publish` audit log를 같은 transaction에서 한 번만 남긴다.
+- 접수 마감 전 공개도 서버에서 허용하며, 공개 뒤 되돌리는 endpoint는 없다. 마감 전 공개 확인은 admin UI가 담당한다.
+- 이미 공개된 대회에 대한 재요청은 기존 `bracketPublishedAt`을 유지하고 `alreadyPublished=true`를 반환한다. 동시 최초 공개 요청도 `bracketPublishedAt IS NULL` 조건부 갱신으로 직렬화되어 한 요청만 상태와 audit log를 만들고, 나머지는 같은 공개 시각의 멱등 성공으로 수렴한다. 조건부 갱신 후에도 공개 시각을 확인할 수 없는 비정상 충돌만 `409 TOURNAMENT_BRACKET_PUBLISH_CONFLICT`다.
+- 공개 상세는 `bracketPublishedAt=null`인 동안 DB에 조/경기/순위가 있어도 `groups=[]`, `fixtures=[]`로 반환한다. 공개 뒤에는 `groups`에 group teams와 standings, `fixtures`에 팀명·결과·득점자·영상을 포함한다. 공지, 참가팀, 스폰서, 리뷰, 수상 등 다른 상세 필드는 이 공개 게이트와 무관하다. admin `GET /admin/tournaments/:tournamentId/bracket`은 공개 여부와 무관하게 운영 데이터를 조회한다.
+- `POST /api/v1/admin/fixtures/:fixtureId/result`의 `goals`는 최대 50개이며 각 항목은 `team: home | away`, trim 후 비어 있지 않은 `playerName`(max 60), optional `playerId` UUID, optional `minute` 정수(`0~200`)를 받는다.
+- `playerName`이 공백뿐이면 DTO validation에서 거절하고, 서비스 계층에도 `400 GOAL_PLAYER_NAME_REQUIRED` 방어가 있다. `playerId`를 보낸 경우 해당 선수가 goal의 `team`과 일치하는 홈/원정 registration 명단에 있어야 하며, 없거나 상대 팀 선수이면 `400 GOAL_PLAYER_NOT_IN_TEAM`이다. 명단 밖 비회원/대타는 `playerId` 없이 이름만 기록할 수 있다.
+- `goals`를 생략하면 기존 득점 기록을 유지한다. 배열을 보내면 빈 배열을 포함해 replace-all로 처리한다. 결과 upsert, 기존 goal 삭제와 새 goal 생성, fixture의 `completed` 전환, audit log는 하나의 transaction이므로 일부 득점자만 교체되는 상태를 남기지 않는다. 득점자 이름/명단 검증은 기존 goal 삭제 전에 끝난다.
+- admin bracket과 공개 fixture result의 `goals` 항목은 `id`, `team`, `playerId`, `playerName`, `minute`을 반환한다.
+
 ### 공개 상세 응답 계약
 
 - `GET /api/v1/tournaments`와 `GET /api/v1/tournaments/:id`는 로그인 없이 접근 가능한 공개 탐색 API다. 신청, 내 신청, 로스터, 관리자 조작은 별도 guarded endpoint에서만 처리한다.
-- `GET /api/v1/tournaments/:id`는 대회 기본 정보, `groups`, `fixtures`, `announcements`, `confirmedCount`를 반환한다.
+- `GET /api/v1/tournaments/:id`는 대회 기본 정보, `bracketPublishedAt`, `groups`, `fixtures`, `announcements`, `confirmedCount`, `popup`을 반환한다.
 - `announcements`는 public detail에서 `publishedAt != null`인 공지만 포함한다.
   - 필드: `id`, `title`, `body`, `category`, `audience`, `publishedAt`, `createdAt`
   - `category`: `general | venue | sponsor | media | results | review`
@@ -308,6 +339,10 @@
 - `apps/v1_api/src/tournaments/tournaments-read.controller.ts`, `tournaments-read.service.ts`, `dto/tournament-read.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-campaigns.controller.ts`, `tournament-campaign-read.service.ts`, `tournament-campaign-admin.service.ts`, `dto/tournament-campaign.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-sponsors.controller.ts`, `tournament-sponsors.service.ts`, `dto/tournament-sponsor.dto.ts`
+- `apps/v1_api/src/tournaments/tournament-popup.controller.ts`, `tournament-popup.service.ts`, `dto/tournament-popup.dto.ts`
+- `apps/v1_api/src/tournaments/tournaments-admin.controller.ts`, `tournaments-admin.service.ts`
+- `apps/v1_api/src/tournaments/tournament-bracket.controller.ts`, `tournament-bracket.service.ts`, `dto/admin-bracket.dto.ts`
+- `apps/v1_api/src/tournaments/tournament-detail.presenter.ts`, `tournaments-read.query.ts`
 - `apps/v1_api/src/tournaments/tournament-registrations.controller.ts`, `tournament-registrations.service.ts`, `dto/tournament-registration.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-players.controller.ts`, `tournament-players.service.ts`
 - `apps/v1_api/src/health/health.controller.ts`

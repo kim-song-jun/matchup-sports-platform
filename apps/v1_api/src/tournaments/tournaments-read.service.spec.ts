@@ -132,6 +132,9 @@ describe('TournamentsReadService', () => {
       findMany: jest.Mock;
       findFirst: jest.Mock;
     };
+    v1TournamentPopup: {
+      findFirst: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -139,6 +142,9 @@ describe('TournamentsReadService', () => {
       v1Tournament: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+      },
+      v1TournamentPopup: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
     };
 
@@ -622,5 +628,41 @@ describe('TournamentsReadService', () => {
     expect(result.scheduledAt).toBe(scheduledDate.toISOString());
     expect(result.scheduledEndAt).toBe(scheduledEndDate.toISOString());
     expect(result.createdAt).toBe(new Date('2026-06-01T00:00:00.000Z').toISOString());
+  });
+
+  // ─── get — tournament popup (Task 109 Track 8) ───────────────────────────────
+
+  it('get: includes null popup when no active tournament popup exists', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow());
+    prisma.v1TournamentPopup.findFirst.mockResolvedValue(null);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.popup).toBeNull();
+  });
+
+  it('get: includes the active published popup within its display window', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow());
+    prisma.v1TournamentPopup.findFirst.mockResolvedValue({
+      id: 'popup-1',
+      title: '얼리버드 신청 안내',
+      body: '7/31까지 신청하면 참가비 할인!',
+      imageUrl: '/uploads/tournaments/popup.webp',
+    });
+
+    const result = await service.get('tournament-1');
+
+    expect(result.popup).toEqual({
+      popupId: 'popup-1',
+      title: '얼리버드 신청 안내',
+      body: '7/31까지 신청하면 참가비 할인!',
+      imageUrl: '/uploads/tournaments/popup.webp',
+    });
+
+    const callArgs = prisma.v1TournamentPopup.findFirst.mock.calls[0][0];
+    expect(callArgs.where).toMatchObject({
+      tournamentId: 'tournament-1',
+      status: 'published',
+    });
   });
 });

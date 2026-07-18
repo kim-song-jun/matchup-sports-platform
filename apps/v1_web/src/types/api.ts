@@ -1886,6 +1886,8 @@ export type V1TournamentDetail = {
   reviews: V1TournamentReview[];
   /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
   awards: V1TournamentAward[];
+  /** 대회 상세 진입 시 노출할 활성 팝업(published + 노출 기간 내) 1건. 없으면 null. */
+  popup: V1TournamentDetailPopup | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -2382,6 +2384,50 @@ export type V1CreateTournamentSponsorPayload = {
 };
 
 export type V1UpdateTournamentSponsorPayload = Partial<V1CreateTournamentSponsorPayload>;
+
+/** 대회 상세 공개 응답에 포함되는 활성 팝업 1건(published + 노출 기간 내) */
+export type V1TournamentDetailPopup = {
+  popupId: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+};
+
+export type V1AdminTournamentPopup = {
+  id: string;
+  tournamentId: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  status: V1TournamentPopupStatus;
+  displayStartAt: string | null;
+  displayEndAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** V1TournamentPopup 상태 — 기존 V1AdminPopupStatus(홈 팝업)와 동일 값, 별도 타입으로 유지 */
+export type V1TournamentPopupStatus = 'draft' | 'published' | 'archived';
+
+export type V1CreateTournamentPopupPayload = {
+  title: string;
+  body: string;
+  imageUrl?: string;
+  status: V1TournamentPopupStatus;
+  displayStartAt?: string | null;
+  displayEndAt?: string | null;
+};
+
+export type V1UpdateTournamentPopupPayload = V1CreateTournamentPopupPayload;
+
+export type V1AdminTournamentPopupListResult = {
+  items: V1AdminTournamentPopup[];
+};
+
+export type V1DeleteTournamentPopupResult = {
+  popupId: string;
+  deleted: boolean;
+};
 
 export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
 

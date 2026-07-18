@@ -32,6 +32,18 @@ function getGenderCategoryLabel(category: V1TournamentListItem['genderCategory']
   return '성별 구분 없음';
 }
 
+function renderTitleWithBoundStatusPhrases(title: string) {
+  return title.split(/((?:경기|모집)\s+중)/g).map((part, index) =>
+    /^(?:경기|모집)\s+중$/.test(part) ? (
+      <span key={`${part}-${index}`} style={{ whiteSpace: 'nowrap' }}>
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
   const pendingPaymentCount = getPendingPaymentCount(item);
   const max = Math.max(item.teamCount, 1);
@@ -132,7 +144,7 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
                   wordBreak: 'keep-all',
                 }}
               >
-                {item.title}
+                {renderTitleWithBoundStatusPhrases(item.title)}
               </div>
               <span className={`tm-badge ${status.badgeClass}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
                 {status.label}

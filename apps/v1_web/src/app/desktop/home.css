@@ -411,13 +411,6 @@
     min-width: 0;
   }
 
-  .tm-home-featured-carousel .tm-featured-cta {
-    margin-top: auto;
-  }
-
-  .tm-home-featured-carousel .tm-featured-content-with-cta {
-    row-gap: 12px;
-  }
 }
 
 /* ─── Wide (≥1440): expand sidebar slightly ───────────────────────────────── */

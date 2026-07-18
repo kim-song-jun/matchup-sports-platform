@@ -1602,6 +1602,14 @@ button:disabled {
   flex-direction: column;
 }
 
+.tm-featured-content-with-cta {
+  row-gap: 12px;
+}
+
+.tm-featured-content-with-cta .tm-featured-cta {
+  margin-top: auto;
+}
+
 .tm-featured-cta {
   margin-top: 12px;
   width: 100%;

@@ -390,24 +390,29 @@ export class TeamsService {
 
     const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
     const status = query.status ?? 'active';
-    const memberships = await this.prisma.v1TeamMembership.findMany({
-      where: {
-        teamId: team.id,
-        status,
-        ...(query.role ? { role: query.role } : {}),
-      },
-      orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: {
-        user: {
-          select: {
-            phone: true,
-            profile: { select: { nickname: true, displayName: true, realName: true, profileImageUrl: true, birthDate: true, gender: true } },
+    const [memberships, ownerCount] = await Promise.all([
+      this.prisma.v1TeamMembership.findMany({
+        where: {
+          teamId: team.id,
+          status,
+          ...(query.role ? { role: query.role } : {}),
+        },
+        orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+        take: limit + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: {
+          user: {
+            select: {
+              phone: true,
+              profile: { select: { nickname: true, displayName: true, realName: true, profileImageUrl: true, birthDate: true, gender: true } },
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.v1TeamMembership.count({
+        where: { teamId: team.id, role: 'owner', status: 'active' },
+      }),
+    ]);
 
     const pageItems = memberships.slice(0, limit);
     const hasNext = memberships.length > limit;
@@ -441,7 +446,7 @@ export class TeamsService {
         };
       }),
       summary: {
-        ownerCount: 1,
+        ownerCount,
         managerCount: team.managerCount,
         memberCount: team.memberCount,
       },

@@ -389,6 +389,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
                 ? {
                     pending: leaveTeam.isPending,
                     error: leaveError,
+                    activeOwnerCount: members.data?.summary.ownerCount,
                     onSelect: () =>
                       confirmAction(
                         confirm,
@@ -741,7 +742,7 @@ function toMemberModel(
     demote: () => void;
     remove: () => void;
     /** 본인 행에만 설정 — 나머지 멤버 행은 undefined */
-    selfLeave?: { pending: boolean; error?: string | null; onSelect: () => void };
+    selfLeave?: { pending: boolean; error?: string | null; activeOwnerCount: number | undefined; onSelect: () => void };
   },
 ): TeamMembersViewModel['members'][number] {
   const itemActions: TeamMembersViewModel['members'][number]['actions'] = [];
@@ -755,6 +756,7 @@ function toMemberModel(
   if (actions.canManageMembers && member.canRemove && member.role !== 'owner') {
     itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
   }
+  const ownerCanLeave = member.role !== 'owner' || (actions.selfLeave?.activeOwnerCount ?? 0) > 1;
 
   return {
     name: member.displayName,
@@ -766,8 +768,8 @@ function toMemberModel(
     actionPending: actions.actionPending,
     selfLeave: actions.selfLeave
       ? {
-          disabled: member.role === 'owner',
-          disabledReason: member.role === 'owner' ? '소유권을 먼저 이전해주세요' : undefined,
+          disabled: !ownerCanLeave,
+          disabledReason: ownerCanLeave ? undefined : '마지막 소유자는 소유권을 먼저 이전해주세요',
           pending: actions.selfLeave.pending,
           error: actions.selfLeave.error,
           onSelect: actions.selfLeave.onSelect,

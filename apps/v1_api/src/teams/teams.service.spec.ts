@@ -145,7 +145,7 @@ describe('TeamsService', () => {
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         updateMany: jest.fn(),
-        count: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
       },
       v1TeamJoinApplication: {
         findFirst: jest.fn(),
@@ -489,6 +489,44 @@ describe('TeamsService', () => {
         phone: null,
         birthDate: null,
         gender: null,
+      });
+    });
+
+    it('members reports all active owners independently of roster filters and pagination', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ membersVisible: true }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: { id: owner.id, profile: null },
+      });
+      prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
+        {
+          ...membershipRow({ id: 'removed-manager', role: 'manager', status: 'removed', userId: manager.id }),
+          user: { phone: null, profile: null },
+        },
+        {
+          ...membershipRow({ id: 'next-removed-manager', role: 'manager', status: 'removed', userId: 'next-manager' }),
+          user: { phone: null, profile: null },
+        },
+      ]);
+      prisma.v1TeamMembership.count.mockResolvedValueOnce(2);
+
+      const result = await service.members(null, 'team-1', {
+        cursor: 'previous-membership',
+        limit: 1,
+        role: 'manager',
+        status: 'removed',
+      });
+
+      expect(result.summary.ownerCount).toBe(2);
+      expect(result.items).toHaveLength(1);
+      expect(result.pageInfo).toEqual({ nextCursor: 'removed-manager', hasNext: true });
+      expect(prisma.v1TeamMembership.count).toHaveBeenCalledWith({
+        where: { teamId: 'team-1', role: 'owner', status: 'active' },
       });
     });
 

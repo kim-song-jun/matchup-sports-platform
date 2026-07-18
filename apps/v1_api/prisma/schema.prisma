@@ -570,6 +570,7 @@ model V1Popup {
 
   @@index([audience, status, displayStartAt, displayEndAt, publishedAt], map: "v1_popups_active_window_idx")
   @@index([createdAt])
+  @@index([targetScreens], type: Gin, map: "v1_popups_target_screens_idx")
   @@map("v1_popups")
 }
 

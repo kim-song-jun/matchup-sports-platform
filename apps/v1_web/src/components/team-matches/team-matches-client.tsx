@@ -20,6 +20,7 @@ import {
   useV1TeamMatches,
   useV1WithdrawTeamMatchApplication,
 } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
@@ -277,7 +278,11 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
           eligible: selectedEligibility?.eligible,
           isGuest,
           hasNoTeam,
-          apply: (teamId) => applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }),
+          apply: (teamId) =>
+            applyTeamMatch.mutateAsync({ applicantTeamId: teamId, message: null }).then((result) => {
+              trackEvent('team_match_apply_complete', { teamMatchId });
+              return result;
+            }),
           withdraw: () => withdrawTeamMatch.mutateAsync({ reason: 'applicant_team_withdrawn_from_v1_web' }),
           reasonCode: selectedEligibility?.reasonCode,
           redirectTo: (href) => router.push(href),

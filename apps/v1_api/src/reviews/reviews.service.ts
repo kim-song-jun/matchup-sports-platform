@@ -17,6 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
+import { isReviewRevealed } from './review-visibility';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 
 const REVIEW_TAGS = {
@@ -88,6 +89,59 @@ export class ReviewsService {
       items: pageItems.map((review) => this.toReviewDetail(review)),
       pageInfo: { nextCursor: reviews.length > limit ? pageItems.at(-1)?.id ?? null : null, hasNext: reviews.length > limit },
     };
+  }
+
+  async receivedSummary(user: V1AuthUser, query: { targetType: 'user' | 'team'; period?: string }) {
+    const now = new Date();
+    const targetFilter = query.targetType === 'team'
+      ? { targetTeamId: { in: await this.managedTeamIds(user.id) }, targetType: 'team' as const }
+      : { targetUserId: user.id, targetType: 'user' as const };
+
+    const candidates = await this.prisma.v1PostEventReview.findMany({
+      where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
+    });
+
+    const reverseReviews = query.targetType === 'team'
+      ? await this.reverseTeamReviews(candidates)
+      : await this.reverseUserReviews(user.id, candidates);
+
+    const revealed = candidates.filter((review) =>
+      isReviewRevealed(
+        { sourceId: review.sourceId, reviewerUserId: review.reviewerUserId, targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId, submittedAt: review.submittedAt },
+        reverseReviews,
+        now,
+      ),
+    );
+
+    const availableMonths = [...new Set(revealed.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
+    const filtered = query.period
+      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
+      : revealed;
+
+    return { bySport: summarizeBySport(filtered), availableMonths };
+  }
+
+  private async reverseUserReviews(targetUserId: string, candidates: Array<{ sourceId: string }>) {
+    if (!candidates.length) return [];
+    const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+    const reverse = await this.prisma.v1PostEventReview.findMany({
+      where: { reviewerUserId: targetUserId, sourceId: { in: sourceIds }, status: 'submitted' },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+    });
+    return reverse;
+  }
+
+  private async reverseTeamReviews(candidates: Array<{ sourceId: string; targetTeamId: string | null }>) {
+    if (!candidates.length) return [];
+    const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+    const teamIds = [...new Set(candidates.map((review) => review.targetTeamId).filter((id): id is string => Boolean(id)))];
+    if (!teamIds.length) return [];
+    const reverse = await this.prisma.v1PostEventReview.findMany({
+      where: { reviewerTeamId: { in: teamIds }, sourceId: { in: sourceIds }, status: 'submitted' },
+      select: { sourceId: true, reviewerTeamId: true, targetTeamId: true },
+    });
+    return reverse.map((review) => ({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId }));
   }
 
   async source(user: V1AuthUser, params: ReviewSourceParamsDto) {
@@ -734,4 +788,34 @@ function notFound(code: string, message: string) {
 
 function conflict(code: string, message: string) {
   return new ConflictException({ code, message });
+}
+
+function summarizeBySport(
+  reviews: Array<{ sportId: string | null; rating: number; tags: Array<{ tagCode: string; labelSnapshot: string }> }>,
+) {
+  type SportBucket = { ratings: number[]; tagCounts: Map<string, { label: string; count: number }> };
+  const bySport = new Map<string, SportBucket>();
+  for (const review of reviews) {
+    if (!review.sportId) continue;
+    const bucket: SportBucket = bySport.get(review.sportId) ?? { ratings: [], tagCounts: new Map() };
+    bucket.ratings.push(review.rating);
+    for (const tag of review.tags) {
+      const current = bucket.tagCounts.get(tag.tagCode) ?? { label: tag.labelSnapshot, count: 0 };
+      current.count += 1;
+      bucket.tagCounts.set(tag.tagCode, current);
+    }
+    bySport.set(review.sportId, bucket);
+  }
+
+  return [...bySport.entries()].map(([sportId, bucket]) => ({
+    sportId,
+    ratingAvg: bucket.ratings.length ? Number((bucket.ratings.reduce((sum, value) => sum + value, 0) / bucket.ratings.length).toFixed(2)) : null,
+    ratingCount: bucket.ratings.length,
+    tagRates: [...bucket.tagCounts.entries()].map(([tagCode, { label, count }]) => ({
+      tagCode,
+      label,
+      rate: Number((count / bucket.ratings.length).toFixed(2)),
+      count,
+    })),
+  }));
 }

@@ -229,4 +229,51 @@ describe('ReviewsService', () => {
       }),
     );
   });
+
+  describe('receivedSummary', () => {
+    it('sportId가 없는(레거시) 리뷰는 집계에서 제외하고, 공개되지 않은 리뷰도 제외한다', async () => {
+      const now = new Date('2026-08-01T00:00:00Z');
+      jest.useFakeTimers().setSystemTime(now);
+
+      try {
+        const findManyMock = jest
+          .fn()
+          .mockResolvedValueOnce([
+            // 대상 x가 받은 리뷰들
+            { id: 'r1', sourceId: 'm1', reviewerUserId: 'a', targetUserId: 'x', rating: 5, sportId: 'futsal', submittedAt: new Date('2026-07-30T00:00:00Z'), tags: [{ tagCode: 'manner', labelSnapshot: '매너가 좋아요' }] },
+            { id: 'r2', sourceId: 'm2', reviewerUserId: 'b', targetUserId: 'x', rating: 3, sportId: null, submittedAt: new Date('2026-07-01T00:00:00Z'), tags: [] }, // 레거시(sportId null) — 집계 제외
+            { id: 'r3', sourceId: 'm3', reviewerUserId: 'c', targetUserId: 'x', rating: 4, sportId: 'futsal', submittedAt: new Date('2026-07-31T23:00:00Z'), tags: [] }, // 71시간 미만, 상대도 미제출 — 비공개
+          ])
+          .mockResolvedValueOnce([
+            // x가 쓴 리뷰들(reverse pair 확인용) — r1의 짝(a→x)에 대응하는 x→a가 존재해야 즉시 공개
+            { sourceId: 'm1', reviewerUserId: 'x', targetUserId: 'a' },
+          ]);
+
+        const prisma = {
+          v1PostEventReview: {
+            findMany: findManyMock,
+          },
+        };
+        const tournamentFixtureReviews = {
+          pending: jest.fn(),
+          source: jest.fn(),
+          submit: jest.fn(),
+          sourceSummaries: jest.fn(),
+        };
+        const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+        const result = await service.receivedSummary(
+          { id: 'x', email: 'x@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' },
+          { targetType: 'user' },
+        );
+
+        expect(result.bySport).toEqual([
+          { sportId: 'futsal', ratingAvg: 5, ratingCount: 1, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 1, count: 1 }] },
+        ]);
+        expect(findManyMock).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });

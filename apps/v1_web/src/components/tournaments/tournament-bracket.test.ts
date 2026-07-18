@@ -81,6 +81,21 @@ describe('groupFixturesByRound', () => {
     expect(rounds.map((r) => r.key)).toEqual(['semi', 'final', 'third_place']);
   });
 
+  it('keeps knockout stage order when public fixtures have no groupId', () => {
+    const rounds = groupFixturesByRound(
+      [
+        makeFixture({ id: 'final', fixtureNumber: 1, groupId: null, round: 'final' }),
+        makeFixture({ id: 'semi-2', fixtureNumber: 2, groupId: null, round: 'semi' }),
+        makeFixture({ id: 'third', fixtureNumber: 1, groupId: null, round: 'third_place' }),
+        makeFixture({ id: 'semi-1', fixtureNumber: 1, groupId: null, round: 'semi' }),
+      ],
+      [],
+    );
+
+    expect(rounds.map((round) => round.key)).toEqual(['semi', 'final', 'third_place']);
+    expect(rounds[0].fixtures.map((fixture) => fixture.id)).toEqual(['semi-1', 'semi-2']);
+  });
+
   it('sorts fixtures within a round by fixtureNumber ascending', () => {
     const groupSemi = makeGroup({ id: 'g-semi', phase: 'semi' });
 

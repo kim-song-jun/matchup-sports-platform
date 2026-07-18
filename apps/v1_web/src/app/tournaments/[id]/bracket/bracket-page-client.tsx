@@ -222,9 +222,18 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
-      <h1 className="sr-only">{tournament.title} 순위와 대진표</h1>
+      <header className="tm-bracket-page-intro">
+        <div>
+          <span className="tm-bracket-page-eyebrow">순위와 대진표</span>
+          <h1>{tournament.title}</h1>
+          <p>조별 순위와 결선 진행 상황을 단계별로 확인하세요.</p>
+        </div>
+        <span className="tm-bracket-page-format">
+          {format === 'league' ? '리그' : format === 'knockout' ? '토너먼트' : '조별리그 + 토너먼트'}
+        </span>
+      </header>
       {/* 진행 단계 */}
-      <div className="tm-tourn-sub-header">
+      <div className="tm-tourn-sub-header tm-bracket-page-stepper">
         {stages.length > 0 && (
           <div style={{ borderBottom: '1px solid var(--grey100)' }}>
             <TournamentProgressStepper stages={stages} />
@@ -233,7 +242,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
       </div>
 
       {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑) */}
-      <div className={`tm-tourn-sub-grid ${format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col'}`}>
+      <div className={`tm-tourn-sub-grid tm-bracket-page-grid ${format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col'}`}>
         {/* 좌: 순위표 */}
         <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
           {format === 'league' && (

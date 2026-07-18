@@ -56,11 +56,11 @@ export function groupFixturesByRound(
         sortIndex = PHASE_ORDER[group.phase] ?? 99;
       } else {
         key = fixture.round;
-        sortIndex = 100;
+        sortIndex = PHASE_ORDER[fixture.round] ?? 100;
       }
     } else {
       key = fixture.round;
-      sortIndex = 100;
+      sortIndex = PHASE_ORDER[fixture.round] ?? 100;
     }
 
     const existing = roundMap.get(key);
@@ -589,6 +589,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
 
   return (
     <div>
+      <p className="tm-bk2-scroll-hint">단계별 대진은 옆으로 밀어 확인할 수 있어요.</p>
       {/* ── 수평 스크롤 브래킷 트리 (드래그 가능) ── */}
       <div style={{ position: 'relative' }}>
         <div
@@ -654,12 +655,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
         </div>
 
         {/* 오른쪽 페이드 — 더 내용 있음 힌트 */}
-        <div style={{
-          position: 'absolute', top: 0, right: 0, bottom: 8, width: 32,
-          background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.92))',
-          pointerEvents: 'none',
-          borderRadius: '0 8px 8px 0',
-        }} aria-hidden="true" />
+        <div className="tm-bk2-scroll-fade" aria-hidden="true" />
       </div>
 
       {/* ── 3·4위전 ── */}
@@ -670,7 +666,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
             <span style={{ fontSize: 11, color: 'var(--text-caption)' }}>4강에서 진 두 팀이 3위를 가려요</span>
           </div>
           {thirdPlace.fixtures.map((f) => (
-            <div key={f.id} style={{ maxWidth: 240 }}>
+            <div key={f.id} className="tm-bk2-third-match">
               <MatchCard fixture={f} />
             </div>
           ))}

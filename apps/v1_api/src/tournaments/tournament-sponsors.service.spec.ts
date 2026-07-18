@@ -23,6 +23,7 @@ const ownerAdminRecord = {
   userId: 'owner-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 const supportAdminRecord = {
@@ -30,6 +31,7 @@ const supportAdminRecord = {
   userId: 'support-user-id',
   adminRole: 'support' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function sponsorRow(overrides: Record<string, unknown> = {}) {

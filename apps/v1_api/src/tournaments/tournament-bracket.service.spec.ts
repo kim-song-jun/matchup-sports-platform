@@ -50,12 +50,14 @@ const ownerAdmin = {
   userId: 'owner-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 const supportAdmin = {
   id: 'support-admin-id',
   userId: 'support-user-id',
   adminRole: 'support' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function tournamentRow(overrides: Record<string, unknown> = {}) {

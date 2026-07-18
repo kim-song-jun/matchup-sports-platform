@@ -19,8 +19,8 @@ const opsAuth = { id: 'ops-user-id', email: 'ops@teameet.v1', accountStatus: 'ac
 const supportAuth = { id: 'support-user-id', email: 'support@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const nonAdminAuth = { id: 'plain-user-id', email: 'user@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
-const opsAdminRecord = { id: 'ops-admin-id', userId: 'ops-user-id', adminRole: 'ops' as const, status: 'active' as const };
-const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', adminRole: 'support' as const, status: 'active' as const };
+const opsAdminRecord = { id: 'ops-admin-id', userId: 'ops-user-id', adminRole: 'ops' as const, status: 'active' as const, user: { accountStatus: 'active' as const } };
+const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', adminRole: 'support' as const, status: 'active' as const, user: { accountStatus: 'active' as const } };
 
 function registrationRow(overrides: Record<string, unknown> = {}) {
   return {

@@ -50,12 +50,14 @@ const opsAdminRecord = {
   userId: 'admin-user-id',
   adminRole: 'ops' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 const supportAdminRecord = {
   id: 'support-admin-id',
   userId: 'support-user-id',
   adminRole: 'support' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function registrationRow(overrides: Record<string, unknown> = {}) {

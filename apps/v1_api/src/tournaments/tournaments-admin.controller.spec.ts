@@ -35,6 +35,7 @@ const ownerAdminRecord = {
   userId: 'owner-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function tournamentSummary(overrides: Record<string, unknown> = {}) {

@@ -48,13 +48,11 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
         const badgeText = featured.promoHomeBadgeText?.trim() || '추천 대회';
         const imageUrl = featured.promoHomeImageUrl?.trim();
         const facts = [
-          featured.promoHomeDateText?.trim(),
-          featured.promoHomeTeamsText?.trim(),
-          featured.promoHomeLocationText?.trim(),
-          featured.promoHomePrizeText?.trim(),
-        ]
-          .filter(Boolean)
-          .join(' · ');
+          { kind: 'date', value: featured.promoHomeDateText?.trim() },
+          { kind: 'teams', value: featured.promoHomeTeamsText?.trim() },
+          { kind: 'location', value: featured.promoHomeLocationText?.trim() },
+          { kind: 'prize', value: featured.promoHomePrizeText?.trim() },
+        ].filter((fact): fact is { kind: string; value: string } => Boolean(fact.value));
 
         return (
           <Link
@@ -92,24 +90,27 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
                   </div>
                 </div>
               </div>
-              <div className="tm-featured-content">
-                <div className="tm-text-body-lg">{cardBody}</div>
-                {facts ? (
-                  <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                    {facts}
-                  </div>
-                ) : null}
-                {/*
-                 * FeaturedMatchCard와 짝을 이루는 시각적 CTA — 카드 전체가 이미 <Link>이므로
-                 * 순수 시각 신호만 제공하는 비-interactive 요소(span)로 렌더링한다.
-                 * <a> 안에 <button>(interactive-in-interactive) 중첩은 HTML5 스펙 위반이라
-                 * span으로 대체했다(Copilot 리뷰 지적, PR #51).
-                 * (매치 히어로 카드의 tm-btn tm-btn-primary tm-btn-sm 패턴과 동일)
-                 * .tm-featured-cta는 고정 marginTop:12px — 카드 하단 경계 정합은
-                 * .tm-featured-card{height:100%}가 담당하므로 버튼은 텍스트 바로 아래
-                 * 일정한 간격으로 붙인다(marginTop:auto였을 때 짧은 텍스트 카드에서
-                 * 버튼이 과하게 아래로 밀리던 문제 해결).
-                 */}
+              <div className="tm-featured-content tm-featured-content-with-cta">
+                <div className="tm-featured-copy">
+                  <div className="tm-text-body-lg">{cardBody}</div>
+                  {facts.length > 0 ? (
+                    <div
+                      className="tm-text-caption tm-featured-meta"
+                      style={{ marginTop: 6, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
+                    >
+                      {facts.map((fact) => (
+                        <span
+                          key={`${featured.id}-${fact.kind}`}
+                          style={fact.kind === 'date'
+                            ? { color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }
+                            : undefined}
+                        >
+                          {fact.value}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 <span
                   className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
                   aria-hidden="true"

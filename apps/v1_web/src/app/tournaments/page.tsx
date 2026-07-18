@@ -8,7 +8,6 @@ import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primiti
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
 import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { getSportAccent } from '@/lib/v1-sport-accent';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
 
@@ -47,9 +46,9 @@ function TournamentsListContent() {
 
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
   const { data: sportsData } = useV1MasterSports();
-  const filterSports: Array<{ id: string; code: string; label: string }> = (sportsData ?? [])
+  const filterSports: Array<{ id: string; label: string }> = (sportsData ?? [])
     .filter((s) => s.id)
-    .map((s) => ({ id: s.id, code: s.code ?? s.id, label: s.name }));
+    .map((s) => ({ id: s.id, label: s.name }));
 
   const { data, isLoading, isError, error, isFetching, refetch } = useV1Tournaments({
     cursor,
@@ -87,7 +86,7 @@ function TournamentsListContent() {
     : null;
 
   return (
-    <div className="tm-tournament-list" style={{ padding: '0 0 48px' }}>
+    <div className="tm-tournament-list">
       <h1 className="sr-only">스포츠 대회</h1>
 
       {/* ── 홍보 카드뉴스 캐러셀 — 관리자가 리스트 홍보를 켠 open 대회를 우선순위 순으로 노출 ── */}
@@ -99,7 +98,7 @@ function TournamentsListContent() {
       />
 
       {/* ── 이벤트 허브 배너 — 캠페인 발견 진입점 ── */}
-      <div style={{ padding: '12px 20px 0' }}>
+      <div className="tm-tournament-event-hub-entry">
         <Link
           href="/events"
           style={{
@@ -125,13 +124,10 @@ function TournamentsListContent() {
       </div>
 
       {/* ── Tournament list (리스트 우선 — 대회 탭의 핵심) ── */}
-      <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section" style={{ marginTop: 28 }}>
-        <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle title="대회 목록" />
-        </div>
+      <section id="tournament-list" aria-labelledby="tournament-list-heading" className="tm-tournament-list-section">
+        <SectionTitle title="대회 목록" />
         <div id="tournament-list-heading" className="sr-only">진행 중인 대회 목록</div>
 
-        {/* D3: 종목 필터 칩 — 컬러+텍스트 병행으로 a11y 준수. 스타일은 .tm-sport-chip (globals.css) */}
         <div role="group" aria-label="종목 필터" className="tm-sport-chip-row">
           {/* 전체 칩 */}
           <button
@@ -139,13 +135,12 @@ function TournamentsListContent() {
             onClick={() => handleSportFilter(null)}
             aria-pressed={activeSportId === null}
             aria-label="전체 종목"
-            className={`tm-sport-chip${activeSportId === null ? ' is-active' : ''}`}
+            className={`tm-chip${activeSportId === null ? ' tm-chip-active' : ''}`}
           >
             전체
           </button>
 
-          {filterSports.map(({ id, code, label }) => {
-            const accent = getSportAccent(code);
+          {filterSports.map(({ id, label }) => {
             const isActive = activeSportId === id;
             return (
               <button
@@ -154,14 +149,8 @@ function TournamentsListContent() {
                 onClick={() => handleSportFilter(id)}
                 aria-pressed={isActive}
                 aria-label={`${label} 종목만 보기`}
-                className={`tm-sport-chip${isActive ? ' is-active' : ''}`}
+                className={`tm-chip${isActive ? ' tm-chip-active' : ''}`}
               >
-                {/* 종목 색깔 점 — 종목별 실제 액센트 컬러로 컬러+텍스트 병행 */}
-                <span
-                  aria-hidden="true"
-                  className="tm-sport-chip-dot"
-                  style={{ background: isActive ? 'var(--static-white)' : accent.dot }}
-                />
                 {label}
               </button>
             );
@@ -189,7 +178,6 @@ function TournamentsListContent() {
               role="list"
               aria-label="대회 목록"
               className="tm-tournament-list-grid"
-              style={{ marginTop: 4 }}
             >
               {displayItems.map((item) => (
                 <TournamentCard key={item.id} item={item} />

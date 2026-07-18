@@ -406,9 +406,17 @@
   }
 
   .tm-home-featured-carousel > * {
-    /* 캐러셀 고정폭(min(88%, 400px)) 해제 — 그리드 셀 채움 */
-    flex: 1 1 0;
+    flex: 0 1 calc((100% - 24px) / 2);
+    max-width: calc((100% - 24px) / 2);
     min-width: 0;
+  }
+
+  .tm-home-featured-carousel .tm-featured-cta {
+    margin-top: auto;
+  }
+
+  .tm-home-featured-carousel .tm-featured-content-with-cta {
+    row-gap: 12px;
   }
 }
 

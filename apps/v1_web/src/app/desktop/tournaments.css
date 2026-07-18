@@ -1,6 +1,4 @@
 /* Desktop overrides for tournaments — owned by the tournaments wave. */
-/* Mobile (<1024) is byte-identical — only @media (min-width:1024px|1440px) blocks here. */
-
 /* ─── List /tournaments ───────────────────────────────────────────────────────
  * Kill the stretched single-column. Convert .tm-tournament-card-stack to a
  * 2-up card grid at ≥1024 and 3-up at ≥1440.
@@ -445,10 +443,34 @@
   padding: 0 20px;
 }
 
+.tm-tournament-list {
+  padding-bottom: 48px;
+}
+
+.tm-tournament-event-hub-entry {
+  padding: 12px 20px 0;
+}
+
 /* 대회 목록 섹션(필터 칩 + 카드 그리드) — promo-section과 동일한 반응형 padding으로
    맞춰 데스크탑에서 두 섹션의 좌우 여백이 어긋나지 않도록 함. */
 .tm-tournament-list-section {
+  margin-top: 24px;
   padding: 0 20px;
+}
+
+.tm-tournament-list-section > .tm-section-title {
+  margin: 0;
+  padding: 0 0 8px;
+}
+
+.tm-tournament-list-section > .tm-sport-chip-row {
+  flex-wrap: nowrap;
+  margin: 0 0 16px;
+  padding: 2px 0;
+}
+
+.tm-tournament-list-section > .tm-tournament-list-grid {
+  margin-top: 4px;
 }
 
 /* 추천 대회 배너 — 위 두 섹션과 동일한 반응형 좌우 여백(모바일 20px / 데스크탑 0) */
@@ -764,8 +786,17 @@
     padding: 0;
   }
 
+  .tm-tournament-event-hub-entry {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
   .tm-tournament-list-section {
     padding: 0;
+  }
+
+  .tm-tournament-list-section > .tm-sport-chip-row {
+    flex-wrap: wrap;
   }
 
   .tm-tournament-featured-banner {

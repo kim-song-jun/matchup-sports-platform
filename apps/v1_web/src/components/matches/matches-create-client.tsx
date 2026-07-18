@@ -12,6 +12,7 @@ import {
   useV1UpdateMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
@@ -122,6 +123,9 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
           window.localStorage.setItem('teameet:v1:last-match-id', result.matchId);
           window.localStorage.removeItem(storageKey);
           window.localStorage.removeItem(selectionKey);
+          trackEvent('match_create_complete', {
+            sportType: sports.data?.find((sport) => sport.id === selectedSportId)?.name ?? '',
+          });
           router.push(result.detailRoute || `/matches/${result.matchId}`);
         },
         onError: (err) => {

@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -35,6 +36,8 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
@@ -191,12 +194,21 @@ export class ChatService {
       sentAt: message.sentAt,
       senderUserId: user.id,
     };
+    // Fire-and-forget, matching NotificationsService's emitNotificationFireAndForget:
+    // the message + notifications already committed above, so a realtime-emit failure
+    // must never surface as an error response for a request that already succeeded.
     for (const recipientUserId of recipientUserIds) {
-      this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', chatMessagePayload);
-      this.realtimeGateway.emitToUser(recipientUserId, 'notification:new', {
-        targetType: 'chat',
-        targetId: room.id,
-      });
+      try {
+        this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', chatMessagePayload);
+        this.realtimeGateway.emitToUser(recipientUserId, 'notification:new', {
+          targetType: 'chat',
+          targetId: room.id,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `실시간 채팅 알림 전송 실패 [recipientUserId=${recipientUserId} roomId=${room.id}]: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     return chatMessagePayload;

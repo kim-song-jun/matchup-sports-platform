@@ -75,6 +75,10 @@ const nextConfig: NextConfig = {
         source: '/uploads/:path*',
         destination: `${internalApiOrigin}/uploads/:path*`,
       },
+      {
+        source: '/socket.io/:path*',
+        destination: `${internalApiOrigin}/socket.io/:path*`,
+      },
     ];
   },
 };

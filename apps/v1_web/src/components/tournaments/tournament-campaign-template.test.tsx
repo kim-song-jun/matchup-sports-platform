@@ -119,6 +119,14 @@ describe('TournamentCampaignTemplate', () => {
     );
   });
 
+  it('keeps campaign content visible by default and limits motion to progressive enhancement', () => {
+    expect(campaignStyles).not.toContain('content-visibility');
+    expect(campaignStyles).toContain('@supports (animation-timeline: view())');
+    expect(campaignStyles).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.heroImage,[\s\S]*animation:\s*none;[\s\S]*transform:\s*none;/,
+    );
+  });
+
   it('pins the actions bar to the bottom of the viewport with an opaque background', () => {
     expect(campaignStyles).toMatch(
       /\.actions\s*{[^}]*position:\s*sticky;[^}]*bottom:\s*0;[^}]*background:\s*var\(--bg\);[^}]*}/,
@@ -190,6 +198,29 @@ describe('TournamentCampaignTemplate', () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it('renders text-only highlights without repeating the campaign image fallback', () => {
+    const source = campaign('open');
+    const textOnlyHighlights = [
+      { title: '빠른 경기 진행', body: '대기 시간을 줄인 일정으로 운영해요.' },
+      { title: '개인 시상', body: '팀 성적과 함께 개인 활약도 기록해요.' },
+      { title: '결과 아카이브', body: '경기 종료 후 결과 페이지에서 다시 확인해요.' },
+    ];
+
+    render(
+      <TournamentCampaignTemplate
+        campaign={{
+          ...source,
+          content: { ...source.content, highlights: textOnlyHighlights },
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole('img')).toHaveLength(1);
+    expect(screen.getByText('빠른 경기 진행')).toBeInTheDocument();
+    expect(screen.getByText('개인 시상')).toBeInTheDocument();
+    expect(screen.getByText('결과 아카이브')).toBeInTheDocument();
   });
 
   it.each([

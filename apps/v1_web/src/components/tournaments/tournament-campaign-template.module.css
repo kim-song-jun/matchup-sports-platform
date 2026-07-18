@@ -566,7 +566,7 @@
   }
 
   .actionsIntro,
-  .actionsHasPrimary .actionSecondary {
+  .actions:has(.actionLinks > :global(.tm-btn-primary)) .actionSecondary {
     display: none;
   }
 

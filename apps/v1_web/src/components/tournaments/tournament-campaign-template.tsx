@@ -194,10 +194,7 @@ export function TournamentCampaignTemplate({
           </section>
         ) : null}
 
-        <section
-          className={`${styles.actions} ${actions.primary ? styles.actionsHasPrimary : ''}`}
-          aria-label="대회 다음 단계"
-        >
+        <section className={styles.actions} aria-label="대회 다음 단계">
           <div className={styles.actionsIntro}>
             <span className={styles.sectionKicker}>다음 단계</span>
             <h2 className={styles.actionsTitle}>

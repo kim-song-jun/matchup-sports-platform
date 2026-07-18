@@ -10,6 +10,7 @@ export type ApiErrorBody = {
   code: string;
   message: unknown;
   details?: unknown;
+  requestId?: string;
   timestamp: string;
 };
 

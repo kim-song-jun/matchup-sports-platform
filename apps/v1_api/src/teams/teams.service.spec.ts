@@ -117,7 +117,7 @@ describe('TeamsService', () => {
   let prisma: {
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
-    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; updateMany: jest.Mock };
+    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; updateMany: jest.Mock; count: jest.Mock };
     v1TeamJoinApplication: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1User: { findUnique: jest.Mock };
@@ -128,6 +128,7 @@ describe('TeamsService', () => {
     v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatMessage: { create: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
 
@@ -142,7 +143,9 @@ describe('TeamsService', () => {
         create: jest.fn(),
         upsert: jest.fn(),
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         updateMany: jest.fn(),
+        count: jest.fn(),
       },
       v1TeamJoinApplication: {
         findFirst: jest.fn(),
@@ -166,12 +169,14 @@ describe('TeamsService', () => {
       v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatMessage: { create: jest.fn() },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn(),
     };
 
     // Default: $transaction executes the callback with prisma itself as tx
     (prisma.$transaction as jest.Mock).mockImplementation(
       (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma),
     );
+    prisma.$queryRaw.mockResolvedValue(undefined);
     prisma.v1ChatRoom.upsert.mockResolvedValue({ id: 'room-1' });
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
     prisma.v1ChatRoomParticipant.updateMany.mockResolvedValue({ count: 1 });
@@ -685,6 +690,126 @@ describe('TeamsService', () => {
 
     await expect(
       service.removeMembership(manager, 'mem-1', {}),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // ─── leaveTeam: 본인 self-leave ────────────────────────────────────────────
+
+  it('leaveTeam: 마지막 active owner는 나갈 수 없다 → 409 LAST_OWNER_CANNOT_LEAVE', async () => {
+    const ownerMembership = membershipRow({ role: 'owner', userId: owner.id, status: 'active' });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [ownerMembership],
+    });
+    prisma.v1TeamMembership.count.mockResolvedValueOnce(0); // no other active owner
+
+    await expect(
+      service.leaveTeam(owner, 'team-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LAST_OWNER_CANNOT_LEAVE' }),
+    });
+    // R15-005: last-owner 체크는 $transaction 내부(row lock 하에서) 실행되어야 하며,
+    // 실패 시 트랜잭션이 롤백되어 membership 업데이트는 발생하지 않는다.
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.v1TeamMembership.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('leaveTeam: 다른 active owner가 있으면 owner도 나갈 수 있다', async () => {
+    const ownerMembership = membershipRow({ id: 'mem-owner', role: 'owner', userId: owner.id, status: 'active' });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [ownerMembership],
+    });
+    prisma.v1TeamMembership.count.mockResolvedValueOnce(1); // another active owner exists
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null); // no chat room
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.v1TeamMembership.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'mem-owner',
+      teamId: 'team-1',
+      status: 'left',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 1 });
+
+    const result = await service.leaveTeam(owner, 'team-1', {});
+
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+    expect(prisma.v1TeamMembership.updateMany).toHaveBeenCalledWith({
+      where: { id: 'mem-owner', teamId: 'team-1', status: 'active' },
+      data: { status: 'left', leftAt: expect.any(Date) },
+    });
+    expect(result).toMatchObject({ membershipId: 'mem-owner', status: 'left', memberCount: 4 });
+  });
+
+  it('leaveTeam: 일반 멤버는 나가면 status=left + memberCount decrement + 채팅 참가자 정리', async () => {
+    const memberMembership = membershipRow({
+      id: 'mem-member',
+      role: 'member',
+      userId: member.id,
+      status: 'active',
+    });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [memberMembership],
+    });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce({ id: 'room-1' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce({ id: 'participant-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.update.mockResolvedValueOnce({ id: 'participant-1' });
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.v1TeamMembership.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'mem-member',
+      teamId: 'team-1',
+      status: 'left',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 1 });
+
+    const result = await service.leaveTeam(member, 'team-1', {});
+
+    // owner-only 확인 경로(count/row lock)는 member에게는 호출되지 않는다
+    expect(prisma.v1TeamMembership.count).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(prisma.v1Team.update).toHaveBeenCalledWith({
+      where: { id: 'team-1' },
+      data: { memberCount: { decrement: 1 } },
+    });
+    expect(prisma.v1ChatRoomParticipant.update).toHaveBeenCalledWith({
+      where: { id: 'participant-1' },
+      data: { status: 'left', leftAt: expect.any(Date) },
+      select: { id: true },
+    });
+    expect(result).toMatchObject({ membershipId: 'mem-member', status: 'left', memberCount: 4 });
+  });
+
+  it('leaveTeam: membership이 트랜잭션 중 이미 처리되면 409 CONCURRENT_UPDATE', async () => {
+    const memberMembership = membershipRow({
+      id: 'mem-member',
+      role: 'member',
+      userId: member.id,
+      status: 'active',
+    });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [memberMembership],
+    });
+    // updateMany의 조건부 guard(where: status='active')가 0건을 매칭한 상황을 시뮬레이션
+    // (동시 요청이 먼저 이 membership을 'left'로 바꿔버린 경우)
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.leaveTeam(member, 'team-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CONCURRENT_UPDATE' }),
+    });
+    expect(prisma.v1Team.update).not.toHaveBeenCalled();
+  });
+
+  it('leaveTeam: 팀에 소속되지 않은 사용자는 403', async () => {
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [],
+    });
+
+    await expect(
+      service.leaveTeam(member, 'team-1', {}),
     ).rejects.toThrow(ForbiddenException);
   });
 

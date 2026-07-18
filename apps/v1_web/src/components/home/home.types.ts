@@ -35,6 +35,8 @@ export type HomePopup = {
   title: string;
   body: string;
   trailing: string;
+  linkUrl?: string | null;
+  linkLabel?: string | null;
 };
 
 export type HomeChatRoom = {

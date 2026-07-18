@@ -5,6 +5,7 @@ export const v1Keys = {
   masterSports: () => [...v1Keys.all, 'master', 'sports'] as const,
   masterRegions: () => [...v1Keys.all, 'master', 'regions'] as const,
   home: (filters?: Record<string, unknown>) => [...v1Keys.all, 'home', filters ?? {}] as const,
+  activePopup: (screen: string | null) => [...v1Keys.all, 'popups', 'active', screen] as const,
   recentSearches: () => [...v1Keys.all, 'search', 'recent'] as const,
   notices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'notices', filters ?? {}] as const,
   notice: (noticeId: string) => [...v1Keys.all, 'notices', noticeId] as const,

@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { PopupsService } from '../popups/popups.service';
 import { HomeQueryDto, HomeRecommendationsQueryDto } from './dto/home-query.dto';
 
 @Injectable()
 export class HomeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly popupsService: PopupsService,
+  ) {}
 
   async getHome(user: V1AuthUser | null, query: HomeQueryDto) {
     const [viewer, summary, recommendations, popup, notices, unreadCount, myTeamRoute] =
@@ -14,7 +18,7 @@ export class HomeService {
         this.getViewer(user),
         this.getSummary(user),
         this.getRecommendationItems({ ...query, limit: 5 }),
-        this.getActivePopup(),
+        this.popupsService.findActive('home'),
         this.getRecentNotices(),
         this.getUnreadCount(user),
         this.getMyTeamRoute(user),
@@ -167,31 +171,6 @@ export class HomeService {
       recommendationReason: input.userId ? '선호 정보 기반 추천' : '최근 모집 중인 매치',
       trustState: match.hostUser.reputationSummary?.trustState ?? 'none',
     }));
-  }
-
-  private async getActivePopup() {
-    const now = new Date();
-    const popup = await this.prisma.v1Popup.findFirst({
-      where: {
-        status: 'published',
-        audience: 'public',
-        AND: [
-          { OR: [{ displayStartAt: null }, { displayStartAt: { lte: now } }] },
-          { OR: [{ displayEndAt: null }, { displayEndAt: { gt: now } }] },
-        ],
-      },
-      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-      select: { id: true, title: true, body: true, publishedAt: true },
-    });
-
-    return popup
-      ? {
-          popupId: popup.id,
-          title: popup.title,
-          body: popup.body,
-          publishedAt: popup.publishedAt,
-        }
-      : null;
   }
 
   private async getRecentNotices() {

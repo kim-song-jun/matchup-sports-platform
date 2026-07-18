@@ -2,16 +2,20 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminPopupsPage from './page';
+import type { V1AdminPopupRow } from '@/types/api';
 
 const createMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
 
-const popup = {
+const popup: V1AdminPopupRow = {
   popupId: 'popup-1',
   audience: 'public' as const,
   title: '서비스 점검 안내',
   body: '7월 15일 새벽에 서비스 점검을 진행합니다.',
+  targetScreens: ['home', 'matches'],
+  linkUrl: '/matches',
+  linkLabel: '매치 보기',
   status: 'published' as const,
   publishedAt: '2026-07-13T00:00:00.000Z',
   archivedAt: null,
@@ -81,8 +85,14 @@ describe('AdminPopupsPage', () => {
     expect(within(status).getByRole('option', { name: '초안' })).toBeInTheDocument();
     expect(screen.getByLabelText('노출 시작')).not.toHaveValue('');
     expect(screen.getByLabelText('노출 종료')).not.toHaveValue('');
+    expect(screen.getByRole('checkbox', { name: /홈/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /개인 매치/ })).toBeChecked();
+    expect(screen.getByLabelText(/이동 링크/)).toHaveValue('/matches');
 
     await user.selectOptions(status, 'archived');
+    await user.click(screen.getByRole('checkbox', { name: /팀 매칭/ }));
+    await user.clear(screen.getByLabelText(/버튼 문구/));
+    await user.type(screen.getByLabelText(/버튼 문구/), '확인하기');
     await user.click(screen.getByRole('button', { name: '수정 저장' }));
 
     expect(updateMutate).toHaveBeenCalledWith(
@@ -90,12 +100,28 @@ describe('AdminPopupsPage', () => {
         popupId: 'popup-1',
         body: expect.objectContaining({
           status: 'archived',
+          targetScreens: ['home', 'matches', 'team_matches'],
+          linkUrl: '/matches',
+          linkLabel: '확인하기',
           displayStartAt: '2026-07-14T00:00:00.000Z',
           displayEndAt: '2026-07-20T00:00:00.000Z',
         }),
       },
       expect.any(Object),
     );
+  });
+
+  it('requires at least one target screen', async () => {
+    const user = userEvent.setup();
+    render(<AdminPopupsPage />);
+
+    await user.click(screen.getByRole('button', { name: '수정' }));
+    await user.click(screen.getByRole('checkbox', { name: /홈/ }));
+    await user.click(screen.getByRole('checkbox', { name: /개인 매치/ }));
+    await user.click(screen.getByRole('button', { name: '수정 저장' }));
+
+    expect(screen.getByText('노출할 화면을 하나 이상 선택해 주세요.')).toBeInTheDocument();
+    expect(updateMutate).not.toHaveBeenCalled();
   });
 
   it('does not submit when the display end is not later than the start', async () => {

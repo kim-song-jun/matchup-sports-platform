@@ -1,5 +1,19 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { POPUP_TARGET_SCREENS, PopupTargetScreen } from '../../popups/popup-screen';
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
 
@@ -216,6 +230,22 @@ export class CreateAdminPopupDto {
   @IsString()
   @MaxLength(5000)
   body!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(POPUP_TARGET_SCREENS.length)
+  @IsIn(POPUP_TARGET_SCREENS, { each: true })
+  targetScreens!: PopupTargetScreen[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  linkUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  linkLabel?: string | null;
 
   @IsIn(['draft', 'published', 'archived'])
   status!: 'draft' | 'published' | 'archived';

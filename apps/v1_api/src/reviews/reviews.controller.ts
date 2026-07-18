@@ -3,6 +3,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
+import { ReceivedSummaryQueryDto } from './dto/received-summary-query.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
 import { ReviewsService } from './reviews.service';
@@ -20,6 +21,11 @@ export class ReviewsController {
   @Get('received')
   received(@CurrentUser() user: V1AuthUser, @Query() query: ListReviewsQueryDto) {
     return this.reviewsService.received(user, query);
+  }
+
+  @Get('received/summary')
+  receivedSummary(@CurrentUser() user: V1AuthUser, @Query() query: ReceivedSummaryQueryDto) {
+    return this.reviewsService.receivedSummary(user, query);
   }
 
   @Get('sources/:sourceType/:sourceId')

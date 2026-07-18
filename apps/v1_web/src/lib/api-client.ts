@@ -1,5 +1,6 @@
 import type { ApiEnvelope, ApiErrorBody } from '@/types/api';
 import { getStoredV1Session } from './session-storage';
+import { reportClientError } from './client-error-reporter';
 
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryValue>;
@@ -67,15 +68,21 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
   const body = await response.json().catch(() => null);
 
   if (!response.ok || body?.status === 'error') {
-    throw new V1ApiError(
+    const errorBody: ApiErrorBody =
       body ?? {
         status: 'error',
         statusCode: response.status,
         code: 'NETWORK_OR_PARSE_ERROR',
         message: response.statusText || 'Request failed',
         timestamp: new Date().toISOString(),
-      },
-    );
+      };
+    const error = new V1ApiError(errorBody);
+    reportClientError({
+      message: error.message,
+      level: error.statusCode >= 500 ? 'error' : 'warn',
+      context: { path, statusCode: error.statusCode, code: error.code, requestId: errorBody.requestId },
+    });
+    throw error;
   }
 
   return (body as ApiEnvelope<T>).data;

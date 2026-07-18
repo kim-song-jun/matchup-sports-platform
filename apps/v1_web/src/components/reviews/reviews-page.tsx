@@ -16,23 +16,33 @@ type QueryStateProps = {
 
 export function ReviewsPageView({
   errorMessage,
+  hasManagedTeam,
   loading,
   model,
   onPeriodChange,
   onRetry,
   onTabChange,
+  onTeamPeriodChange,
   period,
   receivedModel,
   summary,
   summaryLoading,
+  teamPeriod,
+  teamSummary,
+  teamSummaryLoading,
 }: QueryStateProps & {
+  hasManagedTeam: boolean;
   model: ReviewsPageModel;
   onPeriodChange: (period: string | null) => void;
   onTabChange: (tab: ReviewsTab) => void;
+  onTeamPeriodChange: (period: string | null) => void;
   period: string | null;
   receivedModel: ReviewsReceivedPageModel;
   summary: V1ReviewReceivedSummaryResponse | undefined;
   summaryLoading: boolean;
+  teamPeriod: string | null;
+  teamSummary: V1ReviewReceivedSummaryResponse | undefined;
+  teamSummaryLoading: boolean;
 }) {
   const isReceivedTab = model.tab === 'received';
   // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
@@ -45,7 +55,16 @@ export function ReviewsPageView({
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
           <>
-            <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
+            <div>
+              <div className="tm-my-section-label">내가 받은 리뷰 집계</div>
+              <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
+            </div>
+            {hasManagedTeam ? (
+              <div style={{ marginTop: 24 }}>
+                <div className="tm-my-section-label">내 팀이 받은 리뷰 집계</div>
+                <ReviewsSummaryDashboard summary={teamSummary} period={teamPeriod} onPeriodChange={onTeamPeriodChange} loading={teamSummaryLoading} />
+              </div>
+            ) : null}
             {hasLegacyContent ? (
               <div style={{ marginTop: 24 }}>
                 <div className="tm-my-section-label">이전 리뷰</div>
@@ -188,19 +207,29 @@ export function ReviewSourcePageView({
 
 export function ReviewsReceivedPageView({
   errorMessage,
+  hasManagedTeam,
   loading,
   model,
+  onPeriodChange,
   onRetry,
+  onTeamPeriodChange,
+  period,
   summary,
   summaryLoading,
-  period,
-  onPeriodChange,
+  teamPeriod,
+  teamSummary,
+  teamSummaryLoading,
 }: QueryStateProps & {
+  hasManagedTeam: boolean;
   model: ReviewsReceivedPageModel;
+  onPeriodChange: (period: string | null) => void;
+  onTeamPeriodChange: (period: string | null) => void;
+  period: string | null;
   summary: V1ReviewReceivedSummaryResponse | undefined;
   summaryLoading: boolean;
-  period: string | null;
-  onPeriodChange: (period: string | null) => void;
+  teamPeriod: string | null;
+  teamSummary: V1ReviewReceivedSummaryResponse | undefined;
+  teamSummaryLoading: boolean;
 }) {
   // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
   // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
@@ -209,7 +238,16 @@ export function ReviewsReceivedPageView({
     // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
     <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received">
       <div className="tm-review-shell">
-        <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
+        <div>
+          <div className="tm-my-section-label">내가 받은 리뷰 집계</div>
+          <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
+        </div>
+        {hasManagedTeam ? (
+          <div style={{ marginTop: 24 }}>
+            <div className="tm-my-section-label">내 팀이 받은 리뷰 집계</div>
+            <ReviewsSummaryDashboard summary={teamSummary} period={teamPeriod} onPeriodChange={onTeamPeriodChange} loading={teamSummaryLoading} />
+          </div>
+        ) : null}
         {hasLegacyContent ? (
           <div style={{ marginTop: 24 }}>
             <div className="tm-my-section-label">이전 리뷰</div>

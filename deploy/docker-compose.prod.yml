@@ -45,6 +45,12 @@ services:
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       API_PORT: 8121
       NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     healthcheck:
       test:
         [
@@ -79,6 +85,11 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 3013
       NODE_ENV: production
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     depends_on:
       v1_api:
         condition: service_healthy

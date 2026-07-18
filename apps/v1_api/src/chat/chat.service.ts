@@ -3,11 +3,13 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
 import {
   ChatMessagesQueryDto,
@@ -34,7 +36,12 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ChatService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeGateway: RealtimeGateway,
+  ) {}
 
   async rooms(user: V1AuthUser, query: ChatRoomsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -146,7 +153,7 @@ export class ChatService {
     const room = await this.getActiveParticipantRoom(user.id, roomId);
     if (room.status !== 'active') throw stateConflict('Chat room is not active');
 
-    const message = await this.prisma.$transaction(async (tx) => {
+    const { message, recipientUserIds } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1ChatMessage.create({
         data: { chatRoomId: room.id, senderUserId: user.id, body: content, status: 'sent' },
       });
@@ -176,16 +183,35 @@ export class ChatService {
           })),
         });
       }
-      return created;
+      return { message: created, recipientUserIds: recipients.map((participant) => participant.userId) };
     });
 
-    return {
+    const chatMessagePayload = {
       messageId: message.id,
       roomId: room.id,
       content: message.body,
       status: message.status,
       sentAt: message.sentAt,
+      senderUserId: user.id,
     };
+    // Fire-and-forget, matching NotificationsService's emitNotificationFireAndForget:
+    // the message + notifications already committed above, so a realtime-emit failure
+    // must never surface as an error response for a request that already succeeded.
+    for (const recipientUserId of recipientUserIds) {
+      try {
+        this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', chatMessagePayload);
+        this.realtimeGateway.emitToUser(recipientUserId, 'notification:new', {
+          targetType: 'chat',
+          targetId: room.id,
+        });
+      } catch (err) {
+        this.logger.warn(
+          `실시간 채팅 알림 전송 실패 [recipientUserId=${recipientUserId} roomId=${room.id}]: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    return chatMessagePayload;
   }
 
   async updateMe(user: V1AuthUser, roomId: string, dto: UpdateMyChatRoomDto) {

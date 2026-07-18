@@ -9,6 +9,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from './notifications.service';
 
 const user = {
@@ -48,6 +49,8 @@ describe('NotificationsService', () => {
     };
   };
 
+  const realtimeGateway = { emitToUser: jest.fn() };
+
   beforeEach(async () => {
     prisma = {
       v1NotificationPreference: {
@@ -65,7 +68,11 @@ describe('NotificationsService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [NotificationsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        NotificationsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: RealtimeGateway, useValue: realtimeGateway },
+      ],
     }).compile();
 
     service = module.get(NotificationsService);
@@ -171,6 +178,22 @@ describe('NotificationsService', () => {
           body: '"주말 풋살 모임" 매치 신청을 확인해 주세요.',
         }),
       }),
+    );
+  });
+
+  it('emits notification:new to the recipient after creating the row', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-2' }));
+
+    await service.emitNotification('user-1', 'match_application_received', 'match-1');
+
+    // Must flush the fire-and-forget promise
+    await new Promise(setImmediate);
+
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      'user-1',
+      'notification:new',
+      expect.objectContaining({ id: 'notif-2' }),
     );
   });
 

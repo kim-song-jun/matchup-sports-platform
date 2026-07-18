@@ -18,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
 import { ChatModule } from './chat/chat.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ProfileModule } from './profile/profile.module';
 import { AdminModule } from './admin/admin.module';
@@ -73,6 +74,7 @@ import { LogsModule } from './logs/logs.module';
     TeamsModule,
     TeamMatchesModule,
     ChatModule,
+    RealtimeModule,
     NotificationsModule,
     ProfileModule,
     AdminModule,

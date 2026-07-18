@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nest
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
   NotificationsQueryDto,
   ReadAllNotificationsDto,
@@ -219,7 +220,10 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeGateway: RealtimeGateway,
+  ) {}
 
   /**
    * Fire-and-forget: creates a V1Notification for userId if the user's preference
@@ -327,7 +331,7 @@ export class NotificationsService {
     const enabled = pref ? (pref as Record<string, boolean>)[prefField] !== false : true;
     if (!enabled) return;
 
-    await this.prisma.v1Notification.create({
+    const notification = await this.prisma.v1Notification.create({
       data: {
         recipientUserId: userId,
         targetType,
@@ -337,6 +341,8 @@ export class NotificationsService {
         deepLink,
       },
     });
+
+    this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
   }
 
   async list(user: V1AuthUser, query: NotificationsQueryDto) {

@@ -308,6 +308,7 @@ export class TournamentRegistrationsService {
       result.updated.appliedByUserId,
       'tournament_registration_submitted',
       tournamentId,
+      `"${result.tournament.title}" 대회 입금 안내를 확인해 주세요.`,
     );
 
     const playerCount = await this.prisma.v1TournamentPlayer.count({

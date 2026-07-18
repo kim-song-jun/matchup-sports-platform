@@ -105,7 +105,7 @@ importers:
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.19
-        version: 11.0.19(@swc/cli@0.8.1(@swc/core@1.15.30(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.30(@swc/helpers@0.5.21))(@types/node@22.19.15)
+        version: 11.0.19(@swc/cli@0.8.1(@swc/core@1.15.30(@swc/helpers@0.5.21)))(@swc/core@1.15.30(@swc/helpers@0.5.21))(@types/node@22.19.15)
       '@nestjs/schematics':
         specifier: ^11.0.10
         version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
@@ -214,10 +214,13 @@ importers:
       socket.io:
         specifier: ^4.8.3
         version: 4.8.3
+      web-push:
+        specifier: ^3.6.7
+        version: 3.6.7
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.19
-        version: 11.0.19(@swc/cli@0.8.1(@swc/core@1.15.30(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.30(@swc/helpers@0.5.21))(@types/node@22.19.15)
+        version: 11.0.19(@swc/cli@0.8.1(@swc/core@1.15.30(@swc/helpers@0.5.21)))(@swc/core@1.15.30(@swc/helpers@0.5.21))(@types/node@22.19.15)
       '@nestjs/schematics':
         specifier: ^11.0.10
         version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
@@ -239,6 +242,9 @@ importers:
       '@types/supertest':
         specifier: ^7.2.0
         version: 7.2.0
+      '@types/web-push':
+        specifier: ^3.6.4
+        version: 3.6.4
       jest:
         specifier: ^30.3.0
         version: 30.3.0(@types/node@22.19.15)(ts-node@10.9.2(@swc/core@1.15.30(@swc/helpers@0.5.21))(@types/node@22.19.15)(typescript@5.9.3))
@@ -7084,7 +7090,7 @@ snapshots:
       '@tybys/wasm-util': 0.10.1
     optional: true
 
-  '@nestjs/cli@11.0.19(@swc/cli@0.8.1(@swc/core@1.15.30(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.30(@swc/helpers@0.5.21))(@types/node@22.19.15)':
+  '@nestjs/cli@11.0.19(@swc/cli@0.8.1(@swc/core@1.15.30(@swc/helpers@0.5.21)))(@swc/core@1.15.30(@swc/helpers@0.5.21))(@types/node@22.19.15)':
     dependencies:
       '@angular-devkit/core': 19.2.24(chokidar@4.0.3)
       '@angular-devkit/schematics': 19.2.24(chokidar@4.0.3)

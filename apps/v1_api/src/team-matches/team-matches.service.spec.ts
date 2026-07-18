@@ -567,6 +567,76 @@ describe('TeamMatchesService', () => {
     expect(teamB?.applicantTeam.matchCount).toBe(2);
   });
 
+  // ─── getPublicTeamMatch: hostTeam.trustScore를 노출하지 않는 경로는 live 재계산을 건너뛴다 ──
+
+  it('applicationEligibility: 응답이 hostTeam.trustScore를 쓰지 않으므로 live 재계산 쿼리를 건너뛴다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: 'owner-user',
+        status: 'active',
+        profile: null,
+        trustScore: { trustState: 'sample' }, // 쓰이지 않아야 하는 값
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+    });
+    prisma.v1Team.findMany.mockResolvedValue([
+      { id: 'team-applicant', name: '신청팀', memberships: [{ role: 'manager' }] },
+    ]);
+
+    const result = await service.applicationEligibility(manager, 'tm-1', {});
+
+    expect(result.teams[0].eligible).toBe(true);
+    // computeRevealedTeamTrustBatch가 실행되면 v1PostEventReview.findMany가 최소 1회 호출된다.
+    // eligibility 응답은 hostTeam.trustScore를 전혀 노출하지 않으므로 이 쿼리 자체가 없어야 한다 —
+    // includeTrust 플래그를 되돌리면(항상 재계산) 이 assertion이 깨진다.
+    expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
+  });
+
+  it('createApplication: 신청 제출 성공 경로는 hostTeam.trustScore를 쓰지 않으므로 live 재계산 쿼리를 건너뛴다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant' }); // assertCanManageTeam(applicantTeamId)
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...teamMatchRow({ status: 'recruiting', startAt: FUTURE, hostTeamId: 'team-host' }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: '호스트팀',
+        ownerUserId: 'owner-user',
+        status: 'active',
+        profile: null,
+        trustScore: { trustState: 'sample' }, // 쓰이지 않아야 하는 값
+        memberships: [],
+      },
+      approvedApplicantTeam: null,
+      applications: [],
+    });
+    prisma.v1TeamMatchApplication.create.mockResolvedValue({
+      id: 'app-new',
+      teamMatchId: 'tm-1',
+      applicantTeamId: 'team-applicant',
+      status: 'requested',
+    });
+    prisma.v1StatusChangeLog.create.mockResolvedValue({});
+
+    const result = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+
+    expect(result.status).toBe('requested');
+    // 신청 제출(POST)은 쓰기 경로의 critical path다 — 응답에 노출되지 않는 hostTeam 신뢰점수를 위해
+    // 추가 쿼리를 태우면 안 된다.
+    expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
+  });
+
   it('detail(getPublicTeamMatch): 단일 조회도 캐시가 아닌 live 재계산된 hostTeam trustState를 반환한다', async () => {
     mockPostEventReviewsByTeam({
       'team-host': [{ sourceId: 'tm-a', rating: 4 }],

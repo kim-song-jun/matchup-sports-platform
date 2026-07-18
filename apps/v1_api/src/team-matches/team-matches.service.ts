@@ -102,7 +102,7 @@ export class TeamMatchesService {
   }
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
-    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user);
+    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
     const viewer = await this.getViewer(teamMatch, user);
     const approvedApplication = teamMatch.applications.find((item) => item.status === 'approved');
 
@@ -641,7 +641,7 @@ export class TeamMatchesService {
             id: true,
             name: true,
             profile: { select: { logoUrl: true } },
-            trustScore: { select: { trustState: true, mannerScore: true, matchCount: true } },
+            trustScore: { select: { matchCount: true } },
           },
         },
         appliedByUser: {
@@ -670,28 +670,28 @@ export class TeamMatchesService {
       items: pageItems.map((application) => {
         const trust = trustByApplicantTeam.get(application.applicantTeamId);
         return {
-        applicationId: application.id,
-        status: application.status,
-        message: application.message,
-        createdAt: application.createdAt,
-        reviewedAt: application.reviewedAt,
-        applicantTeam: {
-          teamId: application.applicantTeam.id,
-          name: application.applicantTeam.name,
-          logoUrl: application.applicantTeam.profile?.logoUrl ?? null,
-          trustState: trust?.trustState ?? 'none',
-          score: trust?.mannerScore ?? null,
-          matchCount: application.applicantTeam.trustScore?.matchCount ?? 0,
-        },
-        appliedBy: {
-          userId: application.appliedByUser.id,
-          displayName:
-            application.appliedByUser.profile?.nickname ?? application.appliedByUser.profile?.displayName ??
-            '신청자',
-          profileImageUrl: application.appliedByUser.profile?.profileImageUrl ?? null,
-        },
-        canApprove: application.status === 'requested' && teamMatch.status === 'recruiting',
-        canReject: application.status === 'requested',
+          applicationId: application.id,
+          status: application.status,
+          message: application.message,
+          createdAt: application.createdAt,
+          reviewedAt: application.reviewedAt,
+          applicantTeam: {
+            teamId: application.applicantTeam.id,
+            name: application.applicantTeam.name,
+            logoUrl: application.applicantTeam.profile?.logoUrl ?? null,
+            trustState: trust?.trustState ?? 'none',
+            score: trust?.mannerScore ?? null,
+            matchCount: application.applicantTeam.trustScore?.matchCount ?? 0,
+          },
+          appliedBy: {
+            userId: application.appliedByUser.id,
+            displayName:
+              application.appliedByUser.profile?.nickname ?? application.appliedByUser.profile?.displayName ??
+              '신청자',
+            profileImageUrl: application.appliedByUser.profile?.profileImageUrl ?? null,
+          },
+          canApprove: application.status === 'requested' && teamMatch.status === 'recruiting',
+          canReject: application.status === 'requested',
         };
       }),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
@@ -1020,18 +1020,26 @@ export class TeamMatchesService {
     };
   }
 
-  private async getPublicTeamMatch(teamMatchId: string, user: V1AuthUser | null) {
+  private async getPublicTeamMatch(
+    teamMatchId: string,
+    user: V1AuthUser | null,
+    options: { includeTrust?: boolean } = {},
+  ) {
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
       where: { id: teamMatchId, deletedAt: null, hostTeam: { status: 'active', deletedAt: null } },
       include: this.teamMatchInclude(user),
     });
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
 
-    // 단일 조회라 N+1 걱정은 없지만, list()/applications()와 일관성을 위해 hostTeam 신뢰점수도
-    // 캐시 대신 live 재계산으로 덮어쓴다 (teamIds가 1개뿐이어도 같은 배치 함수를 재사용).
-    const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, [teamMatch.hostTeamId]);
-    const trust = trustByHostTeam.get(teamMatch.hostTeamId);
-    teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+    // hostTeam 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
+    // hostTeam.trustScore를 전혀 참조하지 않으므로 불필요한 live 재계산(추가 쿼리)을 건너뛴다.
+    if (options.includeTrust) {
+      const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, [teamMatch.hostTeamId]);
+      const trust = trustByHostTeam.get(teamMatch.hostTeamId);
+      teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+    } else {
+      teamMatch.hostTeam.trustScore = null;
+    }
 
     return teamMatch;
   }

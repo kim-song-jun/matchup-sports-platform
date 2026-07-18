@@ -10,6 +10,7 @@ import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { useV1EmailLogin } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
@@ -45,10 +46,12 @@ export function EmailLoginClient() {
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
+          trackEvent('login', { method: 'email' });
           const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
           router.replace(redirect ?? '/home');
         },
         onError: (nextError) => {
+          trackEvent('login_failed', { method: 'email', reason: nextError instanceof V1ApiError ? nextError.code : 'unknown' });
           setError(mapEmailLoginError(nextError));
         },
         onSettled: () => {

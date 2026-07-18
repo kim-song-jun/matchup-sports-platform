@@ -6,6 +6,7 @@ import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
 import {
@@ -98,6 +99,7 @@ export function SocialSignupClient() {
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
+          trackEvent('sign_up_complete', { method: 'kakao' });
           router.replace(result.next.route);
         },
         onError: (nextError) => {

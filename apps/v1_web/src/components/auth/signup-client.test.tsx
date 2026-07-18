@@ -16,6 +16,10 @@ const hooks = vi.hoisted(() => ({
   checkEmailMutate: vi.fn(),
 }));
 
+const analytics = vi.hoisted(() => ({
+  trackEvent: vi.fn(),
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }));
@@ -26,6 +30,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UploadImages: () => ({ mutateAsync: hooks.uploadImagesMutateAsync, isPending: false }),
   useV1CheckNickname: () => ({ mutate: hooks.checkNicknameMutate, isPending: false }),
   useV1CheckEmail: () => ({ mutate: hooks.checkEmailMutate, isPending: false }),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  trackEvent: analytics.trackEvent,
 }));
 
 type AvailabilityCallbacks = {
@@ -121,6 +129,22 @@ describe('SignupClient required profile contract', () => {
         }),
       ),
     );
+  });
+
+  it('tracks a sign_up_complete event with method=email once registration succeeds', async () => {
+    // Given
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+
+    // When
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    // Then
+    await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'email' }));
   });
 
   it.each([

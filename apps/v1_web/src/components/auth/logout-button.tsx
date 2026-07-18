@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useV1Logout } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { clearStoredV1Session } from '@/lib/session-storage';
 import { v1Keys } from '@/lib/query-keys';
 import { Button } from '@/components/v1-ui/button';
@@ -38,6 +39,7 @@ export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
         // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
         // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
         if (logout.isPending) return;
+        trackEvent('logout', {});
         logout.mutate(undefined, { onSettled: clearAndRedirect });
       }}
       size={isGhost ? 'md' : 'lg'}

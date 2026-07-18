@@ -12,6 +12,10 @@ const hooks = vi.hoisted(() => ({
   completeProfileMutate: vi.fn(),
 }));
 
+const analytics = vi.hoisted(() => ({
+  trackEvent: vi.fn(),
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }));
@@ -19,6 +23,10 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1CheckNickname: () => ({ mutate: hooks.checkNicknameMutate, isPending: false }),
   useV1CompleteSocialProfile: () => ({ mutate: hooks.completeProfileMutate, isPending: false }),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  trackEvent: analytics.trackEvent,
 }));
 
 type AvailabilityCallbacks = {
@@ -98,6 +106,24 @@ describe('SocialSignupClient required profile contract', () => {
         expect.any(Object),
       ),
     );
+  });
+
+  it('tracks a sign_up_complete event with method=kakao once the social profile is saved', async () => {
+    // Given
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) =>
+      callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, next: { route: '/onboarding/region' } }),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+
+    // When
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    // Then
+    await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao' }));
   });
 
   it('follows the exact API next route after social profile completion', async () => {

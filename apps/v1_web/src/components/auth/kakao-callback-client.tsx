@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { V1ApiError, v1Post } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
 import { AuthFrame } from './auth-page';
@@ -43,6 +44,7 @@ export function KakaoCallbackClient() {
     const providerError = searchParams.get('error');
 
     if (providerError || !code) {
+      trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
       setError('카카오 로그인을 완료하지 못했어요.');
       return;
     }
@@ -51,6 +53,7 @@ export function KakaoCallbackClient() {
     const storedState = getStoredKakaoOAuthState();
 
     if (!returnedState || !storedState || returnedState !== storedState) {
+      trackEvent('login_failed', { method: 'kakao', reason: 'invalid_state' });
       setError('로그인 요청이 유효하지 않아요. 다시 시도해 주세요.');
       return;
     }
@@ -61,9 +64,19 @@ export function KakaoCallbackClient() {
     })
       .then((result) => {
         saveStoredV1Session(result.session);
-        router.replace(result.next?.route ?? getSavedRedirectPath() ?? '/home');
+        const nextRoute = result.next?.route ?? getSavedRedirectPath() ?? '/home';
+        // next.route가 사회 가입 미완료 상태로 안내하면 신규 가입 진행 중, 그 외에는 기존 계정 로그인.
+        if (nextRoute === '/terms?mode=social' || nextRoute === '/signup/social') {
+          trackEvent('sign_up_start', { method: 'kakao' });
+        } else {
+          trackEvent('login', { method: 'kakao' });
+        }
+        router.replace(nextRoute);
       })
       .catch((nextError) => {
+        const reason = nextError instanceof V1ApiError ? nextError.code : 'unknown';
+        trackEvent('login_failed', { method: 'kakao', reason });
+
         if (nextError instanceof V1ApiError) {
           if (nextError.code === 'MISSING_EMAIL') {
             router.replace('/auth/missing-email');

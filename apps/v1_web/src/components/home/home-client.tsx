@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { v1Post } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
@@ -11,6 +12,10 @@ import type { HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
 
 export function HomePageClient() {
+  useEffect(() => {
+    trackEvent('home_view', {});
+  }, []);
+
   const query = useV1Home();
   const isAuthenticated = query.data?.viewer?.authenticated === true;
   const chatRooms = useV1ChatRooms({ enabled: isAuthenticated });

@@ -65,8 +65,8 @@ describe('TournamentPopupTab permissions', () => {
       />,
     );
 
-    await user.type(screen.getByLabelText('제목'), '새 팝업');
-    await user.type(screen.getByLabelText('내용'), '새 운영 안내입니다.');
+    await user.type(screen.getByPlaceholderText('예: 얼리버드 신청 안내'), '새 팝업');
+    await user.type(screen.getByPlaceholderText('예: 7/31까지 신청하면 참가비를 할인해 드려요.'), '새 운영 안내입니다.');
 
     expect(screen.getByRole('button', { name: '팝업 추가' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '수정' })).toBeEnabled();

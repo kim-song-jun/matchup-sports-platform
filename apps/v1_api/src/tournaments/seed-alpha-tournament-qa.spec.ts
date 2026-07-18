@@ -1,5 +1,9 @@
 import { Prisma, V1TournamentStatus } from '@prisma/client';
-import { buildAlphaTournamentCampaignContent } from '../../prisma/seed-alpha-tournament-qa';
+import {
+  ALPHA_TOURNAMENT_SCENARIOS,
+  buildAlphaTournamentCampaignContent,
+  createCompetitionData,
+} from '../../prisma/seed-alpha-tournament-qa';
 import { parseCampaignContentJson } from './tournament-campaign-content';
 
 describe('alpha tournament QA campaign content', () => {
@@ -21,5 +25,38 @@ describe('alpha tournament QA campaign content', () => {
 
     const persistedContent = JSON.parse(JSON.stringify(content)) as Prisma.JsonValue;
     expect(() => parseCampaignContentJson(persistedContent)).not.toThrow();
+  });
+
+  it('creates completed knockout rounds so final rankings and videos are reachable', async () => {
+    const rounds: string[] = [];
+    const tx = {
+      v1TournamentGroup: { create: jest.fn().mockResolvedValue({ id: 'group-a' }) },
+      v1TournamentGroupTeam: { create: jest.fn().mockResolvedValue({}) },
+      v1TournamentStanding: { create: jest.fn().mockResolvedValue({}) },
+      v1TournamentFixture: {
+        create: jest.fn().mockImplementation(({ data }: { data: { round: string } }) => {
+          rounds.push(data.round);
+          return Promise.resolve({ id: `fixture-${rounds.length}`, round: data.round });
+        }),
+      },
+      v1TournamentFixtureResult: { create: jest.fn().mockResolvedValue({}) },
+    } as unknown as Parameters<typeof createCompetitionData>[0];
+    const registrations = Array.from({ length: 4 }, (_, index) => ({
+      id: `registration-${index + 1}`,
+    })) as unknown as Parameters<typeof createCompetitionData>[2];
+    const completedScenario = ALPHA_TOURNAMENT_SCENARIOS.find(
+      (scenario) => scenario.status === V1TournamentStatus.completed,
+    );
+    if (!completedScenario) throw new Error('Completed alpha tournament scenario is required.');
+
+    const fixtures = await createCompetitionData(
+      tx,
+      completedScenario,
+      registrations,
+      new Date('2026-07-04T01:00:00.000Z'),
+    );
+
+    expect(rounds).toEqual(expect.arrayContaining(['semi', 'final', 'third_place']));
+    expect(fixtures.find((fixture) => fixture.round === 'final')).toBeDefined();
   });
 });

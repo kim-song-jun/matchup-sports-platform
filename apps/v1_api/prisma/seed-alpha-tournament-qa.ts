@@ -308,7 +308,7 @@ async function createRegistrations(
   return registrations;
 }
 
-async function createCompetitionData(
+export async function createCompetitionData(
   tx: Prisma.TransactionClient,
   scenario: TournamentScenario,
   registrations: Awaited<ReturnType<typeof createRegistrations>>,
@@ -397,6 +397,38 @@ async function createCompetitionData(
       });
     }
     fixtures.push(fixture);
+  }
+  if (scenario.status === V1TournamentStatus.completed) {
+    const knockoutPlans = [
+      { round: 'semi', fixtureNumber: 1, homeIndex: 0, awayIndex: 3, homeScore: 3, awayScore: 0 },
+      { round: 'semi', fixtureNumber: 2, homeIndex: 1, awayIndex: 2, homeScore: 2, awayScore: 1 },
+      { round: 'final', fixtureNumber: 1, homeIndex: 0, awayIndex: 1, homeScore: 4, awayScore: 2 },
+      { round: 'third_place', fixtureNumber: 1, homeIndex: 2, awayIndex: 3, homeScore: 2, awayScore: 1 },
+    ] as const;
+    for (let index = 0; index < knockoutPlans.length; index += 1) {
+      const plan = knockoutPlans[index];
+      const fixture = await tx.v1TournamentFixture.create({
+        data: {
+          tournamentId: scenario.id,
+          round: plan.round,
+          fixtureNumber: plan.fixtureNumber,
+          homeRegistrationId: registrations[plan.homeIndex].id,
+          awayRegistrationId: registrations[plan.awayIndex].id,
+          scheduledAt: new Date(scheduledAt.getTime() + (pairings.length + index) * 90 * 60 * 1000),
+          venue: '서울 송파 풋살파크 결선구장',
+          status: V1TournamentFixtureStatus.completed,
+        },
+      });
+      await tx.v1TournamentFixtureResult.create({
+        data: {
+          fixtureId: fixture.id,
+          homeScore: plan.homeScore,
+          awayScore: plan.awayScore,
+          note: 'ALPHA QA 결선 결과',
+        },
+      });
+      fixtures.push(fixture);
+    }
   }
   return fixtures;
 }
@@ -523,11 +555,13 @@ async function createScenario(
   );
   const fixtures = await createCompetitionData(tx, scenario, registrations, scheduledAt);
   if (scenario.status !== V1TournamentStatus.completed) return;
+  const finalFixture = fixtures.find((fixture) => fixture.round === 'final');
+  if (!finalFixture) throw new Error('Completed alpha tournament requires a final fixture.');
 
   await tx.v1TournamentFixtureVideo.createMany({
     data: [
-      { fixtureId: fixtures[0].id, title: '결승 하이라이트', url: HIGHLIGHT_VIDEO_URL, sortOrder: 0 },
-      { fixtureId: fixtures[0].id, title: '우승 세리머니', url: HIGHLIGHT_VIDEO_URL, sortOrder: 1 },
+      { fixtureId: finalFixture.id, title: '결승 하이라이트', url: HIGHLIGHT_VIDEO_URL, sortOrder: 0 },
+      { fixtureId: finalFixture.id, title: '우승 세리머니', url: HIGHLIGHT_VIDEO_URL, sortOrder: 1 },
     ],
   });
   await tx.v1TournamentAward.createMany({

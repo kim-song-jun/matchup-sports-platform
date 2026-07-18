@@ -904,8 +904,8 @@ model V1PostEventReview {
   @@index([sourceType, sourceGroupId])
   @@index([targetType])
   @@index([status])
-  @@index([targetUserId, sportId, submittedAt])
-  @@index([targetTeamId, sportId, submittedAt])
+  @@index([targetUserId, sportId, submittedAt], map: "v1_post_event_reviews_target_user_sport_idx")
+  @@index([targetTeamId, sportId, submittedAt], map: "v1_post_event_reviews_target_team_sport_idx")
   @@map("v1_post_event_reviews")
 }
 

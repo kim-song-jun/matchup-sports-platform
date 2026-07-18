@@ -817,6 +817,37 @@ describe('TeamsService', () => {
     expect(result).toMatchObject({ membershipId: 'mem-member', status: 'left', memberCount: 4 });
   });
 
+  it('leaveTeam: manager가 나가면 tx 내부에서 재조회한 role로 managerCount를 decrement한다(바깥에서 읽은 stale role 무시)', async () => {
+    // 바깥(tx 밖)에서 읽은 membership은 role='member'였지만, tx 내부 재조회(findUniqueOrThrow)는
+    // role='manager'를 반환하도록 해 "바깥 role 대신 tx 내부 재조회 결과를 쓴다"를 직접 증명한다.
+    const memberMembership = membershipRow({
+      id: 'mem-manager',
+      role: 'member',
+      userId: member.id,
+      status: 'active',
+    });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [memberMembership],
+    });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.v1TeamMembership.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'mem-manager',
+      teamId: 'team-1',
+      status: 'left',
+      role: 'manager',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 0 });
+
+    await service.leaveTeam(member, 'team-1', {});
+
+    expect(prisma.v1Team.update).toHaveBeenCalledWith({
+      where: { id: 'team-1' },
+      data: { memberCount: { decrement: 1 }, managerCount: { decrement: 1 } },
+    });
+  });
+
   it('leaveTeam: membership이 트랜잭션 중 이미 처리되면 409 CONCURRENT_UPDATE', async () => {
     const memberMembership = membershipRow({
       id: 'mem-member',

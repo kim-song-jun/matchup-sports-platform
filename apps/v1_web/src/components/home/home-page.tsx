@@ -27,6 +27,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
   const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || hasHomePromo;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
+  const weatherPermission = model.weatherPermission ?? 'prompt';
+  const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
 
   return (
     <>
@@ -157,18 +159,18 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             {/* 인라인 style 제거 → home.css .tm-home-weather-head 규칙으로 이전 */}
             <div className="tm-home-weather-head">
               <div>
-                <div className="tm-text-label">현재 위치 날씨</div>
+                <div className="tm-text-label">내 위치 날씨</div>
                 <div className="tm-text-caption" style={{ marginTop: 2 }}>
-                  새로고침하면 현재 좌표를 날씨·지역 확인에 1회 전송해요.
+                  {weatherPermissionCopy}
                 </div>
               </div>
               <button
                 className="tm-btn tm-btn-icon tm-btn-neutral"
                 type="button"
                 onClick={model.refreshWeather}
-                disabled={!model.refreshWeather || model.weatherRefreshing}
-                aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 좌표 전송에 동의하고 날씨 새로고침'}
-                title={model.weatherRefreshing ? '확인 중' : '현재 좌표를 1회 전송해 날씨 확인'}
+                disabled={!model.refreshWeather || model.weatherRefreshing || weatherPermission === 'unsupported'}
+                aria-label={model.weatherRefreshing ? '날씨 확인 중' : weatherPermission === 'granted' ? '현재 위치 날씨 다시 확인' : '위치 권한을 확인하고 날씨 보기'}
+                title={model.weatherRefreshing ? '확인 중' : weatherPermission === 'granted' ? '날씨 다시 확인' : '위치로 날씨 보기'}
               >
                 <RefreshIcon size={18} strokeWidth={2.1} />
               </button>
@@ -210,6 +212,14 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
       </AppChrome>
     </>
   );
+}
+
+function getWeatherPermissionCopy(permission: NonNullable<HomeViewModel['weatherPermission']>) {
+  if (permission === 'checking') return '브라우저의 위치 허용 상태를 확인하고 있어요.';
+  if (permission === 'granted') return '위치 권한은 허용되어 있어요. 버튼을 누를 때만 좌표를 1회 사용해요.';
+  if (permission === 'denied') return '브라우저 설정에서 위치를 허용한 뒤 다시 확인해 주세요.';
+  if (permission === 'unsupported') return '이 브라우저에서는 위치 기반 날씨를 사용할 수 없어요.';
+  return '버튼을 누르면 위치 권한을 요청하고 좌표를 1회 사용해요.';
 }
 
 function HomeChatSummary({ model }: { model: HomeViewModel }) {

@@ -82,6 +82,7 @@ export type HomeViewModel = {
     status?: string;
     icon?: 'sun' | 'cloud-sun' | 'cloud' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunderstorm';
   };
+  weatherPermission?: 'checking' | 'prompt' | 'granted' | 'denied' | 'unsupported';
   weatherRefreshing?: boolean;
   refreshWeather?: () => void;
   popup: HomePopup | null;

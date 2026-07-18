@@ -182,9 +182,7 @@
     right: 0;
     height: 64px;
     z-index: 50;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: var(--bg);
     border-bottom: 1px solid var(--grey150);
     /*
      * Cap the nav's inner content to the 1120px content column and center it,

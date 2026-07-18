@@ -80,5 +80,8 @@ describe('EmailLoginClient GA events', () => {
     await waitFor(() =>
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'email', reason: 'UNAUTHENTICATED' }),
     );
+    expect(screen.getByRole('alert')).toHaveTextContent('이메일이나 비밀번호를 다시 확인해 주세요.');
+    expect(screen.getByLabelText('이메일')).toHaveAttribute('aria-describedby', 'email-login-error');
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-describedby', 'email-login-error');
   });
 });

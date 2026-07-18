@@ -17,10 +17,10 @@ import { getEmailLoginViewModel } from './auth.view-model';
 
 function mapEmailLoginError(err: unknown): string {
   if (err instanceof V1ApiError) {
-    if (err.code === 'UNAUTHENTICATED') return '이메일 또는 비밀번호가 올바르지 않아요.';
-    if (err.code === 'PERMISSION_DENIED') return '이 계정으로는 로그인할 수 없어요. 고객센터에 문의해 주세요.';
+    if (err.code === 'UNAUTHENTICATED') return '이메일이나 비밀번호를 다시 확인해 주세요.';
+    if (err.code === 'PERMISSION_DENIED') return '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.';
   }
-  return '로그인에 실패했어요. 잠시 후 다시 시도해 주세요.';
+  return '지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.';
 }
 
 export function EmailLoginClient() {
@@ -69,15 +69,6 @@ export function EmailLoginClient() {
         </div>
         <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
         {model.sub ? <p className="tm-text-body tm-auth-sub">{model.sub}</p> : null}
-        {error ? (
-          <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertCircle aria-hidden="true" color="var(--red500)" size={18} strokeWidth={2.2} />
-              <span className="tm-text-body-lg">로그인에 실패했어요</span>
-            </div>
-            <p className="tm-text-caption" id="email-login-error" role="alert">{error}</p>
-          </Card>
-        ) : null}
         <div className="tm-auth-form">
           <label className="tm-auth-field">
             <span className="tm-text-label">이메일</span>
@@ -117,6 +108,12 @@ export function EmailLoginClient() {
               </button>
             </span>
           </label>
+          {error ? (
+            <div className="tm-auth-inline-error" id="email-login-error" role="alert">
+              <AlertCircle aria-hidden="true" size={17} strokeWidth={2.2} />
+              <span className="tm-text-caption">{error}</span>
+            </div>
+          ) : null}
         </div>
         <Button className="tm-auth-email-submit" block loading={login.isPending} size="lg" type="submit" variant="primary">
           {model.primary.label}

@@ -800,6 +800,26 @@ button:disabled {
   color: var(--red500);
 }
 
+.tm-auth-inline-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--red50);
+  color: var(--red500);
+}
+
+.tm-auth-inline-error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.tm-auth-inline-error .tm-text-caption {
+  color: inherit;
+  line-height: 1.45;
+}
+
 .tm-auth-soft-card-warning {
   background: rgba(254, 152, 0, .10);
 }

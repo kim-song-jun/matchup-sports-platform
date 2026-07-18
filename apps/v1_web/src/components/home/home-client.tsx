@@ -19,7 +19,12 @@ export function HomePageClient() {
   const query = useV1Home();
   const isAuthenticated = query.data?.viewer?.authenticated === true;
   const chatRooms = useV1ChatRooms({ enabled: isAuthenticated });
-  const { weather, refreshing: weatherRefreshing, refresh: refreshWeather } = useCurrentLocationWeather();
+  const {
+    weather,
+    permission: weatherPermission,
+    refreshing: weatherRefreshing,
+    refresh: refreshWeather,
+  } = useCurrentLocationWeather();
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
@@ -39,6 +44,7 @@ export function HomePageClient() {
             chatStatus,
             chatRooms: chatRoomSummaries,
             weather: weather ?? fallback.weather,
+            weatherPermission,
             weatherRefreshing,
             refreshWeather,
             retry: () => void query.refetch(),
@@ -58,10 +64,11 @@ export function HomePageClient() {
                 ...toHomeModel(query.data, fallback, () => void query.refetch(), chatUnreadCount, weather),
                 chatStatus,
                 chatRooms: chatRoomSummaries,
+                weatherPermission,
                 weatherRefreshing,
                 refreshWeather,
               }
-            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherRefreshing, refreshWeather }
+            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather }
         }
       />
     </>
@@ -70,11 +77,46 @@ export function HomePageClient() {
 
 function useCurrentLocationWeather() {
   const [weather, setWeather] = useState<HomeViewModel['weather'] | null>(null);
+  const [permission, setPermission] = useState<NonNullable<HomeViewModel['weatherPermission']>>('checking');
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setPermission('unsupported');
+      return;
+    }
+
+    if (!navigator.permissions?.query) {
+      setPermission('prompt');
+      return;
+    }
+
+    let active = true;
+    let status: PermissionStatus | null = null;
+    const syncPermission = () => {
+      if (!active || !status) return;
+      setPermission(status.state);
+      if (status.state === 'denied') setWeather(null);
+    };
+
+    void navigator.permissions.query({ name: 'geolocation' }).then((nextStatus) => {
+      if (!active) return;
+      status = nextStatus;
+      syncPermission();
+      status.addEventListener('change', syncPermission);
+    }).catch(() => {
+      if (active) setPermission('prompt');
+    });
+
+    return () => {
+      active = false;
+      status?.removeEventListener('change', syncPermission);
+    };
+  }, []);
 
   const refresh = useCallback(() => {
     if (!('geolocation' in navigator)) {
-      setWeather((current) => current ?? { city: '현재 위치', temp: '-', cond: '위치 권한 필요', wind: '-' });
+      setPermission('unsupported');
       return () => undefined;
     }
 
@@ -83,6 +125,7 @@ function useCurrentLocationWeather() {
     setRefreshing(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        setPermission('granted');
         try {
           const { latitude, longitude } = position.coords;
           const params = new URLSearchParams({
@@ -128,9 +171,12 @@ function useCurrentLocationWeather() {
           if (!cancelled) setRefreshing(false);
         }
       },
-      () => {
+      (error) => {
         if (!cancelled) {
-          setWeather((current) => current ?? { city: '현재 위치', temp: '-', cond: '위치 권한 필요', wind: '-' });
+          if (error.code === error.PERMISSION_DENIED) {
+            setPermission('denied');
+            setWeather(null);
+          }
           setRefreshing(false);
         }
       },
@@ -142,7 +188,19 @@ function useCurrentLocationWeather() {
     };
   }, []);
 
-  return { weather, refreshing, refresh: () => void refresh() };
+  return {
+    weather: weather ?? getIdleWeather(permission),
+    permission,
+    refreshing,
+    refresh: () => void refresh(),
+  };
+}
+
+function getIdleWeather(permission: NonNullable<HomeViewModel['weatherPermission']>): HomeViewModel['weather'] {
+  if (permission === 'denied') return { city: '내 위치', temp: '-', cond: '위치 사용이 꺼져 있어요', wind: '-' };
+  if (permission === 'unsupported') return { city: '내 위치', temp: '-', cond: '위치 기능을 지원하지 않아요', wind: '-' };
+  if (permission === 'granted') return { city: '내 위치', temp: '-', cond: '날씨를 확인해 주세요', wind: '-' };
+  return { city: '내 위치', temp: '-', cond: '위치 확인이 필요해요', wind: '-' };
 }
 
 type OpenMeteoCurrentWeatherResponse = {

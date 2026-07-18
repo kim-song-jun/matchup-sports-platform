@@ -526,11 +526,11 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
 
 function LocationNotice({ detectedRegion, status }: { detectedRegion: DetectedRegionDraft | null; status: LocationStatus }) {
   if (status === 'requesting') {
-    return <Notice title="현재 위치 확인 중" body="위치 권한을 확인하고 있어요." />;
+    return <Notice title="현재 위치 확인 중" body="브라우저의 위치 권한을 확인하고 있어요." />;
   }
 
   if (status === 'denied') {
-    return <Notice title="위치 권한 거부" body="브라우저에서 위치 권한이 거부됐어요. 지역을 직접 선택해 계속할 수 있어요." tone="orange" />;
+    return <Notice title="위치 권한이 꺼져 있어요" body="브라우저 설정에서 다시 허용하거나 지역을 직접 선택해 계속할 수 있어요." tone="orange" />;
   }
 
   if (status === 'unsupported') {
@@ -542,10 +542,10 @@ function LocationNotice({ detectedRegion, status }: { detectedRegion: DetectedRe
   }
 
   if (detectedRegion) {
-    return <Notice title="현재 위치 확인 완료" body={`${detectedRegion.regionName}을 활동 지역으로 선택했어요. 좌표는 저장하지 않아요.`} tone="green" />;
+    return <Notice title="현재 위치 확인 완료" body={`${detectedRegion.regionName}을 활동 지역으로 선택했어요. 허용 상태는 브라우저에 유지되지만 좌표는 저장하지 않아요.`} tone="green" />;
   }
 
-  return <Notice title="현재 위치 사용하기" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택해요. 거부해도 직접 선택할 수 있어요." />;
+  return <Notice title="현재 위치로 지역 찾기" body="한 번 허용하면 브라우저가 권한을 기억해요. 좌표는 가까운 지역을 찾을 때만 1회 사용하고 저장하지 않아요." />;
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {

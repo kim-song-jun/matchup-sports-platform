@@ -101,6 +101,13 @@ jobs:
       - name: Production deploy security guardrails
         run: pnpm qa:production-deploy-security
 
+      - name: Alpha immutable deployment guardrails
+        run: |
+          node scripts/qa/check-alpha-immutable-deploy.mjs --self-test
+          bash scripts/qa/test-alpha-release-state.sh
+          bash scripts/release/create-alpha-release-manifest.sh --self-test
+          bash scripts/qa/check-expand-contract-migrations.sh --self-test
+
       - name: Generate V1 Prisma client
         run: cd apps/v1_api && pnpm prisma generate
 

@@ -14,12 +14,14 @@ concurrency:
   group: deploy-alpha
   cancel-in-progress: false
 
+env:
+  API_REPOSITORY: teameet-alpha-v1-api
+  WEB_REPOSITORY: teameet-alpha-v1-web
+
 jobs:
   deploy:
-    if: >-
-      github.ref == 'refs/heads/dev'
+    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
-
     steps:
       - name: Resolve release commit
         id: release
@@ -27,10 +29,7 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
-          if [[ ! "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Invalid release SHA" >&2
-            exit 1
-          fi
+          [[ "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           echo "sha=${RELEASE_SHA}" >> "${GITHUB_OUTPUT}"
 
       - name: Wait for matching CI success
@@ -45,25 +44,20 @@ jobs:
             ci_result="$(gh api \
               "repos/${REPOSITORY}/actions/workflows/deploy.yml/runs?branch=dev&event=push&per_page=100" \
               --jq "[.workflow_runs[] | select(.head_sha == \"${RELEASE_SHA}\")][0] | if . == null then empty else [.status, (.conclusion // \"pending\")] | @tsv end")"
-
             if [[ -n "${ci_result}" ]]; then
               read -r ci_status ci_conclusion <<< "${ci_result}"
-              if [[ "${ci_status}" == "completed" ]]; then
-                if [[ "${ci_conclusion}" == "success" ]]; then
-                  echo "Matching CI run passed"
-                  exit 0
-                fi
-                echo "Matching CI run finished with ${ci_conclusion}" >&2
+              if [[ "${ci_status}" == completed ]]; then
+                [[ "${ci_conclusion}" == success ]] && exit 0
+                echo "Matching CI finished with ${ci_conclusion}" >&2
                 exit 1
               fi
             fi
             sleep 10
           done
-
-          echo "Matching CI run did not finish within 35 minutes" >&2
+          echo "Matching CI did not finish within 35 minutes" >&2
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ steps.release.outputs.sha }}
           fetch-depth: 0
@@ -76,109 +70,126 @@ jobs:
           set -Eeuo pipefail
           release_date="$(git show -s --format=%cs "${RELEASE_SHA}")"
           metadata="$(node scripts/release/resolve-changeset-version.mjs \
-            --repo . \
-            --sha "${RELEASE_SHA}" \
-            --date "${release_date}")"
-          prerelease="$(jq -er '.prereleaseVersion' <<< "${metadata}")"
-          stable="$(jq -er '.stableVersion' <<< "${metadata}")"
-          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
-          echo "stable=${stable}" >> "${GITHUB_OUTPUT}"
-          echo "Alpha release ${prerelease}; planned stable ${stable}"
+            --repo . --sha "${RELEASE_SHA}" --date "${release_date}")"
+          echo "prerelease=$(jq -er '.prereleaseVersion' <<< "${metadata}")" >> "${GITHUB_OUTPUT}"
+          echo "stable=$(jq -er '.stableVersion' <<< "${metadata}")" >> "${GITHUB_OUTPUT}"
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ vars.ALPHA_AWS_ROLE_ARN }}
           aws-region: ${{ vars.ALPHA_AWS_REGION }}
 
-      - name: Package release
+      - name: Verify alpha AWS target
+        id: target
         env:
-          RELEASE_SHA: ${{ steps.release.outputs.sha }}
-        run: |
-          set -Eeuo pipefail
-          tar -czf "/tmp/teameet-alpha-${RELEASE_SHA}.tar.gz" \
-            .changeset \
-            .dockerignore \
-            package.json \
-            pnpm-lock.yaml \
-            pnpm-workspace.yaml \
-            apps/v1_api \
-            apps/v1_web \
-            deploy \
-            scripts/release
+          ALPHA_AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          ALPHA_EXPECTED_ACCOUNT_ID: ${{ vars.ALPHA_EXPECTED_ACCOUNT_ID }}
+          ALPHA_DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
+          ALPHA_EC2_INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+        run: bash scripts/release/verify-alpha-aws-target.sh
 
-      - name: Upload versioned release artifact
+      - name: Sign in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
+
+      - name: Package and bind versioned source
+        id: source
         env:
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
           DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
+        run: bash scripts/release/prepare-alpha-source.sh
+
+      - name: Resolve rollback compatibility base
+        id: rollback-base
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+        run: bash scripts/release/resolve-alpha-rollback-base.sh
+
+      - name: Resolve immutable image tags
+        id: images
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
         run: |
           set -Eeuo pipefail
-          aws s3 cp \
-            "/tmp/teameet-alpha-${RELEASE_SHA}.tar.gz" \
-            "s3://${DEPLOY_BUCKET}/releases/${RELEASE_SHA}.tar.gz" \
-            --only-show-errors
+          imageTag="sha-${RELEASE_SHA}"
+          api_exists=false
+          web_exists=false
+          aws ecr describe-images --repository-name "${API_REPOSITORY}" \
+            --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && api_exists=true
+          aws ecr describe-images --repository-name "${WEB_REPOSITORY}" \
+            --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && web_exists=true
+          echo "imageTag=${imageTag}" >> "${GITHUB_OUTPUT}"
+          echo "api_exists=${api_exists}" >> "${GITHUB_OUTPUT}"
+          echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push immutable API image
+        if: steps.images.outputs.api_exists != 'true'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-api
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.API_REPOSITORY }}:${{ steps.images.outputs.imageTag }}
+          cache-from: type=gha,scope=alpha-v1-api
+          cache-to: type=gha,mode=max,scope=alpha-v1-api
+
+      - name: Build and push immutable Web image
+        if: steps.images.outputs.web_exists != 'true'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-web
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.WEB_REPOSITORY }}:${{ steps.images.outputs.imageTag }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=/api/v1
+            INTERNAL_API_ORIGIN=http://v1_api:8121
+            NEXT_PUBLIC_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}
+            NEXT_PUBLIC_GA_MEASUREMENT_ID=${{ secrets.GA_ALPHA }}
+          cache-from: type=gha,scope=alpha-v1-web
+          cache-to: type=gha,mode=max,scope=alpha-v1-web
+
+      - name: Gate ECR critical findings
+        env:
+          IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+        run: bash scripts/release/check-alpha-image-scans.sh
+
+      - name: Create or reuse immutable release manifest
+        id: manifest
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          RELEASE_VERSION: ${{ steps.version.outputs.prerelease }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
+          SOURCE_VERSION_ID: ${{ steps.source.outputs.sourceVersionId }}
+          SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
+          IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+          PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
+          MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
+        run: bash scripts/release/create-alpha-release-manifest.sh
 
       - name: Deploy through AWS Systems Manager
-        timeout-minutes: 45
+        timeout-minutes: 25
         env:
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
           RELEASE_VERSION: ${{ steps.version.outputs.prerelease }}
           DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
-          GA_MEASUREMENT_ID: ${{ secrets.GA_ALPHA }}
-        run: |
-          set -Eeuo pipefail
-          stage="/home/ec2-user/.teameet-alpha-staging/${RELEASE_SHA}"
-          archive="/tmp/teameet-alpha-${RELEASE_SHA}.tar.gz"
-          object="s3://${DEPLOY_BUCKET}/releases/${RELEASE_SHA}.tar.gz"
-
-          parameters="$(jq -nc \
-            --arg strict "set -Eeuo pipefail" \
-            --arg cleanup "trap 'status=\$?; rm -f '${archive}'; rm -rf '${stage}'; exit \${status}' EXIT" \
-            --arg prepare "install -d -o ec2-user -g ec2-user '${stage}'" \
-            --arg download "aws s3 cp '${object}' '${archive}' --only-show-errors" \
-            --arg extract "tar -xzf '${archive}' -C '${stage}' && chown -R ec2-user:ec2-user '${stage}'" \
-            --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' GA_MEASUREMENT_ID='${GA_MEASUREMENT_ID}' bash '${stage}/deploy/deploy-alpha.sh'" \
-            '{commands: [$strict, $cleanup, $prepare, $download, $extract, $deploy]}'
-          )"
-
-          command_id="$(aws ssm send-command \
-            --instance-ids "${INSTANCE_ID}" \
-            --document-name AWS-RunShellScript \
-            --comment "Teameet alpha ${RELEASE_VERSION} ${RELEASE_SHA}" \
-            --parameters "${parameters}" \
-            --query 'Command.CommandId' \
-            --output text)"
-
-          for attempt in $(seq 1 180); do
-            status="$(aws ssm get-command-invocation \
-              --command-id "${command_id}" \
-              --instance-id "${INSTANCE_ID}" \
-              --query Status \
-              --output text 2>/dev/null || true)"
-            case "${status}" in
-              Success)
-                aws ssm get-command-invocation \
-                  --command-id "${command_id}" \
-                  --instance-id "${INSTANCE_ID}" \
-                  --query StandardOutputContent \
-                  --output text
-                exit 0
-                ;;
-              Failed|TimedOut|Cancelled|Cancelling)
-                aws ssm get-command-invocation \
-                  --command-id "${command_id}" \
-                  --instance-id "${INSTANCE_ID}" \
-                  --query '{status:Status,stdout:StandardOutputContent,stderr:StandardErrorContent}' \
-                  --output json
-                exit 1
-                ;;
-            esac
-            sleep 10
-          done
-
-          echo "Alpha deployment did not finish within 30 minutes" >&2
-          exit 1
+          SOURCE_VERSION_ID: ${{ steps.source.outputs.sourceVersionId }}
+          SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
+          MANIFEST_VERSION_ID: ${{ steps.manifest.outputs.manifestVersionId }}
+          MANIFEST_SHA256: ${{ steps.manifest.outputs.manifestSha256 }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+        run: bash scripts/release/deploy-alpha-via-ssm.sh
 
       - name: Verify public alpha release identity
         env:
@@ -188,16 +199,11 @@ jobs:
           set -Eeuo pipefail
           for attempt in $(seq 1 36); do
             headers="$(curl -fsSI https://alpha.teameet.co.kr/landing 2>/dev/null || true)"
-            deployed_version="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
-            deployed_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
-            db_healthy="$(curl -fsS https://alpha.teameet.co.kr/api/v1/health 2>/dev/null | jq -r '.data.checks.db // false' 2>/dev/null || true)"
-            if [[ "${deployed_version}" == "${RELEASE_VERSION}" && "${deployed_sha}" == "${RELEASE_SHA}" && "${db_healthy}" == "true" ]]; then
-              exit 0
-            fi
+            version="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+            sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+            db="$(curl -fsS https://alpha.teameet.co.kr/api/v1/health 2>/dev/null | jq -r '.data.checks.db // false' 2>/dev/null || true)"
+            [[ "${version}" == "${RELEASE_VERSION}" && "${sha}" == "${RELEASE_SHA}" && "${db}" == true ]] && exit 0
             sleep 5
           done
-
-          echo "Alpha did not expose the expected release identity within 3 minutes" >&2
-          echo "expected_version=${RELEASE_VERSION} observed_version=${deployed_version:-missing}" >&2
-          echo "expected_sha=${RELEASE_SHA} observed_sha=${deployed_sha:-missing} db_healthy=${db_healthy:-false}" >&2
+          echo "Alpha did not expose the expected immutable release identity" >&2
           exit 1

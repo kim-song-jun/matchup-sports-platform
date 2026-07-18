@@ -2,6 +2,8 @@
 
 이 문서는 `apps/v1_api`와 `apps/v1_web`으로 구성된 v1 운영 스택만 다룬다.
 
+`dev` 전용 alpha는 production SSH 배포와 분리된다. alpha는 GitHub runner에서 만든 ECR digest 이미지와 S3 release manifest를 사용하며, 운영 계약과 rollback 절차는 [`docs/ops/v1-alpha-environment.md`](../docs/ops/v1-alpha-environment.md)를 따른다. 이 가이드의 local image build·production 절차를 alpha에 적용하지 않는다.
+
 ## 1. 공개 경로 계약
 
 Nginx는 v1 Web을 별도 브라우저 prefix 없이 루트에 제공한다.

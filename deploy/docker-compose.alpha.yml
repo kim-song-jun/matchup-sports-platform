@@ -1,9 +1,12 @@
 services:
+  v1_uploads_init:
+    image: ${ALPHA_API_IMAGE:?ALPHA_API_IMAGE must be an ECR digest URI}
+
   v1_api:
-    image: teameet-v1-api:${ALPHA_RELEASE_VERSION:-alpha}
+    image: ${ALPHA_API_IMAGE:?ALPHA_API_IMAGE must be an ECR digest URI}
 
   v1_web:
-    image: teameet-v1-web:${ALPHA_RELEASE_VERSION:-alpha}
+    image: ${ALPHA_WEB_IMAGE:?ALPHA_WEB_IMAGE must be an ECR digest URI}
 
   nginx:
     volumes:

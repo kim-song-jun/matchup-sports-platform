@@ -19,9 +19,8 @@ export async function createV1IntegrationApp(): Promise<{
   let app: INestApplication | undefined;
   let setupFailure: { readonly error: unknown } | undefined;
   try {
-    const [appModule, exceptionFilter, transformInterceptor] = await Promise.all([
+    const [appModule, transformInterceptor] = await Promise.all([
       import('../../src/app.module'),
-      import('../../src/common/filters/http-exception.filter'),
       import('../../src/common/interceptors/transform.interceptor'),
     ]);
     const moduleRef = await Test.createTestingModule({ imports: [appModule.AppModule] }).compile();
@@ -46,7 +45,8 @@ export async function createV1IntegrationApp(): Promise<{
         },
       }),
     );
-    app.useGlobalFilters(new exceptionFilter.AllExceptionsFilter());
+    // AllExceptionsFilter is registered globally via AppModule's APP_FILTER provider
+    // (needed for its PinoLogger DI) — no manual useGlobalFilters() call here.
     app.useGlobalInterceptors(new transformInterceptor.TransformInterceptor());
     await app.init();
   } catch (error) {

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { V1AdminNoticeRow, V1AdminPopupRow, V1Inquiry } from '@/types/api';
+import type { V1AdminNoticeRow, V1AdminPopupCreatePayload, V1AdminPopupRow, V1Inquiry } from '@/types/api';
 import {
   v1AdminLogsFixture,
   v1AdminNoticesFixture,
@@ -108,6 +108,23 @@ export const v1MswHandlers = [
     return ok({ id: 'recent-new', ...body, searchedAt: '2026-05-18T10:00:00.000Z' });
   }),
   http.get(`${api}/home`, () => ok(v1HomeFixture)),
+  http.get(`${api}/popups/active`, ({ request }) => {
+    const screen = new URL(request.url).searchParams.get('screen');
+    const row = v1AdminPopupsFixture.find((popup) =>
+      popup.status === 'published' && Boolean(screen) && popup.targetScreens.includes(screen as never),
+    );
+    return ok({
+      popup: row ? {
+        popupId: row.popupId,
+        title: row.title,
+        body: row.body,
+        targetScreens: row.targetScreens,
+        linkUrl: row.linkUrl,
+        linkLabel: row.linkLabel,
+        publishedAt: row.publishedAt,
+      } : null,
+    });
+  }),
   http.get(`${api}/notices`, ({ request }) => {
     const category = new URL(request.url).searchParams.get('category');
     const notices = category ? v1NoticesFixture.filter((item) => item.category === category) : v1NoticesFixture;
@@ -340,20 +357,16 @@ export const v1MswHandlers = [
     return popup ? ok({ popup }) : HttpResponse.json({ status: 'error', message: 'Popup was not found' }, { status: 404 });
   }),
   http.post(api + '/admin/popups', async ({ request }) => {
-    const body = await request.json() as {
-      audience: 'public' | 'users' | 'admins';
-      title: string;
-      body: string;
-      status: 'draft' | 'published' | 'archived';
-      displayStartAt?: string | null;
-      displayEndAt?: string | null;
-    };
+    const body = await request.json() as V1AdminPopupCreatePayload;
     const now = '2026-05-18T10:00:00.000Z';
     const popup: V1AdminPopupRow = {
       popupId: 'popup-new',
       audience: body.audience,
       title: body.title,
       body: body.body,
+      targetScreens: body.targetScreens,
+      linkUrl: body.linkUrl ?? null,
+      linkLabel: body.linkLabel ?? null,
       status: body.status,
       publishedAt: body.status === 'published' ? now : null,
       archivedAt: body.status === 'archived' ? now : null,

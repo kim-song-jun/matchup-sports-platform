@@ -163,11 +163,34 @@ export type V1Notice = {
   body?: string | null;
 };
 
+export type V1PopupTargetScreen =
+  | 'home'
+  | 'matches'
+  | 'team_matches'
+  | 'teams'
+  | 'tournaments'
+  | 'lessons'
+  | 'marketplace'
+  | 'mercenary'
+  | 'venues'
+  | 'community'
+  | 'chat'
+  | 'notifications'
+  | 'profile'
+  | 'my';
+
 export type V1Popup = {
   popupId: string;
   title: string;
   body: string;
+  targetScreens: V1PopupTargetScreen[];
+  linkUrl: string | null;
+  linkLabel: string | null;
   publishedAt: string | null;
+};
+
+export type V1ActivePopupResponse = {
+  popup: V1Popup | null;
 };
 
 export type V1NoticesResponse = {
@@ -1290,6 +1313,9 @@ export type V1AdminPopupRow = {
   audience: V1AdminNoticeAudience;
   title: string;
   body: string;
+  targetScreens: V1PopupTargetScreen[];
+  linkUrl: string | null;
+  linkLabel: string | null;
   status: V1AdminPopupStatus;
   publishedAt: string | null;
   archivedAt: string | null;
@@ -1303,6 +1329,9 @@ export type V1AdminPopupCreatePayload = {
   audience: V1AdminNoticeAudience;
   title: string;
   body: string;
+  targetScreens: V1PopupTargetScreen[];
+  linkUrl?: string | null;
+  linkLabel?: string | null;
   status: V1AdminPopupStatus;
   displayStartAt?: string | null;
   displayEndAt?: string | null;

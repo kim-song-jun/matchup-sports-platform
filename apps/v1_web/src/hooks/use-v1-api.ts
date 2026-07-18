@@ -21,6 +21,7 @@ import type {
   V1AdminPopupRow,
   V1AdminPopupUpdatePayload,
   V1AdminPopupUpdateResult,
+  V1ActivePopupResponse,
   V1AdminNoticeCreatePayload,
   V1AdminNoticeCreateResult,
   V1AdminNoticeDeleteResult,
@@ -78,6 +79,7 @@ import type {
   V1OnboardingMutationResult,
   V1OnboardingPreferencePayload,
   V1Profile,
+  V1PopupTargetScreen,
   V1PublicProfile,
   V1Region,
   V1ResolveLocationResponse,
@@ -367,6 +369,14 @@ export function useV1Home(filters?: ListFilters) {
   return useQuery({
     queryKey: v1Keys.home(filters),
     queryFn: () => v1Get<V1Home>('/home', filters),
+  });
+}
+
+export function useV1ActivePopup(screen: V1PopupTargetScreen | null) {
+  return useQuery({
+    queryKey: v1Keys.activePopup(screen),
+    queryFn: () => v1Get<V1ActivePopupResponse>('/popups/active', { screen: screen ?? undefined }),
+    enabled: Boolean(screen),
   });
 }
 

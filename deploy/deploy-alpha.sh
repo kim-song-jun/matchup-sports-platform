@@ -91,6 +91,11 @@ if (( memory_available_kib < 262144 || swap_free_kib < 262144 )); then
   exit 1
 fi
 
+if ! command -v rsync >/dev/null 2>&1; then
+  echo "[alpha-deploy] Installing missing rsync prerequisite"
+  sudo dnf install -y rsync
+fi
+
 rsync -a --delete \
   --exclude '/deploy/.env' \
   --exclude '/deploy/certbot/' \
@@ -141,6 +146,11 @@ done
   -v ON_ERROR_STOP=1 \
   -U "${V1_DB_USER:-teameet_v1}" \
   -d "${V1_DB_NAME:-teameet_v1}" < "${LIVE_DIR}/deploy/alpha-sanitize.sql"
+"${compose[@]}" run --rm --no-deps -T \
+  -e V1_ALPHA_QA_SEED=true \
+  -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
+  v1_api sh -c \
+  'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
 "${compose[@]}" up -d
 
 for attempt in $(seq 1 36); do

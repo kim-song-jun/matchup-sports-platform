@@ -54,6 +54,21 @@ Route 53 레코드의 대상은 EC2에 연결된 Elastic IP다. 인스턴스를 
 - 외부 결제, 메시지 발송, push 발송 같은 실사용자 side effect를 만드는 운영 credential은 alpha에 복사하지 않는다.
 - 유료 대회의 은행명·계좌번호·예금주는 `deploy/alpha-sanitize.sql`로 테스트 안내값에 덮어쓴다. 실제 운영 입금 계좌를 alpha 신청 완료 화면에 노출하지 않는다.
 
+### 대회 lifecycle QA 데이터
+
+alpha 배포는 migration과 결제 안내 비식별화 뒤 `prisma/seed-alpha-tournament-qa.ts`를 실행한다. 이 seed는 `V1_ALPHA_QA_SEED=true`, 정확한 alpha origin, `v1_postgres/teameet_v1` 조합이 모두 맞을 때만 실행되며, 고정 `aa1...` 대회 ID와 `[ALPHA QA]` 제목으로 식별되는 관리 대상만 교체한다. 프로덕션에서 복제한 기존 대회·사용자·업로드는 수정하거나 삭제하지 않는다.
+
+| 상태 | 대표 데이터 | 확인할 화면 |
+|---|---|---|
+| `draft` | 기획 중 대회 | 관리자 목록·편집 |
+| `open` | 신청 2팀, 캠페인, 유료 참가 안내 | 이벤트 허브·신청 플로우 |
+| `closed` | 확정 4팀, 잠긴 명단, 예정 대진 | 명단·대진 준비 |
+| `in_progress` | 완료/진행 중/예정 경기가 함께 있는 조별리그 | 라이브 대진·스코어 |
+| `completed` | 결과·순위·WebM 영상 2개·후기 2개·개인 어워드 3개·스폰서 | 결과·영상·후기·시상 |
+| `cancelled` | 취소된 대회 | 관리자 상태 표시 |
+
+일정은 배포 시점을 기준으로 상대 날짜를 다시 계산하므로 모집 중 대회가 시간이 지나 자동으로 과거 데이터가 되지 않는다. 영상은 외부 서비스에 의존하지 않는 3초 VP9 WebM 목자산을 사용한다. alpha QA 데이터는 실제 결제·송금·메시지 발송을 수행하지 않는다.
+
 덤프 파일은 복원 확인 후 운영자 로컬 임시 디렉터리와 EC2 staging 영역에서 삭제한다. 보관이 필요하면 암호화된 제한 버킷에 만료 정책과 접근 감사를 함께 둔다.
 
 ## `dev` 자동 배포
@@ -84,7 +99,9 @@ GitHub repository variables:
 
 IAM 신뢰 정책은 `kim-song-jun/matchup-sports-platform` 저장소의 `refs/heads/dev`로 제한한다. GitHub role은 alpha artifact prefix 쓰기와 해당 인스턴스의 SSM 명령 실행만 허용한다. EC2 instance role은 SSM core 권한과 alpha artifact prefix 읽기만 가진다.
 
-배포는 `COMPOSE_PARALLEL_LIMIT=1`로 API 이미지 다음 Web 이미지를 순차 빌드한다. migration 뒤에는 alpha 전용 결제 안내 비식별화를 적용하며, health check까지 성공해야 `/home/ec2-user/.teameet-alpha-release`가 갱신된다.
+배포는 `COMPOSE_PARALLEL_LIMIT=1`로 API 이미지 다음 Web 이미지를 순차 빌드한다. migration 뒤에는 alpha 전용 결제 안내 비식별화와 대회 lifecycle QA seed를 직렬 적용하며, health check까지 성공해야 `/home/ec2-user/.teameet-alpha-release`가 갱신된다.
+
+SSM 명령은 첫 줄에서 `set -Eeuo pipefail`을 강제한다. deploy가 실패한 뒤 cleanup 명령이 성공해 전체 실행이 성공처럼 보이는 상태를 허용하지 않는다. Amazon Linux 이미지에 `rsync`가 없으면 배포 스크립트가 한 번 설치한 뒤 source mirror를 진행한다. GitHub의 최종 검증은 단순 HTTP 200이 아니라 예상 SemVer prerelease, 전체 commit SHA, DB health가 모두 일치할 때까지 최대 3분 동안 확인한다.
 
 ## Changesets와 배포 버전
 

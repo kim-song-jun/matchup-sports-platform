@@ -132,12 +132,13 @@ jobs:
           object="s3://${DEPLOY_BUCKET}/releases/${RELEASE_SHA}.tar.gz"
 
           parameters="$(jq -nc \
+            --arg strict "set -Eeuo pipefail" \
+            --arg cleanup "trap 'status=\$?; rm -f '${archive}'; rm -rf '${stage}'; exit \${status}' EXIT" \
             --arg prepare "install -d -o ec2-user -g ec2-user '${stage}'" \
             --arg download "aws s3 cp '${object}' '${archive}' --only-show-errors" \
             --arg extract "tar -xzf '${archive}' -C '${stage}' && chown -R ec2-user:ec2-user '${stage}'" \
             --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' bash '${stage}/deploy/deploy-alpha.sh'" \
-            --arg cleanup "rm -f '${archive}' && rm -rf '${stage}'" \
-            '{commands: [$prepare, $download, $extract, $deploy, $cleanup]}'
+            '{commands: [$strict, $cleanup, $prepare, $download, $extract, $deploy]}'
           )"
 
           command_id="$(aws ssm send-command \
@@ -184,11 +185,18 @@ jobs:
           RELEASE_VERSION: ${{ steps.version.outputs.prerelease }}
         run: |
           set -Eeuo pipefail
-          headers="$(curl -fsSI --retry 6 --retry-delay 5 https://alpha.teameet.co.kr/landing)"
-          deployed_version="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
-          deployed_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
-          test "${deployed_version}" = "${RELEASE_VERSION}"
-          test "${deployed_sha}" = "${RELEASE_SHA}"
-          curl -fsS --retry 6 --retry-delay 5 \
-            https://alpha.teameet.co.kr/api/v1/health |
-            jq -e '.data.checks.db == true'
+          for attempt in $(seq 1 36); do
+            headers="$(curl -fsSI https://alpha.teameet.co.kr/landing 2>/dev/null || true)"
+            deployed_version="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+            deployed_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${headers}")"
+            db_healthy="$(curl -fsS https://alpha.teameet.co.kr/api/v1/health 2>/dev/null | jq -r '.data.checks.db // false' 2>/dev/null || true)"
+            if [[ "${deployed_version}" == "${RELEASE_VERSION}" && "${deployed_sha}" == "${RELEASE_SHA}" && "${db_healthy}" == "true" ]]; then
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Alpha did not expose the expected release identity within 3 minutes" >&2
+          echo "expected_version=${RELEASE_VERSION} observed_version=${deployed_version:-missing}" >&2
+          echo "expected_sha=${RELEASE_SHA} observed_sha=${deployed_sha:-missing} db_healthy=${db_healthy:-false}" >&2
+          exit 1

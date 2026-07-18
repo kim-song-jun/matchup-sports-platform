@@ -151,6 +151,14 @@ export type TeamMembersViewModel = {
     locked?: boolean;
     actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
     actionPending?: boolean;
+    /** 본인 행에만 노출되는 "팀 나가기" 버튼. owner는 소유권 이전 전까지 disabled + 툴팁. */
+    selfLeave?: {
+      disabled: boolean;
+      disabledReason?: string;
+      pending?: boolean;
+      error?: string | null;
+      onSelect: () => void;
+    };
   }>;
   requests: Array<{
     name: string;

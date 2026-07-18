@@ -7,6 +7,7 @@
 | GET | /api/v1/master/regions | public | none | region tree/list |
 | GET | /api/v1/home | optional user | sportId?, regionId? | aggregate with independent popup and notices |
 | GET | /api/v1/home/recommendations | optional user | sportId?, regionId?, limit? max 20 | recommendation list |
+| GET | /api/v1/popups/active | public | screen (supported target screen) | { popup: active popup or null } |
 | GET | /api/v1/notices | public | service-defined list filters | published notice list |
 | GET | /api/v1/notices/:noticeId | visibility-dependent | path id | notice detail |
 | GET | /api/v1/admin/notices | active admin | status?, category?, audience?, q?, cursor?, limit? | notice cursor page |
@@ -15,7 +16,7 @@
 | DELETE | /api/v1/admin/notices/:noticeId | owner/ops | path id | { noticeId, deleted: true } |
 | GET | /api/v1/admin/popups | active admin | status?, q?, cursor?, limit? | popup cursor page |
 | GET | /api/v1/admin/popups/:popupId | active admin | path id | popup detail |
-| POST | /api/v1/admin/popups | owner/ops | { audience, title, body, status, displayStartAt?, displayEndAt? } | created popup |
+| POST | /api/v1/admin/popups | owner/ops | { audience, title, body, status, targetScreens[], linkUrl?, linkLabel?, displayStartAt?, displayEndAt? } | created popup |
 | PATCH | /api/v1/admin/popups/:popupId | owner/ops | same popup payload | updated popup |
 | DELETE | /api/v1/admin/popups/:popupId | owner/ops | path id | { popupId, deleted: true } |
 
@@ -25,7 +26,10 @@
 - Notice categories accepted by admin mutation DTOs are 안내 | 업데이트; pinned is not a notice field.
 - Popup status labels are UI-only mappings: published=공개, archived=비공개, draft=초안.
 - Popup display end must be later than display start. Invalid ranges return 400 INVALID_DISPLAY_WINDOW.
-- Home popup selects the newest published + public popup whose optional start is at/before now and whose optional end is after now.
+- Popup target screens are home, matches, team_matches, teams, tournaments, lessons, marketplace, mercenary, venues, community, chat, notifications, profile, and my. At least one is required.
+- Popup links must be a root-relative internal path or HTTPS URL. A label without a URL and unsafe schemes return 400 INVALID_POPUP_LINK.
+- Active popup lookup selects the newest published + public popup targeting the requested screen whose optional start is at/before now and whose optional end is after now.
+- Home popup uses the same lookup with screen=home for backward compatibility.
 - Home notices contains recent published + public notices and does not supply popup content.
 - Popup deletion writes popup.delete; notice deletion writes notice.delete.
 - The split migration copies existing category=고정 notice rows to v1_popups with IDs and display windows, then removes them from v1_notices.

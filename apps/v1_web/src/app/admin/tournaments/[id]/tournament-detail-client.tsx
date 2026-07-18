@@ -3801,7 +3801,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         hidden={activeTab !== 'popups'}
       >
         {activeTab === 'popups' && (
-          <TournamentPopupTab tournamentId={id} showToast={showToast} />
+          <TournamentPopupTab tournamentId={id} canWrite={canWrite} showToast={showToast} />
         )}
       </div>
 

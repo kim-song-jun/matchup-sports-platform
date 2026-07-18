@@ -6,6 +6,7 @@ import { PendingSocialSignupGate } from '@/components/auth/pending-social-signup
 import { ClientErrorListener } from '@/components/providers/client-error-listener';
 import { GoogleAnalytics } from '@/components/providers/google-analytics';
 import { getGaMeasurementId } from '@/lib/analytics';
+import { GlobalPopup } from '@/components/popups/global-popup';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -33,6 +34,7 @@ export function Providers({ children }: { children: ReactNode }) {
         </Suspense>
       )}
       <PendingSocialSignupGate>{children}</PendingSocialSignupGate>
+      <GlobalPopup />
     </QueryClientProvider>
   );
 }

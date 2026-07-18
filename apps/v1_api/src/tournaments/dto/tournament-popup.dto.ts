@@ -1,11 +1,28 @@
-import { IsDateString, IsIn, IsOptional, IsString, IsUrl, MaxLength, ValidateIf } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsDateString,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
+
+const trimString = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim() : value;
 
 export class CreateTournamentPopupDto {
+  @Transform(trimString)
   @IsString()
+  @IsNotEmpty()
   @MaxLength(120)
   title!: string;
 
+  @Transform(trimString)
   @IsString()
+  @IsNotEmpty()
   @MaxLength(5000)
   body!: string;
 

@@ -9,7 +9,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
-import { useV1AdminIntegrationSettings, useV1AdminMe, useV1UpdateIntegrationSettings } from '@/hooks/use-v1-api';
+import {
+  useV1ActivePopup,
+  useV1AdminIntegrationSettings,
+  useV1AdminMe,
+  useV1UpdateIntegrationSettings,
+} from '@/hooks/use-v1-api';
 import AdminIntegrationSettingsPage from './page';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -17,11 +22,13 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1ActivePopup: vi.fn(),
   useV1AdminIntegrationSettings: vi.fn(),
   useV1AdminMe: vi.fn(),
   useV1UpdateIntegrationSettings: vi.fn(),
 }));
 
+const useV1ActivePopupMock = vi.mocked(useV1ActivePopup);
 const useV1AdminIntegrationSettingsMock = vi.mocked(useV1AdminIntegrationSettings);
 const useV1AdminMeMock = vi.mocked(useV1AdminMe);
 const useV1UpdateIntegrationSettingsMock = vi.mocked(useV1UpdateIntegrationSettings);
@@ -38,6 +45,9 @@ describe('AdminIntegrationSettingsPage', () => {
   const mutate = vi.fn();
 
   beforeEach(() => {
+    useV1ActivePopupMock.mockReturnValue({
+      data: undefined,
+    } as unknown as ReturnType<typeof useV1ActivePopup>);
     useV1AdminMeMock.mockReturnValue({
       data: { capabilities: ['status:write'] },
     } as unknown as ReturnType<typeof useV1AdminMe>);

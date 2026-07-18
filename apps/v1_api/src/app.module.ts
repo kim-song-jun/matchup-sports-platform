@@ -13,6 +13,7 @@ import { MasterModule } from './master/master.module';
 import { MatchesModule } from './matches/matches.module';
 import { NoticesModule } from './notices/notices.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { PopupsModule } from './popups/popups.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
@@ -62,6 +63,7 @@ import { LogsModule } from './logs/logs.module';
     PrismaModule,
     HealthModule,
     AuthModule,
+    PopupsModule,
     HomeModule,
     InquiriesModule,
     MatchesModule,

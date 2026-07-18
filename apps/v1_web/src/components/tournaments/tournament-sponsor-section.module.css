@@ -11,10 +11,6 @@
   gap: 8px;
 }
 
-.card {
-  padding: 16px;
-}
-
 .summary {
   display: flex;
   align-items: flex-start;

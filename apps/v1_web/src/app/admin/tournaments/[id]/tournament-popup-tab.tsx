@@ -27,10 +27,12 @@ const STATUS_LABEL: Record<V1AdminTournamentPopup['status'], string> = {
 
 export function TournamentPopupTab({
   tournamentId,
+  canWrite,
   showToast,
 }: {
-  tournamentId: string;
-  showToast: (msg: string, v?: 'success' | 'error') => void;
+  readonly tournamentId: string;
+  readonly canWrite: boolean;
+  readonly showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
   const [form, setForm] = useState<PopupForm>(emptyPopupForm);
   const [editingPopupId, setEditingPopupId] = useState<string | null>(null);
@@ -97,14 +99,23 @@ export function TournamentPopupTab({
 
   return (
     <div className="flex flex-col gap-6">
-      <TournamentPopupForm
-        form={form}
-        mode={formMode}
-        pending={formPending}
-        setField={setField}
-        onSubmit={handleSubmit}
-        onCancel={editingPopupId ? resetForm : undefined}
-      />
+      {canWrite ? (
+        <TournamentPopupForm
+          form={form}
+          mode={formMode}
+          pending={formPending}
+          setField={setField}
+          onSubmit={handleSubmit}
+          onCancel={editingPopupId ? resetForm : undefined}
+        />
+      ) : (
+        <p
+          className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600"
+          role="status"
+        >
+          조회 전용 권한으로 접속했어요. 팝업을 추가하거나 변경하려면 운영 권한이 필요해요.
+        </p>
+      )}
 
       {(isPending || isError) && (
         <AdminDataTable
@@ -139,29 +150,31 @@ export function TournamentPopupTab({
               <p className="mt-3 text-[13px] text-gray-600 leading-relaxed whitespace-pre-wrap">
                 {popup.body}
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => startEdit(popup)}
-                  className={[
-                    'min-h-[44px] rounded-lg bg-gray-100 px-3 text-xs font-semibold text-gray-700',
-                    'transition-colors hover:bg-gray-200',
-                  ].join(' ')}
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(popup)}
-                  disabled={deletePopup.isPending}
-                  className={[
-                    'min-h-[44px] rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-600',
-                    'transition-colors hover:bg-red-100 disabled:opacity-50',
-                  ].join(' ')}
-                >
-                  삭제
-                </button>
-              </div>
+              {canWrite ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(popup)}
+                    className={[
+                      'min-h-[44px] rounded-lg bg-gray-100 px-3 text-xs font-semibold text-gray-700',
+                      'transition-colors hover:bg-gray-200',
+                    ].join(' ')}
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(popup)}
+                    disabled={deletePopup.isPending}
+                    className={[
+                      'min-h-[44px] rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-600',
+                      'transition-colors hover:bg-red-100 disabled:opacity-50',
+                    ].join(' ')}
+                  >
+                    삭제
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

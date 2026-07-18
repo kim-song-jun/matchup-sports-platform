@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getTournamentPopupStorageKey, TournamentPopupDialog } from './tournament-popup-dialog';
@@ -28,6 +28,19 @@ describe('TournamentPopupDialog', () => {
   it('renders no dialog when there is no active popup', () => {
     render(<TournamentPopupDialog popup={null} />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('replaces a broken remote popup image with the local campaign fallback', async () => {
+    render(
+      <TournamentPopupDialog
+        popup={{ ...popup, imageUrl: 'https://cdn.example.com/broken-popup.webp' }}
+      />,
+    );
+
+    const image = await screen.findByRole('presentation');
+    fireEvent.error(image);
+
+    expect(image).toHaveAttribute('src', '/mock/generated/team-huddle.webp');
   });
 
   it('hides only this tournament popup for seven days, keyed by popupId', async () => {

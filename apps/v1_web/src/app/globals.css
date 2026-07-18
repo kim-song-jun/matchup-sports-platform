@@ -6062,7 +6062,6 @@ button:disabled {
   padding: 28px 0 8px;
   position: relative;
 }
-/* 1위 뒤 은은한 스포트라이트 글로우 — 살짝 숨쉬듯 pulse */
 .tm-awards-podium::before {
   content: '';
   position: absolute;
@@ -6073,11 +6072,6 @@ button:disabled {
   height: 150px;
   background: radial-gradient(ellipse at center, rgba(245, 166, 35, 0.16) 0%, rgba(245, 166, 35, 0) 72%);
   pointer-events: none;
-  animation: tmPodiumSpotlightPulse 2.6s ease-in-out infinite;
-}
-@keyframes tmPodiumSpotlightPulse {
-  0%, 100% { opacity: 0.75; }
-  50% { opacity: 1; }
 }
 /* 3위 → 2위 → 1위 순으로 차오르는 등장 연출 */
 .tm-awards-podium-slot {
@@ -6096,7 +6090,6 @@ button:disabled {
   to   { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tm-awards-podium::before { animation: none; }
   .tm-awards-podium-slot { animation: none; opacity: 1; }
 }
 .tm-awards-podium-block {

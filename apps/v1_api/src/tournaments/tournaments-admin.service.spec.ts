@@ -81,7 +81,14 @@ describe('TournamentsAdminService', () => {
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
     v1Sport: { findUnique: jest.Mock };
-    v1Tournament: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1Tournament: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -91,7 +98,14 @@ describe('TournamentsAdminService', () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
       v1Sport: { findUnique: jest.fn() },
-      v1Tournament: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1Tournament: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
@@ -335,23 +349,52 @@ describe('TournamentsAdminService', () => {
   it('publishBracket: not-yet-published tournament → sets bracketPublishedAt + writes audit log', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: null }));
-    prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ bracketPublishedAt: new Date() }));
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
     const result = await service.publishBracket(ownerAuthUser, 'tournament-1');
 
     expect(result.alreadyPublished).toBe(false);
     expect(result.bracketPublishedAt).toEqual(expect.any(String));
-    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'tournament-1' },
-        data: { bracketPublishedAt: expect.any(Date) },
-      }),
-    );
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tournament-1', deletedAt: null, bracketPublishedAt: null },
+      data: { bracketPublishedAt: expect.any(Date) },
+    });
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.bracket_publish' }) }),
     );
     // 대진표 공개는 대회 status와 무관한 이벤트라 status-change 로그는 남기지 않는다.
     expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: concurrent requests produce one transition and one audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: null }));
+    let winnerPublishedAt: Date | null = null;
+    prisma.v1Tournament.updateMany.mockImplementation(
+      ({ data }: { data: { bracketPublishedAt: Date } }) => {
+        if (winnerPublishedAt) return Promise.resolve({ count: 0 });
+        winnerPublishedAt = data.bracketPublishedAt;
+        return Promise.resolve({ count: 1 });
+      },
+    );
+    prisma.v1Tournament.findUnique.mockImplementation(() =>
+      Promise.resolve({ bracketPublishedAt: winnerPublishedAt, deletedAt: null }),
+    );
+
+    const results = await Promise.all([
+      service.publishBracket(ownerAuthUser, 'tournament-1'),
+      service.publishBracket(ownerAuthUser, 'tournament-1'),
+    ]);
+
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ alreadyPublished: false }),
+        expect.objectContaining({ alreadyPublished: true }),
+      ]),
+    );
+    expect(new Set(results.map((result) => result.bracketPublishedAt)).size).toBe(1);
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
   });
 
   it('publishBracket: already published → idempotent no-op (no write)', async () => {
@@ -367,6 +410,7 @@ describe('TournamentsAdminService', () => {
       alreadyPublished: true,
     });
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
     expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 

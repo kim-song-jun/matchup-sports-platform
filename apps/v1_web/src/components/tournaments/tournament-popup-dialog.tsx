@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { V1TournamentDetailPopup } from '@/types/api';
+import { TournamentCampaignMedia } from './tournament-campaign-media';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const STORAGE_KEY_PREFIX = 'teameet:v1:tournament-popup:hidden-until:';
@@ -91,8 +92,7 @@ export function TournamentPopupDialog({ popup }: { popup: V1TournamentDetailPopu
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(25, 31, 40, 0.48)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) setOpen(false);
       }}
@@ -103,22 +103,20 @@ export function TournamentPopupDialog({ popup }: { popup: V1TournamentDetailPopu
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={bodyId}
-        className="w-full max-w-[420px] overflow-hidden rounded-2xl"
-        style={{ background: 'var(--surface, #fff)', boxShadow: 'var(--shadow-modal)' }}
+        className="w-full max-w-[420px] overflow-hidden rounded-2xl bg-[var(--surface)] shadow-[var(--shadow-modal)]"
       >
         {popup.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <TournamentCampaignMedia
             src={popup.imageUrl}
+            sportCode=""
             alt=""
-            aria-hidden="true"
-            className="w-full h-auto max-h-[240px] object-cover"
+            className="h-auto max-h-[240px] w-full object-cover"
           />
         ) : null}
 
-        <div style={{ padding: '24px 24px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-            <h2 id={titleId} className="tm-text-subhead" style={{ margin: 0, color: 'var(--text-strong)' }}>
+        <div className="px-6 pb-5 pt-6">
+          <div className="flex items-start justify-between gap-4">
+            <h2 id={titleId} className="tm-text-subhead m-0 text-[var(--text-strong)]">
               {popup.title}
             </h2>
             <button
@@ -127,22 +125,20 @@ export function TournamentPopupDialog({ popup }: { popup: V1TournamentDetailPopu
               className="tm-btn tm-btn-icon tm-btn-ghost"
               aria-label="팝업 닫기"
               onClick={() => setOpen(false)}
-              style={{ marginTop: -10, marginRight: -10 }}
             >
-              <span aria-hidden="true" style={{ fontSize: 24, lineHeight: 1 }}>×</span>
+              <span aria-hidden="true" className="text-2xl leading-none">×</span>
             </button>
           </div>
 
           <p
             id={bodyId}
-            className="tm-text-label"
-            style={{ margin: '16px 0 0', color: 'var(--text-muted)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 220, overflowY: 'auto' }}
+            className="tm-text-label mt-4 max-h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed text-[var(--text-muted)]"
           >
             {popup.body}
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8, padding: '0 24px 24px' }}>
+        <div className="grid grid-cols-2 gap-2 px-6 pb-6">
           <button type="button" className="tm-btn tm-btn-md tm-btn-ghost" onClick={hideForAWeek}>
             일주일 안 보기
           </button>

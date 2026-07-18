@@ -1,10 +1,30 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { TeamMembersPageClient } from './teams-client';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView } from './teams-page';
 import { getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
 import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel } from './teams.types';
+
+const teamApiMocks = vi.hoisted(() => ({
+  useV1TeamDetail: vi.fn(),
+  useV1TeamMembers: vi.fn(),
+  useV1TeamJoinApplications: vi.fn(),
+  useV1ChangeTeamMembershipRole: vi.fn(),
+  useV1RemoveTeamMembership: vi.fn(),
+  useV1ApproveTeamJoinApplication: vi.fn(),
+  useV1RejectTeamJoinApplication: vi.fn(),
+  useV1SendTeamInvitation: vi.fn(),
+  useV1CancelTeamInvitation: vi.fn(),
+  useV1TeamInvitations: vi.fn(),
+  useV1LeaveTeam: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
+  ...teamApiMocks,
+}));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/edit',
@@ -24,6 +44,52 @@ function render(ui: ReactElement) {
   });
 
   return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
+function mockOwnerMembersPage(activeOwnerCount: number) {
+  const leaveMutate = vi.fn();
+  teamApiMocks.useV1TeamDetail.mockReturnValue({
+    data: {
+      name: '성수 풋살 크루',
+      canViewMembers: true,
+      viewer: { role: 'owner', membershipId: 'membership-owner' },
+    },
+    isError: false,
+  });
+  teamApiMocks.useV1TeamMembers.mockReturnValue({
+    data: {
+      items: [
+        {
+          membershipId: 'membership-owner',
+          userId: 'user-owner',
+          displayName: '김도윤',
+          realName: null,
+          phone: null,
+          birthDate: null,
+          profileImageUrl: null,
+          role: 'owner',
+          status: 'active',
+          joinedAt: '2026-01-01T00:00:00.000Z',
+          canChangeRole: false,
+          canRemove: false,
+        },
+      ],
+      summary: { ownerCount: activeOwnerCount, managerCount: 0, memberCount: activeOwnerCount },
+      viewerRole: 'owner',
+      pageInfo: { nextCursor: null, hasNext: false },
+    },
+    isError: false,
+  });
+  teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+  teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+  teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  teamApiMocks.useV1RejectTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  teamApiMocks.useV1SendTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  teamApiMocks.useV1LeaveTeam.mockReturnValue({ isPending: false, mutate: leaveMutate });
+  return leaveMutate;
 }
 
 describe('TeamListPageView', () => {
@@ -356,5 +422,62 @@ describe('TeamFormPageView', () => {
     fireEvent.click(screen.getByRole('button', { name: '가입 닫힘' }));
 
     expect(onJoinPolicyChange).toHaveBeenCalledWith('closed');
+  });
+});
+
+describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
+  it('본인 행에만 "팀 나가기" 버튼이 보이고 클릭 시 onSelect가 호출된다', () => {
+    const onSelect = vi.fn();
+    const base = getTeamMembersViewModel();
+    const model: TeamMembersViewModel = {
+      ...base,
+      members: [
+        { name: '김도윤', role: '팀장', meta: 'FW · 가입 2024.03', locked: true, actions: [] },
+        {
+          name: '이하나',
+          role: '멤버',
+          meta: 'MF · 최근 4경기',
+          actions: [],
+          selfLeave: { disabled: false, pending: false, onSelect },
+        },
+      ],
+    };
+
+    render(<TeamMembersPageView model={model} />);
+
+    const leaveButtons = screen.getAllByRole('button', { name: '팀 나가기' });
+    // 본인(이하나) 행에만 1개만 렌더된다 — 김도윤 행에는 selfLeave가 없으므로 버튼 없음
+    expect(leaveButtons).toHaveLength(1);
+
+    fireEvent.click(leaveButtons[0]);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('단독 owner는 active owner 요약에 따라 "팀 나가기"가 비활성화된다', () => {
+    mockOwnerMembersPage(1);
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    const button = screen.getByRole('button', { name: /팀 나가기/ });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', '마지막 소유자는 소유권을 먼저 이전해주세요');
+  });
+
+  it('다른 active owner가 있는 공동 owner는 확인 후 "팀 나가기"를 실행할 수 있다', async () => {
+    const leaveMutate = mockOwnerMembersPage(2);
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    const button = screen.getByRole('button', { name: '팀 나가기' });
+    expect(button).toBeEnabled();
+
+    fireEvent.click(button);
+    expect(screen.getByRole('dialog', { name: '팀 나가기' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '나가기' }));
+
+    await waitFor(() => expect(leaveMutate).toHaveBeenCalledWith(
+      { reason: 'left_from_v1_web_member_page' },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    ));
   });
 });

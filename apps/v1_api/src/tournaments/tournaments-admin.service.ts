@@ -415,12 +415,34 @@ export class TournamentsAdminService {
       };
     }
 
-    const publishedAt = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.v1Tournament.update({
-        where: { id: tournamentId },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const publishedAt = new Date();
+      const transition = await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, deletedAt: null, bracketPublishedAt: null },
         data: { bracketPublishedAt: publishedAt },
       });
+
+      if (transition.count === 0) {
+        const current = await tx.v1Tournament.findUnique({
+          where: { id: tournamentId },
+          select: { bracketPublishedAt: true, deletedAt: true },
+        });
+        if (!current || current.deletedAt) {
+          throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+        }
+        if (!current.bracketPublishedAt) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_BRACKET_PUBLISH_CONFLICT',
+            message: '대진표 공개 상태가 변경되었어요. 다시 시도해 주세요.',
+          });
+        }
+        return {
+          tournamentId,
+          bracketPublishedAt: current.bracketPublishedAt.toISOString(),
+          alreadyPublished: true,
+        };
+      }
+
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -431,9 +453,11 @@ export class TournamentsAdminService {
         },
         tx,
       );
+
+      return { tournamentId, bracketPublishedAt: publishedAt.toISOString(), alreadyPublished: false };
     });
 
-    return { tournamentId, bracketPublishedAt: publishedAt.toISOString(), alreadyPublished: false };
+    return result;
   }
 
   /**

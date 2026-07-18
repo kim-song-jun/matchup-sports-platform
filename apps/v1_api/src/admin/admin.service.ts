@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { isSafePopupLink } from '../popups/popup-screen';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
@@ -826,6 +827,7 @@ export class AdminService {
     const publishedAt = dto.status === 'published' ? now : null;
     const archivedAt = dto.status === 'archived' ? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
+    const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
 
     const row = await this.prisma.$transaction(async (tx) => {
       const popup = await tx.v1Popup.create({
@@ -833,6 +835,9 @@ export class AdminService {
           audience: dto.audience,
           title: dto.title.trim(),
           body: dto.body.trim(),
+          targetScreens,
+          linkUrl,
+          linkLabel,
           status: dto.status,
           publishedAt,
           archivedAt,
@@ -853,6 +858,9 @@ export class AdminService {
             popupId: popup.id,
             audience: popup.audience,
             status: popup.status,
+            targetScreens: popup.targetScreens,
+            linkUrl: popup.linkUrl,
+            linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
             displayEndAt: popup.displayEndAt?.toISOString() ?? null,
           } as Prisma.InputJsonValue,
@@ -877,6 +885,7 @@ export class AdminService {
     const publishedAt = dto.status === 'published' ? existing.publishedAt ?? now : null;
     const archivedAt = dto.status === 'archived' ? existing.archivedAt ?? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
+    const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
 
     const row = await this.prisma.$transaction(async (tx) => {
       const popup = await tx.v1Popup.update({
@@ -885,6 +894,9 @@ export class AdminService {
           audience: dto.audience,
           title: dto.title.trim(),
           body: dto.body.trim(),
+          targetScreens,
+          linkUrl,
+          linkLabel,
           status: dto.status,
           publishedAt,
           archivedAt,
@@ -904,6 +916,9 @@ export class AdminService {
             popupId: existing.id,
             audience: existing.audience,
             status: existing.status,
+            targetScreens: existing.targetScreens,
+            linkUrl: existing.linkUrl,
+            linkLabel: existing.linkLabel,
             displayStartAt: existing.displayStartAt?.toISOString() ?? null,
             displayEndAt: existing.displayEndAt?.toISOString() ?? null,
           } as Prisma.InputJsonValue,
@@ -911,6 +926,9 @@ export class AdminService {
             popupId: popup.id,
             audience: popup.audience,
             status: popup.status,
+            targetScreens: popup.targetScreens,
+            linkUrl: popup.linkUrl,
+            linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
             displayEndAt: popup.displayEndAt?.toISOString() ?? null,
           } as Prisma.InputJsonValue,
@@ -1664,11 +1682,41 @@ export class AdminService {
     return { displayStartAt, displayEndAt };
   }
 
+  private parsePopupTargeting(dto: CreateAdminPopupDto) {
+    const targetScreens = [...new Set(dto.targetScreens)];
+    if (targetScreens.length === 0) {
+      throw new BadRequestException({
+        code: 'POPUP_TARGET_REQUIRED',
+        message: 'At least one popup target screen is required',
+      });
+    }
+
+    const linkUrl = dto.linkUrl?.trim() || null;
+    const linkLabel = dto.linkLabel?.trim() || null;
+    if (linkUrl && !isSafePopupLink(linkUrl)) {
+      throw new BadRequestException({
+        code: 'INVALID_POPUP_LINK',
+        message: 'Popup links must be root-relative paths or HTTPS URLs',
+      });
+    }
+    if (linkLabel && !linkUrl) {
+      throw new BadRequestException({
+        code: 'INVALID_POPUP_LINK',
+        message: 'Popup link label requires a link URL',
+      });
+    }
+
+    return { targetScreens, linkUrl, linkLabel };
+  }
+
   private toAdminPopupRow(row: {
     id: string;
     audience: string;
     title: string;
     body: string;
+    targetScreens: string[];
+    linkUrl: string | null;
+    linkLabel: string | null;
     status: string;
     publishedAt: Date | null;
     archivedAt: Date | null;
@@ -1682,6 +1730,9 @@ export class AdminService {
       audience: row.audience,
       title: row.title,
       body: row.body,
+      targetScreens: row.targetScreens,
+      linkUrl: row.linkUrl,
+      linkLabel: row.linkLabel,
       status: row.status,
       publishedAt: row.publishedAt,
       archivedAt: row.archivedAt,

@@ -277,7 +277,15 @@ jobs:
           # postgres:16-alpine, etc.) forcing a full re-pull on every deploy.
           sudo docker image prune -f || true
           sudo docker container prune -f || true
-          sudo docker builder prune -a -f || true
+          BUILDX_PRUNE_HELP="$(sudo docker buildx prune --help)"
+          for required_flag in --max-used-space --min-free-space; do
+            if ! grep -q -- "${required_flag}" <<<"${BUILDX_PRUNE_HELP}"; then
+              echo "[ERROR] Docker Buildx must support ${required_flag} for bounded production cache cleanup"
+              exit 1
+            fi
+          done
+          sudo docker buildx prune -f --filter 'until=168h'
+          sudo docker buildx prune -f --max-used-space 10GB --min-free-space 20GB
           sudo docker network prune -f || true
           echo "[cleanup] Disk usage after prune:"
           df -h / | tail -1

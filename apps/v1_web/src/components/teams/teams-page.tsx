@@ -1075,7 +1075,7 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         </div>
         {model.activeTab === 'members' ? (
           <MemberSection title="팀 멤버" sub="팀에 속한 멤버의 역할과 권한을 관리해요." desktopGrid>
-            {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} profileHref={member.profileHref} actions={member.actions} actionPending={member.actionPending} />)}
+            {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} profileHref={member.profileHref} actions={member.actions} actionPending={member.actionPending} selfLeave={member.selfLeave} />)}
           </MemberSection>
         ) : model.activeTab === 'requests' ? (
           <MemberSection title="가입 신청" sub="가입을 신청한 분을 승인하거나 거절할 수 있어요." desktopGrid>
@@ -1597,6 +1597,7 @@ function MemberCard({
   profileHref,
   actions,
   actionPending,
+  selfLeave,
 }: {
   title: string;
   sub: string;
@@ -1604,6 +1605,7 @@ function MemberCard({
   profileHref?: string;
   actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
   actionPending?: boolean;
+  selfLeave?: { disabled: boolean; disabledReason?: string; pending?: boolean; error?: string | null; onSelect: () => void };
 }) {
   const [open, setOpen] = useState(false);
   const disabled = actionPending || actions.length === 0;
@@ -1630,6 +1632,24 @@ function MemberCard({
             </button>
           ))}
         </div>
+      ) : null}
+      {selfLeave ? (
+        <button
+          className="tm-btn tm-btn-sm tm-btn-danger tm-btn-block"
+          style={{ marginTop: 10, minHeight: 44 }}
+          type="button"
+          disabled={selfLeave.disabled || selfLeave.pending}
+          title={selfLeave.disabled ? selfLeave.disabledReason : undefined}
+          aria-label={selfLeave.disabled && selfLeave.disabledReason ? `팀 나가기 — ${selfLeave.disabledReason}` : '팀 나가기'}
+          onClick={selfLeave.onSelect}
+        >
+          {selfLeave.pending ? '나가는 중…' : '팀 나가기'}
+        </button>
+      ) : null}
+      {selfLeave?.error ? (
+        <p role="alert" className="tm-text-caption" style={{ marginTop: 6, color: 'var(--red500)' }}>
+          {selfLeave.error}
+        </p>
       ) : null}
     </Card>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import type { HomePopup } from './home.types';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -11,6 +12,8 @@ const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1
 export function getHomePopupStorageKey(popupId: string) {
   return `${STORAGE_KEY_PREFIX}${popupId}`;
 }
+
+export const getPopupStorageKey = getHomePopupStorageKey;
 
 export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
   const [open, setOpen] = useState(false);
@@ -82,6 +85,10 @@ export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
     setOpen(false);
   };
 
+  const closePopup = () => setOpen(false);
+  const linkLabel = popup.linkLabel?.trim() || '자세히 보기';
+  const externalLink = popup.linkUrl?.startsWith('https://') ?? false;
+
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -132,9 +139,21 @@ export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
           <button type="button" className="tm-btn tm-btn-md tm-btn-ghost" onClick={hideForAWeek}>
             일주일 안 보기
           </button>
-          <button type="button" className="tm-btn tm-btn-md tm-btn-primary" onClick={() => setOpen(false)}>
-            닫기
-          </button>
+          {popup.linkUrl ? (
+            externalLink ? (
+              <a className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} target="_blank" rel="noreferrer" onClick={closePopup}>
+                {linkLabel}
+              </a>
+            ) : (
+              <Link className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} onClick={closePopup}>
+                {linkLabel}
+              </Link>
+            )
+          ) : (
+            <button type="button" className="tm-btn tm-btn-md tm-btn-primary" onClick={closePopup}>
+              닫기
+            </button>
+          )}
         </div>
       </div>
     </div>,

@@ -1,5 +1,6 @@
 'use client';
 
+import { Card } from '@/components/v1-ui/primitives';
 import type { V1TournamentSponsor } from '@/types/api';
 import { TournamentCampaignMedia } from './tournament-campaign-media';
 import styles from './tournament-sponsor-section.module.css';
@@ -63,7 +64,7 @@ export function TournamentSponsorSection({
       </div>
       <div className={styles.cardList}>
         {cards.map((sponsor) => (
-          <div key={sponsor.id} className={`tm-card ${styles.card}`}>
+          <Card key={sponsor.id} pad={16}>
             <div className={styles.summary}>
               <SponsorLogo name={sponsor.name} logoUrl={sponsor.logoUrl} />
               <div className={styles.details}>
@@ -108,7 +109,7 @@ export function TournamentSponsorSection({
                 ))}
               </div>
             ) : null}
-          </div>
+          </Card>
         ))}
       </div>
     </section>

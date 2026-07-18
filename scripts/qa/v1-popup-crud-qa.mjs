@@ -11,8 +11,10 @@ const adminEmail = process.env.V1_QA_ADMIN_EMAIL ?? 'admin@teameet.v1';
 const userEmail = process.env.V1_QA_USER_EMAIL ?? 'host@teameet.v1';
 const marker = Date.now().toString(36);
 const popupTitle = `QA 중앙 팝업 ${marker}`;
-const initialBody = '관리자 화면에서 생성한 실제 팝업입니다. 홈 화면 중앙 노출을 확인합니다.';
-const updatedBody = '수정 완료: 생성, 상세 조회, 수정, 홈 중앙 노출, 삭제 계약을 검증합니다.';
+const initialBody = '관리자 화면에서 생성한 실제 팝업입니다. 선택한 화면의 중앙 노출을 확인합니다.';
+const updatedBody = '수정 완료: 복수 화면 선택, CTA 링크, 지정 화면 노출, 비지정 화면 미노출을 검증합니다.';
+const popupLinkUrl = '/matches';
+const popupLinkLabel = '매치 보러 가기';
 const displayStartAt = new Date(Date.now() - 5 * 60 * 1000);
 const displayEndAt = new Date(Date.now() + 60 * 60 * 1000);
 const viewports = [
@@ -43,6 +45,7 @@ function observe(page, scope) {
     const failure = request.failure()?.errorText ?? 'failed';
     const url = request.url();
     if (failure === 'net::ERR_ABORTED' && new URL(url).searchParams.has('_rsc')) return;
+    if (failure === 'net::ERR_ABORTED' && url.includes('webpack.hot-update.json')) return;
     networkErrors.push(`${request.method()} ${url} — ${failure}`);
   });
   page.on('response', (response) => {
@@ -87,6 +90,9 @@ try {
     await page.getByRole('button', { name: '새 팝업' }).click();
     await page.getByLabel('제목').fill(popupTitle);
     await page.getByLabel('본문').fill(initialBody);
+    await page.getByLabel('개인 매치').check();
+    await page.getByLabel('이동 링크 (선택)').fill(popupLinkUrl);
+    await page.getByLabel('버튼 문구 (선택)').fill(popupLinkLabel);
     const statusSelect = page.getByLabel('공개 상태');
     for (const label of ['공개', '비공개', '초안']) {
       if (await statusSelect.getByRole('option', { name: label, exact: true }).count() !== 1) result.issues.push(`${label} status option missing`);
@@ -102,6 +108,13 @@ try {
     if (!createdPopupId) result.issues.push('created popup id missing');
     if (!createJson?.data?.popup?.displayStartAt || !createJson?.data?.popup?.displayEndAt) {
       result.issues.push('created display window missing');
+    }
+    const createdTargets = createJson?.data?.popup?.targetScreens ?? [];
+    if (!createdTargets.includes('home') || !createdTargets.includes('matches')) {
+      result.issues.push(`created target screens mismatch: ${createdTargets.join(',')}`);
+    }
+    if (createJson?.data?.popup?.linkUrl !== popupLinkUrl || createJson?.data?.popup?.linkLabel !== popupLinkLabel) {
+      result.issues.push('created popup link mismatch');
     }
 
     await page.getByRole('heading', { name: popupTitle }).waitFor({ state: 'visible', timeout: 20_000 });
@@ -168,12 +181,39 @@ try {
         if (deltaX > 2) homeResult.issues.push(`horizontal center delta ${deltaX}px`);
         if (deltaY > 2) homeResult.issues.push(`vertical center delta ${deltaY}px`);
         if (layout.overflowX > 1) homeResult.issues.push(`horizontal overflow ${layout.overflowX}px`);
+        const cta = dialog.getByRole('link', { name: popupLinkLabel });
+        await cta.waitFor({ state: 'visible' });
+        if (await cta.getAttribute('href') !== popupLinkUrl) homeResult.issues.push('CTA href mismatch');
         await homePage.screenshot({ path: path.join(outDir, `home-${viewport.key}-centered.png`), fullPage: false });
       } catch (error) {
         homeResult.issues.push(error instanceof Error ? error.message : String(error));
       }
       await userContext.close();
     }
+
+    const routingContext = await authenticatedContext(userEmail, viewports[2]);
+    const routingPage = await routingContext.newPage();
+    const routingResult = observe(routingPage, 'target-routing-and-link');
+    results.push(routingResult);
+    try {
+      await routingPage.goto(`${baseUrl}/matches`, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+      const targetDialog = routingPage.getByRole('dialog', { name: popupTitle });
+      await targetDialog.waitFor({ state: 'visible', timeout: 30_000 });
+      await targetDialog.getByRole('link', { name: popupLinkLabel }).click();
+      await routingPage.waitForURL((url) => url.pathname.endsWith('/matches'), { timeout: 30_000 });
+      await routingPage.screenshot({ path: path.join(outDir, 'matches-desktop-targeted.png'), fullPage: false });
+
+      await routingPage.goto(`${baseUrl}/teams`, { waitUntil: 'domcontentloaded', timeout: 90_000 });
+      const nonTargetDialog = routingPage.getByRole('dialog', { name: popupTitle });
+      if (await nonTargetDialog.count()) {
+        await nonTargetDialog.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+        if (await nonTargetDialog.isVisible()) routingResult.issues.push('popup visible on non-target teams screen');
+      }
+      await routingPage.screenshot({ path: path.join(outDir, 'teams-desktop-not-targeted.png'), fullPage: false });
+    } catch (error) {
+      routingResult.issues.push(error instanceof Error ? error.message : String(error));
+    }
+    await routingContext.close();
 
     const scheduleContext = await authenticatedContext(adminEmail, viewports[2]);
     const scheduleResult = { scope: 'visibility-and-schedule', consoleErrors: [], pageErrors: [], networkErrors: [], issues: [] };
@@ -185,6 +225,9 @@ try {
       audience: 'public',
       title: popupTitle,
       body: updatedBody,
+      targetScreens: ['home', 'matches'],
+      linkUrl: popupLinkUrl,
+      linkLabel: popupLinkLabel,
     };
     const assertHomeVisibility = async (expected, label) => {
       const response = await scheduleContext.request.get(homeUrl, { headers: { 'x-v1-user-email': userEmail } });
@@ -245,13 +288,13 @@ for (const result of results) {
 }
 const issueCount = results.reduce((sum, result) => sum + result.issues.length, 0);
 const report = [
-  '# V1 Admin Popup CRUD & Centered Home Popup QA',
+  '# V1 Admin Popup Targeting & CTA QA',
   '',
   `- Base URL: ${baseUrl}`,
   `- Run ID: ${runId}`,
   `- Admin persona: ${adminEmail}`,
   `- User persona: ${userEmail}`,
-  `- CRUD: create with display window → detail → update → 공개/비공개/초안 options → schedule visibility → delete cleanup`,
+  `- CRUD: create with target screens/link/window → detail → update → target/non-target routing → schedule visibility → delete cleanup`,
   `- Verdict: ${issueCount === 0 ? 'PASS' : `FAIL (${issueCount} issues)`}`,
   '',
   '| Scope | Console | Page | Network | Issues |',

@@ -130,3 +130,85 @@ describe('ProfileService public profile moderation', () => {
     });
   });
 });
+
+describe('ProfileService public profile activity summary (reveal filtering)', () => {
+  const targetUserId = 'user-public-1';
+  const baseUser = {
+    id: targetUserId,
+    deletedAt: null,
+    accountStatus: 'active',
+    profile: { nickname: '테스트' },
+    reputationSummary: { trustState: 'sample', mannerScore: null, reviewCount: 5 },
+  };
+
+  function buildPrisma(overrides: { v1PostEventReview?: { findMany: jest.Mock } } = {}) {
+    return {
+      v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue({ reviewCount: 5 }) },
+      v1PostEventReview: overrides.v1PostEventReview ?? { findMany: jest.fn().mockResolvedValue([]) },
+    };
+  }
+
+  it('totals.reviewCount는 원본 count() 대신 캐시된 V1UserReputationSummary.reviewCount(공개된 리뷰만 반영)를 반환한다', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      const prisma = buildPrisma();
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.publicProfile(null, targetUserId);
+
+      expect(prisma.v1UserReputationSummary.findUnique).toHaveBeenCalledWith({
+        where: { userId: targetUserId },
+        select: { reviewCount: true },
+      });
+      expect(result.activitySummary.totals.reviewCount).toBe(5);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('monthly.reviewCount는 이번 달 제출된 리뷰 중 아직 공개(reveal)되지 않은 리뷰를 제외한다', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      // revealed: 상대(reviewer-a)가 이미 반대 방향 리뷰를 제출해서 즉시 공개됨
+      const revealedReview = {
+        sourceId: 'source-a',
+        reviewerUserId: 'reviewer-a',
+        targetUserId,
+        submittedAt: now,
+      };
+      // hidden: 방금 제출됐고(72시간 미경과) 상대도 아직 제출 안 함 — 아직 비공개
+      const hiddenReview = {
+        sourceId: 'source-b',
+        reviewerUserId: 'reviewer-b',
+        targetUserId,
+        submittedAt: now,
+      };
+      const reverseReview = { sourceId: 'source-a', reviewerUserId: targetUserId, targetUserId: 'reviewer-a' };
+
+      const findMany = jest
+        .fn()
+        .mockResolvedValueOnce([revealedReview, hiddenReview])
+        .mockResolvedValueOnce([reverseReview]);
+
+      const prisma = buildPrisma({ v1PostEventReview: { findMany } });
+      const service = new ProfileService(prisma as never);
+
+      const result = await service.publicProfile(null, targetUserId);
+
+      expect(result.activitySummary.monthly.reviewCount).toBe(1);
+      expect(findMany).toHaveBeenNthCalledWith(2, {
+        where: { reviewerUserId: targetUserId, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});

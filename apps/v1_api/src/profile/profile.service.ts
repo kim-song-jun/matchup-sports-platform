@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma, V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { isReviewRevealed } from '../reviews/review-visibility';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRegionsDto,
@@ -274,7 +275,7 @@ export class ProfileService {
     const [
       matchCount,
       teamCount,
-      reviewCount,
+      reputationSummary,
       monthlyMatchCount,
       monthlyTeamJoinCount,
       monthlyReviewCount,
@@ -293,8 +294,11 @@ export class ProfileService {
           team: { status: 'active', deletedAt: null },
         },
       }),
-      this.prisma.v1PostEventReview.count({
-        where: { targetUserId: userId, targetType: 'user', status: 'submitted' },
+      // 리뷰를 직접 재집계하지 않고 캐시된 요약(공개된 리뷰만 반영됨, ReviewsService.recalculateUserReputation 참조)을 읽는다 —
+      // 비공개(reveal 안 된) 리뷰의 존재/시점이 새어나가지 않도록 원본 count() 대신 캐시를 사용
+      this.prisma.v1UserReputationSummary.findUnique({
+        where: { userId },
+        select: { reviewCount: true },
       }),
       this.prisma.v1MatchParticipant.count({
         where: {
@@ -311,16 +315,15 @@ export class ProfileService {
           team: { status: 'active', deletedAt: null },
         },
       }),
-      this.prisma.v1PostEventReview.count({
-        where: { targetUserId: userId, targetType: 'user', status: 'submitted', createdAt: { gte: monthStart, lt: nextMonthStart } },
-      }),
+      // 캐시에는 월별 값이 없으므로 이번 달 리뷰만 live로 reveal 필터링한다 (ReviewsService.receivedSummary 패턴 이식)
+      this.getRevealedMonthlyReviewCount(userId, monthStart, nextMonthStart),
     ]);
 
     return {
       totals: {
         matchCount,
         teamCount,
-        reviewCount,
+        reviewCount: reputationSummary?.reviewCount ?? 0,
       },
       monthly: {
         matchCount: monthlyMatchCount,
@@ -328,6 +331,33 @@ export class ProfileService {
         reviewCount: monthlyReviewCount,
       },
     };
+  }
+
+  /**
+   * 이번 달 공개(reveal)된 리뷰 개수 — 상호제출 또는 72시간 경과 기준.
+   * ReviewsService.receivedSummary()의 candidates → reverse → isReviewRevealed 패턴을 이식했다.
+   * ProfileModule ↔ ReviewsModule 순환 의존을 피하기 위해 ReviewsService를 주입하지 않고 로직만 복제한다.
+   */
+  private async getRevealedMonthlyReviewCount(userId: string, monthStart: Date, nextMonthStart: Date) {
+    const candidates = await this.prisma.v1PostEventReview.findMany({
+      where: {
+        targetUserId: userId,
+        targetType: 'user',
+        status: 'submitted',
+        submittedAt: { gte: monthStart, lt: nextMonthStart },
+      },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true, submittedAt: true },
+    });
+    if (candidates.length === 0) return 0;
+
+    const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+    const reverseReviews = await this.prisma.v1PostEventReview.findMany({
+      where: { reviewerUserId: userId, sourceId: { in: sourceIds }, status: 'submitted' },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+    });
+
+    const now = new Date();
+    return candidates.filter((review) => isReviewRevealed(review, reverseReviews, now)).length;
   }
 
   async settings(user: V1AuthUser) {

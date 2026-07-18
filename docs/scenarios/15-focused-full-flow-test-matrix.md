@@ -98,8 +98,8 @@ Notes:
 | AUTH-002 | 회원가입 필수값 검증 | `/signup` | `GUEST` | 빈 값, 공백·zero-width-only 이름, 잘못된 이메일, 짧은 비밀번호, 비밀번호 불일치, 약관 미동의, 10/12자리·문자 혼입 휴대폰, 존재하지 않는 날짜, 성별 미선택, 입력값 유지, invalid raw 값 silent 보정 금지 |
 | AUTH-003 | 이메일/닉네임 중복 확인 | `/signup` | `GUEST` | `GET /auth/check-email`, `GET /auth/check-nickname`, 중복 메시지, 수정 후 재검증 |
 | AUTH-004 | 소셜 회원가입 진입 | `/signup/social`, `/callback/kakao` | `GUEST` | Kakao success, denied, missing email, provider denied, account conflict route |
-| AUTH-005 | 소셜 추가 정보 입력 | `/signup/social`, auth error routes | `GUEST` | `POST /auth/social-terms`의 `next.route` 준수, 이름/휴대폰/실제 달력 생년월일/성별 필수, 닉네임·휴대폰 중복, invalid raw 값 차단, 완료 후 API route 진입 |
-| AUTH-005A | Required signup profile contract | `/signup`, `/signup/social`, `/my/profile` | `GUEST`, `USER_A` | 신규 가입 name/phone/birthDate/gender 필수, male/female only, optional image null/non-null 저장, 기존 nullable row는 프로필 저장 시 안내 |
+| AUTH-005 | 소셜 추가 정보 입력 | `/terms?mode=social`, `/signup/social`, `/signup/complete`, auth error routes | 가입 제한 카카오 세션 | `POST /auth/social-terms`의 `next.route` 준수, 이름/휴대폰/실제 달력 생년월일/성별 필수, 닉네임·휴대폰 중복, invalid raw 값 차단, 완료 후 API route 진입, `signup_done` 전 사이트/API 접근은 `403 SIGNUP_INCOMPLETE` |
+| AUTH-005A | Required signup profile contract | `/signup`, `/signup/social`, `/my/profile/edit` | `GUEST`, `USER_A` | 신규 가입 realName/displayName 호환, phone/birthDate/gender 필수, male/female only, optional image null/non-null 저장, 기존 nullable row는 프로필 저장 및 생성 gate에서 안내 |
 | AUTH-006 | 이메일 로그인 happy path | `/login`, `/login/email`, `/home` | `GUEST` | 정상 로그인, token 저장, `/auth/me`, 홈 진입, 뒤로가기 시 auth 화면 루프 없음 |
 | AUTH-007 | 로그인 실패 처리 | `/login/email` | `GUEST` | 없는 계정, 틀린 비밀번호, blocked user, 네트워크 실패, 성공처럼 이동 금지 |
 | AUTH-008 | 세션 유지 | `/home`, `/my`, `/teams` | `USER_A` | 새로고침, 새 탭, 같은 브라우저 컨텍스트, `/auth/me` 재검증 |
@@ -183,7 +183,7 @@ Notes:
 | TOURN-021 | 참가 확정/대기 | API `PATCH /admin/registrations/:id/confirm` | `ADMIN` | confirm/waitlist, idempotent alreadyProcessed, user `/my` 반영 |
 | TOURN-022 | 관리자 취소 처리 | API `PATCH /admin/registrations/:id/cancel` | `ADMIN` | cancel_requested 포함 허용 상태, 결제 있으면 manual refund copy |
 | TOURN-023 | 명단 잠금/해제 | API `POST`/`DELETE /admin/registrations/:id/roster-lock` | `ADMIN` | confirmed만 잠금, 잠금 후 사용자 수정 제한, 해제 후 정책 복원 |
-| TOURN-023A | 관리자 명단 조회 | `/admin/tournaments/[id]`, API `GET /admin/registrations/:id/players` | `ADMIN`, `SUPPORT`, `USER_A` | 팀 비소속 관리자 조회 성공, support 읽기 성공, 일반 사용자 403, 성별 snapshot/미등록 표시, 실패와 빈 명단 구분 |
+| TOURN-023A | 관리자 명단 조회 | `/admin/tournaments/[id]`, API `GET /admin/registrations/:id/players` | `ADMIN`, `SUPPORT`, `USER_A` | 팀 비소속 관리자 조회 성공, support 읽기 성공, 일반 사용자 403, 성별 snapshot/미등록 표시, 팀장 포함 시 최상단 정렬과 팀장 배지, 실패와 빈 명단 구분 |
 | TOURN-024 | 대회 알림 연동 | `/notifications`, tournament events | `TEAM_OWNER`, `ADMIN` | 신청/입금확인/확정/취소 알림, 딥링크, read state |
 | TOURN-025 | 대회 반응형 | `/tournaments`, `/tournaments/[id]`, apply/my/admin routes | All | 모바일 sticky CTA, 데스크탑 2-column, tablet overflow 없음 |
 | TOURN-026 | 캠페인 공개/보관 | `/tournaments/campaigns/[slug]`, API `GET /tournaments/campaigns/:slug` | `GUEST` | published+public tournament만 200, draft/archived/deleted/non-public은 동일 404, bank/PII 미노출 |

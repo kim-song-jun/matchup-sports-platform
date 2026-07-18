@@ -174,7 +174,7 @@ export class TournamentPlayersService {
           user: {
             select: {
               phone: true,
-              profile: { select: { displayName: true, birthDate: true, gender: true } },
+              profile: { select: { realName: true, birthDate: true, gender: true } },
             },
           },
         },
@@ -185,7 +185,7 @@ export class TournamentPlayersService {
           message: '해당 팀의 활성 멤버가 아니에요.',
         });
       }
-      const memberRealName = teamMembership.user.profile?.displayName?.trim();
+      const memberRealName = teamMembership.user.profile?.realName?.trim();
       const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
       const memberGender = normalizeGender(teamMembership.user.profile?.gender);
       const memberPhone = teamMembership.user.phone?.trim();
@@ -198,7 +198,6 @@ export class TournamentPlayersService {
             : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
         });
       }
-
       const existingActive = await tx.v1TournamentPlayer.findFirst({
         where: { registrationId, userId: dto.userId, removedAt: null },
       });
@@ -323,7 +322,7 @@ export class TournamentPlayersService {
         id: true,
         teamId: true,
         rosterLockedAt: true,
-        team: { select: { name: true } },
+        team: { select: { name: true, ownerUserId: true } },
         tournament: { select: { minPlayers: true } },
       },
     });
@@ -337,15 +336,20 @@ export class TournamentPlayersService {
       orderBy: { addedAt: 'asc' },
     });
 
+    const serializedPlayers = players
+      .map(({ user: playerUser, ...player }) => ({
+        ...this.serializePlayer(player),
+        phone: playerUser.phone?.trim() || null,
+        isTeamCaptain: player.userId === registration.team.ownerUserId,
+      }))
+      .sort((left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain));
+
     return {
       registrationId: registration.id,
       teamId: registration.teamId,
       teamName: registration.team.name,
       rosterLockedAt: registration.rosterLockedAt?.toISOString() ?? null,
-      players: players.map(({ user: playerUser, ...player }) => ({
-        ...this.serializePlayer(player),
-        phone: playerUser.phone?.trim() || null,
-      })),
+      players: serializedPlayers,
       belowMinimum: players.length < registration.tournament.minPlayers,
     };
   }

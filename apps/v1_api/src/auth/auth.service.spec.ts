@@ -554,6 +554,7 @@ describe('AuthService', () => {
         update: {
           nickname: '소셜유저',
           displayName: '소셜 유저',
+          realName: '소셜 유저',
           gender: 'female',
           birthDate: '19991231',
           profileImageUrl: '/mock/profile-social.jpg',
@@ -563,6 +564,7 @@ describe('AuthService', () => {
           userId: 'user-1',
           nickname: '소셜유저',
           displayName: '소셜 유저',
+          realName: '소셜 유저',
           gender: 'female',
           birthDate: '19991231',
           profileImageUrl: '/mock/profile-social.jpg',

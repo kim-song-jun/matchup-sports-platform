@@ -50,7 +50,7 @@ describe('ProfileController', () => {
 
   it('updates my profile', async () => {
     const dto = {
-      displayName: '김민수',
+      realName: '김민수',
       nickname: '민수',
       email: 'user@teameet.v1',
       profileImageUrl: null,

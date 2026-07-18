@@ -48,6 +48,7 @@ function makeRoom(overrides: Record<string, unknown> = {}) {
         mutedUntil: null,
         leftAt: null,
         lastReadMessageId: null,
+        visibleFromAt: new Date('1970-01-01T00:00:00.000Z'),
         createdAt: new Date(),
         updatedAt: new Date(),
         user: { id: userA.id, profile: { nickname: 'A닉', displayName: null, profileImageUrl: null } },
@@ -72,6 +73,7 @@ function makeRoomForParticipant(userId: string, participantStatus = 'active', ro
         mutedUntil: null,
         leftAt: null,
         lastReadMessageId: null,
+        visibleFromAt: new Date('1970-01-01T00:00:00.000Z'),
         createdAt: new Date(),
         updatedAt: new Date(),
         user: { id: userId, profile: { nickname: '닉네임', displayName: null, profileImageUrl: null } },
@@ -99,8 +101,11 @@ describe('ChatService', () => {
       count: jest.Mock;
     };
     v1ChatRoomParticipant: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       upsert: jest.Mock;
     };
     v1Notification: { createMany: jest.Mock };
@@ -127,8 +132,11 @@ describe('ChatService', () => {
         count: jest.fn(),
       },
       v1ChatRoomParticipant: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         upsert: jest.fn(),
       },
       v1Notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
@@ -333,27 +341,32 @@ describe('ChatService', () => {
     const newRoom = { id: 'room-new', matchId: 'match-1', status: 'active', createdAt: new Date(), updatedAt: new Date() };
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
     prisma.v1ChatRoom.create.mockResolvedValueOnce(newRoom);
-    prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoomParticipant.create.mockResolvedValueOnce({});
 
     const first = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
     expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true, route: '/chat/room-new' });
 
     // Second call: room already exists → return existing, created=false
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(newRoom);
-    prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce({ id: 'participant-a', status: 'active' });
 
     const second = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
     expect(second).toMatchObject({ roomId: 'room-new', roomType: 'match', created: false, route: '/chat/room-new' });
 
     // Room should only be created ONCE
     expect(prisma.v1ChatRoom.create).toHaveBeenCalledTimes(1);
+    expect(prisma.v1ChatRoomParticipant.create).toHaveBeenCalledWith({
+      data: { chatRoomId: 'room-new', userId: userA.id, status: 'active', visibleFromAt: null },
+    });
   });
 
   it('resolve(team): returns the v1 web chat page route for active team members', async () => {
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'team-member-1' });
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
     prisma.v1ChatRoom.create.mockResolvedValueOnce({ id: 'team-room-1', teamId: 'team-1', status: 'active' });
-    prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoomParticipant.create.mockResolvedValueOnce({});
 
     const result = await service.resolve(userA, { targetType: 'team', targetId: 'team-1' });
 

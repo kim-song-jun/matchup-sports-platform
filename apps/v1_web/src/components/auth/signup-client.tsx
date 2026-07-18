@@ -65,7 +65,7 @@ export function SignupClient() {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
-  const [displayName, setDisplayName] = useState('');
+  const [realName, setRealName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
@@ -92,7 +92,7 @@ export function SignupClient() {
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
   const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
-  const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
+  const profileDraft = { displayName: realName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
   const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || profileIssue !== null;
 
@@ -203,9 +203,11 @@ export function SignupClient() {
     }
 
     try {
+      const normalizedRealName = normalizeSignupDisplayName(profileDraft.displayName);
       const result = await register.mutateAsync({
         nickname: normalizedNickname,
-        displayName: normalizeSignupDisplayName(profileDraft.displayName),
+        realName: normalizedRealName,
+        displayName: normalizedRealName,
         email: normalizedEmail,
         password,
         gender: profileDraft.gender,
@@ -224,7 +226,7 @@ export function SignupClient() {
         }
 
         await updateProfile.mutateAsync({
-          displayName: normalizeSignupDisplayName(profileDraft.displayName),
+          realName: normalizedRealName,
           nickname: normalizedNickname,
           email: normalizedEmail,
           profileImageUrl: uploadedUrl,
@@ -461,7 +463,7 @@ export function SignupClient() {
               <section className="tm-auth-profile-upload">
                 <label className="tm-auth-profile-preview-trigger" aria-label="프로필 사진 선택">
                   <div className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
-                    {profileImageUrl ? null : <span className="tm-text-caption">{initials(displayName || normalizedNickname)}</span>}
+                    {profileImageUrl ? null : <span className="tm-text-caption">{initials(realName || normalizedNickname)}</span>}
                   </div>
                   {profileImageUrl ? null : (
                     <span className="tm-auth-profile-preview-badge" aria-hidden="true">
@@ -516,11 +518,11 @@ export function SignupClient() {
                 <input
                   className="tm-input tm-auth-input"
                   maxLength={40}
-                  onChange={(event) => { setDisplayName(event.target.value); setProfileError(null); }}
+                  onChange={(event) => { setRealName(event.target.value); setProfileError(null); }}
                   placeholder="실명 또는 확인 가능한 이름"
                   required
                   type="text"
-                  value={displayName}
+                  value={realName}
                 />
               </label>
 

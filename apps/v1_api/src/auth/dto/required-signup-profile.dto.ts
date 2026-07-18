@@ -1,10 +1,16 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength, ValidateBy } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength, ValidateBy, type ValidationArguments } from 'class-validator';
 
-const IsNonBlankDisplayName = ValidateBy({
-  name: 'isNonBlankDisplayName',
+const IsValidSignupName = ValidateBy({
+  name: 'isValidSignupName',
   validator: {
-    validate: (value: unknown) => typeof value === 'string' && normalizeSignupDisplayName(value).length > 0,
-    defaultMessage: () => 'displayName must contain a non-whitespace character',
+    validate: (value: unknown, args: ValidationArguments) => {
+      const realName = (args.object as { realName?: unknown }).realName;
+      const candidate = value ?? realName;
+      return typeof candidate === 'string'
+        && normalizeSignupDisplayName(candidate).length > 0
+        && candidate.length <= 40;
+    },
+    defaultMessage: () => 'realName or displayName must contain a non-whitespace character with at most 40 characters',
   },
 });
 
@@ -17,10 +23,13 @@ const IsCalendarBirthDate = ValidateBy({
 });
 
 export abstract class RequiredSignupProfileDto {
+  @IsOptional()
   @IsString()
   @MaxLength(40)
-  @IsNonBlankDisplayName
-  displayName!: string;
+  realName?: string;
+
+  @IsValidSignupName
+  displayName?: string;
 
   @IsString()
   @Matches(/^\d{11}$/)

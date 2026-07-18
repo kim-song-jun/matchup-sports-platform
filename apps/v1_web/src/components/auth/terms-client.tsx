@@ -72,7 +72,7 @@ export function TermsClient() {
       socialTerms.mutate(
         { requiredTermsAccepted: true },
         {
-          onSuccess: (result) => router.push(result.next.route),
+          onSuccess: (result) => router.replace(result.next.route),
           onError: (nextError) => {
             if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
               setError('가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.');

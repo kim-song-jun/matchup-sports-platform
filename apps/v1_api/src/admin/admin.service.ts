@@ -187,6 +187,7 @@ export class AdminService {
         data: {
           nickname: buildDeletedNickname(userId),
           displayName: '탈퇴 회원',
+          realName: null,
           bio: null,
           profileImageUrl: null,
           deletedAt,
@@ -366,6 +367,7 @@ export class AdminService {
       ? {
           OR: [
             { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } },
+            { profile: { realName: { contains: query.q, mode: 'insensitive' as const } } },
             { profile: { displayName: { contains: query.q, mode: 'insensitive' as const } } },
             { email: { contains: query.q, mode: 'insensitive' as const } },
           ],
@@ -388,7 +390,11 @@ export class AdminService {
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true, gender: true } },
+        profile: { select: { nickname: true, displayName: true, realName: true, gender: true } },
+        authIdentities: {
+          where: { status: 'active' },
+          select: { provider: true },
+        },
         adminUser: { select: { adminRole: true } },
         teamMemberships: {
           where: { status: 'active' },
@@ -412,8 +418,9 @@ export class AdminService {
         userId: row.id,
         gender: normalizeProfileGender(row.profile?.gender),
         nickname: row.profile?.nickname ?? null,
-        displayName: row.profile?.displayName ?? null,
+        displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
         email: row.email ?? null,
+        authProviders: row.authIdentities.map((identity) => identity.provider),
         accountStatus: row.accountStatus,
         onboardingStatus: row.onboardingStatus,
         lastLoginAt: row.lastLoginAt,
@@ -445,7 +452,11 @@ export class AdminService {
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true, gender: true } },
+        profile: { select: { nickname: true, displayName: true, realName: true, gender: true } },
+        authIdentities: {
+          where: { status: 'active' },
+          select: { provider: true },
+        },
         adminUser: { select: { adminRole: true } },
         reputationSummary: {
           select: { trustState: true, mannerScore: true, reviewCount: true, calculatedAt: true },
@@ -503,8 +514,9 @@ export class AdminService {
     return {
       userId: row.id,
       nickname: row.profile?.nickname ?? null,
-      displayName: row.profile?.displayName ?? null,
+      displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
       email: row.email ?? null,
+      authProviders: row.authIdentities.map((identity) => identity.provider),
       accountStatus: row.accountStatus,
       onboardingStatus: row.onboardingStatus,
       lastLoginAt: row.lastLoginAt,

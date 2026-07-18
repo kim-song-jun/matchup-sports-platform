@@ -124,7 +124,8 @@ describe('TeamsService', () => {
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
     v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
-    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
+    v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; create: jest.Mock; upsert: jest.Mock };
+    v1ChatMessage: { create: jest.Mock };
     $transaction: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
@@ -161,7 +162,8 @@ describe('TeamsService', () => {
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
       v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
-      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
+      v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
+      v1ChatMessage: { create: jest.fn() },
       $transaction: jest.fn(),
     };
 
@@ -171,6 +173,12 @@ describe('TeamsService', () => {
     );
     prisma.v1ChatRoom.upsert.mockResolvedValue({ id: 'room-1' });
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
+    prisma.v1ChatRoomParticipant.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1ChatMessage.create.mockResolvedValue({ sentAt: new Date('2026-06-01T10:00:00.000Z') });
+    prisma.v1User.findUnique.mockResolvedValue({
+      phone: '01012345678',
+      profile: { realName: '새 멤버 실명', gender: 'male', displayName: '새 멤버', nickname: '새멤버' },
+    });
 
     notifications = {
       emitNotification: jest.fn().mockResolvedValue(undefined),
@@ -189,6 +197,29 @@ describe('TeamsService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  it('create blocks an incomplete creator profile in the service layer', async () => {
+    prisma.v1User.findUnique.mockResolvedValueOnce({
+      phone: null,
+      profile: { realName: null, gender: 'male' },
+    });
+
+    await expect(
+      service.create(owner, {
+        sportId: 'sport-1',
+        regionId: 'region-seoul',
+        name: '생성되면 안 되는 팀',
+        joinPolicy: 'approval_required',
+      }),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: {
+        code: 'PROFILE_COMPLETION_REQUIRED',
+        details: { missingFields: ['realName', 'phone'] },
+      },
+    });
+    expect(prisma.v1Team.create).not.toHaveBeenCalled();
+  });
 
   describe('team region validation', () => {
     it('create allows a city-level region for city-wide teams', async () => {
@@ -581,6 +612,7 @@ describe('TeamsService', () => {
             profile: {
               nickname: 'owner',
               displayName: 'Owner',
+              realName: 'Owner Real',
               profileImageUrl: null,
               birthDate: new Date('1990-01-01'),
               gender: 'male',
@@ -594,7 +626,7 @@ describe('TeamsService', () => {
       expect(result.viewerRole).toBe('none');
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toMatchObject({
-        displayName: 'Owner',
+        displayName: 'owner',
         realName: null,
         phone: null,
         birthDate: null,
@@ -875,6 +907,20 @@ describe('TeamsService', () => {
         where: { chatRoomId_userId: { chatRoomId: 'team-room-1', userId: application.applicantUserId } },
       }),
     );
+    expect(prisma.v1ChatRoomParticipant.updateMany).toHaveBeenCalledWith({
+      where: { id: 'team-room-participant-1', status: 'active', visibleFromAt: null },
+      data: { visibleFromAt: expect.any(Date) },
+    });
+    expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        chatRoomId: 'team-room-1',
+        senderUserId: application.applicantUserId,
+        body: '새멤버님이 들어왔습니다',
+        messageType: 'system',
+        systemEventType: 'joined',
+      }),
+      select: { sentAt: true },
+    });
     expect(notifications.emitNotification).toHaveBeenCalledWith(
       application.applicantUserId,
       'team_join_application_accepted',
@@ -1399,14 +1445,8 @@ describe('TeamsService', () => {
   // ─── acceptInvitation ───────────────────────────────────────────────────────
 
   describe('acceptInvitation', () => {
-    /** 채팅방 관련 mock — ensureTeamChatParticipant early-path (채팅방 없음) */
-    function mockChatEarlyReturn() {
-      // v1ChatRoom.findUnique → null → create 경로
-      prisma.v1ChatRoom.findUnique.mockResolvedValue(null);
-      prisma.v1ChatRoom.create.mockResolvedValue({ id: 'room-1' });
-      // participant 없음 → create 경로
+    function mockMissingChatParticipant() {
       prisma.v1ChatRoomParticipant.findUnique.mockResolvedValue(null);
-      prisma.v1ChatRoomParticipant.create.mockResolvedValue({ id: 'part-1' });
     }
 
     it('full team cannot accept a pending invitation', async () => {
@@ -1446,7 +1486,7 @@ describe('TeamsService', () => {
       // memberCount increment
       prisma.v1Team.update.mockResolvedValueOnce({ id: 'team-1', memberCount: 6 });
       prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 1 });
-      mockChatEarlyReturn();
+      mockMissingChatParticipant();
 
       const result = await service.acceptInvitation(invitee, 'inv-1');
 
@@ -1459,6 +1499,20 @@ describe('TeamsService', () => {
           data: expect.objectContaining({ memberCount: { increment: 1 } }),
         }),
       );
+      expect(prisma.v1ChatRoomParticipant.updateMany).toHaveBeenCalledWith({
+        where: { id: 'participant-1', status: 'active', visibleFromAt: null },
+        data: { visibleFromAt: expect.any(Date) },
+      });
+      expect(prisma.v1ChatMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          chatRoomId: 'room-1',
+          senderUserId: invitee.id,
+          body: '새멤버님이 들어왔습니다',
+          messageType: 'system',
+          systemEventType: 'joined',
+        }),
+        select: { sentAt: true },
+      });
     });
 
     it('본인 아닌 유저가 수락 시도 → 403 PERMISSION_DENIED', async () => {
@@ -1510,13 +1564,15 @@ describe('TeamsService', () => {
         joinedAt: new Date('2026-01-01'),
       });
       prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 1 });
-      mockChatEarlyReturn();
+      mockMissingChatParticipant();
 
       const result = await service.acceptInvitation(invitee, 'inv-1');
 
       expect(result.alreadyProcessed).toBe(false);
       // wasActive=true → v1Team.update(memberCount increment) 가 호출되지 않아야 함
       expect(prisma.v1Team.update).not.toHaveBeenCalled();
+      expect(prisma.v1ChatRoomParticipant.updateMany).toHaveBeenCalled();
+      expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
     });
 
     it('R15-002: invitation cancelled between outer read and transaction → 409 STATE_CONFLICT', async () => {

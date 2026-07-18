@@ -78,13 +78,17 @@ Team list/detail and `/me/teams` `region` includes `{ regionId, name, parentName
 
 ## State And Permissions
 
+- Creating a team requires profile `realName`, phone, and gender; missing fields return `422 PROFILE_COMPLETION_REQUIRED`. Application and management endpoints are exempt.
+
+
 - V1 has no open instant join. Team join is `approval_required` or `closed`.
 - Team creator becomes owner.
 - `memberGoalCount` is the team capacity. When `memberCount >= memberGoalCount`, join applications, join approvals, team invitations, and invitation acceptance fail with `TEAM_FULL`.
 - Team capacity cannot be updated below the current `memberCount`.
 - Owner is not changed through the general role API.
 - Manager limit is enforced by service logic.
-- Approving a join application creates or restores an active member.
+- Approving a join application or accepting a team invitation creates or restores an active member.
+- New/reactivated membership starts team-chat visibility and writes one joined system message in the same transaction; the member does not need to open the chat room first.
 
 Primary tables:
 

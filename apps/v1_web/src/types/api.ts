@@ -982,10 +982,13 @@ export type V1ChatMessage = {
     displayName: string;
     profileImageUrl: string | null;
   };
+  messageType?: 'text' | 'system';
+  systemEventType?: 'joined' | 'left' | null;
   content: string | null;
   status: string;
   sentAt: string;
   mine: boolean;
+  unreadCount?: number;
 };
 
 export type V1ChatRoomDetail = {
@@ -1000,6 +1003,7 @@ export type V1ChatRoomDetail = {
     pinned: boolean;
     mutedUntil: string | null;
     lastReadMessageId: string | null;
+    visibleFromAt?: string | null;
   };
   participants: Array<{
     userId: string;
@@ -1085,6 +1089,7 @@ export type V1Profile = {
   }>;
   profile: {
     displayName: string;
+    realName: string | null;
     nickname?: string | null;
     profileImageUrl: string | null;
     birthDate?: string | null;
@@ -1382,6 +1387,7 @@ export type V1AdminUserRow = {
   nickname: string | null;
   displayName: string | null;
   email: string | null;
+  authProviders: Array<'kakao' | 'naver' | 'email'>;
   gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
@@ -1994,6 +2000,7 @@ export type V1TournamentRosterResponse = {
 
 export type V1AdminTournamentPlayer = V1TournamentPlayer & {
   phone: string | null;
+  isTeamCaptain: boolean;
 };
 
 /** 어드민 전용 로스터 조회 응답 — 팀 비멤버 어드민도 조회 가능 (Task 110) */

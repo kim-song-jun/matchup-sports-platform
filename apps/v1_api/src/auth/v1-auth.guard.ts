@@ -7,12 +7,12 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
-import type { V1AuthUser } from './v1-auth-user';
 import {
-  currentRuntimeConfiguration,
-  resolveV1RequestIdentity,
-} from './v1-session';
-import type { V1RequestIdentity } from './v1-session';
+  getPendingSocialSignupRoute,
+  isPendingSocialSignupRequestAllowed,
+} from './social-signup-access';
+import type { V1AuthUser } from './v1-auth-user';
+import { currentRuntimeConfiguration, resolveV1RequestIdentity, type V1RequestIdentity } from './v1-session';
 
 type V1Request = Request & { v1User?: V1AuthUser };
 
@@ -55,6 +55,18 @@ export class V1AuthGuard implements CanActivate {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: '이용이 제한된 계정이에요.',
+      });
+    }
+
+    const pendingSignupRoute = getPendingSocialSignupRoute(user.onboardingStatus);
+    if (
+      pendingSignupRoute &&
+      !isPendingSocialSignupRequestAllowed(user.onboardingStatus, request.originalUrl ?? request.url)
+    ) {
+      throw new ForbiddenException({
+        code: 'SIGNUP_INCOMPLETE',
+        message: 'Social signup must be completed before accessing this resource',
+        details: { next: { route: pendingSignupRoute } },
       });
     }
 

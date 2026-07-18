@@ -77,8 +77,9 @@ export class ProfileService {
 
   async updateMe(user: V1AuthUser, dto: UpdateProfileDto) {
     this.assertMutableAccount(user);
-    const displayName = dto.displayName.trim();
+    const realName = dto.realName?.trim() || dto.displayName?.trim() || null;
     const nickname = dto.nickname.trim();
+    const emailProvided = dto.email !== undefined;
     const requestedEmail = dto.email?.trim() ? normalizeEmail(dto.email) : null;
     const phone = dto.phone?.trim() || null;
     const birthDate = dto.birthDate?.trim() || null;
@@ -90,13 +91,14 @@ export class ProfileService {
       select: {
         email: true,
         phone: true,
+        emailVerifiedAt: true,
         authIdentities: {
           where: { status: 'active' },
           select: { provider: true, passwordHash: true },
         },
         profile: {
           select: {
-            displayName: true,
+            realName: true,
             nickname: true,
             profileImageUrl: true,
             birthDate: true,
@@ -107,12 +109,14 @@ export class ProfileService {
     });
 
     const hasPassword = before?.authIdentities.some((identity) => Boolean(identity.passwordHash)) ?? false;
-    const email = requestedEmail ?? before?.email ?? null;
-    const emailChanged = email !== (before?.email ?? null);
-    const phoneChanged = phone !== (before?.phone ?? null);
+    const email = hasPassword
+      ? requestedEmail ?? before?.email ?? null
+      : emailProvided
+        ? requestedEmail
+        : before?.email ?? null;
 
-    if (!displayName || !nickname || (hasPassword && !email)) {
-      throw validationError('displayName, nickname, and email are required', 'profile');
+    if (!nickname || !gender || (hasPassword && !email)) {
+      throw validationError('nickname and gender are required; email is required for password accounts', 'profile');
     }
 
     if (birthDate && !isValidBirthDate(birthDate)) {
@@ -169,6 +173,8 @@ export class ProfileService {
       });
     }
 
+    const emailChanged = email !== (before?.email ?? null);
+    const phoneChanged = phone !== (before?.phone ?? null);
     const profile = await this.prisma.$transaction(async (tx) => {
       await tx.v1User.update({
         where: { id: user.id },
@@ -180,7 +186,7 @@ export class ProfileService {
         },
       });
 
-      if (email && !emailChanged) {
+      if (email && hasPassword) {
         await tx.v1AuthIdentity.updateMany({
           where: { userId: user.id, provider: V1AuthProvider.email, status: 'active' },
           data: { email, providerUserKey: email },
@@ -190,7 +196,7 @@ export class ProfileService {
       const nextProfile = await tx.v1UserProfile.upsert({
         where: { userId: user.id },
         update: {
-          displayName,
+          realName,
           nickname,
           profileImageUrl,
           birthDate,
@@ -198,7 +204,7 @@ export class ProfileService {
         },
         create: {
           userId: user.id,
-          displayName,
+          realName,
           nickname,
           profileImageUrl,
           birthDate,
@@ -213,7 +219,7 @@ export class ProfileService {
         reason: `profile.update:${changedFields({
           email: before?.email ?? null,
           phone: before?.phone ?? null,
-          displayName: before?.profile?.displayName ?? null,
+          realName: before?.profile?.realName ?? null,
           nickname: before?.profile?.nickname ?? null,
           profileImageUrl: before?.profile?.profileImageUrl ?? null,
           birthDate: before?.profile?.birthDate ?? null,
@@ -221,7 +227,7 @@ export class ProfileService {
         }, {
           email,
           phone,
-          displayName,
+          realName,
           nickname,
           profileImageUrl,
           birthDate,
@@ -253,7 +259,7 @@ export class ProfileService {
 
     return {
       userId: user.id,
-      displayName: user.profile?.displayName ?? user.profile?.nickname ?? '사용자',
+      displayName: user.profile?.nickname ?? '사용자',
       nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
       reputation: toReputationPayload(user.reputationSummary),
@@ -337,7 +343,7 @@ export class ProfileService {
         hasPassword: snapshot.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       },
       profile: {
-        displayName: snapshot.profile?.displayName ?? snapshot.profile?.nickname ?? '사용자',
+        displayName: snapshot.profile?.nickname ?? '사용자',
       },
       notifications: toSettingsNotifications(preferences),
     };
@@ -390,7 +396,7 @@ export class ProfileService {
     });
 
     return {
-      profile: { displayName: profile?.displayName ?? profile?.nickname ?? '사용자' },
+      profile: { displayName: profile?.nickname ?? '사용자' },
       notifications: toSettingsNotifications(preferences),
       updatedAt: preferences.updatedAt,
     };
@@ -687,13 +693,15 @@ function formatPrimaryRegion(
 function toProfilePayload(profile: {
   nickname: string;
   displayName: string | null;
+  realName: string | null;
   profileImageUrl: string | null;
   birthDate: string | null;
   gender: string | null;
 } | null) {
   return {
-    displayName: profile?.displayName ?? profile?.nickname ?? '사용자',
+    displayName: profile?.nickname ?? '사용자',
     nickname: profile?.nickname ?? null,
+    realName: profile?.realName ?? null,
     profileImageUrl: profile?.profileImageUrl ?? null,
     birthDate: profile?.birthDate ?? null,
     gender: normalizeProfileGender(profile?.gender),

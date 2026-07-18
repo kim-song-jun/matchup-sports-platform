@@ -112,6 +112,15 @@ describe('RegisterDto (required signup profile contract)', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('accepts realName as the canonical signup name', async () => {
+    const input: Record<string, unknown> = { ...VALID_REGISTER_INPUT, realName: '홍길동' };
+    delete input.displayName;
+
+    const failures = await failedProperties(input);
+
+    expect(failures).not.toContain('displayName');
+  });
+
   it('rejects a gender outside male or female', async () => {
     // Given
     const input = { ...VALID_REGISTER_INPUT, gender: 'other' };

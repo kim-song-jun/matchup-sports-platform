@@ -530,7 +530,9 @@ export function RosterModal({
   );
   const updateEligibility = useV1UpdatePlayerEligibility();
 
-  const players = data?.players ?? [];
+  const players = [...(data?.players ?? [])].sort(
+    (left, right) => Number(right.isTeamCaptain) - Number(left.isTeamCaptain),
+  );
 
   const handleEligibilityChange = (playerId: string, status: string) => {
     updateEligibility.mutate(
@@ -572,7 +574,12 @@ export function RosterModal({
               className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{p.realName}</p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{p.realName}</p>
+                  {p.isTeamCaptain ? (
+                    <span className="shrink-0 rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] font-semibold text-blue-700">팀장</span>
+                  ) : null}
+                </div>
                 <p className="text-xs text-gray-500">
                   {p.birthDateSnapshot ?? '생년월일 미등록'} ·{' '}
                   {p.genderSnapshot ? GENDER_LABEL[p.genderSnapshot] : '성별 미등록'}

@@ -108,7 +108,7 @@ function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
     user: {
       phone: '01012345678',
       profile: {
-        displayName: '홍길동',
+        realName: '홍길동',
         birthDate: '1995-03-15',
         gender: 'male',
       },
@@ -534,7 +534,7 @@ describe('TournamentPlayersService', () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
-      .mockResolvedValueOnce(teamPlayerMembershipRow({ user: { phone: null, profile: { displayName: '홍길동', birthDate: '1995-03-15' } } }));
+      .mockResolvedValueOnce(teamPlayerMembershipRow({ user: { phone: null, profile: { realName: '홍길동', birthDate: '1995-03-15' } } }));
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
     prisma.v1TournamentPlayer.count.mockResolvedValue(2);
 
@@ -554,7 +554,7 @@ describe('TournamentPlayersService', () => {
       .mockResolvedValueOnce(teamPlayerMembershipRow({
         user: {
           phone: '01012345678',
-          profile: { displayName: '홍길동', birthDate: '1995-03-15', gender: null },
+          profile: { realName: '홍길동', birthDate: '1995-03-15', gender: null },
         },
       }));
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
@@ -828,6 +828,36 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1TeamMembership.findFirst).not.toHaveBeenCalled();
   });
 
+  it('listPlayersForAdmin: marks the team owner and sorts them before other players', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      id: 'reg-1',
+      teamId: 'team-1',
+      rosterLockedAt: null,
+      team: { name: '번개팀', ownerUserId: 'owner-user-id' },
+      tournament: { minPlayers: 2 },
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      {
+        ...playerRow({ id: 'member-player', userId: 'member-user-id' }),
+        user: { phone: '01011112222' },
+      },
+      {
+        ...playerRow({ id: 'owner-player', userId: 'owner-user-id' }),
+        user: { phone: '01033334444' },
+      },
+    ]);
+
+    const result = await service.listPlayersForAdmin(adminUser, 'reg-1');
+
+    expect(result.players.map((player) => ({
+      id: player.id,
+      isTeamCaptain: player.isTeamCaptain,
+    }))).toEqual([
+      { id: 'owner-player', isTeamCaptain: true },
+      { id: 'member-player', isTeamCaptain: false },
+    ]);
+  });
   it('listPlayersForAdmin: support admin has read-only roster access', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue({

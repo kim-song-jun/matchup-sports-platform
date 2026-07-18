@@ -207,7 +207,8 @@ export function useV1Register() {
       email: string;
       password: string;
       gender: 'male' | 'female';
-      displayName: string;
+      realName?: string;
+      displayName?: string;
       phone: string;
       birthDate: string;
       profileImageUrl?: string;
@@ -224,7 +225,8 @@ export function useV1CompleteSocialProfile() {
     mutationFn: (body: {
       nickname: string;
       gender: 'male' | 'female';
-      displayName: string;
+      realName?: string;
+      displayName?: string;
       phone: string;
       birthDate: string;
       profileImageUrl?: string;
@@ -1190,7 +1192,7 @@ export function useV1UpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: {
-      displayName: string;
+      realName?: string | null;
       nickname: string;
       email?: string | null;
       profileImageUrl?: string | null;

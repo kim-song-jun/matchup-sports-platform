@@ -3,6 +3,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import {
   CancelTeamMatchDto,
   CloseTeamMatchDto,
@@ -32,7 +33,7 @@ export class TeamMatchesController {
   }
 
   @Post('team-matches')
-  @UseGuards(V1AuthGuard)
+  @UseGuards(V1AuthGuard, CreatorProfileGuard)
   create(@CurrentUser() user: V1AuthUser, @Body() dto: MutateTeamMatchDto) {
     return this.teamMatchesService.create(user, dto);
   }

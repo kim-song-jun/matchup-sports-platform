@@ -3,6 +3,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { MatchesQueryDto } from './dto/matches-query.dto';
 import {
   CreateMatchApplicationDto,
@@ -22,7 +23,7 @@ export class MatchesController {
   }
 
   @Post()
-  @UseGuards(V1AuthGuard)
+  @UseGuards(V1AuthGuard, CreatorProfileGuard)
   create(@CurrentUser() user: V1AuthUser, @Body() dto: MutateMatchDto) {
     return this.matchesService.create(user, dto);
   }

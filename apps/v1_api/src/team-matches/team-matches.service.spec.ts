@@ -96,6 +96,7 @@ function applicationWithTeamMatch(appOverrides: Record<string, unknown> = {}, tm
 describe('TeamMatchesService', () => {
   let service: TeamMatchesService;
   let prisma: {
+    v1User: { findUnique: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatchApplication: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
@@ -110,6 +111,7 @@ describe('TeamMatchesService', () => {
 
   beforeEach(async () => {
     prisma = {
+      v1User: { findUnique: jest.fn().mockResolvedValue({ phone: '01012345678', profile: { realName: '매니저 실명', gender: 'male' } }) },
       v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn() },
       v1TeamMatch: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
       v1TeamMatchApplication: {

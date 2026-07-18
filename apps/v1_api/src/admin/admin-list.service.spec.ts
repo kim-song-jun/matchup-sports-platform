@@ -52,7 +52,8 @@ function makeUserRow(overrides: Record<string, unknown> = {}) {
     lastLoginAt: null,
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
     deletedAt: null,
-    profile: { nickname: '호스트민', displayName: '호스트민', gender: 'male' },
+    profile: { nickname: '호스트민', displayName: '호스트민', realName: '호스트민', gender: 'male' },
+    authIdentities: [{ provider: 'kakao' }],
     adminUser: null,
     teamMemberships: [{ role: 'owner' }, { role: 'member' }],
     _count: { hostedMatches: 3, ownedTeams: 1, teamMemberships: 2 },
@@ -193,6 +194,7 @@ describe('AdminService — list/detail endpoints', () => {
         nickname: '호스트민',
         displayName: '호스트민',
         email: 'host@teameet.v1',
+        authProviders: ['kakao'],
         accountStatus: 'active',
         onboardingStatus: 'completed',
         gender: 'male',
@@ -213,14 +215,14 @@ describe('AdminService — list/detail endpoints', () => {
       expect(call.where).toMatchObject({ accountStatus: 'suspended' });
     });
 
-    it('passes q search as OR on nickname/displayName/email', async () => {
+    it('passes q search as OR on nickname/realName/displayName/email', async () => {
       prisma.v1User.findMany.mockResolvedValue([]);
       await service.listUsers(adminAuthUser, { q: '호스트' });
 
       const call = prisma.v1User.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
       const where = call.where as { OR?: unknown[] };
       expect(Array.isArray(where.OR)).toBe(true);
-      expect(where.OR).toHaveLength(3);
+      expect(where.OR).toHaveLength(4);
     });
 
     it('returns hasNext=true and nextCursor when rows exceed limit', async () => {
@@ -297,6 +299,7 @@ describe('AdminService — list/detail endpoints', () => {
       const result = await service.getUser(adminAuthUser, 'u-1');
 
       expect(result.gender).toBe('male');
+      expect(result.authProviders).toEqual(['kakao']);
       expect(result.reputationSummary).not.toBeNull();
       expect(result.reputationSummary?.trustState).toBe('estimated');
       expect(result.hostedMatches).toHaveLength(1);

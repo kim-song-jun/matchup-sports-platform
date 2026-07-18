@@ -148,6 +148,8 @@ Personas: ordinary user, support/read-only admin, ops/owner admin
 
 Desktop awards audit found a real layout gap: the left prize/awards card stretches to the longer reviews column and leaves a large blank area. It remains FAIL-for-polish until the required Lazyweb report is reviewed and a scoped layout rebalance is implemented; mobile/tablet do not reproduce the overflow or blank-height issue.
 
+The content-height rebalance shipped to alpha in release `0.1.0-alpha.20260719.ga608551bbafa` at SHA `a608551bbafaa2a4689aabb166600b3ec87690f1`; CI `29659353429` and deploy `29659353464` passed. The after screenshot remains intentionally pending because the stale Codex app-server continued multiplying Playwright MCP processes and host swap reached 38.7/39GB. Restart Codex before the single final visual recheck.
+
 ## Ambiguity Log
 
 - The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed.

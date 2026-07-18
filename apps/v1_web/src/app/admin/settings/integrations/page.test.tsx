@@ -12,6 +12,10 @@ import { Providers } from '@/app/providers';
 import { useV1AdminIntegrationSettings, useV1AdminMe, useV1UpdateIntegrationSettings } from '@/hooks/use-v1-api';
 import AdminIntegrationSettingsPage from './page';
 
+vi.mock('@/components/auth/pending-social-signup-gate', () => ({
+  PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminIntegrationSettings: vi.fn(),
   useV1AdminMe: vi.fn(),

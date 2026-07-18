@@ -20,6 +20,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
 }));
 
+vi.mock('@/components/auth/pending-social-signup-gate', () => ({
+  PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournaments: vi.fn(),
   useV1CreateTournament: vi.fn(),

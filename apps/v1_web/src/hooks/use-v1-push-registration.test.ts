@@ -1,0 +1,92 @@
+import { renderHook, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/api-client', () => ({
+  v1Get: vi.fn(),
+  v1Post: vi.fn(),
+  v1Delete: vi.fn(),
+}));
+
+import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
+
+const subscription = {
+  endpoint: 'https://push.example/abc',
+  toJSON: () => ({ endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' } }),
+  unsubscribe: vi.fn().mockResolvedValue(true),
+};
+const pushManager = { getSubscription: vi.fn(), subscribe: vi.fn() };
+const registration = { pushManager };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  pushManager.getSubscription.mockResolvedValue(null);
+  pushManager.subscribe.mockResolvedValue(subscription);
+  Object.defineProperty(global.navigator, 'serviceWorker', {
+    configurable: true,
+    value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.resolve(registration) },
+  });
+  Object.defineProperty(global, 'PushManager', {
+    configurable: true,
+    writable: true,
+    value: class {},
+  });
+  Object.defineProperty(global, 'Notification', {
+    configurable: true,
+    writable: true,
+    value: { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') },
+  });
+  (v1Get as ReturnType<typeof vi.fn>).mockResolvedValue({ publicKey: 'BPUBLICKEY' });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('useV1PushRegistration', () => {
+  it('subscribes: requests permission, registers the SW, and posts the subscription', async () => {
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(Notification.requestPermission).toHaveBeenCalled();
+    expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw-push.js');
+    expect(v1Post).toHaveBeenCalledWith('/notifications/push-subscribe', {
+      endpoint: 'https://push.example/abc',
+      keys: { p256dh: 'p', auth: 'a' },
+    });
+  });
+
+  it('does nothing when permission is already denied', async () => {
+    Object.defineProperty(global, 'Notification', {
+      configurable: true,
+      writable: true,
+      value: { permission: 'denied', requestPermission: vi.fn() },
+    });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(v1Post).not.toHaveBeenCalled();
+  });
+
+  it('unsubscribe calls the server delete before the browser unsubscribe', async () => {
+    pushManager.getSubscription.mockResolvedValue(subscription);
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(v1Delete).toHaveBeenCalledWith('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' });
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+});

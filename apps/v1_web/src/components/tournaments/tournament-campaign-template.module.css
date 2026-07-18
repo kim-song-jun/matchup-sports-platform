@@ -566,7 +566,7 @@
   }
 
   .actionsIntro,
-  .actionSecondary {
+  .actionsHasPrimary .actionSecondary {
     display: none;
   }
 

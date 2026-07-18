@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/components/v1-ui/primitives';
+import { Handshake } from 'lucide-react';
 import type { V1TournamentSponsor } from '@/types/api';
 import { TournamentCampaignMedia } from './tournament-campaign-media';
 import styles from './tournament-sponsor-section.module.css';
@@ -48,21 +49,32 @@ export function getTournamentSponsorCards(
 
 export function TournamentSponsorSection({
   sponsors,
+  showEmptyState = false,
 }: {
   sponsors: V1TournamentSponsor[];
+  showEmptyState?: boolean;
 }) {
-  if (sponsors.length === 0) {
-    return null;
-  }
-
   const cards = getTournamentSponsorCards(sponsors);
+
+  if (cards.length === 0 && !showEmptyState) return null;
 
   return (
     <section id="tournament-sponsors" aria-labelledby="sponsor-heading" className={styles.section}>
-      <div id="sponsor-heading" className={`tm-text-body-lg ${styles.heading}`}>
-        협찬·이벤트
+      <div className={styles.sectionHeading}>
+        <span className={styles.kicker}>Sponsors</span>
+        <h2 id="sponsor-heading" className={styles.heading}>함께 만드는 파트너</h2>
+        <p>대회를 더 풍성하게 만드는 공식 후원 혜택과 현장 이벤트를 확인하세요.</p>
       </div>
-      <div className={styles.cardList}>
+      {cards.length === 0 ? (
+        <div className={styles.emptyState}>
+          <span className={styles.emptyIcon}><Handshake aria-hidden="true" /></span>
+          <div>
+            <strong>공식 후원사를 준비하고 있어요</strong>
+            <p>파트너 정보와 참가팀 혜택은 확정되는 대로 이곳에 공개합니다.</p>
+          </div>
+        </div>
+      ) : (
+        <div className={styles.cardList}>
         {cards.map((sponsor) => (
           <Card key={sponsor.id} pad={16}>
             <div className={styles.summary}>
@@ -111,7 +123,8 @@ export function TournamentSponsorSection({
             ) : null}
           </Card>
         ))}
-      </div>
+        </div>
+      )}
     </section>
   );
 }

@@ -135,8 +135,13 @@ describe('TournamentCampaignTemplate', () => {
     expect(screen.getByRole('heading', { name: '함께 만드는 여름의 결승전' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '대회 하이라이트' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '참가 전 확인해 주세요' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '함께 만드는 파트너' })).toBeInTheDocument();
     expect(screen.getByText('하루 완결 운영')).toBeInTheDocument();
     expect(screen.getByText('선수 명단은 언제까지 제출하나요?')).toBeInTheDocument();
+    expect(screen.getByText('공식 후원사를 준비하고 있어요')).toBeInTheDocument();
+    expect(screen.getByText('총 4,000,000원')).toBeInTheDocument();
+    expect(screen.queryByText('참가 현황')).not.toBeInTheDocument();
+    expect(screen.queryByText('참가비')).not.toBeInTheDocument();
   });
 
   it('renders repeated highlight titles and FAQ questions without duplicate React keys', () => {
@@ -178,7 +183,10 @@ describe('TournamentCampaignTemplate', () => {
     (status, label, href) => {
       render(<TournamentCampaignTemplate campaign={campaign(status)} />);
 
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', href);
+      expect(
+        screen.getAllByRole('link', { name: label })
+          .some((link) => link.getAttribute('href') === href),
+      ).toBe(true);
     },
   );
 
@@ -186,9 +194,8 @@ describe('TournamentCampaignTemplate', () => {
     render(<TournamentCampaignTemplate campaign={campaign('closed')} />);
 
     expect(screen.queryByRole('link', { name: '참가 신청하기' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '대회 상세 보기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tournament-1',
+    expect(screen.getAllByRole('link', { name: '대회 상세 보기' })[0]).toHaveAttribute(
+      'href', '/tournaments/tournament-1',
     );
   });
 
@@ -214,7 +221,7 @@ describe('TournamentCampaignTemplate', () => {
     },
   );
 
-  it('shows pending payment teams in the capacity fact without exposing them as participants', () => {
+  it('keeps operational participant counts out of the promotional fact strip', () => {
     const source = campaign('open');
     render(
       <TournamentCampaignTemplate
@@ -228,7 +235,8 @@ describe('TournamentCampaignTemplate', () => {
       />,
     );
 
-    expect(screen.getByText('4팀 확정 · 2팀 입금 대기 / 8팀')).toBeInTheDocument();
+    expect(screen.queryByText('4팀 확정 · 2팀 입금 대기 / 8팀')).not.toBeInTheDocument();
+    expect(screen.getByText('공식 파트너 공개 예정')).toBeInTheDocument();
   });
 
   it('replaces a failed campaign image with a local sport fallback', () => {

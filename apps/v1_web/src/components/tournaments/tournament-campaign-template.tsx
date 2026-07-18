@@ -1,42 +1,29 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import {
-  ArrowRight,
-  CalendarDays,
-  MapPin,
-  Trophy,
-  Users,
-  WalletCards,
-} from 'lucide-react';
+import { CalendarDays, Handshake, MapPin, Trophy } from 'lucide-react';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
-import {
-  formatEntryFee,
-  formatTournamentDateRangeLong,
-} from '@/lib/date-utils';
-import type { V1PublicTournamentStatus } from '@/types/api';
+import { formatTournamentDateRangeLong } from '@/lib/date-utils';
+import { formatPrizeRowValue, parsePrizeRows } from '@/lib/prize-breakdown';
 import type {
   V1AdminTournamentCampaignPreview,
   V1PublicTournamentCampaign,
-  V1TournamentRegistrationAvailability,
 } from '@/types/tournament-campaign';
 import { TournamentCampaignMedia } from './tournament-campaign-media';
+import { TournamentCampaignPrimaryAction } from './tournament-campaign-primary-action';
+import { TournamentRegistrationCountdown } from './tournament-registration-countdown';
 import { TournamentSponsorSection } from './tournament-sponsor-section';
+import {
+  formatPrizeSummary,
+  formatSponsorSummary,
+  getCampaignActions,
+  getCampaignActionHeading,
+} from './tournament-campaign-presentation';
 import styles from './tournament-campaign-template.module.css';
 
 type TournamentCampaignTemplateProps = {
   readonly campaign: V1PublicTournamentCampaign | V1AdminTournamentCampaignPreview;
   readonly preview?: boolean;
-};
-
-type CampaignAction = {
-  readonly label: string;
-  readonly href: string;
-};
-
-type CampaignActions = {
-  readonly primary: CampaignAction | null;
-  readonly secondary: CampaignAction;
 };
 
 export function TournamentCampaignTemplate({
@@ -55,6 +42,9 @@ export function TournamentCampaignTemplate({
     tournament.scheduledAt,
     tournament.scheduledEndAt,
   );
+  const prizeRows = tournament.prizeBreakdown
+    ? parsePrizeRows(tournament.prizeBreakdown)
+    : [];
 
   return (
     <article className={styles.campaign} data-preview={preview || undefined}>
@@ -76,6 +66,22 @@ export function TournamentCampaignTemplate({
           {content.hero.summary ? (
             <p className={styles.heroSummary}>{content.hero.summary}</p>
           ) : null}
+          <div className={styles.heroConversion}>
+            <TournamentRegistrationCountdown
+              deadlineAt={tournament.registrationDeadlineAt}
+              availability={tournament.registrationAvailability}
+            />
+            <div className={styles.heroActions}>
+              <TournamentCampaignPrimaryAction
+                action={actions.primary}
+                registrationDeadlineAt={tournament.registrationDeadlineAt}
+                enforceRegistrationDeadline={tournament.status === 'open'}
+              />
+              <Link className={styles.heroSecondaryAction} href={actions.secondary.href}>
+                {actions.secondary.label}
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -83,16 +89,8 @@ export function TournamentCampaignTemplate({
         <section className={styles.facts} aria-label="대회 핵심 정보">
           <CampaignFact icon={<CalendarDays aria-hidden="true" />} label="일정" value={dateLabel} />
           <CampaignFact icon={<MapPin aria-hidden="true" />} label="장소" value={tournament.venue ?? '장소 협의 중'} />
-          <CampaignFact
-            icon={<Users aria-hidden="true" />}
-            label="참가 현황"
-            value={formatParticipantCount(
-              tournament.confirmedCount,
-              tournament.pendingPaymentCount,
-              tournament.teamCount,
-            )}
-          />
-          <CampaignFact icon={<WalletCards aria-hidden="true" />} label="참가비" value={formatEntryFee(tournament.entryFee)} />
+          <CampaignFact icon={<Trophy aria-hidden="true" />} label="총 상금" value={formatPrizeSummary(tournament.prizeSummary, tournament.prizePool)} />
+          <CampaignFact icon={<Handshake aria-hidden="true" />} label="후원사" value={formatSponsorSummary(tournament.sponsors.map((sponsor) => sponsor.name))} />
         </section>
 
         <section className={styles.intro} aria-labelledby="campaign-intro-title">
@@ -135,17 +133,27 @@ export function TournamentCampaignTemplate({
         {tournament.prizeSummary || tournament.prizePool !== null ? (
           <section className={styles.prize} aria-labelledby="campaign-prize-title">
             <div className={styles.prizeIcon} aria-hidden="true"><Trophy /></div>
-            <div>
+            <div className={styles.prizeContent}>
               <span className={styles.sectionKicker}>Prize</span>
               <h2 id="campaign-prize-title" className={styles.prizeTitle}>
                 {tournament.prizeSummary ?? `${tournament.prizePool?.toLocaleString('ko-KR')}원`}
               </h2>
               <p>참가 팀의 도전을 마지막 시상까지 투명하게 이어갑니다.</p>
+              {prizeRows.length > 0 ? (
+                <dl className={styles.prizeBreakdown}>
+                  {prizeRows.map((row, index) => (
+                    <div key={`${row.label}:${row.amount}:${index}`}>
+                      <dt>{row.label}</dt>
+                      <dd>{formatPrizeRowValue(row.amount)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
             </div>
           </section>
         ) : null}
 
-        <TournamentSponsorSection sponsors={tournament.sponsors} />
+        <TournamentSponsorSection sponsors={tournament.sponsors} showEmptyState />
 
         {content.faq.length > 0 ? (
           <section className={styles.section} aria-labelledby="campaign-faq-title">
@@ -168,19 +176,18 @@ export function TournamentCampaignTemplate({
           <div>
             <span className={styles.sectionKicker}>Next step</span>
             <h2 className={styles.actionsTitle}>
-              {getActionHeading(tournament.status, tournament.registrationAvailability)}
+              {getCampaignActionHeading(tournament.status, tournament.registrationAvailability)}
             </h2>
           </div>
           <div className={styles.actionLinks}>
             <Link className="tm-btn tm-btn-neutral tm-btn-lg" href={actions.secondary.href}>
               {actions.secondary.label}
             </Link>
-            {actions.primary ? (
-              <Link className="tm-btn tm-btn-primary tm-btn-lg" href={actions.primary.href}>
-                {actions.primary.label}
-                <ArrowRight size={18} aria-hidden="true" />
-              </Link>
-            ) : null}
+            <TournamentCampaignPrimaryAction
+              action={actions.primary}
+              registrationDeadlineAt={tournament.registrationDeadlineAt}
+              enforceRegistrationDeadline={tournament.status === 'open'}
+            />
           </div>
         </section>
       </div>
@@ -206,62 +213,4 @@ function CampaignFact({
       </div>
     </div>
   );
-}
-
-function getCampaignActions(
-  status: V1PublicTournamentStatus,
-  registrationAvailability: V1TournamentRegistrationAvailability,
-  tournamentId: string,
-): CampaignActions {
-  const secondary = { label: '대회 상세 보기', href: `/tournaments/${tournamentId}` };
-
-  switch (status) {
-    case 'open':
-      return registrationAvailability === 'available'
-        ? { primary: { label: '참가 신청하기', href: `/tournaments/${tournamentId}/my` }, secondary }
-        : { primary: null, secondary };
-    case 'closed':
-      return { primary: null, secondary };
-    case 'in_progress':
-      return { primary: { label: '대진표 보기', href: `/tournaments/${tournamentId}/bracket` }, secondary };
-    case 'completed':
-      return { primary: { label: '결과 보기', href: `/tournaments/${tournamentId}/results` }, secondary };
-  }
-}
-
-function getActionHeading(
-  status: V1PublicTournamentStatus,
-  registrationAvailability: V1TournamentRegistrationAvailability,
-): string {
-  switch (status) {
-    case 'open': {
-      switch (registrationAvailability) {
-        case 'available':
-          return '함께 뛸 팀을 기다리고 있어요';
-        case 'deadline_passed':
-          return '접수 기간이 종료됐어요';
-        case 'full':
-          return '참가 정원이 모두 찼어요';
-        case 'started':
-          return '이미 시작된 대회예요';
-        case 'closed':
-          return '현재 참가 신청을 받지 않아요';
-      }
-    }
-    case 'closed':
-      return '접수가 마감된 대회예요';
-    case 'in_progress':
-      return '지금 펼쳐지는 경기를 확인하세요';
-    case 'completed':
-      return '대회의 마지막 기록을 확인하세요';
-  }
-}
-
-function formatParticipantCount(
-  confirmedCount: number,
-  pendingPaymentCount: number,
-  teamCount: number,
-): string {
-  if (pendingPaymentCount === 0) return `${confirmedCount}/${teamCount}팀`;
-  return `${confirmedCount}팀 확정 · ${pendingPaymentCount}팀 입금 대기 / ${teamCount}팀`;
 }

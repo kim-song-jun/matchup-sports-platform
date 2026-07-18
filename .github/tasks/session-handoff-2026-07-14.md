@@ -31,6 +31,14 @@
 - [x] Codex Security standard 전체 scan `ac898bd4-fc5c-4024-9360-9ef52bb9162e`은 workspace `1a52d3a8-1d57-434b-881a-9430e0460095`에서 152/152 파일, validation 44/44, attack-path 44/44, reportable finding 21건(Critical 1, Medium 11, Low 9)을 완료했다. manifest·finding write-up 21건·hardening portfolio·final Markdown report는 schema validation 후 로컬 sealed 상태다. plugin indexing transport만 미완료이며 remediation 상태는 `docs/security/v1-security-scan-remediation.md`가 canonical ledger다.
 - [ ] UI 완료 후 pathspec commit을 만들고 committed-tree 검증 → `dev` push, 기존 PR #69 정리 판단.
 
+### 2026-07-18 이벤트 허브·캠페인 후속 폴리시
+
+- [x] 브라우저 코멘트 기준으로 `/events`를 desktop 3열, tablet 2열, mobile 1열의 동일 비율 카드 그리드로 재구성하고 제목·요약·일정·장소·상금·신청 마감·상세 CTA의 정보 위계를 통일했다.
+- [x] 캠페인 hero에 실제 `registrationDeadlineAt` 기반 마감 카운트다운과 상태별 실제 CTA를 추가했다. 상단 핵심 정보는 일정·장소·총 상금·후원사로 바꾸고 참가 현황·참가비는 제거했다.
+- [x] 상금 블록을 강조하고 구조화 상금 배분을 노출했다. 후원사 섹션은 실제 sponsor 데이터를 카드로 표시하며, 데이터가 없을 때는 가짜 후원사를 만들지 않고 공개 예정 상태를 명시한다.
+- [x] 이벤트 허브와 캠페인 각각 Lazyweb 리포트를 생성했다: `f5f48213-8638-4c79-a857-fc57327363ff`, `4eca22f5-ae06-49ca-ae5d-e701cc17ac48`.
+- [ ] 호스트 preflight는 load 3.80/12 cores였지만 Node 683개, swap 27.47/28GB로 비정상 압박을 확인했다. 다른 세션 프로세스는 종료하지 않았고 새 dev server·Vitest·typecheck·build를 시작하지 않았다. 기존 Node REPL 프로세스에서 변경 TSX/CSS syntax만 확인했으며 오류는 0개다. GitHub CI와 alpha 배포 뒤 headed browser 390/768/1183/1440 검증을 완료해야 한다.
+
 ### 2026-07-16 production snapshot + 이벤트 데이터 추가
 
 - [x] `matchup-prod` SSH alias로 production PostgreSQL health와 read-only 통계를 확인했다. 2026-07-17 fresh snapshot은 약 14.8MB, 성공 migration 40개, public 대상 대회 2개/풋살 1종목이며 캠페인 테이블 migration 전 상태다. 사용자/인증/PII 데이터 본문은 조회하거나 출력하지 않았다.

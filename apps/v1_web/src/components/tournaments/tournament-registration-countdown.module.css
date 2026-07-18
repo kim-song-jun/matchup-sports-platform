@@ -1,0 +1,32 @@
+.countdown {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--static-white) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--static-black) 36%, transparent);
+  color: var(--static-white);
+  font-size: var(--font-size-label);
+  backdrop-filter: blur(8px);
+}
+
+.countdown svg {
+  width: 16px;
+  height: 16px;
+}
+
+.countdown span {
+  color: color-mix(in srgb, var(--static-white) 78%, transparent);
+}
+
+.countdown strong {
+  font-size: var(--font-size-body-sm);
+}
+
+@media (max-width: 639px) {
+  .countdown {
+    align-self: flex-start;
+  }
+}

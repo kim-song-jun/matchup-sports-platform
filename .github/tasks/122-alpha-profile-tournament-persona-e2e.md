@@ -168,6 +168,8 @@ Desktop awards audit found a real layout gap: the left prize/awards card stretch
 
 The content-height rebalance shipped to alpha in release `0.1.0-alpha.20260719.ga608551bbafa` at SHA `a608551bbafaa2a4689aabb166600b3ec87690f1`; CI `29659353429` and deploy `29659353464` passed. The after screenshot remains intentionally pending because the stale Codex app-server continued multiplying Playwright MCP processes and host swap reached 38.7/39GB. Restart Codex before the single final visual recheck.
 
+Current alpha advanced through the shared admin authorization hardening to release `0.1.0-alpha.20260719.g1fb7aa656008` at SHA `1fb7aa65600889d634d0d0960360edbd60dd549d`; CI `29660283922` and deploy `29660283946` passed, and DB health is `true`. This security-only increment does not replace the still-pending awards after screenshot or Task 122 browser evidence.
+
 ## Ambiguity Log
 
 - The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed.

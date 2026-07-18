@@ -511,6 +511,10 @@ describe('TournamentsReadService', () => {
             awayPenaltyScore: null,
             note: '명승부',
             recordedAt: new Date('2026-07-01T17:30:00Z'),
+            goals: [
+              { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
+              { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+            ],
           },
         },
       ],
@@ -527,6 +531,10 @@ describe('TournamentsReadService', () => {
         awayScore: 2,
         hasPenalty: false,
         note: '명승부',
+        goals: [
+          { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
+          { id: 'goal-2', team: 'away', playerId: null, playerName: '대타 선수', minute: null },
+        ],
       },
     });
   });

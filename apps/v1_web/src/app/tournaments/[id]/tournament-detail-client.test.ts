@@ -96,6 +96,7 @@ function makeFixtureResult(overrides: Partial<V1TournamentFixtureResult> = {}): 
     awayPenaltyScore: null,
     note: null,
     recordedAt: '2026-01-01T00:00:00.000Z',
+    goals: [],
     ...overrides,
   };
 }

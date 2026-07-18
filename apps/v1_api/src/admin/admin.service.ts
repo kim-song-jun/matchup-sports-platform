@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { isSafePopupLink } from '../popups/popup-screen';
+import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
@@ -740,7 +741,7 @@ export class AdminService {
         region: { select: { name: true } },
         ownerUser: { select: { profile: { select: { nickname: true } } } },
         trustScore: {
-          select: { trustState: true, mannerScore: true, matchCount: true, calculatedAt: true },
+          select: { matchCount: true, calculatedAt: true },
         },
         hostedTeamMatches: {
           take: 5,
@@ -751,6 +752,8 @@ export class AdminService {
     });
 
     if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
+
+    const revealedTrust = (await computeRevealedTeamTrustBatch(this.prisma, [row.id])).get(row.id) ?? null;
 
     return {
       teamId: row.id,
@@ -765,8 +768,8 @@ export class AdminService {
       createdAt: row.createdAt,
       trustScore: row.trustScore
         ? {
-            trustState: row.trustScore.trustState,
-            mannerScore: row.trustScore.mannerScore,
+            trustState: revealedTrust?.trustState ?? 'sample',
+            mannerScore: revealedTrust?.mannerScore ?? null,
             matchCount: row.trustScore.matchCount,
             calculatedAt: row.trustScore.calculatedAt,
           }

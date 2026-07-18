@@ -117,6 +117,7 @@ describe('AdminService — list/detail endpoints', () => {
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock };
+    v1PostEventReview: { findMany: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -126,6 +127,9 @@ describe('AdminService — list/detail endpoints', () => {
       v1Match: { findMany: jest.fn(), findUnique: jest.fn() },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn() },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn() },
+      // getTeam() live-recalculates trustScore via computeRevealedTeamTrustBatch(); default to
+      // "no submitted reviews" so tests that don't care about trust reveal math still resolve.
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -545,6 +549,36 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.trustScore?.matchCount).toBe(8);
       expect(result.recentHostedTeamMatches).toHaveLength(1);
       expect(result.recentHostedTeamMatches[0]).toMatchObject({ teamMatchId: 'tm-1' });
+    });
+
+    it('recalculates trustState/mannerScore live from submitted reviews instead of trusting the stale cache', async () => {
+      // Cache says 'sample'/null (never evaluated), but 3 submitted reviews (>72h old, so
+      // auto-revealed by the fallback window) exist for this team — live recalculation must
+      // win over the stale cache and report 'verified' with the actual average rating.
+      const longAgo = new Date(Date.now() - 100 * 60 * 60 * 1000);
+      prisma.v1Team.findUnique.mockResolvedValue({
+        ...makeTeamRow(),
+        region: { name: '강남구' },
+        trustScore: {
+          matchCount: 8,
+          calculatedAt: new Date('2026-05-18T00:00:00.000Z'),
+        },
+        hostedTeamMatches: [],
+      });
+      prisma.v1PostEventReview.findMany
+        .mockResolvedValueOnce([
+          { targetTeamId: 't-1', sourceId: 's-1', reviewerTeamId: 't-2', rating: 5, submittedAt: longAgo },
+          { targetTeamId: 't-1', sourceId: 's-2', reviewerTeamId: 't-2', rating: 4, submittedAt: longAgo },
+          { targetTeamId: 't-1', sourceId: 's-3', reviewerTeamId: 't-2', rating: 5, submittedAt: longAgo },
+        ])
+        .mockResolvedValueOnce([]); // reverse-review lookup: not needed, fallback window already elapsed
+
+      const result = await service.getTeam(adminAuthUser, 't-1');
+
+      expect(result.trustScore?.trustState).toBe('verified');
+      expect(result.trustScore?.mannerScore).toBeCloseTo(4.67, 2);
+      // matchCount/calculatedAt are out of scope for this fix — they stay cache-sourced.
+      expect(result.trustScore?.matchCount).toBe(8);
     });
 
     it('returns trustScore=null when absent', async () => {

@@ -64,7 +64,7 @@
 | GET | /api/v1/admin/popups | 팝업 목록 |
 | GET | /api/v1/admin/popups/:popupId | 팝업 상세 |
 | POST | /api/v1/admin/popups | 팝업 생성 |
-| PATCH | /api/v1/admin/popups/:popupId | 팝업 수정 및 노출 기간 변경 |
+| PATCH | /api/v1/admin/popups/:popupId | 팝업 수정 및 노출 화면·링크·기간 변경 |
 | DELETE | /api/v1/admin/popups/:popupId | 팝업 삭제 및 popup.delete 감사 로그 |
 ### B. `/admin/disputes`
 
@@ -145,8 +145,12 @@
 - /admin/notices는 안내/업데이트 공지만 관리하며 pinned와 display window를 전송하지 않는다.
 - 관리자 회원 목록과 상세 응답은 gender: male | female | null을 포함한다. 공개 프로필에는 노출하지 않는다.
 - 팝업 운영 라벨은 published=공개, archived=비공개, draft=초안이다.
-- 팝업 생성/수정은 선택적으로 displayStartAt, displayEndAt ISO datetime을 받는다. 종료는 시작보다 늦어야 하며 위반 시 400 INVALID_DISPLAY_WINDOW다.
-- 홈 중앙 팝업은 v1_popups의 published + public + active-window 행만 사용한다. 홈 notices와는 별도 응답 필드다.
+- 팝업 생성/수정은 targetScreens를 최소 1개 받아야 하며, 선택적으로 linkUrl, linkLabel, displayStartAt, displayEndAt을 받는다.
+- targetScreens는 home, matches, team_matches, teams, tournaments, lessons, marketplace, mercenary, venues, community, chat, notifications, profile, my 중 하나 이상이다.
+- linkUrl은 /로 시작하는 내부 경로 또는 https:// URL만 허용한다. linkLabel만 단독으로 보내면 400 INVALID_POPUP_LINK다.
+- 노출 종료는 시작보다 늦어야 하며 위반 시 400 INVALID_DISPLAY_WINDOW다.
+- GET /popups/active?screen=...은 requested screen + published + public + active-window 조건을 만족하는 최신 팝업 하나를 반환한다.
+- 홈 응답의 popup은 호환성을 위해 home target에 같은 선택 규칙을 적용하며, notices와는 별도 응답 필드다.
 ## 엣지 케이스 / 안티패턴
 
 - 운영 API를 사용자 페이지 CTA와 직접 연결하지 않는다(권한 실패 + UX 혼선).

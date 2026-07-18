@@ -44,6 +44,9 @@ function makePopupRow(overrides: Record<string, unknown> = {}) {
     audience: 'public',
     title: '서비스 점검',
     body: '팝업 본문',
+    targetScreens: ['home'],
+    linkUrl: null,
+    linkLabel: null,
     status: 'published',
     publishedAt: new Date('2026-07-13T00:00:00.000Z'),
     archivedAt: null,
@@ -149,6 +152,9 @@ describe('AdminService — notices and popups', () => {
       audience: 'public',
       title: ' 새 팝업 ',
       body: ' 팝업 본문 ',
+      targetScreens: ['matches', 'teams'],
+      linkUrl: '/matches',
+      linkLabel: '매치 보기',
       status: 'published',
       displayStartAt: '2026-07-14T00:00:00.000Z',
       displayEndAt: '2026-07-20T00:00:00.000Z',
@@ -158,6 +164,9 @@ describe('AdminService — notices and popups', () => {
       data: expect.objectContaining({
         title: '새 팝업',
         body: '팝업 본문',
+        targetScreens: ['matches', 'teams'],
+        linkUrl: '/matches',
+        linkLabel: '매치 보기',
         displayStartAt: new Date('2026-07-14T00:00:00.000Z'),
         displayEndAt: new Date('2026-07-20T00:00:00.000Z'),
       }),
@@ -176,6 +185,7 @@ describe('AdminService — notices and popups', () => {
       audience: 'public',
       title: '잘못된 기간',
       body: '본문',
+      targetScreens: ['home'],
       status: 'published',
       displayStartAt: '2026-07-20T00:00:00.000Z',
       displayEndAt: '2026-07-20T00:00:00.000Z',
@@ -194,6 +204,9 @@ describe('AdminService — notices and popups', () => {
       audience: 'public',
       title: '비공개 팝업',
       body: '본문',
+      targetScreens: ['home'],
+      linkUrl: null,
+      linkLabel: null,
       status: 'archived',
       displayStartAt: null,
       displayEndAt: null,
@@ -204,6 +217,40 @@ describe('AdminService — notices and popups', () => {
       data: expect.objectContaining({ status: 'archived', publishedAt: null, archivedAt: expect.any(Date) }),
     }));
     expect(prisma.v1Notice.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a popup without any target screen', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+
+    await expect(service.createPopup(adminAuthUser, {
+      audience: 'public',
+      title: '대상 없는 팝업',
+      body: '본문',
+      targetScreens: [],
+      status: 'published',
+      displayStartAt: null,
+      displayEndAt: null,
+    })).rejects.toThrow(BadRequestException);
+
+    expect(prisma.v1Popup.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unsafe popup link scheme', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+
+    await expect(service.createPopup(adminAuthUser, {
+      audience: 'public',
+      title: '잘못된 링크',
+      body: '본문',
+      targetScreens: ['home'],
+      linkUrl: 'javascript:alert(1)',
+      linkLabel: '열기',
+      status: 'published',
+      displayStartAt: null,
+      displayEndAt: null,
+    })).rejects.toThrow(BadRequestException);
+
+    expect(prisma.v1Popup.create).not.toHaveBeenCalled();
   });
 
   it('denies popup mutations to support admins', async () => {

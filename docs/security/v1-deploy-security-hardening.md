@@ -84,11 +84,15 @@ flowchart TD
 이번 하드닝은 배포 환경에서 아래 조치가 함께 이뤄져야 안전·정상 동작한다.
 
 - [ ] **`V1_ALLOW_HEADER_AUTH=true`** 설정 (C1) — 미설정 시 프로덕션 부팅 거부(의도된 fail-closed).
-- [ ] **uploads 볼륨 소유권** (L2) — 컨테이너가 이제 non-root `app`(UID/GID **1001**)로 실행된다. **기존 root 소유 uploads 볼륨을 재사용**하는 환경이라면 최초 배포 시 볼륨을 1001 소유로 맞춰야 업로드 쓰기가 가능하다. 예:
+- [x] **uploads 볼륨 소유권** (L2) — 컨테이너가 non-root `app`(UID/GID **1001**)로 실행되므로, root 소유 uploads 볼륨은 Multer 임시 파일 생성 단계에서 `EACCES`와 HTTP 500을 발생시킨다. 정상 배포에서는 `v1_uploads_init`이 시작 전과 백업 복원 후 소유권을 자동 보정한다. 즉시 운영 복구가 필요하면 아래 명령을 실행한 뒤 `v1_api`를 재시작한다. 예:
   ```bash
   docker run --rm -v <v1_uploads_volume>:/data alpine chown -R 1001:1001 /data
   ```
-  (fresh 볼륨은 이미지가 1001 소유로 초기화하므로 조치 불필요.)
+  실제 Compose 볼륨 이름은 `docker volume ls`로 확인하고, 복구 후에는
+  `docker exec teameet_v1_api sh -c 'test -w /app/apps/v1_api/uploads'`와 실제
+  인증된 이미지 업로드로 검증한다. `deploy/restart-containers.sh`를 통하지
+  않는 수동 기동도 `v1_uploads_init` 완료 후 `v1_api`가 시작되는 의존성을
+  사용한다.
 - [ ] **HSTS `includeSubDomains`** (M2/M3) — `teameet.co.kr` **모든 서브도메인에 HTTPS 를 강제**한다. HTTP-only 서브도메인이 있으면 접속이 깨지므로, 그런 서브도메인이 없음을 확인한 뒤 배포한다. `preload` 는 되돌리기 어려워 의도적으로 제외했다.
 - [ ] **레이트리밋 강제 범위** (H1) — 애플리케이션 레이트리밋(`V1ThrottlerGuard`)은 **`NODE_ENV=production`에서만** 강제된다. dev/test/e2e 에서는 스킵되어 테스트 flakiness(429)를 유발하지 않는다. 프로덕션에서만 login 10/min·check 30/min·전역 1000/min 이 적용된다.
 

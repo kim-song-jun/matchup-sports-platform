@@ -81,6 +81,11 @@ printf '[alpha-deploy] preflight cpu=%s load=%s mem_available_kib=%s swap_free_k
   "${browser_count}" \
   "${container_count}"
 
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "[alpha-deploy] Docker BuildKit/buildx is required; install and enable the Docker Buildx plugin until 'docker buildx version' succeeds" >&2
+  exit 1
+fi
+
 if ! awk -v current_load="${load_average}" -v cpu="${cpu_count}" 'BEGIN { exit !(current_load <= cpu * 1.5) }'; then
   echo "[alpha-deploy] Host load is too high for a sequential image build" >&2
   exit 1
@@ -110,12 +115,12 @@ printf 'add_header X-Teameet-Release "%s" always;\nadd_header X-Teameet-Commit "
 chmod 644 "${metadata_tmp}"
 mv "${metadata_tmp}" "${metadata_snippet}"
 
-docker build \
+DOCKER_BUILDKIT=1 docker build \
   -f "${LIVE_DIR}/deploy/Dockerfile.v1-api" \
   -t "teameet-v1-api:${release_version}" \
   "${LIVE_DIR}"
 
-docker build \
+DOCKER_BUILDKIT=1 docker build \
   -f "${LIVE_DIR}/deploy/Dockerfile.v1-web" \
   --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
   --build-arg INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}" \

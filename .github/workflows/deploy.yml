@@ -89,50 +89,19 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-${{ runner.os }}-
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: V1 DB guardrails
         run: pnpm qa:v1-db-guardrails
 
-      - name: Generate Prisma client
-        run: cd apps/api && pnpm prisma generate
-
-      - name: Lint (all packages)
-        run: pnpm lint
-
-      - name: Type-check (sequential)
-        run: |
-          cd apps/api
-          npx tsc --noEmit
-          cd ../web
-          npx tsc --noEmit
-
-      - name: Unit tests (sequential)
-        run: |
-          pnpm --filter api test
-          pnpm --filter web test
-
-      - name: Prisma DB push (integration test schema)
-        run: cd apps/api && pnpm prisma db push
-
-      - name: Integration tests
-        run: pnpm --filter api test:integration
-
       - name: Generate V1 Prisma client
         run: cd apps/v1_api && pnpm prisma generate
+
+      - name: V1 lint and type-check (sequential)
+        run: |
+          pnpm --filter v1_api exec tsc --noEmit
+          pnpm --filter v1_web lint
 
       # 마이그레이션 게이트: 빈 DB에 전체 체인 재생 + schema.prisma 드리프트 0 검증.
       # db push로만 스키마를 바꾸면 여기서 CI가 깨진다 — 반드시 migration 파일 동반.
@@ -289,6 +258,11 @@ jobs:
 
           V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}"
 
+          if ! sudo docker buildx version >/dev/null 2>&1; then
+            echo "[ERROR] Docker BuildKit/buildx is required for production image builds"
+            exit 1
+          fi
+
           # ── Pre-build disk cleanup ────────────────────────────────────────
           # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
           # dangling images, stopped containers, and unused build cache.
@@ -305,8 +279,8 @@ jobs:
           echo "[cleanup] Disk usage after prune:"
           df -h / | tail -1
 
-          sudo docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
-          sudo docker build --no-cache \
+          sudo env DOCKER_BUILDKIT=1 docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
+          sudo env DOCKER_BUILDKIT=1 docker build --no-cache \
             -f deploy/Dockerfile.v1-web \
             --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
             --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \

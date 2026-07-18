@@ -103,6 +103,35 @@ IAM 신뢰 정책은 `kim-song-jun/matchup-sports-platform` 저장소의 `refs/h
 
 SSM 명령은 첫 줄에서 `set -Eeuo pipefail`을 강제한다. deploy가 실패한 뒤 cleanup 명령이 성공해 전체 실행이 성공처럼 보이는 상태를 허용하지 않는다. Amazon Linux 이미지에 `rsync`가 없으면 배포 스크립트가 한 번 설치한 뒤 source mirror를 진행한다. GitHub의 최종 검증은 단순 HTTP 200이 아니라 예상 SemVer prerelease, 전체 commit SHA, DB health가 모두 일치할 때까지 최대 3분 동안 확인한다.
 
+### v1 전용 CI 계약과 캐시
+
+`CI / Deploy`의 검증 대상은 `apps/v1_api`와 `apps/v1_web`뿐이다. legacy `apps/api`·`apps/web` lint, test, integration, build는 실행하지 않으며, 아래 v1 게이트는 생략하지 않고 직렬로 유지한다.
+
+1. lockfile 기준 의존성 설치와 v1 DB guardrail
+2. v1 Prisma client 생성, API type-check, Web lint
+3. 빈 PostgreSQL에 전체 migration replay, schema drift 0 확인, v1 API integration test
+4. v1 API·Web unit test
+5. v1 API build 뒤 v1 Web build
+
+CI의 pnpm 의존성 store 캐시는 `actions/setup-node@v4`의 `cache: pnpm`이 단독으로 관리한다. 별도의 `pnpm store path`와 `actions/cache` 조합을 겹쳐 쓰지 않는다. `apps/v1_web/.next/cache`는 pnpm 의존성 캐시가 아니라 Next.js 증분 빌드 캐시이므로 별도로 유지한다. 캐시 miss나 복원 실패는 시간을 늘릴 수 있지만 검증 결과를 바꾸거나 게이트를 건너뛰어서는 안 된다.
+
+이전 관측에서 legacy integration만 약 6분 46초로 전체 약 11분의 큰 비중을 차지했다. 개선 효과는 한 번의 빠른 실행으로 확정하지 않고, 변경 전후 GitHub Actions의 step timing을 같은 범주의 PR 또는 `dev` 실행에서 비교한다. cold cache와 warm cache를 구분하고 각각 3회 이상 기록해 중앙값과 범위를 남기며, 의존성 설치·migration/integration·unit·build 시간을 따로 본다. alpha 호스트 Docker build 시간은 CI 시간과 섞지 않고 API/Web별로 별도 측정한다.
+
+### alpha Docker BuildKit 캐시
+
+alpha API와 Web Dockerfile은 BuildKit cache mount를 사용한다. 두 이미지는 `teameet-pnpm-store`를 공유하고 `sharing=locked`로 동시 쓰기를 막는다. Web의 `.next/cache`는 `teameet-v1-web-next-cache`로 분리한다. 호스트 preflight와 API → Web 순차 build는 그대로 유지되므로 캐시는 배포 순서나 migration·health gate를 대체하지 않는다.
+
+`RUN --mount=type=cache`를 해석하지 못하거나 build frontend 오류가 나면 배포를 중지하고 현재 실행 중인 release를 유지한다. 먼저 `docker version`, `docker buildx version`, `docker info`, `docker system df`로 Docker/Buildx 지원과 디스크 상태를 확인한다. BuildKit이 설치되어 있지만 비활성화된 경우 다음처럼 명시적으로 켜고 preflight 뒤 이미지를 순서대로 다시 빌드한다.
+
+```bash
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+docker compose --project-name deploy -f docker-compose.prod.yml -f docker-compose.alpha.yml build v1_api
+docker compose --project-name deploy -f docker-compose.prod.yml -f docker-compose.alpha.yml build v1_web
+```
+
+Buildx가 없거나 Docker 버전이 cache mount를 지원하지 않으면 Docker/Buildx를 업그레이드한 뒤 재시도한다. legacy builder에 맞추려고 cache mount를 조용히 제거하거나 migration·재기동으로 진행하지 않는다. 캐시 이상이 의심되면 `docker buildx du`로 사용량을 확인하고, 다른 세션·배포의 캐시까지 지우는 broad prune 전에 영향 범위와 복구 비용을 검토한다.
+
 ## Changesets와 배포 버전
 
 Teameet v1은 `v1_api`와 `v1_web`을 하나의 fixed Changesets 그룹으로 관리한다. 사용자 동작·API·배포 계약을 바꾸는 PR은 `.changeset/*.md`에서 `patch`, `minor`, `major` 중 하나를 선언한다. 여러 PR을 한 번에 릴리스하면 가장 높은 bump가 다음 정식 버전을 결정한다.

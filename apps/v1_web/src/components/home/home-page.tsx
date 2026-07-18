@@ -130,7 +130,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           <div className="tm-home-matches-block">
             <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '내 실력에 맞는 매치 추천'} action="전체보기" actionHref="/matches" />
             {model.network ? (
-              <div style={{ padding: '0 20px 8px' }}>
+              <div className="tm-home-matches-error-wrap" role="alert">
                 {/* [P2 UX 라이팅] 능동형 + 해요체 */}
                 <EmptyState title="목록을 불러오지 못했어요" sub="아래 버튼으로 다시 불러올 수 있어요." cta="다시 불러오기" onCta={model.retry} />
               </div>

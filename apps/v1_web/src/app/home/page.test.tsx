@@ -100,4 +100,19 @@ describe('HomePage', () => {
     expect(screen.getAllByText('홈 노출 공지 제목').length).toBeGreaterThan(0);
     expect(screen.queryByText('홈에서는 이 긴 공지 본문이 그대로 보이면 안 됩니다.')).not.toBeInTheDocument();
   });
+
+  it('uses the compact recommended-match error container for network failures', () => {
+    const model = { ...getHomeViewModel(), network: true, recommendedMatches: [] };
+
+    const { container } = render(
+      <Providers>
+        <HomePageView model={model} />
+      </Providers>,
+    );
+
+    const error = container.querySelector('.tm-home-matches-error-wrap');
+    expect(error).toHaveAttribute('role', 'alert');
+    expect(error).toHaveTextContent('목록을 불러오지 못했어요');
+    expect(error).toHaveTextContent('다시 불러오기');
+  });
 });

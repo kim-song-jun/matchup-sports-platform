@@ -22,6 +22,10 @@
   margin: 0 20px 28px;
 }
 
+.tm-home-matches-error-wrap {
+  padding: 0 20px 8px;
+}
+
 /*
  * Bug fix: .tm-section-title carries its own `padding: 0 20px 12px` (globals.css)
  * so that sections using it standalone (e.g. .tm-home-matches-block, which has no
@@ -380,15 +384,25 @@
 
 /* ─── Desktop EmptyState / error fills the column gracefully ──────────────── */
 @media (min-width: 1024px) {
+  .tm-home-matches-error-wrap {
+    padding: 0;
+  }
+
   .tm-home-matches-block .tm-empty-state,
   .tm-home-matches-block .tm-error-state {
-    /* Don't let the empty state be a tiny centered card in a huge column */
-    min-height: 200px;
+    min-height: 176px;
+    padding: 28px 24px;
     border: 1px solid var(--border);
     border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .tm-home-matches-block .tm-empty-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
   }
 }
 

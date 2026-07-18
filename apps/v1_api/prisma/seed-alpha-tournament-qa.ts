@@ -126,7 +126,7 @@ function scenarioDate(now: Date, days: number, hour: number) {
   return value;
 }
 
-function campaignContent(
+export function buildAlphaTournamentCampaignContent(
   scenario: TournamentScenario,
   scheduledAt: Date,
   registrationDeadlineAt: Date,
@@ -136,7 +136,7 @@ function campaignContent(
     hero: {
       title: scenario.title,
       summary: `${scheduledAt.toISOString().slice(0, 10)} · 서울 송파 풋살파크 · 4개 팀`,
-      imageUrl: COVER_IMAGE_URL,
+      imageUrl: `${ALPHA_QA_ORIGIN}${COVER_IMAGE_URL}`,
     },
     intro: {
       title: '대회 상태별 실제 사용자 플로우를 확인해 보세요',
@@ -480,7 +480,7 @@ async function createScenario(
         tournamentId: scenario.id,
         slug: scenario.slug,
         status: 'published',
-        content: campaignContent(scenario, scheduledAt, registrationDeadlineAt),
+        content: buildAlphaTournamentCampaignContent(scenario, scheduledAt, registrationDeadlineAt),
         publishedAt: now,
       },
     });
@@ -592,7 +592,9 @@ async function main() {
   }
 }
 
-main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error: unknown) => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

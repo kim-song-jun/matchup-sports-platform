@@ -879,6 +879,7 @@ model V1PostEventReview {
   targetUserId   String?                     @map("target_user_id")
   targetTeamId   String?                     @map("target_team_id")
   rating         Int
+  sportId        String?                     @map("sport_id")
   status         V1PostEventReviewStatus     @default(submitted)
   submittedAt    DateTime                    @default(now()) @map("submitted_at")
   hiddenAt       DateTime?                   @map("hidden_at")
@@ -903,6 +904,8 @@ model V1PostEventReview {
   @@index([sourceType, sourceGroupId])
   @@index([targetType])
   @@index([status])
+  @@index([targetUserId, sportId, submittedAt])
+  @@index([targetTeamId, sportId, submittedAt])
   @@map("v1_post_event_reviews")
 }
 

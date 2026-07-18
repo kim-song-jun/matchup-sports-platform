@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 describe('AdminOpsService', () => {
   let service: AdminOpsService;
   const prisma = {
-    v1WebPushFailureLog: { findMany: jest.fn(), update: jest.fn() },
+    v1WebPushFailureLog: { findMany: jest.fn(), updateMany: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -37,11 +37,11 @@ describe('AdminOpsService', () => {
     expect(result[0]).not.toHaveProperty('userId');
   });
 
-  it('ack records acknowledgedAt and acknowledgedBy', async () => {
-    await service.acknowledgeFailures(['fail-1'], 'admin-user-1');
+  it('ack records acknowledgedAt and acknowledgedBy for every id in one bulk update', async () => {
+    await service.acknowledgeFailures(['fail-1', 'fail-2'], 'admin-user-1');
 
-    expect(prisma.v1WebPushFailureLog.update).toHaveBeenCalledWith({
-      where: { id: 'fail-1' },
+    expect(prisma.v1WebPushFailureLog.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['fail-1', 'fail-2'] } },
       data: expect.objectContaining({ acknowledgedBy: 'admin-user-1' }),
     });
   });

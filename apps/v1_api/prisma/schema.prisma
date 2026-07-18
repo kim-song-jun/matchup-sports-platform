@@ -308,6 +308,8 @@ model V1User {
   notifications                  V1Notification[]
   notificationPreference         V1NotificationPreference?
   pushSubscriptions              V1PushSubscription[]
+  webPushFailureLogs             V1WebPushFailureLog[]      @relation("V1WebPushFailureLogUser")
+  acknowledgedPushFailureLogs    V1WebPushFailureLog[]      @relation("V1WebPushFailureLogAcknowledgedBy")
   searchHistories                V1SearchHistory[]
   adminUser                      V1AdminUser?               @relation("V1AdminUserAccount")
   grantedAdmins                  V1AdminUser[]              @relation("V1AdminGrantor")
@@ -1092,7 +1094,8 @@ model V1PushSubscription {
   createdAt  DateTime @default(now()) @map("created_at")
   lastUsedAt DateTime @updatedAt @map("last_used_at")
 
-  user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         V1User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  failureLogs  V1WebPushFailureLog[]
 
   @@index([userId])
   @@map("v1_push_subscriptions")
@@ -1109,9 +1112,14 @@ model V1WebPushFailureLog {
   acknowledgedAt DateTime? @map("acknowledged_at")
   acknowledgedBy String?   @map("acknowledged_by")
 
+  user               V1User              @relation("V1WebPushFailureLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  subscription       V1PushSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  acknowledgedByUser V1User?             @relation("V1WebPushFailureLogAcknowledgedBy", fields: [acknowledgedBy], references: [id], onDelete: SetNull)
+
   @@index([occurredAt])
   @@index([acknowledgedAt])
   @@index([userId])
+  @@index([subscriptionId])
   @@map("v1_web_push_failure_logs")
 }
 

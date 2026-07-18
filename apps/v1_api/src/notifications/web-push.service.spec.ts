@@ -12,6 +12,7 @@ import * as webpush from 'web-push';
 describe('WebPushService', () => {
   const prisma = {
     v1PushSubscription: {
+      findUnique: jest.fn(),
       findMany: jest.fn(),
       upsert: jest.fn(),
       delete: jest.fn(),
@@ -97,5 +98,41 @@ describe('WebPushService', () => {
         data: expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1', statusCode: 500 }),
       }),
     );
+  });
+
+  it('subscribe upserts a new subscription when the endpoint is not yet registered', async () => {
+    const service = await build({});
+    prisma.v1PushSubscription.findUnique.mockResolvedValue(null);
+
+    const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } };
+    await service.subscribe('user-1', dto);
+
+    expect(prisma.v1PushSubscription.upsert).toHaveBeenCalledWith({
+      where: { endpoint: dto.endpoint },
+      create: { userId: 'user-1', endpoint: dto.endpoint, p256dh: 'p', auth: 'a' },
+      update: { p256dh: 'p', auth: 'a' },
+    });
+  });
+
+  it('subscribe refreshes the keys when the same user re-registers an existing endpoint', async () => {
+    const service = await build({});
+    prisma.v1PushSubscription.findUnique.mockResolvedValue({ id: 'sub-1', userId: 'user-1' });
+
+    const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p2', auth: 'a2' } };
+    await service.subscribe('user-1', dto);
+
+    expect(prisma.v1PushSubscription.upsert).toHaveBeenCalled();
+  });
+
+  it('subscribe rejects when the endpoint is already registered to a different user', async () => {
+    const service = await build({});
+    prisma.v1PushSubscription.findUnique.mockResolvedValue({ id: 'sub-1', userId: 'other-user' });
+
+    const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } };
+
+    await expect(service.subscribe('user-1', dto)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PUSH_ENDPOINT_ALREADY_REGISTERED' }),
+    });
+    expect(prisma.v1PushSubscription.upsert).not.toHaveBeenCalled();
   });
 });

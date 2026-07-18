@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -36,10 +36,18 @@ export class WebPushService implements OnModuleInit {
   }
 
   async subscribe(userId: string, dto: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<void> {
+    const existing = await this.prisma.v1PushSubscription.findUnique({ where: { endpoint: dto.endpoint } });
+    if (existing && existing.userId !== userId) {
+      throw new ConflictException({
+        code: 'PUSH_ENDPOINT_ALREADY_REGISTERED',
+        message: '이미 다른 계정에 등록된 구독이에요.',
+      });
+    }
+
     await this.prisma.v1PushSubscription.upsert({
       where: { endpoint: dto.endpoint },
       create: { userId, endpoint: dto.endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth },
-      update: { p256dh: dto.keys.p256dh, auth: dto.keys.auth, userId },
+      update: { p256dh: dto.keys.p256dh, auth: dto.keys.auth },
     });
   }
 

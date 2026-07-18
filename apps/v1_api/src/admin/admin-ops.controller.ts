@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -18,6 +18,8 @@ class RecentPushFailuresQueryDto {
 
 class AckPushFailuresDto {
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @IsString({ each: true })
   ids!: string[];
 }
@@ -38,7 +40,7 @@ export class AdminOpsController {
 
   @Post('push-failures/ack')
   async ackPushFailures(@CurrentUser() user: V1AuthUser, @Body() dto: AckPushFailuresDto) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getMutationAdmin(user.id);
     return this.adminOpsService.acknowledgeFailures(dto.ids, user.id);
   }
 }

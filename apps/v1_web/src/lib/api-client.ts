@@ -65,7 +65,7 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     },
   });
 
-  const body = await response.json().catch(() => null);
+  const body = response.status === 204 ? null : await response.json().catch(() => null);
 
   if (!response.ok || body?.status === 'error') {
     const errorBody: ApiErrorBody =
@@ -84,6 +84,8 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     });
     throw error;
   }
+
+  if (response.status === 204) return undefined as T;
 
   return (body as ApiEnvelope<T>).data;
 }

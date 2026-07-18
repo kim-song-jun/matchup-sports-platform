@@ -1683,12 +1683,11 @@ export function BracketTab({
 
     <div className={[
       'flex flex-col gap-6',
-      /* 우측 컬럼(브래킷)에 minmax(0,640px) 상한 추가 — 1920+에서 과폭 방지 */
-      hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_minmax(0,640px)] lg:items-start lg:gap-6' : '',
+      hasData ? 'xl:grid xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] xl:items-start xl:gap-8' : '',
     ].join(' ')}>
 
       {/* ── 좌측 컬럼: 관리 폼 (조 만들기 · 팀 배정 · 픽스처 만들기) ── */}
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
 
       {/* ── Step 1: 조 만들기 ───────────────────────────────────────── */}
       <StepRow n={1} locked={false}>
@@ -2014,13 +2013,18 @@ export function BracketTab({
       </div>{/* end left column */}
 
       {/* ── 우측 컬럼: 데이터 (조별 순위표 · 픽스처 목록) ── */}
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
 
       {/* ── 조별 순위표 ──────────────────────────────────────────────── */}
       {groups.length > 0 && (
-        <div className="flex flex-col gap-4">
+        <section
+          aria-labelledby="admin-group-standings-title"
+          className="flex min-w-0 flex-col gap-4 rounded-2xl border border-gray-100 bg-white px-5 py-5"
+        >
           <div className="flex items-center justify-between">
-            <h3 className="text-[15px] font-bold text-gray-900">조별 순위표</h3>
+            <h3 id="admin-group-standings-title" className="text-[15px] font-bold text-gray-900">
+              조별 순위표
+            </h3>
             <button
               type="button"
               onClick={handleRecalculate}
@@ -2173,7 +2177,7 @@ export function BracketTab({
               </div>
             );
           })}
-        </div>
+        </section>
       )}
 
       </div>{/* end right column */}

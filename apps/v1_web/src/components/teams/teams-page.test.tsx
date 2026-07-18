@@ -2,9 +2,9 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TeamDetailPageView, TeamFormPageView, TeamListPageView } from './teams-page';
-import { getTeamListViewModel } from './teams.view-model';
-import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel } from './teams.types';
+import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView } from './teams-page';
+import { getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
+import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel } from './teams.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/edit',
@@ -239,6 +239,72 @@ describe('TeamDetailPageView', () => {
     });
 
     expect(onCta).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('TeamMembersPageView — 보낸 초대 목록', () => {
+  function baseModel(overrides: Partial<NonNullable<TeamMembersViewModel['invitations']>>): TeamMembersViewModel {
+    const fallback = getTeamMembersViewModel();
+    return {
+      ...fallback,
+      activeTab: 'invitations',
+      invitations: {
+        form: {
+          email: '',
+          message: '',
+          onEmailChange: vi.fn(),
+          onMessageChange: vi.fn(),
+          onSubmit: vi.fn(),
+          submitting: false,
+          error: null,
+          successMessage: null,
+        },
+        items: [],
+        listLoading: false,
+        listError: false,
+        onRetry: vi.fn(),
+        ...overrides,
+      },
+    };
+  }
+
+  it('조회 실패 시 빈 목록 대신 에러+재시도 UI를 보여준다', () => {
+    const onRetry = vi.fn();
+    const model = baseModel({ listError: true, onRetry });
+
+    render(<TeamMembersPageView model={model} />);
+
+    expect(screen.getByText('초대 목록을 불러오지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByText('보낸 초대가 없어요')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('다시 시도'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('"초대 중" 상태 텍스트에 띄어쓰기가 있고, 취소 처리 중인 아이템만 비활성화된다', () => {
+    const onCancelA = vi.fn();
+    const onCancelB = vi.fn();
+    const model = baseModel({
+      items: [
+        { invitationId: 'inv-a', displayName: '김도윤', createdAt: '2026-07-01T00:00:00Z', message: null, cancelPending: true, onCancel: onCancelA },
+        { invitationId: 'inv-b', displayName: '박서준', createdAt: '2026-07-01T00:00:00Z', message: null, cancelPending: false, onCancel: onCancelB },
+      ],
+    });
+
+    render(<TeamMembersPageView model={model} />);
+
+    expect(screen.getAllByText('초대 중').length).toBeGreaterThan(0);
+    expect(screen.queryByText('초대중')).not.toBeInTheDocument();
+
+    expect(screen.getByText('취소 중…')).toBeInTheDocument();
+    const pendingCancelButton = screen.getByRole('button', { name: '김도윤님 초대 취소' });
+    expect(pendingCancelButton).toBeDisabled();
+    const activeCancelButton = screen.getByRole('button', { name: '박서준님 초대 취소' });
+    expect(activeCancelButton).not.toBeDisabled();
+
+    fireEvent.click(activeCancelButton);
+    expect(onCancelB).toHaveBeenCalledTimes(1);
+    expect(onCancelA).not.toHaveBeenCalled();
   });
 });
 

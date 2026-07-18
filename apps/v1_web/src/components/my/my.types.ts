@@ -133,12 +133,13 @@ export type MyInvitationItem = {
   invitedByName: string;
   message: string | null;
   dateLabel: string;
+  /** 이 초대건의 수락/거절 처리 중 여부 — 아이템별 상태(팀초대 목록의 cancelPending 패턴과 동일) */
+  actionPending: boolean;
 };
 
 export type MyInvitationsViewModel = {
   invitations: MyInvitationItem[];
   error: boolean;
-  actionPending: boolean;
   onAccept: (invitationId: string) => void;
   onDecline: (invitationId: string) => void;
   onRetry: () => void;

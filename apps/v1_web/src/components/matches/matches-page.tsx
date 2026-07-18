@@ -125,7 +125,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
         </div>
         {model.matches.length ? (
           <div className="tm-match-card-stack">
-            {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
+            {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
           </div>
         ) : (
           /* EmptyState must be a sibling of .tm-match-card-stack, not nested inside it —
@@ -164,7 +164,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
         ) : null}
         {model.state === 'joined' ? (
           <div className="tm-match-card-stack" style={{ marginTop: 18 }}>
-            {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
+            {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
           </div>
         ) : null}
       </div>
@@ -668,11 +668,11 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
   );
 }
 
-function MatchCardItem({ match, index }: { match: MatchCardModel; index: number }) {
+function MatchCardItem({ match }: { match: MatchCardModel }) {
   return (
     <Link className="tm-match-list-card tm-pressable" href={`/matches/${match.id}`}>
       <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
-        <span className="tm-badge tm-badge-blue">{index === 0 ? '추천' : match.sport}</span>
+        <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
         <span className="tm-match-count-badge" style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
           <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-lg)' }}>{match.current}</span>

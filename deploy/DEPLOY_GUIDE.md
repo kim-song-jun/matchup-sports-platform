@@ -57,6 +57,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 |---|---|
 | `EC2_HOST` | 배포 대상 EC2 주소 |
 | `EC2_SSH_KEY` | EC2 SSH private key |
+| `EC2_KNOWN_HOSTS` | 신뢰한 EC2 SSH host public key를 담은 known_hosts 한 줄 이상 |
 | `TOSS_CLIENT_KEY` | 결제 client key, 선택 |
 | `TOSS_SECRET_KEY` | 결제 server key, 선택 |
 | `TOSS_WEBHOOK_SECRET` | 결제 webhook 검증 key, 선택 |
@@ -64,6 +65,17 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `KAKAO_CLIENT_SECRET` | Kakao OAuth client secret, 선택 |
 | `KAKAO_REDIRECT_URI` | Kakao OAuth callback, 선택 |
 | `V1_HOST_ADMIN_PASSWORD` | v1 host admin password |
+| `GA_PROD` | production GA4 Measurement ID, 선택 |
+
+`EC2_KNOWN_HOSTS`는 배포 시점의 `ssh-keyscan` 결과를 즉석에서 신뢰하지 않는다. 먼저 AWS Systems Manager 또는 EC2 콘솔처럼 AWS 제어면을 통해 대상 인스턴스에서 host key fingerprint를 확인하고, 별도 로컬 `ssh-keyscan -t ed25519 <EC2_HOST>` 결과의 fingerprint가 같은지 대조한 뒤 그 known_hosts 줄을 GitHub secret으로 등록한다. 값이 없거나 `EC2_HOST`와 일치하지 않으면 배포는 연결 전에 fail-closed 된다.
+
+```bash
+ssh-keyscan -t ed25519 <EC2_HOST> > ec2-known-hosts
+ssh-keygen -lf ec2-known-hosts
+gh secret set EC2_KNOWN_HOSTS < ec2-known-hosts
+```
+
+GitHub Actions의 OAuth·관리자·GA 값은 SSH 명령줄 인자가 아니라 원격 `bash` 표준입력으로만 전달한다. 따라서 프로세스 목록에 값이 남지 않으며, EC2에는 별도 임시 secret 파일을 만들지 않는다.
 
 배포 단계는 다음 계약을 따른다.
 

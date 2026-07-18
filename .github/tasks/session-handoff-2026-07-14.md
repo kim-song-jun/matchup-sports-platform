@@ -18,7 +18,7 @@
 
 - 호스트는 12 cores 대비 load 약 35, Node 약 700~900, MCP match 약 650으로 과부하다. 로컬 전체 테스트·빌드는 시작하지 않았고 GitHub의 직렬 CI 결과를 사용했다.
 - Playwright MCP 재증식 원인은 `/Users/sungjun/.codex/config.toml`에서 plugin이 이미 disabled인데도 7일 이상 살아 있던 Codex app-server PID 51610이 stale tool config를 유지하는 것이다. 이번 세션이 만든 root/child 한 트리만 exact PID TERM cleanup했다. 영구 반영에는 이 작업을 안전하게 끝낸 뒤 Codex 앱 재시작이 필요하며, 다른 세션 소유 14개 tree는 임의 종료하지 않았다.
-- production deploy의 남은 high-risk 항목: SSH host verification 비활성, SSH argv에 secret 전달, mutable `:latest` 이미지/rollback provenance, production workflow explicit permissions 부재, production header-auth posture 증명 필요. alpha compose의 JSON log rotation과 alpha workflow permissions는 이미 존재하므로 미구현으로 분류하지 않는다.
+- Task 121에서 production workflow의 SSH host verification을 pinned `EC2_KNOWN_HOSTS` + fail-closed로 전환하고, secret을 argv가 아닌 encrypted stdin stream으로 전달하며, token permission을 `contents: read`로 제한했다. 기존 trusted ED25519 fingerprint와 live production EC2 scan 일치 후 public known_hosts 줄을 GitHub secret으로 등록했다. 남은 high-risk는 mutable `:latest` image/rollback provenance와 production header-auth posture 증명이다. alpha compose의 JSON log rotation과 alpha workflow permissions는 이미 존재한다.
 
 ### 다음 미완 범위
 

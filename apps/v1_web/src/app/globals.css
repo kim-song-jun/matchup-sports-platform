@@ -6872,12 +6872,8 @@ button:disabled {
   }
   .tm-bracket-page-grid .tm-bk2-scroll-hint { display: none; }
 
-  /* 시상 페이지: 좌(상금) 컬럼이 우(어워드+후기)보다 짧아 하단에 빈 공간이 생기는 문제
-     — 좌측 카드를 컬럼 높이만큼 늘려 빈 여백이 카드 "안쪽" 여백처럼 보이게 함 */
-  .tm-awards-grid { align-items: stretch; }
-  .tm-awards-col-prize { display: flex; flex-direction: column; }
-  .tm-awards-col-prize .tm-prize-section { flex: 1; display: flex; flex-direction: column; }
-  .tm-awards-col-prize .tm-prize-card { flex: 1; display: flex; flex-direction: column; }
+  /* 시상 페이지: 각 컬럼과 카드는 콘텐츠 높이만 차지한다. */
+  .tm-awards-grid { align-items: start; }
 
   /* 최종결과 페이지: 좌(최종순위+대회요약) 컬럼은 내용 높이만 차지하고 sticky로 고정
      — 우측 결선 경기를 스크롤하는 동안에도 순위표가 계속 보인다 */

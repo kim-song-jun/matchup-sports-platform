@@ -132,8 +132,21 @@ Personas: ordinary user, support/read-only admin, ops/owner admin
 - [x] Verified alpha fixture payloads and public routes with sequential low-load HTTP checks.
 - [ ] Restart Codex app and confirm Playwright MCP root count no longer grows.
 - [ ] Run live profile and tournament browser scenarios.
+  - 2026-07-19 partial PASS: completed detail에서 실제 링크로 results → `경기 영상 2` → awards를 이동했고, 7경기 결과·2영상·3개인상·2후기를 화면에서 확인했다.
+  - awards responsive PASS: mobile `390×844`, tablet `768×1024` document horizontal overflow `0`; desktop 데이터 렌더와 podium/prize/award/review 구성을 확인했다.
+  - remaining: 영상 lightbox close/previous/next, results 전체 responsive 캡처, console/network 기록, profile/upload, registration/admin mutation과 cleanup.
 - [ ] Add the narrow automated regression cases proven by the live run.
 - [ ] Update `docs/scenarios/index.md` with final evidence and cleanup receipt.
+
+### Current browser evidence
+
+- `output/playwright/visual-audit/task-122-alpha-persona/completed-detail-desktop.png`
+- `output/playwright/visual-audit/task-122-alpha-persona/completed-results-videos-desktop.png`
+- `output/playwright/visual-audit/task-122-alpha-persona/completed-awards-desktop.png`
+- `output/playwright/visual-audit/task-122-alpha-persona/completed-awards-mobile-viewport.png`
+- `output/playwright/visual-audit/task-122-alpha-persona/completed-awards-tablet-viewport.png`
+
+Desktop awards audit found a real layout gap: the left prize/awards card stretches to the longer reviews column and leaves a large blank area. It remains FAIL-for-polish until the required Lazyweb report is reviewed and a scoped layout rebalance is implemented; mobile/tablet do not reproduce the overflow or blank-height issue.
 
 ## Ambiguity Log
 

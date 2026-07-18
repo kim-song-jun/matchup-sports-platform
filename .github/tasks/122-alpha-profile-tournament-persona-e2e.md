@@ -95,6 +95,22 @@ Personas: guest, ordinary team member, owner/manager, admin
 6. Reload `/my`; confirm the same status.
 7. Restore the alpha QA registration to its original seed state through the authorized admin contract.
 
+#### Proven live-run contract
+
+- Authentication bootstrap must call `loginViaApi(nickname)`, inject `accessToken`, `refreshToken`, and `authUser`, then hydrate the protected shell at `/home` before opening `/tournaments/{id}/apply`. Direct token injection followed by a heavy route is not accepted because it can produce an auth-wall false negative.
+- Use the open fixture `aa100000-0000-4000-8000-000000000002`. The seed already has `submitted` registrations for the red and blue teams; green and gold are the two eligible unregistered owner personas.
+- The team-step button exposes `aria-label="다음 단계: 동의 및 결제 수단 선택"`. The agreement-step submit exposes `aria-label="신청 제출하기"`, changes to `신청 중…`, and is disabled while either create or submit mutation is pending.
+- A confirmation dialog provides `확인하고 신청하기`; it is disabled during submission. The implementation also uses `createBusyRef` and `submitBusyRef`, so the live proof must cover both rapid UI clicks and the server result, not button styling alone.
+- Duplicate proof: record the first create response registration ID, issue the same create action again for the same tournament/team, and require the same ID. Then query `GET /tournaments/{id}/registrations/my-registrations` and require exactly one row for that team. A forced second submit must return deterministic `REGISTRATION_NOT_DRAFT` rather than create another row.
+- Cleanup cannot be described as an admin status restore: the public admin contract can cancel but cannot remove a registration that was absent in the seed. The live run must therefore snapshot the exact row graph and use an alpha-only, exact-ID operator cleanup after the UI assertions, then prove the team is absent again. A broad seed/reset or deletion of shared fixture rows is prohibited.
+
+### PROFILE-ALPHA cleanup contract
+
+- Valid upload success creates both a retained file and a `v1_upload_assets` row with owner, MIME type, byte size, URL, storage path, and creation time.
+- The current upload API has only `POST /uploads` and `POST /uploads/videos`; it has no owner deletion endpoint. Restoring `profileImageUrl` alone does not clean the retained file, ledger row, or quota usage.
+- Until an authenticated owner-delete contract exists, the valid-upload live scenario must record the returned URL and use an exact alpha-only operator cleanup for that single owned asset after restoring the original profile URL. It must delete the file and ledger row together and then prove both are absent. Non-image and 2–5 MB client-rejection scenarios must show zero upload request and need no asset cleanup.
+- This missing owner cleanup contract is a product/security lifecycle gap, not a reason to claim the upload scenario complete. A future implementation must reject deletion of referenced assets and assets owned by another user; no broad filesystem cleanup is allowed.
+
 ### TOURN-ALPHA-004 — Admin lifecycle and permissions
 
 Personas: ordinary user, support/read-only admin, ops/owner admin
@@ -135,6 +151,8 @@ Personas: ordinary user, support/read-only admin, ops/owner admin
   - 2026-07-19 partial PASS: completed detail에서 실제 링크로 results → `경기 영상 2` → awards를 이동했고, 7경기 결과·2영상·3개인상·2후기를 화면에서 확인했다.
   - awards responsive PASS: mobile `390×844`, tablet `768×1024` document horizontal overflow `0`; desktop 데이터 렌더와 podium/prize/award/review 구성을 확인했다.
   - remaining: 영상 lightbox close/previous/next, results 전체 responsive 캡처, console/network 기록, profile/upload, registration/admin mutation과 cleanup.
+- [x] Static live selectors and duplicate-submit guards mapped for the apply wizard.
+- [x] Exact cleanup blockers mapped: registration has no absent-state admin restore, and uploads have no authenticated owner-delete endpoint.
 - [ ] Add the narrow automated regression cases proven by the live run.
 - [ ] Update `docs/scenarios/index.md` with final evidence and cleanup receipt.
 

@@ -144,6 +144,18 @@ describe('TournamentCampaignTemplate', () => {
     expect(screen.queryByText('참가비')).not.toBeInTheDocument();
   });
 
+  it('omits incomplete prize breakdown rows without a value', () => {
+    render(
+      <TournamentCampaignTemplate
+        campaign={{ ...campaign('open'), prizeBreakdown: '우승 30만원 / 경품' }}
+      />,
+    );
+
+    expect(screen.getByText('우승')).toBeInTheDocument();
+    expect(screen.getByText('30만원')).toBeInTheDocument();
+    expect(screen.queryByText('경품')).not.toBeInTheDocument();
+  });
+
   it('renders repeated highlight titles and FAQ questions without duplicate React keys', () => {
     const repeatedHighlight = {
       title: '하루 완결 운영',

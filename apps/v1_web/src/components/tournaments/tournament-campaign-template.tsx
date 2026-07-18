@@ -43,7 +43,9 @@ export function TournamentCampaignTemplate({
     tournament.scheduledEndAt,
   );
   const prizeRows = tournament.prizeBreakdown
-    ? parsePrizeRows(tournament.prizeBreakdown)
+    ? parsePrizeRows(tournament.prizeBreakdown).filter(
+        (row) => row.amount.trim().length > 0,
+      )
     : [];
 
   return (

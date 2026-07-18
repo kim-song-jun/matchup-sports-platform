@@ -195,14 +195,17 @@ export function TournamentCampaignTemplate({
         ) : null}
 
         <section className={styles.actions} aria-label="대회 다음 단계">
-          <div>
+          <div className={styles.actionsIntro}>
             <span className={styles.sectionKicker}>다음 단계</span>
             <h2 className={styles.actionsTitle}>
               {getCampaignActionHeading(tournament.status, tournament.registrationAvailability)}
             </h2>
           </div>
           <div className={styles.actionLinks}>
-            <Link className="tm-btn tm-btn-neutral tm-btn-lg" href={actions.secondary.href}>
+            <Link
+              className={`tm-btn tm-btn-neutral tm-btn-lg ${styles.actionSecondary}`}
+              href={actions.secondary.href}
+            >
               {actions.secondary.label}
             </Link>
             <TournamentCampaignPrimaryAction

@@ -559,15 +559,19 @@
   }
 
   .actions {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
+    display: block;
     margin-top: 64px;
     margin-inline: -20px;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .actionsIntro,
+  .actionSecondary {
+    display: none;
   }
 
   .actionLinks {
-    flex-direction: column-reverse;
+    display: block;
     width: 100%;
   }
 

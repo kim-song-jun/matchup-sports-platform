@@ -1,4 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { ProfileService } from './profile.service';
 
 const user = {
@@ -41,7 +42,7 @@ describe('ProfileService identity binding', () => {
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
-    const service = new ProfileService(prisma as never);
+    const service = new ProfileService(prisma as unknown as PrismaService);
 
     await service.updateMe(user, {
       displayName: profile.displayName,
@@ -74,7 +75,7 @@ describe('ProfileService public profile moderation', () => {
     const prisma = {
       v1User: { findFirst: jest.fn().mockResolvedValue(null) },
     };
-    const service = new ProfileService(prisma as never);
+    const service = new ProfileService(prisma as unknown as PrismaService);
 
     await expect(service.publicProfile(null, 'blocked-user')).rejects.toBeInstanceOf(
       NotFoundException,
@@ -87,5 +88,73 @@ describe('ProfileService public profile moderation', () => {
       },
       include: { profile: true, reputationSummary: true },
     });
+  });
+});
+
+describe('ProfileService withdrawal admin lockout', () => {
+  function createPrisma(activeAdmin: { id: string } | null) {
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({ accountStatus: 'active' }),
+        update: jest.fn().mockResolvedValue({
+          id: user.id,
+          accountStatus: 'withdrawal_pending',
+          updatedAt: new Date('2026-07-19T00:00:00.000Z'),
+        }),
+      },
+      v1AdminUser: {
+        findUnique: jest.fn().mockResolvedValue(activeAdmin ? { status: 'active' } : null),
+      },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+    return prisma;
+  }
+
+  it('fails closed with a stable error before mutating an active admin account', async () => {
+    const prisma = createPrisma({ id: 'admin-record-1' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+    const request = service.withdrawalRequest(user, { reason: 'leave' });
+
+    await expect(request).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(request).rejects.toMatchObject({
+      response: { code: 'ADMIN_WITHDRAWAL_FORBIDDEN' },
+    });
+    expect(prisma.v1AdminUser.findUnique).toHaveBeenCalledWith({
+      where: { userId: user.id },
+      select: { status: true },
+    });
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
+  it('allows a non-admin active user to request withdrawal after the locked-state check', async () => {
+    const prisma = createPrisma(null);
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await expect(service.withdrawalRequest(user, { reason: 'leave' })).resolves.toMatchObject({
+      userId: user.id,
+      accountStatus: 'withdrawal_pending',
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.v1User.update).toHaveBeenCalledWith({
+      where: { id: user.id },
+      data: { accountStatus: 'withdrawal_pending' },
+    });
+  });
+
+  it('rejects when the transaction-time account status is no longer active', async () => {
+    const prisma = createPrisma(null);
+    prisma.v1User.findUnique.mockResolvedValue({ accountStatus: 'suspended' });
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await expect(service.withdrawalRequest(user, { reason: 'stale auth' })).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    expect(prisma.v1AdminUser.findUnique).not.toHaveBeenCalled();
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
   });
 });

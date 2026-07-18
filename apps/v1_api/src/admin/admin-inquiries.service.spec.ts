@@ -32,6 +32,7 @@ const activeAdminRecord = {
   userId: 'admin-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function makeGuestInquiryRow(overrides: Record<string, unknown> = {}) {

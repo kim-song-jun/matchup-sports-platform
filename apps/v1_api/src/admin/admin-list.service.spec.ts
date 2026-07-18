@@ -40,6 +40,7 @@ const activeAdminRecord = {
   userId: 'admin-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 // A minimal seeded V1User row shape that Prisma returns for list queries

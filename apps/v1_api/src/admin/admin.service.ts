@@ -107,19 +107,36 @@ export class AdminService {
   }
 
   async changeUserStatus(user: V1AuthUser, userId: string, dto: ChangeUserStatusDto) {
-    const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-
-    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
-    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
-      throw new ForbiddenException({
-        code: 'PERMISSION_DENIED',
-        message: '운영자 계정의 상태는 owner만 변경할 수 있어요.',
-      });
-    }
-
     return this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const admin = await this.getTransactionMutationAdmin(tx, user.id);
+      await this.lockUserRow(tx, userId);
+
+      const target = await tx.v1User.findUnique({ where: { id: userId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+      const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
+      if (targetAdminRecord?.status === 'active') {
+        if (admin.userId === userId && dto.status !== 'active') {
+          throw new ConflictException({
+            code: 'SELF_LOCKOUT',
+            message: 'Active admins cannot disable their own user account',
+          });
+        }
+        if (admin.adminRole !== 'owner') {
+          throw new ForbiddenException({
+            code: 'PERMISSION_DENIED',
+            message: '운영자 계정의 상태는 owner만 변경할 수 있어요.',
+          });
+        }
+        if (dto.status !== 'active') {
+          throw new ConflictException({
+            code: 'ADMIN_ACCESS_ACTIVE',
+            message: 'Revoke admin access before disabling the user account',
+          });
+        }
+      }
+
       const updated = await tx.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -140,20 +157,35 @@ export class AdminService {
   }
 
   async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {
-    const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-
-    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
-    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
-      throw new ForbiddenException({
-        code: 'PERMISSION_DENIED',
-        message: '운영자 계정은 owner만 삭제할 수 있어요.',
-      });
-    }
-
     const deletedAt = new Date();
     return this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const admin = await this.getTransactionMutationAdmin(tx, user.id);
+      await this.lockUserRow(tx, userId);
+
+      const target = await tx.v1User.findUnique({ where: { id: userId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+      const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
+      if (targetAdminRecord?.status === 'active') {
+        if (admin.userId === userId) {
+          throw new ConflictException({
+            code: 'SELF_LOCKOUT',
+            message: 'Active admins cannot delete their own user account',
+          });
+        }
+        if (admin.adminRole !== 'owner') {
+          throw new ForbiddenException({
+            code: 'PERMISSION_DENIED',
+            message: '운영자 계정은 owner만 삭제할 수 있어요.',
+          });
+        }
+        throw new ConflictException({
+          code: 'ADMIN_ACCESS_ACTIVE',
+          message: 'Revoke admin access before deleting the user account',
+        });
+      }
+
       const updated = await tx.v1User.update({
         where: { id: userId },
         data: {
@@ -1442,46 +1474,55 @@ export class AdminService {
   }
 
   async grantAdmin(user: V1AuthUser, dto: GrantAdminDto) {
-    const actor = await this.getOwnerAdmin(user.id);
-
-    const targetUser = await this.prisma.v1User.findUnique({ where: { id: dto.userId } });
-    if (!targetUser) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-    }
-
     const now = new Date();
 
-    const adminRow = await this.prisma.$transaction(async (tx) => {
+    const withUser = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const actor = await this.getTransactionOwnerAdmin(tx, user.id);
+      await this.lockUserRow(tx, dto.userId);
+
+      const targetUser = await tx.v1User.findUnique({ where: { id: dto.userId } });
+      if (!targetUser) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+      }
+      if (targetUser.accountStatus !== 'active') {
+        throw new ConflictException({
+          code: 'ADMIN_ACCOUNT_INACTIVE',
+          message: 'Admin access can only be granted to an active user account',
+        });
+      }
+
       const existing = await tx.v1AdminUser.findUnique({ where: { userId: dto.userId } });
       if (existing && existing.status === 'active') {
         throw new ConflictException({ code: 'ALREADY_ADMIN', message: 'User is already an active admin' });
       }
 
-      let row: { id: string; userId: string; adminRole: string; status: string; grantedByAdminUserId: string | null; grantedAt: Date; revokedAt: Date | null };
-
-      if (existing) {
-        // revoked/suspended → reactivate
-        row = await tx.v1AdminUser.update({
-          where: { userId: dto.userId },
-          data: {
-            adminRole: dto.adminRole,
-            status: 'active',
-            revokedAt: null,
-            grantedByAdminUserId: actor.userId,
-            grantedAt: now,
-          },
-        });
-      } else {
-        row = await tx.v1AdminUser.create({
-          data: {
-            userId: dto.userId,
-            adminRole: dto.adminRole,
-            status: 'active',
-            grantedByAdminUserId: actor.userId,
-            grantedAt: now,
-          },
-        });
-      }
+      const row = existing
+        ? await tx.v1AdminUser.update({
+            where: { userId: dto.userId },
+            data: {
+              adminRole: dto.adminRole,
+              status: 'active',
+              revokedAt: null,
+              grantedByAdminUserId: actor.userId,
+              grantedAt: now,
+            },
+            include: {
+              user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+            },
+          })
+        : await tx.v1AdminUser.create({
+            data: {
+              userId: dto.userId,
+              adminRole: dto.adminRole,
+              status: 'active',
+              grantedByAdminUserId: actor.userId,
+              grantedAt: now,
+            },
+            include: {
+              user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+            },
+          });
 
       await tx.v1AdminActionLog.create({
         data: {
@@ -1500,13 +1541,6 @@ export class AdminService {
       return row;
     });
 
-    const withUser = await this.prisma.v1AdminUser.findUniqueOrThrow({
-      where: { userId: dto.userId },
-      include: {
-        user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
-      },
-    });
-
     return {
       adminUserId: withUser.id,
       userId: withUser.userId,
@@ -1522,33 +1556,40 @@ export class AdminService {
   }
 
   async updateAdmin(user: V1AuthUser, targetUserId: string, dto: UpdateAdminDto) {
-    const actor = await this.getOwnerAdmin(user.id);
-
-    // Guard: cannot modify self (check before entering transaction — self-id is immutable)
-    if (actor.userId === targetUserId) {
-      throw new ConflictException({ code: 'SELF_MODIFICATION', message: 'Cannot modify your own admin record' });
-    }
-
     const now = new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const actor = await this.getTransactionOwnerAdmin(tx, user.id);
+      await this.lockUserRow(tx, targetUserId);
+
+      if (actor.userId === targetUserId) {
+        throw new ConflictException({ code: 'SELF_MODIFICATION', message: 'Cannot modify your own admin record' });
+      }
+
       const existing = await tx.v1AdminUser.findUnique({ where: { userId: targetUserId } });
       if (!existing) {
         throw new NotFoundException({ code: 'NOT_FOUND', message: 'Admin was not found' });
       }
 
-      // Guard: cannot demote or revoke the last active owner (atomic count inside tx)
+      // The row lock above serializes every path that can remove owner access.
       const wouldLoseOwnerStatus =
         existing.adminRole === 'owner' &&
+        existing.status === 'active' &&
         (dto.status === 'revoked' || (dto.adminRole !== undefined && dto.adminRole !== 'owner'));
       if (wouldLoseOwnerStatus) {
-        const activeOwnerCount = await tx.v1AdminUser.count({
-          where: { adminRole: 'owner', status: 'active' },
+        await this.assertAnotherActiveOwner(tx, targetUserId);
+      }
+
+      if (dto.status === 'active') {
+        const targetUser = await tx.v1User.findUnique({
+          where: { id: targetUserId },
+          select: { accountStatus: true },
         });
-        if (activeOwnerCount <= 1) {
+        if (!targetUser || targetUser.accountStatus !== 'active') {
           throw new ConflictException({
-            code: 'LAST_OWNER',
-            message: 'Cannot demote or revoke the last active owner',
+            code: 'ADMIN_ACCOUNT_INACTIVE',
+            message: 'Admin access can only be activated for an active user account',
           });
         }
       }
@@ -1607,11 +1648,20 @@ export class AdminService {
   }
 
   private async getActiveAdmin(userId: string): Promise<ActiveAdmin> {
-    const admin = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
-    if (!admin || admin.status !== 'active') {
+    const admin = await this.prisma.v1AdminUser.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        adminRole: true,
+        status: true,
+        user: { select: { accountStatus: true } },
+      },
+    });
+    if (!admin || admin.status !== 'active' || admin.user.accountStatus !== 'active') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Active admin access is required' });
     }
-    return admin as ActiveAdmin;
+    return { id: admin.id, userId: admin.userId, adminRole: admin.adminRole, status: 'active' };
   }
 
   private async getMutationAdmin(userId: string) {
@@ -1620,6 +1670,77 @@ export class AdminService {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Support admins cannot mutate status' });
     }
     return admin;
+  }
+
+  private async getTransactionMutationAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
+    const admin = await this.getTransactionActiveAdmin(tx, userId);
+    if (admin.adminRole === 'support') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Support admins cannot mutate status' });
+    }
+    return admin;
+  }
+
+  private async getTransactionOwnerAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
+    const admin = await this.getTransactionActiveAdmin(tx, userId);
+    if (admin.adminRole !== 'owner') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Owner access is required' });
+    }
+    return admin;
+  }
+
+  private async getTransactionActiveAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "v1_admin_users" WHERE "user_id" = ${userId} FOR UPDATE
+    `;
+    await this.lockUserRow(tx, userId);
+
+    const admin = await tx.v1AdminUser.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        adminRole: true,
+        status: true,
+        user: { select: { accountStatus: true } },
+      },
+    });
+    if (!admin || admin.status !== 'active' || admin.user.accountStatus !== 'active') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Active admin access is required' });
+    }
+    return { id: admin.id, userId: admin.userId, adminRole: admin.adminRole, status: 'active' };
+  }
+
+  private async lockActiveOwnerRows(tx: Prisma.TransactionClient) {
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "v1_admin_users"
+      WHERE "admin_role" = 'owner' AND "status" = 'active'
+      ORDER BY id
+      FOR UPDATE
+    `;
+  }
+
+  private async lockUserRow(tx: Prisma.TransactionClient, userId: string) {
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "v1_users" WHERE id = ${userId} FOR UPDATE
+    `;
+  }
+
+  private async assertAnotherActiveOwner(tx: Prisma.TransactionClient, targetUserId: string) {
+    const remainingOwnerCount = await tx.v1AdminUser.count({
+      where: {
+        userId: { not: targetUserId },
+        adminRole: 'owner',
+        status: 'active',
+        user: { accountStatus: 'active' },
+      },
+    });
+    if (remainingOwnerCount === 0) {
+      throw new ConflictException({
+        code: 'LAST_OWNER',
+        message: 'Cannot remove access from the last active owner',
+      });
+    }
   }
 
   private async writeAdminStatusLogs(

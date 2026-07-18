@@ -1,178 +1,185 @@
 # Domain Contract — Admin & Ops
 
-## 범위
+## 범위와 Source of Truth
 
-운영자 전용 surface를 다룬다.
+이 문서는 v1 `AdminController`가 실제로 노출하는 `/api/v1/admin/*` 운영 API만 다룬다.
 
-- `/admin/*` (관리자 대시보드 및 운영 CRUD)
-- `/admin/disputes/*` (분쟁 운영)
-- `/admin/settlements/*` (정산 운영)
-
-이 문서는 **운영자 전용 계약**이다. 사용자 self-service 흐름으로 해석하면 안 된다.
-
-기준 우선순위:
-
-1. `apps/api/src/admin/admin.controller.ts` + `admin.service.ts`
-2. `apps/api/src/disputes/disputes.controller.ts` + `disputes.service.ts`
-3. `apps/api/src/settlements/settlements.controller.ts` + `settlements.service.ts`
-4. `apps/api/src/admin/dto/*.ts`
-5. `apps/web/src/hooks/use-api.ts` (관리자 호출부)
-
-> v1 공지·팝업 관리 계약은 위 legacy 목록이 아니라 `apps/v1_api/src/admin/admin.controller.ts`, `apps/v1_api/src/admin/admin.service.ts`, `apps/v1_api/src/admin/dto/admin.dto.ts`, `apps/v1_web/src/hooks/use-v1-api.ts`를 기준으로 한다.
+1. `apps/v1_api/src/admin/admin.controller.ts`
+2. `apps/v1_api/src/admin/dto/admin.dto.ts`
+3. `apps/v1_api/src/admin/admin.service.ts`
+4. `apps/v1_web/src/hooks/use-v1-api.ts`
 
 ## 공통 인증/권한
 
-- 기본적으로 `JwtAuthGuard + AdminGuard`가 함께 걸린다.
-- `/admin/*`, `/admin/disputes/*`, `/admin/settlements/*`는 일반 사용자 토큰으로 접근 불가.
-- 프론트는 관리자 shell 안에서만 진입 링크를 노출해야 한다.
+- 모든 경로는 `V1AuthGuard`를 통과해야 한다.
+- 서비스는 `V1AdminUser.status=active`뿐 아니라 연결된 `V1User.accountStatus=active`도 함께 확인한다. 둘 중 하나라도 active가 아니면 `403 PERMISSION_DENIED`다.
+- 조회는 active owner/ops/support가 사용할 수 있다.
+- 상태 변경, 팝업·공지·문의 mutation은 owner 또는 ops만 가능하다. support는 `403 PERMISSION_DENIED`다.
+- 운영자 목록·부여·변경은 owner 전용이다.
 
 ## Endpoint Matrix
 
-### A. `/admin`
+| Method | Path | DTO / Query | 권한 | 용도 |
+|---|---|---|---|---|
+| `GET` | `/api/v1/admin/me` | - | active admin | 내 운영자 역할·capability |
+| `GET` | `/api/v1/admin/overview` | `AdminOverviewQueryDto` | active admin | 운영 현황 요약 |
+| `GET` | `/api/v1/admin/action-logs` | `AdminLogsQueryDto` | active admin | 관리자 액션 로그 |
+| `GET` | `/api/v1/admin/status-change-logs` | `AdminLogsQueryDto` | active admin | 상태 변경 로그 |
+| `GET` | `/api/v1/admin/users` | `AdminUserListQueryDto` | active admin | 사용자 목록 |
+| `GET` | `/api/v1/admin/users/:userId` | - | active admin | 사용자 상세·탈퇴 사유·팀 역할 요약 |
+| `POST` | `/api/v1/admin/users/:userId/status` | `ChangeUserStatusDto` | owner/ops | 사용자 상태 변경 |
+| `DELETE` | `/api/v1/admin/users/:userId` | `DeleteAdminUserDto` | owner/ops | 사용자 삭제 처리 |
+| `GET` | `/api/v1/admin/matches` | `AdminMatchListQueryDto` | active admin | 매치 목록 |
+| `GET` | `/api/v1/admin/matches/:matchId` | - | active admin | 매치 상세 |
+| `POST` | `/api/v1/admin/matches/:matchId/status` | `ChangeMatchStatusDto` | owner/ops | 매치 상태 변경 |
+| `GET` | `/api/v1/admin/teams` | `AdminTeamListQueryDto` | active admin | 팀 목록 |
+| `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세 |
+| `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
+| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
+| `GET` | `/api/v1/admin/popups` | `AdminPopupListQueryDto` | active admin | 팝업 목록 |
+| `GET` | `/api/v1/admin/popups/:popupId` | - | active admin | 팝업 상세 |
+| `POST` | `/api/v1/admin/popups` | `CreateAdminPopupDto` | owner/ops | 팝업 생성 |
+| `PATCH` | `/api/v1/admin/popups/:popupId` | `UpdateAdminPopupDto` | owner/ops | 팝업 전체 필드 수정 |
+| `DELETE` | `/api/v1/admin/popups/:popupId` | - | owner/ops | 팝업 삭제 |
+| `GET` | `/api/v1/admin/notices` | `AdminNoticeListQueryDto` | active admin | 공지 목록 |
+| `GET` | `/api/v1/admin/notices/:noticeId` | - | active admin | 공지 상세 |
+| `POST` | `/api/v1/admin/notices` | `CreateAdminNoticeDto` | owner/ops | 공지 생성 |
+| `PATCH` | `/api/v1/admin/notices/:noticeId` | `UpdateAdminNoticeDto` | owner/ops | 공지 전체 필드 수정 |
+| `DELETE` | `/api/v1/admin/notices/:noticeId` | - | owner/ops | 공지 삭제 |
+| `GET` | `/api/v1/admin/inquiries` | `AdminInquiryListQueryDto` | active admin | 문의 목록 |
+| `GET` | `/api/v1/admin/inquiries/pending-count` | - | active admin | `received/reviewing` 문의 수 |
+| `GET` | `/api/v1/admin/inquiries/:inquiryId` | - | active admin | 문의 및 답변 상세 |
+| `POST` | `/api/v1/admin/inquiries/:inquiryId/replies` | `ReplyInquiryDto` | owner/ops | 답변 작성 |
+| `PATCH` | `/api/v1/admin/inquiries/:inquiryId/replies/:replyId` | `ReplyInquiryDto` | owner/ops | 답변 수정 |
+| `POST` | `/api/v1/admin/inquiries/:inquiryId/status` | `ChangeInquiryStatusDto` | owner/ops | 문의 상태 변경 |
+| `GET` | `/api/v1/admin/admins` | `AdminListQueryDto` | owner | 운영자 목록 |
+| `POST` | `/api/v1/admin/admins` | `GrantAdminDto` | owner | 운영자 권한 부여·재부여 |
+| `PATCH` | `/api/v1/admin/admins/:userId` | `UpdateAdminDto` | owner | 운영자 역할·상태 변경 |
 
-| Method | Path | 용도 |
-|---|---|---|
-| `GET` | `/api/v1/admin/stats` | 대시보드 통계 |
-| `GET` | `/api/v1/admin/statistics` | 통계 개요(추세/분포) |
-| `GET` | `/api/v1/admin/users` | 사용자 목록(cursored) |
-| `GET` | `/api/v1/admin/users/:id` | 사용자 상세 + 탈퇴 요청 메시지 + 팀 역할 요약 |
-| `POST` | `/api/v1/admin/users/:id/warn` | 사용자 경고 |
-| `PATCH` | `/api/v1/admin/users/:id/status` | 사용자 상태 변경 |
-| `DELETE` | `/api/v1/admin/users/:id` | 사용자 삭제 처리 |
-| `GET` | `/api/v1/admin/matches` | 매치 목록(cursored) |
-| `PATCH` | `/api/v1/admin/matches/:id/status` | 매치 상태 변경 |
-| `GET` | `/api/v1/admin/reviews` | 리뷰 목록 |
-| `GET` | `/api/v1/admin/mercenary` | 용병 모집글 목록 |
-| `DELETE` | `/api/v1/admin/mercenary/:id` | 용병 모집글 삭제 |
-| `GET` | `/api/v1/admin/lessons` | 강좌 목록 |
-| `POST` | `/api/v1/admin/lessons` | 강좌 생성 |
-| `PATCH` | `/api/v1/admin/lessons/:id/status` | 강좌 상태 변경 |
-| `GET` | `/api/v1/admin/teams` | 팀 목록 |
-| `GET` | `/api/v1/admin/teams/:id` | 팀 상세 |
-| `POST` | `/api/v1/admin/teams` | 팀 생성 |
-| `GET` | `/api/v1/admin/venues` | 시설 목록 |
-| `GET` | `/api/v1/admin/venues/:id` | 시설 상세 |
-| `POST` | `/api/v1/admin/venues` | 시설 생성 |
-| `PATCH` | `/api/v1/admin/venues/:id` | 시설 수정 |
-| `DELETE` | `/api/v1/admin/venues/:id` | 시설 삭제 |
-| `GET` | `/api/v1/admin/payments` | 결제 목록 |
-| GET | /api/v1/admin/notices | 일반 공지 목록 |
-| GET | /api/v1/admin/notices/:noticeId | 일반 공지 상세 |
-| POST | /api/v1/admin/notices | 일반 공지 생성 |
-| PATCH | /api/v1/admin/notices/:noticeId | 일반 공지 수정 |
-| DELETE | /api/v1/admin/notices/:noticeId | 일반 공지 삭제 및 notice.delete 감사 로그 |
-| GET | /api/v1/admin/popups | 팝업 목록 |
-| GET | /api/v1/admin/popups/:popupId | 팝업 상세 |
-| POST | /api/v1/admin/popups | 팝업 생성 |
-| PATCH | /api/v1/admin/popups/:popupId | 팝업 수정 및 노출 화면·링크·기간 변경 |
-| DELETE | /api/v1/admin/popups/:popupId | 팝업 삭제 및 popup.delete 감사 로그 |
-### B. `/admin/disputes`
+## 목록 Query 계약
 
-| Method | Path | 용도 |
-|---|---|---|
-| `GET` | `/api/v1/admin/disputes` | 분쟁 목록 |
-| `GET` | `/api/v1/admin/disputes/:id` | 분쟁 상세 |
-| `POST` | `/api/v1/admin/disputes` | 분쟁 생성 |
-| `PATCH` | `/api/v1/admin/disputes/:id/status` | 분쟁 상태 업데이트 |
+- 사용자: `status=active|suspended|blocked|withdrawal_pending|deleted`, `q`, `cursor`, `limit`(1~50).
+- 매치: `status=recruiting|closed|cancelled|completed|archived`, `sportId`, `q`, `cursor`, `limit`(1~50).
+- 팀: `status=active|suspended|archived`, `q`, `cursor`, `limit`(1~50).
+- 팀 매치: `status=recruiting|closed|matched|cancelled|completed|archived`, `cursor`, `limit`(1~50).
+- 팝업: `status=draft|published|archived`, `q`, `cursor`, `limit`(1~50).
+- 공지: `status=draft|published|archived`, `audience=public|users|admins`, `category=업데이트|안내`, `q`, `cursor`, `limit`(1~50).
+- 문의: `status=received|reviewing|answered|closed`, `category=account|match|team|tournament|payment_refund|report|other`, `q`, `cursor`, `limit`(1~50).
+- 운영자: `status=active|suspended|revoked`, `cursor`, `limit`(1~50).
+- 목록 응답은 `items`와 `pageInfo: { nextCursor, hasNext }`를 사용한다.
 
-### C. `/admin/settlements`
+## 사용자·운영자 접근 불변식
 
-| Method | Path | 용도 |
-|---|---|---|
-| `GET` | `/api/v1/admin/settlements` | 정산 목록 |
-| `GET` | `/api/v1/admin/settlements/summary` | 정산 요약 |
-| `PATCH` | `/api/v1/admin/settlements/:id/process` | 정산 처리 |
+### 사용자 상태와 삭제
 
-## 요청/응답 핵심 계약
-
-### 사용자 운영
-
-- `POST /admin/users/:id/warn`
-  - Body: `WarnUserAdminDto`
-  - `note` optional (max 500)
-- `PATCH /admin/users/:id/status`
-  - Body: `UpdateUserStatusAdminDto`
-  - `status`: `active | suspended`
-  - `status=suspended`일 때 `note` 사실상 필수 (없으면 400)
-- `DELETE /admin/users/:id`
-  - Body: `{ reason: string }`
-  - v1에서는 `accountStatus=deleted`, `deletedAt` 기록, 이메일/전화번호/프로필 마스킹, auth identity unlink, provider key 마스킹, 감사 로그 기록으로 처리한다.
-  - 이메일 계정과 카카오 계정 모두 원본 unique key를 비우므로 같은 이메일/카카오 계정으로 재가입할 수 있다.
-  - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
-  - 팀 정보는 생성/소유 팀, 팀장/운영진/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다.
-
-예시:
+`ChangeUserStatusDto`:
 
 ```json
 {
   "status": "suspended",
-  "note": "반복 신고로 인한 임시 정지"
+  "reason": "반복 신고로 인한 임시 정지"
 }
 ```
 
-### 매치/강좌 상태 변경
+- `status`: `active | suspended | blocked | deleted`
+- `reason`: 필수 문자열, 최대 500자
+- `DeleteAdminUserDto`도 `reason` 필수, 최대 500자다.
+- 삭제는 `accountStatus=deleted`, `deletedAt`, 이메일·전화번호·프로필 마스킹, auth identity unlink/provider key 마스킹, 감사 로그를 하나의 처리로 수행한다.
+- active 운영자가 자기 사용자 계정을 비활성화하거나 삭제하면 `409 SELF_LOCKOUT`이다.
+- 다른 active 운영자 계정을 비활성화하거나 삭제하려면 owner여야 하며, 먼저 `PATCH /admin/admins/:userId`에서 운영자 상태를 `revoked`로 바꿔야 한다. revoke 전에는 `409 ADMIN_ACCESS_ACTIVE`다.
+- 따라서 사용자 계정을 `active`로 되돌려도 revoked 운영자 권한이 자동으로 복구되지 않는다.
 
-- `PATCH /admin/matches/:id/status`: `status`는 `MatchStatus` enum만 허용
-- `PATCH /admin/lessons/:id/status`: `status`는 `LessonStatus` enum만 허용
+### 운영자 부여·변경
 
-### 시설 삭제
+`GrantAdminDto`:
 
-- `DELETE /admin/venues/:id`
-- 연결된 `match` 또는 `lesson`이 있으면 삭제 거부(`400`)
+```json
+{
+  "userId": "uuid",
+  "adminRole": "ops",
+  "reason": "운영 담당자 지정"
+}
+```
 
-### 분쟁 상태 변경
+- `adminRole`: `ops | support`. 신규 owner 부여는 이 endpoint의 계약이 아니다.
+- 신규 부여와 revoked/suspended 운영자 재활성화는 연결된 사용자 계정이 active일 때만 가능하다. 아니면 `409 ADMIN_ACCOUNT_INACTIVE`다.
+- 이미 active인 운영자에게 다시 부여하면 `409 ALREADY_ADMIN`이다.
 
-- `PATCH /admin/disputes/:id/status`
-- body는 DTO가 아닌 raw object
-  - `status`: `pending | investigating | resolved | dismissed`
-  - `resolution?`, `note?`, `actor?`
+`UpdateAdminDto`:
 
-### 정산 처리
+```json
+{
+  "adminRole": "support",
+  "status": "active",
+  "reason": "담당 업무 변경"
+}
+```
 
-- `PATCH /admin/settlements/:id/process`
-- body는 DTO가 아닌 raw object
-  - `action=approve` -> `completed`
-  - `action=reject` -> `failed`
-  - 그 외 값 -> `processing`
+- `adminRole?`: `owner | ops | support`
+- `status?`: `active | revoked`
+- `reason`: 필수 문자열, 최대 500자
+- 자기 운영자 레코드 변경은 `409 SELF_MODIFICATION`이다.
+- active owner를 demote 또는 revoke할 때는 연결된 사용자 계정까지 active인 다른 owner가 최소 1명 남아야 한다. 위반하면 `409 LAST_OWNER`다.
+- 구현은 active owner 행을 정렬된 순서로 `FOR UPDATE` 잠금한 뒤 트랜잭션 안에서 남은 owner를 계산한다. 동시 demote/revoke가 owner 0명 상태를 만들 수 없다.
 
-## 프론트 연동 메모
+### 배포 마이그레이션 remediation
 
-- 관리자 쿼리는 대부분 `items + nextCursor` 또는 리스트 배열을 반환한다.
-  - 프론트 훅은 `extractCollection`으로 배열/`items` 모두 수용하고 있음.
-- 사용자 상태 변경, 매치 상태 변경, 강좌 상태 변경은 mutation 후 관련 목록/상세 query invalidation이 필요하다.
-- 분쟁/정산 mutation payload는 현재 `Record<string, unknown>`로 전달된다. 폼 검증은 프론트에서 선행해야 한다.
-- /admin/popups는 독립 /admin/popups API와 v1_popups 테이블만 사용한다. /admin/notices 또는 category=고정 필터를 재사용하지 않는다.
-- /admin/notices는 안내/업데이트 공지만 관리하며 pinned와 display window를 전송하지 않는다.
-- 관리자 회원 목록과 상세 응답은 gender: male | female | null을 포함한다. 공개 프로필에는 노출하지 않는다.
-- 팝업 운영 라벨은 published=공개, archived=비공개, draft=초안이다.
-- 팝업 생성/수정은 targetScreens를 최소 1개 받아야 하며, 선택적으로 linkUrl, linkLabel, displayStartAt, displayEndAt을 받는다.
-- targetScreens는 home, matches, team_matches, teams, tournaments, lessons, marketplace, mercenary, venues, community, chat, notifications, profile, my 중 하나 이상이다.
-- linkUrl은 /로 시작하는 내부 경로 또는 https:// URL만 허용한다. linkLabel만 단독으로 보내면 400 INVALID_POPUP_LINK다.
-- 노출 종료는 시작보다 늦어야 하며 위반 시 400 INVALID_DISPLAY_WINDOW다.
-- GET /popups/active?screen=...은 requested screen + published + public + active-window 조건을 만족하는 최신 팝업 하나를 반환한다.
-- 홈 응답의 popup은 호환성을 위해 home target에 같은 선택 규칙을 적용하며, notices와는 별도 응답 필드다.
-## 엣지 케이스 / 안티패턴
+`apps/v1_api/prisma/migrations/20260719043000_v1_admin_active_account_invariant/migration.sql`은 기존 데이터 중 연결된 `V1User.accountStatus`가 active가 아닌데 `V1AdminUser.status=active`인 행을 `revoked`로 바꾼다. 기존 `revoked_at`은 보존하고, 없으면 마이그레이션 시각을 기록하며 `updated_at`을 갱신한다. 런타임과 같은 owner-first 순서로 행을 잠그고, 각 변경에는 `actorType=system`, `reason=linked_user_account_inactive` 상태 감사 로그를 같은 SQL 문에서 남긴다.
 
-- 운영 API를 사용자 페이지 CTA와 직접 연결하지 않는다(권한 실패 + UX 혼선).
-- `status` enum은 UI label과 분리해서 관리한다(라벨 문자열 전송 금지).
-- `/admin/venues/:id` 삭제는 optimistic 제거를 바로 적용하지 않는다. 400 실패 가능성이 높다.
+이 remediation 이후 런타임도 운영자 행과 연결 사용자 계정이 모두 active인 경우에만 접근을 허용한다.
 
-## CAUTION
+## 상태 변경 DTO
 
-- `DisputesService`는 현재 DB 영속이 아닌 메모리 배열 기반 구현이다.
-  - 서버 재시작 시 상태가 유지되지 않는다.
-  - 운영 화면에서는 실운영 영속 데이터로 오해될 수 있으므로 표시 copy를 분리한다.
-- `/admin/disputes`와 `/admin/settlements/:id/process`는 raw-body surface다.
-  - Swagger 스키마/프론트 타입만 신뢰하지 말고 실제 서비스 로직(status/action 매핑)을 기준으로 검증한다.
-- 문서상 "관리자 용병 모집글 삭제", "시설 CRUD"는 운영자 도구다. venue self-service(운영자 아닌 owner 전용 콘솔)와 동일시하면 안 된다.
+- 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
+- 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500).
+- 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
+- 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.
+
+## 팝업 계약
+
+- 생성·수정 body: `audience=public|users|admins`, `title`(max 120), `body`(max 5000), `targetScreens`(1개 이상), `status=draft|published|archived`, 선택 `linkUrl`, `linkLabel`, `displayStartAt`, `displayEndAt`.
+- `targetScreens`: `home`, `matches`, `team_matches`, `teams`, `tournaments`, `lessons`, `marketplace`, `mercenary`, `venues`, `community`, `chat`, `notifications`, `profile`, `my`.
+- `linkUrl`은 `/`로 시작하는 내부 경로 또는 `https://` URL만 허용한다. `linkLabel`만 보내면 `400 INVALID_POPUP_LINK`다.
+- 노출 종료 시각은 시작 시각보다 늦어야 한다. 위반하면 `400 INVALID_DISPLAY_WINDOW`다.
+- 팝업은 공지의 고정 category가 아니라 독립 `v1_popups` 계약이다.
+- 생성·수정·삭제는 각각 `popup.create`, `popup.update`, `popup.delete` 감사 로그를 남긴다.
+
+## 공지 계약
+
+- 생성·수정 body: `audience=public|users|admins`, `category=업데이트|안내`, `title`(max 120), `body`(max 5000), `status=draft|published|archived`.
+- `UpdateAdminNoticeDto`는 partial DTO가 아니므로 모든 필드를 보낸다.
+- 공지에는 팝업의 `targetScreens`, 링크, 노출 기간 필드를 보내지 않는다.
+- 생성·수정·삭제는 각각 `notice.create`, `notice.update`, `notice.delete` 감사 로그를 남긴다.
+
+## 문의 계약
+
+- `ReplyInquiryDto`: `body` 필수(max 2000). trim 후 비어 있으면 `400 INVALID_INQUIRY_REPLY`다.
+- 답변 작성은 문의 상태를 `answered`로 바꾸고 `closedAt`을 비운다.
+- 답변 수정은 path의 `inquiryId`와 실제 답변 소속이 일치해야 한다.
+- `ChangeInquiryStatusDto`: `status=received|reviewing|answered|closed`, 선택 `reason`(max 500).
+- `closed` 전환 시 `closedAt`을 기록하고 다른 상태로 전환하면 비운다.
+
+## 주요 오류
+
+| HTTP | Code | 조건 |
+|---|---|---|
+| `400` | `INVALID_POPUP_LINK` | 팝업 링크 조합/형식 오류 |
+| `400` | `INVALID_DISPLAY_WINDOW` | 팝업 노출 기간 오류 |
+| `400` | `INVALID_INQUIRY_REPLY` | 공백 답변 |
+| `403` | `PERMISSION_DENIED` | inactive 계정/운영자, 역할 부족, support mutation |
+| `404` | `NOT_FOUND` | 대상 사용자·운영자·콘텐츠 없음 |
+| `409` | `SELF_LOCKOUT` | active 운영자의 자기 사용자 계정 비활성화/삭제 |
+| `409` | `ADMIN_ACCESS_ACTIVE` | revoke 전 active 운영자 사용자 계정 비활성화/삭제 |
+| `409` | `LAST_OWNER` | 마지막 active-linked owner 접근 제거 |
+| `409` | `ADMIN_ACCOUNT_INACTIVE` | inactive 사용자에게 운영자 접근 부여/재활성화 |
+| `409` | `SELF_MODIFICATION` | 자기 운영자 레코드 변경 |
+| `409` | `ALREADY_ADMIN` | 이미 active인 운영자 재부여 |
 
 ## Source References
 
-- `apps/api/src/admin/admin.controller.ts`
-- `apps/api/src/admin/admin.service.ts`
-- `apps/api/src/admin/dto/*.ts`
-- `apps/api/src/disputes/disputes.controller.ts`
-- `apps/api/src/disputes/disputes.service.ts`
-- `apps/api/src/settlements/settlements.controller.ts`
-- `apps/api/src/settlements/settlements.service.ts`
-- `apps/web/src/hooks/use-api.ts` (`useAdmin*`, `useUpdateDisputeStatus`, `useProcessSettlement`)
+- `apps/v1_api/src/admin/admin.controller.ts`
+- `apps/v1_api/src/admin/admin.service.ts`
+- `apps/v1_api/src/admin/dto/admin.dto.ts`
+- `apps/v1_api/prisma/migrations/20260719043000_v1_admin_active_account_invariant/migration.sql`
+- `apps/v1_web/src/hooks/use-v1-api.ts`

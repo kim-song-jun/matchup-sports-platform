@@ -15,6 +15,7 @@ const activeOpsAdminRecord = {
   userId: 'admin-user-id',
   adminRole: 'ops' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 const activeSupportAdminRecord = {

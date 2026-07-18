@@ -925,7 +925,11 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
 }
 
 function CreateField({ label, value, placeholder, suffix, multiline, type = 'text', onChange }: { label: string; value?: string; placeholder?: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
-  return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder || '입력'}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
+  // date/time 인풋은 lang="ko"를 부여해 OS locale에 상관없이
+  // 가능한 경우 한국어 포맷(yyyy.mm.dd 또는 HH:MM)으로 표시를 유도한다.
+  // 매치 생성 위저드(matches-page.tsx CreateField)와 동일한 처리.
+  const isDateLike = type === 'date' || type === 'time';
+  return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} lang={isDateLike ? 'ko' : undefined} value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder || '입력'}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
 }
 
 function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (value: string) => void }) {

@@ -89,6 +89,7 @@ import type {
   V1RecentSearchesResponse,
   V1ReviewListResponse,
   V1ReviewReceivedResponse,
+  V1ReviewReceivedSummaryResponse,
   V1ReviewSourceResponse,
   V1ReviewSourceType,
   V1ReviewSubmitPayload,
@@ -1039,6 +1040,14 @@ export function useV1ReceivedReviews(filters?: ListFilters, options?: QueryOptio
   return useQuery({
     queryKey: v1Keys.reviewsReceived(filters),
     queryFn: () => v1Get<V1ReviewReceivedResponse>('/reviews/received', filters),
+    enabled: options?.enabled,
+  });
+}
+
+export function useV1ReceivedReviewSummary(targetType: 'user' | 'team', period?: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.reviewsReceivedSummary(targetType, period),
+    queryFn: () => v1Get<V1ReviewReceivedSummaryResponse>('/reviews/received/summary', { targetType, period }),
     enabled: options?.enabled,
   });
 }

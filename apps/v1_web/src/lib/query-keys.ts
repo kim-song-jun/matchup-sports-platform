@@ -18,6 +18,7 @@ export const v1Keys = {
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
+  reviewsReceivedSummary: (targetType: 'user' | 'team', period?: string) => [...v1Keys.all, 'reviews', 'received', 'summary', targetType, period ?? 'all'] as const,
   chatRooms: () => [...v1Keys.all, 'chat', 'rooms'] as const,
   chatRoom: (roomId: string) => [...v1Keys.chatRooms(), roomId] as const,
   chatMessages: (roomId: string) => [...v1Keys.chatRoom(roomId), 'messages'] as const,

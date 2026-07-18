@@ -24,6 +24,7 @@
   --orange500: #fe9800;
   --red50: #feebec;
   --red500: #f04452;
+  --red700: #b42332;
   --yellow50: #fff8d6;
   --yellow500: #ffc342;
   --teal50: #e2f7f8;
@@ -807,7 +808,7 @@ button:disabled {
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--red50);
-  color: var(--red500);
+  color: var(--red700);
 }
 
 .tm-auth-inline-error svg {

@@ -216,10 +216,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
 function getWeatherPermissionCopy(permission: NonNullable<HomeViewModel['weatherPermission']>) {
   if (permission === 'checking') return '브라우저의 위치 허용 상태를 확인하고 있어요.';
-  if (permission === 'granted') return '위치 권한은 허용되어 있어요. 버튼을 누를 때만 좌표를 1회 사용해요.';
+  if (permission === 'granted') return '권한은 허용되어 있어요. 버튼을 누를 때만 Teameet와 날씨·지역 확인 제공처에 좌표를 1회 전송해요.';
   if (permission === 'denied') return '브라우저 설정에서 위치를 허용한 뒤 다시 확인해 주세요.';
   if (permission === 'unsupported') return '이 브라우저에서는 위치 기반 날씨를 사용할 수 없어요.';
-  return '버튼을 누르면 위치 권한을 요청하고 좌표를 1회 사용해요.';
+  return '버튼을 누르면 권한을 요청하고 Teameet와 날씨·지역 확인 제공처에 좌표를 1회 전송해요.';
 }
 
 function HomeChatSummary({ model }: { model: HomeViewModel }) {

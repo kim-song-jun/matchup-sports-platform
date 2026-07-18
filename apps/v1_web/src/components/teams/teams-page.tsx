@@ -1598,7 +1598,7 @@ function MemberCard({
   profileHref?: string;
   actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
   actionPending?: boolean;
-  selfLeave?: { disabled: boolean; disabledReason?: string; pending?: boolean; onSelect: () => void };
+  selfLeave?: { disabled: boolean; disabledReason?: string; pending?: boolean; error?: string | null; onSelect: () => void };
 }) {
   const [open, setOpen] = useState(false);
   const disabled = actionPending || actions.length === 0;
@@ -1638,6 +1638,11 @@ function MemberCard({
         >
           {selfLeave.pending ? '나가는 중…' : '팀 나가기'}
         </button>
+      ) : null}
+      {selfLeave?.error ? (
+        <p role="alert" className="tm-text-caption" style={{ marginTop: 6, color: 'var(--red500)' }}>
+          {selfLeave.error}
+        </p>
       ) : null}
     </Card>
   );

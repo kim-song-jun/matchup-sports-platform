@@ -156,6 +156,7 @@ export type TeamMembersViewModel = {
       disabled: boolean;
       disabledReason?: string;
       pending?: boolean;
+      error?: string | null;
       onSelect: () => void;
     };
   }>;

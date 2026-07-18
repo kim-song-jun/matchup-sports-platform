@@ -293,6 +293,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
@@ -300,10 +301,19 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
 
   function handleLeaveTeam() {
+    setLeaveError(null);
     leaveTeam.mutate(
       { reason: 'left_from_v1_web_member_page' },
       {
         onSuccess: () => router.push('/teams'),
+        onError: (err) => {
+          const responseCode = err instanceof V1ApiError ? err.code : undefined;
+          if (responseCode === 'CONCURRENT_UPDATE') {
+            setLeaveError('처리 중 팀 상태가 바뀌었어요. 다시 시도해 주세요.');
+          } else {
+            setLeaveError(extractErrorMessage(err, '팀을 나가지 못했어요. 다시 시도해 주세요.'));
+          }
+        },
       },
     );
   }
@@ -376,6 +386,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
               viewerMembershipId && member.membershipId === viewerMembershipId
                 ? {
                     pending: leaveTeam.isPending,
+                    error: leaveError,
                     onSelect: () =>
                       confirmAction(
                         confirm,
@@ -720,7 +731,7 @@ function toMemberModel(
     demote: () => void;
     remove: () => void;
     /** 본인 행에만 설정 — 나머지 멤버 행은 undefined */
-    selfLeave?: { pending: boolean; onSelect: () => void };
+    selfLeave?: { pending: boolean; error?: string | null; onSelect: () => void };
   },
 ): TeamMembersViewModel['members'][number] {
   const itemActions: TeamMembersViewModel['members'][number]['actions'] = [];
@@ -748,6 +759,7 @@ function toMemberModel(
           disabled: member.role === 'owner',
           disabledReason: member.role === 'owner' ? '소유권을 먼저 이전해주세요' : undefined,
           pending: actions.selfLeave.pending,
+          error: actions.selfLeave.error,
           onSelect: actions.selfLeave.onSelect,
         }
       : undefined,

@@ -41,19 +41,6 @@ services:
         mkdir -p /app/apps/v1_api/uploads;
         chown -R 1001:1001 /app/apps/v1_api/uploads
 
-  v1_uploads_init:
-    image: teameet-v1-api:latest
-    user: 0:0
-    restart: no
-    volumes:
-      - v1_uploads_data:/app/apps/v1_api/uploads
-    entrypoint: [sh, -c]
-    command:
-      - >-
-        set -eu;
-        mkdir -p /app/apps/v1_api/uploads;
-        chown -R 1001:1001 /app/apps/v1_api/uploads
-
   v1_api:
     image: teameet-v1-api:latest
     container_name: teameet_v1_api

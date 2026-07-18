@@ -11,6 +11,10 @@ const sourceId = '00000000-0000-4000-8000-000000000010';
 const targetUserId = '00000000-0000-4000-8000-000000000002';
 const submittedAt = new Date('2026-06-02T12:00:00.000Z');
 
+const teamSourceId = '00000000-0000-4000-8000-000000000030';
+const hostTeamId = '00000000-0000-4000-8000-000000000031';
+const awayTeamId = '00000000-0000-4000-8000-000000000032';
+
 describe('ReviewsService', () => {
   it('returns an idempotent duplicate response when personal review create hits the unique constraint', async () => {
     const existingReview = {
@@ -142,6 +146,87 @@ describe('ReviewsService', () => {
 
     expect(createMock).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ sportId: 'sport-futsal' }) }),
+    );
+  });
+
+  it('submitTeamReview: 리뷰 생성 시 팀 매치의 sportId를 스냅샷으로 저장한다', async () => {
+    const createMock = jest.fn().mockResolvedValue({
+      id: 'review-3',
+      sourceType: 'team_match',
+      sourceId: teamSourceId,
+      targetType: 'team',
+      targetUser: null,
+      targetTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+      reviewerUser: { id: user.id, profile: { nickname: '송준', profileImageUrl: null } },
+      reviewerTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+      rating: 5,
+      sportId: 'sport-futsal',
+      tags: [],
+      status: 'submitted',
+      submittedAt,
+    });
+    const prisma = {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: teamSourceId,
+          title: '성수 풋살파크 팀 매치',
+          status: 'completed',
+          completedAt: submittedAt,
+          startAt: submittedAt,
+          sportId: 'sport-futsal',
+          hostTeamId,
+          approvedApplicantTeamId: awayTeamId,
+          hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+          approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+        }),
+      },
+      v1TeamMembership: {
+        findMany: jest.fn().mockResolvedValue([
+          { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
+        ]),
+      },
+      v1PostEventReview: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
+        v1PostEventReview: {
+          create: createMock,
+          aggregate: jest.fn().mockResolvedValue({ _avg: { rating: 5 }, _count: { _all: 1 } }),
+        },
+        v1TeamMatch: {
+          count: jest.fn().mockResolvedValue(1),
+        },
+        v1TeamTrustScore: {
+          upsert: jest.fn().mockResolvedValue({}),
+        },
+      })),
+    };
+    const tournamentFixtureReviews = {
+      pending: jest.fn(),
+      source: jest.fn(),
+      submit: jest.fn(),
+      sourceSummaries: jest.fn(),
+    };
+    const service = new ReviewsService(prisma as never, tournamentFixtureReviews as never);
+
+    await service.submit(user, {
+      sourceType: 'team_match',
+      sourceId: teamSourceId,
+      targetType: 'team',
+      targetTeamId: awayTeamId,
+      rating: 5,
+      tagCodes: ['manner'],
+    });
+
+    expect(createMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sportId: 'sport-futsal',
+          sourceType: 'team_match',
+          reviewerTeamId: hostTeamId,
+          targetTeamId: awayTeamId,
+        }),
+      }),
     );
   });
 });

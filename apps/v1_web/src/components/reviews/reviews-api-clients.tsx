@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useV1ReceivedReviews, useV1Reviews, useV1ReviewSource, useV1SubmitReview } from '@/hooks/use-v1-api';
+import { useV1ReceivedReviews, useV1ReceivedReviewSummary, useV1Reviews, useV1ReviewSource, useV1SubmitReview } from '@/hooks/use-v1-api';
 import type { V1ReviewSourceType, V1ReviewTargetType } from '@/types/api';
 import { ReviewSourcePageView, ReviewsPageView, ReviewsReceivedPageView, ReviewSubmitCompleteView } from './reviews-page';
 import type { ReviewTargetDraft, ReviewsTab } from './reviews.types';
@@ -133,7 +133,9 @@ export function ReviewSourcePageClient({
 }
 
 export function ReviewsReceivedPageClient() {
+  const [period, setPeriod] = useState<string | null>(null);
   const query = useV1ReceivedReviews();
+  const summaryQuery = useV1ReceivedReviewSummary('user', period ?? undefined);
   const model = useMemo(() => toReviewsReceivedPageModel(query.data), [query.data]);
 
   return (
@@ -142,6 +144,10 @@ export function ReviewsReceivedPageClient() {
       loading={query.isLoading}
       model={model}
       onRetry={() => void query.refetch()}
+      summary={summaryQuery.data}
+      summaryLoading={summaryQuery.isLoading}
+      period={period}
+      onPeriodChange={setPeriod}
     />
   );
 }

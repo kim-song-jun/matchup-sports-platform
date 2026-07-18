@@ -76,6 +76,7 @@ export class ReviewsService {
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         status: 'submitted',
+        sportId: null, // 레거시(이 기능 출시 이전) 리뷰만 — 개별 노출은 소급 마스킹하지 않는다는 스펙에 따름
         OR: receivedFilters,
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],

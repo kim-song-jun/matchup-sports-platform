@@ -5,7 +5,8 @@ import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
-import type { V1ReviewDetail, V1ReviewTargetType } from '@/types/api';
+import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
+import type { V1ReviewDetail, V1ReviewReceivedSummaryResponse, V1ReviewTargetType } from '@/types/api';
 
 type QueryStateProps = {
   errorMessage: string | null;
@@ -170,19 +171,37 @@ export function ReviewsReceivedPageView({
   loading,
   model,
   onRetry,
+  summary,
+  summaryLoading,
+  period,
+  onPeriodChange,
 }: QueryStateProps & {
   model: ReviewsReceivedPageModel;
+  summary: V1ReviewReceivedSummaryResponse | undefined;
+  summaryLoading: boolean;
+  period: string | null;
+  onPeriodChange: (period: string | null) => void;
 }) {
+  // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
+  // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
+  const hasLegacyContent = loading || Boolean(errorMessage) || model.userGroups.length > 0 || model.teamGroups.length > 0;
   return (
     // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
     <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received">
       <div className="tm-review-shell">
-        <ReviewsReceivedContent
-          errorMessage={errorMessage}
-          loading={loading}
-          model={model}
-          onRetry={onRetry}
-        />
+        <ReviewsSummaryDashboard summary={summary} period={period} onPeriodChange={onPeriodChange} loading={summaryLoading} />
+        {hasLegacyContent ? (
+          <div style={{ marginTop: 24 }}>
+            <div className="tm-my-section-label">이전 리뷰</div>
+            <div className="tm-text-caption" style={{ marginBottom: 10 }}>이 기능이 도입되기 전에 받은 리뷰예요.</div>
+            <ReviewsReceivedContent
+              errorMessage={errorMessage}
+              loading={loading}
+              model={model}
+              onRetry={onRetry}
+            />
+          </div>
+        ) : null}
       </div>
     </AppChrome>
   );

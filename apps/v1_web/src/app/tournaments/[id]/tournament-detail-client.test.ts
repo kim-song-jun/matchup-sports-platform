@@ -110,6 +110,7 @@ function makeTournament(
     title: '테스트 대회',
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
+    bracketPublishedAt: null,
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,

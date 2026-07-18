@@ -40,6 +40,7 @@ import {
   useV1MasterSports,
   useV1AdminMe,
   useV1ChangeTournamentStatus,
+  useV1PublishTournamentBracket,
   useV1UpdateTournament,
   useV1AdminTournamentRegistrations,
   useV1ConfirmPayment,
@@ -1181,14 +1182,20 @@ function ActionButton({
 
 // ── Tab: Bracket ──────────────────────────────────────────────────────────
 
-function BracketTab({
+export function BracketTab({
   tournamentId,
   showToast,
   registrations,
+  registrationDeadlineAt,
+  bracketPublishedAt,
+  canWrite,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
   registrations: V1AdminTournamentRegistration[];
+  registrationDeadlineAt: string | null | undefined;
+  bracketPublishedAt: string | null | undefined;
+  canWrite: boolean;
 }) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const createGroup = useV1CreateGroup(tournamentId);
@@ -1201,6 +1208,7 @@ function BracketTab({
   const deleteFixtureResult = useV1DeleteFixtureResult(tournamentId);
   const updateGroup = useV1UpdateGroup(tournamentId);
   const deleteGroup = useV1DeleteGroup(tournamentId);
+  const publishBracket = useV1PublishTournamentBracket(tournamentId);
   const removeGroupTeam = useV1RemoveGroupTeam(tournamentId);
 
   // ── 경기 수정 모달 상태 ─────────────────────────────────────────────
@@ -1619,10 +1627,58 @@ function BracketTab({
 
   const hasData = groups.length > 0 || fixtures.length > 0;
 
+  // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
+  const isBracketPublished = !!bracketPublishedAt;
+  const deadlinePassed = registrationDeadlineAt
+    ? new Date(registrationDeadlineAt).getTime() < Date.now()
+    : false;
+  const handlePublishBracket = async () => {
+    const warningLine = deadlinePassed
+      ? ''
+      : '접수 마감 전이에요. 그래도 공개할까요?\n\n';
+    const ok = await confirmModal({
+      title: '대진표 전체 공개',
+      message: `${warningLine}공개하면 참가팀·방문자가 조/일정/대진표를 볼 수 있어요. 이후에는 비공개로 되돌릴 수 없어요.`,
+      confirmLabel: '전체 공개',
+      tone: deadlinePassed ? 'default' : 'danger',
+    });
+    if (!ok) return;
+    publishBracket.mutate(undefined, {
+      onSuccess: (res) => {
+        showToast(res.alreadyPublished ? '이미 공개된 대진표예요.' : '대진표를 공개했어요.', 'success');
+      },
+      onError: (err) =>
+        showToast(extractErrorMessage(err, '대진표 공개에 실패했어요.'), 'error'),
+    });
+  };
+
   return (
     <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
+
+      {/* ── 대진표 일괄 공개 ──────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-[15px] font-bold text-gray-900 mb-1">대진표 전체 공개</h3>
+          <p className="text-xs text-gray-500">
+            {isBracketPublished
+              ? `${formatDate(bracketPublishedAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
+              : '아직 비공개예요. 공개 전까지 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요.'}
+          </p>
+        </div>
+        {canWrite && !isBracketPublished && (
+          <button
+            type="button"
+            onClick={handlePublishBracket}
+            disabled={publishBracket.isPending}
+            className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+          >
+            대진표 전체 공개
+          </button>
+        )}
+      </div>
+
     <div className={[
       'flex flex-col gap-6',
       /* 우측 컬럼(브래킷)에 minmax(0,640px) 상한 추가 — 1920+에서 과폭 방지 */
@@ -3703,7 +3759,14 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         hidden={activeTab !== 'bracket'}
       >
         {activeTab === 'bracket' && (
-          <BracketTab tournamentId={id} showToast={showToast} registrations={registrations} />
+          <BracketTab
+            tournamentId={id}
+            showToast={showToast}
+            registrations={registrations}
+            registrationDeadlineAt={tournament?.registrationDeadlineAt}
+            bracketPublishedAt={tournament?.bracketPublishedAt}
+            canWrite={canWrite}
+          />
         )}
       </div>
 

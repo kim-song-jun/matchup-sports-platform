@@ -76,6 +76,9 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     title: '봄 풋살 대회',
     status: 'open',
     registrationDeadlineAt: null,
+    // 기본값: 대진표 공개 완료 상태(대부분 테스트가 groups/fixtures 노출을 검증하므로).
+    // 비공개 게이트 자체를 검증하는 테스트는 bracketPublishedAt: null로 override.
+    bracketPublishedAt: new Date('2026-06-20T00:00:00.000Z'),
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
     scheduledEndAt: null,
     venue: '서울 풋살장',
@@ -373,6 +376,75 @@ describe('TournamentsReadService', () => {
       title: '경기 일정 공지',
       category: 'venue',
     });
+  });
+
+  // ─── bracket publish gate (Task 109 Track 6) ────────────────────────────────
+
+  it('get: bracketPublishedAt=null → groups/fixtures hidden, other fields still returned', async () => {
+    const row = fullTournamentRow({
+      bracketPublishedAt: null,
+      groups: [
+        {
+          id: 'group-1',
+          name: 'A조',
+          phase: 'group',
+          sortOrder: 0,
+          groupTeams: [],
+          standings: [],
+        },
+      ],
+      fixtures: [
+        {
+          id: 'fixture-1',
+          groupId: 'group-1',
+          round: 'group',
+          fixtureNumber: 1,
+          legNumber: 1,
+          scheduledAt: null,
+          venue: null,
+          status: 'scheduled',
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: null,
+          homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
+          awayRegistration: null,
+          videos: [],
+          result: null,
+        },
+      ],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.groups).toEqual([]);
+    expect(result.fixtures).toEqual([]);
+    expect(result.bracketPublishedAt).toBeNull();
+    // 대진표만 게이트 — 나머지 대회 정보는 그대로 노출.
+    expect(result).toMatchObject({ id: 'tournament-1', title: '봄 풋살 대회', confirmedCount: 4 });
+  });
+
+  it('get: bracketPublishedAt set → groups/fixtures included and ISO-serialized', async () => {
+    const publishedAt = new Date('2026-06-20T00:00:00.000Z');
+    const row = fullTournamentRow({
+      bracketPublishedAt: publishedAt,
+      groups: [
+        {
+          id: 'group-1',
+          name: 'A조',
+          phase: 'group',
+          sortOrder: 0,
+          groupTeams: [],
+          standings: [],
+        },
+      ],
+      fixtures: [],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.bracketPublishedAt).toBe(publishedAt.toISOString());
+    expect(result.groups).toHaveLength(1);
   });
 
   it('get: returns public participant teams and filters to active registration statuses', async () => {

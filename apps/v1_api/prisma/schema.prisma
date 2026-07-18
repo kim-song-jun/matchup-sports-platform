@@ -1326,6 +1326,7 @@ model V1Tournament {
   format                 V1TournamentFormat @default(group_knockout)
   registrationDeadlineAt DateTime?          @map("registration_deadline_at")
   rosterDeadlineAt       DateTime?          @map("roster_deadline_at")
+  bracketPublishedAt     DateTime?          @map("bracket_published_at")
   scheduledAt            DateTime?          @map("scheduled_at")
   scheduledEndAt         DateTime?          @map("scheduled_end_at")
   venue                  String?

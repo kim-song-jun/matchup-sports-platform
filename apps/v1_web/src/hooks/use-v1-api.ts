@@ -136,6 +136,7 @@ import type {
   V1AdminTournamentSponsor,
   V1AdminTournamentSponsorListResult,
   V1AdminTournamentStatusChangeResult,
+  V1PublishBracketResult,
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
   V1Tournament,
@@ -2212,6 +2213,19 @@ export function useV1ChangeTournamentStatus(id: string) {
   return useMutation({
     mutationFn: (body: V1ChangeTournamentStatusPayload) =>
       v1Post<V1AdminTournamentStatusChangeResult>(`/admin/tournaments/${id}/status`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
+/** Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개. 성공 시 어드민 상세 + 공개 상세를 모두 invalidate. */
+export function useV1PublishTournamentBracket(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<V1PublishBracketResult>(`/admin/tournaments/${id}/publish-bracket`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });

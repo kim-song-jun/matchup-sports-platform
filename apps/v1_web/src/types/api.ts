@@ -1657,6 +1657,8 @@ export type V1Tournament = {
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
   rosterDeadlineAt: string | null;
+  /** null이면 대진표(조/픽스처) 비공개 — 공개 상세 API는 이 값이 채워질 때까지 groups/fixtures를 숨긴다 */
+  bracketPublishedAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -1829,6 +1831,8 @@ export type V1TournamentDetail = {
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
   rosterDeadlineAt: string | null;
+  /** null이면 groups/fixtures가 빈 배열로 내려온다(대진표 비공개). 관리자가 일괄 공개하면 타임스탬프가 채워진다. */
+  bracketPublishedAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -2131,6 +2135,13 @@ export type V1AdminTournamentStatusChangeResult = {
   previousStatus: V1TournamentStatus;
   status: V1TournamentStatus;
   alreadyInStatus: boolean;
+};
+
+/** Task 109 Track 6 — 대진표 일괄 공개 응답 */
+export type V1PublishBracketResult = {
+  tournamentId: string;
+  bracketPublishedAt: string;
+  alreadyPublished: boolean;
 };
 
 export type V1StandingsRecalculateResult = {

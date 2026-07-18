@@ -1,6 +1,11 @@
 import type { TournamentDetailRow } from './tournaments-read.query';
 
 export function presentTournamentDetail(row: TournamentDetailRow) {
+  // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
+  // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
+  // 다른 대회 정보(공지·리뷰·수상·스폰서 등)는 이 게이트와 무관하게 그대로 노출한다.
+  const bracketPublished = row.bracketPublishedAt !== null;
+
   return {
     id: row.id,
     sportId: row.sportId,
@@ -10,6 +15,7 @@ export function presentTournamentDetail(row: TournamentDetailRow) {
     format: row.format,
     registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
     rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
+    bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,
     scheduledAt: row.scheduledAt?.toISOString() ?? null,
     scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
     venue: row.venue,
@@ -71,7 +77,9 @@ export function presentTournamentDetail(row: TournamentDetailRow) {
     pendingPaymentCount: row.registrations.filter((registration) =>
       ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),
     ).length,
-    groups: row.groups.map((group) => ({
+    groups: !bracketPublished
+      ? []
+      : row.groups.map((group) => ({
       id: group.id,
       name: group.name,
       phase: group.phase,
@@ -98,7 +106,9 @@ export function presentTournamentDetail(row: TournamentDetailRow) {
         recalculatedAt: standing.recalculatedAt?.toISOString() ?? null,
       })),
     })),
-    fixtures: row.fixtures.map((fixture) => ({
+    fixtures: !bracketPublished
+      ? []
+      : row.fixtures.map((fixture) => ({
       id: fixture.id,
       groupId: fixture.groupId,
       round: fixture.round,

@@ -393,6 +393,50 @@ export class TournamentsAdminService {
   }
 
   /**
+   * Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개.
+   * 접수마감(registrationDeadlineAt) 이후에만 강제하지는 않는다(운영자 재량으로 조기 공개 허용) —
+   * 마감 전 공개 여부 경고는 프론트 확인 모달에서 처리한다. idempotent: 이미 공개된 경우
+   * 트랜잭션/로그 없이 alreadyPublished:true 반환.
+   */
+  async publishBracket(user: V1AuthUser, tournamentId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+    });
+    if (!existing) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    if (existing.bracketPublishedAt) {
+      return {
+        tournamentId,
+        bracketPublishedAt: existing.bracketPublishedAt.toISOString(),
+        alreadyPublished: true,
+      };
+    }
+
+    const publishedAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.v1Tournament.update({
+        where: { id: tournamentId },
+        data: { bracketPublishedAt: publishedAt },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket_publish',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          afterJson: { bracketPublishedAt: publishedAt.toISOString() },
+        },
+        tx,
+      );
+    });
+
+    return { tournamentId, bracketPublishedAt: publishedAt.toISOString(), alreadyPublished: false };
+  }
+
+  /**
    * KakaoGeocodingService.geocode()는 이미 내부에서 모든 실패(키 미설정/네트워크
    * 오류/응답 이상)를 잡아 null을 반환하지만, 여기서도 한 번 더 방어한다 —
    * 지오코딩 실패가 venue 저장(대회 생성/수정) 자체를 절대 막아서는 안 된다.
@@ -502,6 +546,7 @@ export class TournamentsAdminService {
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
+      bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,

@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -11,11 +12,13 @@ interface PushPayload {
 
 @Injectable()
 export class WebPushService implements OnModuleInit {
-  private readonly logger = new Logger(WebPushService.name);
   private enabled = false;
   private publicKey: string | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectPinoLogger(WebPushService.name) private readonly logger: PinoLogger,
+  ) {}
 
   onModuleInit(): void {
     const publicKey = process.env.VAPID_PUBLIC_KEY;
@@ -89,6 +92,12 @@ export class WebPushService implements OnModuleInit {
               }
               return;
             }
+
+            this.logger.warn(
+              { userId, subscriptionId: subscription.id, statusCode: error.statusCode ?? null },
+              '웹 푸시 발송 실패',
+            );
+
             try {
               await this.prisma.v1WebPushFailureLog.create({
                 data: {
@@ -98,8 +107,11 @@ export class WebPushService implements OnModuleInit {
                   endpointSuffix: subscription.endpoint.slice(-6),
                 },
               });
-            } catch {
-              // failure logging must never break the send flow
+            } catch (logError) {
+              this.logger.error(
+                { userId, subscriptionId: subscription.id, err: logError },
+                '웹 푸시 실패 기록(V1WebPushFailureLog) 저장 실패',
+              );
             }
           }),
       ),

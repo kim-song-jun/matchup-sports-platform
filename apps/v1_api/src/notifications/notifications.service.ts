@@ -1,5 +1,6 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -219,12 +220,11 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
 
 @Injectable()
 export class NotificationsService {
-  private readonly logger = new Logger(NotificationsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly webPushService: WebPushService,
+    @InjectPinoLogger(NotificationsService.name) private readonly logger: PinoLogger,
   ) {}
 
   /**
@@ -291,9 +291,10 @@ export class NotificationsService {
     void (async () => {
       const userIds = await resolveUserIds();
       await this.emitNotificationToMany(userIds, type, targetId, body);
-    })().catch((e) =>
+    })().catch((e: unknown) =>
       this.logger.warn(
-        `알림 발송 실패(${type}): ${e instanceof Error ? e.message : String(e)}`,
+        { type, error: e instanceof Error ? e.message : String(e) },
+        '알림 발송 실패',
       ),
     );
   }
@@ -310,7 +311,13 @@ export class NotificationsService {
     this.createNotificationWithPrefCheck(userId, targetType, targetId, title, body, deepLink, prefField).catch(
       (err: unknown) => {
         this.logger.warn(
-          `알림 생성 실패 [userId=${userId} targetType=${targetType} targetId=${targetId}]: ${err instanceof Error ? err.message : String(err)}`,
+          {
+            userId,
+            targetType,
+            targetId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          '알림 생성 실패',
         );
       },
     );
@@ -344,12 +351,33 @@ export class NotificationsService {
       },
     });
 
-    this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
+    // emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의
+    // 시도는 계속되어야 한다(ChatService.sendMessage의 개별 try/catch 격리 패턴과 동일).
+    try {
+      this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
+    } catch (err) {
+      this.logger.warn(
+        {
+          userId,
+          targetType,
+          targetId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        '실시간 알림 전송 실패',
+      );
+    }
+
     void this.webPushService
       .sendToUser(userId, { title, body: body ?? undefined, url: deepLink ?? undefined })
       .catch((err: unknown) => {
         this.logger.warn(
-          `웹 푸시 발송 실패 [userId=${userId}]: ${err instanceof Error ? err.message : String(err)}`,
+          {
+            userId,
+            targetType,
+            targetId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          '웹 푸시 발송 실패',
         );
       });
   }

@@ -74,6 +74,22 @@ describe('PushSendForm', () => {
     });
   });
 
+  it('restores focus to the trigger button after the broadcast confirm modal closes (cancel path)', async () => {
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await user.click(screen.getByRole('radio', { name: /전체 구독자/ }));
+    await user.type(screen.getByLabelText(/제목/), '전체 공지');
+
+    const triggerButton = screen.getByRole('button', { name: '전체 발송 확인' });
+    await user.click(triggerButton);
+
+    const dialog = await screen.findByRole('alertdialog', { name: '전체 발송 확인' });
+    await user.click(within(dialog).getByRole('button', { name: '취소' }));
+
+    await waitFor(() => expect(triggerButton).toHaveFocus());
+  });
+
   it('shows the sent/skipped/failed result summary after a successful send', async () => {
     sendMutate.mockImplementation((_payload, options) => {
       options.onSuccess({ sent: 5, skipped: 2, failed: 1 });

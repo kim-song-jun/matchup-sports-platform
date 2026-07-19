@@ -55,7 +55,7 @@
 - [x] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002/003` verified, restart-persistence follow-up remains
 - [x] [04-team-and-membership.md](./04-team-and-membership.md) - `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` verified
 - [ ] [05-team-match-flows.md](./05-team-match-flows.md) - partial: `TM-004` operational spec exists, stale `submitResult` contract issue is cleared, but host Next dev still returns intermittent `/team-matches` `ERR_CONNECTION_RESET` / generic `Internal Server Error`
-- [ ] [06-mercenary-flows.md](./06-mercenary-flows.md) - partial: core create/apply/approve/status lifecycle is verified, but explicit reload/API-restart persistence and local Next `webServer` cold-boot instability follow-up remain
+- [ ] [06-mercenary-flows.md](./06-mercenary-flows.md) - not implemented in active v1: prior checked lifecycle evidence belonged to legacy `apps/api` + `apps/web`; v1 DB/API/list-create-detail flow is gated by the new-page A/B/C decision
 - [ ] [07-chat-and-notifications.md](./07-chat-and-notifications.md) - partial: `NOTI-001` verified, chat realtime/unread scenarios pending
 - [ ] [08-marketplace-and-lessons.md](./08-marketplace-and-lessons.md) - partial: `MKT-003` / `LES-003` verified, lesson user-side purchase/ownership is implemented via Task 42, but live smoke is blocked by current dev runtime and host-side reflection remains follow-up
 - [ ] [09-payment-review-badge.md](./09-payment-review-badge.md) - partial: Task 89 post-event review API/UI validation and route smoke complete; payment/badge verification still pending

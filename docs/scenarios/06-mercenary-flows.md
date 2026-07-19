@@ -1,58 +1,28 @@
-# Mercenary Flow Scenarios
+# V1 Mercenary Flow Scenarios
 
-> Status: Partial
-> 2026-04-11 Task 36 기준으로 create -> detail redirect, unauthenticated apply redirect, applicant apply, host accept, applicant status 확인은 targeted automation으로 검증되었다. 다만 expanded rerun은 local Next dev `webServer` cold-boot instability(`.next/routes-manifest.json` / `app-paths-manifest.json` ENOENT)와 함께 새 글 노출 explicit reload / API-restart persistence smoke를 follow-up으로 남긴다.
+> Status: Not implemented in the active v1 runtime.
 
-## Scenario Checklist
+The earlier checked scenarios were executed against legacy `apps/api` and `apps/web`. Under the repository v1 scope override, that evidence does not prove anything about `apps/v1_api` or `apps/v1_web` and is no longer counted as complete.
 
-- [x] MERC-001 용병 모집글 생성 후 영속성 검증
-- [x] MERC-002 지원 / 승인 / 상태 확인
+## Current V1 Evidence
 
-## MERC-001 용병 모집글 생성 후 영속성 검증
+- `apps/v1_web` has no `/mercenary`, `/mercenary/new`, or `/mercenary/[id]` route.
+- `apps/v1_api` has no mercenary controller, service, DTO, Prisma model, migration, or fixture.
+- The landing page still advertises mercenary recruiting, and the popup screen enum includes `mercenary`; these references are promises/navigation taxonomy, not an implemented user flow.
+- The new-page decision is gated in [`teameet-new-page-scope-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html). Option B is recommended because it is the only candidate that creates a genuinely absent user-facing v1 page rather than extending an existing route.
 
-### Preconditions
+## Pending V1 Scenario Contract
 
-- [x] `용병호스트E2E` 로그인 상태다.
+- [ ] MERC-V1-001 Define the DB/API/permission/idempotency contract before UI work.
+- [ ] MERC-V1-002 Create a realistic recruitment post through `/mercenary/new` and persist it.
+- [ ] MERC-V1-003 Show the post in `/mercenary`, its detail route, the related team surface, and the host's own list after reload.
+- [ ] MERC-V1-004 Reject guest application, self-application, duplicate application, and application after close.
+- [ ] MERC-V1-005 Let the host review and accept or reject applicants; reflect the result to the applicant after reload.
+- [ ] MERC-V1-006 Make create/apply/accept/reject/close safe against same-tick double submit and network retry.
+- [ ] MERC-V1-007 Prove role boundaries for team owner/manager/member and protect private applicant data.
+- [ ] MERC-V1-008 Verify loading, empty, error, retry, validation, animation, focus, and responsive layouts at 375/768/1280.
+- [ ] MERC-V1-009 Record exact fixture creation and cleanup without production data mutation.
 
-### Steps
+## Gate
 
-- [x] `/mercenary/new`에서 모집글을 생성한다.
-- [x] 생성 직후 상세 페이지로 이동한다.
-- [x] `/mercenary`, 관련 팀 상세, 내 모집글 화면에서 노출을 확인한다.
-
-### Expected
-
-- [x] 생성 결과가 상세로 반영된다.
-- [x] 필수 정보가 손실되지 않는다.
-
-### Persistence Check
-
-- [x] 새로고침 후에도 유지된다.
-- [ ] 가능하면 API 재시작 후에도 유지된다.
-
-## MERC-002 지원 / 승인 / 상태 확인
-
-### Preconditions
-
-- [x] 지원 가능한 일반 사용자 계정을 준비한다.
-
-### Steps
-
-- [x] 일반 사용자가 용병 모집글에 지원한다.
-- [x] 호스트가 지원 목록을 확인한다.
-- [x] 호스트가 승인 또는 거절한다.
-- [x] 지원자가 내 상태를 확인한다.
-
-### Expected
-
-- [x] 비로그인 사용자는 지원 완료 불가다.
-- [x] 중복 지원이 차단된다.
-- [x] 승인/거절 결과가 지원자 관점에서도 보인다.
-
-## Notes
-
-- 이 영역은 실제 DB 저장 확인이 특히 중요하다.
-- 2026-04-11: `/mercenary/[id]` 상세 페이지는 현재 코드에 존재한다. 이전 backlog의 “detail page missing” 진술은 stale이며, follow-up 초점은 detail route 부재가 아니라 lifecycle completion이다.
-- 2026-04-11: `e2e/tests/mercenary-flow.spec.ts`는 create -> detail redirect, unauthenticated apply redirect, apply -> host accept -> applicant status 확인까지 포함하도록 확장되었다.
-- 2026-04-11: E2E runtime 안정화를 위해 `e2e/fixtures/auth.ts`, `e2e/fixtures/api-helpers.ts`에 transient fetch retry와 lighter protected-route bootstrap(`/matches`)를 반영했다.
-- 2026-04-11: repo Playwright config의 local Next `webServer`는 cold boot 시 `.next/routes-manifest.json` / `app-paths-manifest.json` ENOENT를 간헐적으로 낼 수 있다. 이 경우 mercenary 제품 regression으로 단정하지 않고 runtime follow-up으로 분리한다.
+No v1 schema, API, route, mock, or QA data is created until the user selects the new-page scope. Legacy source or tests must not be copied as implementation authority.

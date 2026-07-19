@@ -21,7 +21,13 @@ export interface ManualPushSendResult {
   failed: number;
 }
 
-/** 한 번에 동시 처리할 브로드캐스트 수신자 수 — 대량 발송이 웹 푸시 provider·DB에 순간 과부하를 주지 않도록 청크 단위로 순차 처리한다. */
+/**
+ * 브로드캐스트 동시성 상한. 청크 "안"은 Promise.all로 최대 이 수만큼 동시 발송하고,
+ * 청크와 청크 "사이"는 순차로 진행한다(한 청크가 끝나야 다음 청크를 시작) — 무제한
+ * 동시성으로 인한 과부하를 이 상한으로 막으면서도, 완전 순차(1명씩)보다 훨씬 빠르게
+ * 대량 발송을 끝낸다. 30은 웹 푸시 provider/DB에 순간적으로 걸어도 안전한 수준의
+ * 통상적인 배치 크기다.
+ */
 const BROADCAST_CHUNK_SIZE = 30;
 
 @Injectable()

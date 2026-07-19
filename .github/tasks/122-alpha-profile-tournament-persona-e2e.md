@@ -182,5 +182,5 @@ Current alpha advanced through the shared admin authorization hardening to relea
 
 ## Ambiguity Log
 
-- The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed.
+- The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed. The interactive decision artifact is [`teameet-new-page-scope-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html): A extends the existing profile route, B creates the currently absent mercenary v1 flow (recommended), and C hardens the already-existing admin tournament-create wizard. No product/schema work starts before the user selects A, B, or C.
 - Alpha QA tournament persona rows do not include passwords in the seed. Browser mutation scenarios must use an explicitly authorized login flow or an isolated QA account; header-auth posture must not be weakened to make tests convenient.

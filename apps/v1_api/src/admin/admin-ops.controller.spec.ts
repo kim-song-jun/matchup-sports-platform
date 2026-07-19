@@ -15,7 +15,7 @@ const user = {
 const admin = { id: 'admin-row-1', userId: 'user-1', adminRole: 'ops' as const, status: 'active' as const };
 
 describe('AdminOpsController', () => {
-  const adminOpsService = { recentPushFailures: jest.fn(), acknowledgeFailures: jest.fn() };
+  const adminOpsService = { recentPushFailures: jest.fn(), acknowledgeFailures: jest.fn(), sendManualPush: jest.fn() };
   const adminContext = {
     getActiveAdmin: jest.fn().mockResolvedValue(admin),
     getMutationAdmin: jest.fn().mockResolvedValue(admin),
@@ -64,5 +64,26 @@ describe('AdminOpsController', () => {
     await expect(controller.ackPushFailures(user, { ids: ['fail-1'] })).rejects.toThrow('Support admins cannot mutate');
 
     expect(adminOpsService.acknowledgeFailures).not.toHaveBeenCalled();
+  });
+
+  it('sendPush gates on getMutationAdmin and delegates the dto + admin to the service', async () => {
+    const dto = { target: 'user' as const, userId: 'user-1', title: '점검 안내' };
+    adminOpsService.sendManualPush.mockResolvedValue({ sent: 1, skipped: 0, failed: 0 });
+
+    const result = await controller.sendPush(user, dto);
+
+    expect(adminContext.getMutationAdmin).toHaveBeenCalledWith('user-1');
+    expect(adminOpsService.sendManualPush).toHaveBeenCalledWith(dto, admin);
+    expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
+  });
+
+  it('sendPush rejects before any send when the caller is a support-role admin (blocked by getMutationAdmin)', async () => {
+    adminContext.getMutationAdmin.mockRejectedValue(new Error('Support admins cannot mutate'));
+
+    await expect(
+      controller.sendPush(user, { target: 'broadcast', title: '전체 공지' }),
+    ).rejects.toThrow('Support admins cannot mutate');
+
+    expect(adminOpsService.sendManualPush).not.toHaveBeenCalled();
   });
 });

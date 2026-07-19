@@ -1,6 +1,9 @@
 import { Test } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { WebPushService } from '../notifications/web-push.service';
 import { AdminOpsService } from './admin-ops.service';
 import { createHash } from 'node:crypto';
 
@@ -10,9 +13,15 @@ describe('AdminOpsService', () => {
   let service: AdminOpsService;
   const prisma = {
     v1WebPushFailureLog: { findMany: jest.fn(), updateMany: jest.fn() },
+    v1User: { findUnique: jest.fn() },
+    v1PushSubscription: { findMany: jest.fn() },
+    v1NotificationPreference: { findUnique: jest.fn() },
+    v1Notification: { create: jest.fn() },
     $transaction: jest.fn(),
   };
   const adminContext = { logAdminAction: jest.fn().mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null }) };
+  const realtimeGateway = { emitToUser: jest.fn() };
+  const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -20,11 +29,17 @@ describe('AdminOpsService', () => {
     // same mock model object so individual model-mock assertions still work.
     prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
     adminContext.logAdminAction.mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null });
+    webPushService.sendToUser.mockResolvedValue(undefined);
+    prisma.v1Notification.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: 'notif-1', ...data }),
+    );
     const moduleRef = await Test.createTestingModule({
       providers: [
         AdminOpsService,
         { provide: PrismaService, useValue: prisma },
         { provide: AdminContextService, useValue: adminContext },
+        { provide: RealtimeGateway, useValue: realtimeGateway },
+        { provide: WebPushService, useValue: webPushService },
       ],
     }).compile();
     service = moduleRef.get(AdminOpsService);
@@ -118,5 +133,111 @@ describe('AdminOpsService', () => {
     });
 
     await expect(service.acknowledgeFailures(['fail-1'], admin)).rejects.toThrow('audit log write failed');
+  });
+
+  describe('sendManualPush', () => {
+    it('sends to a single user: creates the notification, emits realtime, sends the push, and audit-logs the userId as targetId', async () => {
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'user-1' });
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+
+      const result = await service.sendManualPush(
+        { target: 'user', userId: 'user-1', title: '점검 안내', body: '내일 새벽 점검이 있어요.', url: '/notices/1' },
+        admin,
+      );
+
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
+      expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+        data: {
+          recipientUserId: 'user-1',
+          targetType: 'notice',
+          targetId: null,
+          title: '점검 안내',
+          body: '내일 새벽 점검이 있어요.',
+          deepLink: '/notices/1',
+        },
+      });
+      expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+        'user-1',
+        'notification:new',
+        expect.objectContaining({ recipientUserId: 'user-1' }),
+      );
+      expect(webPushService.sendToUser).toHaveBeenCalledWith('user-1', {
+        title: '점검 안내',
+        body: '내일 새벽 점검이 있어요.',
+        url: '/notices/1',
+      });
+      expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+        admin,
+        expect.objectContaining({ action: 'push.manual_send', targetType: 'push', targetId: 'user-1' }),
+      );
+    });
+
+    it('throws 404 for a non-existent userId target and never creates a notification', async () => {
+      prisma.v1User.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.sendManualPush({ target: 'user', userId: 'missing-user', title: 'hi' }, admin),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+      expect(adminContext.logAdminAction).not.toHaveBeenCalled();
+    });
+
+    it('skips a single user whose noticeEnabled preference is off, without creating a notification', async () => {
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'user-1' });
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: false });
+
+      const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
+
+      expect(result).toEqual({ sent: 0, skipped: 1, failed: 0 });
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
+
+    it('treats a missing preference row as enabled by default (matches notifications.service.ts convention)', async () => {
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'user-1' });
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+
+      const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
+
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
+    });
+
+    it('broadcasts to every distinct push subscriber, skipping those with noticeEnabled off, and audit-logs targetId "broadcast"', async () => {
+      prisma.v1PushSubscription.findMany.mockResolvedValue([
+        { userId: 'user-1' },
+        { userId: 'user-2' },
+        { userId: 'user-3' },
+      ]);
+      prisma.v1NotificationPreference.findUnique.mockImplementation(({ where }: { where: { userId: string } }) =>
+        Promise.resolve(where.userId === 'user-2' ? { noticeEnabled: false } : { noticeEnabled: true }),
+      );
+
+      const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
+
+      expect(prisma.v1PushSubscription.findMany).toHaveBeenCalledWith({
+        distinct: ['userId'],
+        select: { userId: true },
+      });
+      expect(result).toEqual({ sent: 2, skipped: 1, failed: 0 });
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
+      expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+        admin,
+        expect.objectContaining({ targetId: 'broadcast', afterJson: expect.objectContaining({ target: 'broadcast' }) }),
+      );
+    });
+
+    it('isolates a per-recipient failure during broadcast so the rest still send', async () => {
+      prisma.v1PushSubscription.findMany.mockResolvedValue([{ userId: 'user-1' }, { userId: 'user-2' }]);
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+      prisma.v1Notification.create
+        .mockRejectedValueOnce(new Error('db write failed'))
+        .mockImplementationOnce(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ id: 'notif-2', ...data }),
+        );
+
+      const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
+
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 1 });
+    });
   });
 });

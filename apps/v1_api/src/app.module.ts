@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { buildPinoHttpOptions } from './common/logging/pino-http.config';
 import { V1ThrottlerGuard } from './common/guards/v1-throttler.guard';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './auth/auth.module';
@@ -34,29 +35,7 @@ import { LogsModule } from './logs/logs.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-        transport:
-          process.env.NODE_ENV === 'production'
-            ? undefined
-            : { target: 'pino-pretty', options: { colorize: true, singleLine: true } },
-        // 쿼리스트링에 실린 PII(예: GET /auth/check-email?email=...)가 그대로 찍히는 것을
-        // 막기 위해 경로만 남기고 쿼리스트링은 로깅 대상에서 제외한다.
-        serializers: {
-          req(req: { id?: string; method: string; url: string }) {
-            return { id: req.id, method: req.method, url: req.url?.split('?')[0] };
-          },
-        },
-        redact: {
-          paths: [
-            'req.headers.authorization',
-            'req.headers.cookie',
-            'req.headers["x-v1-user-email"]',
-            'res.headers["set-cookie"]',
-          ],
-          remove: true,
-        },
-      },
+      pinoHttp: buildPinoHttpOptions(),
     }),
     ThrottlerModule.forRoot({
       throttlers: [{ limit: 1000, ttl: 60_000 }],

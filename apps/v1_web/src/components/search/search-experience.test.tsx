@@ -50,17 +50,23 @@ describe('SearchExperience GA events', () => {
     apiMocks.teams = { items: [] };
   });
 
-  it('reports only the domain that actually returned results, not a hardcoded "all"', async () => {
+  it('tracks a search event with the query length (not raw text) and the domain that actually returned results', async () => {
     // Given: only the match domain returns a result (teamMatch/team empty)
     // When
     render(<SearchExperience state="results" />);
 
-    // Then: domain reflects the single responding domain, not a meaningless constant
+    // Then — 'futsal' 검색어 원문이 아니라 length(=6)만 전송해야 한다: 자유 입력 검색창은
+    // 사용자가 이름/전화번호 등 PII를 입력할 수 있으므로 GA4에 원문을 보내지 않는다.
+    // domain은 하드코딩된 'all'이 아니라 실제로 결과를 낳은 도메인만 반영해야 한다.
     await waitFor(() =>
-      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { query: 'futsal', resultCount: 1, domain: 'match' }),
+      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 1, domain: 'match' }),
     );
     // 결과가 안정된 뒤 재렌더링되어도 같은 검색어로 중복 발화하지 않는다.
     expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+
+    // trackEvent 로 전달된 params 어디에도 원문 검색어 문자열이 실려서는 안 된다.
+    const [, params] = analytics.trackEvent.mock.calls[0];
+    expect(JSON.stringify(params)).not.toContain('futsal');
   });
 
   it('comma-joins multiple responding domains when more than one domain returns results', async () => {
@@ -74,7 +80,7 @@ describe('SearchExperience GA events', () => {
 
     // Then
     await waitFor(() =>
-      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { query: 'futsal', resultCount: 2, domain: 'match,team' }),
+      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 2, domain: 'match,team' }),
     );
   });
 
@@ -89,7 +95,7 @@ describe('SearchExperience GA events', () => {
 
     // Then
     await waitFor(() =>
-      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { query: 'futsal', resultCount: 0, domain: '' }),
+      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 0, domain: '' }),
     );
   });
 });

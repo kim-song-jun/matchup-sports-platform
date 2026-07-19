@@ -80,7 +80,10 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     const trimmedQuery = submittedQuery.trim();
     if (!trimmedQuery || trackedSearchRef.current === trimmedQuery) return;
     trackedSearchRef.current = trimmedQuery;
-    // 설계 문서(docs/superpowers/specs/2026-07-18-logging-ga-analytics-design.md)의
+    // GA4 는 자유 입력 텍스트를 담을 수 없는 채널이다 — 사용자가 이름/전화번호 등 개인 식별
+    // 정보를 검색어로 입력할 수 있으므로(제약 없는 open text), 원문 대신 길이만 전송한다.
+    //
+    // domain: 설계 문서(docs/superpowers/specs/2026-07-18-logging-ga-analytics-design.md)의
     // domain enum(match|team|tournament)은 이 통합검색 구현과 어긋난다 — 이 화면은
     // tournament를 조회하지 않고 대신 match/teamMatch/team 3개 도메인을 항상 동시에
     // 조회한다. 리터럴 'all'은 어떤 도메인이 실제로 결과를 낳았는지 알 수 없어
@@ -91,7 +94,11 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       teamMatchResultCount > 0 ? 'team_match' : null,
       teamResultCount > 0 ? 'team' : null,
     ].filter((domain): domain is string => domain !== null);
-    trackEvent('search', { query: trimmedQuery, resultCount: apiResults.length, domain: respondingDomains.join(',') });
+    trackEvent('search', {
+      queryLength: trimmedQuery.length,
+      resultCount: apiResults.length,
+      domain: respondingDomains.join(','),
+    });
   }, [apiResults.length, errored, loading, matchResultCount, shouldSearch, submittedQuery, teamMatchResultCount, teamResultCount]);
 
   function goBack() {

@@ -87,8 +87,15 @@ export class WebPushService implements OnModuleInit {
             if (error.statusCode === 410 || error.statusCode === 404) {
               try {
                 await this.prisma.v1PushSubscription.delete({ where: { id: subscription.id } });
-              } catch {
-                // subscription already removed — safe to ignore
+              } catch (deleteError) {
+                const alreadyRemoved =
+                  deleteError instanceof Prisma.PrismaClientKnownRequestError && deleteError.code === 'P2025';
+                if (!alreadyRemoved) {
+                  this.logger.warn(
+                    { userId, subscriptionId: subscription.id, err: deleteError },
+                    '만료된 웹 푸시 구독 삭제 실패',
+                  );
+                }
               }
               return;
             }

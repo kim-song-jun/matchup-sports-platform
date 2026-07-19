@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { StoredV1Session } from './session-storage';
 
 // on() 리스너를 실제로 저장해 두어, 테스트에서 handshake 실패/연결 끊김을 재현할 수 있게 한다
 // (jsdom 환경에는 실제 소켓 서버가 없으므로 socket.io-client 자체를 목킹한다).
@@ -13,14 +14,16 @@ const mockSocket = {
   off: vi.fn(),
   emit: vi.fn(),
 };
-const ioMock = vi.fn((_uri: string, _options: { auth: Record<string, string> }) => mockSocket);
+type AuthCallback = (data: Record<string, string>) => void;
+const ioMock = vi.fn((_uri: string, _options: { auth: (cb: AuthCallback) => void }) => mockSocket);
 
 const reportClientError = vi.hoisted(() => vi.fn());
+const getStoredV1Session = vi.hoisted(() =>
+  vi.fn<() => StoredV1Session>(() => ({ userId: 'user-1', userEmail: null })),
+);
 
 vi.mock('socket.io-client', () => ({ io: ioMock }));
-vi.mock('./session-storage', () => ({
-  getStoredV1Session: () => ({ userId: 'user-1', userEmail: null }),
-}));
+vi.mock('./session-storage', () => ({ getStoredV1Session }));
 vi.mock('./client-error-reporter', () => ({ reportClientError }));
 
 afterEach(() => {
@@ -46,7 +49,34 @@ describe('getV1Socket', () => {
     getV1Socket();
 
     const [, options] = ioMock.mock.calls[0];
-    expect(options.auth).toEqual(expect.objectContaining({ 'x-v1-user-id': 'user-1' }));
+    expect(typeof options.auth).toBe('function');
+
+    const cb = vi.fn();
+    options.auth(cb);
+    expect(cb).toHaveBeenCalledWith(expect.objectContaining({ 'x-v1-user-id': 'user-1' }));
+  });
+
+  it('re-reads the stored session on every (re)connection attempt instead of caching the first value', async () => {
+    const { getV1Socket } = await import('./v1-socket');
+
+    getV1Socket();
+
+    const [, options] = ioMock.mock.calls[0];
+
+    // 최초 연결 시점 세션은 user-1
+    const firstCb = vi.fn();
+    options.auth(firstCb);
+    expect(firstCb).toHaveBeenCalledWith(expect.objectContaining({ 'x-v1-user-id': 'user-1' }));
+
+    // 세션이 갱신된 뒤(예: 로그인 전환) socket.io-client가 재연결을 시도하며 auth를 다시 호출한다.
+    getStoredV1Session.mockReturnValue({ userId: 'user-2', userEmail: 'user2@teameet.v1' });
+    const secondCb = vi.fn();
+    options.auth(secondCb);
+
+    expect(secondCb).toHaveBeenCalledWith({
+      'x-v1-user-id': 'user-2',
+      'x-v1-user-email': 'user2@teameet.v1',
+    });
   });
 });
 

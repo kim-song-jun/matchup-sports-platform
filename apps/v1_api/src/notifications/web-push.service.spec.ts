@@ -12,6 +12,13 @@ function uniqueConstraintError(target: string) {
   });
 }
 
+function recordNotFoundError() {
+  return new Prisma.PrismaClientKnownRequestError(
+    'An operation failed because it depends on one or more records that were required but not found.',
+    { code: 'P2025', clientVersion: '6.19.2' },
+  );
+}
+
 jest.mock('web-push', () => ({
   setVapidDetails: jest.fn(),
   sendNotification: jest.fn(),
@@ -93,6 +100,47 @@ describe('WebPushService', () => {
     await service.sendToUser('user-1', { title: 'hi' });
 
     expect(prisma.v1PushSubscription.delete).toHaveBeenCalledWith({ where: { id: 'sub-1' } });
+  });
+
+  it('sendToUser silently ignores a P2025 (already deleted) error when cleaning up an expired subscription', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([
+      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+    ]);
+    (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 410 });
+    prisma.v1PushSubscription.delete.mockRejectedValue(recordNotFoundError());
+
+    await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(prisma.v1PushSubscription.delete).toHaveBeenCalledWith({ where: { id: 'sub-1' } });
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('sendToUser logs a structured warning when deleting an expired subscription fails for a non-P2025 reason', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([
+      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+    ]);
+    (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 410 });
+    const connectionError = new Error('connection timeout');
+    prisma.v1PushSubscription.delete.mockRejectedValue(connectionError);
+
+    await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(prisma.v1PushSubscription.delete).toHaveBeenCalledWith({ where: { id: 'sub-1' } });
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1', err: connectionError }),
+      '만료된 웹 푸시 구독 삭제 실패',
+    );
   });
 
   it('sendToUser logs a failure without deleting the subscription on a non-expiry error', async () => {

@@ -65,6 +65,31 @@ describe('buildPinoHttpOptions', () => {
     expect((loggedReq.headers as Record<string, unknown>)['user-agent']).toBe('jest-test-agent');
   });
 
+  it('redacts req.headers.referer to prevent leaking OAuth code/state carried by same-origin Referer headers', () => {
+    const { stream, lines } = captureLogLines();
+    const { logger } = pinoHttp(optionsForTest(), stream);
+
+    const req = {
+      id: 'req-2',
+      method: 'GET',
+      url: '/api/v1/auth/kakao',
+      headers: {
+        // strict-origin-when-cross-origin 하에서 same-origin fetch 는 쿼리스트링을 포함한
+        // 전체 URL을 Referer 로 보낸다 — 카카오 콜백 페이지의 code/state 가 여기 실린다.
+        referer:
+          'https://teameet.example.com/callback/kakao?code=abcd1234&state=csrf-secret-state',
+        'user-agent': 'jest-test-agent',
+      },
+    };
+
+    logger.info({ req }, 'test log');
+
+    const [entry] = lines();
+    const loggedReq = entry.req as Record<string, unknown>;
+    expect(loggedReq.headers).not.toHaveProperty('referer');
+    expect((loggedReq.headers as Record<string, unknown>)['user-agent']).toBe('jest-test-agent');
+  });
+
   it('redacts res.headers["set-cookie"] while preserving other response headers', () => {
     const { stream, lines } = captureLogLines();
     const { logger } = pinoHttp(optionsForTest(), stream);

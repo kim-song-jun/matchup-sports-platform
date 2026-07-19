@@ -47,6 +47,12 @@ const noIndexRoutes = [
 const nextConfig: NextConfig = {
   output: isProd ? 'standalone' : undefined,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  // socket.io-client always requests the polling/upgrade handshake with a trailing
+  // slash (/socket.io/?EIO=...). Next's default trailing-slash redirect (308 to
+  // /socket.io?EIO=...) runs BEFORE rewrites, and the redirected path no longer
+  // matches the `/socket.io/:path*` rewrite below — so every realtime connection
+  // 404s. Skipping the redirect lets the rewrite match the original request as-is.
+  skipTrailingSlashRedirect: true,
   experimental: {
     optimizePackageImports: ['@tanstack/react-query'],
   },
@@ -74,6 +80,14 @@ const nextConfig: NextConfig = {
         // them without CORS and so stored relative URLs resolve in dev + prod.
         source: '/uploads/:path*',
         destination: `${internalApiOrigin}/uploads/:path*`,
+      },
+      {
+        // The bare handshake request (no extra path segments) still needs an
+        // explicit rule: `/socket.io/:path*` alone collapses to a destination
+        // without the trailing slash when :path* is empty, and the Engine.IO
+        // server 404s without it.
+        source: '/socket.io',
+        destination: `${internalApiOrigin}/socket.io/`,
       },
       {
         source: '/socket.io/:path*',

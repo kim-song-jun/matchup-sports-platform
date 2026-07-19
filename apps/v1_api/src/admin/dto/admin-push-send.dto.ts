@@ -30,9 +30,17 @@ export class AdminPushSendDto {
   // 알림 target.route로 그대로 전달되므로, 외부 URL을 허용하면 운영자가 실수로
   // 피싱성 외부 이동 링크를 발송할 수 있다 — 앱 내부 상대 경로만 허용한다
   // (login 페이지의 sanitizeRedirect()와 동일한 open-redirect 방지 정책).
+  // 슬래시 하나로 시작해야 하고(연속 슬래시 금지) 문자열 전체에 백슬래시가
+  // 전혀 없어야 한다 — WHATWG URL 파서는 http/https 같은 special scheme에서
+  // 백슬래시를 슬래시처럼 취급해 `/\evil.com` 같은 값이 origin을 바꿔버리는
+  // open-redirect 우회를 허용한다(new URL('/\\evil.com','https://x').origin
+  // === 'https://evil.com'). notification-route.ts의 isSafeInternalRoute()와
+  // 동일한 엄격도.
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  @Matches(/^\/(?!\/)/, { message: 'url must be a relative in-app path starting with a single /' })
+  @Matches(/^\/(?!\/)[^\\]*$/, {
+    message: 'url must be a relative in-app path starting with a single / and containing no backslashes',
+  })
   url?: string;
 }

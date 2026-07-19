@@ -24,7 +24,6 @@ export function useV1ChatRoomSocket(roomId: string): void {
 
   useEffect(() => {
     const socket = getV1Socket();
-    socket.emit('chat:join', { roomId });
     const handler = () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRoom(roomId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.chatMessages(roomId) });

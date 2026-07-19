@@ -209,12 +209,18 @@ jobs:
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
           V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
           GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
+          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
         run: |
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
           V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
           GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
 
           {
             printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
@@ -222,6 +228,9 @@ jobs:
             printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
             printf 'V1_HOST_ADMIN_PASSWORD_B64=%s\n' "${V1_HOST_ADMIN_PASSWORD_B64}"
             printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
+            printf 'VAPID_PUBLIC_KEY_B64=%s\n' "${VAPID_PUBLIC_KEY_B64}"
+            printf 'VAPID_PRIVATE_KEY_B64=%s\n' "${VAPID_PRIVATE_KEY_B64}"
+            printf 'VAPID_SUBJECT_B64=%s\n' "${VAPID_SUBJECT_B64}"
             cat <<'REMOTE_SCRIPT'
           set -euo pipefail
 
@@ -272,6 +281,9 @@ jobs:
           sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
           sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
           sync_env_from_github_secret "GA_MEASUREMENT_ID" "${GA_MEASUREMENT_ID_B64:-}"
+          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
 
           # Harden deploy/.env perms against EC2 umask 022 — contains DB_PASSWORD/JWT_SECRET and other secrets
           chmod 600 deploy/.env

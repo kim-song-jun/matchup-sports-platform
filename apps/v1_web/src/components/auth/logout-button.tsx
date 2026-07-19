@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useV1Logout } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { clearStoredV1Session } from '@/lib/session-storage';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { v1Keys } from '@/lib/query-keys';
 import { Button } from '@/components/v1-ui/button';
 
@@ -23,6 +24,7 @@ export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
 
   const clearAndRedirect = () => {
     clearStoredV1Session();
+    disconnectV1Socket();
     queryClient.removeQueries({ queryKey: v1Keys.all });
     router.replace('/login');
   };

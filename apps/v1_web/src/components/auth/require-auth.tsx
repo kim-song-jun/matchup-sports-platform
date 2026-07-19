@@ -10,6 +10,7 @@ import {
   getLoginPathForRedirect,
   shouldProbeV1Session,
 } from '@/lib/session-storage';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
 
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -30,6 +31,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     if (!authMe.isError) return;
 
     clearStoredV1Session();
+    disconnectV1Socket();
     router.replace(getLoginPathForRedirect(getCurrentRedirectPath()));
   }, [authMe.isError, hasSessionHint, router]);
 

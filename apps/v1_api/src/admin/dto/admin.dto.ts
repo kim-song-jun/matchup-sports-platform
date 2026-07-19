@@ -7,6 +7,7 @@ import {
   IsIn,
   IsInt,
   IsOptional,
+  IsObject,
   IsString,
   IsUUID,
   Max,
@@ -187,9 +188,14 @@ export class CreateAdminNoticeDto {
   @MaxLength(120)
   title!: string;
 
+  @IsOptional()
   @IsString()
-  @MaxLength(5000)
-  body!: string;
+  @MaxLength(10000)
+  body?: string;
+
+  @IsOptional()
+  @IsObject()
+  content?: Record<string, unknown>;
 
   @IsIn(['draft', 'published', 'archived'])
   status!: 'draft' | 'published' | 'archived';
@@ -227,9 +233,14 @@ export class CreateAdminPopupDto {
   @MaxLength(120)
   title!: string;
 
+  @IsOptional()
   @IsString()
-  @MaxLength(5000)
-  body!: string;
+  @MaxLength(10000)
+  body?: string;
+
+  @IsOptional()
+  @IsObject()
+  content?: Record<string, unknown>;
 
   @IsArray()
   @ArrayMinSize(1)

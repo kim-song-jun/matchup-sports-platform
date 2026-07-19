@@ -4842,3 +4842,118 @@ button:disabled {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;
 }
+
+.tm-rich-editor .ProseMirror {
+  min-height: 280px;
+  padding: 18px;
+  color: var(--text-strong);
+  font-size: 14px;
+  line-height: 1.7;
+  outline: none;
+}
+
+.tm-rich-editor .ProseMirror[contenteditable='false'] {
+  background: var(--grey50);
+  color: var(--text-muted);
+}
+
+.tm-rich-content > :first-child,
+.tm-rich-editor .ProseMirror > :first-child {
+  margin-top: 0;
+}
+
+.tm-rich-content > :last-child,
+.tm-rich-editor .ProseMirror > :last-child {
+  margin-bottom: 0;
+}
+
+.tm-rich-content p,
+.tm-rich-editor .ProseMirror p {
+  margin: 0.75em 0;
+  white-space: pre-wrap;
+}
+
+.tm-rich-content h2,
+.tm-rich-editor .ProseMirror h2 {
+  margin: 1.5em 0 0.55em;
+  font-size: 1.35em;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.tm-rich-content h3,
+.tm-rich-editor .ProseMirror h3 {
+  margin: 1.3em 0 0.5em;
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.tm-rich-content ul,
+.tm-rich-content ol,
+.tm-rich-editor .ProseMirror ul,
+.tm-rich-editor .ProseMirror ol {
+  margin: 0.9em 0;
+  padding-left: 1.5em;
+}
+
+.tm-rich-content ul,
+.tm-rich-editor .ProseMirror ul {
+  list-style: disc;
+}
+
+.tm-rich-content ol,
+.tm-rich-editor .ProseMirror ol {
+  list-style: decimal;
+}
+
+.tm-rich-content li,
+.tm-rich-editor .ProseMirror li {
+  margin: 0.3em 0;
+}
+
+.tm-rich-content blockquote,
+.tm-rich-editor .ProseMirror blockquote {
+  margin: 1em 0;
+  border: 1px solid var(--grey200);
+  border-radius: 12px;
+  background: var(--grey50);
+  padding: 12px 14px;
+  color: var(--text-muted);
+}
+
+.tm-rich-content hr,
+.tm-rich-editor .ProseMirror hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid var(--grey200);
+}
+
+.tm-rich-content a,
+.tm-rich-editor .ProseMirror a {
+  color: var(--blue500);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tm-rich-content figure,
+.tm-rich-editor .ProseMirror img {
+  margin: 1.25em 0;
+}
+
+.tm-rich-content figure img,
+.tm-rich-editor .ProseMirror img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 720px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+
+.tm-rich-content figcaption {
+  margin-top: 8px;
+  color: var(--text-caption);
+  font-size: 12px;
+  text-align: center;
+}

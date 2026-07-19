@@ -78,6 +78,8 @@ Team list/detail and `/me/teams` `region` includes `{ regionId, name, parentName
 - Manager limit is enforced by service logic.
 - Approving a join application or accepting a team invitation creates or restores an active member.
 - New/reactivated membership starts team-chat visibility and writes one joined system message in the same transaction; the member does not need to open the chat room first.
+- Inactive membership is retained as history. Removing a member updates the existing membership to `removed`, records `leftAt` and `removedByUserId`, and does not hard-delete the membership row. Records already stored in another team-owned domain, including tournament roster snapshots, are not deleted by this membership state change.
+- The v1 member-management UI treats removal as a destructive action. Its confirmation modal requires the operator to enter the exact phrase `확인했습니다` before the final `내보내기` button is enabled and the remove mutation can run.
 
 Primary tables:
 

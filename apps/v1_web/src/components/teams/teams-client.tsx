@@ -358,7 +358,13 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
             delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
             demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
-            remove: () => confirmAction(confirm, { title: '멤버 내보내기', message: `${member.displayName}님을 팀에서 내보낼까요?`, tone: 'danger' }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
+            remove: () => confirmAction(confirm, {
+              title: '멤버 내보내기',
+              message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지됩니다.`,
+              confirmLabel: '내보내기',
+              tone: 'danger',
+              confirmationPhrase: '확인했습니다',
+            }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
           }),
         )
       : fallback.members,

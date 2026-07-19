@@ -29,6 +29,8 @@ const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
   cancelled: [],
 };
 
+const TOURNAMENT_LIST_STATUSES = ['draft', 'open', 'closed', 'in_progress', 'completed', 'cancelled'] as const;
+
 function nullableText(value: string | undefined): string | null | undefined {
   if (value === undefined) return undefined;
   const trimmed = value.trim();
@@ -46,27 +48,45 @@ export class TournamentsAdminService {
     await this.adminContext.getActiveAdmin(user.id);
     const limit = query.limit ?? 20;
 
-    const where: Prisma.V1TournamentWhereInput = {
+    const statusFacetWhere: Prisma.V1TournamentWhereInput = {
       deletedAt: null,
-      ...(query.status ? { status: query.status } : {}),
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
     };
 
-    const rows = await this.prisma.v1Tournament.findMany({
+    const where: Prisma.V1TournamentWhereInput = {
+      ...statusFacetWhere,
+      ...(query.status ? { status: query.status } : {}),
+    };
+
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1Tournament.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: { _count: { select: { registrations: true } } },
-    });
+    }), this.prisma.v1Tournament.groupBy({
+      by: ['status'],
+      where: statusFacetWhere,
+      _count: { _all: true },
+    })]);
 
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
+    const byStatus = Object.fromEntries(TOURNAMENT_LIST_STATUSES.map((status) => [status, 0])) as Record<
+      (typeof TOURNAMENT_LIST_STATUSES)[number],
+      number
+    >;
+    for (const group of statusGroups) byStatus[group.status] = group._count._all;
+
     return {
       items: pageItems.map((row) => this.serialize(row, row._count.registrations)),
       pageInfo: { nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null, hasNext },
+      summary: {
+        total: Object.values(byStatus).reduce((sum, count) => sum + count, 0),
+        byStatus,
+      },
     };
   }
 
@@ -74,12 +94,16 @@ export class TournamentsAdminService {
     await this.adminContext.getActiveAdmin(user.id);
     const row = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      include: { _count: { select: { registrations: true } } },
+      include: { _count: { select: { registrations: true, fixtures: true, announcements: true } } },
     });
     if (!row) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    return this.serialize(row, row._count.registrations);
+    return this.serialize(row, row._count.registrations, {
+      registrations: row._count.registrations,
+      fixtures: row._count.fixtures,
+      announcements: row._count.announcements,
+    });
   }
 
   async create(user: V1AuthUser, dto: CreateTournamentDto) {
@@ -311,7 +335,11 @@ export class TournamentsAdminService {
     }
   }
 
-  private serialize(row: V1Tournament, registrationCount: number) {
+  private serialize(
+    row: V1Tournament,
+    registrationCount: number,
+    operationCounts?: { registrations: number; fixtures: number; announcements: number },
+  ) {
     return {
       id: row.id,
       sportId: row.sportId,
@@ -355,6 +383,7 @@ export class TournamentsAdminService {
       promoListPrizeText: row.promoListPrizeText,
       promoListPriority: row.promoListPriority,
       registrationCount,
+      ...(operationCounts ? { operationCounts } : {}),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

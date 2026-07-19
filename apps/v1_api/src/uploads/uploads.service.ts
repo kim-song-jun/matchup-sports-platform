@@ -19,7 +19,7 @@ const ALLOWED_MIMETYPES = new Set(Object.keys(MIME_TO_EXT));
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
 
 /** Discriminated-union subset of Express.Multer.File we rely on */
-interface UploadedFile {
+export interface UploadedFile {
   fieldname: string;
   originalname: string;
   encoding: string;
@@ -116,6 +116,19 @@ export class UploadsService {
     }
 
     return { urls };
+  }
+
+  async removeStoredUrl(url: string): Promise<void> {
+    if (!url.startsWith(`${UploadsService.SERVE_PREFIX}/`) || url.includes('\\')) {
+      throw new BadRequestException('삭제할 업로드 경로가 올바르지 않아요.');
+    }
+    const relativePath = url.slice(UploadsService.SERVE_PREFIX.length + 1);
+    const basePath = path.resolve(UploadsService.UPLOAD_BASE);
+    const resolvedPath = path.resolve(basePath, relativePath);
+    if (!resolvedPath.startsWith(`${basePath}${path.sep}`)) {
+      throw new BadRequestException('삭제할 업로드 경로가 올바르지 않아요.');
+    }
+    await this.safeUnlink(resolvedPath);
   }
 
   /** Best-effort cleanup of all multer temp files (e.g. on a validation failure). */

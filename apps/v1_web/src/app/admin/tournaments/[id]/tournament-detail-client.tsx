@@ -2479,12 +2479,18 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
+          const count = tab.id === 'registrations'
+            ? tournament.operationCounts?.registrations
+            : tab.id === 'bracket'
+              ? tournament.operationCounts?.fixtures
+              : tournament.operationCounts?.announcements;
           return (
             <button
               key={tab.id}
               id={`tab-${tab.id}`}
               role="tab"
               aria-selected={active}
+              aria-label={typeof count === 'number' ? `${tab.label} ${count}` : tab.label}
               aria-controls={`panel-${tab.id}`}
               type="button"
               onClick={() => setActiveTab(tab.id)}
@@ -2496,7 +2502,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                   : 'text-gray-600 hover:text-gray-900',
               ].join(' ')}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <span className={active ? 'ml-1.5 font-semibold tabular-nums text-blue-600' : 'ml-1.5 font-semibold tabular-nums text-gray-400'} aria-hidden="true">
+                {typeof count === 'number' ? count.toLocaleString('ko-KR') : '—'}
+              </span>
             </button>
           );
         })}

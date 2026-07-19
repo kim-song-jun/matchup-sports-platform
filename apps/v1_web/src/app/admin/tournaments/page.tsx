@@ -98,6 +98,10 @@ export default function AdminTournamentsPage() {
 
   const { data, isPending, isFetching, isError, error, refetch } =
     useV1AdminTournaments(filters);
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? data?.summary.byStatus[option.value] : data?.summary.total,
+  }));
 
   useEffect(() => {
     if (!data?.items) return;
@@ -150,7 +154,7 @@ export default function AdminTournamentsPage() {
           hideSearch
           searchValue=""
           onSearchChange={() => undefined}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={handleStatusChange}
         />

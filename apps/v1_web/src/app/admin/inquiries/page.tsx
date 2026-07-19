@@ -113,6 +113,18 @@ export default function AdminInquiriesPage() {
 
   const rows = [...(firstPage?.items ?? []), ...extraRows];
   const errorMessage = isError ? extractErrorMessage(error, '문의 목록을 불러오지 못했어요.') : undefined;
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
+  }));
+  const categoryCounts = firstPage?.summary.byCategory;
+  const categoryTotal = categoryCounts
+    ? Object.values(categoryCounts).reduce((sum, count) => sum + count, 0)
+    : undefined;
+  const categoryOptions = CATEGORY_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? categoryCounts?.[option.value] : categoryTotal,
+  }));
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -144,7 +156,7 @@ export default function AdminInquiriesPage() {
           searchPlaceholder="제목, 내용, 사용자 검색"
           searchValue={search}
           onSearchChange={setSearch}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={setActiveStatus}
           rightSlot={
@@ -154,9 +166,9 @@ export default function AdminInquiriesPage() {
               aria-label="문의 분류 필터"
               className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             >
-              {CATEGORY_OPTIONS.map((option) => (
+              {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
                 </option>
               ))}
             </select>

@@ -183,6 +183,7 @@ function normalizePopup(popup: V1Popup | null | undefined): HomePopup | null {
     id: popup.popupId,
     title: popup.title,
     body: popup.body,
+    content: popup.content,
     trailing: popup.publishedAt ? formatDate(popup.publishedAt) : '팝업',
     linkUrl: popup.linkUrl,
     linkLabel: popup.linkLabel,

@@ -1,3 +1,5 @@
+import type { V1RichContentDocument } from '@/types/api';
+
 export type NoticeModel = {
   id: string;
   tag: string;
@@ -5,6 +7,7 @@ export type NoticeModel = {
   summary: string;
   date: string;
   body: string[];
+  content?: V1RichContentDocument;
 };
 
 export type NoticeListViewModel = {

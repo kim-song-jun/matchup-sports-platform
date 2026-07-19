@@ -1,5 +1,40 @@
 # 세션 핸드오프 — 2026-07-14 (Teameet v1 대회 도메인 폴리시 + main↔dev 통합)
 
+## 2026-07-19 13:04 최신 스냅샷 (이 문서의 아래 스냅샷보다 우선)
+
+### Git·배포 경계
+
+- 로컬 `dev` HEAD는 `50f2808d9a08299e7d8c556d54b608c4dd24a79f`이고 `origin/dev 1fb7aa65600889d634d0d0960360edbd60dd549d`보다 9개 커밋 앞선다. `origin/main f3fe424236f23d1fb4765b136a59d14d7f36dfcf`은 현재 HEAD의 ancestor라 최신 fetch 기준 main→dev 병합은 완료 상태다.
+- 마지막으로 원격 검증된 alpha는 `6d9d4dec1f9e50570789c92115c60b3d37edf778`이다. 이후 로컬 9개 커밋은 push·alpha deploy하지 않았다.
+- 사용자 최신 지시대로 AWS/IAM/ECR/S3/SSM, main 머지, 정식 릴리스, production 데이터는 건드리지 않는다. Task 124의 ECR digest + release manifest는 로컬 구현·정적 검증까지만 완료됐고 live AWS 증거는 의도적으로 없다.
+
+### 완료 증거
+
+- Task 118 public bracket은 390×844 내부 가로 스크롤과 768×1024/1280×900 overflow 0, console error 0으로 완료됐다. 증거: `output/playwright/visual-audit/2026-07-19-tournament-bracket/`.
+- Task 120 캠페인 Round 2의 사용자 선택 C(신청 결정을 앞당김)는 로컬 구현·headed QA·독립 시각 리뷰까지 완료됐다. 375/768/1280에서 네트워크 4xx/5xx 0, console error 0, 문서 overflow 0이며 증거는 `output/playwright/visual-audit/task-120-campaign-round2/` 18장과 JSON receipt다. 이 Round 2는 아직 push·alpha deploy되지 않았다.
+- 최신 fetched main 기능은 dev에 포함됐다. v1 mercenary는 기존 구현이 아니라는 사실을 소스에서 재확인했고, `docs/scenarios/06-mercenary-flows.md`를 미구현 v1 계약으로 바로잡았다.
+
+### 현재 런타임·부하
+
+- 로컬 v1 frontend는 `http://localhost:3013`의 PID `25530`으로 계속 실행 중이다. backend `8121`은 없다. 기존 DB 자격증명으로 API 시작을 한 번 시도했을 때 Prisma `P1000`으로 fail-closed됐으며 새 DB·reset·seed는 만들지 않았다.
+- 2026-07-19 13:04 KST 기준 12 cores, load `7.41/8.51/9.59`, swap `18011.69/18432MB`, Node-like 180, browser-like 66이다. swap 압박이 해소되기 전 Jest/typecheck/build/browser/subagent를 새로 시작하지 않는다. 다른 세션 프로세스는 종료하지 않는다.
+
+### 사용자 선택·외부 게이트
+
+- Task 125 업로드 수명주기는 사용자가 B(자산 참조 등록 + 미참조 소유자 삭제)를 선택했다. 다음 구현 전 rolling 24시간 쿼터 결정 A/B/C가 남아 있다. 의사결정 UI: `/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-upload-quota-decision.html` (추천 B: 보관 한도만 해제, 최근 24시간 사용량 유지).
+- 신규 페이지 범위 A/B/C 선택이 남아 있다. UI: `/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html`; 추천 B는 실제 v1에 없는 mercenary create 도메인이다.
+- 프로필 UI는 Lazyweb report가 필수지만 현재 세션에 Lazyweb MCP가 노출되지 않는다. connector 재연결 후 `lazyweb-update`가 필요하며, report 없이 수동 UI 변경하지 않는다.
+- `insane-review` GPT Pro는 전용 CDP/로그인/model 확인이 되지 않아 아직 유효한 최종 리뷰가 없다. 이전 장시간 시도는 final 없이 종료돼 인용할 수 없다.
+
+### 다음 구현 순서
+
+1. Task 122: upload image/video에서 `withdrawal_pending` 사용자를 저장 이전에 403 `PERMISSION_DENIED`로 차단하는 RED→GREEN, active 사용자 control, 프로필 동일 tick 이중 submit lock, JPEG/PNG/WebP accept 정합성을 좁게 구현한다.
+2. Task 125: 사용자가 upload quota A/B/C를 선택한 뒤 reference registry·owner-only delete·in-use 409·race serialization·tombstone cleanup을 구현한다. alpha/production 실제 데이터 삭제는 별도 명시 승인 전 금지다.
+3. 신규 페이지 A/B/C가 선택되면 해당 v1 계약부터 skeleton-first로 진행한다.
+4. 호스트가 안정되고 Lazyweb/GPT Pro가 복구되면 profile 실제 375/768/1280 QA, save/double-submit/reduced-motion, 권한 bundle insane-review, 기획자 전달 evidence를 닫는다.
+
+Canonical entry: `.github/tasks/122-alpha-profile-tournament-persona-e2e.md`, `.github/tasks/124-alpha-immutable-ecr-deploy.md`, `.github/tasks/125-upload-asset-reference-lifecycle.md`, `docs/scenarios/index.md`.
+
 ## 2026-07-19 재개 스냅샷 (현재 기준)
 
 ### Git·CI·Alpha

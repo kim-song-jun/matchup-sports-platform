@@ -96,6 +96,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const [error, setError] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
   const [selectedRegionGroupId, setSelectedRegionGroupId] = useState<string | null>(null);
+  const [pushRequesting, setPushRequesting] = useState(false);
 
   useEffect(() => {
     if (hydrated || !onboarding.data) return;
@@ -205,12 +206,23 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     completeOnboarding.mutate(undefined, {
       onSuccess: (result) => {
         trackEvent('onboarding_complete', {});
-        void pushRegistration.subscribe();
         clearDraft();
         router.replace(result.next?.route ?? '/home');
       },
       onError: (nextError) => setError(getErrorMessage(nextError)),
     });
+  };
+
+  // 위치 권한(requestCurrentLocation)과 동일하게, 알림 권한도 사전 안내 카드 + 명시적 버튼 클릭으로만
+  // 요청한다 — user gesture 없이 팝업이 뜨는 것을 방지.
+  const requestPush = async () => {
+    if (pushRequesting || pushRegistration.isSubscribed) return;
+    setPushRequesting(true);
+    try {
+      await pushRegistration.subscribe();
+    } finally {
+      setPushRequesting(false);
+    }
   };
 
   const requestCurrentLocation = () => {
@@ -406,7 +418,26 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
             </div>
           </>
         ) : null}
-        {step === 'confirm' ? <ConfirmPanel draft={draft} emptySports={emptySports} regions={regionOptions} sports={sports} /> : null}
+        {step === 'confirm' ? (
+          <>
+            {/* 위치 권한과 동일한 패턴: 사전 안내 후 명시적 버튼 클릭이 실제 user gesture로
+                pushRegistration.subscribe()를 트리거한다 — complete() 성공 시 자동 호출 금지. */}
+            <button
+              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+              disabled={pushRequesting || pushRegistration.isSubscribed}
+              onClick={() => void requestPush()}
+              type="button"
+            >
+              {pushRequesting ? '알림 권한 확인 중' : pushRegistration.isSubscribed ? '알림 받기 완료' : '알림 받기'}
+            </button>
+            <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+              매칭 성사, 채팅, 경기 결과 같은 소식을 놓치지 않도록 브라우저 알림을 받을 수 있어요.
+              언제든 설정에서 끌 수 있어요.
+            </p>
+            <PushNotice isSubscribed={pushRegistration.isSubscribed} permission={pushRegistration.permission} requesting={pushRequesting} />
+            <ConfirmPanel draft={draft} emptySports={emptySports} regions={regionOptions} sports={sports} />
+          </>
+        ) : null}
       </div>
     </AuthFrame>
   );
@@ -549,6 +580,34 @@ function LocationNotice({ detectedRegion, status }: { detectedRegion: DetectedRe
   }
 
   return <Notice title="현재 위치로 지역 찾기" body="한 번 허용하면 브라우저가 권한을 기억해요. 좌표는 가까운 지역을 찾을 때만 1회 사용하고 저장하지 않아요." />;
+}
+
+function PushNotice({
+  isSubscribed,
+  permission,
+  requesting,
+}: {
+  isSubscribed: boolean;
+  permission: NotificationPermission | 'unsupported';
+  requesting: boolean;
+}) {
+  if (requesting) {
+    return <Notice title="알림 권한 확인 중" body="브라우저의 알림 권한을 확인하고 있어요." />;
+  }
+
+  if (permission === 'unsupported') {
+    return <Notice title="알림 사용 불가" body="이 브라우저에서는 알림을 지원하지 않아요. 다른 브라우저에서 다시 시도해 주세요." tone="orange" />;
+  }
+
+  if (permission === 'denied') {
+    return <Notice title="알림 권한이 꺼져 있어요" body="브라우저 설정에서 알림을 다시 허용하면 소식을 받을 수 있어요." tone="orange" />;
+  }
+
+  if (isSubscribed) {
+    return <Notice title="알림 받기 완료" body="매칭, 채팅, 경기 결과 소식을 보내드릴게요." tone="green" />;
+  }
+
+  return <Notice title="알림 받기" body="버튼을 누르면 브라우저가 알림 권한을 물어봐요. 언제든 설정에서 끌 수 있어요." />;
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {

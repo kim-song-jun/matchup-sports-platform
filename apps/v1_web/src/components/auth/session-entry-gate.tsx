@@ -9,6 +9,7 @@ import {
   sanitizeRedirectPath,
   shouldProbeV1Session,
 } from '@/lib/session-storage';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 
 type SessionEntryGateProps = {
@@ -41,6 +42,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
 
     if (authMe.isError) {
       clearStoredV1Session();
+      disconnectV1Socket();
       if (mode === 'root') router.replace('/login');
     }
   }, [authMe.isError, authMe.isSuccess, hasSessionHint, mode, router]);

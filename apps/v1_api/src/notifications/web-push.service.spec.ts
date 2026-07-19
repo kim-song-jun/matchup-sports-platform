@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
+import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from './web-push.service';
 
@@ -30,6 +31,7 @@ describe('WebPushService', () => {
     },
     v1WebPushFailureLog: { create: jest.fn() },
   };
+  const logger = { warn: jest.fn(), error: jest.fn() };
 
   async function build(env: Record<string, string | undefined>) {
     const originalEnv = { ...process.env };
@@ -43,7 +45,11 @@ describe('WebPushService', () => {
       }
     }
     const moduleRef = await Test.createTestingModule({
-      providers: [WebPushService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        WebPushService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: getLoggerToken(WebPushService.name), useValue: logger },
+      ],
     }).compile();
     const service = moduleRef.get(WebPushService);
     service.onModuleInit();
@@ -103,6 +109,10 @@ describe('WebPushService', () => {
     await service.sendToUser('user-1', { title: 'hi' });
 
     expect(prisma.v1PushSubscription.delete).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1', statusCode: 500 }),
+      '웹 푸시 발송 실패',
+    );
     expect(prisma.v1WebPushFailureLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -112,6 +122,51 @@ describe('WebPushService', () => {
           endpointSuffix: 'le/abc',
         }),
       }),
+    );
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('sendToUser includes the error message (not just statusCode) in the failure warn log', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([
+      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+    ]);
+    (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 500, message: 'gateway timeout' });
+
+    await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 500, message: 'gateway timeout' }),
+      '웹 푸시 발송 실패',
+    );
+  });
+
+  it('sendToUser logs an error via pino when the failure log itself cannot be written', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([
+      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+    ]);
+    (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 500 });
+    const dbError = new Error('db unavailable');
+    prisma.v1WebPushFailureLog.create.mockRejectedValue(dbError);
+
+    await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1', statusCode: 500 }),
+      '웹 푸시 발송 실패',
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1', err: dbError }),
+      '웹 푸시 실패 기록(V1WebPushFailureLog) 저장 실패',
     );
   });
 

@@ -98,7 +98,10 @@ describe('OnboardingClient GA events', () => {
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('onboarding_complete', {}));
   });
 
-  it('triggers a push subscription prompt after onboarding completes', async () => {
+  it('does NOT trigger a push subscription automatically when onboarding completes', async () => {
+    // Regression guard: subscribe() must only fire from an explicit user gesture
+    // (the 알림 받기 button), never as a side effect of completing onboarding —
+    // mirrors the LocationNotice pattern for the geolocation prompt.
     const subscribe = vi.fn();
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe,
@@ -114,6 +117,46 @@ describe('OnboardingClient GA events', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '홈으로 시작하기' }));
 
-    await waitFor(() => expect(subscribe).toHaveBeenCalled());
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(subscribe).not.toHaveBeenCalled();
+  });
+
+  it('renders a 알림 받기 button on the confirm step that triggers subscribe() via explicit click', async () => {
+    const subscribe = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe,
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+    });
+    window.sessionStorage.setItem(
+      'teameet.v1.onboardingDraft',
+      JSON.stringify({ sports: [{ sportId: FUTSAL_SPORT_ID, levelId: null }], regions: [] }),
+    );
+    render(<OnboardingClient step="confirm" />);
+
+    // Not called just from rendering the confirm step.
+    expect(subscribe).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '알림 받기' }));
+
+    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows the subscribed state on the 알림 받기 button once isSubscribed is true', () => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'granted',
+      isSubscribed: true,
+    });
+    window.sessionStorage.setItem(
+      'teameet.v1.onboardingDraft',
+      JSON.stringify({ sports: [{ sportId: FUTSAL_SPORT_ID, levelId: null }], regions: [] }),
+    );
+    render(<OnboardingClient step="confirm" />);
+
+    const button = screen.getByRole('button', { name: '알림 받기 완료' });
+    expect(button).toBeDisabled();
   });
 });

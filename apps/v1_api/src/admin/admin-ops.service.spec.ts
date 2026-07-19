@@ -51,11 +51,17 @@ describe('AdminOpsService', () => {
   });
 
   it('ack records acknowledgedAt/acknowledgedBy in one bulk update and an audit log per id, inside one transaction', async () => {
+    prisma.v1WebPushFailureLog.findMany.mockResolvedValue([{ id: 'fail-1' }, { id: 'fail-2' }]);
+
     await service.acknowledgeFailures(['fail-1', 'fail-2'], admin);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.v1WebPushFailureLog.updateMany).toHaveBeenCalledWith({
+    expect(prisma.v1WebPushFailureLog.findMany).toHaveBeenCalledWith({
       where: { id: { in: ['fail-1', 'fail-2'] }, acknowledgedAt: null },
+      select: { id: true },
+    });
+    expect(prisma.v1WebPushFailureLog.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['fail-1', 'fail-2'] } },
       data: expect.objectContaining({ acknowledgedBy: 'admin-user-1' }),
     });
     expect(adminContext.logAdminAction).toHaveBeenCalledWith(
@@ -70,7 +76,36 @@ describe('AdminOpsService', () => {
     );
   });
 
+  it('only updates and logs the ids that were actually still unacknowledged, skipping the rest silently', async () => {
+    // Caller asked to ack 3 ids, but only 'fail-2' is still unacknowledged
+    // (fail-1 was already acked, fail-3 doesn't exist / belongs to someone else's batch).
+    prisma.v1WebPushFailureLog.findMany.mockResolvedValue([{ id: 'fail-2' }]);
+
+    await service.acknowledgeFailures(['fail-1', 'fail-2', 'fail-3'], admin);
+
+    expect(prisma.v1WebPushFailureLog.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['fail-2'] } },
+      data: expect.objectContaining({ acknowledgedBy: 'admin-user-1' }),
+    });
+    expect(adminContext.logAdminAction).toHaveBeenCalledTimes(1);
+    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({ targetId: 'fail-2' }),
+      prisma,
+    );
+  });
+
+  it('does nothing (no update, no audit log) when every id is already acknowledged', async () => {
+    prisma.v1WebPushFailureLog.findMany.mockResolvedValue([]);
+
+    await service.acknowledgeFailures(['fail-1'], admin);
+
+    expect(prisma.v1WebPushFailureLog.updateMany).not.toHaveBeenCalled();
+    expect(adminContext.logAdminAction).not.toHaveBeenCalled();
+  });
+
   it('rolls back the update when an audit log write fails, instead of leaving a partial commit', async () => {
+    prisma.v1WebPushFailureLog.findMany.mockResolvedValue([{ id: 'fail-1' }]);
     adminContext.logAdminAction.mockRejectedValueOnce(new Error('audit log write failed'));
     prisma.$transaction.mockImplementation(async (cb: (tx: typeof prisma) => Promise<unknown>) => {
       try {

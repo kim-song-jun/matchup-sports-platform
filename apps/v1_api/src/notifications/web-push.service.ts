@@ -95,7 +95,7 @@ export class WebPushService implements OnModuleInit {
                   userId,
                   subscriptionId: subscription.id,
                   statusCode: error.statusCode ?? null,
-                  endpointSuffix: subscription.endpoint.slice(-12),
+                  endpointSuffix: subscription.endpoint.slice(-6),
                 },
               });
             } catch {

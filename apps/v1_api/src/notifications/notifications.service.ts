@@ -347,7 +347,11 @@ export class NotificationsService {
     this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
     void this.webPushService
       .sendToUser(userId, { title, body: body ?? undefined, url: deepLink ?? undefined })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        this.logger.warn(
+          `웹 푸시 발송 실패 [userId=${userId}]: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
   }
 
   async list(user: V1AuthUser, query: NotificationsQueryDto) {

@@ -51,6 +51,15 @@ describe('PushSubscribeDto', () => {
     const errors = await validate(dto);
     expect(errors.some((error) => error.property === 'endpoint')).toBe(true);
   });
+
+  it('rejects a request body with a missing keys object instead of crashing downstream', async () => {
+    const dto = plainToInstance(PushSubscribeDto, {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/abc123',
+    });
+
+    const errors = await validate(dto);
+    expect(errors.some((error) => error.property === 'keys')).toBe(true);
+  });
 });
 
 describe('PushUnsubscribeDto', () => {

@@ -6,7 +6,7 @@
  * transition is correct, computed value is right, idempotency holds.
  * No test merely verifies that a mock was called with what we told it to return.
  */
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -216,6 +216,19 @@ describe('NotificationsService', () => {
       'user-1',
       expect.objectContaining({ title: '매치 신청이 도착했어요' }),
     );
+  });
+
+  it('logs a warning (without throwing) when WebPushService.sendToUser rejects', async () => {
+    const loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-4' }));
+    webPushService.sendToUser.mockRejectedValueOnce(new Error('vapid send failed'));
+
+    await service.emitNotification('user-1', 'match_application_received', 'match-1');
+    await new Promise(setImmediate);
+
+    expect(loggerWarnSpy).toHaveBeenCalledWith(expect.stringContaining('vapid send failed'));
+    loggerWarnSpy.mockRestore();
   });
 
   it('team join application received notifications deep-link to team member management', async () => {

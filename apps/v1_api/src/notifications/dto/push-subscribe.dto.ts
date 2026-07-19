@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+  IsDefined,
+  IsObject,
   IsString,
   ValidateNested,
   ValidationArguments,
@@ -63,6 +65,8 @@ export class PushSubscribeDto {
   @IsPushEndpointUrl()
   endpoint!: string;
 
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => PushSubscriptionKeysDto)
   keys!: PushSubscriptionKeysDto;

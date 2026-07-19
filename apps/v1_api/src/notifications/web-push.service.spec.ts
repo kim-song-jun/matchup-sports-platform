@@ -105,7 +105,12 @@ describe('WebPushService', () => {
     expect(prisma.v1PushSubscription.delete).not.toHaveBeenCalled();
     expect(prisma.v1WebPushFailureLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1', statusCode: 500 }),
+        data: expect.objectContaining({
+          userId: 'user-1',
+          subscriptionId: 'sub-1',
+          statusCode: 500,
+          endpointSuffix: 'le/abc',
+        }),
       }),
     );
   });

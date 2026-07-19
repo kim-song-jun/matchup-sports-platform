@@ -154,6 +154,15 @@ Personas: ordinary user, support/read-only admin, ops/owner admin
   - remaining: 영상 lightbox close/previous/next, results 전체 responsive 캡처, console/network 기록, profile/upload, registration/admin mutation과 cleanup.
 - [x] Static live selectors and duplicate-submit guards mapped for the apply wizard.
 - [x] Exact cleanup blockers mapped: registration has no absent-state admin restore, and uploads have no authenticated owner-delete endpoint.
+- [x] Profile edit source/API/security contract re-audited before implementation.
+  - `/my/profile/edit` immediately uploads a selected image, then binds only its URL during the later profile PATCH. Abandon, replacement, validation failure, or profile conflict can therefore retain an unreferenced file, ledger row, and quota charge.
+  - Task 125 lifecycle option B remains the required deletion boundary: explicit asset references plus owner deletion only at zero references. Its separate rolling-quota choice is still a user gate; this task does not invent a frontend-only delete.
+  - `withdrawal_pending` accounts are rejected by profile mutation but can still call image/video upload. The focused server regression must prove both upload methods return `403 PERMISSION_DENIED` without invoking storage, while an active account continues to upload.
+  - Profile save has no synchronous same-tick lock. A focused component regression must prove rapid submit issues one PATCH and that upload/check pending states issue zero PATCH requests.
+  - Profile image selection must reject unsupported MIME types locally using the exact JPEG/PNG/WebP allowlist. The profile-specific 2 MiB cap remains intentional even though the generic upload API permits 5 MiB.
+  - The scenario/design requirement for `bio` is not implemented end-to-end despite the Prisma column. It is a separate API/type/UI slice, not part of the safety-only patch.
+- [ ] Reconnect the Lazyweb connector and run `lazyweb-update`; this session exposes neither the Lazyweb MCP nor its required image-upload tools, so the mandatory profile UI report cannot be generated or replaced manually.
+- [ ] Host gate before focused RED: latest check was 12 cores, load `7.52/11.70/11.02`, memory free `36%`, swap `17.2/18GB`. Do not start Jest/typecheck/build until swap pressure clears; then run only the upload controller regression and profile component regression serially.
 - [ ] Add the narrow automated regression cases proven by the live run.
 - [ ] Update `docs/scenarios/index.md` with final evidence and cleanup receipt.
 

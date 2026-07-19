@@ -33,7 +33,7 @@ export class AdminOpsService {
 
   async acknowledgeFailures(ids: string[], acknowledgedBy: string): Promise<void> {
     await this.prisma.v1WebPushFailureLog.updateMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, acknowledgedAt: null },
       data: { acknowledgedAt: new Date(), acknowledgedBy },
     });
   }

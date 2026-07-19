@@ -65,6 +65,19 @@ describe('useV1PushRegistration', () => {
     });
   });
 
+  it('does not register the service worker when the server has no VAPID public key', async () => {
+    (v1Get as ReturnType<typeof vi.fn>).mockResolvedValue({ publicKey: null });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(navigator.serviceWorker.register).not.toHaveBeenCalled();
+    expect(v1Post).not.toHaveBeenCalled();
+  });
+
   it('does nothing when permission is already denied', async () => {
     Object.defineProperty(global, 'Notification', {
       configurable: true,

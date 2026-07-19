@@ -30,10 +30,10 @@ export function useV1PushRegistration() {
       const permissionResult = await Notification.requestPermission();
       if (permissionResult !== 'granted') return;
 
-      const registration = await navigator.serviceWorker.register('/sw-push.js');
       const { publicKey } = await v1Get<{ publicKey: string | null }>('/notifications/vapid-public-key');
       if (!publicKey) return;
 
+      const registration = await navigator.serviceWorker.register('/sw-push.js');
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),

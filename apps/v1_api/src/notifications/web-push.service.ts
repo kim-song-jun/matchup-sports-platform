@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import * as webpush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -36,18 +37,28 @@ export class WebPushService implements OnModuleInit {
   }
 
   async subscribe(userId: string, dto: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<void> {
+    try {
+      await this.prisma.v1PushSubscription.create({
+        data: { userId, endpoint: dto.endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth },
+      });
+      return;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+    }
+
+    // endpoint unique 충돌 — DB가 보장하는 원자적 신호를 기준으로 소유권을 재확인한다
+    // (create 이전의 findUnique는 그 자체로 TOCTOU race를 남기므로 쓰지 않는다).
     const existing = await this.prisma.v1PushSubscription.findUnique({ where: { endpoint: dto.endpoint } });
-    if (existing && existing.userId !== userId) {
+    if (!existing || existing.userId !== userId) {
       throw new ConflictException({
         code: 'PUSH_ENDPOINT_ALREADY_REGISTERED',
         message: '이미 다른 계정에 등록된 구독이에요.',
       });
     }
 
-    await this.prisma.v1PushSubscription.upsert({
+    await this.prisma.v1PushSubscription.update({
       where: { endpoint: dto.endpoint },
-      create: { userId, endpoint: dto.endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth },
-      update: { p256dh: dto.keys.p256dh, auth: dto.keys.auth },
+      data: { p256dh: dto.keys.p256dh, auth: dto.keys.auth },
     });
   }
 

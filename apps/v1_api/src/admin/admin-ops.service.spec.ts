@@ -37,11 +37,11 @@ describe('AdminOpsService', () => {
     expect(result[0]).not.toHaveProperty('userId');
   });
 
-  it('ack records acknowledgedAt and acknowledgedBy for every id in one bulk update', async () => {
+  it('ack records acknowledgedAt and acknowledgedBy for every id in one bulk update, skipping already-acknowledged rows', async () => {
     await service.acknowledgeFailures(['fail-1', 'fail-2'], 'admin-user-1');
 
     expect(prisma.v1WebPushFailureLog.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ['fail-1', 'fail-2'] } },
+      where: { id: { in: ['fail-1', 'fail-2'] }, acknowledgedAt: null },
       data: expect.objectContaining({ acknowledgedBy: 'admin-user-1' }),
     });
   });

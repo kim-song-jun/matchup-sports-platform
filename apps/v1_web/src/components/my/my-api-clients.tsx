@@ -1244,11 +1244,23 @@ export function NotificationSettingsPageClient() {
                 role="switch"
                 aria-checked={pushRegistration.isSubscribed}
                 aria-label="브라우저 알림 받기"
-                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                disabled={pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed}
+                style={{
+                  width: '100%',
+                  background: 'none',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed ? 'not-allowed' : 'pointer',
+                  opacity: pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed ? 0.5 : 1,
+                }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="tm-text-body">브라우저 알림 받기</div>
-                  <div className="tm-text-caption" style={{ marginTop: 3 }}>매치, 팀, 채팅 알림을 브라우저 푸시로 받아요</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed
+                      ? '브라우저 설정에서 알림 권한을 허용해주세요'
+                      : '매치, 팀, 채팅 알림을 브라우저 푸시로 받아요'}
+                  </div>
                 </div>
                 <span
                   className="tm-text-caption"

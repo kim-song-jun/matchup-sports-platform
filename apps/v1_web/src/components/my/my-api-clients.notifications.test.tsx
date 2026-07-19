@@ -91,6 +91,24 @@ describe('NotificationSettingsPageClient push toggle', () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
+  it('disables the toggle when browser permission is denied and not currently subscribed', async () => {
+    const subscribe = vi.fn();
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe,
+      unsubscribe: vi.fn(),
+      permission: 'denied',
+      isSubscribed: false,
+    });
+    const user = userEvent.setup();
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    const toggle = screen.getByRole('switch', { name: '브라우저 알림 받기' });
+    expect(toggle).toBeDisabled();
+
+    await user.click(toggle);
+    expect(subscribe).not.toHaveBeenCalled();
+  });
+
   it('hides the toggle entirely when push is unsupported', () => {
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe: vi.fn(),

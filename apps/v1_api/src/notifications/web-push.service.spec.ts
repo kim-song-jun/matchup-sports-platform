@@ -1,6 +1,15 @@
 import { Test } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from './web-push.service';
+
+function uniqueConstraintError(target: string) {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: '6.19.2',
+    meta: { target: [target] },
+  });
+}
 
 jest.mock('web-push', () => ({
   setVapidDetails: jest.fn(),
@@ -12,9 +21,10 @@ import * as webpush from 'web-push';
 describe('WebPushService', () => {
   const prisma = {
     v1PushSubscription: {
+      create: jest.fn(),
+      update: jest.fn(),
       findUnique: jest.fn(),
       findMany: jest.fn(),
-      upsert: jest.fn(),
       delete: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -100,32 +110,36 @@ describe('WebPushService', () => {
     );
   });
 
-  it('subscribe upserts a new subscription when the endpoint is not yet registered', async () => {
+  it('subscribe creates a new subscription when the endpoint is not yet registered', async () => {
     const service = await build({});
-    prisma.v1PushSubscription.findUnique.mockResolvedValue(null);
+    prisma.v1PushSubscription.create.mockResolvedValue({ id: 'sub-1' });
 
     const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } };
     await service.subscribe('user-1', dto);
 
-    expect(prisma.v1PushSubscription.upsert).toHaveBeenCalledWith({
-      where: { endpoint: dto.endpoint },
-      create: { userId: 'user-1', endpoint: dto.endpoint, p256dh: 'p', auth: 'a' },
-      update: { p256dh: 'p', auth: 'a' },
+    expect(prisma.v1PushSubscription.create).toHaveBeenCalledWith({
+      data: { userId: 'user-1', endpoint: dto.endpoint, p256dh: 'p', auth: 'a' },
     });
+    expect(prisma.v1PushSubscription.findUnique).not.toHaveBeenCalled();
   });
 
-  it('subscribe refreshes the keys when the same user re-registers an existing endpoint', async () => {
+  it('subscribe refreshes the keys on a unique-constraint race when the existing row belongs to the same user', async () => {
     const service = await build({});
+    prisma.v1PushSubscription.create.mockRejectedValue(uniqueConstraintError('endpoint'));
     prisma.v1PushSubscription.findUnique.mockResolvedValue({ id: 'sub-1', userId: 'user-1' });
 
     const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p2', auth: 'a2' } };
     await service.subscribe('user-1', dto);
 
-    expect(prisma.v1PushSubscription.upsert).toHaveBeenCalled();
+    expect(prisma.v1PushSubscription.update).toHaveBeenCalledWith({
+      where: { endpoint: dto.endpoint },
+      data: { p256dh: 'p2', auth: 'a2' },
+    });
   });
 
-  it('subscribe rejects when the endpoint is already registered to a different user', async () => {
+  it('subscribe rejects on a unique-constraint race when the existing row belongs to a different user', async () => {
     const service = await build({});
+    prisma.v1PushSubscription.create.mockRejectedValue(uniqueConstraintError('endpoint'));
     prisma.v1PushSubscription.findUnique.mockResolvedValue({ id: 'sub-1', userId: 'other-user' });
 
     const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } };
@@ -133,6 +147,16 @@ describe('WebPushService', () => {
     await expect(service.subscribe('user-1', dto)).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'PUSH_ENDPOINT_ALREADY_REGISTERED' }),
     });
-    expect(prisma.v1PushSubscription.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1PushSubscription.update).not.toHaveBeenCalled();
+  });
+
+  it('subscribe rejects a non-conflict create error unchanged', async () => {
+    const service = await build({});
+    prisma.v1PushSubscription.create.mockRejectedValue(new Error('db down'));
+
+    const dto = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } };
+
+    await expect(service.subscribe('user-1', dto)).rejects.toThrow('db down');
+    expect(prisma.v1PushSubscription.findUnique).not.toHaveBeenCalled();
   });
 });

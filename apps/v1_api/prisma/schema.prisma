@@ -1092,7 +1092,7 @@ model V1PushSubscription {
   p256dh     String
   auth       String
   createdAt  DateTime @default(now()) @map("created_at")
-  lastUsedAt DateTime @updatedAt @map("last_used_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   user         V1User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   failureLogs  V1WebPushFailureLog[]

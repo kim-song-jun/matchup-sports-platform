@@ -1785,7 +1785,7 @@ export function useV1UpdateAdminRole() {
 
 export function useV1RecentPushFailures(limit = 20) {
   return useQuery({
-    queryKey: v1Keys.adminPushFailures(limit),
+    queryKey: v1Keys.adminPushFailures({ limit }),
     queryFn: () => v1Get<V1PushFailureSummary[]>('/admin/ops/recent-push-failures', { limit }),
   });
 }
@@ -1795,8 +1795,8 @@ export function useV1AckPushFailures() {
   return useMutation({
     mutationFn: (ids: string[]) => v1Post('/admin/ops/push-failures/ack', { ids }),
     onSuccess: () => {
-      // Partial prefix match — invalidates every limit variant, not just the default.
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'push-failures'] });
+      // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
     },
   });
 }

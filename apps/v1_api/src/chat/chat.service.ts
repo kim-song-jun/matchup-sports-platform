@@ -195,7 +195,19 @@ export class ChatService {
       sentAt: message.sentAt,
       senderUserId: user.id,
     };
-    const pushEnabledRecipientIds = await this.chatPushEnabledRecipientIds(recipientUserIds);
+    // 메시지/알림은 이미 위 트랜잭션에서 커밋됐다 — 이 선호도 조회가 실패해도
+    // 이미 성공한 전송을 500으로 되돌리면 안 되므로, 실패 시 웹 푸시만 스킵하고
+    // 요청은 계속 성공으로 처리한다.
+    let pushEnabledRecipientIds: Set<string>;
+    try {
+      pushEnabledRecipientIds = await this.chatPushEnabledRecipientIds(recipientUserIds);
+    } catch (err) {
+      this.logger.warn(
+        { roomId: room.id, error: err instanceof Error ? err.message : String(err) },
+        '채팅 웹 푸시 선호도 조회 실패 — 이 메시지는 웹 푸시 없이 처리됩니다',
+      );
+      pushEnabledRecipientIds = new Set();
+    }
     const roomTitle = getRoomTitle(room);
     // Fire-and-forget, matching NotificationsService's emitNotificationFireAndForget:
     // the message + notifications already committed above, so a realtime-emit or

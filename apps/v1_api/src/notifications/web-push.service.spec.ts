@@ -126,6 +126,25 @@ describe('WebPushService', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it('sendToUser includes the error message (not just statusCode) in the failure warn log', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([
+      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+    ]);
+    (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 500, message: 'gateway timeout' });
+
+    await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 500, message: 'gateway timeout' }),
+      '웹 푸시 발송 실패',
+    );
+  });
+
   it('sendToUser logs an error via pino when the failure log itself cannot be written', async () => {
     const service = await build({
       VAPID_PUBLIC_KEY: 'pub-key',

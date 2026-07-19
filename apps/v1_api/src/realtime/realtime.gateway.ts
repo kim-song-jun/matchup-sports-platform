@@ -74,10 +74,9 @@ export class RealtimeGateway implements OnGatewayConnection {
       await client.join(`user:${user.id}`);
       this.logger.debug({ socketId: client.id, userId: user.id }, 'Socket joined user room');
     } catch (err) {
-      this.logger.error(
-        { socketId: client.id, error: err instanceof Error ? err.message : String(err) },
-        'Socket handshake failed',
-      );
+      // err 필드에 Error 객체를 그대로 넘긴다 — pino의 표준 에러 직렬화가 stack까지
+      // 포함해 주는데, 문자열로 미리 변환하면 그 정보가 사라진다.
+      this.logger.error({ socketId: client.id, err }, 'Socket handshake failed');
       client.disconnect(true);
     }
   }

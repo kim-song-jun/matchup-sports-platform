@@ -83,7 +83,7 @@ export class WebPushService implements OnModuleInit {
             },
             JSON.stringify(payload),
           )
-          .catch(async (error: { statusCode?: number }) => {
+          .catch(async (error: { statusCode?: number; message?: string }) => {
             if (error.statusCode === 410 || error.statusCode === 404) {
               try {
                 await this.prisma.v1PushSubscription.delete({ where: { id: subscription.id } });
@@ -94,7 +94,12 @@ export class WebPushService implements OnModuleInit {
             }
 
             this.logger.warn(
-              { userId, subscriptionId: subscription.id, statusCode: error.statusCode ?? null },
+              {
+                userId,
+                subscriptionId: subscription.id,
+                statusCode: error.statusCode ?? null,
+                message: error.message ?? null,
+              },
               '웹 푸시 발송 실패',
             );
 

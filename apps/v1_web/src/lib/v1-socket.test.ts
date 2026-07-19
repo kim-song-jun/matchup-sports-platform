@@ -96,4 +96,14 @@ describe('connection failure reporting', () => {
       }),
     );
   });
+
+  it('does not report an intentional client-initiated disconnect (e.g. logout) as an error', async () => {
+    const { getV1Socket } = await import('./v1-socket');
+    getV1Socket();
+
+    const handler = listeners.get('disconnect');
+    handler?.('io client disconnect');
+
+    expect(reportClientError).not.toHaveBeenCalled();
+  });
 });

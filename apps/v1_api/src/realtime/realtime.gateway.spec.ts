@@ -118,7 +118,7 @@ describe('RealtimeGateway', () => {
     expect(socket.join).not.toHaveBeenCalled();
     expect(socket.disconnect).toHaveBeenCalledWith(true);
     expect(logger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ socketId: socket.id, error: 'connection terminated unexpectedly' }),
+      expect.objectContaining({ socketId: socket.id, err: dbError }),
       expect.any(String),
     );
   });

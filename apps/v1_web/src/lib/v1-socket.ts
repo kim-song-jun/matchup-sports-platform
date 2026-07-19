@@ -26,8 +26,12 @@ export function getV1Socket(): Socket {
   });
 
   socket.on('disconnect', (reason: string) => {
+    // 'io client disconnect'는 disconnectV1Socket()(로그아웃 등 의도된 세션 종료)이
+    // 만드는 정상 흐름이다 — 에러로 리포트하지 않는다. 메시지는 reason별로 dedupe가
+    // 갈라지지 않도록 고정값으로 두고, reason은 context에만 남긴다.
+    if (reason === 'io client disconnect') return;
     reportClientError({
-      message: `실시간 연결이 끊겼어요. (${reason})`,
+      message: '실시간 연결이 끊겼어요.',
       level: 'warn',
       context: { flow: 'v1-socket', event: 'disconnect', reason },
     });

@@ -439,6 +439,24 @@ describe('ChatService', () => {
     });
   });
 
+  it('sendMessage: still succeeds (skipping push for all recipients) when the preference lookup itself rejects', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-pref-lookup-fail', chatRoomId: 'room-1', senderUserId: userA.id, body: 'ping', status: 'sent', sentAt };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
+    // The message/notifications are already committed above by the time this runs —
+    // a rejection here must not turn an already-successful send into a 500.
+    prisma.v1NotificationPreference.findMany.mockRejectedValueOnce(new Error('db unavailable'));
+
+    await expect(service.sendMessage(userA, 'room-1', { content: 'ping' })).resolves.toMatchObject({
+      messageId: 'msg-pref-lookup-fail',
+    });
+    expect(webPushService.sendToUser).not.toHaveBeenCalled();
+  });
+
   it('sendMessage: skips WebPushService.sendToUser for recipients with chatEnabled=false', async () => {
     const sentAt = new Date('2026-06-21T10:00:00Z');
     const createdMessage = { id: 'msg-muted-pref', chatRoomId: 'room-1', senderUserId: userA.id, body: 'quiet', status: 'sent', sentAt };

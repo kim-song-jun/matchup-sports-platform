@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { TournamentCampaignRegistrationProvider } from './tournament-campaign-registration-state';
 import { TournamentRegistrationCountdown } from './tournament-registration-countdown';
 
 describe('TournamentRegistrationCountdown', () => {
@@ -11,10 +12,12 @@ describe('TournamentRegistrationCountdown', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-07T22:00:00.000Z'));
     render(
-      <TournamentRegistrationCountdown
-        deadlineAt="2026-08-08T00:00:00.000Z"
+      <TournamentCampaignRegistrationProvider
         availability="available"
-      />,
+        deadlineAt="2026-08-08T00:00:00.000Z"
+      >
+        <TournamentRegistrationCountdown />
+      </TournamentCampaignRegistrationProvider>,
     );
 
     expect(screen.getByText('참가 신청 마감까지')).toBeInTheDocument();

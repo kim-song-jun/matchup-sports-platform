@@ -2,6 +2,12 @@
   margin-top: 72px;
 }
 
+.section[data-variant='embedded'] {
+  margin-top: 28px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+
 .sectionHeading {
   margin-bottom: 24px;
 }
@@ -62,6 +68,7 @@
 }
 
 .emptyState strong {
+  display: block;
   color: var(--text-strong);
 }
 
@@ -160,6 +167,11 @@
     align-items: flex-start;
     padding: 20px;
   }
+
+  .emptyState strong {
+    font-size: var(--font-size-label);
+    white-space: nowrap;
+  }
 }
 
 @keyframes sponsor-section-reveal {
@@ -174,7 +186,7 @@
 }
 
 @supports (animation-timeline: view()) {
-  .section {
+  .section:not([data-variant='embedded']) {
     animation: sponsor-section-reveal linear;
     animation-timeline: view();
     animation-range: entry 0% entry 28%;

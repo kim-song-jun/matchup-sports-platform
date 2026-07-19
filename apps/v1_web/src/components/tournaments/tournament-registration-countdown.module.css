@@ -25,6 +25,21 @@
   font-size: var(--font-size-body-sm);
 }
 
+.countdown[data-tone='surface'] {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text-strong);
+  backdrop-filter: none;
+}
+
+.countdown[data-tone='surface'] svg {
+  color: var(--blue600);
+}
+
+.countdown[data-tone='surface'] span {
+  color: var(--text-muted);
+}
+
 @media (max-width: 639px) {
   .countdown {
     align-self: flex-start;

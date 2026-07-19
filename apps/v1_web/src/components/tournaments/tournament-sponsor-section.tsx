@@ -50,20 +50,33 @@ export function getTournamentSponsorCards(
 export function TournamentSponsorSection({
   sponsors,
   showEmptyState = false,
+  variant = 'standalone',
 }: {
   sponsors: V1TournamentSponsor[];
   showEmptyState?: boolean;
+  variant?: 'standalone' | 'embedded';
 }) {
   const cards = getTournamentSponsorCards(sponsors);
 
   if (cards.length === 0 && !showEmptyState) return null;
 
   return (
-    <section id="tournament-sponsors" aria-labelledby="sponsor-heading" className={styles.section}>
+    <section
+      id="tournament-sponsors"
+      aria-labelledby="sponsor-heading"
+      className={styles.section}
+      data-variant={variant}
+    >
       <div className={styles.sectionHeading}>
-        <span className={styles.kicker}>공식 파트너</span>
-        <h2 id="sponsor-heading" className={styles.heading}>함께 만드는 파트너</h2>
-        <p>대회를 더 풍성하게 만드는 공식 후원 혜택과 현장 이벤트를 확인하세요.</p>
+        <span className={styles.kicker}>{variant === 'embedded' ? 'Presented by' : '공식 파트너'}</span>
+        {variant === 'embedded' ? (
+          <h3 id="sponsor-heading" className={styles.heading}>공식 파트너</h3>
+        ) : (
+          <h2 id="sponsor-heading" className={styles.heading}>함께 만드는 파트너</h2>
+        )}
+        <p>{variant === 'embedded'
+          ? '파트너가 준비한 참가팀 혜택과 현장 이벤트를 확인하세요.'
+          : '대회를 더 풍성하게 만드는 공식 후원 혜택과 현장 이벤트를 확인하세요.'}</p>
       </div>
       {cards.length === 0 ? (
         <div className={styles.emptyState}>

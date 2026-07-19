@@ -8,6 +8,7 @@ import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 import { trackEvent } from '@/lib/analytics';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import {
   useV1CompleteOnboarding,
   useV1DeferOnboarding,
@@ -89,6 +90,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const completeOnboarding = useV1CompleteOnboarding();
   const deferOnboarding = useV1DeferOnboarding();
   const resolveLocation = useV1ResolveLocation();
+  const pushRegistration = useV1PushRegistration();
   const [draft, setDraft] = useState<OnboardingDraft>({ sports: [], regions: [] });
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,6 +205,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     completeOnboarding.mutate(undefined, {
       onSuccess: (result) => {
         trackEvent('onboarding_complete', {});
+        void pushRegistration.subscribe();
         clearDraft();
         router.replace(result.next?.route ?? '/home');
       },

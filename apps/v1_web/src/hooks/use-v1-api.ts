@@ -32,6 +32,7 @@ import type {
   V1AdminNoticeUpdatePayload,
   V1AdminNoticeUpdateResult,
   V1AdminRow,
+  V1PushFailureSummary,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -1774,6 +1775,28 @@ export function useV1UpdateAdminRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminAdmins() });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — ops (web push failure log)
+// ---------------------------------------------------------------------------
+
+export function useV1RecentPushFailures(limit = 20) {
+  return useQuery({
+    queryKey: v1Keys.adminPushFailures({ limit }),
+    queryFn: () => v1Get<V1PushFailureSummary[]>('/admin/ops/recent-push-failures', { limit }),
+  });
+}
+
+export function useV1AckPushFailures() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => v1Post('/admin/ops/push-failures/ack', { ids }),
+    onSuccess: () => {
+      // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
     },
   });
 }

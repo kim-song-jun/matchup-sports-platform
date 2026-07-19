@@ -6,11 +6,12 @@
  * transition is correct, computed value is right, idempotency holds.
  * No test merely verifies that a mock was called with what we told it to return.
  */
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from './notifications.service';
+import { WebPushService } from './web-push.service';
 
 const user = {
   id: 'user-1',
@@ -50,6 +51,7 @@ describe('NotificationsService', () => {
   };
 
   const realtimeGateway = { emitToUser: jest.fn() };
+  const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
     prisma = {
@@ -72,6 +74,7 @@ describe('NotificationsService', () => {
         NotificationsService,
         { provide: PrismaService, useValue: prisma },
         { provide: RealtimeGateway, useValue: realtimeGateway },
+        { provide: WebPushService, useValue: webPushService },
       ],
     }).compile();
 
@@ -195,6 +198,37 @@ describe('NotificationsService', () => {
       'notification:new',
       expect.objectContaining({ id: 'notif-2' }),
     );
+  });
+
+  it('calls WebPushService.sendToUser alongside the socket emit', async () => {
+    // Note: the plan's original test used the nonexistent event type 'match_join'
+    // and asserted a title ('알림 제목') the service can never produce — title is
+    // always looked up from the fixed EVENT_TITLES map (keyed by the real
+    // NotificationEventType), never read back off the mocked created row. Using
+    // a real event type here and asserting its real EVENT_TITLES value.
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-3' }));
+
+    await service.emitNotification('user-1', 'match_application_received', 'match-1');
+    await new Promise(setImmediate);
+
+    expect(webPushService.sendToUser).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ title: '매치 신청이 도착했어요' }),
+    );
+  });
+
+  it('logs a warning (without throwing) when WebPushService.sendToUser rejects', async () => {
+    const loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-4' }));
+    webPushService.sendToUser.mockRejectedValueOnce(new Error('vapid send failed'));
+
+    await service.emitNotification('user-1', 'match_application_received', 'match-1');
+    await new Promise(setImmediate);
+
+    expect(loggerWarnSpy).toHaveBeenCalledWith(expect.stringContaining('vapid send failed'));
+    loggerWarnSpy.mockRestore();
   });
 
   it('team join application received notifications deep-link to team member management', async () => {

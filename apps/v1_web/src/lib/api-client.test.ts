@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getV1ApiBaseUrl, getV1DevAuthHeaders, v1Get } from './api-client';
+import { getV1ApiBaseUrl, getV1DevAuthHeaders, v1Delete, v1Get } from './api-client';
 import { V1_USER_EMAIL_KEY, V1_USER_ID_KEY } from './session-storage';
 import * as clientErrorReporter from './client-error-reporter';
 
@@ -85,5 +85,20 @@ describe('v1Api error reporting', () => {
     await expect(v1Get('/matches/1')).rejects.toThrow();
 
     expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ level: 'error' }));
+  });
+
+  it('resolves without throwing on a 204 No Content response with an empty body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+        json: async () => {
+          throw new SyntaxError('Unexpected end of JSON input');
+        },
+      }),
+    );
+
+    await expect(v1Delete('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' })).resolves.toBeUndefined();
   });
 });

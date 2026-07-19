@@ -1552,6 +1552,15 @@ export type V1AdminRow = {
 
 export type V1AdminGrantResult = V1AdminRow;
 
+export type V1PushFailureSummary = {
+  id: string;
+  userIdHash: string;
+  endpointSuffix: string;
+  statusCode: number | null;
+  occurredAt: string;
+  acknowledgedAt: string | null;
+};
+
 // ---------------------------------------------------------------------------
 // Upload
 // ---------------------------------------------------------------------------

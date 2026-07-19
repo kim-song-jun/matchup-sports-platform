@@ -65,7 +65,7 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     },
   });
 
-  const body = await response.json().catch(() => null);
+  const body = response.status === 204 ? null : await response.json().catch(() => null);
 
   if (!response.ok || body?.status === 'error') {
     const errorBody: ApiErrorBody =
@@ -84,6 +84,8 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     });
     throw error;
   }
+
+  if (response.status === 204) return undefined as T;
 
   return (body as ApiEnvelope<T>).data;
 }
@@ -104,8 +106,8 @@ export function v1Patch<T>(path: string, body?: unknown, init?: RequestInit) {
   return v1Api<T>(path, { ...init, method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
-export function v1Delete<T>(path: string, init?: RequestInit) {
-  return v1Api<T>(path, { ...init, method: 'DELETE' });
+export function v1Delete<T>(path: string, body?: unknown, init?: RequestInit) {
+  return v1Api<T>(path, { ...init, method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
 function withQuery(path: string, query?: QueryParams) {

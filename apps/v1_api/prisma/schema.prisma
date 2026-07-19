@@ -307,6 +307,9 @@ model V1User {
   chatMessages                   V1ChatMessage[]            @relation("V1ChatMessageSender")
   notifications                  V1Notification[]
   notificationPreference         V1NotificationPreference?
+  pushSubscriptions              V1PushSubscription[]
+  webPushFailureLogs             V1WebPushFailureLog[]      @relation("V1WebPushFailureLogUser")
+  acknowledgedPushFailureLogs    V1WebPushFailureLog[]      @relation("V1WebPushFailureLogAcknowledgedBy")
   searchHistories                V1SearchHistory[]
   adminUser                      V1AdminUser?               @relation("V1AdminUserAccount")
   grantedAdmins                  V1AdminUser[]              @relation("V1AdminGrantor")
@@ -1080,6 +1083,44 @@ model V1Notification {
   @@index([recipientUserId, readAt, createdAt])
   @@index([targetType, targetId, createdAt])
   @@map("v1_notifications")
+}
+
+model V1PushSubscription {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user         V1User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  failureLogs  V1WebPushFailureLog[]
+
+  @@index([userId])
+  @@map("v1_push_subscriptions")
+}
+
+model V1WebPushFailureLog {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  subscriptionId String?   @map("subscription_id")
+  statusCode     Int?      @map("status_code")
+  errorCode      String?   @map("error_code")
+  endpointSuffix String    @map("endpoint_suffix")
+  occurredAt     DateTime  @default(now()) @map("occurred_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedBy String?   @map("acknowledged_by")
+
+  user               V1User              @relation("V1WebPushFailureLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  subscription       V1PushSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  acknowledgedByUser V1User?             @relation("V1WebPushFailureLogAcknowledgedBy", fields: [acknowledgedBy], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt])
+  @@index([acknowledgedAt])
+  @@index([userId])
+  @@index([subscriptionId])
+  @@map("v1_web_push_failure_logs")
 }
 
 model V1NotificationPreference {

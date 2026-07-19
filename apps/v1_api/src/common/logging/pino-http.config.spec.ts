@@ -48,6 +48,7 @@ describe('buildPinoHttpOptions', () => {
         authorization: 'Bearer topsecret',
         cookie: 'session=abc',
         'x-v1-user-email': 'me@example.com',
+        'x-v1-user-id': 'user-123',
         'user-agent': 'jest-test-agent',
       },
     };
@@ -60,6 +61,7 @@ describe('buildPinoHttpOptions', () => {
     expect(loggedReq.headers).not.toHaveProperty('authorization');
     expect(loggedReq.headers).not.toHaveProperty('cookie');
     expect(loggedReq.headers).not.toHaveProperty('x-v1-user-email');
+    expect(loggedReq.headers).not.toHaveProperty('x-v1-user-id');
     expect((loggedReq.headers as Record<string, unknown>)['user-agent']).toBe('jest-test-agent');
   });
 

@@ -32,6 +32,7 @@ export function buildPinoHttpOptions(): PinoHttpOptions {
         'req.headers.authorization',
         'req.headers.cookie',
         'req.headers["x-v1-user-email"]',
+        'req.headers["x-v1-user-id"]',
         'res.headers["set-cookie"]',
       ],
       remove: true,

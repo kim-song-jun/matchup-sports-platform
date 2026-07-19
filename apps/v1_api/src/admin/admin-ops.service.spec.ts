@@ -202,11 +202,13 @@ describe('AdminOpsService', () => {
       expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
     });
 
-    it('broadcasts to every distinct push subscriber, skipping those with noticeEnabled off, and audit-logs targetId "broadcast"', async () => {
-      prisma.v1PushSubscription.findMany.mockResolvedValue([
-        { userId: 'user-1' },
-        { userId: 'user-2' },
-        { userId: 'user-3' },
+    it('broadcasts to every distinct push subscriber via cursor pagination, skipping those with noticeEnabled off, and audit-logs targetId "broadcast"', async () => {
+      // Page has only 3 rows (< BROADCAST_CHUNK_SIZE), so the loop makes exactly
+      // one findMany call and stops — no second page mock needed.
+      prisma.v1PushSubscription.findMany.mockResolvedValueOnce([
+        { id: 'sub-1', userId: 'user-1' },
+        { id: 'sub-2', userId: 'user-2' },
+        { id: 'sub-3', userId: 'user-3' },
       ]);
       prisma.v1NotificationPreference.findUnique.mockImplementation(({ where }: { where: { userId: string } }) =>
         Promise.resolve(where.userId === 'user-2' ? { noticeEnabled: false } : { noticeEnabled: true }),
@@ -214,9 +216,10 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(prisma.v1PushSubscription.findMany).toHaveBeenCalledWith({
-        distinct: ['userId'],
-        select: { userId: true },
+      expect(prisma.v1PushSubscription.findMany).toHaveBeenNthCalledWith(1, {
+        take: 30,
+        orderBy: { id: 'asc' },
+        select: { id: true, userId: true },
       });
       expect(result).toEqual({ sent: 2, skipped: 1, failed: 0 });
       expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
@@ -226,8 +229,31 @@ describe('AdminOpsService', () => {
       );
     });
 
+    it('pages through multiple chunks of subscribers using an id cursor instead of loading them all at once', async () => {
+      const page1 = Array.from({ length: 30 }, (_, i) => ({ id: `sub-${i}`, userId: `user-${i}` }));
+      const page2 = [{ id: 'sub-30', userId: 'user-30' }];
+      prisma.v1PushSubscription.findMany.mockResolvedValueOnce(page1).mockResolvedValueOnce(page2);
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+
+      const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
+
+      expect(result).toEqual({ sent: 31, skipped: 0, failed: 0 });
+      expect(prisma.v1PushSubscription.findMany).toHaveBeenNthCalledWith(2, {
+        take: 30,
+        skip: 1,
+        cursor: { id: 'sub-29' },
+        orderBy: { id: 'asc' },
+        select: { id: true, userId: true },
+      });
+    });
+
     it('isolates a per-recipient failure during broadcast so the rest still send', async () => {
-      prisma.v1PushSubscription.findMany.mockResolvedValue([{ userId: 'user-1' }, { userId: 'user-2' }]);
+      // Page has only 2 rows (< BROADCAST_CHUNK_SIZE), so the loop makes exactly
+      // one findMany call and stops — no second page mock needed.
+      prisma.v1PushSubscription.findMany.mockResolvedValueOnce([
+        { id: 'sub-1', userId: 'user-1' },
+        { id: 'sub-2', userId: 'user-2' },
+      ]);
       prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
       prisma.v1Notification.create
         .mockRejectedValueOnce(new Error('db write failed'))
@@ -238,6 +264,18 @@ describe('AdminOpsService', () => {
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
       expect(result).toEqual({ sent: 1, skipped: 0, failed: 1 });
+    });
+
+    it('does not fail the whole request when the audit log write fails after a successful send', async () => {
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'user-1' });
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+      adminContext.logAdminAction.mockRejectedValueOnce(new Error('audit log write failed'));
+
+      const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
+
+      // The push was already sent — a failed audit log must not turn this into
+      // an error response, or an operator could retry and duplicate-send.
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
     });
   });
 });

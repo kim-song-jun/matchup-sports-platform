@@ -111,33 +111,56 @@ export class AdminOpsService {
       result = { sent: outcome === 'sent' ? 1 : 0, skipped: outcome === 'skipped' ? 1 : 0, failed: outcome === 'failed' ? 1 : 0 };
     } else {
       targetId = 'broadcast';
-      const subscribers = await this.prisma.v1PushSubscription.findMany({
-        distinct: ['userId'],
-        select: { userId: true },
-      });
-
       result = { sent: 0, skipped: 0, failed: 0 };
-      for (let i = 0; i < subscribers.length; i += BROADCAST_CHUNK_SIZE) {
-        const chunk = subscribers.slice(i, i + BROADCAST_CHUNK_SIZE);
-        const outcomes = await Promise.all(chunk.map(({ userId }) => this.sendToOneRecipient(userId, dto)));
+      // 구독자 전체를 findMany로 한 번에 메모리에 올리지 않고, id 커서로 DB에서
+      // 청크 단위로 페이지네이션해 가져온다 — 구독자 수가 커져도 한 번에 들고
+      // 있는 row 수는 BROADCAST_CHUNK_SIZE로 고정된다.
+      const sentUserIds = new Set<string>();
+      let cursor: string | undefined;
+      for (;;) {
+        const page = await this.prisma.v1PushSubscription.findMany({
+          take: BROADCAST_CHUNK_SIZE,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+          orderBy: { id: 'asc' },
+          select: { id: true, userId: true },
+        });
+        if (page.length === 0) break;
+        cursor = page[page.length - 1].id;
+
+        const newUserIds = [...new Set(page.map((row) => row.userId))].filter(
+          (userId) => !sentUserIds.has(userId),
+        );
+        newUserIds.forEach((userId) => sentUserIds.add(userId));
+        const outcomes = await Promise.all(newUserIds.map((userId) => this.sendToOneRecipient(userId, dto)));
         for (const outcome of outcomes) {
           result[outcome === 'sent' ? 'sent' : outcome === 'skipped' ? 'skipped' : 'failed'] += 1;
         }
+
+        if (page.length < BROADCAST_CHUNK_SIZE) break;
       }
     }
 
-    await this.adminContext.logAdminAction(admin, {
-      action: 'push.manual_send',
-      targetType: 'push',
-      targetId,
-      afterJson: {
-        title: dto.title,
-        target: dto.target,
-        sent: result.sent,
-        skipped: result.skipped,
-        failed: result.failed,
-      },
-    });
+    // 감사 로그 기록 실패가 이미 완료된 발송 결과를 500으로 뒤엎지 않도록 별도로
+    // 격리한다 — 그대로 두면 운영자가 "실패"로 오인해 재시도하면서 중복 발송할
+    // 위험이 있다.
+    try {
+      await this.adminContext.logAdminAction(admin, {
+        action: 'push.manual_send',
+        targetType: 'push',
+        targetId,
+        afterJson: {
+          title: dto.title,
+          target: dto.target,
+          sent: result.sent,
+          skipped: result.skipped,
+          failed: result.failed,
+        },
+      });
+    } catch (err: unknown) {
+      this.logger.warn(
+        `수동 푸시 발송 감사 로그 기록 실패 [targetId=${targetId}]: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     return result;
   }

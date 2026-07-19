@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
 
 /**
  * 어드민 수동 웹 푸시 발송 요청.
@@ -27,8 +27,12 @@ export class AdminPushSendDto {
   @MaxLength(2000)
   body?: string;
 
+  // 알림 target.route로 그대로 전달되므로, 외부 URL을 허용하면 운영자가 실수로
+  // 피싱성 외부 이동 링크를 발송할 수 있다 — 앱 내부 상대 경로만 허용한다
+  // (login 페이지의 sanitizeRedirect()와 동일한 open-redirect 방지 정책).
   @IsOptional()
   @IsString()
   @MaxLength(500)
+  @Matches(/^\/(?!\/)/, { message: 'url must be a relative in-app path starting with a single /' })
   url?: string;
 }

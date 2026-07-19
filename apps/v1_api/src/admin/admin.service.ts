@@ -189,7 +189,7 @@ export class AdminService {
 
   async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {
     const deletedAt = new Date();
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
       await this.lockUserRow(tx, userId);
@@ -284,6 +284,18 @@ export class AdminService {
 
       return { ...result, deletedAt };
     });
+
+    // Same isolation as changeUserStatus(): deletion also lands on the
+    // disable-class accountStatus, so an already-connected socket must be
+    // cut off here too — otherwise a deleted account keeps receiving
+    // notifications/chat until it happens to reconnect.
+    try {
+      this.realtimeGateway?.forceDisconnectUser(userId);
+    } catch (err) {
+      this.logger?.warn({ userId, err }, '탈퇴 처리 후 실시간 소켓 강제 종료 실패');
+    }
+
+    return result;
   }
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {

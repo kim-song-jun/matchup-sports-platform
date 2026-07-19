@@ -41,6 +41,8 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
     v1User: { findUnique: jest.Mock; update: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
+    v1AuthIdentity: { findMany: jest.Mock; update: jest.Mock };
+    v1UserProfile: { updateMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
@@ -57,18 +59,29 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
       v1User: { findUnique: jest.fn(), update: jest.fn() },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     const p = prisma;
     prisma.$transaction.mockImplementation(
-      (cb: (tx: Pick<typeof p, 'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | '$queryRaw'>) => Promise<unknown>) =>
+      (
+        cb: (
+          tx: Pick<
+            typeof p,
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | '$queryRaw'
+          >,
+        ) => Promise<unknown>,
+      ) =>
         cb({
           v1AdminUser: p.v1AdminUser,
           v1User: p.v1User,
           v1AdminActionLog: p.v1AdminActionLog,
           v1StatusChangeLog: p.v1StatusChangeLog,
+          v1AuthIdentity: p.v1AuthIdentity,
+          v1UserProfile: p.v1UserProfile,
           $queryRaw: p.$queryRaw,
         }),
     );
@@ -156,6 +169,112 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
 
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ userId: targetUserId, status: 'suspended', err: gatewayError }),
+      expect.any(String),
+    );
+  });
+});
+
+describe('AdminService.deleteUser — realtime disconnect side effect', () => {
+  // deleteUser() is a separate mutation path from changeUserStatus() (a distinct
+  // controller endpoint) that also lands on the disable-class accountStatus
+  // ('deleted') — a Copilot review on PR #98 caught that the force-disconnect
+  // fix above was applied to changeUserStatus() but not here, so a deleted
+  // account kept receiving realtime notifications/chat until it reconnected.
+  let service: AdminService;
+  let prisma: {
+    v1AdminUser: { findUnique: jest.Mock };
+    v1User: { findUnique: jest.Mock; update: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock };
+    v1StatusChangeLog: { create: jest.Mock };
+    v1AuthIdentity: { findMany: jest.Mock; update: jest.Mock };
+    v1UserProfile: { updateMany: jest.Mock };
+    $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
+  };
+  let realtimeGateway: { forceDisconnectUser: jest.Mock };
+  let logger: { warn: jest.Mock };
+
+  function targetUser(accountStatus: string) {
+    return { id: targetUserId, accountStatus, email: 'target@teameet.v1', phone: null, deletedAt: null };
+  }
+
+  beforeEach(async () => {
+    prisma = {
+      v1AdminUser: { findUnique: jest.fn() },
+      v1User: { findUnique: jest.fn(), update: jest.fn() },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+
+    const p = prisma;
+    prisma.$transaction.mockImplementation(
+      (
+        cb: (
+          tx: Pick<
+            typeof p,
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | '$queryRaw'
+          >,
+        ) => Promise<unknown>,
+      ) =>
+        cb({
+          v1AdminUser: p.v1AdminUser,
+          v1User: p.v1User,
+          v1AdminActionLog: p.v1AdminActionLog,
+          v1StatusChangeLog: p.v1StatusChangeLog,
+          v1AuthIdentity: p.v1AuthIdentity,
+          v1UserProfile: p.v1UserProfile,
+          $queryRaw: p.$queryRaw,
+        }),
+    );
+
+    realtimeGateway = { forceDisconnectUser: jest.fn() };
+    logger = { warn: jest.fn() };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: RealtimeGateway, useValue: realtimeGateway },
+        { provide: getLoggerToken(AdminService.name), useValue: logger },
+      ],
+    }).compile();
+
+    service = module.get(AdminService);
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it('deleting a user via deleteUser() force-disconnects that user’s realtime socket after the transaction commits', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+    prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+
+    const result = await service.deleteUser(actorAuthUser, targetUserId, { reason: '이용약관 위반' });
+
+    expect(result).toMatchObject({ userId: targetUserId, status: 'deleted' });
+    expect(realtimeGateway.forceDisconnectUser).toHaveBeenCalledTimes(1);
+    expect(realtimeGateway.forceDisconnectUser).toHaveBeenCalledWith(targetUserId);
+  });
+
+  it('a realtime gateway failure during deleteUser() is swallowed with a structured warn log and does not fail the deletion', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+    prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+    prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+    const gatewayError = new Error('socket.io server unavailable');
+    realtimeGateway.forceDisconnectUser.mockImplementation(() => {
+      throw gatewayError;
+    });
+
+    await expect(
+      service.deleteUser(actorAuthUser, targetUserId, { reason: '이용약관 위반' }),
+    ).resolves.toMatchObject({ userId: targetUserId, status: 'deleted' });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: targetUserId, err: gatewayError }),
       expect.any(String),
     );
   });

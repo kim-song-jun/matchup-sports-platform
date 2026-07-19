@@ -33,6 +33,8 @@ import type {
   V1AdminNoticeUpdateResult,
   V1AdminRow,
   V1PushFailureSummary,
+  V1AdminPushSendPayload,
+  V1AdminPushSendResult,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -1796,6 +1798,21 @@ export function useV1AckPushFailures() {
     mutationFn: (ids: string[]) => v1Post('/admin/ops/push-failures/ack', { ids }),
     onSuccess: () => {
       // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+    },
+  });
+}
+
+/**
+ * 어드민 수동 웹 푸시 발송 — 특정 유저 또는 전체 구독자 브로드캐스트.
+ * 성공 시 push-failures 목록(새 실패가 즉시 생겼을 수 있음)을 무효화한다.
+ */
+export function useV1AdminSendPush() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1AdminPushSendPayload) =>
+      v1Post<V1AdminPushSendResult>('/admin/ops/push-send', payload),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
     },
   });

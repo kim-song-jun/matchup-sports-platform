@@ -4,10 +4,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { isSafePopupLink } from '../popups/popup-screen';
 import {
   AdminListQueryDto,
@@ -44,7 +47,19 @@ type ActiveAdmin = {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Optional: AdminModule always wires RealtimeModule in production (see
+    // admin.module.ts), so these resolve normally there. They're marked
+    // optional purely so unit-test modules for other AdminService methods
+    // (which have no reason to know about realtime disconnection) don't have
+    // to provide unrelated mocks just to compile — changeUserStatus() itself
+    // treats a missing/failing gateway as non-fatal via optional chaining +
+    // try/catch below, consistent with "realtime failures must never block a
+    // status change."
+    @Optional() private readonly realtimeGateway?: RealtimeGateway,
+    @Optional() @InjectPinoLogger(AdminService.name) private readonly logger?: PinoLogger,
+  ) {}
 
   async me(user: V1AuthUser) {
     const admin = await this.getActiveAdmin(user.id);
@@ -107,7 +122,7 @@ export class AdminService {
   }
 
   async changeUserStatus(user: V1AuthUser, userId: string, dto: ChangeUserStatusDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
       await this.lockUserRow(tx, userId);
@@ -154,6 +169,22 @@ export class AdminService {
         tx,
       );
     });
+
+    // Disable-class statuses must cut off any realtime channel the user already
+    // holds — otherwise a socket connected before this change keeps receiving
+    // notifications/chat until it happens to reconnect. This runs after the
+    // transaction commits and must never roll back the status change itself if
+    // the gateway throws, so it's isolated in its own try/catch (same
+    // fire-and-forget isolation pattern as NotificationsService.emitToUser).
+    if (dto.status === 'suspended' || dto.status === 'blocked' || dto.status === 'deleted') {
+      try {
+        this.realtimeGateway?.forceDisconnectUser(userId);
+      } catch (err) {
+        this.logger?.warn({ userId, status: dto.status, err }, '상태 변경 후 실시간 소켓 강제 종료 실패');
+      }
+    }
+
+    return result;
   }
 
   async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {

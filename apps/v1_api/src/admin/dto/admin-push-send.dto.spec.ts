@@ -47,4 +47,26 @@ describe('AdminPushSendDto', () => {
     const errors = await validate(dto);
     expect(errors.some((error) => error.property === 'url')).toBe(true);
   });
+
+  it('rejects a backslash-prefixed url that WHATWG URL parsers treat as protocol-relative (open-redirect bypass)', async () => {
+    const dto = plainToInstance(AdminPushSendDto, {
+      target: 'broadcast',
+      title: '전체 공지',
+      url: '/\\evil.com',
+    });
+
+    const errors = await validate(dto);
+    expect(errors.some((error) => error.property === 'url')).toBe(true);
+  });
+
+  it('rejects a url containing a backslash anywhere, not just at the start', async () => {
+    const dto = plainToInstance(AdminPushSendDto, {
+      target: 'broadcast',
+      title: '전체 공지',
+      url: '/notices/1\\evil.com',
+    });
+
+    const errors = await validate(dto);
+    expect(errors.some((error) => error.property === 'url')).toBe(true);
+  });
 });

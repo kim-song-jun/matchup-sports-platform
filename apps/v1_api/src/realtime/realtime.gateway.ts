@@ -84,6 +84,18 @@ export class RealtimeGateway implements OnGatewayConnection {
   emitToUser(userId: string, event: string, payload: unknown): void {
     this.server.to(`user:${userId}`).emit(event, payload);
   }
+
+  /**
+   * Forcibly disconnects every socket currently joined to a user's room —
+   * every open tab/device, not just one. Used when an admin transitions a
+   * user's accountStatus to suspended/blocked/deleted: without this, a
+   * socket connected before the status change keeps receiving realtime
+   * notifications/chat until it happens to reconnect (handleConnection is
+   * the only place accountStatus is re-checked).
+   */
+  forceDisconnectUser(userId: string): void {
+    this.server.in(`user:${userId}`).disconnectSockets(true);
+  }
 }
 
 function toSingleValue(value: string | string[] | undefined): string | undefined {

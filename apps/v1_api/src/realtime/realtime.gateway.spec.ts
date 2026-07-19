@@ -21,7 +21,12 @@ describe('RealtimeGateway', () => {
   const prisma = {
     v1User: { findFirst: jest.fn() },
   };
-  const server = { to: jest.fn().mockReturnThis(), emit: jest.fn() };
+  const server = {
+    to: jest.fn().mockReturnThis(),
+    emit: jest.fn(),
+    in: jest.fn().mockReturnThis(),
+    disconnectSockets: jest.fn(),
+  };
   const logger = { debug: jest.fn(), error: jest.fn() };
 
   beforeEach(async () => {
@@ -128,5 +133,12 @@ describe('RealtimeGateway', () => {
 
     expect(server.to).toHaveBeenCalledWith('user:user-1');
     expect(server.emit).toHaveBeenCalledWith('notification:new', { id: 'notif-1' });
+  });
+
+  it('forceDisconnectUser disconnects every socket in that user room only', () => {
+    gateway.forceDisconnectUser('user-1');
+
+    expect(server.in).toHaveBeenCalledWith('user:user-1');
+    expect(server.disconnectSockets).toHaveBeenCalledWith(true);
   });
 });

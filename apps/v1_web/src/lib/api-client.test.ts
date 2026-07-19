@@ -65,6 +65,37 @@ describe('v1Api error reporting', () => {
     );
   });
 
+  it('strips the query string from the reported path so PII in query params is never sent to the log endpoint', async () => {
+    const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          status: 'error',
+          statusCode: 409,
+          code: 'EMAIL_TAKEN',
+          message: '이미 사용중인 이메일이에요.',
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    );
+
+    await expect(v1Get('/auth/check-email', { email: 'x@example.com' })).rejects.toThrow();
+
+    expect(reportSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ path: '/auth/check-email' }),
+      }),
+    );
+    const [[reportedPayload]] = reportSpy.mock.calls;
+    const reportedContext = reportedPayload.context as Record<string, unknown>;
+    expect(String(reportedContext.path)).toBe('/auth/check-email');
+    expect(String(reportedContext.path)).not.toContain('?');
+    expect(String(reportedContext.path)).not.toContain('x@example.com');
+  });
+
   it('reports 5xx as level "error"', async () => {
     const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
     vi.stubGlobal(

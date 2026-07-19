@@ -80,7 +80,12 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     reportClientError({
       message: error.message,
       level: error.statusCode >= 500 ? 'error' : 'warn',
-      context: { path, statusCode: error.statusCode, code: error.code, requestId: errorBody.requestId },
+      context: {
+        path: path.split('?')[0],
+        statusCode: error.statusCode,
+        code: error.code,
+        requestId: errorBody.requestId,
+      },
     });
     throw error;
   }

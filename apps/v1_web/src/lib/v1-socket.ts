@@ -7,12 +7,17 @@ let socket: Socket | null = null;
 export function getV1Socket(): Socket {
   if (socket) return socket;
 
-  const { userId, userEmail } = getStoredV1Session();
   socket = io('/', {
     path: '/socket.io',
-    auth: {
-      ...(userId ? { 'x-v1-user-id': userId } : {}),
-      ...(userEmail ? { 'x-v1-user-email': userEmail } : {}),
+    // auth를 고정 객체가 아닌 함수로 넘겨야 socket.io-client가 매 (재)연결 시도마다
+    // 호출해 최신 localStorage 세션을 반영한다 — 고정 객체는 최초 연결 시점 값이
+    // 소켓 인스턴스 수명 내내 캐시되어, 재연결 시 세션이 갱신돼도 반영되지 않는다.
+    auth: (cb: (data: Record<string, string>) => void) => {
+      const { userId, userEmail } = getStoredV1Session();
+      cb({
+        ...(userId ? { 'x-v1-user-id': userId } : {}),
+        ...(userEmail ? { 'x-v1-user-email': userEmail } : {}),
+      });
     },
     withCredentials: true,
   });

@@ -33,6 +33,10 @@ export function buildPinoHttpOptions(): PinoHttpOptions {
         'req.headers.cookie',
         'req.headers["x-v1-user-email"]',
         'req.headers["x-v1-user-id"]',
+        // 카카오 등 OAuth 콜백 페이지(/callback/kakao?code=...&state=...)에서 same-origin fetch 시
+        // Referrer-Policy(strict-origin-when-cross-origin)가 전체 URL을 Referer 헤더에 실어 보내므로,
+        // OAuth code/CSRF state 가 그대로 로그에 남는 것을 막기 위해 referer 도 완전 redact 한다.
+        'req.headers.referer',
         'res.headers["set-cookie"]',
       ],
       remove: true,

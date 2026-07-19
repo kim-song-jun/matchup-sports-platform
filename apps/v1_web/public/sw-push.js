@@ -33,6 +33,13 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url;
-  const target = typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') ? url : '/';
+  // '/'로 시작하되 '//'(protocol-relative)나 백슬래시를 포함하면 안전하지
+  // 않다 — WHATWG URL 파서는 http/https 같은 special scheme에서 백슬래시를
+  // 슬래시처럼 취급해 '/\evil.com' 같은 값이 openWindow 시 origin을 바꿔버리는
+  // open-redirect 우회를 허용한다. notification-route.ts의
+  // isSafeInternalRoute()와 동일한 엄격도(백슬래시는 위치 무관 전면 차단).
+  const isSafeInternalRoute =
+    typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') && !url.includes('\\');
+  const target = isSafeInternalRoute ? url : '/';
   event.waitUntil(self.clients.openWindow(target));
 });

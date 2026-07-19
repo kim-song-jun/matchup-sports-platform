@@ -203,7 +203,7 @@ export class ChatService {
       pushEnabledRecipientIds = await this.chatPushEnabledRecipientIds(recipientUserIds);
     } catch (err) {
       this.logger.warn(
-        { roomId: room.id, error: err instanceof Error ? err.message : String(err) },
+        { roomId: room.id, err },
         '채팅 웹 푸시 선호도 조회 실패 — 이 메시지는 웹 푸시 없이 처리됩니다',
       );
       pushEnabledRecipientIds = new Set();
@@ -221,14 +221,7 @@ export class ChatService {
           targetId: room.id,
         });
       } catch (err) {
-        this.logger.warn(
-          {
-            recipientUserId,
-            roomId: room.id,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          '실시간 채팅 알림 전송 실패',
-        );
+        this.logger.warn({ recipientUserId, roomId: room.id, err }, '실시간 채팅 알림 전송 실패');
       }
       if (!pushEnabledRecipientIds.has(recipientUserId)) continue;
       void this.webPushService
@@ -238,14 +231,7 @@ export class ChatService {
           url: `/chat/${room.id}`,
         })
         .catch((err) => {
-          this.logger.warn(
-            {
-              recipientUserId,
-              roomId: room.id,
-              error: err instanceof Error ? err.message : String(err),
-            },
-            '채팅 웹 푸시 발송 실패',
-          );
+          this.logger.warn({ recipientUserId, roomId: room.id, err }, '채팅 웹 푸시 발송 실패');
         });
     }
 

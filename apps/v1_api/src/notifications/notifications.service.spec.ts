@@ -224,13 +224,14 @@ describe('NotificationsService', () => {
   it('logs a structured warning (without throwing) when WebPushService.sendToUser rejects', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-4' }));
-    webPushService.sendToUser.mockRejectedValueOnce(new Error('vapid send failed'));
+    const pushError = new Error('vapid send failed');
+    webPushService.sendToUser.mockRejectedValueOnce(pushError);
 
     await service.emitNotification('user-1', 'match_application_received', 'match-1');
     await new Promise(setImmediate);
 
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1', error: 'vapid send failed' }),
+      expect.objectContaining({ userId: 'user-1', err: pushError }),
       '웹 푸시 발송 실패',
     );
   });
@@ -240,15 +241,16 @@ describe('NotificationsService', () => {
     // must not prevent the independent web-push attempt from being made.
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-5' }));
+    const emitError = new Error('socket not connected');
     realtimeGateway.emitToUser.mockImplementationOnce(() => {
-      throw new Error('socket not connected');
+      throw emitError;
     });
 
     await service.emitNotification('user-1', 'match_application_received', 'match-1');
     await new Promise(setImmediate);
 
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1', error: 'socket not connected' }),
+      expect.objectContaining({ userId: 'user-1', err: emitError }),
       '실시간 알림 전송 실패',
     );
     // The web-push attempt must still have gone through despite the emit failure.

@@ -291,12 +291,7 @@ export class NotificationsService {
     void (async () => {
       const userIds = await resolveUserIds();
       await this.emitNotificationToMany(userIds, type, targetId, body);
-    })().catch((e: unknown) =>
-      this.logger.warn(
-        { type, error: e instanceof Error ? e.message : String(e) },
-        '알림 발송 실패',
-      ),
-    );
+    })().catch((e: unknown) => this.logger.warn({ type, err: e }, '알림 발송 실패'));
   }
 
   private emitNotificationFireAndForget(
@@ -310,15 +305,7 @@ export class NotificationsService {
   ): void {
     this.createNotificationWithPrefCheck(userId, targetType, targetId, title, body, deepLink, prefField).catch(
       (err: unknown) => {
-        this.logger.warn(
-          {
-            userId,
-            targetType,
-            targetId,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          '알림 생성 실패',
-        );
+        this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
       },
     );
   }
@@ -356,29 +343,13 @@ export class NotificationsService {
     try {
       this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
     } catch (err) {
-      this.logger.warn(
-        {
-          userId,
-          targetType,
-          targetId,
-          error: err instanceof Error ? err.message : String(err),
-        },
-        '실시간 알림 전송 실패',
-      );
+      this.logger.warn({ userId, targetType, targetId, err }, '실시간 알림 전송 실패');
     }
 
     void this.webPushService
       .sendToUser(userId, { title, body: body ?? undefined, url: deepLink ?? undefined })
       .catch((err: unknown) => {
-        this.logger.warn(
-          {
-            userId,
-            targetType,
-            targetId,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          '웹 푸시 발송 실패',
-        );
+        this.logger.warn({ userId, targetType, targetId, err }, '웹 푸시 발송 실패');
       });
   }
 

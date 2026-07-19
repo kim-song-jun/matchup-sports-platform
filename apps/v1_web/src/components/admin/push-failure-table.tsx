@@ -3,24 +3,10 @@
 import { CheckCircle2 } from 'lucide-react';
 import { useV1AckPushFailures, useV1RecentPushFailures } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatAdminDateTime } from '@/lib/date-utils';
 import { AdminDataTable, AdminEmpty } from '@/components/admin';
 import type { AdminTableColumn } from '@/components/admin';
 import type { V1PushFailureSummary } from '@/types/api';
-
-// ── Helpers ───────────────────────────────────────────────────────────────
-function formatDateTime(dateStr: string): string {
-  try {
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(dateStr));
-  } catch {
-    return dateStr;
-  }
-}
 
 // ── Component ─────────────────────────────────────────────────────────────
 export function PushFailureTable() {
@@ -59,7 +45,7 @@ export function PushFailureTable() {
       key: 'occurredAt',
       header: '발생 시각',
       render: (failure) => (
-        <span className="text-gray-500 whitespace-nowrap">{formatDateTime(failure.occurredAt)}</span>
+        <span className="text-gray-500 whitespace-nowrap">{formatAdminDateTime(failure.occurredAt)}</span>
       ),
     },
     {

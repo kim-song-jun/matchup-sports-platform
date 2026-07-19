@@ -41,16 +41,6 @@ export class AdminOpsController {
   @Post('push-failures/ack')
   async ackPushFailures(@CurrentUser() user: V1AuthUser, @Body() dto: AckPushFailuresDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const result = await this.adminOpsService.acknowledgeFailures(dto.ids, user.id);
-    await Promise.all(
-      dto.ids.map((id) =>
-        this.adminContext.logAdminAction(admin, {
-          action: 'web_push_failure_log.ack',
-          targetType: 'web_push_failure_log',
-          targetId: id,
-        }),
-      ),
-    );
-    return result;
+    return this.adminOpsService.acknowledgeFailures(dto.ids, admin);
   }
 }

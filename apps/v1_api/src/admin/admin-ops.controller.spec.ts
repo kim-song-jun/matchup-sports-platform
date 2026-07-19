@@ -19,7 +19,6 @@ describe('AdminOpsController', () => {
   const adminContext = {
     getActiveAdmin: jest.fn().mockResolvedValue(admin),
     getMutationAdmin: jest.fn().mockResolvedValue(admin),
-    logAdminAction: jest.fn().mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null }),
   };
 
   let controller: AdminOpsController;
@@ -50,21 +49,13 @@ describe('AdminOpsController', () => {
     expect(adminOpsService.recentPushFailures).toHaveBeenCalledWith(10);
   });
 
-  it('ackPushFailures gates on getMutationAdmin (support role blocked) and records an audit log per id', async () => {
+  it('ackPushFailures gates on getMutationAdmin (support role blocked) and delegates the admin + ids to the service', async () => {
     adminOpsService.acknowledgeFailures.mockResolvedValue(undefined);
 
     await controller.ackPushFailures(user, { ids: ['fail-1', 'fail-2'] });
 
     expect(adminContext.getMutationAdmin).toHaveBeenCalledWith('user-1');
-    expect(adminOpsService.acknowledgeFailures).toHaveBeenCalledWith(['fail-1', 'fail-2'], 'user-1');
-    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
-      admin,
-      expect.objectContaining({ action: 'web_push_failure_log.ack', targetType: 'web_push_failure_log', targetId: 'fail-1' }),
-    );
-    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
-      admin,
-      expect.objectContaining({ action: 'web_push_failure_log.ack', targetType: 'web_push_failure_log', targetId: 'fail-2' }),
-    );
+    expect(adminOpsService.acknowledgeFailures).toHaveBeenCalledWith(['fail-1', 'fail-2'], admin);
   });
 
   it('ackPushFailures rejects before any mutation when the caller is not a mutation-eligible admin', async () => {
@@ -73,6 +64,5 @@ describe('AdminOpsController', () => {
     await expect(controller.ackPushFailures(user, { ids: ['fail-1'] })).rejects.toThrow('Support admins cannot mutate');
 
     expect(adminOpsService.acknowledgeFailures).not.toHaveBeenCalled();
-    expect(adminContext.logAdminAction).not.toHaveBeenCalled();
   });
 });

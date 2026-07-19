@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import { OnGatewayConnection, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 import { PrismaService } from '../prisma/prisma.service';
 import { currentRuntimeConfiguration, resolveV1RequestIdentity } from '../auth/v1-session';
@@ -19,9 +19,10 @@ export class RealtimeGateway implements OnGatewayConnection {
   @WebSocketServer()
   server!: Server;
 
-  private readonly logger = new Logger(RealtimeGateway.name);
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectPinoLogger(RealtimeGateway.name) private readonly logger: PinoLogger,
+  ) {}
 
   async handleConnection(client: V1Socket): Promise<void> {
     // NestJS's global AllExceptionsFilter is HTTP-only and never runs for gateway
@@ -71,10 +72,11 @@ export class RealtimeGateway implements OnGatewayConnection {
 
       client.data.userId = user.id;
       await client.join(`user:${user.id}`);
-      this.logger.debug(`Socket ${client.id} joined user:${user.id}`);
+      this.logger.debug({ socketId: client.id, userId: user.id }, 'Socket joined user room');
     } catch (err) {
       this.logger.error(
-        `Socket ${client.id} handshake failed: ${err instanceof Error ? err.message : String(err)}`,
+        { socketId: client.id, error: err instanceof Error ? err.message : String(err) },
+        'Socket handshake failed',
       );
       client.disconnect(true);
     }

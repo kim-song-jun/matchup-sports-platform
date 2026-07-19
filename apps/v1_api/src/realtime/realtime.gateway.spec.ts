@@ -1,5 +1,5 @@
-import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from './realtime.gateway';
 
@@ -22,13 +22,18 @@ describe('RealtimeGateway', () => {
     v1User: { findFirst: jest.fn() },
   };
   const server = { to: jest.fn().mockReturnThis(), emit: jest.fn() };
+  const logger = { debug: jest.fn(), error: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     delete process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
     const moduleRef = await Test.createTestingModule({
-      providers: [RealtimeGateway, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        RealtimeGateway,
+        { provide: PrismaService, useValue: prisma },
+        { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
+      ],
     }).compile();
     gateway = moduleRef.get(RealtimeGateway);
     gateway.server = server as never;
@@ -104,7 +109,6 @@ describe('RealtimeGateway', () => {
   it('disconnects the socket and logs instead of crashing when the DB lookup rejects', async () => {
     const dbError = new Error('connection terminated unexpectedly');
     prisma.v1User.findFirst.mockRejectedValue(dbError);
-    const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     const socket = buildSocket({}, { 'x-v1-user-id': 'user-1' });
 
     // If handleConnection let the rejection propagate, this await would throw and
@@ -113,9 +117,10 @@ describe('RealtimeGateway', () => {
 
     expect(socket.join).not.toHaveBeenCalled();
     expect(socket.disconnect).toHaveBeenCalledWith(true);
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('connection terminated unexpectedly'));
-
-    errorSpy.mockRestore();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ socketId: socket.id, error: 'connection terminated unexpectedly' }),
+      expect.any(String),
+    );
   });
 
   it('emitToUser sends the event to that user room only', () => {

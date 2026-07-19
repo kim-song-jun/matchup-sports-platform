@@ -20,7 +20,7 @@ describe('AdminShell nav', () => {
 
     // Desktop sidebar renders inside `nav[aria-label="주 메뉴"]`; there are two
     // (desktop sidebar + mobile drawer), so assert at least one reachable link exists.
-    const links = screen.getAllByRole('link', { name: /Web Push 실패/ });
+    const links = screen.getAllByRole('link', { name: /웹 푸시 실패/ });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
       expect(link).toHaveAttribute('href', '/admin/ops/push-failures');

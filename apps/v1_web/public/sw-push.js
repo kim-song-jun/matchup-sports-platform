@@ -18,9 +18,12 @@ self.addEventListener('push', (event) => {
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // 열려 있는 창 중 실제로 포커스된(visible) 탭이 있으면 소켓 실시간 갱신과
+        // 열려 있는 창 중 실제로 입력 포커스를 가진 탭이 있으면 소켓 실시간 갱신과
         // OS 네이티브 푸시 알림이 중복으로 뜨는 것을 막기 위해 알림 표시를 생략한다.
-        const hasFocusedClient = clientList.some((client) => client.visibilityState === 'visible');
+        // visibilityState는 탭이 최소화/전환되지 않았는지만 알려줄 뿐 OS 포커스는
+        // 반영하지 않으므로(다른 창으로 전환해도 'visible'로 남음), WindowClient의
+        // focused 불리언을 사용한다.
+        const hasFocusedClient = clientList.some((client) => client.focused === true);
         if (hasFocusedClient) return;
         return self.registration.showNotification(title, options);
       }),

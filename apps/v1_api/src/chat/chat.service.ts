@@ -219,22 +219,22 @@ export class ChatService {
         );
       }
       if (!pushEnabledRecipientIds.has(recipientUserId)) continue;
-      try {
-        await this.webPushService.sendToUser(recipientUserId, {
+      void this.webPushService
+        .sendToUser(recipientUserId, {
           title: roomTitle,
           body: content.slice(0, 120),
           url: `/chat/${room.id}`,
+        })
+        .catch((err) => {
+          this.logger.warn(
+            {
+              recipientUserId,
+              roomId: room.id,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            '채팅 웹 푸시 발송 실패',
+          );
         });
-      } catch (err) {
-        this.logger.warn(
-          {
-            recipientUserId,
-            roomId: room.id,
-            error: err instanceof Error ? err.message : String(err),
-          },
-          '채팅 웹 푸시 발송 실패',
-        );
-      }
     }
 
     return chatMessagePayload;

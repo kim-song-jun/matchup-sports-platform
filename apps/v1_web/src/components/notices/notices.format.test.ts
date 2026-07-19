@@ -67,6 +67,6 @@ describe('notice body formatting', () => {
       },
     });
 
-    expect(notice.summary).toBe('이미지가 포함된 공지입니다.');
+    expect(notice.summary).toBe('이미지가 포함된 공지예요.');
   });
 });

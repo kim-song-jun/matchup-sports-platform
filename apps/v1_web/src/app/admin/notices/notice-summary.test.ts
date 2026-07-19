@@ -13,6 +13,6 @@ describe('noticeSummary', () => {
   });
 
   it('uses a readable label instead of a file name for image-only content', () => {
-    expect(noticeSummary('[이미지: event-poster.png]')).toBe('이미지가 포함된 공지입니다.');
+    expect(noticeSummary('[이미지: event-poster.png]')).toBe('이미지가 포함된 공지예요.');
   });
 });

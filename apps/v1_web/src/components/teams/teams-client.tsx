@@ -360,7 +360,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
             remove: () => confirmAction(confirm, {
               title: '멤버 내보내기',
-              message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지됩니다.`,
+              message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지돼요.`,
               confirmLabel: '내보내기',
               tone: 'danger',
               confirmationPhrase: '확인했습니다',

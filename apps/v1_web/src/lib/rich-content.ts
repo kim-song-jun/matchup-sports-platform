@@ -43,7 +43,7 @@ export function richContentPlainText(content: V1RichContentDocument): string {
 export function richContentPreviewText(
   content: V1RichContentDocument | null | undefined,
   legacyBody: string | null | undefined,
-  imageOnlyText = '이미지가 포함된 공지입니다.',
+  imageOnlyText = '이미지가 포함된 공지예요.',
 ): string {
   if (content?.type === 'doc' && Array.isArray(content.content)) {
     const text = richContentPlainText(content);

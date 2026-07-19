@@ -77,7 +77,9 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     const trimmedQuery = submittedQuery.trim();
     if (!trimmedQuery || trackedSearchRef.current === trimmedQuery) return;
     trackedSearchRef.current = trimmedQuery;
-    trackEvent('search', { query: trimmedQuery, resultCount: apiResults.length, domain: 'all' });
+    // GA4 는 자유 입력 텍스트를 담을 수 없는 채널이다 — 사용자가 이름/전화번호 등 개인 식별
+    // 정보를 검색어로 입력할 수 있으므로(제약 없는 open text), 원문 대신 길이만 전송한다.
+    trackEvent('search', { queryLength: trimmedQuery.length, resultCount: apiResults.length, domain: 'all' });
   }, [apiResults.length, errored, loading, shouldSearch, submittedQuery]);
 
   function goBack() {

@@ -14,14 +14,22 @@ function sweepExpiredEntries(now: number): void {
   }
 }
 
+// message 텍스트만으로 dedupe 하면 level/stack이 다른, 실제로는 별개인 에러가 같은 문구를
+// 우연히 공유할 때(예: 4xx warn 이 먼저 찍히고 뒤이어 진짜 5xx error 가 같은 문구로 도착)
+// 뒤의 리포트가 조용히 눌린다 — level과 stack까지 키에 포함해 진짜 동일 에러만 dedupe한다.
+function buildDedupeKey(message: string, level: 'error' | 'warn', stack?: string): string {
+  return `${level}::${message}::${stack ?? ''}`;
+}
+
 export function reportClientError({ message, stack, level = 'error', context }: ClientErrorPayload): void {
   if (typeof window === 'undefined') return;
 
   const now = Date.now();
   sweepExpiredEntries(now);
-  const lastReportedAt = recentlyReported.get(message);
+  const dedupeKey = buildDedupeKey(message, level, stack);
+  const lastReportedAt = recentlyReported.get(dedupeKey);
   if (lastReportedAt && now - lastReportedAt < DEDUPE_WINDOW_MS) return;
-  recentlyReported.set(message, now);
+  recentlyReported.set(dedupeKey, now);
 
   const body = JSON.stringify({
     message: message.slice(0, 4000),

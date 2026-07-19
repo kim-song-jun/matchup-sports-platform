@@ -1562,6 +1562,27 @@ export type V1PushFailureSummary = {
 };
 
 // ---------------------------------------------------------------------------
+// Admin — manual web push send
+// ---------------------------------------------------------------------------
+
+export type V1AdminPushSendTarget = 'user' | 'broadcast';
+
+export type V1AdminPushSendPayload = {
+  target: V1AdminPushSendTarget;
+  /** target === 'user'일 때만 필수 */
+  userId?: string;
+  title: string;
+  body?: string;
+  url?: string;
+};
+
+export type V1AdminPushSendResult = {
+  sent: number;
+  skipped: number;
+  failed: number;
+};
+
+// ---------------------------------------------------------------------------
 // Upload
 // ---------------------------------------------------------------------------
 

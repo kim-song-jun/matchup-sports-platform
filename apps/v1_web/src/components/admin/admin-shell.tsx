@@ -17,6 +17,7 @@ import {
   ClipboardList,
   ShieldCheck,
   Settings,
+  Send,
   BellRing,
   ChevronLeft,
   Menu,
@@ -48,6 +49,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
   { label: '웹 푸시 실패', href: '/admin/ops/push-failures', icon: <BellRing size={18} /> },
   { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
+  { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} /> },
 ];
 
 const OWNER_NAV_ITEM: NavItem = {

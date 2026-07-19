@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AdminContextService } from '../common/admin-context.service';
+import { AdminPushSendDto } from './dto/admin-push-send.dto';
 import { AdminOpsService } from './admin-ops.service';
 
 class RecentPushFailuresQueryDto {
@@ -42,5 +44,13 @@ export class AdminOpsController {
   async ackPushFailures(@CurrentUser() user: V1AuthUser, @Body() dto: AckPushFailuresDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     return this.adminOpsService.acknowledgeFailures(dto.ids, admin);
+  }
+
+  // broadcast는 전체 구독자에게 즉시 도달하는 파급력 큰 작업이라 낮은 한도로 남용을 막는다.
+  @Post('push-send')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async sendPush(@CurrentUser() user: V1AuthUser, @Body() dto: AdminPushSendDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.adminOpsService.sendManualPush(dto, admin);
   }
 }

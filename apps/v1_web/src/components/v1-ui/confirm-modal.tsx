@@ -15,6 +15,8 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   /** 'danger' = 확인 버튼이 빨간색 — 비가역 액션(거절/탈퇴/취소)에 사용 */
   tone?: ConfirmTone;
+  /** 정확히 입력해야 확인 버튼이 활성화되는 문구. 비가역 작업의 이중 확인에 사용 */
+  confirmationPhrase?: string;
 }
 
 interface ConfirmState extends ConfirmOptions {
@@ -58,6 +60,7 @@ export function useConfirm() {
       confirmLabel={state?.confirmLabel}
       cancelLabel={state?.cancelLabel}
       tone={state?.tone}
+      confirmationPhrase={state?.confirmationPhrase}
       onConfirm={() => handleResolve(true)}
       onCancel={() => handleResolve(false)}
     />
@@ -75,6 +78,7 @@ interface ConfirmModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
+  confirmationPhrase?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -96,13 +100,18 @@ export function ConfirmModal({
   confirmLabel = '확인',
   cancelLabel = '취소',
   tone = 'default',
+  confirmationPhrase,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   // 취소 버튼에 초기 포커스를 줘서 실수로 확인 누르는 것을 방지한다
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  const confirmationInputRef = useRef<HTMLInputElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
+  const [confirmationInput, setConfirmationInput] = useState('');
+  const confirmationMatched =
+    confirmationPhrase === undefined || confirmationInput === confirmationPhrase;
 
   // 열릴 때 이전 포커스 저장, 닫힐 때 복원 (WCAG 2.4.3)
   useEffect(() => {
@@ -117,13 +126,20 @@ export function ConfirmModal({
     }
   }, [open]);
 
-  // 열릴 때 취소 버튼에 포커스
+  // 입력 확인이 필요한 작업은 입력창, 일반 작업은 취소 버튼에 초기 포커스
   useEffect(() => {
     if (open) {
-      const id = setTimeout(() => cancelBtnRef.current?.focus(), 60);
+      setConfirmationInput('');
+      const id = setTimeout(() => {
+        if (confirmationPhrase) {
+          confirmationInputRef.current?.focus();
+        } else {
+          cancelBtnRef.current?.focus();
+        }
+      }, 60);
       return () => clearTimeout(id);
     }
-  }, [open]);
+  }, [open, confirmationPhrase]);
 
   // ESC 키로 취소
   useEffect(() => {
@@ -222,6 +238,28 @@ export function ConfirmModal({
           >
             {message}
           </p>
+          {confirmationPhrase ? (
+            <div style={{ marginTop: 18 }}>
+              <label
+                htmlFor="v1-confirm-phrase"
+                className="tm-text-label"
+                style={{ display: 'block', color: 'var(--text-strong)', fontWeight: 600, marginBottom: 8 }}
+              >
+                계속하려면 <strong>{confirmationPhrase}</strong>를 입력해 주세요.
+              </label>
+              <input
+                ref={confirmationInputRef}
+                id="v1-confirm-phrase"
+                type="text"
+                value={confirmationInput}
+                onChange={(event) => setConfirmationInput(event.target.value)}
+                autoComplete="off"
+                placeholder={confirmationPhrase}
+                className="tm-input"
+                style={{ width: '100%', minHeight: 44 }}
+              />
+            </div>
+          ) : null}
         </div>
 
         {/* Footer */}
@@ -239,7 +277,10 @@ export function ConfirmModal({
             type="button"
             className={`tm-btn tm-btn-md ${isDanger ? 'tm-btn-danger' : 'tm-btn-primary'}`}
             style={{ flex: 1, minHeight: 44 }}
-            onClick={onConfirm}
+            disabled={!confirmationMatched}
+            onClick={() => {
+              if (confirmationMatched) onConfirm();
+            }}
           >
             {confirmLabel}
           </button>

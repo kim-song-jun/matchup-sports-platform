@@ -216,6 +216,14 @@
 | 2026-07-14 | Task 110 admin tournament roster access | Passed with runtime follow-up | 팀 비소속 관리자와 support가 읽을 수 있는 관리자 전용 명단 API를 추가하고, 일반 사용자의 PII 접근은 403 전에 차단했다. 성별 snapshot 저장·기존 행 backfill·UI/CSV 표시와 오류/빈 상태 분리를 구현했다. API 501 tests, Web 93 tests, 양쪽 build, Web lint, Prisma/DB guardrail이 통과했다. | QA DB에 migration 적용 후 owner/ops/support 실제 브라우저 screenshot·console·network 재검증 |
 | 2026-07-14 | Task 87 required profile gender | Passed | DB remains nullable for legacy rows; email/social signup and profile save require male/female. Self, authorized team member, admin user, and tournament roster surfaces display gender. API 121 focused tests, Web 95 tests, both builds, and 6 desktop/mobile browser checks passed. | Existing null users must choose gender on their next profile save; public profiles remain gender-private. |
 
+### 2026-07-19 Admin rich-content image matrix
+
+- Status: Passed
+- Coverage: focused automation 71/71, full API 578/578, full Web 139/139, browser 14/14, live API/DB lifecycle 6/6
+- Scenario: [16-admin-rich-content-images.md](./16-admin-rich-content-images.md)
+- Browser evidence: output/playwright/visual-audit/rich-content-image-matrix-2026-07-19/report.json
+- Finding fixed during QA: selecting multiple images inserted only one image; the editor now inserts the ordered image node array in one Tiptap transaction.
+
 ## Historical Run Summary
 
 - 2026-04 priority QA remediation 실행 명령:

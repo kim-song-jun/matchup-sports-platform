@@ -83,6 +83,23 @@
 | `GET` | `/api/v1/admin/settlements/summary` | 정산 요약 |
 | `PATCH` | `/api/v1/admin/settlements/:id/process` | 정산 처리 |
 
+## v1 관리자 목록 집계 계약
+
+감사 로그를 제외한 v1 관리자 목록 화면의 필터 숫자는 현재 페이지의 `items.length`가 아니라 서버가 반환하는 전체 검색 결과 집계를 사용한다. 아래 목록 응답은 기존 `items`, `pageInfo`와 함께 다음 `summary`를 반환한다.
+
+```ts
+type AdminListSummary = {
+  total: number;
+  byStatus: Record<string, number>;
+  byCategory?: Record<string, number>;
+  byAudience?: Record<string, number>;
+};
+```
+
+적용 엔드포인트는 `GET /api/v1/admin/users`, `matches`, `teams`, `team-matches`, `tournaments`, `inquiries`, `notices`, `popups`, `admins`다. `summary`는 cursor와 limit의 영향을 받지 않으므로 첫 페이지와 추가 로드 응답에서 같은 필터 조건이면 동일하다. 검색어나 종목 같은 비상태 조건은 집계에 반영하지만, `byStatus`는 현재 선택한 status를 제외하고 계산하여 모든 상태 칩의 전환 가능 건수를 유지한다.
+
+문의 `byCategory`는 현재 category를 제외하고 검색어와 status를 반영한다. 공지 `byAudience`는 현재 audience를 제외하고 검색어, status, category를 반영한다. 따라서 보조 필터의 `전체` 숫자는 해당 facet map 값의 합으로 계산한다. 알려진 상태·분류·대상 키는 결과가 없어도 `0`을 반환한다.
+
 ## 요청/응답 핵심 계약
 
 ### 사용자 운영
@@ -165,6 +182,19 @@
 - `/admin/disputes`와 `/admin/settlements/:id/process`는 raw-body surface다.
   - Swagger 스키마/프론트 타입만 신뢰하지 말고 실제 서비스 로직(status/action 매핑)을 기준으로 검증한다.
 - 문서상 "관리자 용병 모집글 삭제", "시설 CRUD"는 운영자 도구다. venue self-service(운영자 아닌 owner 전용 콘솔)와 동일시하면 안 된다.
+
+## Notice and popup rich content
+
+- POST /api/v1/admin/content-assets uploads one JPEG, PNG, or WebP image up to 5MB for owner/ops and returns a temporary managed asset.
+- DELETE /api/v1/admin/content-assets/:assetId deletes an unused temporary asset owned by the uploader; an owner may delete any temporary asset.
+- Notice and popup content is restricted Tiptap JSON; body is the server-derived plain-text projection for search, summaries, and legacy clients.
+- Tiptap's default textAlign=null attribute is accepted at the API boundary and omitted from canonical stored JSON. Explicit alignment remains restricted to left, center, or right.
+- Tiptap Image's default title/width/height=null attributes are likewise omitted before validation and persistence. Non-null dimensions and arbitrary image attributes are not accepted.
+- Empty Tiptap paragraph/heading nodes may omit content and are canonicalized to content=[]. Default Link presentation attrs are stripped; custom target/rel/class/title attrs are not part of the stored contract.
+- Only managed /uploads URLs may be used for content images. External URLs, base64 images, raw HTML, unsafe links, and unknown nodes or attributes are rejected.
+- Saving a notice or popup claims referenced temporary assets. Removing an unreferenced image deletes its managed asset record and stored file.
+- The Web editor deletes its current session's unused temporary assets after save and all session temporary assets on explicit cancel or editor switch.
+- The API performs an immediate startup scan and then hourly scans for unattached temporary assets older than 24 hours. It conditionally deletes the still-temporary database row before removing the file, so a concurrently attached asset is preserved.
 
 ## Source References
 

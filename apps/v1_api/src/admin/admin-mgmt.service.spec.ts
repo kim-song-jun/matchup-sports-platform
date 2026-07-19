@@ -94,6 +94,7 @@ describe('AdminService — admin-management (owner-only)', () => {
     v1AdminUser: {
       findUnique: jest.Mock;
       findMany: jest.Mock;
+      groupBy: jest.Mock;
       count: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
@@ -113,6 +114,7 @@ describe('AdminService — admin-management (owner-only)', () => {
       v1AdminUser: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -191,6 +193,10 @@ describe('AdminService — admin-management (owner-only)', () => {
     it('returns items with correct row shape', async () => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
       prisma.v1AdminUser.findMany.mockResolvedValue([withUser(opsAdminRecord)]);
+      prisma.v1AdminUser.groupBy.mockResolvedValue([
+        { status: 'active', _count: { _all: 3 } },
+        { status: 'revoked', _count: { _all: 1 } },
+      ]);
 
       const result = await service.listAdmins(ownerAuthUser, {});
 
@@ -207,6 +213,10 @@ describe('AdminService — admin-management (owner-only)', () => {
         revokedAt: null,
       });
       expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+      expect(result.summary).toEqual({
+        total: 4,
+        byStatus: { active: 3, suspended: 0, revoked: 1 },
+      });
     });
 
     it('passes status filter to Prisma where', async () => {

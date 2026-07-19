@@ -3,6 +3,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { BellIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
 
 export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
@@ -88,7 +89,7 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
             <h1 className="tm-text-heading tm-notice-title">{notice.title}</h1>
             <p className="tm-text-caption tm-notice-lead">{notice.date} · teameet 운영팀</p>
             <div className="tm-notice-body">
-              {notice.body.map((paragraph, index) => <p key={`${index}-${paragraph}`} className="tm-text-body">{paragraph}</p>)}
+              <RichContentRenderer content={notice.content} legacyBody={notice.body.join('\n\n')} />
             </div>
             {model.relatedHref ? (
               <Link className="tm-card tm-pressable tm-notice-related" href={model.relatedHref}>

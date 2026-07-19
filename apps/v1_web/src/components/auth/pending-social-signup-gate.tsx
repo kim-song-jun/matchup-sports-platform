@@ -9,6 +9,7 @@ import {
   clearStoredV1Session,
   hasStoredV1Session,
 } from '@/lib/session-storage';
+import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
 import {
   getPendingSocialSignupRoute,
@@ -28,6 +29,7 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hasSessionHint !== true || !authMe.isError) return;
     clearStoredV1Session();
+    disconnectV1Socket();
     setHasSessionHint(false);
   }, [authMe.isError, hasSessionHint]);
 

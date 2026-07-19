@@ -72,6 +72,9 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   // 통합 검색(매치/팀매치/팀)이 실제로 완료된 시점에만 1회 기록한다 — 같은 검색어로
   // 로딩 상태가 재렌더링되는 동안 중복 발화되지 않도록 마지막으로 기록한 검색어를 ref로 추적.
   const trackedSearchRef = useRef<string | null>(null);
+  const matchResultCount = matchesQuery.data?.items?.length ?? 0;
+  const teamMatchResultCount = teamMatchesQuery.data?.items?.length ?? 0;
+  const teamResultCount = teamsQuery.data?.items?.length ?? 0;
   useEffect(() => {
     if (!shouldSearch || loading || errored) return;
     const trimmedQuery = submittedQuery.trim();
@@ -79,8 +82,24 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     trackedSearchRef.current = trimmedQuery;
     // GA4 는 자유 입력 텍스트를 담을 수 없는 채널이다 — 사용자가 이름/전화번호 등 개인 식별
     // 정보를 검색어로 입력할 수 있으므로(제약 없는 open text), 원문 대신 길이만 전송한다.
-    trackEvent('search', { queryLength: trimmedQuery.length, resultCount: apiResults.length, domain: 'all' });
-  }, [apiResults.length, errored, loading, shouldSearch, submittedQuery]);
+    //
+    // domain: 설계 문서(docs/superpowers/specs/2026-07-18-logging-ga-analytics-design.md)의
+    // domain enum(match|team|tournament)은 이 통합검색 구현과 어긋난다 — 이 화면은
+    // tournament를 조회하지 않고 대신 match/teamMatch/team 3개 도메인을 항상 동시에
+    // 조회한다. 리터럴 'all'은 어떤 도메인이 실제로 결과를 낳았는지 알 수 없어
+    // 세그먼트 분석이 불가능하므로, 실제로 결과가 있었던 도메인만 콤마로 join해
+    // 기록한다(전부 0건이면 빈 문자열 — "빈 검색" 세그먼트로 식별 가능).
+    const respondingDomains = [
+      matchResultCount > 0 ? 'match' : null,
+      teamMatchResultCount > 0 ? 'team_match' : null,
+      teamResultCount > 0 ? 'team' : null,
+    ].filter((domain): domain is string => domain !== null);
+    trackEvent('search', {
+      queryLength: trimmedQuery.length,
+      resultCount: apiResults.length,
+      domain: respondingDomains.join(','),
+    });
+  }, [apiResults.length, errored, loading, matchResultCount, shouldSearch, submittedQuery, teamMatchResultCount, teamResultCount]);
 
   function goBack() {
     if (window.history.length > 1) {

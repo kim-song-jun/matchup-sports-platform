@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
+import { trackEvent } from '@/lib/analytics';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -10,7 +11,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
-export function useV1PushRegistration() {
+export interface V1PushRegistration {
+  subscribe: () => Promise<void>;
+  unsubscribe: () => Promise<void>;
+  permission: NotificationPermission | 'unsupported';
+  isSubscribed: boolean;
+}
+
+export function useV1PushRegistration(): V1PushRegistration {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
   const permission = supported ? Notification.permission : 'unsupported';
@@ -20,7 +28,13 @@ export function useV1PushRegistration() {
     navigator.serviceWorker.ready
       .then((registration) => registration.pushManager.getSubscription())
       .then((subscription) => setIsSubscribed(subscription !== null))
-      .catch(() => {});
+      .catch((err) => {
+        reportClientError({
+          message: extractErrorMessage(err, '푸시 구독 상태를 확인하지 못했어요.'),
+          level: 'warn',
+          context: { flow: 'push-subscription-check' },
+        });
+      });
   }, [supported]);
 
   const subscribe = useCallback(async () => {
@@ -41,6 +55,7 @@ export function useV1PushRegistration() {
       const json = subscription.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
 
       await v1Post('/notifications/push-subscribe', { endpoint: json.endpoint, keys: json.keys });
+      trackEvent('push_subscribe_complete', {});
       setIsSubscribed(true);
     } catch (err) {
       reportClientError({

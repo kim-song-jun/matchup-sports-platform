@@ -104,17 +104,19 @@ describe('AdminOpsService', () => {
     expect(adminContext.logAdminAction).not.toHaveBeenCalled();
   });
 
-  it('rolls back the update when an audit log write fails, instead of leaving a partial commit', async () => {
+  it('propagates the error instead of swallowing it when an audit log write fails inside the transaction', async () => {
+    // NOTE: this test only proves the service does not catch-and-swallow the error — the
+    // $transaction mock below just re-throws whatever the callback throws, it does not
+    // exercise real Prisma rollback/atomicity. Actual rollback behavior is Prisma's
+    // responsibility and is covered by the real interactive-transaction contract, not
+    // by this mock.
     prisma.v1WebPushFailureLog.findMany.mockResolvedValue([{ id: 'fail-1' }]);
     adminContext.logAdminAction.mockRejectedValueOnce(new Error('audit log write failed'));
     prisma.$transaction.mockImplementation(async (cb: (tx: typeof prisma) => Promise<unknown>) => {
-      try {
-        return await cb(prisma);
-      } catch (error) {
-        // Mirrors real Prisma interactive-transaction behavior: a thrown error
-        // inside the callback rejects $transaction itself (rollback).
-        throw error;
-      }
+      // Mirrors the shape of a real Prisma interactive transaction (a thrown error inside
+      // the callback rejects the $transaction call), but this is still a mock: it does not
+      // verify that any writes made before the throw were actually rolled back in a DB.
+      return cb(prisma);
     });
 
     await expect(service.acknowledgeFailures(['fail-1'], admin)).rejects.toThrow('audit log write failed');

@@ -6,8 +6,9 @@
  * transition is correct, computed value is right, idempotency holds.
  * No test merely verifies that a mock was called with what we told it to return.
  */
-import { ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from './notifications.service';
@@ -52,6 +53,7 @@ describe('NotificationsService', () => {
 
   const realtimeGateway = { emitToUser: jest.fn() };
   const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+  const logger = { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() };
 
   beforeEach(async () => {
     prisma = {
@@ -75,6 +77,7 @@ describe('NotificationsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: RealtimeGateway, useValue: realtimeGateway },
         { provide: WebPushService, useValue: webPushService },
+        { provide: getLoggerToken(NotificationsService.name), useValue: logger },
       ],
     }).compile();
 
@@ -218,17 +221,43 @@ describe('NotificationsService', () => {
     );
   });
 
-  it('logs a warning (without throwing) when WebPushService.sendToUser rejects', async () => {
-    const loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  it('logs a structured warning (without throwing) when WebPushService.sendToUser rejects', async () => {
     prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
     prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-4' }));
-    webPushService.sendToUser.mockRejectedValueOnce(new Error('vapid send failed'));
+    const pushError = new Error('vapid send failed');
+    webPushService.sendToUser.mockRejectedValueOnce(pushError);
 
     await service.emitNotification('user-1', 'match_application_received', 'match-1');
     await new Promise(setImmediate);
 
-    expect(loggerWarnSpy).toHaveBeenCalledWith(expect.stringContaining('vapid send failed'));
-    loggerWarnSpy.mockRestore();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', err: pushError }),
+      '웹 푸시 발송 실패',
+    );
+  });
+
+  it('still attempts WebPushService.sendToUser when RealtimeGateway.emitToUser throws synchronously', async () => {
+    // Isolation contract mirrored from ChatService.sendMessage: a realtime-emit failure
+    // must not prevent the independent web-push attempt from being made.
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockResolvedValue(makeNotification({ id: 'notif-5' }));
+    const emitError = new Error('socket not connected');
+    realtimeGateway.emitToUser.mockImplementationOnce(() => {
+      throw emitError;
+    });
+
+    await service.emitNotification('user-1', 'match_application_received', 'match-1');
+    await new Promise(setImmediate);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', err: emitError }),
+      '실시간 알림 전송 실패',
+    );
+    // The web-push attempt must still have gone through despite the emit failure.
+    expect(webPushService.sendToUser).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({ title: '매치 신청이 도착했어요' }),
+    );
   });
 
   it('team join application received notifications deep-link to team member management', async () => {

@@ -12,8 +12,13 @@ vi.mock('@/lib/client-error-reporter', () => ({
   reportClientError: vi.fn(),
 }));
 
+vi.mock('@/lib/analytics', () => ({
+  trackEvent: vi.fn(),
+}));
+
 import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { reportClientError } from '@/lib/client-error-reporter';
+import { trackEvent } from '@/lib/analytics';
 
 const subscription = {
   endpoint: 'https://push.example/abc',
@@ -63,6 +68,33 @@ describe('useV1PushRegistration', () => {
       endpoint: 'https://push.example/abc',
       keys: { p256dh: 'p', auth: 'a' },
     });
+  });
+
+  it('tracks push_subscribe_complete only after the server subscribe call succeeds', async () => {
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(trackEvent).toHaveBeenCalledWith('push_subscribe_complete', {});
+    // Ordering: the GA event must fire after v1Post resolves, not before.
+    const postOrder = (v1Post as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    const trackOrder = (trackEvent as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    expect(trackOrder).toBeGreaterThan(postOrder);
+  });
+
+  it('does not track push_subscribe_complete when the server subscribe call fails', async () => {
+    (v1Post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('server exploded'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 
   it('does not register the service worker when the server has no VAPID public key', async () => {
@@ -137,6 +169,21 @@ describe('useV1PushRegistration', () => {
     expect(result.current.isSubscribed).toBe(false);
     expect(reportClientError).toHaveBeenCalledWith(
       expect.objectContaining({ context: expect.objectContaining({ flow: 'push-unsubscribe-server' }) }),
+    );
+  });
+
+  it('reports the initial subscription-status check failure instead of swallowing it silently', async () => {
+    Object.defineProperty(global.navigator, 'serviceWorker', {
+      configurable: true,
+      value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.reject(new Error('sw registration lost')) },
+    });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    renderHook(() => useV1PushRegistration());
+
+    await waitFor(() =>
+      expect(reportClientError).toHaveBeenCalledWith(
+        expect.objectContaining({ context: expect.objectContaining({ flow: 'push-subscription-check' }) }),
+      ),
     );
   });
 

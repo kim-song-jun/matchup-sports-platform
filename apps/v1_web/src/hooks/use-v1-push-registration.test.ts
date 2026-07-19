@@ -108,6 +108,20 @@ describe('useV1PushRegistration', () => {
     expect(subscription.unsubscribe).toHaveBeenCalled();
   });
 
+  it('unsubscribe syncs isSubscribed to false when the browser has no active subscription', async () => {
+    pushManager.getSubscription.mockResolvedValueOnce(subscription).mockResolvedValueOnce(null);
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(v1Delete).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+  });
+
   it('unsubscribe still unsubscribes the browser and reports the error when the server call fails', async () => {
     pushManager.getSubscription.mockResolvedValue(subscription);
     (v1Delete as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));

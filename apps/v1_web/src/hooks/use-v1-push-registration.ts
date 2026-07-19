@@ -57,7 +57,10 @@ export function useV1PushRegistration() {
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      if (!subscription) return;
+      if (!subscription) {
+        setIsSubscribed(false);
+        return;
+      }
 
       try {
         await v1Delete('/notifications/push-unsubscribe', { endpoint: subscription.endpoint });

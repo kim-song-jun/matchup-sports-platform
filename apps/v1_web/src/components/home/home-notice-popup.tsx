@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import type { HomePopup } from './home.types';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -126,13 +127,13 @@ export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
           <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-subtle)' }}>
             {popup.trailing}
           </div>
-          <p
+          <div
             id={bodyId}
             className="tm-text-label"
-            style={{ margin: '24px 0 0', color: 'var(--text-muted)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 180, overflowY: 'auto' }}
+            style={{ margin: '24px 0 0', color: 'var(--text-muted)', lineHeight: 1.65, maxHeight: 'min(52vh, 440px)', overflowY: 'auto' }}
           >
-            {popup.body}
-          </p>
+            <RichContentRenderer content={popup.content} legacyBody={popup.body} />
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8, padding: '0 24px 24px' }}>

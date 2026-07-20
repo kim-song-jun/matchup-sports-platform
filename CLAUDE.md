@@ -2,12 +2,13 @@
 
 풋살/농구/아이스하키/배드민턴 등 생활체육 종목의 개인 및 팀을 AI로 최적 매칭하는 플랫폼.
 
-## Git 브랜치 정책 (Critical — 2026-07-12 사용자 지정)
+## Git 브랜치 정책 (Critical — 2026-07-20 갱신, 사용자 재지정)
 
-- **main 직접 push·머지 절대 금지.** 사용자의 명시적 승인 없이는 main에 어떤 커밋도 넣지 않는다 — PR 머지 버튼(gh pr merge 포함)도 동일하게 금지.
-- **통합 브랜치는 `dev`.** 모든 작업 브랜치와 PR의 base는 `dev`다. 기능의 "완료"는 dev 머지까지를 뜻한다.
-- **dev → main 승격은 사용자 게이트.** main push는 프로덕션 배포(CI deploy)를 트리거하므로, 승격 시점은 항상 사용자가 결정한다.
-- **배포는 사람 승인 게이트.** deploy job은 `environment: production`(required reviewer)로 보호 — main push 후에도 GitHub UI에서 승인해야 빌드·배포가 시작된다.
+- **dev → main 승격 절대 금지.** `git push`/`gh pr merge`/`gh pr create --base main` 등 어떤 방식으로든 dev를 main에 승격하지 않는다 — main promotion 자체가 이 프로젝트에서 완전히 폐기된 워크플로다. 사용자 승인 여부와 무관하게 하지 않는다(과거 "사용자 게이트" 조항은 폐기됨).
+- **모든 작업은 `dev`에서만.** 통합 브랜치·배포 트리거 브랜치 모두 `dev` 하나다. 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
+- **`main`은 과거 유산 브랜치일 뿐, 배포와 무관하다.** main에 새 커밋이 생겼다면(다른 세션·실수 등) 그 변경분을 **origin/main → dev로 병합**해 흡수한다(반대 방향 금지). main 자체는 더 이상 갱신·유지하지 않는다.
+- **배포는 dev push가 자동 트리거한다.** `.github/workflows/deploy-alpha.yml`이 `push: branches: [dev]`에 반응해 승인 게이트 없이 자동으로 alpha(alpha.teameet.co.kr)에 배포한다 — dev에 머지하는 즉시 실배포로 이어진다는 뜻이므로, dev 머지 전 검증(테스트·tsc·lint)을 프로덕션 배포 게이트로 취급한다.
+- **`deploy.yml`(main 트리거, `environment: production` 승인 게이트)은 이 정책 하에서 사용하지 않는다.** 존재는 하지만 main에 아무것도 push하지 않으므로 발동하지 않는다.
 
 ## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
 

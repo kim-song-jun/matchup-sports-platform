@@ -13,6 +13,9 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import { AdminContentPreview } from '@/components/admin/admin-content-preview';
+import { RichTextEditor } from '@/components/content/rich-text-editor';
+import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import {
   useV1AdminMe,
   useV1AdminPopupDetail,
@@ -21,9 +24,11 @@ import {
   useV1DeleteAdminPopup,
   useV1UpdateAdminPopup,
 } from '@/hooks/use-v1-api';
+import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isSafePopupLink, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
+import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
   AdminListFilters,
   CursorPage,
@@ -31,6 +36,7 @@ import type {
   V1AdminPopupRow,
   V1AdminPopupStatus,
   V1PopupTargetScreen,
+  V1RichContentDocument,
 } from '@/types/api';
 import { noticeSummary } from '../notices/notice-summary';
 
@@ -103,7 +109,7 @@ export default function AdminPopupsPage() {
   const [selectedId, setSelectedId] = useState('');
   const [mode, setMode] = useState<EditorMode>('view');
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [content, setContent] = useState(EMPTY_RICH_CONTENT);
   const [status, setStatus] = useState<V1AdminPopupStatus>('published');
   const [targetScreens, setTargetScreens] = useState<V1PopupTargetScreen[]>(['home']);
   const [linkUrl, setLinkUrl] = useState('');
@@ -131,12 +137,23 @@ export default function AdminPopupsPage() {
     limit: 20,
   };
   const listQuery = useV1AdminPopups(filters);
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? listQuery.data?.summary.byStatus[option.value] : listQuery.data?.summary.total,
+  }));
   const detailQuery = useV1AdminPopupDetail(selectedId);
   const createPopup = useV1CreateAdminPopup();
   const updatePopup = useV1UpdateAdminPopup();
   const deletePopup = useV1DeleteAdminPopup();
+  const contentAssets = useTemporaryContentAssets();
   const isSaving = createPopup.isPending || updatePopup.isPending;
   const isMutating = isSaving || deletePopup.isPending;
+
+  useEffect(() => {
+    if (!contentAssets.cleanupError) return;
+    showToast(contentAssets.cleanupError, 'error');
+    contentAssets.clearCleanupError();
+  }, [contentAssets.cleanupError]);
 
   useEffect(() => {
     if (listQuery.data) {
@@ -162,14 +179,16 @@ export default function AdminPopupsPage() {
   }
 
   function openView(row: V1AdminPopupRow) {
+    void contentAssets.discard();
     setSelectedId(row.popupId);
     setMode('view');
   }
 
   function openCreate() {
+    void contentAssets.discard();
     setSelectedId('');
     setTitle('');
-    setBody('');
+    setContent(EMPTY_RICH_CONTENT);
     setStatus('published');
     setTargetScreens(['home']);
     setLinkUrl('');
@@ -180,9 +199,10 @@ export default function AdminPopupsPage() {
   }
 
   function openEdit(row: V1AdminPopupRow) {
+    void contentAssets.discard();
     setSelectedId(row.popupId);
     setTitle(row.title);
-    setBody(row.body);
+    setContent(resolveRichContent(row.content, row.body));
     setStatus(row.status);
     setTargetScreens(row.targetScreens);
     setLinkUrl(row.linkUrl ?? '');
@@ -192,11 +212,12 @@ export default function AdminPopupsPage() {
     setMode('edit');
   }
 
-  function closeEditor() {
+  async function closeEditor() {
+    await contentAssets.discard();
     setMode('view');
     if (!selectedId) {
       setTitle('');
-      setBody('');
+      setContent(EMPTY_RICH_CONTENT);
     }
   }
 
@@ -205,7 +226,7 @@ export default function AdminPopupsPage() {
     const payload: V1AdminPopupCreatePayload = {
       audience: 'public',
       title: title.trim(),
-      body: body.trim(),
+      content,
       targetScreens,
       linkUrl: linkUrl.trim() || null,
       linkLabel: linkLabel.trim() || null,
@@ -213,7 +234,7 @@ export default function AdminPopupsPage() {
       displayStartAt: toIsoOrNull(displayStartAt),
       displayEndAt: toIsoOrNull(displayEndAt),
     };
-    if (!payload.title || !payload.body) {
+    if (!payload.title || isRichContentEmpty(content)) {
       showToast('제목과 본문을 입력해 주세요.', 'error');
       return;
     }
@@ -237,6 +258,7 @@ export default function AdminPopupsPage() {
     if (mode === 'edit' && selectedId) {
       updatePopup.mutate({ popupId: selectedId, body: payload }, {
         onSuccess: ({ popup }) => {
+          void contentAssets.commit(content);
           setMode('view');
           setSelectedId(popup.popupId);
           setExtraRows([]);
@@ -249,6 +271,7 @@ export default function AdminPopupsPage() {
 
     createPopup.mutate(payload, {
       onSuccess: ({ popup }) => {
+        void contentAssets.commit(content);
         setMode('view');
         setSelectedId(popup.popupId);
         setExtraRows([]);
@@ -301,7 +324,7 @@ export default function AdminPopupsPage() {
             searchPlaceholder="제목·본문 검색"
             searchValue={search}
             onSearchChange={setSearch}
-            statusOptions={STATUS_OPTIONS}
+            statusOptions={statusOptions}
             activeStatus={activeStatus}
             onStatusChange={setActiveStatus}
           />
@@ -362,7 +385,7 @@ export default function AdminPopupsPage() {
             <PopupForm
               mode={mode}
               title={title}
-              body={body}
+              content={content}
               status={status}
               targetScreens={targetScreens}
               linkUrl={linkUrl}
@@ -372,19 +395,37 @@ export default function AdminPopupsPage() {
               canWrite={canWrite}
               saving={isSaving}
               onTitleChange={setTitle}
-              onBodyChange={setBody}
+              onContentChange={(document) => {
+                setContent(document);
+              }}
+              onUploadImage={contentAssets.uploadImage}
               onStatusChange={setStatus}
               onTargetScreensChange={setTargetScreens}
               onLinkUrlChange={setLinkUrl}
               onLinkLabelChange={setLinkLabel}
               onDisplayStartAtChange={setDisplayStartAt}
               onDisplayEndAtChange={setDisplayEndAt}
-              onCancel={closeEditor}
+              onCancel={() => void closeEditor()}
               onSubmit={submitPopup}
             />
           )}
         </aside>
       </div>
+
+      <AdminContentPreview
+        payload={{
+          kind: 'popup',
+          title: mode === 'view' ? selectedPopup?.title ?? '' : title,
+          content: mode === 'view'
+            ? resolveRichContent(selectedPopup?.content, selectedPopup?.body)
+            : content,
+          body: mode === 'view'
+            ? selectedPopup?.body ?? ''
+            : richContentPlainText(content),
+          linkUrl: mode === 'view' ? selectedPopup?.linkUrl : linkUrl.trim() || null,
+          linkLabel: mode === 'view' ? selectedPopup?.linkLabel : linkLabel.trim() || null,
+        }}
+      />
 
       <AdminToasts toasts={toasts} />
     </>
@@ -423,7 +464,9 @@ function PopupDetail({
         <div className="col-span-2"><dt className="text-xs text-gray-400">노출 화면</dt><dd className="mt-1 text-gray-700">{formatTargetScreens(popup.targetScreens)}</dd></div>
         <div className="col-span-2"><dt className="text-xs text-gray-400">이동 링크</dt><dd className="mt-1 break-all text-gray-700">{popup.linkUrl ? `${popup.linkLabel ?? '자세히 보기'} · ${popup.linkUrl}` : '없음'}</dd></div>
       </dl>
-      <div className="mt-4 max-h-[360px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-gray-100 p-4 text-sm leading-7 text-gray-700">{popup.body}</div>
+      <div className="mt-4 max-h-[440px] overflow-y-auto rounded-xl border border-gray-100 p-4 text-sm leading-7 text-gray-700">
+        <RichContentRenderer content={popup.content} legacyBody={popup.body} />
+      </div>
       {canWrite && onEdit ? (
         <button type="button" onClick={onEdit} className="mt-4 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
           <Pencil size={16} aria-hidden="true" /> 수정하기
@@ -436,7 +479,7 @@ function PopupDetail({
 function PopupForm({
   mode,
   title,
-  body,
+  content,
   status,
   targetScreens,
   linkUrl,
@@ -446,7 +489,8 @@ function PopupForm({
   canWrite,
   saving,
   onTitleChange,
-  onBodyChange,
+  onContentChange,
+  onUploadImage,
   onStatusChange,
   onTargetScreensChange,
   onLinkUrlChange,
@@ -458,7 +502,7 @@ function PopupForm({
 }: {
   mode: Exclude<EditorMode, 'view'>;
   title: string;
-  body: string;
+  content: V1RichContentDocument;
   status: V1AdminPopupStatus;
   targetScreens: V1PopupTargetScreen[];
   linkUrl: string;
@@ -468,7 +512,8 @@ function PopupForm({
   canWrite: boolean;
   saving: boolean;
   onTitleChange: (value: string) => void;
-  onBodyChange: (value: string) => void;
+  onContentChange: (value: V1RichContentDocument) => void;
+  onUploadImage: (file: File) => Promise<import('@/types/api').V1AdminContentAsset>;
   onStatusChange: (value: V1AdminPopupStatus) => void;
   onTargetScreensChange: (value: V1PopupTargetScreen[]) => void;
   onLinkUrlChange: (value: string) => void;
@@ -523,7 +568,12 @@ function PopupForm({
           <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 시작</span><input type="datetime-local" value={displayStartAt} onChange={(event) => onDisplayStartAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
           <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">노출 종료</span><input type="datetime-local" value={displayEndAt} min={displayStartAt || undefined} onChange={(event) => onDisplayEndAtChange(event.target.value)} disabled={!canWrite || saving} className="h-[44px] min-w-0 rounded-xl border border-gray-200 px-3 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" /></label>
         </div>
-        <label className="flex flex-col gap-1.5"><span className="text-sm font-semibold text-gray-700">본문</span><textarea value={body} onChange={(event) => onBodyChange(event.target.value)} maxLength={5000} rows={10} disabled={!canWrite || saving} required className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-6 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50" placeholder="선택한 화면에 표시할 내용을 입력해 주세요." /></label>
+        <RichTextEditor
+          value={content}
+          onChange={onContentChange}
+          onUploadImage={onUploadImage}
+          disabled={!canWrite || saving}
+        />
         <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs leading-5 text-gray-500">각 화면에서는 공개 상태이고 노출 기간 안에 있는 팝업 중 가장 최근 항목 하나를 보여줘요. 내부 링크는 /로 시작하고 외부 링크는 https://만 사용할 수 있어요.</p>
         <button type="submit" disabled={!canWrite || saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">{saving ? '저장 중...' : mode === 'create' ? '팝업 생성' : '수정 저장'}</button>
       </form>

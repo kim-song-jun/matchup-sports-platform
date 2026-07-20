@@ -7,7 +7,15 @@ import type {
   SignupProfileDraft,
   SignupProfileField,
 } from '@/components/auth/signup-profile-validation';
-import type { V1AdminNoticeRow, V1AdminPopupCreatePayload, V1AdminPopupRow, V1Inquiry } from '@/types/api';
+import type {
+  V1AdminNoticeCreatePayload,
+  V1AdminNoticeRow,
+  V1AdminNoticeUpdatePayload,
+  V1AdminPopupCreatePayload,
+  V1AdminPopupRow,
+  V1AdminPopupUpdatePayload,
+  V1Inquiry,
+} from '@/types/api';
 import {
   v1AdminLogsFixture,
   v1AdminNoticesFixture,
@@ -115,6 +123,10 @@ function getRegisterIssue(value: unknown): RegisterField | null {
 
 function page<T>(items: T[]) {
   return { items, nextCursor: null };
+}
+
+function countFacet<T>(items: T[], values: readonly string[], read: (item: T) => string) {
+  return Object.fromEntries(values.map((value) => [value, items.filter((item) => read(item) === value).length]));
 }
 
 function teamDetail(teamId: string) {
@@ -422,12 +434,18 @@ export const v1MswHandlers = [
     const params = new URL(request.url).searchParams;
     const status = params.get('status');
     const q = params.get('q')?.trim().toLowerCase();
-    const rows = v1AdminPopupsFixture.filter((popup) => {
-      if (status && popup.status !== status) return false;
+    const statusSource = v1AdminPopupsFixture.filter((popup) => {
       if (q && !(popup.title + ' ' + popup.body).toLowerCase().includes(q)) return false;
       return true;
     });
-    return ok(page(rows));
+    const rows = statusSource.filter((popup) => !status || popup.status === status);
+    return ok({
+      ...page(rows),
+      summary: {
+        total: statusSource.length,
+        byStatus: countFacet(statusSource, ['published', 'archived', 'draft'], (popup) => popup.status),
+      },
+    });
   }),
   http.get(api + '/admin/popups/:popupId', ({ params }) => {
     const popup = v1AdminPopupsFixture.find((item) => item.popupId === params.popupId);
@@ -440,7 +458,9 @@ export const v1MswHandlers = [
       popupId: 'popup-new',
       audience: body.audience,
       title: body.title,
-      body: body.body,
+      body: body.body ?? '',
+      content: body.content,
+      contentVersion: 1,
       targetScreens: body.targetScreens,
       linkUrl: body.linkUrl ?? null,
       linkLabel: body.linkLabel ?? null,
@@ -456,13 +476,15 @@ export const v1MswHandlers = [
     return ok({ popup });
   }),
   http.patch(api + '/admin/popups/:popupId', async ({ params, request }) => {
-    const body = await request.json() as Omit<V1AdminPopupRow, 'popupId' | 'publishedAt' | 'archivedAt' | 'createdAt' | 'updatedAt'>;
+    const body = await request.json() as V1AdminPopupUpdatePayload;
     const index = v1AdminPopupsFixture.findIndex((popup) => popup.popupId === params.popupId);
     const previous = index >= 0 ? v1AdminPopupsFixture[index] : v1AdminPopupsFixture[0];
     const now = '2026-05-18T11:00:00.000Z';
     const popup: V1AdminPopupRow = {
       ...previous,
       ...body,
+      body: body.body ?? previous.body,
+      contentVersion: previous.contentVersion + 1,
       publishedAt: body.status === 'published' ? previous.publishedAt ?? now : null,
       archivedAt: body.status === 'archived' ? previous.archivedAt ?? now : null,
       updatedAt: now,
@@ -482,14 +504,29 @@ export const v1MswHandlers = [
     const category = params.get('category');
     const audience = params.get('audience');
     const q = params.get('q')?.trim().toLowerCase();
-    const rows = v1AdminNoticesFixture.filter((notice) => {
-      if (status && notice.status !== status) return false;
-      if (category && notice.category !== category) return false;
-      if (audience && notice.audience !== audience) return false;
+    const searched = v1AdminNoticesFixture.filter((notice) => {
       if (q && !`${notice.title} ${notice.body}`.toLowerCase().includes(q)) return false;
       return true;
     });
-    return ok(page(rows));
+    const statusSource = searched.filter((notice) => {
+      if (category && notice.category !== category) return false;
+      if (audience && notice.audience !== audience) return false;
+      return true;
+    });
+    const audienceSource = searched.filter((notice) => {
+      if (status && notice.status !== status) return false;
+      if (category && notice.category !== category) return false;
+      return true;
+    });
+    const rows = statusSource.filter((notice) => !status || notice.status === status);
+    return ok({
+      ...page(rows),
+      summary: {
+        total: statusSource.length,
+        byStatus: countFacet(statusSource, ['published', 'draft', 'archived'], (notice) => notice.status),
+        byAudience: countFacet(audienceSource, ['public', 'users', 'admins'], (notice) => notice.audience),
+      },
+    });
   }),
   http.get(`${api}/admin/notices/:noticeId`, ({ params }) => {
     const notice = v1AdminNoticesFixture.find((item) => item.noticeId === params.noticeId);
@@ -500,13 +537,24 @@ export const v1MswHandlers = [
     const status = params.get('status');
     const category = params.get('category');
     const q = params.get('q')?.trim().toLowerCase();
-    const rows = v1InquiriesFixture.items.map(toAdminInquiryRow).filter((inquiry) => {
-      if (status && inquiry.status !== status) return false;
-      if (category && inquiry.category !== category) return false;
+    const searched = v1InquiriesFixture.items.map(toAdminInquiryRow).filter((inquiry) => {
       if (q && !`${inquiry.title} ${inquiry.requesterName ?? ''} ${inquiry.requesterEmail ?? ''}`.toLowerCase().includes(q)) return false;
       return true;
     });
-    return ok(page(rows));
+    const statusSource = searched.filter((inquiry) => {
+      if (category && inquiry.category !== category) return false;
+      return true;
+    });
+    const categorySource = searched.filter((inquiry) => !status || inquiry.status === status);
+    const rows = statusSource.filter((inquiry) => !status || inquiry.status === status);
+    return ok({
+      ...page(rows),
+      summary: {
+        total: statusSource.length,
+        byStatus: countFacet(statusSource, ['received', 'reviewing', 'answered', 'closed'], (inquiry) => inquiry.status),
+        byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'], (inquiry) => inquiry.category),
+      },
+    });
   }),
   http.get(`${api}/admin/inquiries/:inquiryId`, ({ params }) => {
     const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
@@ -547,20 +595,16 @@ export const v1MswHandlers = [
     });
   }),
   http.post(`${api}/admin/notices`, async ({ request }) => {
-    const body = await request.json() as {
-      audience: 'public' | 'users' | 'admins';
-      category: '업데이트' | '안내';
-      title: string;
-      body: string;
-      status: 'draft' | 'published' | 'archived';
-    };
+    const body = await request.json() as V1AdminNoticeCreatePayload;
     const now = '2026-05-18T10:00:00.000Z';
     const notice: V1AdminNoticeRow = {
       noticeId: 'notice-new',
       audience: body.audience,
       category: body.category,
       title: body.title,
-      body: body.body,
+      body: body.body ?? '',
+      content: body.content,
+      contentVersion: 1,
       status: body.status,
       publishedAt: body.status === 'published' ? now : null,
       archivedAt: body.status === 'archived' ? now : null,
@@ -571,13 +615,7 @@ export const v1MswHandlers = [
     return ok({ notice });
   }),
   http.patch(`${api}/admin/notices/:noticeId`, async ({ params, request }) => {
-    const body = await request.json() as {
-      audience: 'public' | 'users' | 'admins';
-      category: '업데이트' | '안내';
-      title: string;
-      body: string;
-      status: 'draft' | 'published' | 'archived';
-    };
+    const body = await request.json() as V1AdminNoticeUpdatePayload;
     const now = '2026-05-18T11:00:00.000Z';
     const index = v1AdminNoticesFixture.findIndex((notice) => notice.noticeId === params.noticeId);
     const previous = index >= 0 ? v1AdminNoticesFixture[index] : v1AdminNoticesFixture[0];
@@ -587,7 +625,9 @@ export const v1MswHandlers = [
       audience: body.audience,
       category,
       title: body.title,
-      body: body.body,
+      body: body.body ?? previous.body,
+      content: body.content,
+      contentVersion: previous.contentVersion + 1,
       status: body.status,
       publishedAt: body.status === 'published' ? previous.publishedAt ?? now : null,
       archivedAt: body.status === 'archived' ? previous.archivedAt ?? now : null,

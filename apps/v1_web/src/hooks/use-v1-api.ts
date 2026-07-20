@@ -8,6 +8,7 @@ import type {
   ApiEnvelope,
   ApiErrorBody,
   AdminListFilters,
+  AdminCursorPage,
   CursorPage,
   V1AdminGrantResult,
   V1AdminInquiryDetail,
@@ -16,6 +17,7 @@ import type {
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
   V1AdminLog,
+  V1AdminContentAsset,
   V1AdminPopupCreatePayload,
   V1AdminPopupCreateResult,
   V1AdminPopupDeleteResult,
@@ -207,7 +209,10 @@ export function useV1EmailLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { email: string; password: string }) => v1Post<V1AuthSessionResponse>('/auth/login', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    // Mutation callbacks run before the component callback that stores the
+    // local session hint. Refetching here can send /auth/me without headers
+    // and cache a 401 that immediately ejects the newly-created session.
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
   });
 }
 
@@ -227,7 +232,7 @@ export function useV1Register() {
       requiredTermsAccepted: boolean;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
   });
 }
 
@@ -1449,7 +1454,7 @@ export function useV1AdminMe() {
 export function useV1AdminUsers(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminUsers(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminUserRow>>('/admin/users', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminUserRow>>('/admin/users', filters),
   });
 }
 
@@ -1464,7 +1469,7 @@ export function useV1AdminUser(userId: string) {
 export function useV1AdminMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminMatches(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminMatchRow>>('/admin/matches', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminMatchRow>>('/admin/matches', filters),
   });
 }
 
@@ -1479,7 +1484,7 @@ export function useV1AdminMatch(matchId: string) {
 export function useV1AdminTeams(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeams(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminTeamRow>>('/admin/teams', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminTeamRow>>('/admin/teams', filters),
   });
 }
 
@@ -1494,7 +1499,7 @@ export function useV1AdminTeam(teamId: string) {
 export function useV1AdminPopups(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminPopups(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminPopupRow>>('/admin/popups', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminPopupRow>>('/admin/popups', filters),
   });
 }
 
@@ -1508,7 +1513,7 @@ export function useV1AdminPopupDetail(popupId: string) {
 export function useV1AdminNotices(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
   });
 }
 
@@ -1523,7 +1528,7 @@ export function useV1AdminNoticeDetail(noticeId: string) {
 export function useV1AdminInquiries(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminInquiryRow>>('/admin/inquiries', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminInquiryRow>>('/admin/inquiries', filters),
   });
 }
 
@@ -1588,7 +1593,7 @@ export function useV1ChangeAdminInquiryStatus(inquiryId: string) {
 export function useV1AdminTeamMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
   });
 }
 
@@ -1753,7 +1758,7 @@ export function useV1DeleteAdminNotice() {
 export function useV1AdminAdmins(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminAdmins(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminRow>>('/admin/admins', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminRow>>('/admin/admins', filters),
   });
 }
 
@@ -2527,6 +2532,7 @@ export function useV1CreateGroup(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
     },
   });
 }
@@ -2962,5 +2968,24 @@ export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
     queryFn: () => v1Get<V1PublicKakaoMapsKeyResponse>('/public/integrations/kakao-maps-key'),
     staleTime: 5 * 60 * 1000,
     enabled: options?.enabled,
+  });
+}
+
+// ─── 어드민: 콘텐츠(공지/팝업) 본문 이미지 업로드 ────────────────────────────
+
+export function useV1UploadAdminContentAsset() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('files', file);
+      return v1MultipartPost<V1AdminContentAsset>('/admin/content-assets', formData);
+    },
+  });
+}
+
+export function useV1DeleteAdminContentAsset() {
+  return useMutation({
+    mutationFn: (assetId: string) =>
+      v1Delete<{ assetId: string; deleted: true }>(`/admin/content-assets/${assetId}`),
   });
 }

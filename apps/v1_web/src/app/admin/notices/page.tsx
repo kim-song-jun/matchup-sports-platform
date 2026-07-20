@@ -13,9 +13,18 @@ import {
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import { useV1AdminMe, useV1AdminNotices, useV1CreateAdminNotice, useV1UpdateAdminNotice } from '@/hooks/use-v1-api';
+import { AdminContentPreview } from '@/components/admin/admin-content-preview';
+import { RichTextEditor } from '@/components/content/rich-text-editor';
+import {
+  useV1AdminMe,
+  useV1AdminNotices,
+  useV1CreateAdminNotice,
+  useV1UpdateAdminNotice,
+} from '@/hooks/use-v1-api';
+import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
   AdminListFilters,
   CursorPage,
@@ -85,7 +94,7 @@ export default function AdminNoticesPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [content, setContent] = useState(EMPTY_RICH_CONTENT);
   const [audience, setAudience] = useState<V1AdminNoticeAudience>('public');
   const [category, setCategory] = useState<V1AdminNoticeCategory>('안내');
   const [createStatus, setCreateStatus] = useState<Extract<V1AdminNoticeStatus, 'draft' | 'published'>>('published');
@@ -115,7 +124,14 @@ export default function AdminNoticesPage() {
   const { data: firstPage, isPending, isError, error, refetch } = useV1AdminNotices(filters);
   const createNotice = useV1CreateAdminNotice();
   const updateNotice = useV1UpdateAdminNotice();
+  const contentAssets = useTemporaryContentAssets();
   const isSaving = createNotice.isPending || updateNotice.isPending;
+
+  useEffect(() => {
+    if (!contentAssets.cleanupError) return;
+    showToast(contentAssets.cleanupError, 'error');
+    contentAssets.clearCleanupError();
+  }, [contentAssets.cleanupError]);
 
   useEffect(() => {
     if (firstPage) {
@@ -124,6 +140,10 @@ export default function AdminNoticesPage() {
   }, [firstPage]);
 
   const rows = [...(firstPage?.items ?? []), ...extraRows];
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
+  }));
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
@@ -142,19 +162,25 @@ export default function AdminNoticesPage() {
     }
   }
 
-  function resetForm() {
+  function clearForm() {
     setTitle('');
-    setBody('');
+    setContent(EMPTY_RICH_CONTENT);
     setAudience('public');
     setCategory('안내');
     setCreateStatus('published');
     setEditingNotice(null);
   }
 
+  async function cancelForm() {
+    await contentAssets.discard();
+    clearForm();
+  }
+
   function startEdit(row: V1AdminNoticeRow) {
+    void contentAssets.discard();
     setEditingNotice(row);
     setTitle(row.title);
-    setBody(row.body);
+    setContent(resolveRichContent(row.content, row.body));
     setAudience(row.audience);
     setCategory(row.category);
     setCreateStatus(row.status === 'published' ? 'published' : 'draft');
@@ -166,11 +192,11 @@ export default function AdminNoticesPage() {
       audience,
       category,
       title: title.trim(),
-      body: body.trim(),
+      content,
       status: createStatus,
     };
 
-    if (!payload.title || !payload.body) {
+    if (!payload.title || isRichContentEmpty(content)) {
       showToast('제목과 본문을 입력해 주세요.', 'error');
       return;
     }
@@ -178,7 +204,8 @@ export default function AdminNoticesPage() {
     if (editingNotice) {
       updateNotice.mutate({ noticeId: editingNotice.noticeId, body: payload }, {
         onSuccess: () => {
-          resetForm();
+          void contentAssets.commit(content);
+          clearForm();
           setExtraRows([]);
           setNextCursor(null);
           showToast(payload.status === 'published' ? '공지를 수정하고 발행 상태로 저장했어요.' : '공지 수정사항을 초안으로 저장했어요.', 'success');
@@ -192,7 +219,8 @@ export default function AdminNoticesPage() {
 
     createNotice.mutate(payload, {
       onSuccess: () => {
-        resetForm();
+        void contentAssets.commit(content);
+        clearForm();
         setExtraRows([]);
         setNextCursor(null);
         showToast(payload.status === 'published' ? '공지를 발행했어요.' : '공지 초안을 저장했어요.', 'success');
@@ -203,10 +231,17 @@ export default function AdminNoticesPage() {
     });
   }
 
+  const audienceCounts = firstPage?.summary.byAudience;
+  const audienceTotal = audienceCounts
+    ? Object.values(audienceCounts).reduce((sum, count) => sum + count, 0)
+    : undefined;
   const audienceOptions = [
     { value: '', label: '전체 대상' },
     ...AUDIENCE_OPTIONS,
-  ];
+  ].map((option) => ({
+    ...option,
+    count: option.value ? audienceCounts?.[option.value] : audienceTotal,
+  }));
 
   const errorMessage = isError ? extractErrorMessage(error, '공지 목록을 불러오지 못했어요.') : undefined;
 
@@ -224,7 +259,7 @@ export default function AdminNoticesPage() {
             searchPlaceholder="제목·본문 검색"
             searchValue={search}
             onSearchChange={setSearch}
-            statusOptions={STATUS_OPTIONS}
+            statusOptions={statusOptions}
             activeStatus={activeStatus}
             onStatusChange={setActiveStatus}
             rightSlot={
@@ -235,7 +270,9 @@ export default function AdminNoticesPage() {
                 className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               >
                 {audienceOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
+                  </option>
                 ))}
               </select>
             }
@@ -274,7 +311,7 @@ export default function AdminNoticesPage() {
                 { icon: <Tag size={14} aria-hidden="true" />, label: row.category },
                 { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.publishedAt) },
               ],
-              description: noticeSummary(row.body),
+              description: noticeSummary(row.body, row.content),
               tone: row.status === 'archived' ? 'warning' : undefined,
             })}
           />
@@ -301,7 +338,7 @@ export default function AdminNoticesPage() {
               {editingNotice ? (
                 <button
                   type="button"
-                  onClick={resetForm}
+                  onClick={() => void cancelForm()}
                   disabled={isSaving}
                   className="inline-flex min-h-[32px] items-center justify-center gap-1 rounded-lg px-2 text-[var(--font-size-label)] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
@@ -373,18 +410,14 @@ export default function AdminNoticesPage() {
             </label>
 
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[var(--font-size-label)] font-semibold text-gray-700">본문</span>
-              <textarea
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                maxLength={5000}
-                disabled={!canWrite || isSaving}
-                rows={8}
-                className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-relaxed text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
-                placeholder="공지 내용을 입력해 주세요."
-              />
-            </label>
+            <RichTextEditor
+              value={content}
+              onChange={(document) => {
+                setContent(document);
+              }}
+              onUploadImage={contentAssets.uploadImage}
+              disabled={!canWrite || isSaving}
+            />
 
             {!canWrite ? (
               <p className="rounded-xl bg-gray-50 px-3 py-2 text-[var(--font-size-caption)] text-gray-500">
@@ -402,6 +435,16 @@ export default function AdminNoticesPage() {
           </form>
         </section>
       </div>
+
+      <AdminContentPreview
+        payload={{
+          kind: 'notice',
+          title,
+          category,
+          content,
+          body: richContentPlainText(content),
+        }}
+      />
 
       <AdminToasts toasts={toasts} />
     </>

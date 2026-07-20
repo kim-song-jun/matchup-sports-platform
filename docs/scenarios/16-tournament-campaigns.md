@@ -6,7 +6,7 @@
 
 - [x] `TOURN-026-A` public slug route는 `published` 캠페인과 public/non-deleted 대회 조합만 반환한다.
 - [x] `TOURN-026-B` draft/archived 캠페인은 동일한 `404 TOURNAMENT_CAMPAIGN_NOT_FOUND`를 반환한다.
-- [x] `TOURN-026-C` public payload는 규정·환불·active sponsors·공개 참가팀을 포함하고 bank/연락처/admin identity를 제외한다.
+- [x] `TOURN-026-C` public payload는 규정·환불·active sponsors를 포함하고 bank/연락처/admin identity를 제외한다. 참가팀(`participantTeams`)은 대회 status가 `open`(모집중)이 아닐 때만 포함되며, `open` 상태에서는 `participantTeams`가 항상 빈 배열이고 `confirmedCount`만(팀 신원 정보 없이) 노출된다.
 - [x] `TOURN-026-D` active admin의 dedicated preview는 draft/published/archived의 실제 status와 public과 동일한 safe tournament projection을 반환하며 support도 읽을 수 있다.
 - [x] `TOURN-026-E` preview 추가 후에도 public slug read는 published-only를 유지하고 draft/archived를 404로 차단한다.
 - [x] `TOURN-027-A` owner/ops는 create/update/status, support는 read-only이며 일반 사용자는 차단된다.

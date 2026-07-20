@@ -168,6 +168,25 @@ describe('AdminService — notices and popups', () => {
     });
   });
 
+  it('increments the notice contentVersion on update instead of resetting it to 1', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+    prisma.v1Notice.findUnique.mockResolvedValue(makeNoticeRow({ contentVersion: 2 }));
+    prisma.v1Notice.update.mockImplementation(async ({ data }) => makeNoticeRow({ ...data, contentVersion: 3 }));
+    prisma.v1AdminActionLog.create.mockResolvedValue({ id: 'log-notice-version' });
+
+    await service.updateNotice(adminAuthUser, 'notice-1', {
+      audience: 'public',
+      category: '안내',
+      title: 'Updated title',
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated body' }] }] },
+      status: 'draft',
+    });
+
+    expect(prisma.v1Notice.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ contentVersion: { increment: 1 } }) }),
+    );
+  });
+
   it('creates a notice only in v1_notices', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
     prisma.v1Notice.create.mockImplementation(async ({ data }) => makeNoticeRow({ ...data, id: 'notice-new' }));
@@ -366,6 +385,25 @@ describe('AdminService — notices and popups', () => {
 
     expect(prisma.v1ContentAsset.deleteMany).not.toHaveBeenCalled();
     expect(removeStoredUrl).not.toHaveBeenCalled();
+  });
+
+  it('increments the popup contentVersion on update instead of resetting it to 1', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeOpsAdminRecord);
+    prisma.v1Popup.findUnique.mockResolvedValue(makePopupRow({ contentVersion: 3 }));
+    prisma.v1Popup.update.mockImplementation(async ({ data }) => makePopupRow({ ...data, contentVersion: 4 }));
+    prisma.v1AdminActionLog.create.mockResolvedValue({ id: 'log-popup-version' });
+
+    await service.updatePopup(adminAuthUser, 'popup-1', {
+      audience: 'public',
+      title: 'Updated title',
+      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated body' }] }] },
+      targetScreens: ['home'],
+      status: 'draft',
+    });
+
+    expect(prisma.v1Popup.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ contentVersion: { increment: 1 } }) }),
+    );
   });
 
   it('stores a temporary content asset and removes the file if DB persistence fails', async () => {

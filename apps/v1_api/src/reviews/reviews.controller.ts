@@ -34,7 +34,12 @@ export class ReviewsController {
     return this.reviewsService.received(user, query);
   }
 
+  // Received review aggregate summary — same recompute cost class as
+  // received() above (unpaginated findMany across user + managed teams,
+  // plus a second reverse findMany and an in-memory reveal-gate loop per
+  // row). Same tighter limit for the same reason.
   @Get('received/summary')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   receivedSummary(@CurrentUser() user: V1AuthUser, @Query() query: ReceivedSummaryQueryDto) {
     return this.reviewsService.receivedSummary(user, query);
   }

@@ -96,6 +96,12 @@ if (( memory_available_kib < 262144 || swap_free_kib < 262144 )); then
   exit 1
 fi
 
+echo "[alpha-deploy] Pre-build disk reclaim (unused images + build cache from prior deploys)"
+df -h / | tail -1
+docker image prune -af >/dev/null 2>&1 || true
+docker builder prune -af >/dev/null 2>&1 || true
+df -h / | tail -1
+
 if ! command -v rsync >/dev/null 2>&1; then
   echo "[alpha-deploy] Installing missing rsync prerequisite"
   sudo dnf install -y rsync
@@ -205,5 +211,10 @@ for repository in teameet-v1-api teameet-v1-web; do
     docker image rm "${image}" >/dev/null 2>&1 || true
   done
 done
+
+echo "[alpha-deploy] Post-deploy disk reclaim (dangling images + stale build cache)"
+docker image prune -f >/dev/null 2>&1 || true
+docker builder prune -af --filter "until=24h" >/dev/null 2>&1 || true
+df -h / | tail -1
 
 echo "[alpha-deploy] ${release_version} is healthy"

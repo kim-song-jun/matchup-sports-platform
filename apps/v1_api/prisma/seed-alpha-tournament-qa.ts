@@ -58,7 +58,7 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
   {
     id: 'aa100000-0000-4000-8000-000000000001',
     slug: 'alpha-qa-futsal-draft',
-    title: '[ALPHA QA] 기획 중인 루키 풋살컵',
+    title: '(테스트) 기획 중인 루키 풋살컵',
     status: V1TournamentStatus.draft,
     startsInDays: 35,
     entryFee: 0,
@@ -68,7 +68,7 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
   {
     id: 'aa100000-0000-4000-8000-000000000002',
     slug: 'alpha-qa-futsal-recruiting',
-    title: '[ALPHA QA] 참가 모집 중 풋살 오픈',
+    title: '(테스트) 참가 모집 중 풋살 오픈',
     status: V1TournamentStatus.open,
     startsInDays: 21,
     entryFee: 120_000,
@@ -78,7 +78,7 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
   {
     id: 'aa100000-0000-4000-8000-000000000003',
     slug: 'alpha-qa-futsal-roster-lock',
-    title: '[ALPHA QA] 모집 마감 · 명단 확정 컵',
+    title: '(테스트) 모집 마감 · 명단 확정 컵',
     status: V1TournamentStatus.closed,
     startsInDays: 7,
     entryFee: 100_000,
@@ -88,7 +88,7 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
   {
     id: 'aa100000-0000-4000-8000-000000000004',
     slug: 'alpha-qa-futsal-live',
-    title: '[ALPHA QA] 현재 경기 중 챔피언십',
+    title: '(테스트) 현재 경기 중 챔피언십',
     status: V1TournamentStatus.in_progress,
     startsInDays: 0,
     entryFee: 150_000,
@@ -98,7 +98,7 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
   {
     id: 'aa100000-0000-4000-8000-000000000005',
     slug: 'alpha-qa-futsal-completed',
-    title: '[ALPHA QA] 결과 · 영상 · 개인 시상 컵',
+    title: '(테스트) 결과 · 영상 · 개인 시상 컵',
     status: V1TournamentStatus.completed,
     startsInDays: -14,
     entryFee: 150_000,
@@ -108,7 +108,7 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
   {
     id: 'aa100000-0000-4000-8000-000000000006',
     slug: 'alpha-qa-futsal-cancelled',
-    title: '[ALPHA QA] 취소된 우천 풋살컵',
+    title: '(테스트) 취소된 우천 풋살컵',
     status: V1TournamentStatus.cancelled,
     startsInDays: 10,
     entryFee: 80_000,
@@ -156,27 +156,27 @@ export const ALPHA_TOURNAMENT_SCENARIOS: readonly TournamentScenario[] = [
 ] as const;
 
 const FEATURED_QA_DEFAULT_MARKETING: TournamentMarketingCopy = {
-  promoHomeSubtitle: 'ALPHA 전체 대회 플로우 검증 데이터',
-  announcementTitle: 'ALPHA QA 대회 운영 안내',
+  promoHomeSubtitle: '내부 테스트용 데이터예요',
+  announcementTitle: '(테스트) 대회 운영 안내',
   announcementBody: '',
-  rulesText: 'ALPHA QA 전용 규정입니다. 실제 경기나 결제 효력이 없습니다.',
-  refundPolicyText: 'ALPHA QA 전용 환불 안내입니다. 실제 환불은 발생하지 않습니다.',
-  bankName: 'ALPHA 테스트은행',
+  rulesText: '내부 테스트 전용 데이터입니다. 실제 경기나 결제 효력이 없습니다.',
+  refundPolicyText: '내부 테스트 전용 환불 안내입니다. 실제 환불은 발생하지 않습니다.',
+  bankName: '테스트은행',
   bankAccount: '000-0000-0000',
-  bankHolder: 'ALPHA TEST · 실제 송금 금지',
+  bankHolder: '테스트 계정 · 실제 송금 금지',
   campaignIntroTitle: '대회 상태별 실제 사용자 플로우를 확인해 보세요',
-  campaignIntroBody: '이 이벤트는 alpha QA 전용 목데이터입니다. 신청, 명단, 대진, 결과, 영상, 후기와 개인 시상 화면을 실제 배포 환경에서 점검할 수 있습니다.',
+  campaignIntroBody: '이 이벤트는 내부 테스트 전용 목데이터입니다. 신청, 명단, 대진, 결과, 영상, 후기와 개인 시상 화면을 실제 배포 환경에서 점검할 수 있습니다.',
   campaignHighlightsSectionTitle: '이 대회에서 확인할 수 있는 기능',
   campaignHighlightBody: '',
-  campaignFaqSectionTitle: 'ALPHA QA 안내',
+  campaignFaqSectionTitle: '테스트 안내',
   campaignFaq: [],
   sponsor: {
-    name: '팀밋 ALPHA 파트너',
-    description: 'QA 전용 가상 스폰서',
+    name: '팀밋 테스트 파트너',
+    description: '테스트 전용 가상 스폰서',
     benefitText: '참가팀 전원 테스트 기념품',
     eventTitle: '결승 스코어 맞히기',
-    eventDescription: 'ALPHA 화면 검증용 이벤트',
-    eventResultText: '알파레드 FC 우승',
+    eventDescription: '테스트 화면 검증용 이벤트',
+    eventResultText: '우승팀 발표 완료',
   },
 };
 

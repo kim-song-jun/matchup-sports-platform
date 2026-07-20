@@ -101,6 +101,6 @@ describe('alpha tournament QA campaign content', () => {
       new Date('2026-08-08T09:00:00.000Z'),
       new Date('2026-08-01T09:00:00.000Z'),
     ) as { faqSectionTitle: string };
-    expect(content.faqSectionTitle).toBe('ALPHA QA 안내');
+    expect(content.faqSectionTitle).toBe('테스트 안내');
   });
 });

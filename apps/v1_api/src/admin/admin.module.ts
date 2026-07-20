@@ -7,9 +7,10 @@ import { AdminController } from './admin.controller';
 import { AdminOpsController } from './admin-ops.controller';
 import { AdminOpsService } from './admin-ops.service';
 import { AdminService } from './admin.service';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
-  imports: [AdminContextModule, NotificationsModule, RealtimeModule],
+  imports: [AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule],
   controllers: [AdminController, AdminOpsController],
   providers: [AdminService, AdminOpsService, V1AuthGuard],
 })

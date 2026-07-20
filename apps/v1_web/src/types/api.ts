@@ -23,6 +23,17 @@ export type CursorPage<T> = {
   };
 };
 
+export type AdminListSummary = {
+  total: number;
+  byStatus: Record<string, number>;
+  byCategory?: Record<string, number>;
+  byAudience?: Record<string, number>;
+};
+
+export type AdminCursorPage<T> = CursorPage<T> & {
+  summary: AdminListSummary;
+};
+
 export type V1Status = 'open' | 'pending' | 'confirmed' | 'closed' | 'cancelled';
 export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full';
 export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired';
@@ -147,6 +158,28 @@ export type V1OnboardingMutationResult = {
   limited?: boolean;
 };
 
+export type V1RichContentMark = {
+  type: 'bold' | 'italic' | 'underline' | 'strike' | 'link';
+  attrs?: { href?: string; target?: '_blank'; rel?: 'noopener noreferrer nofollow' };
+};
+
+export type V1RichContentNode = {
+  type: 'doc' | 'paragraph' | 'heading' | 'bulletList' | 'orderedList' | 'listItem' | 'blockquote' | 'horizontalRule' | 'hardBreak' | 'image' | 'text';
+  attrs?: {
+    level?: 2 | 3;
+    src?: string;
+    alt?: string;
+    title?: string | null;
+    assetId?: string;
+    textAlign?: 'left' | 'center' | 'right';
+  };
+  content?: V1RichContentNode[];
+  marks?: V1RichContentMark[];
+  text?: string;
+};
+
+export type V1RichContentDocument = V1RichContentNode & { type: 'doc' };
+
 export type V1Notice = {
   id?: string;
   noticeId?: string;
@@ -155,6 +188,8 @@ export type V1Notice = {
   category?: string;
   publishedAt: string;
   body?: string | null;
+  content?: V1RichContentDocument | null;
+  contentVersion?: number;
 };
 
 export type V1PopupTargetScreen =
@@ -177,6 +212,8 @@ export type V1Popup = {
   popupId: string;
   title: string;
   body: string;
+  content?: V1RichContentDocument | null;
+  contentVersion?: number;
   targetScreens: V1PopupTargetScreen[];
   linkUrl: string | null;
   linkLabel: string | null;
@@ -1285,6 +1322,8 @@ export type V1AdminNoticeRow = {
   category: V1AdminNoticeCategory;
   title: string;
   body: string;
+  content: V1RichContentDocument;
+  contentVersion: number;
   status: V1AdminNoticeStatus;
   publishedAt: string | null;
   archivedAt: string | null;
@@ -1296,7 +1335,8 @@ export type V1AdminNoticeCreatePayload = {
   audience: V1AdminNoticeAudience;
   category: V1AdminNoticeCategory;
   title: string;
-  body: string;
+  body?: string;
+  content: V1RichContentDocument;
   status: V1AdminNoticeStatus;
 };
 
@@ -1326,6 +1366,8 @@ export type V1AdminPopupRow = {
   audience: V1AdminNoticeAudience;
   title: string;
   body: string;
+  content: V1RichContentDocument;
+  contentVersion: number;
   targetScreens: V1PopupTargetScreen[];
   linkUrl: string | null;
   linkLabel: string | null;
@@ -1341,7 +1383,8 @@ export type V1AdminPopupRow = {
 export type V1AdminPopupCreatePayload = {
   audience: V1AdminNoticeAudience;
   title: string;
-  body: string;
+  body?: string;
+  content: V1RichContentDocument;
   targetScreens: V1PopupTargetScreen[];
   linkUrl?: string | null;
   linkLabel?: string | null;
@@ -1764,6 +1807,11 @@ export type V1Tournament = {
   rulesText: string | null;
   refundPolicyText: string | null;
   registrationCount: number;
+  operationCounts?: {
+    registrations: number;
+    fixtures: number;
+    announcements: number;
+  };
   createdAt: string;
   updatedAt: string;
 };
@@ -2231,6 +2279,13 @@ export type V1AdminTournamentListPage = {
     nextCursor: string | null;
     hasNext: boolean;
   };
+  summary: AdminListSummary;
+};
+
+export type V1AdminContentAsset = {
+  assetId: string;
+  url: string;
+  status: 'temporary' | 'attached';
 };
 
 export type V1AdminRegistrationListPage = {

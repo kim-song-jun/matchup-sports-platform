@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -28,6 +29,8 @@ import {
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { AdminService } from './admin.service';
+import { UploadsService } from '../uploads/uploads.service';
+import '../uploads/multer.types';
 
 @Controller('admin')
 @UseGuards(V1AuthGuard)
@@ -37,6 +40,23 @@ export class AdminController {
   @Get('me')
   me(@CurrentUser() user: V1AuthUser) {
     return this.adminService.me(user);
+  }
+
+  @Post('content-assets')
+  @UseInterceptors(FilesInterceptor('files', 1, {
+    dest: UploadsService.UPLOAD_BASE,
+    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  }))
+  createContentAsset(
+    @CurrentUser() user: V1AuthUser,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.adminService.createContentAsset(user, files ?? []);
+  }
+
+  @Delete('content-assets/:assetId')
+  deleteContentAsset(@CurrentUser() user: V1AuthUser, @Param('assetId') assetId: string) {
+    return this.adminService.deleteContentAsset(user, assetId);
   }
 
   @Get('overview')

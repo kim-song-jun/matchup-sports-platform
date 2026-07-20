@@ -21,6 +21,8 @@ export class NoticesService {
         category: true,
         title: true,
         body: true,
+        contentJson: true,
+        contentVersion: true,
         publishedAt: true,
       },
     });
@@ -32,6 +34,8 @@ export class NoticesService {
         category: notice.category,
         title: notice.title,
         body: notice.body,
+        content: notice.contentJson,
+        contentVersion: notice.contentVersion,
         publishedAt: notice.publishedAt,
       })),
       pageInfo: {
@@ -55,6 +59,8 @@ export class NoticesService {
         category: true,
         title: true,
         body: true,
+        contentJson: true,
+        contentVersion: true,
         publishedAt: true,
       },
     });
@@ -70,6 +76,8 @@ export class NoticesService {
         category: notice.category,
         title: notice.title,
         body: notice.body,
+        content: notice.contentJson,
+        contentVersion: notice.contentVersion,
         publishedAt: notice.publishedAt,
       },
     };

@@ -143,6 +143,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       data: {
         items: [previousTournament()],
         pageInfo: { nextCursor: null, hasNext: false },
+        summary: { total: 1, byStatus: {} },
       },
       isPending: false,
     });

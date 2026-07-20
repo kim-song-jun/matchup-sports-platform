@@ -108,25 +108,45 @@ function makeTeamMatchRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeInquiryRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'inq-1',
+    category: 'account',
+    title: '로그인 문의',
+    status: 'received',
+    relatedType: null,
+    relatedId: null,
+    createdAt: new Date('2026-07-18T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-18T00:00:00.000Z'),
+    closedAt: null,
+    userId: 'u-1',
+    user: { email: 'user@teameet.v1', profile: { nickname: '문의자', displayName: '문의자' } },
+    _count: { replies: 0 },
+    ...overrides,
+  };
+}
+
 // ─── Test setup ───────────────────────────────────────────────────────────────
 
 describe('AdminService — list/detail endpoints', () => {
   let service: AdminService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
-    v1User: { findMany: jest.Mock; findUnique: jest.Mock };
-    v1Match: { findMany: jest.Mock; findUnique: jest.Mock };
-    v1Team: { findMany: jest.Mock; findUnique: jest.Mock };
-    v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock };
+    v1User: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
+    v1Match: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
+    v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
+    v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
+    v1Inquiry: { findMany: jest.Mock; groupBy: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
-      v1User: { findMany: jest.fn(), findUnique: jest.fn() },
-      v1Match: { findMany: jest.fn(), findUnique: jest.fn() },
-      v1Team: { findMany: jest.fn(), findUnique: jest.fn() },
-      v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn() },
+      v1User: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1Match: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1Team: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1Inquiry: { findMany: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -185,6 +205,10 @@ describe('AdminService — list/detail endpoints', () => {
     it('returns items and pageInfo with correct shape for active admin', async () => {
       const row = makeUserRow();
       prisma.v1User.findMany.mockResolvedValue([row]);
+      prisma.v1User.groupBy.mockResolvedValue([
+        { accountStatus: 'active', _count: { _all: 21 } },
+        { accountStatus: 'suspended', _count: { _all: 2 } },
+      ]);
 
       const result = await service.listUsers(adminAuthUser, {});
 
@@ -206,6 +230,10 @@ describe('AdminService — list/detail endpoints', () => {
         adminRole: null,
       });
       expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+      expect(result.summary).toEqual({
+        total: 23,
+        byStatus: { active: 21, suspended: 2, blocked: 0, withdrawal_pending: 0, deleted: 0 },
+      });
     });
 
     it('passes status filter to Prisma where clause', async () => {
@@ -351,6 +379,10 @@ describe('AdminService — list/detail endpoints', () => {
 
     it('returns items with correct shape', async () => {
       prisma.v1Match.findMany.mockResolvedValue([makeMatchRow()]);
+      prisma.v1Match.groupBy.mockResolvedValue([
+        { status: 'recruiting', _count: { _all: 8 } },
+        { status: 'completed', _count: { _all: 4 } },
+      ]);
 
       const result = await service.listMatches(adminAuthUser, {});
 
@@ -368,6 +400,10 @@ describe('AdminService — list/detail endpoints', () => {
         maxParticipants: 6,
       });
       expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+      expect(result.summary).toEqual({
+        total: 12,
+        byStatus: { recruiting: 8, closed: 0, cancelled: 0, completed: 4, archived: 0 },
+      });
     });
 
     it('passes status filter to where', async () => {
@@ -453,6 +489,10 @@ describe('AdminService — list/detail endpoints', () => {
 
     it('returns items with correct shape', async () => {
       prisma.v1Team.findMany.mockResolvedValue([makeTeamRow()]);
+      prisma.v1Team.groupBy.mockResolvedValue([
+        { status: 'active', _count: { _all: 7 } },
+        { status: 'archived', _count: { _all: 1 } },
+      ]);
 
       const result = await service.listTeams(adminAuthUser, {});
 
@@ -466,6 +506,10 @@ describe('AdminService — list/detail endpoints', () => {
         memberCount: 3,
         managerCount: 1,
         status: 'active',
+      });
+      expect(result.summary).toEqual({
+        total: 8,
+        byStatus: { active: 7, suspended: 0, archived: 1 },
       });
     });
 
@@ -570,6 +614,10 @@ describe('AdminService — list/detail endpoints', () => {
 
     it('returns items with correct shape', async () => {
       prisma.v1TeamMatch.findMany.mockResolvedValue([makeTeamMatchRow()]);
+      prisma.v1TeamMatch.groupBy.mockResolvedValue([
+        { status: 'recruiting', _count: { _all: 5 } },
+        { status: 'matched', _count: { _all: 3 } },
+      ]);
 
       const result = await service.listTeamMatches(adminAuthUser, {});
 
@@ -581,6 +629,10 @@ describe('AdminService — list/detail endpoints', () => {
         hostTeamName: '강남 러닝 크루',
         sportName: '풋살',
         status: 'recruiting',
+      });
+      expect(result.summary).toEqual({
+        total: 8,
+        byStatus: { recruiting: 5, closed: 0, matched: 3, cancelled: 0, completed: 0, archived: 0 },
       });
     });
 
@@ -601,6 +653,39 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.pageInfo.hasNext).toBe(true);
       expect(result.pageInfo.nextCursor).toBe('tm-5');
       expect(result.items).toHaveLength(5);
+    });
+  });
+
+  describe('listInquiries', () => {
+    it('returns status and category facets without cursor truncation', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+      prisma.v1Inquiry.findMany.mockResolvedValue([makeInquiryRow()]);
+      prisma.v1Inquiry.groupBy
+        .mockResolvedValueOnce([
+          { status: 'received', _count: { _all: 9 } },
+          { status: 'answered', _count: { _all: 4 } },
+        ])
+        .mockResolvedValueOnce([
+          { category: 'account', _count: { _all: 3 } },
+          { category: 'report', _count: { _all: 2 } },
+        ]);
+
+      const result = await service.listInquiries(adminAuthUser, { q: '로그인' });
+
+      expect(result.items[0]).toMatchObject({ inquiryId: 'inq-1', status: 'received', category: 'account' });
+      expect(result.summary).toEqual({
+        total: 13,
+        byStatus: { received: 9, reviewing: 0, answered: 4, closed: 0 },
+        byCategory: {
+          account: 3,
+          match: 0,
+          team: 0,
+          tournament: 0,
+          payment_refund: 0,
+          report: 2,
+          other: 0,
+        },
+      });
     });
   });
 });

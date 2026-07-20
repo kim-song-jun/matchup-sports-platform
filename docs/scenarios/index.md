@@ -223,6 +223,14 @@
 | 2026-07-15 | Browser root promotion | Passed | Existing Web/API returned `/home` 200, legacy browser `/v1/home` 404, and `/api/v1/health` 200. Web pages/assets/uploads use root paths while backend `/api/v1` remains canonical. | Deployment health contract must retain the negative `/v1/*` 404 check. |
 | 2026-07-19 | Dynamic tournament campaign lifecycle | Passed | Existing dev Web/API/PostgreSQL lifecycle, public/admin/archive behavior, exact cleanup, hero/fact/story/highlight/prize/sponsor/FAQ/CTA polish, 375/768/1280 responsive evidence and clone-fidelity re-review passed. Final CTA is natural-flow and does not obscure prize rows or mobile navigation. | Production header-auth posture remains an infrastructure/security release gate, not a campaign UI gap. |
 
+### 2026-07-19 Admin rich-content image matrix
+
+- Status: Passed
+- Coverage: focused automation 71/71, full API 578/578, full Web 139/139, browser 14/14, live API/DB lifecycle 6/6
+- Scenario: [16-admin-rich-content-images.md](./16-admin-rich-content-images.md)
+- Browser evidence: output/playwright/visual-audit/rich-content-image-matrix-2026-07-19/report.json
+- Finding fixed during QA: selecting multiple images inserted only one image; the editor now inserts the ordered image node array in one Tiptap transaction.
+
 ## Historical Run Summary
 
 - 2026-04 priority QA remediation 실행 명령:

@@ -185,7 +185,10 @@ export function useV1EmailLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { email: string; password: string }) => v1Post<V1AuthSessionResponse>('/auth/login', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    // Mutation callbacks run before the component callback that stores the
+    // local session hint. Refetching here can send /auth/me without headers
+    // and cache a 401 that immediately ejects the newly-created session.
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
   });
 }
 
@@ -204,7 +207,7 @@ export function useV1Register() {
       requiredTermsAccepted: boolean;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
   });
 }
 

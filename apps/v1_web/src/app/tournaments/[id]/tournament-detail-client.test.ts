@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   getTournamentPostEventCards,
@@ -792,6 +792,91 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     // (모바일 카드 + 데스크탑 aside)에서 쓰던 "참가 전 꼭 확인해 주세요" 카피는 남아있으면 안 된다.
     expect(screen.getAllByText('참가 전 유의사항')).toHaveLength(1);
     expect(screen.queryByText('참가 전 꼭 확인해 주세요')).not.toBeInTheDocument();
+  });
+});
+
+describe('TournamentParticipantSection — hides team names while the tournament is recruiting (status=open)', () => {
+  it('hides confirmed team names/logos and shows the recruiting copy + confirmedCount, even if participantTeams unexpectedly has data (defense-in-depth in case the backend contract regresses)', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'open',
+      format: 'league',
+      teamCount: 8,
+      confirmedCount: 3,
+      participantTeams: [
+        makeParticipantTeam({ registrationId: 'confirmed-1', status: 'confirmed' }),
+        makeParticipantTeam({ registrationId: 'confirmed-2', status: 'confirmed' }),
+      ],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    const participantSection = screen.getByRole('region', { name: '참가팀' });
+    expect(within(participantSection).queryByText('팀 confirmed-1')).not.toBeInTheDocument();
+    expect(within(participantSection).queryByText('팀 confirmed-2')).not.toBeInTheDocument();
+    expect(within(participantSection).getByText('참가팀 공개 전')).toBeInTheDocument();
+    expect(within(participantSection).getByText('모집 마감 후 참가팀 명단이 공개돼요.')).toBeInTheDocument();
+    expect(within(participantSection).getByText('현재 3팀이 참가를 확정했어요')).toBeInTheDocument();
+    expect(within(participantSection).getByText('3/8팀 확정')).toBeInTheDocument();
+  });
+
+  it('hides the "현재 N팀이 참가를 확정했어요" line when confirmedCount is 0 while recruiting', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'open',
+      format: 'league',
+      teamCount: 8,
+      confirmedCount: 0,
+      participantTeams: [],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    const participantSection = screen.getByRole('region', { name: '참가팀' });
+    expect(within(participantSection).getByText('참가팀 공개 전')).toBeInTheDocument();
+    expect(within(participantSection).queryByText(/참가를 확정했어요/)).not.toBeInTheDocument();
+    expect(within(participantSection).getByText('0/8팀 확정')).toBeInTheDocument();
+  });
+
+  it('reveals confirmed and waitlisted team names once status leaves open (e.g. closed) — regression guard for the pre-existing hasAny-based behavior', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'closed',
+      format: 'league',
+      teamCount: 8,
+      // confirmedCount matches the single 'confirmed' team below — for non-open statuses the
+      // header is derived from the actual confirmed team list (confirmed.length), not this field.
+      confirmedCount: 1,
+      participantTeams: [
+        makeParticipantTeam({ registrationId: 'confirmed-1', status: 'confirmed' }),
+        makeParticipantTeam({ registrationId: 'wait-1', status: 'waitlisted' }),
+      ],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    const participantSection = screen.getByRole('region', { name: '참가팀' });
+    expect(within(participantSection).getByText('팀 confirmed-1')).toBeInTheDocument();
+    expect(within(participantSection).getByText('팀 wait-1')).toBeInTheDocument();
+    expect(within(participantSection).queryByText('참가팀 공개 전')).not.toBeInTheDocument();
+    expect(within(participantSection).getByText('1/8팀 확정')).toBeInTheDocument();
+  });
+
+  it('still shows the pre-existing empty state (not the recruiting copy) when closed with zero registrations — regression guard', () => {
+    const tournament = makeTournament({
+      id: 't1',
+      status: 'closed',
+      format: 'league',
+      teamCount: 8,
+      confirmedCount: 0,
+      participantTeams: [],
+    });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    const participantSection = screen.getByRole('region', { name: '참가팀' });
+    expect(within(participantSection).getByText('참가팀 공개 전')).toBeInTheDocument();
+    expect(within(participantSection).getByText('입금 확인과 운영진 검토가 끝난 팀부터 이곳에 공개돼요.')).toBeInTheDocument();
   });
 });
 

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import type { V1TournamentParticipantTeam } from '@/types/api';
+import type { V1TournamentParticipantTeam, V1TournamentStatus } from '@/types/api';
 
 type ParticipantTeamBuckets = {
   confirmed: V1TournamentParticipantTeam[];
@@ -103,11 +103,21 @@ export function TournamentApplicationGuideSection({
 export function TournamentParticipantSection({
   teams,
   teamCount,
+  status,
+  confirmedCount,
 }: {
   teams: V1TournamentParticipantTeam[];
   teamCount: number;
+  /** 'open'(모집 중)에는 참가팀 명단(팀명·로고)을 숨긴다 — 확정 인원수는 계속 노출. */
+  status: V1TournamentStatus;
+  confirmedCount: number;
 }) {
   const { confirmed, waitlisted, hasAny } = getParticipantTeamBuckets(teams);
+  const isRecruiting = status === 'open';
+  // 모집 중에는 백엔드가 participantTeams를 빈 배열로 내려주므로 confirmed.length는 항상 0이다.
+  // 헤더 숫자는 대회 status와 무관하게 정확해야 하므로, 모집 중일 때만 confirmedCount로 대체한다.
+  const confirmedDisplayCount = isRecruiting ? confirmedCount : confirmed.length;
+  const showList = !isRecruiting && hasAny;
 
   return (
     <section aria-labelledby="participant-teams-heading" style={{ marginTop: 24 }}>
@@ -116,11 +126,11 @@ export function TournamentParticipantSection({
           참가팀
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
-          {confirmed.length}/{teamCount}팀 확정
+          {confirmedDisplayCount}/{teamCount}팀 확정
         </div>
       </div>
 
-      {hasAny ? (
+      {showList ? (
         <Card pad={16} style={{ marginTop: 4 }}>
           <ParticipantTeamList teams={confirmed} label="참가 확정" badgeClass="tm-badge-blue" />
           {waitlisted.length > 0 ? (
@@ -135,8 +145,15 @@ export function TournamentParticipantSection({
             참가팀 공개 전
           </div>
           <div className="tm-text-caption" style={{ color: 'var(--text-caption)', lineHeight: 1.6, marginTop: 4 }}>
-            입금 확인과 운영진 검토가 끝난 팀부터 이곳에 공개돼요.
+            {isRecruiting
+              ? '모집 마감 후 참가팀 명단이 공개돼요.'
+              : '입금 확인과 운영진 검토가 끝난 팀부터 이곳에 공개돼요.'}
           </div>
+          {isRecruiting && confirmedCount > 0 ? (
+            <div className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 600, marginTop: 8 }}>
+              현재 {confirmedCount}팀이 참가를 확정했어요
+            </div>
+          ) : null}
         </Card>
       )}
     </section>

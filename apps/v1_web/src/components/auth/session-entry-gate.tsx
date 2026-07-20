@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
 import { clearStoredV1Session, hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 
@@ -35,17 +36,23 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
       return;
     }
 
-    if (authMe.isError) {
+    if (authMe.isError && !authMe.isFetching && isUnauthenticated(authMe.error)) {
       clearStoredV1Session();
+      setHasSessionHint(false);
       if (mode === 'root') router.replace('/login');
     }
-  }, [authMe.isError, authMe.isSuccess, hasSessionHint, mode, router]);
+  }, [authMe.error, authMe.isError, authMe.isFetching, authMe.isSuccess, hasSessionHint, mode, router]);
 
   if (mode === 'login' && (hasSessionHint === false || authMe.isError)) {
     return <>{children}</>;
   }
 
   return <SessionFallback />;
+}
+
+function isUnauthenticated(error: unknown) {
+  return error instanceof V1ApiError
+    && (error.statusCode === 401 || error.code === 'UNAUTHENTICATED');
 }
 
 export function SessionFallback() {

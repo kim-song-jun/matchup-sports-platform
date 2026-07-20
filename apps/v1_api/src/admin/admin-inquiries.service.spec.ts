@@ -32,6 +32,7 @@ const activeAdminRecord = {
   userId: 'admin-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function makeGuestInquiryRow(overrides: Record<string, unknown> = {}) {
@@ -58,13 +59,13 @@ describe('AdminService — inquiries null-safety (guest inquiries)', () => {
   let service: AdminService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
-    v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock; count: jest.Mock };
+    v1Inquiry: { findMany: jest.Mock; findUnique: jest.Mock; count: jest.Mock; groupBy: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
-      v1Inquiry: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
+      v1Inquiry: { findMany: jest.fn(), findUnique: jest.fn(), count: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
     };
 
     const module: TestingModule = await Test.createTestingModule({

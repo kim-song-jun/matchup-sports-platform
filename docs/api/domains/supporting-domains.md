@@ -278,10 +278,13 @@
   - 필드: `id`, `name`, `description`, `logoUrl`, `websiteUrl`, `instagramUrl`, `benefitText`, `boothText`, `eventTitle`, `eventDescription`, `eventResultText`, `sortOrder`
   - 프론트는 `sponsors.length > 0`일 때 `#tournament-sponsors` 섹션을 렌더하고, 후속 허브의 협찬 CTA도 이 앵커를 우선 사용한다. `announcements.category=sponsor`는 구조화 sponsor row가 없을 때 운영진 공지 fallback으로만 사용한다.
 - `participantTeams`는 공개 가능한 참가팀 목록이다.
-  - 포함 상태: `confirmed`, `waitlisted`
-  - 제외 상태: `draft`, `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested`, `cancelled`
-  - 필드: `registrationId`, `teamId`, `teamName`, `status`, `confirmedAt`
-  - 확정 팀이 대기 팀보다 먼저 렌더링될 수 있도록 API가 `confirmed` 우선 순서로 직렬화한다.
+  - 대회 `status`가 `open`(모집중)이면 `participantTeams`는 항상 빈 배열이다 — 모집 중에는 참가팀의 신원 정보(팀명·로고·지역)를 비공개한다.
+  - `status`가 `closed`(모집마감) 이후(`closed | in_progress | completed`)부터는 아래 등록 상태 기준으로 필터링된 참가팀 목록을 그대로 노출한다.
+    - 포함 상태: `confirmed`, `waitlisted`
+    - 제외 상태: `draft`, `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested`, `cancelled`
+    - 필드: `registrationId`, `teamId`, `teamName`, `status`, `confirmedAt`
+    - 확정 팀이 대기 팀보다 먼저 렌더링될 수 있도록 API가 `confirmed` 우선 순서로 직렬화한다.
+  - `confirmedCount`는 대회 `status`와 무관하게 항상 정확한 확정 인원수(실제 confirmed 등록 수)를 반환한다 — 모집 중에도 "몇 팀이 참가하는지"는 계속 노출된다.
 - 계좌이체 신청 화면에서 안내가 필요하므로 상세 응답에는 `bankName`, `bankAccount`, `bankHolder`가 포함된다.
 
 ### 신청/결제 응답 계약

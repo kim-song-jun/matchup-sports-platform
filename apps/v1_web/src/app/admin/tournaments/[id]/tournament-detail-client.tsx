@@ -1683,12 +1683,11 @@ export function BracketTab({
 
     <div className={[
       'flex flex-col gap-6',
-      /* 우측 컬럼(브래킷)에 minmax(0,640px) 상한 추가 — 1920+에서 과폭 방지 */
-      hasData ? 'lg:grid lg:grid-cols-[minmax(0,480px)_minmax(0,640px)] lg:items-start lg:gap-6' : '',
+      hasData ? 'xl:grid xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] xl:items-start xl:gap-8' : '',
     ].join(' ')}>
 
       {/* ── 좌측 컬럼: 관리 폼 (조 만들기 · 팀 배정 · 픽스처 만들기) ── */}
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
 
       {/* ── Step 1: 조 만들기 ───────────────────────────────────────── */}
       <StepRow n={1} locked={false}>
@@ -2014,13 +2013,18 @@ export function BracketTab({
       </div>{/* end left column */}
 
       {/* ── 우측 컬럼: 데이터 (조별 순위표 · 픽스처 목록) ── */}
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
 
       {/* ── 조별 순위표 ──────────────────────────────────────────────── */}
       {groups.length > 0 && (
-        <div className="flex flex-col gap-4">
+        <section
+          aria-labelledby="admin-group-standings-title"
+          className="flex min-w-0 flex-col gap-4 rounded-2xl border border-gray-100 bg-white px-5 py-5"
+        >
           <div className="flex items-center justify-between">
-            <h3 className="text-[15px] font-bold text-gray-900">조별 순위표</h3>
+            <h3 id="admin-group-standings-title" className="text-[15px] font-bold text-gray-900">
+              조별 순위표
+            </h3>
             <button
               type="button"
               onClick={handleRecalculate}
@@ -2173,7 +2177,7 @@ export function BracketTab({
               </div>
             );
           })}
-        </div>
+        </section>
       )}
 
       </div>{/* end right column */}
@@ -3697,16 +3701,24 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
       {/* ── Tabs (f11: min-h-[44px], no shadow — active = border-b-2 blue-500) ── */}
       <div
+        role="tablist"
         aria-label="대회 운영 탭"
         className="flex max-w-full gap-1 overflow-x-auto bg-gray-100 rounded-xl p-1 mb-4 w-fit"
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
+          const count = tab.id === 'registrations'
+            ? tournament.operationCounts?.registrations
+            : tab.id === 'bracket'
+              ? tournament.operationCounts?.fixtures
+              : tournament.operationCounts?.announcements;
           return (
             <button
               key={tab.id}
               id={`tab-${tab.id}`}
-              aria-pressed={active}
+              role="tab"
+              aria-selected={active}
+              aria-label={typeof count === 'number' ? `${tab.label} ${count}` : tab.label}
               aria-controls={`panel-${tab.id}`}
               type="button"
               onClick={() => setActiveTab(tab.id)}
@@ -3718,7 +3730,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                   : 'text-gray-600 hover:text-gray-900',
               ].join(' ')}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <span className={active ? 'ml-1.5 font-semibold tabular-nums text-blue-600' : 'ml-1.5 font-semibold tabular-nums text-gray-400'} aria-hidden="true">
+                {typeof count === 'number' ? count.toLocaleString('ko-KR') : '—'}
+              </span>
             </button>
           );
         })}
@@ -3743,6 +3758,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-registrations`}
         aria-labelledby="tab-registrations"
+        role="tabpanel"
         hidden={activeTab !== 'registrations'}
       >
         {activeTab === 'registrations' && (
@@ -3758,6 +3774,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-bracket`}
         aria-labelledby="tab-bracket"
+        role="tabpanel"
         hidden={activeTab !== 'bracket'}
       >
         {activeTab === 'bracket' && (
@@ -3775,6 +3792,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-announcements`}
         aria-labelledby="tab-announcements"
+        role="tabpanel"
         hidden={activeTab !== 'announcements'}
       >
         {activeTab === 'announcements' && (
@@ -3788,6 +3806,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-sponsors`}
         aria-labelledby="tab-sponsors"
+        role="tabpanel"
         hidden={activeTab !== 'sponsors'}
       >
         {activeTab === 'sponsors' && (
@@ -3798,6 +3817,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-popups"
         aria-labelledby="tab-popups"
+        role="tabpanel"
         hidden={activeTab !== 'popups'}
       >
         {activeTab === 'popups' && (
@@ -3808,6 +3828,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-campaign"
         aria-labelledby="tab-campaign"
+        role="tabpanel"
         hidden={activeTab !== 'campaign'}
       >
         {activeTab === 'campaign' && (
@@ -3822,6 +3843,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-reviews"
         aria-labelledby="tab-reviews"
+        role="tabpanel"
         hidden={activeTab !== 'reviews'}
       >
         {activeTab === 'reviews' && (
@@ -3835,6 +3857,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-awards"
         aria-labelledby="tab-awards"
+        role="tabpanel"
         hidden={activeTab !== 'awards'}
       >
         {activeTab === 'awards' && (

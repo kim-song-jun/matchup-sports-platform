@@ -5,7 +5,10 @@ export const V1_SESSION_COOKIE_NAME = 'teameet_v1_session';
 const SESSION_TOKEN_VERSION = 'v1';
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MINIMUM_SESSION_SECRET_LENGTH = 32;
-const SESSION_COOKIE_PATH = '/api/v1';
+// '/' so the cookie also attaches to the Socket.IO handshake (/socket.io),
+// which sits outside the /api/v1 prefix — RFC6265 path-prefix matching means
+// a narrower path would silently drop the cookie on realtime connections.
+const SESSION_COOKIE_PATH = '/';
 
 type V1SessionPayload = {
   readonly sub: string;

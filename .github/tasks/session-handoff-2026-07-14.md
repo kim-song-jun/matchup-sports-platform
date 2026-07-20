@@ -1,5 +1,31 @@
 # 세션 핸드오프 — 2026-07-14 (Teameet v1 대회 도메인 폴리시 + main↔dev 통합)
 
+## 2026-07-19 재개 스냅샷 (현재 기준)
+
+### Git·CI·Alpha
+
+- `dev`를 `origin/dev a34d2e627`로 fast-forward한 뒤 `origin/main f3fe42423`을 병합했다. merge commit은 `3a5dfb1c92946c81ccd45d154bcfd225b4cfa0c1`이다.
+- 병합 과정의 중복 `v1_uploads_init`를 `01cf1989f`에서 제거하고, conflict-only import/CRLF noise를 `89adaeae2`에서 정리했다. `origin/main`은 현재 `dev`의 ancestor다.
+- 현재 alpha identity는 release `0.1.0-alpha.20260719.g6d9d4dec1f9e`, commit `6d9d4dec1f9e50570789c92115c60b3d37edf778`다.
+- [CI / Deploy #29656131450](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29656131450)와 [Deploy Alpha #29656131436](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/29656131436)이 같은 SHA에서 성공했다. 공개 release/commit header가 일치하고 `/api/v1/health`는 `checks.db=true`다.
+
+### 이번 UI 증거
+
+- Task 120 캠페인 소개·상금·모션은 구현·배포·알파 QA 완료다. 사용자 코멘트 이미지의 중첩 카드형 상금은 이전 화면이며, 현재는 요약 + semantic 행 목록이다. 최종 승인 증거는 `output/playwright/visual-audit/task-120/*-overlay-final.png` 9장, Lazyweb report는 https://www.lazyweb.com/report/lazyweb/fd205fe5-3e99-4004-aa6f-f660378839a1/?source=create 다.
+- Task 118 public bracket은 390×844에서 의도한 내부 가로 스크롤로 우승 슬롯까지 도달하고, 768×1024/1280×900에서는 내부·문서 overflow 0이다. reload 이후 신규 console error 0이며 증거는 `output/playwright/visual-audit/2026-07-19-tournament-bracket/`다.
+
+### 운영·보안 경고
+
+- 호스트는 12 cores 대비 load 약 35, Node 약 700~900, MCP match 약 650으로 과부하다. 로컬 전체 테스트·빌드는 시작하지 않았고 GitHub의 직렬 CI 결과를 사용했다.
+- Playwright MCP 재증식 원인은 `/Users/sungjun/.codex/config.toml`에서 plugin이 이미 disabled인데도 7일 이상 살아 있던 Codex app-server PID 51610이 stale tool config를 유지하는 것이다. 이번 세션이 만든 root/child 한 트리만 exact PID TERM cleanup했다. 영구 반영에는 이 작업을 안전하게 끝낸 뒤 Codex 앱 재시작이 필요하며, 다른 세션 소유 14개 tree는 임의 종료하지 않았다.
+- Task 121에서 production workflow의 SSH host verification을 pinned `EC2_KNOWN_HOSTS` + fail-closed로 전환하고, secret을 argv가 아닌 encrypted stdin stream으로 전달하며, token permission을 `contents: read`로 제한했다. 기존 trusted ED25519 fingerprint와 live production EC2 scan 일치 후 public known_hosts 줄을 GitHub secret으로 등록했다. 남은 high-risk는 mutable `:latest` image/rollback provenance와 production header-auth posture 증명이다. alpha compose의 JSON log rotation과 alpha workflow permissions는 이미 존재한다.
+
+### 다음 미완 범위
+
+- GPT Pro `insane-review`는 전용 CDP 9222가 내려가 있고 host pressure가 높아 아직 코드를 보내지 않았다. 앱 재시작/호스트 안정 뒤 verified Pro 환경에서 auth·deploy 중요 bundle을 리뷰해야 한다.
+- 실제 alpha persona 기반 프로필 수정, 대회 이중 제출·업로드·admin 권한, 완료 결과→영상→개인 어워드 lifecycle E2E는 아직 충분한 증거가 없다.
+- 사용자가 말한 “새 페이지”는 profile rebuild, mercenary create, admin tournament-create wizard 중 무엇인지 불명확하므로 임의 구현하지 않는다.
+
 ## 2026-07-15 재개 스냅샷 (최신 결정 — 아래의 오래된 충돌 항목보다 우선)
 
 ### 사용자 최신 결정

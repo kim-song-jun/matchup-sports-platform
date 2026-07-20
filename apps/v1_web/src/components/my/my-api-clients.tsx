@@ -7,6 +7,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -1186,6 +1187,7 @@ export function LocationSettingsPageClient() {
 export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
+  const pushRegistration = useV1PushRegistration();
 
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
@@ -1233,10 +1235,48 @@ export function NotificationSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
+          {pushRegistration.permission !== 'unsupported' ? (
+            <div className="tm-card" style={{ padding: 0, marginBottom: 8 }}>
+              <button
+                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                onClick={() => void (pushRegistration.isSubscribed ? pushRegistration.unsubscribe() : pushRegistration.subscribe())}
+                type="button"
+                role="switch"
+                aria-checked={pushRegistration.isSubscribed}
+                aria-label="브라우저 알림 받기"
+                disabled={pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed}
+                style={{
+                  width: '100%',
+                  background: 'none',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed ? 'not-allowed' : 'pointer',
+                  opacity: pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed ? 0.5 : 1,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-body">브라우저 알림 받기</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed
+                      ? '브라우저 설정에서 알림 권한을 허용해주세요'
+                      : '매치, 팀, 채팅 알림을 브라우저 푸시로 받아요'}
+                  </div>
+                </div>
+                <span
+                  className="tm-text-caption"
+                  style={{ minWidth: 24, textAlign: 'right', color: pushRegistration.isSubscribed ? 'var(--blue500)' : 'var(--text-caption)' }}
+                  aria-hidden="true"
+                >
+                  {pushRegistration.isSubscribed ? 'ON' : 'OFF'}
+                </span>
+                <span className={`tm-toggle ${pushRegistration.isSubscribed ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
           <Card pad={14} style={{ marginBottom: 8 }}>
             <div className="tm-text-label">앱 안 알림</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              아래 설정은 팀밋 알림함에 적용돼요. 브라우저·휴대폰 푸시 알림은 아직 제공하지 않아요.
+              아래 설정은 팀밋 알림함에 적용돼요.
             </div>
           </Card>
           {toggleError ? (

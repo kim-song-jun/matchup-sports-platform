@@ -144,17 +144,8 @@ describe('TournamentCampaignReadService', () => {
         confirmedCount: 1,
         pendingPaymentCount: 1,
         registrationAvailability: 'available',
-        participantTeams: [
-          {
-            registrationId: 'registration-1',
-            teamId: 'team-1',
-            teamName: '팀미트 FC',
-            teamLogoUrl: '/uploads/teams/team-1.png',
-            teamRegionName: '서울',
-            status: 'confirmed',
-            confirmedAt: '2026-07-14T08:00:00.000Z',
-          },
-        ],
+        // 대회 status가 open(모집중)이므로 참가팀 명단은 비공개 — confirmedCount(위)는 그대로 정확하다.
+        participantTeams: [],
       },
     });
     const query = prisma.v1TournamentCampaign.findFirst.mock.calls[0][0];
@@ -175,6 +166,34 @@ describe('TournamentCampaignReadService', () => {
       'paid',
     ]);
   });
+
+  // ─── participant privacy during recruiting (open) ───────────────────────────
+
+  it.each(['closed', 'in_progress', 'completed'] as const)(
+    'exposes participant teams once tournament status is %s (regression, unaffected by the open-only privacy gate)',
+    async (status) => {
+      prisma.v1TournamentCampaign.findFirst.mockResolvedValue({
+        ...publishedRow,
+        tournament: { ...publishedRow.tournament, status },
+      });
+
+      const result = await service.getPublished('summer-futsal-cup');
+
+      expect(result.tournament.participantTeams).toEqual([
+        {
+          registrationId: 'registration-1',
+          teamId: 'team-1',
+          teamName: '팀미트 FC',
+          teamLogoUrl: '/uploads/teams/team-1.png',
+          teamRegionName: '서울',
+          status: 'confirmed',
+          confirmedAt: '2026-07-14T08:00:00.000Z',
+        },
+      ]);
+      // 대회 status와 무관하게 confirmedCount는 계속 정확하다.
+      expect(result.tournament.confirmedCount).toBe(1);
+    },
+  );
 
   it.each([
     {

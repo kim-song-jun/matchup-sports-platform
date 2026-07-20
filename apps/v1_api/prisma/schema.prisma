@@ -221,6 +221,11 @@ enum V1AdminStatus {
   revoked
 }
 
+enum V1ContentAssetStatus {
+  temporary
+  attached
+}
+
 enum V1StatusActorType {
   user
   admin
@@ -307,6 +312,9 @@ model V1User {
   chatMessages                   V1ChatMessage[]            @relation("V1ChatMessageSender")
   notifications                  V1Notification[]
   notificationPreference         V1NotificationPreference?
+  pushSubscriptions              V1PushSubscription[]
+  webPushFailureLogs             V1WebPushFailureLog[]      @relation("V1WebPushFailureLogUser")
+  acknowledgedPushFailureLogs    V1WebPushFailureLog[]      @relation("V1WebPushFailureLogAcknowledgedBy")
   searchHistories                V1SearchHistory[]
   adminUser                      V1AdminUser?               @relation("V1AdminUserAccount")
   grantedAdmins                  V1AdminUser[]              @relation("V1AdminGrantor")
@@ -537,6 +545,8 @@ model V1Notice {
   category    String           @default("안내")
   title       String
   body        String
+  contentJson Json?            @map("content_json")
+  contentVersion Int           @default(1) @map("content_version")
   status      V1NoticeStatus   @default(draft)
   publishedAt DateTime?        @map("published_at")
   archivedAt  DateTime?        @map("archived_at")
@@ -544,6 +554,8 @@ model V1Notice {
   displayEndAt   DateTime?     @map("display_end_at")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  contentAssets V1ContentAsset[]
 
   @@index([audience, status, publishedAt])
   @@index([category, status, displayStartAt, displayEndAt], map: "v1_notices_popup_display_window_idx")
@@ -557,6 +569,8 @@ model V1Popup {
   audience       V1NoticeAudience @default(public)
   title          String
   body           String
+  contentJson    Json?            @map("content_json")
+  contentVersion Int              @default(1) @map("content_version")
   targetScreens  String[]         @default(["home"]) @map("target_screens")
   linkUrl        String?          @map("link_url")
   linkLabel      String?          @map("link_label")
@@ -568,10 +582,35 @@ model V1Popup {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
+  contentAssets  V1ContentAsset[]
+
   @@index([audience, status, displayStartAt, displayEndAt, publishedAt], map: "v1_popups_active_window_idx")
   @@index([createdAt])
   @@index([targetScreens], type: Gin, map: "v1_popups_target_screens_idx")
   @@map("v1_popups")
+}
+
+model V1ContentAsset {
+  id                    String               @id @default(uuid())
+  url                   String               @unique
+  storagePath           String               @unique @map("storage_path")
+  status                V1ContentAssetStatus @default(temporary)
+  uploadedByAdminUserId String               @map("uploaded_by_admin_user_id")
+  noticeId              String?              @map("notice_id")
+  popupId               String?              @map("popup_id")
+  attachedAt            DateTime?            @map("attached_at")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  uploadedByAdminUser V1AdminUser @relation(fields: [uploadedByAdminUserId], references: [id], onDelete: Restrict)
+  notice             V1Notice?    @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  popup              V1Popup?     @relation(fields: [popupId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([uploadedByAdminUserId, createdAt])
+  @@index([noticeId])
+  @@index([popupId])
+  @@map("v1_content_assets")
 }
 
 model V1UserSportPreference {
@@ -1094,6 +1133,44 @@ model V1Notification {
   @@map("v1_notifications")
 }
 
+model V1PushSubscription {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user         V1User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  failureLogs  V1WebPushFailureLog[]
+
+  @@index([userId])
+  @@map("v1_push_subscriptions")
+}
+
+model V1WebPushFailureLog {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  subscriptionId String?   @map("subscription_id")
+  statusCode     Int?      @map("status_code")
+  errorCode      String?   @map("error_code")
+  endpointSuffix String    @map("endpoint_suffix")
+  occurredAt     DateTime  @default(now()) @map("occurred_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedBy String?   @map("acknowledged_by")
+
+  user               V1User              @relation("V1WebPushFailureLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  subscription       V1PushSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  acknowledgedByUser V1User?             @relation("V1WebPushFailureLogAcknowledgedBy", fields: [acknowledgedBy], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt])
+  @@index([acknowledgedAt])
+  @@index([userId])
+  @@index([subscriptionId])
+  @@map("v1_web_push_failure_logs")
+}
+
 model V1NotificationPreference {
   id               String   @id @default(uuid())
   userId           String   @unique @map("user_id")
@@ -1150,6 +1227,7 @@ model V1AdminUser {
   confirmedTournamentPayments      V1TournamentPayment[]       @relation("V1TournamentPaymentConfirmedByAdmin")
   recordedTournamentResults        V1TournamentFixtureResult[] @relation("V1TournamentFixtureResultRecordedByAdmin")
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
+  contentAssets                    V1ContentAsset[]
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])

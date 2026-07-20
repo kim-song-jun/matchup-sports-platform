@@ -16,7 +16,10 @@
  */
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
+import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ChatService } from './chat.service';
 
 // ─── shared test fixtures ──────────────────────────────────────────────────────
@@ -82,10 +85,23 @@ function makeRoomForParticipant(userId: string, participantStatus = 'active', ro
   };
 }
 
+/** Room with sender userA + two other active recipients (user-2, user-3), for push/notification fan-out tests. */
+function roomWithTwoRecipients() {
+  return {
+    ...makeRoom(),
+    participants: [
+      { id: 'part-a', chatRoomId: 'room-1', userId: userA.id, status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userA.id, profile: { nickname: 'A', displayName: null, profileImageUrl: null } } },
+      { id: 'part-b', chatRoomId: 'room-1', userId: 'user-2', status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: 'user-2', profile: { nickname: 'B', displayName: null, profileImageUrl: null } } },
+      { id: 'part-c', chatRoomId: 'room-1', userId: 'user-3', status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: 'user-3', profile: { nickname: 'C', displayName: null, profileImageUrl: null } } },
+    ],
+  };
+}
+
 // ─── test suite ────────────────────────────────────────────────────────────────
 
 describe('ChatService', () => {
   let service: ChatService;
+  const realtimeGateway = { emitToUser: jest.fn() };
   let prisma: {
     v1ChatRoom: {
       findFirst: jest.Mock;
@@ -109,12 +125,15 @@ describe('ChatService', () => {
       upsert: jest.Mock;
     };
     v1Notification: { createMany: jest.Mock };
+    v1NotificationPreference: { findMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     v1MatchParticipant: { findFirst: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock };
     v1TeamMatch: { findFirst: jest.Mock };
     $transaction: jest.Mock;
   };
+  const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+  const logger = { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() };
 
   beforeEach(async () => {
     prisma = {
@@ -140,6 +159,7 @@ describe('ChatService', () => {
         upsert: jest.fn(),
       },
       v1Notification: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1NotificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
       v1MatchParticipant: { findFirst: jest.fn() },
       v1TeamMembership: { findFirst: jest.fn() },
@@ -156,6 +176,9 @@ describe('ChatService', () => {
       providers: [
         ChatService,
         { provide: PrismaService, useValue: prisma },
+        { provide: RealtimeGateway, useValue: realtimeGateway },
+        { provide: WebPushService, useValue: webPushService },
+        { provide: getLoggerToken(ChatService.name), useValue: logger },
       ],
     }).compile();
 
@@ -332,6 +355,126 @@ describe('ChatService', () => {
   });
 
   // ─── 7. resolve(match): get-or-create 멱등성 ─────────────────────────────────
+
+  // ─── 10. sendMessage: chat:message + notification:new 실시간 emit ───────────
+
+  it('sendMessage: emits chat:message and notification:new to every other active recipient', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-1', chatRoomId: 'room-1', senderUserId: userA.id, body: 'hello', status: 'sent', sentAt };
+    const roomWithThreeParticipants = {
+      ...makeRoom(),
+      participants: [
+        { id: 'part-a', chatRoomId: 'room-1', userId: userA.id, status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: userA.id, profile: { nickname: 'A', displayName: null, profileImageUrl: null } } },
+        { id: 'part-b', chatRoomId: 'room-1', userId: 'user-2', status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: 'user-2', profile: { nickname: 'B', displayName: null, profileImageUrl: null } } },
+        { id: 'part-c', chatRoomId: 'room-1', userId: 'user-3', status: 'active', pinnedAt: null, mutedUntil: null, leftAt: null, lastReadMessageId: null, createdAt: new Date(), updatedAt: new Date(), user: { id: 'user-3', profile: { nickname: 'C', displayName: null, profileImageUrl: null } } },
+      ],
+    };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithThreeParticipants);
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
+
+    await service.sendMessage(userA, 'room-1', { content: 'hello' });
+
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      'user-2',
+      'chat:message',
+      expect.objectContaining({ roomId: 'room-1', content: 'hello' }),
+    );
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      'user-2',
+      'notification:new',
+      expect.objectContaining({ targetType: 'chat', targetId: 'room-1' }),
+    );
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith(
+      'user-3',
+      'chat:message',
+      expect.objectContaining({ roomId: 'room-1', content: 'hello' }),
+    );
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalledWith(userA.id, expect.anything(), expect.anything());
+  });
+
+  // ─── 11. sendMessage: WebPushService.sendToUser 웹 푸시 발송 ────────────────
+
+  it('sendMessage: calls WebPushService.sendToUser for each recipient alongside the realtime emit', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-push', chatRoomId: 'room-1', senderUserId: userA.id, body: 'hello push', status: 'sent', sentAt };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
+    prisma.v1NotificationPreference.findMany.mockResolvedValue([]); // no rows → default enabled for both
+
+    await service.sendMessage(userA, 'room-1', { content: 'hello push' });
+
+    expect(prisma.v1NotificationPreference.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: { in: ['user-2', 'user-3'] } } }),
+    );
+    expect(webPushService.sendToUser).toHaveBeenCalledWith(
+      'user-2',
+      expect.objectContaining({ title: '테스트 매치', body: 'hello push', url: '/chat/room-1' }),
+    );
+    expect(webPushService.sendToUser).toHaveBeenCalledWith(
+      'user-3',
+      expect.objectContaining({ title: '테스트 매치', body: 'hello push', url: '/chat/room-1' }),
+    );
+    expect(webPushService.sendToUser).not.toHaveBeenCalledWith(userA.id, expect.anything());
+  });
+
+  it('sendMessage: WebPushService.sendToUser rejecting does not fail the send (fire-and-forget)', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-push-fail', chatRoomId: 'room-1', senderUserId: userA.id, body: 'ping', status: 'sent', sentAt };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
+    prisma.v1NotificationPreference.findMany.mockResolvedValue([]);
+    webPushService.sendToUser.mockRejectedValueOnce(new Error('vapid send failed'));
+
+    await expect(service.sendMessage(userA, 'room-1', { content: 'ping' })).resolves.toMatchObject({
+      messageId: 'msg-push-fail',
+    });
+  });
+
+  it('sendMessage: still succeeds (skipping push for all recipients) when the preference lookup itself rejects', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-pref-lookup-fail', chatRoomId: 'room-1', senderUserId: userA.id, body: 'ping', status: 'sent', sentAt };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
+    // The message/notifications are already committed above by the time this runs —
+    // a rejection here must not turn an already-successful send into a 500.
+    prisma.v1NotificationPreference.findMany.mockRejectedValueOnce(new Error('db unavailable'));
+
+    await expect(service.sendMessage(userA, 'room-1', { content: 'ping' })).resolves.toMatchObject({
+      messageId: 'msg-pref-lookup-fail',
+    });
+    expect(webPushService.sendToUser).not.toHaveBeenCalled();
+  });
+
+  it('sendMessage: skips WebPushService.sendToUser for recipients with chatEnabled=false', async () => {
+    const sentAt = new Date('2026-06-21T10:00:00Z');
+    const createdMessage = { id: 'msg-muted-pref', chatRoomId: 'room-1', senderUserId: userA.id, body: 'quiet', status: 'sent', sentAt };
+    prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
+    prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
+    prisma.v1ChatRoom.update.mockResolvedValue({});
+    prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
+    // user-2 disabled chat push; user-3 has no preference row (default enabled)
+    prisma.v1NotificationPreference.findMany.mockResolvedValue([{ userId: 'user-2', chatEnabled: false }]);
+
+    await service.sendMessage(userA, 'room-1', { content: 'quiet' });
+
+    expect(webPushService.sendToUser).not.toHaveBeenCalledWith('user-2', expect.anything());
+    expect(webPushService.sendToUser).toHaveBeenCalledWith('user-3', expect.anything());
+    // Realtime in-app notification must still fire for the pref-disabled recipient (push-only gate)
+    expect(realtimeGateway.emitToUser).toHaveBeenCalledWith('user-2', 'chat:message', expect.anything());
+  });
 
   it('resolve(match): 첫 호출 시 created=true, 두 번째 호출 시 created=false (멱등성)', async () => {
     // Simulate user being an active match participant

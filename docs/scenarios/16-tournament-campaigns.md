@@ -6,7 +6,7 @@
 
 - [x] `TOURN-026-A` public slug route는 `published` 캠페인과 public/non-deleted 대회 조합만 반환한다.
 - [x] `TOURN-026-B` draft/archived 캠페인은 동일한 `404 TOURNAMENT_CAMPAIGN_NOT_FOUND`를 반환한다.
-- [x] `TOURN-026-C` public payload는 규정·환불·active sponsors·공개 참가팀을 포함하고 bank/연락처/admin identity를 제외한다.
+- [x] `TOURN-026-C` public payload는 규정·환불·active sponsors를 포함하고 bank/연락처/admin identity를 제외한다. 참가팀(`participantTeams`)은 대회 status가 `open`(모집중)이 아닐 때만 포함되며, `open` 상태에서는 `participantTeams`가 항상 빈 배열이고 `confirmedCount`만(팀 신원 정보 없이) 노출된다.
 - [x] `TOURN-026-D` active admin의 dedicated preview는 draft/published/archived의 실제 status와 public과 동일한 safe tournament projection을 반환하며 support도 읽을 수 있다.
 - [x] `TOURN-026-E` preview 추가 후에도 public slug read는 published-only를 유지하고 draft/archived를 404로 차단한다.
 - [x] `TOURN-027-A` owner/ops는 create/update/status, support는 read-only이며 일반 사용자는 차단된다.
@@ -28,10 +28,10 @@
 - [x] public campaign 신청 CTA는 단순 `status=open`이 아니라 시작 시각, 접수 마감, 확정 팀과 입금 대기 팀이 차지한 정원을 반영한 서버 `registrationAvailability` 계약을 따른다. 신청 불가 상태는 상세 링크만 남기고 이유를 제목으로 표시한다.
 - [x] 기존 dev runtime에서 draft create → preview → edit/reload persistence → publish → public API/page/CTA → archive retention/404 → republish를 검증했다.
 - [x] 390×844, 768×1024, 1440×900에서 public/admin/archive final capture와 CTA·hero bleed·CJK wrapping·404 CTA를 재검토했다. 증거는 `output/playwright/visual-audit/session-handoff-2026-07-14/campaign-live-qa/final-*`이다.
-- [ ] final capture 기준 layout·CTA·empty/error state는 재검토 완료. 기존 `3013`/`8121`이 다시 안전하게 올라온 뒤 focus order·scroll interaction·console/network를 한 번씩 재확인한다.
+- [x] Task 120 후속 알파 QA에서 375×900, 768×900, 1280×900의 상단·상금·FAQ/CTA를 다시 확인했다. 문서 가로 overflow와 alert는 0이고, 최종 CTA는 `position: static`인 자연 흐름으로 내려가 상금·후원사·FAQ를 가리지 않는다. 증거는 `output/playwright/visual-audit/task-120/*-overlay-final.png` 9장이다.
 
 Lazyweb campaign report는 https://www.lazyweb.com/report/lazyweb/51a09311-a5d3-4fd2-bead-89dcc6ab6b38/?source=create 에서 `degraded=false`, `failures=[]`로 완료됐다. 검증에는 기존 Web `3013`, API `8121`, 기존 dev PostgreSQL만 사용했다. 별도 DB/seed/reset/db push는 사용하지 않았다.
 
 Live lifecycle row는 campaign id `cc6a970d-b25d-4ebd-99de-a21024efab1b`, slug `ulw-qa-campaign-20260715-0436`이었다. owner는 기존 `admin@teameet.v1`을 사용했고, 기존 dev DB에 support persona가 없어 support live browser 검증은 생략했다. support read-only와 owner/ops mutation 경계는 focused permission tests가 담당한다.
 
-검증 후 exact cleanup transaction으로 status log 5개, action log 8개, campaign 1개만 삭제했다. 사후 상태는 campaign 0, QA action log 0, QA status log 0, tournament 2다. Initial capture는 `output/playwright/visual-audit/session-handoff-2026-07-14/campaign-live-qa/clean-*`에 있으며, final visual revision 완료 전에는 이 캡처를 최종 PASS 증거로 승격하지 않는다.
+검증 후 exact cleanup transaction으로 status log 5개, action log 8개, campaign 1개만 삭제했다. 사후 상태는 campaign 0, QA action log 0, QA status log 0, tournament 2다. 초기 증거는 `output/playwright/visual-audit/session-handoff-2026-07-14/campaign-live-qa/clean-*`, 최종 소개·상금·모션 증거는 `output/playwright/visual-audit/task-120/*-overlay-final.png`다. 최종 clone-fidelity 재검토는 deployed commit `8c588487b382c99ecf779123defec9356ea3abe6`에서 APPROVE/blocker 0이었다.

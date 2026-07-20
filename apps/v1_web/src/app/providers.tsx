@@ -7,6 +7,7 @@ import { ClientErrorListener } from '@/components/providers/client-error-listene
 import { GoogleAnalytics } from '@/components/providers/google-analytics';
 import { getGaMeasurementId } from '@/lib/analytics';
 import { GlobalPopup } from '@/components/popups/global-popup';
+import { NotificationSocketBridge } from '@/components/providers/notification-socket-bridge';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -28,6 +29,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ClientErrorListener />
+      <NotificationSocketBridge />
       {getGaMeasurementId() && (
         <Suspense fallback={null}>
           <GoogleAnalytics />

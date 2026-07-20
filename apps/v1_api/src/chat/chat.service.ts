@@ -6,8 +6,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
 import {
   ChatMessagesQueryDto,
@@ -34,7 +37,12 @@ type RoomWithRelations = Prisma.V1ChatRoomGetPayload<{
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtimeGateway: RealtimeGateway,
+    private readonly webPushService: WebPushService,
+    @InjectPinoLogger(ChatService.name) private readonly logger: PinoLogger,
+  ) {}
 
   async rooms(user: V1AuthUser, query: ChatRoomsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -146,7 +154,7 @@ export class ChatService {
     const room = await this.getActiveParticipantRoom(user.id, roomId);
     if (room.status !== 'active') throw stateConflict('Chat room is not active');
 
-    const message = await this.prisma.$transaction(async (tx) => {
+    const { message, recipientUserIds } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.v1ChatMessage.create({
         data: { chatRoomId: room.id, senderUserId: user.id, body: content, status: 'sent' },
       });
@@ -176,16 +184,75 @@ export class ChatService {
           })),
         });
       }
-      return created;
+      return { message: created, recipientUserIds: recipients.map((participant) => participant.userId) };
     });
 
-    return {
+    const chatMessagePayload = {
       messageId: message.id,
       roomId: room.id,
       content: message.body,
       status: message.status,
       sentAt: message.sentAt,
+      senderUserId: user.id,
     };
+    // 메시지/알림은 이미 위 트랜잭션에서 커밋됐다 — 이 선호도 조회가 실패해도
+    // 이미 성공한 전송을 500으로 되돌리면 안 되므로, 실패 시 웹 푸시만 스킵하고
+    // 요청은 계속 성공으로 처리한다.
+    let pushEnabledRecipientIds: Set<string>;
+    try {
+      pushEnabledRecipientIds = await this.chatPushEnabledRecipientIds(recipientUserIds);
+    } catch (err) {
+      this.logger.warn(
+        { roomId: room.id, err },
+        '채팅 웹 푸시 선호도 조회 실패 — 이 메시지는 웹 푸시 없이 처리됩니다',
+      );
+      pushEnabledRecipientIds = new Set();
+    }
+    const roomTitle = getRoomTitle(room);
+    // Fire-and-forget, matching NotificationsService's emitNotificationFireAndForget:
+    // the message + notifications already committed above, so a realtime-emit or
+    // web-push failure must never surface as an error response for a request that
+    // already succeeded.
+    for (const recipientUserId of recipientUserIds) {
+      try {
+        this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', chatMessagePayload);
+        this.realtimeGateway.emitToUser(recipientUserId, 'notification:new', {
+          targetType: 'chat',
+          targetId: room.id,
+        });
+      } catch (err) {
+        this.logger.warn({ recipientUserId, roomId: room.id, err }, '실시간 채팅 알림 전송 실패');
+      }
+      if (!pushEnabledRecipientIds.has(recipientUserId)) continue;
+      void this.webPushService
+        .sendToUser(recipientUserId, {
+          title: roomTitle,
+          body: content.slice(0, 120),
+          url: `/chat/${room.id}`,
+        })
+        .catch((err) => {
+          this.logger.warn({ recipientUserId, roomId: room.id, err }, '채팅 웹 푸시 발송 실패');
+        });
+    }
+
+    return chatMessagePayload;
+  }
+
+  /**
+   * Recipients with chatEnabled=false in V1NotificationPreference are excluded from
+   * web push (no preference row → default enabled, matching NotificationsService's
+   * createNotificationWithPrefCheck convention).
+   */
+  private async chatPushEnabledRecipientIds(recipientUserIds: string[]): Promise<Set<string>> {
+    if (recipientUserIds.length === 0) return new Set();
+    const preferences = await this.prisma.v1NotificationPreference.findMany({
+      where: { userId: { in: recipientUserIds } },
+      select: { userId: true, chatEnabled: true },
+    });
+    const disabledUserIds = new Set(
+      preferences.filter((preference) => !preference.chatEnabled).map((preference) => preference.userId),
+    );
+    return new Set(recipientUserIds.filter((userId) => !disabledUserIds.has(userId)));
   }
 
   async updateMe(user: V1AuthUser, roomId: string, dto: UpdateMyChatRoomDto) {

@@ -123,3 +123,16 @@ export function formatEntryFee(fee: number): string {
   if (fee === 0) return '무료';
   return `${fee.toLocaleString('ko-KR')}원`;
 }
+
+/**
+ * 관리자 운영 화면 공용 일시 포맷터: 'YYYY.M.D HH:MM'
+ * 대회 도메인 밖의 관리자 로그/운영 테이블(예: 웹 푸시 실패 로그)에서 사용해요.
+ * dateStr 이 없거나 invalid 이면 원본 문자열을 그대로 반환.
+ */
+export function formatAdminDateTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const hour = String(d.getHours()).padStart(2, '0');
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
+}

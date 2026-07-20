@@ -623,6 +623,8 @@ export function TournamentDetailView({
       <TournamentParticipantSection
         teams={tournament.participantTeams}
         teamCount={tournament.teamCount}
+        status={tournament.status}
+        confirmedCount={tournament.confirmedCount}
       />
 
       <TournamentVenuePrepSection
@@ -694,6 +696,8 @@ export function TournamentDetailView({
       <TournamentParticipantSection
         teams={tournament.participantTeams}
         teamCount={tournament.teamCount}
+        status={tournament.status}
+        confirmedCount={tournament.confirmedCount}
       />
 
       <section aria-labelledby="completed-basic-info-heading" style={{ marginTop: 24 }}>

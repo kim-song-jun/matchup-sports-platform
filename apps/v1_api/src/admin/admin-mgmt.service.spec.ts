@@ -1,8 +1,8 @@
 /**
  * admin-mgmt.service.spec.ts
  *
- * Contract tests for the three owner-only admin-management endpoints:
- *   listAdmins, grantAdmin, updateAdmin
+ * Contract tests for owner-only admin management and the owner-access
+ * invariants shared with user status/deletion mutations.
  *
  * Each test validates observable behaviour (returned data shape or thrown error).
  * No mock is asserted for its own sake.
@@ -46,6 +46,7 @@ const ownerAdminRecord = {
   revokedAt: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  user: { accountStatus: 'active' as const },
 };
 
 const opsAdminRecord = {
@@ -58,6 +59,7 @@ const opsAdminRecord = {
   revokedAt: null,
   createdAt: new Date('2026-01-15T00:00:00.000Z'),
   updatedAt: new Date('2026-01-15T00:00:00.000Z'),
+  user: { accountStatus: 'active' as const },
 };
 
 const supportAdminRecord = {
@@ -70,6 +72,7 @@ const supportAdminRecord = {
   revokedAt: null,
   createdAt: new Date('2026-01-20T00:00:00.000Z'),
   updatedAt: new Date('2026-01-20T00:00:00.000Z'),
+  user: { accountStatus: 'active' as const },
 };
 
 function withUser(
@@ -94,18 +97,21 @@ describe('AdminService — admin-management (owner-only)', () => {
     v1AdminUser: {
       findUnique: jest.Mock;
       findMany: jest.Mock;
+      groupBy: jest.Mock;
       count: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
-      findUniqueOrThrow: jest.Mock;
     };
-    v1User: { findUnique: jest.Mock };
+    v1User: { findUnique: jest.Mock; update: jest.Mock };
+    v1AuthIdentity: { findMany: jest.Mock; update: jest.Mock };
+    v1UserProfile: { updateMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock };
-    v1StatusChangeLog: { findMany: jest.Mock };
+    v1StatusChangeLog: { findMany: jest.Mock; create: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -113,26 +119,50 @@ describe('AdminService — admin-management (owner-only)', () => {
       v1AdminUser: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
         count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
-        findUniqueOrThrow: jest.fn(),
       },
-      v1User: { findUnique: jest.fn() },
+      v1User: { findUnique: jest.fn(), update: jest.fn() },
+      v1AuthIdentity: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() },
+      v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'log-1' }) },
       v1Match: { findMany: jest.fn(), findUnique: jest.fn() },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn() },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn() },
-      v1StatusChangeLog: { findMany: jest.fn() },
+      v1StatusChangeLog: { findMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     // $transaction executes the callback with a tx proxy that delegates back to
     // the same mock model objects so individual model mock assertions still work.
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation(
-      (cb: (tx: Pick<typeof p, 'v1AdminUser' | 'v1AdminActionLog'>) => Promise<unknown>) =>
-        cb({ v1AdminUser: p.v1AdminUser, v1AdminActionLog: p.v1AdminActionLog }),
+      (
+        cb: (
+          tx: Pick<
+            typeof p,
+            | 'v1AdminUser'
+            | 'v1User'
+            | 'v1AuthIdentity'
+            | 'v1UserProfile'
+            | 'v1AdminActionLog'
+            | 'v1StatusChangeLog'
+            | '$queryRaw'
+          >,
+        ) => Promise<unknown>,
+      ) =>
+        cb({
+          v1AdminUser: p.v1AdminUser,
+          v1User: p.v1User,
+          v1AuthIdentity: p.v1AuthIdentity,
+          v1UserProfile: p.v1UserProfile,
+          v1AdminActionLog: p.v1AdminActionLog,
+          v1StatusChangeLog: p.v1StatusChangeLog,
+          $queryRaw: p.$queryRaw,
+        }),
     );
 
     const module: TestingModule = await Test.createTestingModule({
@@ -170,6 +200,18 @@ describe('AdminService — admin-management (owner-only)', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('listAdmins: active admin row with inactive linked user → 403 PERMISSION_DENIED', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValue({
+        ...ownerAdminRecord,
+        user: { accountStatus: 'withdrawal_pending' },
+      });
+
+      await expect(service.listAdmins(ownerAuthUser, {})).rejects.toMatchObject({
+        response: { code: 'PERMISSION_DENIED' },
+      });
+      expect(prisma.v1AdminUser.findMany).not.toHaveBeenCalled();
+    });
+
     it('grantAdmin: ops admin → 403', async () => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
       await expect(
@@ -191,6 +233,10 @@ describe('AdminService — admin-management (owner-only)', () => {
     it('returns items with correct row shape', async () => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
       prisma.v1AdminUser.findMany.mockResolvedValue([withUser(opsAdminRecord)]);
+      prisma.v1AdminUser.groupBy.mockResolvedValue([
+        { status: 'active', _count: { _all: 3 } },
+        { status: 'revoked', _count: { _all: 1 } },
+      ]);
 
       const result = await service.listAdmins(ownerAuthUser, {});
 
@@ -207,6 +253,10 @@ describe('AdminService — admin-management (owner-only)', () => {
         revokedAt: null,
       });
       expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+      expect(result.summary).toEqual({
+        total: 4,
+        byStatus: { active: 3, suspended: 0, revoked: 1 },
+      });
     });
 
     it('passes status filter to Prisma where', async () => {
@@ -250,13 +300,10 @@ describe('AdminService — admin-management (owner-only)', () => {
       prisma.v1AdminUser.findUnique
         .mockResolvedValueOnce(ownerAdminRecord) // getOwnerAdmin
         .mockResolvedValueOnce(null); // existing admin check → no row
-      prisma.v1User.findUnique.mockResolvedValue({ id: 'u-new', email: 'new@teameet.v1' });
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'u-new', email: 'new@teameet.v1', accountStatus: 'active' });
 
       const created = { ...opsAdminRecord, id: 'au-new', userId: 'u-new' };
-      prisma.v1AdminUser.create.mockResolvedValue(created);
-      prisma.v1AdminUser.findUniqueOrThrow.mockResolvedValue(
-        withUser({ ...created }, 'new@teameet.v1', '신규'),
-      );
+      prisma.v1AdminUser.create.mockResolvedValue(withUser(created, 'new@teameet.v1', '신규'));
 
       const result = await service.grantAdmin(ownerAuthUser, {
         userId: 'u-new',
@@ -295,13 +342,30 @@ describe('AdminService — admin-management (owner-only)', () => {
       ).rejects.toMatchObject({ response: { code: 'NOT_FOUND' } });
     });
 
+    it('rejects granting admin access to an inactive user after locking the user row', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce(ownerAdminRecord);
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'u-pending', accountStatus: 'withdrawal_pending' });
+
+      await expect(
+        service.grantAdmin(ownerAuthUser, { userId: 'u-pending', adminRole: 'ops', reason: 'test' }),
+      ).rejects.toMatchObject({ response: { code: 'ADMIN_ACCOUNT_INACTIVE' } });
+      expect(
+        prisma.$queryRaw.mock.calls.some(
+          ([sql, userId]: [TemplateStringsArray, string]) =>
+            sql.join('').includes('FROM "v1_users"') && userId === 'u-pending',
+        ),
+      ).toBe(true);
+      expect(prisma.v1AdminUser.create).not.toHaveBeenCalled();
+      expect(prisma.v1AdminUser.update).not.toHaveBeenCalled();
+    });
+
     it('returns 409 ALREADY_ADMIN when target is already an active admin', async () => {
       prisma.v1AdminUser.findUnique
         .mockResolvedValueOnce(ownerAdminRecord) // getOwnerAdmin
         .mockResolvedValueOnce(opsAdminRecord) // existing → active!
         .mockResolvedValueOnce(ownerAdminRecord) // getOwnerAdmin (second call)
         .mockResolvedValueOnce(opsAdminRecord); // existing → active! (second call)
-      prisma.v1User.findUnique.mockResolvedValue({ id: 'ops-user-id' });
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'ops-user-id', accountStatus: 'active' });
 
       await expect(
         service.grantAdmin(ownerAuthUser, { userId: 'ops-user-id', adminRole: 'support', reason: 'test' }),
@@ -316,11 +380,10 @@ describe('AdminService — admin-management (owner-only)', () => {
       prisma.v1AdminUser.findUnique
         .mockResolvedValueOnce(ownerAdminRecord) // getOwnerAdmin
         .mockResolvedValueOnce(revokedRow); // existing → revoked
-      prisma.v1User.findUnique.mockResolvedValue({ id: 'ops-user-id' });
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'ops-user-id', accountStatus: 'active' });
 
       const reactivated = { ...opsAdminRecord, status: 'active' as const, revokedAt: null };
-      prisma.v1AdminUser.update.mockResolvedValue(reactivated);
-      prisma.v1AdminUser.findUniqueOrThrow.mockResolvedValue(withUser(reactivated));
+      prisma.v1AdminUser.update.mockResolvedValue(withUser(reactivated));
 
       await service.grantAdmin(ownerAuthUser, {
         userId: 'ops-user-id',
@@ -336,9 +399,8 @@ describe('AdminService — admin-management (owner-only)', () => {
       prisma.v1AdminUser.findUnique
         .mockResolvedValueOnce(ownerAdminRecord)
         .mockResolvedValueOnce(null);
-      prisma.v1User.findUnique.mockResolvedValue({ id: 'u-new' });
-      prisma.v1AdminUser.create.mockResolvedValue({ ...opsAdminRecord, id: 'au-new', userId: 'u-new' });
-      prisma.v1AdminUser.findUniqueOrThrow.mockResolvedValue(
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'u-new', accountStatus: 'active' });
+      prisma.v1AdminUser.create.mockResolvedValue(
         withUser({ ...opsAdminRecord, id: 'au-new', userId: 'u-new' }),
       );
 
@@ -392,7 +454,7 @@ describe('AdminService — admin-management (owner-only)', () => {
         .mockResolvedValueOnce(otherOwnerRecord) // target = also owner
         .mockResolvedValueOnce(ownerAdminRecord)
         .mockResolvedValueOnce(otherOwnerRecord);
-      prisma.v1AdminUser.count.mockResolvedValue(1); // only 1 active owner
+      prisma.v1AdminUser.count.mockResolvedValue(0); // no other active owner
 
       await expect(
         service.updateAdmin(ownerAuthUser, 'other-owner-uid', { adminRole: 'ops', reason: 'demote' }),
@@ -409,7 +471,7 @@ describe('AdminService — admin-management (owner-only)', () => {
         .mockResolvedValueOnce(otherOwnerRecord)
         .mockResolvedValueOnce(ownerAdminRecord)
         .mockResolvedValueOnce(otherOwnerRecord);
-      prisma.v1AdminUser.count.mockResolvedValue(1);
+      prisma.v1AdminUser.count.mockResolvedValue(0);
 
       await expect(
         service.updateAdmin(ownerAuthUser, 'other-owner-uid', { status: 'revoked', reason: 'revoke' }),
@@ -424,7 +486,7 @@ describe('AdminService — admin-management (owner-only)', () => {
       prisma.v1AdminUser.findUnique
         .mockResolvedValueOnce(ownerAdminRecord)
         .mockResolvedValueOnce(otherOwnerRecord);
-      prisma.v1AdminUser.count.mockResolvedValue(2); // 2 active owners
+      prisma.v1AdminUser.count.mockResolvedValue(1); // one other active owner
 
       const updated = {
         ...otherOwnerRecord,
@@ -500,6 +562,7 @@ describe('AdminService — admin-management (owner-only)', () => {
       prisma.v1AdminUser.findUnique
         .mockResolvedValueOnce(ownerAdminRecord)
         .mockResolvedValueOnce(revokedOps);
+      prisma.v1User.findUnique.mockResolvedValue({ id: 'ops-user-id', accountStatus: 'active' });
 
       const reactivated = {
         ...opsAdminRecord,
@@ -521,6 +584,210 @@ describe('AdminService — admin-management (owner-only)', () => {
         data: { revokedAt?: null };
       };
       expect(updateCall.data.revokedAt).toBeNull();
+    });
+
+    it('rejects reactivating admin access while the underlying user is inactive', async () => {
+      const revokedOps = { ...opsAdminRecord, status: 'revoked' as const, revokedAt: new Date() };
+      prisma.v1AdminUser.findUnique
+        .mockResolvedValueOnce(ownerAdminRecord)
+        .mockResolvedValueOnce(revokedOps);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'ops-user-id',
+        accountStatus: 'withdrawal_pending',
+      });
+
+      await expect(
+        service.updateAdmin(ownerAuthUser, 'ops-user-id', { status: 'active', reason: 'reactivate' }),
+      ).rejects.toMatchObject({ response: { code: 'ADMIN_ACCOUNT_INACTIVE' } });
+      expect(prisma.v1AdminUser.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the owner actor was demoted before the locked transaction check', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce({ ...ownerAdminRecord, adminRole: 'ops' });
+
+      await expect(
+        service.updateAdmin(ownerAuthUser, 'ops-user-id', { adminRole: 'support', reason: 'stale actor' }),
+      ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+      expect(prisma.v1AdminUser.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the actor admin was revoked before the locked transaction check', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce({ ...ownerAdminRecord, status: 'revoked' });
+
+      await expect(
+        service.grantAdmin(ownerAuthUser, { userId: 'u-new', adminRole: 'ops', reason: 'stale actor' }),
+      ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+      expect(prisma.v1AdminUser.create).not.toHaveBeenCalled();
+      expect(prisma.v1AdminUser.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the actor user account is no longer active at transaction time', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce({
+        ...ownerAdminRecord,
+        user: { accountStatus: 'withdrawal_pending' },
+      });
+
+      await expect(
+        service.updateAdmin(ownerAuthUser, 'ops-user-id', { adminRole: 'support', reason: 'stale user' }),
+      ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+      expect(prisma.v1AdminUser.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('serializes concurrent demotions so exactly one of two active owners remains', async () => {
+      type ConcurrentOwnerRow = Omit<typeof ownerAdminRecord, 'id' | 'userId' | 'adminRole'> & {
+        id: string;
+        userId: string;
+        adminRole: 'owner' | 'ops' | 'support';
+      };
+      const owners = new Map<string, ConcurrentOwnerRow>([
+        ['owner-a', { ...ownerAdminRecord, id: 'owner-a-record', userId: 'owner-a' }],
+        ['owner-b', { ...ownerAdminRecord, id: 'owner-b-record', userId: 'owner-b' }],
+      ]);
+      let lockTail = Promise.resolve();
+
+      prisma.v1AdminUser.findUnique.mockImplementation(({ where }: { where: { userId: string } }) =>
+        Promise.resolve(owners.get(where.userId) ?? null),
+      );
+      prisma.v1AdminUser.count.mockImplementation(({ where }: { where: { userId: { not: string } } }) =>
+        Promise.resolve(
+          [...owners.values()].filter(
+            (row) => row.userId !== where.userId.not && row.adminRole === 'owner' && row.status === 'active',
+          ).length,
+        ),
+      );
+      prisma.v1AdminUser.update.mockImplementation(
+        ({ where, data }: { where: { userId: string }; data: { adminRole?: 'owner' | 'ops' | 'support' } }) => {
+          const current = owners.get(where.userId)!;
+          const next = { ...current, ...data };
+          owners.set(where.userId, next);
+          return Promise.resolve({
+            ...next,
+            user: { email: `${where.userId}@teameet.v1`, profile: { nickname: where.userId, displayName: where.userId } },
+          });
+        },
+      );
+      prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+        let releaseLock: (() => void) | undefined;
+        const tx = {
+          ...prisma,
+          $queryRaw: jest.fn(async (sql: TemplateStringsArray) => {
+            if (!sql.join('').includes('"admin_role" = \'owner\'') || releaseLock) return [];
+            const previousLock = lockTail;
+            lockTail = new Promise<void>((resolve) => {
+              releaseLock = resolve;
+            });
+            await previousLock;
+            return [];
+          }),
+        };
+        try {
+          return await callback(tx);
+        } finally {
+          releaseLock?.();
+        }
+      });
+
+      const results = await Promise.allSettled([
+        service.updateAdmin(
+          { ...ownerAuthUser, id: 'owner-a', email: 'owner-a@teameet.v1' },
+          'owner-b',
+          { adminRole: 'ops', reason: 'concurrent-a' },
+        ),
+        service.updateAdmin(
+          { ...ownerAuthUser, id: 'owner-b', email: 'owner-b@teameet.v1' },
+          'owner-a',
+          { adminRole: 'ops', reason: 'concurrent-b' },
+        ),
+      ]);
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      const rejected = results.filter((result) => result.status === 'rejected');
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0]).toMatchObject({ reason: { response: { code: 'PERMISSION_DENIED' } } });
+      expect([...owners.values()].filter((row) => row.adminRole === 'owner' && row.status === 'active')).toHaveLength(1);
+    });
+  });
+
+  describe('underlying user access invariants', () => {
+    it('rejects an active admin suspending their own user account', async () => {
+      prisma.v1AdminUser.findUnique
+        .mockResolvedValueOnce(opsAdminRecord)
+        .mockResolvedValueOnce(opsAdminRecord);
+      prisma.v1User.findUnique.mockResolvedValue({ ...opsAuthUser, deletedAt: null });
+
+      await expect(
+        service.changeUserStatus(opsAuthUser, opsAuthUser.id, { status: 'suspended', reason: 'self' }),
+      ).rejects.toMatchObject({ response: { code: 'SELF_LOCKOUT' } });
+      expect(prisma.v1User.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an active admin deleting their own user account', async () => {
+      prisma.v1AdminUser.findUnique
+        .mockResolvedValueOnce(ownerAdminRecord)
+        .mockResolvedValueOnce(ownerAdminRecord);
+      prisma.v1User.findUnique.mockResolvedValue({ ...ownerAuthUser, deletedAt: null });
+
+      await expect(
+        service.deleteUser(ownerAuthUser, ownerAuthUser.id, { reason: 'self' }),
+      ).rejects.toMatchObject({ response: { code: 'SELF_LOCKOUT' } });
+      expect(prisma.v1User.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects disabling another active admin until admin access is revoked', async () => {
+      const otherOwner = { ...ownerAdminRecord, id: 'other-owner-record', userId: 'other-owner' };
+      prisma.v1AdminUser.findUnique
+        .mockResolvedValueOnce(ownerAdminRecord)
+        .mockResolvedValueOnce(otherOwner);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'other-owner',
+        accountStatus: 'active',
+        deletedAt: null,
+      });
+
+      await expect(
+        service.changeUserStatus(ownerAuthUser, 'other-owner', { status: 'suspended', reason: 'remove access' }),
+      ).rejects.toMatchObject({ response: { code: 'ADMIN_ACCESS_ACTIVE' } });
+      expect(prisma.v1User.update).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting another active admin until admin access is revoked', async () => {
+      prisma.v1AdminUser.findUnique
+        .mockResolvedValueOnce(ownerAdminRecord)
+        .mockResolvedValueOnce(opsAdminRecord);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'ops-user-id',
+        accountStatus: 'active',
+        deletedAt: null,
+      });
+
+      await expect(
+        service.deleteUser(ownerAuthUser, 'ops-user-id', { reason: 'remove account' }),
+      ).rejects.toMatchObject({ response: { code: 'ADMIN_ACCESS_ACTIVE' } });
+      expect(prisma.v1User.update).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    });
+
+    it('allows disabling the user after the admin record has been revoked', async () => {
+      const revokedOps = { ...opsAdminRecord, status: 'revoked' as const, revokedAt: new Date() };
+      prisma.v1AdminUser.findUnique
+        .mockResolvedValueOnce(ownerAdminRecord)
+        .mockResolvedValueOnce(revokedOps);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'ops-user-id',
+        accountStatus: 'active',
+        deletedAt: null,
+      });
+      prisma.v1User.update.mockResolvedValue({ id: 'ops-user-id', accountStatus: 'suspended' });
+
+      await expect(
+        service.changeUserStatus(ownerAuthUser, 'ops-user-id', { status: 'suspended', reason: 'offboarded' }),
+      ).resolves.toMatchObject({ userId: 'ops-user-id', status: 'suspended' });
+      expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledTimes(1);
     });
   });
 });

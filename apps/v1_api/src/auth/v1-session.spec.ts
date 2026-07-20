@@ -134,9 +134,32 @@ describe('v1 signed session', () => {
         httpOnly: true,
         secure: true,
         sameSite: 'lax',
-        path: '/api/v1',
+        path: '/',
       }),
     );
+  });
+
+  it('scopes the session cookie to path "/" so it also attaches to Socket.IO handshakes', () => {
+    // Given: the Socket.IO handshake lives at /socket.io, outside the
+    // /api/v1 REST prefix. RFC6265 cookie path matching is a strict prefix
+    // match, so a cookie scoped to '/api/v1' would never be sent on that
+    // request — every realtime connection would silently fail auth.
+    const response = { cookie: jest.fn() };
+
+    // When
+    writeV1SessionCookie(response, 'user-1', {
+      nodeEnv: 'production',
+      sessionSecret: SESSION_SECRET,
+      nowMs: NOW_MS,
+    });
+
+    // Then
+    const [, , options] = response.cookie.mock.calls[0] as [
+      string,
+      string,
+      { path: string },
+    ];
+    expect(options.path).toBe('/');
   });
 
   it('clears the session cookie even when no authenticated identity is available', () => {
@@ -153,7 +176,7 @@ describe('v1 signed session', () => {
         httpOnly: true,
         secure: true,
         sameSite: 'lax',
-        path: '/api/v1',
+        path: '/',
       }),
     );
   });

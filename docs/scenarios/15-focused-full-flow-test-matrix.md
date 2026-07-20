@@ -233,3 +233,16 @@ Notes:
 | 5 | `qa(v1): MY flow execution` | `MY-001~014` | 마이 홈, 프로필, 내 매치/팀, 리뷰, 설정, 알림 설정, 탈퇴 요청 | 팀 membership service, tournament registration service |
 | 6 | `qa(v1): CHAT/NOTI flow execution` | `CHAT-001~010`, `NOTI-001~006` | 채팅 목록/방/메시지/나가기, 알림 목록/읽음/딥링크/설정 | 팀/대회 핵심 mutation 구현 |
 | 7 | `qa(v1): cross-flow regression execution` | `X-001~006` | 큰 도메인 간 연결 지점만 재검증 | 신규 기능 구현, 대규모 리팩토링 |
+
+## Current Alpha Execution Cursor — 2026-07-19
+
+Task 122 (`.github/tasks/122-alpha-profile-tournament-persona-e2e.md`) narrows the next live run to `MY-001~003`, `TOURN-003~025`, and the alpha-only completed media/award fixture. Static and low-load HTTP discovery established the following starting point:
+
+- v1 profile routes are `/my` and `/my/profile/edit`; there is no canonical v1 `/profile` route.
+- `e2e/v1-tests` has no profile spec. The existing tournament spec proves only list/detail/apply reachability and does not cover persistence, permission, duplicate submit, completed results, videos, awards, or admin lifecycle.
+- Alpha fixture visibility is correct at the API boundary: draft/cancelled return 404; open/closed/in-progress/completed return their exact status.
+- Completed fixture `aa100000-0000-4000-8000-000000000005` currently returns 1 group, 7 fixtures, 2 videos, 3 awards, and 2 reviews. Its detail, bracket, results, and awards Web routes return 200.
+- A live in-app-browser partial run followed the real completed-detail link through results, the `경기 영상 2` tab, and awards. Desktop proved the seven results, two video entries, podium, prize breakdown, three individual awards, and two reviews. Awards at `390x844` and `768x1024` had document horizontal overflow `0`; evidence is recorded in Task 122.
+- The partial run is not a full UI PASS. Video lightbox controls, results across all viewports, console/network receipts, profile mutation/upload, registration/admin role enforcement, and exact cleanup remain pending. The desktop awards content-height fix shipped in alpha release `0.1.0-alpha.20260719.ga608551bbafa`; one after screenshot remains gated by the stale ChatGPT app-server Playwright MCP leak.
+- Static apply-flow audit fixed the executable duplicate proof: green/gold are unregistered owner personas for the open fixture, create must return one stable registration ID, `my-registrations` must contain one row, and forced resubmit must return `REGISTRATION_NOT_DRAFT`. The UI has pending-state disables plus `createBusyRef`/`submitBusyRef`; live evidence must verify the server row as well.
+- Exact cleanup has two known lifecycle gaps. Admin cancellation cannot restore an originally absent registration, and `/uploads` has no authenticated owner-delete endpoint, so restoring a profile URL leaves the retained file, `v1_upload_assets` ledger row, and quota usage. The alpha run must use exact-ID operator cleanup and prove absence; broad reseed/reset is prohibited. These gaps remain open product/security work rather than being hidden as QA success.

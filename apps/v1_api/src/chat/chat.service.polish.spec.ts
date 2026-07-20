@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
+import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ChatService } from './chat.service';
 
 const userA = { id: 'user-a', email: 'a@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -68,6 +71,9 @@ describe('ChatService room polish', () => {
       providers: [
         ChatService,
         { provide: PrismaService, useValue: prisma },
+        { provide: RealtimeGateway, useValue: { emitToUser: jest.fn() } },
+        { provide: WebPushService, useValue: { sendToUser: jest.fn().mockResolvedValue(undefined) } },
+        { provide: getLoggerToken(ChatService.name), useValue: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() } },
       ],
     }).compile();
 

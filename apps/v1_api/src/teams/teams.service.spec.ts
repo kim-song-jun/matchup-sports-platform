@@ -1526,7 +1526,13 @@ describe('TeamsService', () => {
     const result = await service.removeMembership(manager, 'mem-1', {});
 
     expect(prisma.v1TeamMembership.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'removed' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'removed',
+          leftAt: expect.any(Date),
+          removedByUserId: manager.id,
+        }),
+      }),
     );
     expect(result).toMatchObject({ status: 'removed', memberCount: 4 });
   });

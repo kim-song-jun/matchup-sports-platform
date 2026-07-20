@@ -95,4 +95,54 @@ describe('AllExceptionsFilter', () => {
     expect(logger.warn).not.toHaveBeenCalled();
     expect(response.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
   });
+
+  it('strips the query string from route before logging a 4xx warn (PII in query params must not reach logs)', () => {
+    const request = {
+      id: 'req-4',
+      method: 'GET',
+      originalUrl: '/api/v1/auth/check-email?email=secret@example.com',
+    };
+    const { host } = buildHost(request);
+    const exception = new HttpException({ code: 'DUPLICATE_EMAIL', message: '이미 가입된 이메일이에요.' }, HttpStatus.CONFLICT);
+
+    filter.catch(exception, host);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ route: '/api/v1/auth/check-email' }),
+      expect.any(String),
+    );
+    const [loggedContext] = logger.warn.mock.calls[0];
+    expect(JSON.stringify(loggedContext)).not.toContain('secret@example.com');
+  });
+
+  it('strips the query string from route before logging a 5xx error (PII in query params must not reach logs)', () => {
+    const request = {
+      id: 'req-5',
+      method: 'GET',
+      originalUrl: '/api/v1/auth/check-email?email=secret@example.com',
+    };
+    const { host } = buildHost(request);
+    const exception = new Error('db connection lost');
+
+    filter.catch(exception, host);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ route: '/api/v1/auth/check-email' }),
+      expect.any(String),
+    );
+    const [loggedContext] = logger.error.mock.calls[0];
+    expect(JSON.stringify(loggedContext)).not.toContain('secret@example.com');
+  });
+
+  it('truncates an oversized stack trace to bound log exposure for 5xx errors', () => {
+    const request = { id: 'req-6', method: 'GET', originalUrl: '/api/v1/home' };
+    const { host } = buildHost(request);
+    const exception = new Error('boom');
+    exception.stack = 'Error: boom\n' + 'x'.repeat(10_000);
+
+    filter.catch(exception, host);
+
+    const [loggedContext] = logger.error.mock.calls[0];
+    expect((loggedContext.stack as string).length).toBeLessThanOrEqual(4000);
+  });
 });

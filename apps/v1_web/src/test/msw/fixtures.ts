@@ -191,6 +191,14 @@ export const v1AdminNoticesFixture: V1AdminNoticeRow[] = v1NoticesFixture.map((n
   category: (notice.category ?? '안내') as V1AdminNoticeRow['category'],
   title: notice.title,
   body: notice.body ?? '',
+  content: {
+    type: 'doc',
+    content: [{
+      type: 'paragraph',
+      content: notice.body ? [{ type: 'text', text: notice.body }] : [],
+    }],
+  },
+  contentVersion: 1,
   status: 'published',
   publishedAt: notice.publishedAt,
   archivedAt: null,
@@ -203,6 +211,14 @@ export const v1AdminPopupsFixture: V1AdminPopupRow[] = [{
   audience: 'public',
   title: '이번 주 홈 팝업',
   body: '주말 경기장 입장 시간과 체크인 안내',
+  content: {
+    type: 'doc',
+    content: [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: '주말 경기장 입장 시간과 체크인 안내' }],
+    }],
+  },
+  contentVersion: 1,
   targetScreens: ['home', 'matches'],
   linkUrl: '/matches',
   linkLabel: '매치 보기',

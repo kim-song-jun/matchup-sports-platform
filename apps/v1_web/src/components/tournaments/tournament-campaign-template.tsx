@@ -9,6 +9,7 @@ import type {
   V1AdminTournamentCampaignPreview,
   V1PublicTournamentCampaign,
 } from '@/types/tournament-campaign';
+import { PrizeRankIcon } from './prize-rank-icon';
 import { TournamentCampaignMedia } from './tournament-campaign-media';
 import { TournamentCampaignPrimaryAction } from './tournament-campaign-primary-action';
 import { TournamentRegistrationCountdown } from './tournament-registration-countdown';
@@ -97,7 +98,7 @@ export function TournamentCampaignTemplate({
 
         <section className={styles.intro} aria-labelledby="campaign-intro-title">
           <div>
-            <span className={styles.sectionKicker}>Tournament story</span>
+            <span className={styles.sectionKicker}>대회 이야기</span>
             <h2 id="campaign-intro-title" className={styles.sectionTitle}>{content.intro.title}</h2>
           </div>
           <FormattedText className={styles.introBody} text={content.intro.body} />
@@ -106,52 +107,71 @@ export function TournamentCampaignTemplate({
         {content.highlights.length > 0 ? (
           <section className={styles.section} aria-labelledby="campaign-highlights-title">
             <div className={styles.sectionHeading}>
-              <span className={styles.sectionKicker}>Highlights</span>
+              <span className={styles.sectionKicker}>참가할 이유</span>
               <h2 id="campaign-highlights-title" className={styles.sectionTitle}>
                 {content.highlightsSectionTitle}
               </h2>
             </div>
             <div className={styles.highlightGrid}>
-              {content.highlights.map((highlight, index) => (
-                <article key={`${highlight.title}:${highlight.body}:${index}`} className={styles.highlightCard}>
-                  <div className={styles.highlightMedia}>
-                    <TournamentCampaignMedia
-                      src={highlight.imageUrl}
-                      sportCode={tournament.sport.code}
-                      alt={highlight.title}
-                      className={styles.highlightImage}
-                    />
-                  </div>
-                  <div className={styles.highlightContent}>
-                    <h3>{highlight.title}</h3>
-                    <p>{highlight.body}</p>
-                  </div>
-                </article>
-              ))}
+              {content.highlights.map((highlight, index) => {
+                const hasImage = Boolean(highlight.imageUrl);
+                return (
+                  <article
+                    key={`${highlight.title}:${highlight.body}:${index}`}
+                    className={`${styles.highlightCard} ${hasImage ? '' : styles.highlightCardTextOnly}`}
+                  >
+                    {hasImage ? (
+                      <div className={styles.highlightMedia}>
+                        <TournamentCampaignMedia
+                          src={highlight.imageUrl}
+                          sportCode={tournament.sport.code}
+                          alt={highlight.title}
+                          className={styles.highlightImage}
+                        />
+                      </div>
+                    ) : (
+                      <span className={styles.highlightIndex} aria-hidden="true">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    )}
+                    <div className={styles.highlightContent}>
+                      <h3>{highlight.title}</h3>
+                      <p>{highlight.body}</p>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
         ) : null}
 
         {tournament.prizeSummary || tournament.prizePool !== null ? (
           <section className={styles.prize} aria-labelledby="campaign-prize-title">
-            <div className={styles.prizeIcon} aria-hidden="true"><Trophy /></div>
-            <div className={styles.prizeContent}>
-              <span className={styles.sectionKicker}>Prize</span>
-              <h2 id="campaign-prize-title" className={styles.prizeTitle}>
-                {tournament.prizeSummary ?? `${tournament.prizePool?.toLocaleString('ko-KR')}원`}
-              </h2>
-              <p>참가 팀의 도전을 마지막 시상까지 투명하게 이어갑니다.</p>
-              {prizeRows.length > 0 ? (
-                <dl className={styles.prizeBreakdown}>
-                  {prizeRows.map((row, index) => (
-                    <div key={`${row.label}:${row.amount}:${index}`}>
-                      <dt>{row.label}</dt>
-                      <dd>{formatPrizeRowValue(row.amount)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              ) : null}
+            <div className={styles.prizeSummary}>
+              <div className={styles.prizeIcon} aria-hidden="true"><Trophy /></div>
+              <div>
+                <span className={styles.sectionKicker}>상금 안내</span>
+                <h2 id="campaign-prize-title" className={styles.prizeTitle}>
+                  {tournament.prizeSummary ?? `${tournament.prizePool?.toLocaleString('ko-KR')}원`}
+                </h2>
+                <p>순위와 개인 시상 결과는 대회 종료 후 결과 페이지에 투명하게 기록합니다.</p>
+              </div>
             </div>
+            {prizeRows.length > 0 ? (
+              <dl className={styles.prizeBreakdown} aria-label="상금 및 상품 구성">
+                {prizeRows.map((row, index) => (
+                  <div key={`${row.label}:${row.amount}:${index}`}>
+                    <dt>
+                      <span className={styles.prizeRankIcon} aria-hidden="true">
+                        <PrizeRankIcon label={row.label} />
+                      </span>
+                      {row.label}
+                    </dt>
+                    <dd>{formatPrizeRowValue(row.amount)}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
           </section>
         ) : null}
 
@@ -160,7 +180,7 @@ export function TournamentCampaignTemplate({
         {content.faq.length > 0 ? (
           <section className={styles.section} aria-labelledby="campaign-faq-title">
             <div className={styles.sectionHeading}>
-              <span className={styles.sectionKicker}>FAQ</span>
+              <span className={styles.sectionKicker}>참가 전 확인</span>
               <h2 id="campaign-faq-title" className={styles.sectionTitle}>{content.faqSectionTitle}</h2>
             </div>
             <div className={styles.faqList}>
@@ -175,14 +195,17 @@ export function TournamentCampaignTemplate({
         ) : null}
 
         <section className={styles.actions} aria-label="대회 다음 단계">
-          <div>
-            <span className={styles.sectionKicker}>Next step</span>
+          <div className={styles.actionsIntro}>
+            <span className={styles.sectionKicker}>다음 단계</span>
             <h2 className={styles.actionsTitle}>
               {getCampaignActionHeading(tournament.status, tournament.registrationAvailability)}
             </h2>
           </div>
           <div className={styles.actionLinks}>
-            <Link className="tm-btn tm-btn-neutral tm-btn-lg" href={actions.secondary.href}>
+            <Link
+              className={`tm-btn tm-btn-neutral tm-btn-lg ${styles.actionSecondary}`}
+              href={actions.secondary.href}
+            >
               {actions.secondary.label}
             </Link>
             <TournamentCampaignPrimaryAction

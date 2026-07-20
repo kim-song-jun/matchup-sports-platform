@@ -7,6 +7,9 @@ on:
     branches: [main, dev]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
 # - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
 # - main push · workflow_dispatch: 취소 없이 직렬 큐
@@ -95,6 +98,9 @@ jobs:
       - name: V1 DB guardrails
         run: pnpm qa:v1-db-guardrails
 
+      - name: Production deploy security guardrails
+        run: pnpm qa:production-deploy-security
+
       - name: Generate V1 Prisma client
         run: cd apps/v1_api && pnpm prisma generate
 
@@ -158,16 +164,33 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
+          set -Eeuo pipefail
+          if [[ -z "${EC2_HOST}" || -z "${EC2_KNOWN_HOSTS}" || -z "${EC2_SSH_KEY}" ]]; then
+            echo "EC2_HOST, EC2_KNOWN_HOSTS, and EC2_SSH_KEY are required" >&2
+            exit 1
+          fi
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${EC2_SSH_KEY}" > ~/.ssh/deploy_key
+          printf '%s\n' "${EC2_KNOWN_HOSTS}" > ~/.ssh/known_hosts
           chmod 400 ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/known_hosts
+          if ! ssh-keygen -F "${EC2_HOST}" -f ~/.ssh/known_hosts >/dev/null; then
+            echo "EC2_KNOWN_HOSTS does not contain the configured EC2_HOST" >&2
+            exit 1
+          fi
           cat >> ~/.ssh/config << EOF
           Host ec2
-            HostName ${{ secrets.EC2_HOST }}
+            HostName ${EC2_HOST}
             User ec2-user
             IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
           EOF
 
       - name: Sync code
@@ -175,8 +198,8 @@ jobs:
           rsync -avz --delete \
             --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
             --filter 'protect deploy/.env' \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            ./ ec2-user@${{ secrets.EC2_HOST }}:~/teameet/
+            -e "ssh" \
+            ./ ec2:~/teameet/
 
       - name: Build and deploy
         timeout-minutes: 35
@@ -185,15 +208,30 @@ jobs:
           KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
           V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
-          GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_MEASUREMENT_ID }}
+          GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
+          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
         run: |
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
           V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
           GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
 
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' V1_HOST_ADMIN_PASSWORD_B64='${V1_HOST_ADMIN_PASSWORD_B64}' GA_MEASUREMENT_ID_B64='${GA_MEASUREMENT_ID_B64}' bash -se" <<'EOF'
+          {
+            printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
+            printf 'KAKAO_CLIENT_SECRET_B64=%s\n' "${KAKAO_CLIENT_SECRET_B64}"
+            printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
+            printf 'V1_HOST_ADMIN_PASSWORD_B64=%s\n' "${V1_HOST_ADMIN_PASSWORD_B64}"
+            printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
+            printf 'VAPID_PUBLIC_KEY_B64=%s\n' "${VAPID_PUBLIC_KEY_B64}"
+            printf 'VAPID_PRIVATE_KEY_B64=%s\n' "${VAPID_PRIVATE_KEY_B64}"
+            printf 'VAPID_SUBJECT_B64=%s\n' "${VAPID_SUBJECT_B64}"
+            cat <<'REMOTE_SCRIPT'
           set -euo pipefail
 
           cd ~/teameet
@@ -243,6 +281,9 @@ jobs:
           sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
           sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
           sync_env_from_github_secret "GA_MEASUREMENT_ID" "${GA_MEASUREMENT_ID_B64:-}"
+          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
 
           # Harden deploy/.env perms against EC2 umask 022 — contains DB_PASSWORD/JWT_SECRET and other secrets
           chmod 600 deploy/.env
@@ -326,7 +367,8 @@ jobs:
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
           echo "[INFO] Build phase complete."
-          EOF
+          REMOTE_SCRIPT
+          } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
 
       - name: Restart containers
         timeout-minutes: 15

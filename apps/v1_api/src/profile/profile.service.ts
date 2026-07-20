@@ -580,6 +580,29 @@ export class ProfileService {
   async withdrawalRequest(user: V1AuthUser, dto: WithdrawalRequestDto) {
     this.assertMutableAccount(user);
     const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM "v1_users" WHERE id = ${user.id} FOR UPDATE
+      `;
+
+      const current = await tx.v1User.findUnique({
+        where: { id: user.id },
+        select: { accountStatus: true },
+      });
+      if (!current || current.accountStatus !== 'active') {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Account cannot be modified' });
+      }
+
+      const admin = await tx.v1AdminUser.findUnique({
+        where: { userId: user.id },
+        select: { status: true },
+      });
+      if (admin?.status === 'active') {
+        throw new ForbiddenException({
+          code: 'ADMIN_WITHDRAWAL_FORBIDDEN',
+          message: 'Active admins cannot request account withdrawal',
+        });
+      }
+
       const next = await tx.v1User.update({
         where: { id: user.id },
         data: { accountStatus: 'withdrawal_pending' },
@@ -588,7 +611,7 @@ export class ProfileService {
         data: {
           targetType: 'user',
           targetId: user.id,
-          fromStatus: user.accountStatus,
+          fromStatus: current.accountStatus,
           toStatus: 'withdrawal_pending',
           actorType: 'user',
           actorUserId: user.id,

@@ -13,6 +13,11 @@ const popup: V1AdminPopupRow = {
   audience: 'public' as const,
   title: '서비스 점검 안내',
   body: '7월 15일 새벽에 서비스 점검을 진행합니다.',
+  content: {
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text: '7월 15일 새벽에 서비스 점검을 진행합니다.' }] }],
+  },
+  contentVersion: 1,
   targetScreens: ['home', 'matches'],
   linkUrl: '/matches',
   linkLabel: '매치 보기',
@@ -28,7 +33,11 @@ const popup: V1AdminPopupRow = {
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
   useV1AdminPopups: () => ({
-    data: { items: [popup], pageInfo: { hasNext: false, nextCursor: null } },
+    data: {
+      items: [popup],
+      pageInfo: { hasNext: false, nextCursor: null },
+      summary: { total: 1, byStatus: { published: 1, archived: 0, draft: 0 } },
+    },
     isPending: false,
     isError: false,
     error: null,
@@ -43,6 +52,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateAdminPopup: () => ({ mutate: createMutate, isPending: false }),
   useV1UpdateAdminPopup: () => ({ mutate: updateMutate, isPending: false }),
   useV1DeleteAdminPopup: () => ({ mutate: deleteMutate, isPending: false }),
+  useV1UploadAdminContentAsset: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1DeleteAdminContentAsset: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 describe('AdminPopupsPage', () => {

@@ -8,6 +8,8 @@
 - **통합 브랜치는 `dev`.** 모든 작업 브랜치와 PR의 base는 `dev`다. 기능의 "완료"는 dev 머지까지를 뜻한다.
 - **dev → main 승격은 사용자 게이트.** main push는 프로덕션 배포(CI deploy)를 트리거하므로, 승격 시점은 항상 사용자가 결정한다.
 - **배포는 사람 승인 게이트.** deploy job은 `environment: production`(required reviewer)로 보호 — main push 후에도 GitHub UI에서 승인해야 빌드·배포가 시작된다.
+- **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다.
+  - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
 
 ## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
 

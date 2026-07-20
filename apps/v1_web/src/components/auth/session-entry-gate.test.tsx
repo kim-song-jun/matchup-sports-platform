@@ -61,4 +61,30 @@ describe('SessionEntryGate', () => {
     expect(mocks.disconnectV1Socket).toHaveBeenCalledTimes(1);
     expect(mocks.useV1AuthMe).toHaveBeenLastCalledWith({ enabled: false, retry: false });
   });
+
+  it('does not show the login form for a transient (non-401) auth check failure — keeps the session and stays on the fallback', async () => {
+    mocks.useV1AuthMe.mockReturnValue({
+      isError: true,
+      isFetching: false,
+      isSuccess: false,
+      error: new V1ApiError({
+        status: 'error',
+        statusCode: 503,
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'temporary outage',
+        timestamp: '2026-07-20T00:00:00.000Z',
+      }),
+    });
+
+    render(
+      <SessionEntryGate mode='login'>
+        <div>로그인 선택</div>
+      </SessionEntryGate>,
+    );
+
+    expect(screen.queryByText('로그인 선택')).not.toBeInTheDocument();
+    expect(await screen.findByText('로그인 정보를 확인하고 있어요.')).toBeInTheDocument();
+    expect(mocks.clearStoredV1Session).not.toHaveBeenCalled();
+    expect(mocks.disconnectV1Socket).not.toHaveBeenCalled();
+  });
 });

@@ -49,7 +49,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
     }
   }, [authMe.error, authMe.isError, authMe.isFetching, authMe.isSuccess, hasSessionHint, mode, router]);
 
-  if (mode === 'login' && (hasSessionHint === false || authMe.isError)) {
+  if (mode === 'login' && (hasSessionHint === false || (authMe.isError && isUnauthenticated(authMe.error)))) {
     return <>{children}</>;
   }
 

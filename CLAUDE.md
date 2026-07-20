@@ -9,6 +9,8 @@
 - **`main`은 과거 유산 브랜치일 뿐, 배포와 무관하다.** main에 새 커밋이 생겼다면(다른 세션·실수 등) 그 변경분을 **origin/main → dev로 병합**해 흡수한다(반대 방향 금지). main 자체는 더 이상 갱신·유지하지 않는다.
 - **배포는 dev push가 자동 트리거한다.** `.github/workflows/deploy-alpha.yml`이 `push: branches: [dev]`에 반응해 승인 게이트 없이 자동으로 alpha(alpha.teameet.co.kr)에 배포한다 — dev에 머지하는 즉시 실배포로 이어진다는 뜻이므로, dev 머지 전 검증(테스트·tsc·lint)을 프로덕션 배포 게이트로 취급한다.
 - **`deploy.yml`(main 트리거, `environment: production` 승인 게이트)은 이 정책 하에서 사용하지 않는다.** 존재는 하지만 main에 아무것도 push하지 않으므로 발동하지 않는다.
+- **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다. dev push = 자동 실배포이므로, 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 실제 배포 시점의 코드가 어긋날 위험도 커진다.
+  - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
 
 ## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
 

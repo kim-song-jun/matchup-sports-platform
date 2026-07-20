@@ -40,11 +40,14 @@ export class ReviewsController {
   }
 
   // Review submission — writes inside a transaction and recalculates
-  // reputation/team-trust aggregates, matching the cost profile of other
-  // authenticated mutation endpoints throttled at 10-20/min (auth, uploads,
-  // push-subscribe).
+  // reputation/team-trust aggregates. submit() is single-target per call and
+  // the frontend submits one review per target sequentially in a single
+  // "제출" click (reviews-api-clients.tsx submitAll), so the limit must clear
+  // a full match's worth of targets (participant cap: 100, see
+  // matches/dto/mutate-match.dto.ts) without 429ing mid-flow, while still
+  // bounding repeated abuse tighter than the read-only routes above.
   @Post()
-  @Throttle({ default: { limit: 15, ttl: 60_000 } })
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   submit(@CurrentUser() user: V1AuthUser, @Body() dto: SubmitReviewDto) {
     return this.reviewsService.submit(user, dto);
   }

@@ -69,6 +69,43 @@
 - 운영자: `status=active|suspended|revoked`, `cursor`, `limit`(1~50).
 - 목록 응답은 `items`와 `pageInfo: { nextCursor, hasNext }`를 사용한다.
 
+## v1 관리자 목록 집계 계약
+
+감사 로그를 제외한 v1 관리자 목록 화면의 필터 숫자는 현재 페이지의 `items.length`가 아니라 서버가 반환하는 전체 검색 결과 집계를 사용한다. 아래 목록 응답은 기존 `items`, `pageInfo`와 함께 다음 `summary`를 반환한다.
+
+```ts
+type AdminListSummary = {
+  total: number;
+  byStatus: Record<string, number>;
+  byCategory?: Record<string, number>;
+  byAudience?: Record<string, number>;
+};
+```
+
+적용 엔드포인트는 `GET /api/v1/admin/users`, `matches`, `teams`, `team-matches`, `tournaments`, `inquiries`, `notices`, `popups`, `admins`다. `summary`는 cursor와 limit의 영향을 받지 않으므로 첫 페이지와 추가 로드 응답에서 같은 필터 조건이면 동일하다. 검색어나 종목 같은 비상태 조건은 집계에 반영하지만, `byStatus`는 현재 선택한 status를 제외하고 계산하여 모든 상태 칩의 전환 가능 건수를 유지한다.
+
+문의 `byCategory`는 현재 category를 제외하고 검색어와 status를 반영한다. 공지 `byAudience`는 현재 audience를 제외하고 검색어, status, category를 반영한다. 따라서 보조 필터의 `전체` 숫자는 해당 facet map 값의 합으로 계산한다. 알려진 상태·분류·대상 키는 결과가 없어도 `0`을 반환한다.
+
+## 요청/응답 핵심 계약
+
+### 사용자 운영 (REST 엔드포인트 레벨)
+
+- `POST /admin/users/:id/warn`
+  - Body: `WarnUserAdminDto`
+  - `note` optional (max 500)
+- `PATCH /admin/users/:id/status`
+  - Body: `UpdateUserStatusAdminDto`
+  - `status`: `active | suspended`
+  - `status=suspended`일 때 `note` 사실상 필수 (없으면 400)
+- `DELETE /admin/users/:id`
+  - Body: `{ reason: string }`
+  - v1에서는 `accountStatus=deleted`, `deletedAt` 기록, 이메일/전화번호/프로필 마스킹, auth identity unlink, provider key 마스킹, 감사 로그 기록으로 처리한다. 이미 연결된 실시간 소켓도 강제 종료한다.
+  - 이메일 계정과 카카오 계정 모두 원본 unique key를 비우므로 같은 이메일/카카오 계정으로 재가입할 수 있다.
+  - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
+  - 팀 정보는 생성/소유 팀, 팀장/운영진/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다.
+
+아래 "사용자·운영자 접근 불변식" 절은 같은 사용자 상태 변경/삭제 계약을 DTO 레벨(`ChangeUserStatusDto`/`DeleteAdminUserDto`)에서 상세히 다룬다.
+
 ## 사용자·운영자 접근 불변식
 
 ### 사용자 상태와 삭제
@@ -175,6 +212,19 @@
 | `409` | `ADMIN_ACCOUNT_INACTIVE` | inactive 사용자에게 운영자 접근 부여/재활성화 |
 | `409` | `SELF_MODIFICATION` | 자기 운영자 레코드 변경 |
 | `409` | `ALREADY_ADMIN` | 이미 active인 운영자 재부여 |
+
+## Notice and popup rich content
+
+- POST /api/v1/admin/content-assets uploads one JPEG, PNG, or WebP image up to 5MB for owner/ops and returns a temporary managed asset.
+- DELETE /api/v1/admin/content-assets/:assetId deletes an unused temporary asset owned by the uploader; an owner may delete any temporary asset.
+- Notice and popup content is restricted Tiptap JSON; body is the server-derived plain-text projection for search, summaries, and legacy clients.
+- Tiptap's default textAlign=null attribute is accepted at the API boundary and omitted from canonical stored JSON. Explicit alignment remains restricted to left, center, or right.
+- Tiptap Image's default title/width/height=null attributes are likewise omitted before validation and persistence. Non-null dimensions and arbitrary image attributes are not accepted.
+- Empty Tiptap paragraph/heading nodes may omit content and are canonicalized to content=[]. Default Link presentation attrs are stripped; custom target/rel/class/title attrs are not part of the stored contract.
+- Only managed /uploads URLs may be used for content images. External URLs, base64 images, raw HTML, unsafe links, and unknown nodes or attributes are rejected.
+- Saving a notice or popup claims referenced temporary assets. Removing an unreferenced image deletes its managed asset record and stored file.
+- The Web editor deletes its current session's unused temporary assets after save and all session temporary assets on explicit cancel or editor switch.
+- The API performs an immediate startup scan and then hourly scans for unattached temporary assets older than 24 hours. It conditionally deletes the still-temporary database row before removing the file, so a concurrently attached asset is preserved.
 
 ## Source References
 

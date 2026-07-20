@@ -88,6 +88,7 @@ describe('TournamentsAdminService', () => {
       create: jest.Mock;
       update: jest.Mock;
       updateMany: jest.Mock;
+      groupBy: jest.Mock;
     };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
@@ -105,6 +106,7 @@ describe('TournamentsAdminService', () => {
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
       },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
@@ -447,9 +449,29 @@ describe('TournamentsAdminService', () => {
   it('list: returns items with registrationCount + pageInfo', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findMany.mockResolvedValue([{ ...tournamentRow(), _count: { registrations: 3 } }]);
+    prisma.v1Tournament.groupBy.mockResolvedValue([
+      { status: 'open', _count: { _all: 4 } },
+      { status: 'completed', _count: { _all: 2 } },
+    ]);
     const result = await service.list(ownerAuthUser, { limit: 20 });
     expect(result.items[0]).toMatchObject({ id: 'tournament-1', registrationCount: 3 });
     expect(result.pageInfo).toMatchObject({ hasNext: false, nextCursor: null });
+    expect(result.summary).toEqual({
+      total: 6,
+      byStatus: { draft: 0, open: 4, closed: 0, in_progress: 0, completed: 2, cancelled: 0 },
+    });
+  });
+
+  it('get: returns collection counts for all operation tabs', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({
+      ...tournamentRow(),
+      _count: { registrations: 7, fixtures: 11, announcements: 3 },
+    });
+
+    const result = await service.get(ownerAuthUser, 'tournament-1');
+
+    expect(result.operationCounts).toEqual({ registrations: 7, fixtures: 11, announcements: 3 });
   });
 
   // ─── update ──────────────────────────────────────────────────────────────────

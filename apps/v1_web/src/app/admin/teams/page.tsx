@@ -97,6 +97,10 @@ export default function AdminTeamsPage() {
   };
 
   const { data, isPending, isError, error, refetch } = useV1AdminTeams(filters);
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? data?.summary.byStatus[option.value] : data?.summary.total,
+  }));
 
   // Accumulate rows as pages load
   useEffect(() => {
@@ -163,7 +167,7 @@ export default function AdminTeamsPage() {
           searchPlaceholder="팀명 검색"
           searchValue={searchInput}
           onSearchChange={handleSearchChange}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={handleStatusChange}
         />

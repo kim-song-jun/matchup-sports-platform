@@ -133,6 +133,10 @@ function AdminMatchesPageContent() {
   // Combined rows: first page + loaded extras
   const firstRows = firstPage?.items ?? [];
   const rows = [...firstRows, ...extraRows];
+  const statusOptions = MATCH_STATUS_FILTER_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
+  }));
 
   // Load more handler
   async function loadMore() {
@@ -192,7 +196,7 @@ function AdminMatchesPageContent() {
           searchPlaceholder="제목·장소 검색"
           searchValue={search}
           onSearchChange={setSearch}
-          statusOptions={MATCH_STATUS_FILTER_OPTIONS}
+          statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={(v) => setActiveStatus(v)}
         />

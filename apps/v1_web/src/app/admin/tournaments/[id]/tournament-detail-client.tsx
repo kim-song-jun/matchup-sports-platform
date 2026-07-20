@@ -3701,16 +3701,24 @@ export default function TournamentDetailClient({ id }: { id: string }) {
 
       {/* ── Tabs (f11: min-h-[44px], no shadow — active = border-b-2 blue-500) ── */}
       <div
+        role="tablist"
         aria-label="대회 운영 탭"
         className="flex max-w-full gap-1 overflow-x-auto bg-gray-100 rounded-xl p-1 mb-4 w-fit"
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
+          const count = tab.id === 'registrations'
+            ? tournament.operationCounts?.registrations
+            : tab.id === 'bracket'
+              ? tournament.operationCounts?.fixtures
+              : tournament.operationCounts?.announcements;
           return (
             <button
               key={tab.id}
               id={`tab-${tab.id}`}
-              aria-pressed={active}
+              role="tab"
+              aria-selected={active}
+              aria-label={typeof count === 'number' ? `${tab.label} ${count}` : tab.label}
               aria-controls={`panel-${tab.id}`}
               type="button"
               onClick={() => setActiveTab(tab.id)}
@@ -3722,7 +3730,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
                   : 'text-gray-600 hover:text-gray-900',
               ].join(' ')}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <span className={active ? 'ml-1.5 font-semibold tabular-nums text-blue-600' : 'ml-1.5 font-semibold tabular-nums text-gray-400'} aria-hidden="true">
+                {typeof count === 'number' ? count.toLocaleString('ko-KR') : '—'}
+              </span>
             </button>
           );
         })}
@@ -3747,6 +3758,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-registrations`}
         aria-labelledby="tab-registrations"
+        role="tabpanel"
         hidden={activeTab !== 'registrations'}
       >
         {activeTab === 'registrations' && (
@@ -3762,6 +3774,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-bracket`}
         aria-labelledby="tab-bracket"
+        role="tabpanel"
         hidden={activeTab !== 'bracket'}
       >
         {activeTab === 'bracket' && (
@@ -3779,6 +3792,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-announcements`}
         aria-labelledby="tab-announcements"
+        role="tabpanel"
         hidden={activeTab !== 'announcements'}
       >
         {activeTab === 'announcements' && (
@@ -3792,6 +3806,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id={`panel-sponsors`}
         aria-labelledby="tab-sponsors"
+        role="tabpanel"
         hidden={activeTab !== 'sponsors'}
       >
         {activeTab === 'sponsors' && (
@@ -3802,6 +3817,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-popups"
         aria-labelledby="tab-popups"
+        role="tabpanel"
         hidden={activeTab !== 'popups'}
       >
         {activeTab === 'popups' && (
@@ -3812,6 +3828,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-campaign"
         aria-labelledby="tab-campaign"
+        role="tabpanel"
         hidden={activeTab !== 'campaign'}
       >
         {activeTab === 'campaign' && (
@@ -3826,6 +3843,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-reviews"
         aria-labelledby="tab-reviews"
+        role="tabpanel"
         hidden={activeTab !== 'reviews'}
       >
         {activeTab === 'reviews' && (
@@ -3839,6 +3857,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
       <div
         id="panel-awards"
         aria-labelledby="tab-awards"
+        role="tabpanel"
         hidden={activeTab !== 'awards'}
       >
         {activeTab === 'awards' && (

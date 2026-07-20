@@ -62,5 +62,10 @@
   },
   "dependencies": {
     "playwright": "^1.58.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "ws": ">=8.21.0"
+    }
   }
 }

@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 export interface StatusOption {
   value: string;
   label: string;
+  count?: number;
 }
 
 interface AdminFilterBarProps {
@@ -82,6 +83,7 @@ export function AdminFilterBar({
                     type="button"
                     onClick={() => onStatusChange(opt.value)}
                     aria-pressed={active}
+                    aria-label={typeof opt.count === 'number' ? `${opt.label} ${opt.count}` : opt.label}
                     className={[
                       'inline-flex items-center px-3 min-h-[44px] rounded-full text-[var(--font-size-label)] font-medium transition-colors',
                       'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
@@ -90,7 +92,16 @@ export function AdminFilterBar({
                         : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600',
                     ].join(' ')}
                   >
-                    {opt.label}
+                    <span>{opt.label}</span>
+                    <span
+                      className={[
+                        'ml-1.5 min-w-[1.25rem] text-center font-semibold tabular-nums',
+                        active ? 'text-white/90' : 'text-gray-400',
+                      ].join(' ')}
+                      aria-hidden="true"
+                    >
+                      {typeof opt.count === 'number' ? opt.count.toLocaleString('ko-KR') : '—'}
+                    </span>
                   </button>
                 );
               })}

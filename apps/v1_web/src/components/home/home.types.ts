@@ -34,6 +34,7 @@ export type HomePopup = {
   id: string;
   title: string;
   body: string;
+  content?: import('@/types/api').V1RichContentDocument | null;
   trailing: string;
   linkUrl?: string | null;
   linkLabel?: string | null;

@@ -13,6 +13,7 @@ import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
+  AdminFilterBar,
   AdminCardList,
   AdminReasonModal,
   AdminEmpty,
@@ -22,6 +23,13 @@ import {
 } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import type { V1AdminRow, CursorPage } from '@/types/api';
+
+const ADMIN_STATUS_FILTER_OPTIONS = [
+  { value: '', label: '전체' },
+  { value: 'active', label: '활성' },
+  { value: 'suspended', label: '정지' },
+  { value: 'revoked', label: '회수' },
+];
 
 // ── Date formatter ─────────────────────────────────────────────────────────
 function formatDateCompact(dateStr: string | null | undefined): string {
@@ -344,6 +352,7 @@ export default function AdminAdminsPage() {
   const [extraRows, setExtraRows] = useState<V1AdminRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [activeStatus, setActiveStatus] = useState('');
 
   // Modal state
   const [grantModalOpen, setGrantModalOpen] = useState(false);
@@ -358,7 +367,12 @@ export default function AdminAdminsPage() {
     isError,
     error,
     refetch,
-  } = useV1AdminAdmins({ limit: 20 });
+  } = useV1AdminAdmins({ ...(activeStatus ? { status: activeStatus } : {}), limit: 20 });
+
+  useEffect(() => {
+    setExtraRows([]);
+    setNextCursor(null);
+  }, [activeStatus]);
 
   // Sync cursor from first page
   useEffect(() => {
@@ -390,6 +404,10 @@ export default function AdminAdminsPage() {
   // ── Data ─────────────────────────────────────────────────────────────────
   const firstRows = firstPage?.items ?? [];
   const rows = [...firstRows, ...extraRows];
+  const statusOptions = ADMIN_STATUS_FILTER_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
+  }));
 
   const myAdminUserId = adminMe?.adminUserId;
 
@@ -399,6 +417,7 @@ export default function AdminAdminsPage() {
     try {
       const page = await v1Get<CursorPage<V1AdminRow>>('/admin/admins', {
         limit: 20,
+        ...(activeStatus ? { status: activeStatus } : {}),
         cursor: nextCursor,
       });
       setExtraRows((prev) => [...prev, ...page.items]);
@@ -501,6 +520,8 @@ export default function AdminAdminsPage() {
       />
 
       <div className="flex flex-col gap-4">
+        <AdminFilterBar hideSearch searchValue={''} onSearchChange={setActiveStatus} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
+
         {/* Card list */}
         <AdminCardList<V1AdminRow>
           rows={rows}

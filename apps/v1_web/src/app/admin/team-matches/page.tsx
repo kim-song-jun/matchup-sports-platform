@@ -95,6 +95,10 @@ export default function AdminTeamMatchesPage() {
   };
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches(filters);
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? data?.summary.byStatus[option.value] : data?.summary.total,
+  }));
 
   // Accumulate rows as pages load
   useEffect(() => {
@@ -159,7 +163,7 @@ export default function AdminTeamMatchesPage() {
           hideSearch
           searchValue=""
           onSearchChange={() => undefined}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={handleStatusChange}
         />

@@ -170,8 +170,14 @@ export type V1RichContentNode = {
     src?: string;
     alt?: string;
     title?: string | null;
-    assetId?: string;
-    textAlign?: 'left' | 'center' | 'right';
+    // Tiptap's Image/TextAlign extensions default unset attrs to `null` (not
+    // `undefined`) in the JSON they emit via getJSON() — apps/v1_api's
+    // rich-content.ts normalizer explicitly strips these null defaults, so the
+    // type must allow them to match what the editor actually sends.
+    width?: number | null;
+    height?: number | null;
+    assetId?: string | null;
+    textAlign?: 'left' | 'center' | 'right' | null;
   };
   content?: V1RichContentNode[];
   marks?: V1RichContentMark[];

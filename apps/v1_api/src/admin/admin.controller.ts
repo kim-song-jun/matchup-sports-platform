@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_HARD_CAP_BYTES } from '../uploads/uploads.controller';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -43,9 +44,13 @@ export class AdminController {
   }
 
   @Post('content-assets')
+  // UploadsService.storeFiles() is the single content validator (mimetype + precise
+  // 5MB) and returns clear 400s — see uploads.controller.ts's uploadFiles() for the
+  // full rationale. The multer fileSize limit here is only a hard DoS backstop
+  // (above the 5MB service limit), matching that same endpoint's cap.
   @UseInterceptors(FilesInterceptor('files', 1, {
     dest: UploadsService.UPLOAD_BASE,
-    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    limits: { fileSize: UPLOAD_HARD_CAP_BYTES, files: 1 },
   }))
   createContentAsset(
     @CurrentUser() user: V1AuthUser,

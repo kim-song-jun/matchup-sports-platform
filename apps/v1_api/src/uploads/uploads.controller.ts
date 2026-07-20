@@ -25,7 +25,7 @@ import './multer.types';
 // Hard DoS backstop, above the precise 5MB limit enforced in UploadsService.
 // Files between 5MB and this cap still get the clear "5MB 초과" 400 from the
 // service; larger ones are rejected by multer before fully buffering to disk.
-const UPLOAD_HARD_CAP_BYTES = 10 * 1024 * 1024; // 10MB
+export const UPLOAD_HARD_CAP_BYTES = 10 * 1024 * 1024; // 10MB
 // 영상 전용 하드 캡 — 서비스의 정밀 200MB 검증 위에 두는 multer 백스톱
 const VIDEO_UPLOAD_HARD_CAP_BYTES = 220 * 1024 * 1024; // 220MB
 

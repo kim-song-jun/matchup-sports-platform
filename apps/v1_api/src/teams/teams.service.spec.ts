@@ -127,6 +127,7 @@ describe('TeamsService', () => {
     v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatMessage: { create: jest.Mock };
+    v1PostEventReview: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
@@ -168,6 +169,7 @@ describe('TeamsService', () => {
       v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatMessage: { create: jest.fn() },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn(),
     };
@@ -393,6 +395,103 @@ describe('TeamsService', () => {
         profileImageUrl: null,
       });
       expect(result.items[0].manager).toBeNull();
+    });
+
+    it('returns live-recalculated trustState instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1Team.findMany.mockResolvedValueOnce([
+        {
+          ...teamRow({ id: 'team-live' }),
+          name: '실시간팀',
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [],
+          joinApplications: [],
+          // 캐시는 예전 verified 상태를 그대로 들고 있지만(72시간 경과 직후 cron이 없어 갱신 누락),
+          // 아직 상대팀이 리뷰를 제출하지 않았고 72시간도 지나지 않아 실제로는 공개된 리뷰가 0건이다.
+          trustScore: { trustState: 'verified', mannerScore: null, matchCount: 3 },
+          ownerUser: { id: owner.id, profile: null },
+        },
+      ]);
+      // candidates: 팀이 받은 리뷰 1건, 방금 제출되어 아직 reveal 조건(상호제출 또는 72시간 경과) 미충족.
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      // reverse: 상대팀은 아직 리뷰를 제출하지 않았다.
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.list(null, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].trustState).toBe('none');
+    });
+  });
+
+  describe('myTeams', () => {
+    it('returns live-recalculated trust instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
+        {
+          ...membershipRow({ id: 'mem-live', teamId: 'team-live', userId: owner.id, role: 'owner' }),
+          team: {
+            ...teamRow({ id: 'team-live' }),
+            sport: { id: 'sport-1', name: 'Soccer' },
+            region: null,
+            profile: null,
+            // 캐시는 예전 verified/4.8점을 들고 있지만 아직 상호제출/72시간 reveal 조건을 만족하지 못한다.
+            trustScore: { trustState: 'verified', mannerScore: 4.8 },
+          },
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.myTeams(owner, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].trust).toEqual({ trustState: 'none', score: null });
+    });
+  });
+
+  describe('detail (getPublicTeam)', () => {
+    it('returns live-recalculated trustState instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ id: 'team-live' }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [],
+        joinApplications: [],
+        trustScore: { trustState: 'verified', mannerScore: null, matchCount: 3 },
+        ownerUser: { id: owner.id, profile: null },
+      });
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.detail(null, 'team-live');
+
+      expect(result.trustState).toBe('none');
     });
   });
 

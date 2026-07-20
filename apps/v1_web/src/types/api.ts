@@ -1020,6 +1020,25 @@ export type V1ReviewSubmitResponse = {
   alreadySubmitted: boolean;
 };
 
+export type V1ReviewTagRate = {
+  tagCode: string;
+  label: string;
+  rate: number;
+  count: number;
+};
+
+export type V1ReviewSportSummary = {
+  sportId: string;
+  ratingAvg: number | null;
+  ratingCount: number;
+  tagRates: V1ReviewTagRate[];
+};
+
+export type V1ReviewReceivedSummaryResponse = {
+  bySport: V1ReviewSportSummary[];
+  availableMonths: string[];
+};
+
 export type V1ChatRoom = {
   roomId: string;
   roomType: 'match' | 'team' | 'team_match';

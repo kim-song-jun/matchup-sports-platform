@@ -15,6 +15,7 @@ describe('ReviewsController', () => {
   const reviewsService = {
     list: jest.fn(),
     received: jest.fn(),
+    receivedSummary: jest.fn(),
     source: jest.fn(),
     submit: jest.fn(),
   };
@@ -59,6 +60,16 @@ describe('ReviewsController', () => {
       items: [{ reviewId: 'review-1', targetType: 'team' }],
       pageInfo: { nextCursor: null, hasNext: false },
     });
+  });
+
+  it('GET /reviews/received/summary는 targetType 쿼리를 서비스로 그대로 전달한다', async () => {
+    const summary = { bySport: [], availableMonths: [] };
+    reviewsService.receivedSummary.mockResolvedValueOnce(summary);
+
+    const result = await controller.receivedSummary(user, { targetType: 'user' });
+
+    expect(reviewsService.receivedSummary).toHaveBeenCalledWith(user, { targetType: 'user' });
+    expect(result).toBe(summary);
   });
 
   it('returns review source targets', async () => {

@@ -16,6 +16,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
+import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ChangeTeamMembershipRoleDto,
@@ -108,8 +109,16 @@ export class TeamsService {
     const pageItems = teams.slice(0, limit);
     const hasNext = teams.length > limit;
 
+    // 캐시(V1TeamTrustScore)는 리뷰 reveal 시점(상호제출 또는 72시간 경과)에 즉시 갱신되지 않을 수 있으므로,
+    // 이 페이지에 담긴 팀들의 trustState/mannerScore만 배치 1회로 live 재계산해 덮어쓴다(N+1 방지).
+    // matchCount는 이번 스코프 밖이라 기존 캐시값을 그대로 둔다.
+    const liveTrustByTeam = await computeRevealedTeamTrustBatch(
+      this.prisma,
+      pageItems.map((team) => team.id),
+    );
+
     return {
-      items: pageItems.map((team) => this.toListItem(team, user)),
+      items: pageItems.map((team) => this.toListItem(team, user, liveTrustByTeam.get(team.id))),
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
         hasNext,
@@ -495,9 +504,18 @@ export class TeamsService {
       },
     });
 
+    const activeMemberships = memberships.filter(
+      (membership) => membership.team.status === 'active' && !membership.team.deletedAt,
+    );
+    // list()와 동일한 이유: 이 화면도 여러 팀을 한 번에 렌더링하는 목록형이라 팀 개수만큼 반복 조회하지 않도록
+    // 배치 1회로 live 재계산한다.
+    const liveTrustByTeam = await computeRevealedTeamTrustBatch(
+      this.prisma,
+      activeMemberships.map((membership) => membership.teamId),
+    );
+
     return {
-      items: memberships
-        .filter((membership) => membership.team.status === 'active' && !membership.team.deletedAt)
+      items: activeMemberships
         .map((membership) => ({
           teamId: membership.teamId,
           membershipId: membership.id,
@@ -522,10 +540,16 @@ export class TeamsService {
                 parentName: membership.team.region.parent?.name ?? null,
               }
             : null,
-          trust: {
-            trustState: membership.team.trustScore?.trustState ?? 'none',
-            score: membership.team.trustScore?.mannerScore != null ? Number(membership.team.trustScore.mannerScore) : null,
-          },
+          trust: (() => {
+            const liveTrust = liveTrustByTeam.get(membership.teamId);
+            if (liveTrust) {
+              return { trustState: liveTrust.trustState, score: liveTrust.mannerScore };
+            }
+            return {
+              trustState: membership.team.trustScore?.trustState ?? 'none',
+              score: membership.team.trustScore?.mannerScore != null ? Number(membership.team.trustScore.mannerScore) : null,
+            };
+          })(),
           memberCount: membership.team.memberCount,
           canManage: membership.role === 'owner' || membership.role === 'manager',
           canCreateTeamMatch: membership.role === 'owner' || membership.role === 'manager',
@@ -1596,6 +1620,18 @@ export class TeamsService {
       });
     }
 
+    // 단일 팀 조회라 N+1 걱정은 없지만, list()/myTeams()와 일관되게 trustState/mannerScore를 live로
+    // 덮어쓴다(캐시가 reveal 시점에 즉시 갱신되지 않을 수 있음). matchCount는 기존 캐시값 유지(스코프 밖).
+    const liveTrustByTeam = await computeRevealedTeamTrustBatch(this.prisma, [team.id]);
+    const liveTrust = liveTrustByTeam.get(team.id);
+    if (liveTrust) {
+      team.trustScore = {
+        trustState: liveTrust.trustState,
+        mannerScore: liveTrust.mannerScore !== null ? new Prisma.Decimal(liveTrust.mannerScore) : null,
+        matchCount: team.trustScore?.matchCount ?? 0,
+      };
+    }
+
     return team;
   }
 
@@ -1904,7 +1940,7 @@ export class TeamsService {
     } satisfies Prisma.V1TeamInclude;
   }
 
-  private toListItem(team: TeamWithRelations, user: V1AuthUser | null) {
+  private toListItem(team: TeamWithRelations, user: V1AuthUser | null, liveTrust?: RevealedTeamTrust) {
     const viewer = this.getViewer(team, user);
     return {
       id: team.id,
@@ -1932,7 +1968,7 @@ export class TeamsService {
       memberGoalCount: team.profile?.memberGoalCount ?? null,
       joinPolicy: team.joinPolicy,
       memberCount: team.memberCount,
-      trustState: team.trustScore?.trustState ?? 'none',
+      trustState: liveTrust?.trustState ?? team.trustScore?.trustState ?? 'none',
       viewerRole: viewer.role,
       viewerJoinState: viewer.joinState,
       owner: {

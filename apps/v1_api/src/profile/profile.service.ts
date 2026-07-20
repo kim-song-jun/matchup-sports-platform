@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma, V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { isReviewRevealed } from '../reviews/review-visibility';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRegionsDto,
@@ -34,14 +35,14 @@ export class ProfileService {
     const teamIds = activeMemberships.map((membership) => membership.teamId);
 
     const [
-      receivedReviewAggregate,
+      reputation,
       personalActivityCount,
       monthlyPersonalMatchCount,
     ] = await Promise.all([
-      this.prisma.v1PostEventReview.aggregate({
-        where: { targetUserId: user.id, targetType: 'user', status: 'submitted' },
-        _avg: { rating: true },
-      }),
+      // V1UserReputationSummary 캐시는 리뷰 제출 이벤트(submitPersonalReview/submitTeamReview) 안에서만 갱신되고,
+      // 72시간 경과로 리뷰가 새로 reveal 가능해지는 시점을 트리거하는 cron은 없다(사용자 결정: cron 추가 안 함).
+      // 그래서 캐시를 읽으면 "이후 새 리뷰가 없는 유저"의 평점이 영원히 갱신 안 될 수 있다 — 매 GET마다 live로 재계산한다.
+      this.computeRevealedUserReputation(user.id),
       this.prisma.v1MatchParticipant.count({
         where: {
           userId: user.id,
@@ -57,9 +58,7 @@ export class ProfileService {
         },
       }),
     ]);
-    const mannerScore = receivedReviewAggregate._avg.rating === null
-      ? null
-      : Number(receivedReviewAggregate._avg.rating.toFixed(2));
+    const mannerScore = reputation.mannerScore;
 
     return {
       totals: {
@@ -255,19 +254,28 @@ export class ProfileService {
     });
     if (!user) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
 
-    const activitySummary = await this.getPublicActivitySummary(user.id);
+    // reputation.mannerScore/reviewCount도 캐시가 아니라 매 요청마다 live로 재계산한다 —
+    // 캐시(V1UserReputationSummary)는 72시간 경과 단독으로는 갱신되지 않아 헤드라인 평점 배지가
+    // activitySummary.totals.reviewCount와 어긋날 수 있었다(trustState만 캐시값 유지, 코스한 버킷이라 영향 적음).
+    const liveReputation = await this.computeRevealedUserReputation(user.id);
+    const activitySummary = await this.getPublicActivitySummary(user.id, liveReputation);
 
     return {
       userId: user.id,
       displayName: user.profile?.nickname ?? '사용자',
       nickname: user.profile?.nickname ?? null,
       profileImageUrl: user.profile?.profileImageUrl ?? null,
-      reputation: toReputationPayload(user.reputationSummary),
+      reputation: {
+        ...toReputationPayload(user.reputationSummary),
+        mannerScore: liveReputation.mannerScore,
+        activityCount: liveReputation.reviewCount,
+        reviewCount: liveReputation.reviewCount,
+      },
       activitySummary,
     };
   }
 
-  private async getPublicActivitySummary(userId: string) {
+  private async getPublicActivitySummary(userId: string, precomputedReputation?: { reviewCount: number; mannerScore: number | null }) {
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
@@ -275,7 +283,7 @@ export class ProfileService {
     const [
       matchCount,
       teamCount,
-      reviewCount,
+      reputation,
       monthlyMatchCount,
       monthlyTeamJoinCount,
       monthlyReviewCount,
@@ -294,9 +302,11 @@ export class ProfileService {
           team: { status: 'active', deletedAt: null },
         },
       }),
-      this.prisma.v1PostEventReview.count({
-        where: { targetUserId: userId, targetType: 'user', status: 'submitted' },
-      }),
+      // 리뷰를 원본 count()로 재집계하지 않아 비공개(reveal 안 된) 리뷰의 존재/시점이 새어나가지 않도록 reveal 필터를 태운다.
+      // 캐시(V1UserReputationSummary)는 리뷰 제출 이벤트에서만 갱신되고 72시간 경과만으로 갱신되는 cron이 없어(사용자 결정:
+      // cron 추가 안 함) 매 GET마다 live로 재계산한다 — activitySummary()의 computeRevealedUserReputation()과 동일.
+      // publicProfile()이 reputation 배지용으로 이미 계산해뒀으면(precomputedReputation) 중복 쿼리 없이 재사용한다.
+      precomputedReputation ? Promise.resolve(precomputedReputation) : this.computeRevealedUserReputation(userId),
       this.prisma.v1MatchParticipant.count({
         where: {
           userId,
@@ -312,16 +322,15 @@ export class ProfileService {
           team: { status: 'active', deletedAt: null },
         },
       }),
-      this.prisma.v1PostEventReview.count({
-        where: { targetUserId: userId, targetType: 'user', status: 'submitted', createdAt: { gte: monthStart, lt: nextMonthStart } },
-      }),
+      // 캐시에는 월별 값이 없으므로 이번 달 리뷰만 live로 reveal 필터링한다 (ReviewsService.receivedSummary 패턴 이식)
+      this.getRevealedMonthlyReviewCount(userId, monthStart, nextMonthStart),
     ]);
 
     return {
       totals: {
         matchCount,
         teamCount,
-        reviewCount,
+        reviewCount: reputation.reviewCount,
       },
       monthly: {
         matchCount: monthlyMatchCount,
@@ -329,6 +338,69 @@ export class ProfileService {
         reviewCount: monthlyReviewCount,
       },
     };
+  }
+
+  /**
+   * 유저가 받은 리뷰 중 공개(reveal)된 것만 live로 재계산한다(개수 + 평균 평점).
+   * ReviewsService.recalculateUserReputation()의 candidates → reverse → isReviewRevealed 계산 로직을 이식하되,
+   * 그쪽은 V1UserReputationSummary에 upsert(쓰기)까지 하는 반면 이 메서드는 읽기 전용 GET 요청마다 호출되므로
+   * upsert 없이 계산 결과만 반환한다. 캐시는 리뷰 제출 이벤트에서만 갱신되고 72시간 경과 reveal 시점을 트리거하는
+   * cron이 없어(사용자 결정: cron 추가 안 함, self-view는 항상 live 재계산) 캐시만 읽으면 갱신이 영원히 누락될 수 있다.
+   * ProfileModule ↔ ReviewsModule 순환 의존을 피하기 위해 ReviewsService를 주입하지 않고 로직만 복제한다
+   * (getRevealedMonthlyReviewCount()와 동일 패턴).
+   *
+   * 범위 한정: 이 메서드는 단일 유저 self-view(activitySummary)/공개 프로필(getPublicActivitySummary) 전용이다.
+   * 팀 신뢰점수(V1TeamTrustScore)를 여러 팀 한 번에 렌더링하는 목록형 화면(팀 신청자 목록, admin 팀 목록 등)에는
+   * 적용하지 않는다 — 항목마다 live 재계산하면 N+1 쿼리 문제가 생기고, 이는 이번 요청 범위(단일 유저 GET) 밖이다.
+   */
+  private async computeRevealedUserReputation(userId: string): Promise<{ reviewCount: number; mannerScore: number | null }> {
+    const candidates = await this.prisma.v1PostEventReview.findMany({
+      where: { targetUserId: userId, targetType: 'user', status: 'submitted' },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
+    });
+    if (candidates.length === 0) return { reviewCount: 0, mannerScore: null };
+
+    const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+    const reverseReviews = await this.prisma.v1PostEventReview.findMany({
+      where: { reviewerUserId: userId, sourceId: { in: sourceIds }, status: 'submitted' },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+    });
+
+    const now = new Date();
+    const revealed = candidates.filter((review) => isReviewRevealed(review, reverseReviews, now));
+    const reviewCount = revealed.length;
+    const mannerScore = reviewCount
+      ? Number((revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount).toFixed(2))
+      : null;
+
+    return { reviewCount, mannerScore };
+  }
+
+  /**
+   * 이번 달 공개(reveal)된 리뷰 개수 — 상호제출 또는 72시간 경과 기준.
+   * ReviewsService.receivedSummary()의 candidates → reverse → isReviewRevealed 패턴을 이식했다.
+   * ProfileModule ↔ ReviewsModule 순환 의존을 피하기 위해 ReviewsService를 주입하지 않고 로직만 복제한다.
+   */
+  private async getRevealedMonthlyReviewCount(userId: string, monthStart: Date, nextMonthStart: Date) {
+    const candidates = await this.prisma.v1PostEventReview.findMany({
+      where: {
+        targetUserId: userId,
+        targetType: 'user',
+        status: 'submitted',
+        submittedAt: { gte: monthStart, lt: nextMonthStart },
+      },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true, submittedAt: true },
+    });
+    if (candidates.length === 0) return 0;
+
+    const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+    const reverseReviews = await this.prisma.v1PostEventReview.findMany({
+      where: { reviewerUserId: userId, sourceId: { in: sourceIds }, status: 'submitted' },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+    });
+
+    const now = new Date();
+    return candidates.filter((review) => isReviewRevealed(review, reverseReviews, now)).length;
   }
 
   async settings(user: V1AuthUser) {

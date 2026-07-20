@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -104,6 +104,10 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const idPrefix = useId();
+  const titleId = `${idPrefix}-confirm-title`;
+  const messageId = `${idPrefix}-confirm-message`;
+  const phraseId = `${idPrefix}-confirm-phrase`;
   const dialogRef = useRef<HTMLDivElement>(null);
   // 취소 버튼에 초기 포커스를 줘서 실수로 확인 누르는 것을 방지한다
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
@@ -213,8 +217,8 @@ export function ConfirmModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="v1-confirm-title"
-        aria-describedby="v1-confirm-message"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
         className="w-full max-w-[360px] rounded-2xl overflow-hidden"
         style={{
           background: 'var(--surface, #fff)',
@@ -225,14 +229,14 @@ export function ConfirmModal({
         {/* Body */}
         <div style={{ padding: '28px 24px 20px' }}>
           <p
-            id="v1-confirm-title"
+            id={titleId}
             className="tm-text-body-lg"
             style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 10 }}
           >
             {title}
           </p>
           <p
-            id="v1-confirm-message"
+            id={messageId}
             className="tm-text-label"
             style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}
           >
@@ -241,7 +245,7 @@ export function ConfirmModal({
           {confirmationPhrase ? (
             <div style={{ marginTop: 18 }}>
               <label
-                htmlFor="v1-confirm-phrase"
+                htmlFor={phraseId}
                 className="tm-text-label"
                 style={{ display: 'block', color: 'var(--text-strong)', fontWeight: 600, marginBottom: 8 }}
               >
@@ -249,7 +253,7 @@ export function ConfirmModal({
               </label>
               <input
                 ref={confirmationInputRef}
-                id="v1-confirm-phrase"
+                id={phraseId}
                 type="text"
                 value={confirmationInput}
                 onChange={(event) => setConfirmationInput(event.target.value)}

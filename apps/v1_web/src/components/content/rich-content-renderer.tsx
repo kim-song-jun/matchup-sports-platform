@@ -75,7 +75,7 @@ function applyMarks(text: string, marks: V1RichContentMark[] | undefined, key: s
       case 'link': {
         const href = mark.attrs?.href;
         if (!href || !isSafePopupLink(href)) return result;
-        return href.startsWith('https://')
+        return href.toLowerCase().startsWith('https://')
           ? <a key={markKey} href={href} target="_blank" rel="noopener noreferrer nofollow">{result}</a>
           : <Link key={markKey} href={href}>{result}</Link>;
       }

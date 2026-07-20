@@ -42,12 +42,17 @@ export class ReviewsController {
   // Review submission — writes inside a transaction and recalculates
   // reputation/team-trust aggregates. submit() is single-target per call and
   // the frontend submits one review per target sequentially in a single
-  // "제출" click (reviews-api-clients.tsx submitAll), so the limit must clear
-  // a full match's worth of targets (participant cap: 100, see
-  // matches/dto/mutate-match.dto.ts) without 429ing mid-flow, while still
-  // bounding repeated abuse tighter than the read-only routes above.
+  // "제출" click (reviews-api-clients.tsx submitAll), which aborts the whole
+  // loop on the first 429. The limit must clear a full match's worth of
+  // targets: capacity caps at 100 (matches/dto/mutate-match.dto.ts) and
+  // matchSource() excludes only the caller, so up to 99 targets can be
+  // submitted in one click — 110 gives headroom above that worst case while
+  // still bounding repeated abuse tighter than the read-only routes above.
+  // Duplicate submissions are already rejected by the
+  // (matchId/teamMatchId, authorId, targetId) unique constraint, so raising
+  // this limit does not meaningfully widen the abuse surface.
   @Post()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: { limit: 110, ttl: 60_000 } })
   submit(@CurrentUser() user: V1AuthUser, @Body() dto: SubmitReviewDto) {
     return this.reviewsService.submit(user, dto);
   }

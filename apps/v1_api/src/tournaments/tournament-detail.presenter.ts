@@ -58,22 +58,27 @@ export function presentTournamentDetail(row: TournamentDetailRow) {
     promoListPriority: row.promoListPriority,
     campaignSlug: row.campaign?.status === 'published' ? row.campaign.slug : null,
     confirmedCount: row._count.registrations,
-    participantTeams: row.registrations
-      .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
-      .sort((a, b) => {
-        const aRank = a.status === 'confirmed' ? 0 : 1;
-        const bRank = b.status === 'confirmed' ? 0 : 1;
-        return aRank - bRank;
-      })
-      .map((registration) => ({
-        registrationId: registration.id,
-        teamId: registration.team.id,
-        teamName: registration.team.name,
-        teamLogoUrl: registration.team.profile?.logoUrl ?? null,
-        teamRegionName: registration.team.region?.name ?? null,
-        status: registration.status,
-        confirmedAt: registration.confirmedAt?.toISOString() ?? null,
-      })),
+    // 모집 중(open)에는 참가팀 명단(팀명·로고·지역)을 비공개한다. 확정 인원수(confirmedCount)는
+    // 위에서 status와 무관하게 항상 노출되므로 "몇 팀이 참가하는지"는 계속 보여준다.
+    participantTeams:
+      row.status === 'open'
+        ? []
+        : row.registrations
+            .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
+            .sort((a, b) => {
+              const aRank = a.status === 'confirmed' ? 0 : 1;
+              const bRank = b.status === 'confirmed' ? 0 : 1;
+              return aRank - bRank;
+            })
+            .map((registration) => ({
+              registrationId: registration.id,
+              teamId: registration.team.id,
+              teamName: registration.team.name,
+              teamLogoUrl: registration.team.profile?.logoUrl ?? null,
+              teamRegionName: registration.team.region?.name ?? null,
+              status: registration.status,
+              confirmedAt: registration.confirmedAt?.toISOString() ?? null,
+            })),
     pendingPaymentCount: row.registrations.filter((registration) =>
       ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),
     ).length,

@@ -453,8 +453,9 @@ describe('TournamentsReadService', () => {
     expect(result.groups).toHaveLength(1);
   });
 
-  it('get: returns public participant teams and filters to active registration statuses', async () => {
+  it('get: returns public participant teams and filters to active registration statuses (status=closed, post-recruiting)', async () => {
     const row = fullTournamentRow({
+      status: 'closed',
       registrations: [
         {
           id: 'reg-confirmed',
@@ -512,6 +513,77 @@ describe('TournamentsReadService', () => {
     expect(callArgs.include.registrations.where.status.in).not.toContain('draft');
     expect(callArgs.include.registrations.where.status.in).not.toContain('cancelled');
   });
+
+  // ─── participant privacy during recruiting (open) ───────────────────────────
+
+  it('get: status=open → participantTeams hidden but confirmedCount stays exact', async () => {
+    const row = fullTournamentRow({
+      status: 'open',
+      _count: { registrations: 4 },
+      registrations: [
+        {
+          id: 'reg-confirmed',
+          status: 'confirmed',
+          confirmedAt: new Date('2026-06-20T00:00:00Z'),
+          team: {
+            id: 'team-confirmed',
+            name: '확정 FC',
+            profile: { logoUrl: 'https://cdn.teammeet.test/teams/confirmed-logo.png' },
+            region: { name: '서울 강남구' },
+          },
+        },
+        {
+          id: 'reg-waitlisted',
+          status: 'waitlisted',
+          confirmedAt: null,
+          team: { id: 'team-waitlisted', name: '대기 FC', profile: null, region: null },
+        },
+      ],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.participantTeams).toEqual([]);
+    // 모집 중에도 확정 인원수는 그대로 노출 — "그냥 다 숨겨버리는" 구현이면 이 값도 0이 되어 잡힌다.
+    expect(result.confirmedCount).toBe(4);
+  });
+
+  it.each(['closed', 'in_progress', 'completed'] as const)(
+    'get: status=%s → participantTeams remains public (regression, unaffected by the open-only privacy gate)',
+    async (status) => {
+      const row = fullTournamentRow({
+        status,
+        registrations: [
+          {
+            id: 'reg-confirmed',
+            status: 'confirmed',
+            confirmedAt: new Date('2026-06-20T00:00:00Z'),
+            team: {
+              id: 'team-confirmed',
+              name: '확정 FC',
+              profile: { logoUrl: 'https://cdn.teammeet.test/teams/confirmed-logo.png' },
+              region: { name: '서울 강남구' },
+            },
+          },
+          {
+            id: 'reg-waitlisted',
+            status: 'waitlisted',
+            confirmedAt: null,
+            team: { id: 'team-waitlisted', name: '대기 FC', profile: null, region: null },
+          },
+        ],
+      });
+      prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+      const result = await service.get('tournament-1');
+
+      expect(result.participantTeams.map((team: { teamName: string }) => team.teamName)).toEqual([
+        '확정 FC',
+        '대기 FC',
+      ]);
+    },
+  );
 
   it('get: includes active tournament-scoped sponsor and event data', async () => {
     const row = fullTournamentRow({

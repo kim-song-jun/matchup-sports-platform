@@ -219,6 +219,7 @@
 - `CreateRegistrationDto`
   - `teamId`: UUID
 - `SubmitRegistrationDto`
+  - `termsDocumentIds`: 현재 `tournament_application` 문서 중 사용자가 동의한 정확한 UUID 배열
   - `paymentMethod`: `pg | bank_transfer`
   - `depositorName?`: 계좌이체 선택 시 서비스 계층에서 필수
   - `agreedRules`, `agreedPrivacy`, `agreedRefund`: 필수 boolean
@@ -336,6 +337,20 @@
 4. tournament 쿼리의 `limit`은 숫자 문자열로 전달해도 되지만, 프론트는 명시적으로 숫자 범위를 통제한다.
 5. tournament detail의 `participantTeams`는 공개 참가팀 표시 전용이다. 신청 상태 확인, 입금 대기, 로스터 편집은 registration endpoints를 별도로 조회한다.
 
+## Managed terms v1.1 data foundation
+
+Task 124 registers the current fixed v1 copy as 11 independent policies, 11 immutable `v1.1` documents, and 11 placements. Signup service terms and footer service terms intentionally remain separate documents even when their current bodies are identical, so each surface can be versioned and managed independently.
+
+- Contexts: `signup`, `tournament_application`, `footer`
+- Tournament requirements: rules/privacy/refund are `required`; photo/video use is `optional`
+- Footer documents are `display_only` and never create consent events by display alone.
+- `support` is managed public content only and has no consent history.
+- Every existing tournament registration produces four provenance events. A source `true` becomes `accepted`; a source `false` becomes `not_accepted`. The original four booleans remain authoritative and unchanged.
+- Historical tournament decision time is not inferred from registration timestamps, so migrated events keep `decidedAt=null` and `versionVerified=false`.
+- Event dedupe keys make the backfill safe to rerun. The migration audit stores source row counts and the true-value distribution for all four tournament agreement columns.
+
+The admin management API and `/admin/terms` UI are implemented. `subtitle` and `changeSummary` are separate, and future-effective publication keeps the currently effective version active until the schedule arrives. Signup, tournament application, and footer/direct-document surfaces all consume `GET /api/v1/terms/current` for their context. Email/social signup and tournament submission bind exact current document IDs. Tournament submission appends accepted/not-accepted events in the registration transaction while preserving the four legacy booleans. Existing-user re-consent is enforced after optional `enforcementAt` without rewriting old choices.
+
 ## Source References
 
 - `apps/v1_api/src/reviews/reviews.controller.ts`, `reviews.service.ts`, `tournament-fixture-reviews.service.ts`
@@ -349,4 +364,8 @@
 - `apps/v1_api/src/tournaments/tournament-registrations.controller.ts`, `tournament-registrations.service.ts`, `dto/tournament-registration.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-players.controller.ts`, `tournament-players.service.ts`
 - `apps/v1_api/src/health/health.controller.ts`
+- `apps/v1_api/prisma/data/managed-terms-v1.1.json`
+- `apps/v1_api/prisma/migrations/20260722090000_v1_managed_terms_v11_baseline/migration.sql`
+- `apps/v1_api/prisma/migrations/20260722130000_v1_managed_terms_reconsent_runtime/migration.sql`
+- `apps/v1_api/src/terms/terms.controller.ts`, `managed-terms-runtime.service.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`, `apps/v1_web/src/types/api.ts`

@@ -52,6 +52,31 @@ enum V1TermsKind {
   marketing
 }
 
+enum V1ManagedTermsContext {
+  signup
+  tournament_application
+  footer
+}
+
+enum V1ManagedTermsRequirement {
+  required
+  optional
+  display_only
+}
+
+enum V1ManagedTermsConsentDecision {
+  accepted
+  not_accepted
+  revoked
+}
+
+enum V1ManagedTermsConsentSource {
+  web
+  admin
+  legacy_user_consent
+  legacy_tournament_boolean
+}
+
 enum V1NoticeAudience {
   public
   users
@@ -467,6 +492,115 @@ model V1UserTermsConsent {
   @@unique([userId, termsDocumentId])
   @@index([termsDocumentId])
   @@map("v1_user_terms_consents")
+}
+
+/// Stable identity for a managed legal/content policy. Versions live in
+/// V1ManagedTermsDocument and are never overwritten after publication.
+model V1ManagedTermsPolicy {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  documents  V1ManagedTermsDocument[]
+  placements V1ManagedTermsPlacement[]
+
+  @@index([isActive])
+  @@map("v1_managed_terms_policies")
+}
+
+/// Immutable published version of a managed policy. content contains the
+/// exact plain-text document shown by the current v1 UI baseline.
+model V1ManagedTermsDocument {
+  id                   String                @id @default(uuid())
+  policyId             String                @map("policy_id")
+  version              String
+  title                String
+  subtitle             String?               @db.Text
+  content              String                @db.Text
+  contentHash          String                @map("content_hash")
+  changeSummary        String?               @map("change_summary") @db.Text
+  requiresReconsent    Boolean               @default(true) @map("requires_reconsent")
+  enforcementAt        DateTime?             @map("enforcement_at")
+  status               V1TermsDocumentStatus @default(draft)
+  effectiveAt          DateTime?             @map("effective_at")
+  publishedAt          DateTime?             @map("published_at")
+  archivedAt           DateTime?             @map("archived_at")
+  supersedesDocumentId String?               @map("supersedes_document_id")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  policy             V1ManagedTermsPolicy         @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  supersedesDocument V1ManagedTermsDocument?      @relation("V1ManagedTermsDocumentHistory", fields: [supersedesDocumentId], references: [id], onDelete: Restrict)
+  supersededBy       V1ManagedTermsDocument[]     @relation("V1ManagedTermsDocumentHistory")
+  consentEvents      V1ManagedTermsConsentEvent[]
+
+  @@unique([policyId, version])
+  @@index([status, effectiveAt])
+  @@index([status, enforcementAt])
+  @@index([supersedesDocumentId])
+  @@map("v1_managed_terms_documents")
+}
+
+/// Declares where a policy is shown and whether that flow treats it as
+/// required, optional, or display-only.
+model V1ManagedTermsPlacement {
+  id           String                    @id @default(uuid())
+  policyId     String                    @map("policy_id")
+  context      V1ManagedTermsContext
+  requirement  V1ManagedTermsRequirement
+  displayOrder Int                       @default(0) @map("display_order")
+  isActive     Boolean                   @default(true) @map("is_active")
+  createdAt    DateTime                  @default(now()) @map("created_at")
+  updatedAt    DateTime                  @updatedAt @map("updated_at")
+
+  policy V1ManagedTermsPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@unique([policyId, context])
+  @@index([context, isActive, displayOrder])
+  @@map("v1_managed_terms_placements")
+}
+
+/// Append-only consent history. Legacy source identifiers are stored as
+/// snapshots rather than cascading foreign keys so operational deletion cannot
+/// erase the audit record.
+model V1ManagedTermsConsentEvent {
+  id                       String                        @id @default(uuid())
+  documentId               String                        @map("document_id")
+  userId                   String                        @map("user_id")
+  context                  V1ManagedTermsContext
+  decision                 V1ManagedTermsConsentDecision
+  decidedAt                DateTime?                     @map("decided_at")
+  recordedAt               DateTime                      @default(now()) @map("recorded_at")
+  source                   V1ManagedTermsConsentSource
+  versionVerified          Boolean                       @default(true) @map("version_verified")
+  legacyUserConsentId      String?                       @map("legacy_user_consent_id")
+  tournamentRegistrationId String?                       @map("tournament_registration_id")
+  teamId                   String?                       @map("team_id")
+  legacyBooleanValue       Boolean?                      @map("legacy_boolean_value")
+  dedupeKey                String?                       @unique @map("dedupe_key")
+  createdAt                DateTime                      @default(now()) @map("created_at")
+
+  document V1ManagedTermsDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([userId, context, recordedAt])
+  @@index([documentId, decision])
+  @@index([legacyUserConsentId])
+  @@index([tournamentRegistrationId])
+  @@index([teamId])
+  @@map("v1_managed_terms_consent_events")
+}
+
+/// Immutable count/distribution evidence captured by a data migration.
+model V1ManagedTermsMigrationAudit {
+  id           String   @id @default(uuid())
+  migrationKey String   @unique @map("migration_key")
+  snapshot     Json
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("v1_managed_terms_migration_audits")
 }
 
 model V1Sport {

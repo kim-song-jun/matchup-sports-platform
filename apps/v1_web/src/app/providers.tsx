@@ -35,8 +35,10 @@ export function Providers({ children }: { children: ReactNode }) {
           <GoogleAnalytics />
         </Suspense>
       )}
-      <PendingSocialSignupGate>{children}</PendingSocialSignupGate>
-      <GlobalPopup />
+      <PendingSocialSignupGate>
+        {children}
+        <GlobalPopup />
+      </PendingSocialSignupGate>
     </QueryClientProvider>
   );
 }

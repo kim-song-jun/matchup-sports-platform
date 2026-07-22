@@ -213,6 +213,17 @@ type AdminListSummary = {
 | `409` | `SELF_MODIFICATION` | 자기 운영자 레코드 변경 |
 | `409` | `ALREADY_ADMIN` | 이미 active인 운영자 재부여 |
 
+## Managed terms administration
+
+- `GET /api/v1/admin/terms` and `GET /api/v1/admin/terms/:policyId` allow active owner, ops, and support admins to read policies, placements, every immutable document version, and per-version consent-event counts.
+- `POST /api/v1/admin/terms`, `PATCH /api/v1/admin/terms/:policyId`, `POST /api/v1/admin/terms/:policyId/documents`, `PATCH /api/v1/admin/terms/:policyId/documents/:documentId`, and `POST /api/v1/admin/terms/:policyId/documents/:documentId/status` require owner or ops. Support receives `403 PERMISSION_DENIED` and no write occurs.
+- Policy codes are stable and unique. A policy has at most one placement per context. Footer placements must be `display_only`; signup and tournament placements must be `required` or `optional`.
+- New documents always start as `draft`. Published and archived documents are immutable; editing requires creating a new version. An immediately effective publication archives the currently effective version; a future-effective publication keeps that version active and replaces only another future schedule, so the runtime never loses a current document before `effectiveAt`.
+- `subtitle` is normal list/detail supporting copy. `changeSummary` is version-change copy shown when that version requires user action; the fields are independently editable and returned by admin/current APIs.
+- Each document version stores `requiresReconsent` (default `true`) and optional `enforcementAt`. When re-consent is required, existing users must accept that exact published document at or after the enforcement time. When it is disabled, an earlier accepted version of the same policy remains sufficient.
+- Publication and archive require a non-empty reason and write admin action/status audit records. There is no delete endpoint for policies, documents, consent events, or historical versions.
+- `/admin/terms` exposes context filtering, search, placement activation/order, version history, consent counts, draft editing, re-consent scheduling, publication/archive controls, and a preview rendered from the actual stored document body.
+
 ## Notice and popup rich content
 
 - POST /api/v1/admin/content-assets uploads one JPEG, PNG, or WebP image up to 5MB for owner/ops and returns a temporary managed asset.
@@ -231,5 +242,8 @@ type AdminListSummary = {
 - `apps/v1_api/src/admin/admin.controller.ts`
 - `apps/v1_api/src/admin/admin.service.ts`
 - `apps/v1_api/src/admin/dto/admin.dto.ts`
+- `apps/v1_api/src/admin/admin-terms.controller.ts`
+- `apps/v1_api/src/admin/admin-terms.service.ts`
+- `apps/v1_api/src/admin/dto/admin-terms.dto.ts`
 - `apps/v1_api/prisma/migrations/20260719043000_v1_admin_active_account_invariant/migration.sql`
 - `apps/v1_web/src/hooks/use-v1-api.ts`

@@ -259,6 +259,7 @@ Active task가 불명확하면 새 작업을 시작하기 전에 관련 task doc
 - 보호 경로 E2E는 토큰 주입 직후 바로 진입하지 말고, `/home` 등에서 인증된 UI 상태가 실제로 hydrate된 뒤 다음 경로로 이동한다. 그렇지 않으면 간헐적으로 auth wall false negative가 난다.
 - multi-tab Playwright E2E는 무거운 루트 `/`보다 가벼운 route 기반 storage bootstrap을 우선하고, dev-login 기반 API mutation이 간헐적 401을 내면 long-lived token 재사용보다 mutation 직전 fresh token 재발급 패턴으로 안정화한다.
 - 로컬 dev DB는 Prisma schema보다 뒤처진 컬럼 드리프트(`matches.image_url`, `sport_teams.photos`)가 남아 있을 수 있다. live runtime 검증이 필요한 read/update path에서는 broad `include: true`나 default return payload 대신 explicit `select`를 우선 사용해 런타임 false negative를 줄인다.
+- Windows PowerShell에서 한글이 포함된 SQL을 문자열 파이프로 `docker compose exec ... psql`에 전달하지 않는다. PowerShell 5 파이프 인코딩이 비 ASCII 문자를 `?`로 치환할 수 있으므로, UTF-8 파일을 보존하는 migration runner 또는 애플리케이션의 parameterized Prisma script를 사용하고 DB/API 한글 round-trip을 검증한다.
 
 ## 4.1) Proven Pipeline Patterns
 

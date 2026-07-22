@@ -33,6 +33,12 @@ import type {
   V1AdminNoticeRow,
   V1AdminNoticeUpdatePayload,
   V1AdminNoticeUpdateResult,
+  V1AdminTermsListResult,
+  V1AdminTermsPolicy,
+  V1AdminTermsPolicyCreatePayload,
+  V1AdminTermsPolicyUpdatePayload,
+  V1AdminTermsStatusPayload,
+  V1AdminTermsVersionPayload,
   V1AdminRow,
   V1PushFailureSummary,
   V1AdminPushSendPayload,
@@ -51,6 +57,8 @@ import type {
   V1AdminUserRow,
   V1AuthMe,
   V1AuthSessionResponse,
+  V1CurrentSignupTerms,
+  V1CurrentTerms,
   V1ChatMessage,
   V1ChatMessageSendResult,
   V1ChatRoom,
@@ -231,6 +239,7 @@ export function useV1Register() {
       birthDate: string;
       profileImageUrl?: string;
       requiredTermsAccepted: boolean;
+      acceptedTermsDocumentIds: string[];
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
     onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
@@ -257,7 +266,7 @@ export function useV1CompleteSocialProfile() {
 export function useV1CompleteSocialTerms() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { requiredTermsAccepted: boolean }) =>
+    mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[] }) =>
       v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-terms', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
@@ -1534,6 +1543,52 @@ export function useV1AdminNoticeDetail(noticeId: string) {
   });
 }
 
+export function useV1CurrentSignupTerms(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.currentSignupTerms(),
+    queryFn: () => v1Get<V1CurrentSignupTerms>('/terms/current', { context: 'signup' }),
+    enabled: options?.enabled,
+  });
+}
+
+export function useV1CurrentTerms(
+  context: 'signup' | 'tournament_application' | 'footer',
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: v1Keys.currentTerms(context),
+    queryFn: () => v1Get<V1CurrentTerms>('/terms/current', { context }),
+    enabled: options?.enabled,
+  });
+}
+
+export function useV1AcceptSignupTerms() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { documentIds: string[] }) =>
+      v1Post<V1CurrentSignupTerms>('/terms/consents', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData(v1Keys.currentSignupTerms(), result);
+      queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
+  });
+}
+
+export function useV1AdminTerms(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminTerms(filters),
+    queryFn: () => v1Get<V1AdminTermsListResult>('/admin/terms', filters),
+  });
+}
+
+export function useV1AdminTermsPolicy(policyId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTermsPolicy(policyId),
+    queryFn: () => v1Get<V1AdminTermsPolicy>(`/admin/terms/${policyId}`),
+    enabled: !!policyId,
+  });
+}
+
 export function useV1AdminInquiries(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
@@ -1757,6 +1812,74 @@ export function useV1DeleteAdminNotice() {
       queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
+  });
+}
+
+function invalidateAdminTerms(queryClient: QueryClient, policyId?: string) {
+  queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'terms'] });
+  if (policyId) queryClient.invalidateQueries({ queryKey: v1Keys.adminTermsPolicy(policyId) });
+}
+
+export function useV1CreateAdminTermsPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminTermsPolicyCreatePayload) =>
+      v1Post<V1AdminTermsPolicy>('/admin/terms', body),
+    onSuccess: () => invalidateAdminTerms(queryClient),
+  });
+}
+
+export function useV1UpdateAdminTermsPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ policyId, body }: { policyId: string; body: V1AdminTermsPolicyUpdatePayload }) =>
+      v1Patch<V1AdminTermsPolicy>(`/admin/terms/${policyId}`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1CreateAdminTermsVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ policyId, body }: { policyId: string; body: V1AdminTermsVersionPayload }) =>
+      v1Post<V1AdminTermsPolicy>(`/admin/terms/${policyId}/documents`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1UpdateAdminTermsDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      policyId,
+      documentId,
+      body,
+    }: {
+      policyId: string;
+      documentId: string;
+      body: V1AdminTermsVersionPayload;
+    }) => v1Patch<V1AdminTermsPolicy>(`/admin/terms/${policyId}/documents/${documentId}`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1ChangeAdminTermsStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      policyId,
+      documentId,
+      body,
+    }: {
+      policyId: string;
+      documentId: string;
+      body: V1AdminTermsStatusPayload;
+    }) =>
+      v1Post<V1AdminTermsPolicy>(
+        `/admin/terms/${policyId}/documents/${documentId}/status`,
+        body,
+      ),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
   });
 }
 

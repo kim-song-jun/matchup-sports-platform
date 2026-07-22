@@ -59,7 +59,10 @@ describe('SignupClient required profile contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
-    window.sessionStorage.setItem('teameet.v1.signupTermsAccepted', 'true');
+    window.sessionStorage.setItem(
+      'teameet.v1.signupTermsDocumentIds',
+      JSON.stringify(['11111111-1111-4111-8111-111111111111']),
+    );
     hooks.checkNicknameMutate.mockImplementation(
       (_value: string, callbacks: AvailabilityCallbacks) => callbacks.onSuccess({ available: true }),
     );
@@ -126,6 +129,7 @@ describe('SignupClient required profile contract', () => {
           phone: '01012345678',
           birthDate: '20000229',
           gender: 'male',
+          acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
         }),
       ),
     );

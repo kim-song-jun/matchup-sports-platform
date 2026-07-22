@@ -8,6 +8,7 @@ import {
 import { Prisma, V1Tournament, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   CancelRegistrationRequestDto,
@@ -46,6 +47,7 @@ export class TournamentRegistrationsService {
     private readonly prisma: PrismaService,
     private readonly paymentExpiry: TournamentPaymentExpiryService,
     private readonly notifications: NotificationsService,
+    private readonly managedTerms: ManagedTermsRuntimeService,
   ) {}
 
   /** 팀장 또는 운영진(manager+)만 대회 신청을 관리할 수 있다. */
@@ -213,17 +215,12 @@ export class TournamentRegistrationsService {
   async submit(user: V1AuthUser, tournamentId: string, registrationId: string, dto: SubmitRegistrationDto) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     const teamSportId = await this.assertTeamManager(registration.teamId, user.id);
+    const termsDecisions = await this.managedTerms.assertTournamentAcceptances(dto.termsDocumentIds);
 
     if (registration.status !== 'draft') {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_DRAFT',
         message: '이미 제출된 신청이에요.',
-      });
-    }
-    if (!dto.agreedRules || !dto.agreedPrivacy || !dto.agreedRefund) {
-      throw new BadRequestException({
-        code: 'AGREEMENTS_REQUIRED',
-        message: '필수 동의 항목에 모두 동의해 주세요.',
       });
     }
     if (dto.paymentMethod === 'bank_transfer' && !dto.depositorName?.trim()) {
@@ -274,10 +271,10 @@ export class TournamentRegistrationsService {
         data: {
           status: 'awaiting_payment',
           depositorName: dto.paymentMethod === 'bank_transfer' ? dto.depositorName!.trim() : null,
-          agreedRules: dto.agreedRules,
-          agreedPrivacy: dto.agreedPrivacy,
-          agreedRefund: dto.agreedRefund,
-          agreedMediaConsent: dto.agreedMediaConsent ?? false,
+          agreedRules: termsDecisions.acceptedCodes.has('tournament_rules'),
+          agreedPrivacy: termsDecisions.acceptedCodes.has('tournament_privacy'),
+          agreedRefund: termsDecisions.acceptedCodes.has('tournament_refund'),
+          agreedMediaConsent: termsDecisions.acceptedCodes.has('tournament_media'),
           cancelPreviousStatus: null,
         },
       });
@@ -300,6 +297,13 @@ export class TournamentRegistrationsService {
           refundedAt: null,
         },
       });
+      await this.managedTerms.recordTournamentDecisions(
+        tx,
+        user.id,
+        registrationId,
+        registration.teamId,
+        termsDecisions,
+      );
       return { updated, payment, tournament: lockedTournament };
     });
 

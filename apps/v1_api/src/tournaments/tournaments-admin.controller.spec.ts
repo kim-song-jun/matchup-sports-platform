@@ -197,7 +197,9 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
     // method directly after extracting it to simulate the guard rejecting.
     // A cleaner way: wire the actual guard and trigger canActivate with a
     // stub execution context that has no headers.
-    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService);
+    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService, {
+      signupCompliance: jest.fn(),
+    } as never);
     const ctx = {
       switchToHttp: () => ({
         getRequest: () => ({
@@ -210,7 +212,9 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
 
   it('V1AuthGuard is applied: headers present but user not found → UnauthorizedException', async () => {
     prismaMock.v1User.findFirst.mockResolvedValue(null);
-    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService);
+    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService, {
+      signupCompliance: jest.fn(),
+    } as never);
     const ctx = {
       switchToHttp: () => ({
         getRequest: () => ({
@@ -228,7 +232,9 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
       accountStatus: 'suspended',
       onboardingStatus: 'completed',
     });
-    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService);
+    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService, {
+      signupCompliance: jest.fn(),
+    } as never);
     const ctx = {
       switchToHttp: () => ({
         getRequest: () => ({

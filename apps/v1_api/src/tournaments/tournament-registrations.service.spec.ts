@@ -5,11 +5,12 @@
  * tournament open/deadline guards, submit agreements + payment-method rules,
  * and cancel-request transitions. Asserts observable behaviour only.
  */
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
 
@@ -48,7 +49,18 @@ function paymentRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
-const validSubmit = { paymentMethod: 'bank_transfer' as const, depositorName: '홍길동', agreedRules: true, agreedPrivacy: true, agreedRefund: true };
+const RULES_ID = '11111111-1111-4111-8111-111111111111';
+const PRIVACY_ID = '22222222-2222-4222-8222-222222222222';
+const REFUND_ID = '33333333-3333-4333-8333-333333333333';
+const MEDIA_ID = '44444444-4444-4444-8444-444444444444';
+const validSubmit = {
+  termsDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID],
+  paymentMethod: 'bank_transfer' as const,
+  depositorName: '홍길동',
+  agreedRules: true,
+  agreedPrivacy: true,
+  agreedRefund: true,
+};
 
 describe('TournamentRegistrationsService', () => {
   let service: TournamentRegistrationsService;
@@ -62,6 +74,10 @@ describe('TournamentRegistrationsService', () => {
     $queryRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock };
+  let managedTerms: {
+    assertTournamentAcceptances: jest.Mock;
+    recordTournamentDecisions: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -85,6 +101,21 @@ describe('TournamentRegistrationsService', () => {
     });
 
     notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+    managedTerms = {
+      assertTournamentAcceptances: jest.fn().mockImplementation(async (documentIds: string[]) => {
+        if (![RULES_ID, PRIVACY_ID, REFUND_ID].every((id) => documentIds.includes(id))) {
+          throw new BadRequestException({ code: 'AGREEMENTS_REQUIRED' });
+        }
+        const acceptedCodes = new Set(['tournament_rules', 'tournament_privacy', 'tournament_refund']);
+        if (documentIds.includes(MEDIA_ID)) acceptedCodes.add('tournament_media');
+        return {
+          acceptedDocumentIds: documentIds,
+          notAcceptedDocumentIds: documentIds.includes(MEDIA_ID) ? [] : [MEDIA_ID],
+          acceptedCodes,
+        };
+      }),
+      recordTournamentDecisions: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -92,6 +123,7 @@ describe('TournamentRegistrationsService', () => {
         TournamentPaymentExpiryService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: ManagedTermsRuntimeService, useValue: managedTerms },
       ],
     }).compile();
     service = module.get(TournamentRegistrationsService);
@@ -241,7 +273,11 @@ describe('TournamentRegistrationsService', () => {
   it('submit: missing agreements → 400 AGREEMENTS_REQUIRED', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     await expect(
-      service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, agreedRefund: false }),
+      service.submit(manager, 'tournament-1', 'reg-1', {
+        ...validSubmit,
+        termsDocumentIds: [RULES_ID, PRIVACY_ID],
+        agreedRefund: false,
+      }),
     ).rejects.toMatchObject({ response: { code: 'AGREEMENTS_REQUIRED' } });
   });
 
@@ -375,7 +411,7 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
     prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow({ method: 'pg' }));
     const result = await service.submit(manager, 'tournament-1', 'reg-1', {
-      paymentMethod: 'pg', agreedRules: true, agreedPrivacy: true, agreedRefund: true,
+      ...validSubmit, paymentMethod: 'pg', depositorName: undefined,
     });
     expect(result).toMatchObject({ payment: { method: 'pg' } });
   });

@@ -126,6 +126,9 @@ jobs:
           DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           GA_MEASUREMENT_ID: ${{ secrets.GA_ALPHA }}
+          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
         run: |
           set -Eeuo pipefail
           stage="/home/ec2-user/.teameet-alpha-staging/${RELEASE_SHA}"
@@ -138,7 +141,7 @@ jobs:
             --arg prepare "install -d -o ec2-user -g ec2-user '${stage}'" \
             --arg download "aws s3 cp '${object}' '${archive}' --only-show-errors" \
             --arg extract "tar -xzf '${archive}' -C '${stage}' && chown -R ec2-user:ec2-user '${stage}'" \
-            --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' GA_MEASUREMENT_ID='${GA_MEASUREMENT_ID}' bash '${stage}/deploy/deploy-alpha.sh'" \
+            --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' GA_MEASUREMENT_ID='${GA_MEASUREMENT_ID}' KAKAO_CLIENT_ID='${KAKAO_CLIENT_ID}' KAKAO_CLIENT_SECRET='${KAKAO_CLIENT_SECRET}' KAKAO_REDIRECT_URI='${KAKAO_REDIRECT_URI}' bash '${stage}/deploy/deploy-alpha.sh'" \
             '{commands: [$strict, $cleanup, $prepare, $download, $extract, $deploy]}'
           )"
 

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import request = require('supertest');
 import { AdminContextService } from '../../src/common/admin-context.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { TournamentCampaignAdminService } from '../../src/tournaments/tournament-campaign-admin.service';
 import { createV1IntegrationApp } from './integration-app';
 
@@ -39,6 +40,15 @@ describe('Tournament campaign integration contract', () => {
         { id: supportUserId, email: 'campaign-support@integration.test', onboardingStatus: 'completed' },
       ],
     });
+    const termsService = app.get(ManagedTermsRuntimeService);
+    const currentSignupTerms = await termsService.currentSignupTerms();
+    const requiredDocumentIds = currentSignupTerms.items
+      .filter((item) => item.requirement === 'required')
+      .map((item) => item.documentId);
+    await Promise.all([
+      termsService.acceptSignupTerms(ownerUserId, requiredDocumentIds),
+      termsService.acceptSignupTerms(supportUserId, requiredDocumentIds),
+    ]);
     await prisma.v1AdminUser.createMany({
       data: [
         { id: 'integration-admin-owner', userId: ownerUserId, adminRole: 'owner' },
@@ -68,6 +78,9 @@ describe('Tournament campaign integration contract', () => {
       where: { id: { in: [tournamentId, secondTournamentId] } },
     });
     await prisma.v1AdminUser.deleteMany({ where: { userId: { in: [ownerUserId, supportUserId] } } });
+    await prisma.v1ManagedTermsConsentEvent.deleteMany({
+      where: { userId: { in: [ownerUserId, supportUserId] } },
+    });
     await prisma.v1User.deleteMany({ where: { id: { in: [ownerUserId, supportUserId] } } });
     await prisma.v1Sport.deleteMany({ where: { id: sportId } });
   }

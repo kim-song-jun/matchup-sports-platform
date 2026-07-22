@@ -1,17 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  V1_PUSH_NUDGE_DISMISSED_KEY,
   V1_SESSION_HINT_KEY,
   V1_USER_EMAIL_KEY,
   V1_USER_ID_KEY,
   clearStoredV1Session,
+  dismissPushNudge,
   hasStoredV1Session,
   sanitizeRedirectPath,
   saveStoredV1Session,
   shouldProbeV1Session,
+  shouldShowPushNudge,
 } from './session-storage';
 
 afterEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
   vi.unstubAllEnvs();
 });
 
@@ -56,5 +60,27 @@ describe('production session hint', () => {
 
     expect(hasStoredV1Session()).toBe(false);
     expect(shouldProbeV1Session()).toBe(true);
+  });
+});
+
+describe('push nudge visibility', () => {
+  it('shows the nudge by default', () => {
+    expect(shouldShowPushNudge()).toBe(true);
+  });
+
+  it('hides the nudge for the rest of the session after it is dismissed', () => {
+    dismissPushNudge();
+
+    expect(window.sessionStorage.getItem(V1_PUSH_NUDGE_DISMISSED_KEY)).toBe('true');
+    expect(shouldShowPushNudge()).toBe(false);
+  });
+
+  it('resets the dismissal on every fresh login, so a re-login shows the nudge again', () => {
+    dismissPushNudge();
+    expect(shouldShowPushNudge()).toBe(false);
+
+    saveStoredV1Session({ userId: 'user-1', userEmail: 'user@example.com' });
+
+    expect(shouldShowPushNudge()).toBe(true);
   });
 });

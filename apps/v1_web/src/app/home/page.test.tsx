@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { HomePageView } from '@/components/home/home-page';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHomeViewModel } from '@/components/home/home.view-model';
@@ -114,5 +114,57 @@ describe('HomePage', () => {
     expect(error).toHaveAttribute('role', 'alert');
     expect(error).toHaveTextContent('목록을 불러오지 못했어요');
     expect(error).toHaveTextContent('다시 불러오기');
+  });
+
+  describe('push notification nudge banner', () => {
+    it('does not render the nudge when the model has no pushNudge', () => {
+      const model = getHomeViewModel();
+
+      render(
+        <Providers>
+          <HomePageView model={model} />
+        </Providers>,
+      );
+
+      expect(screen.queryByText('알림을 받아보세요')).not.toBeInTheDocument();
+    });
+
+    it('renders a dismissible nudge and wires the subscribe/dismiss actions through', () => {
+      const onSubscribe = vi.fn();
+      const onDismiss = vi.fn();
+      const model = {
+        ...getHomeViewModel(),
+        pushNudge: { subscribing: false, onSubscribe, onDismiss },
+      };
+
+      render(
+        <Providers>
+          <HomePageView model={model} />
+        </Providers>,
+      );
+
+      expect(screen.getByText('알림을 받아보세요')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '알림 받기' }));
+      expect(onSubscribe).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByLabelText('알림 받기 안내 닫기'));
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the subscribe button and shows a pending label while subscribing', () => {
+      const model = {
+        ...getHomeViewModel(),
+        pushNudge: { subscribing: true, onSubscribe: vi.fn(), onDismiss: vi.fn() },
+      };
+
+      render(
+        <Providers>
+          <HomePageView model={model} />
+        </Providers>,
+      );
+
+      const subscribeButton = screen.getByRole('button', { name: '확인 중' });
+      expect(subscribeButton).toBeDisabled();
+    });
   });
 });

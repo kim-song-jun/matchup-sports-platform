@@ -47,7 +47,13 @@ export function useV1PushRegistration(): V1PushRegistration {
       const { publicKey } = await v1Get<{ publicKey: string | null }>('/notifications/vapid-public-key');
       if (!publicKey) return;
 
-      const registration = await navigator.serviceWorker.register('/sw-push.js');
+      // register() only resolves once the registration exists — on a brand-new
+      // registration the worker is still installing, and pushManager.subscribe()
+      // throws "no active Service Worker" if called before it activates. Wait for
+      // navigator.serviceWorker.ready (resolves once *this page* has an active
+      // controller), matching the pattern already used in unsubscribe() below.
+      await navigator.serviceWorker.register('/sw-push.js');
+      const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),

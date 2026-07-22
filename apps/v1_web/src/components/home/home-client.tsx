@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
@@ -18,6 +20,7 @@ export function HomePageClient() {
 
   const query = useV1Home();
   const isAuthenticated = query.data?.viewer?.authenticated === true;
+  const onboardingCompleted = query.data?.viewer?.onboardingStatus === 'completed';
   const chatRooms = useV1ChatRooms({ enabled: isAuthenticated });
   const {
     weather,
@@ -25,6 +28,35 @@ export function HomePageClient() {
     refreshing: weatherRefreshing,
     refresh: refreshWeather,
   } = useCurrentLocationWeather();
+  const pushRegistration = useV1PushRegistration();
+  const [pushNudgeSubscribing, setPushNudgeSubscribing] = useState(false);
+  const [pushNudgeDismissed, setPushNudgeDismissed] = useState(true);
+  useEffect(() => {
+    setPushNudgeDismissed(!shouldShowPushNudge());
+  }, []);
+  const showPushNudge =
+    isAuthenticated &&
+    onboardingCompleted &&
+    !pushNudgeDismissed &&
+    pushRegistration.permission === 'default' &&
+    !pushRegistration.isSubscribed;
+  const pushNudge = showPushNudge
+    ? {
+        subscribing: pushNudgeSubscribing,
+        onSubscribe: () => {
+          setPushNudgeSubscribing(true);
+          void pushRegistration.subscribe().finally(() => {
+            setPushNudgeSubscribing(false);
+            dismissPushNudge();
+            setPushNudgeDismissed(true);
+          });
+        },
+        onDismiss: () => {
+          dismissPushNudge();
+          setPushNudgeDismissed(true);
+        },
+      }
+    : undefined;
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
@@ -67,6 +99,7 @@ export function HomePageClient() {
                 weatherPermission,
                 weatherRefreshing,
                 refreshWeather,
+                pushNudge,
               }
             : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather }
         }

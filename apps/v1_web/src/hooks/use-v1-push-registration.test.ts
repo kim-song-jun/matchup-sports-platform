@@ -234,7 +234,7 @@ describe('useV1PushRegistration', () => {
     const { result } = renderHook(() => useV1PushRegistration());
 
     await act(async () => {
-      await expect(result.current.subscribe()).resolves.toBeUndefined();
+      await expect(result.current.subscribe()).resolves.toBe(false);
     });
 
     expect(reportClientError).toHaveBeenCalledWith(

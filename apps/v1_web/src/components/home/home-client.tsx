@@ -45,10 +45,13 @@ export function HomePageClient() {
         subscribing: pushNudgeSubscribing,
         onSubscribe: () => {
           setPushNudgeSubscribing(true);
-          void pushRegistration.subscribe().finally(() => {
+          void pushRegistration.subscribe().then((subscribed) => {
+            if (subscribed) {
+              dismissPushNudge();
+              setPushNudgeDismissed(true);
+            }
+          }).finally(() => {
             setPushNudgeSubscribing(false);
-            dismissPushNudge();
-            setPushNudgeDismissed(true);
           });
         },
         onDismiss: () => {

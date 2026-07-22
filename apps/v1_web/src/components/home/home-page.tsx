@@ -341,7 +341,7 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'var(--blue-tint, rgba(49,130,246,0.12))',
+          background: 'var(--blue-soft)',
           color: 'var(--blue500)',
         }}
       >

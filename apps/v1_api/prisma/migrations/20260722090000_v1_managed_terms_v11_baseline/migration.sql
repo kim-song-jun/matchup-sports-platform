@@ -107,6 +107,7 @@ INSERT INTO "v1_managed_terms_policies" ("id", "code", "name", "is_active", "cre
 INSERT INTO "v1_managed_terms_policies" ("id", "code", "name", "is_active", "created_at", "updated_at") VALUES ('a1100000-0000-4000-8000-000000000009', 'tournament_media', '사진·영상 촬영 및 홍보 활용 동의', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "v1_managed_terms_policies" ("id", "code", "name", "is_active", "created_at", "updated_at") VALUES ('a1100000-0000-4000-8000-000000000010', 'tournament_policy', '대회 운영정책', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "v1_managed_terms_policies" ("id", "code", "name", "is_active", "created_at", "updated_at") VALUES ('a1100000-0000-4000-8000-000000000011', 'support', '고객센터 안내', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "v1_managed_terms_policies" ("id", "code", "name", "is_active", "created_at", "updated_at") VALUES ('a1100000-0000-4000-8000-000000000012', 'signup_location', '회원가입 위치기반서비스 이용 선택 동의', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 
 INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title", "content", "content_hash", "change_summary", "status", "effective_at", "published_at", "created_at", "updated_at") VALUES ('a1110000-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000001', 'v1.1', '서비스 이용약관', $terms$제1조 목적
 
@@ -989,8 +990,8 @@ INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title",
 회사명: 아이위(IWI)
 대표자: 김봉목
 개인정보 보호책임자: 김봉목
-이메일: kpb880605@gmail.com
-시행일: 2026년 7월 1일$terms$, '95874aecfe4d56ad8f58766c2b209ce5a7bd305c882e77f14f73c63a1bfcda95', '현재 v1 고정 약관 본문을 관리형 약관 기준선 v1.1로 등록', 'published'::"V1TermsDocumentStatus", '2026-07-01T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
+이메일: teameetsports@naver.com
+시행일: 2026년 7월 1일$terms$, '1a7389cf22744a2432056be32531f25919a5b2a1136bd0b6fc653ee0e80c0a23', '현재 v1 고정 약관 본문을 관리형 약관 기준선 v1.1로 등록', 'published'::"V1TermsDocumentStatus", '2026-07-01T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title", "content", "content_hash", "change_summary", "status", "effective_at", "published_at", "created_at", "updated_at") VALUES ('a1110000-0000-4000-8000-000000000011', 'a1100000-0000-4000-8000-000000000011', 'v1.1', '고객센터', $terms$고객센터
 
 팀밋 서비스 이용, 대회 신청, 입금 확인, 환불, 신고 및 문의가 필요한 경우 아래 연락처로 문의해 주세요.
@@ -1007,6 +1008,40 @@ INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title",
 5. 환불 문의
 6. 노쇼, 비매너, 부정 참가 신고
 7. 개인정보 관련 문의$terms$, '76393cc34a6bb670f201cc5279a4d57976ab562021691856e5c4228173d0fede', '현재 v1 고정 약관 본문을 관리형 약관 기준선 v1.1로 등록', 'published'::"V1TermsDocumentStatus", '2026-07-01T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "v1_managed_terms_documents" ("id", "policy_id", "version", "title", "content", "content_hash", "change_summary", "status", "effective_at", "published_at", "created_at", "updated_at") VALUES ('a1110000-0000-4000-8000-000000000012', 'a1100000-0000-4000-8000-000000000012', 'v1.1', '위치기반서비스 이용 동의', $terms$위치기반서비스 이용 동의
+
+팀밋은 이용자의 주변 경기, 팀, 대회, 시설 추천을 위해 위치정보 또는 활동 지역 정보를 이용할 수 있습니다.
+
+1. 수집 및 이용 항목
+
+현재 위치 정보 또는 이용자가 직접 선택한 활동 지역 정보
+
+2. 이용 목적
+
+1. 주변 경기 추천
+2. 주변 팀 추천
+3. 주변 대회 및 시설 안내
+4. 거리 기반 서비스 제공
+5. 맞춤형 매치 및 활동 추천
+
+3. 보유 및 이용 기간
+
+위치정보는 서비스 제공 목적 달성 후 지체 없이 파기합니다.
+
+단, 이용자가 직접 설정한 활동 지역 정보는 회원 탈퇴 또는 해당 정보 삭제 시까지 보관될 수 있습니다.
+
+4. 동의 거부 안내
+
+위치기반서비스 이용 동의는 선택 사항입니다.
+
+동의하지 않아도 팀밋의 기본 서비스 이용은 가능하나, 주변 경기 추천 등 위치 기반 기능 이용이 제한될 수 있습니다.
+
+회사 정보 및 시행일
+
+회사명: 아이위(IWI)
+대표자: 김봉목
+이메일: teameetsports@naver.com
+시행일: 2026년 7월 1일$terms$, '6f835050b9a63ead73f90f7781a85e25af95ccb298e766d943743e76784c44b4', '현재 v1 고정 약관 본문을 관리형 약관 기준선 v1.1로 등록', 'published'::"V1TermsDocumentStatus", '2026-07-01T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 
 INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ('a1120001-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000001', 'signup'::"V1ManagedTermsContext", 'required'::"V1ManagedTermsRequirement", 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ('a1120002-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000002', 'signup'::"V1ManagedTermsContext", 'required'::"V1ManagedTermsRequirement", 1, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
@@ -1019,6 +1054,7 @@ INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requir
 INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ('a1120009-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000009', 'tournament_application'::"V1ManagedTermsContext", 'optional'::"V1ManagedTermsRequirement", 3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ('a1120010-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000010', 'footer'::"V1ManagedTermsContext", 'display_only'::"V1ManagedTermsRequirement", 3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ('a1120011-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000011', 'footer'::"V1ManagedTermsContext", 'display_only'::"V1ManagedTermsRequirement", 4, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "v1_managed_terms_placements" ("id", "policy_id", "context", "requirement", "display_order", "is_active", "created_at", "updated_at") VALUES ('a1120012-0000-4000-8000-000000000001', 'a1100000-0000-4000-8000-000000000012', 'signup'::"V1ManagedTermsContext", 'optional'::"V1ManagedTermsRequirement", 2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING;
 
 -- Preserve legacy signup acceptance and revocation without changing the original rows.
 WITH mapped AS (

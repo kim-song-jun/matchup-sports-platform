@@ -10,7 +10,8 @@
 
 - Given 현재 v1 고정 문구가 source of truth다.
 - When `node scripts/qa/generate-v1-managed-terms-baseline.mjs`를 실행한다.
-- Then snapshot과 migration은 11개 policy/document, 11개 placement, 전 문서 `version=v1.1`, source-derived SHA-256 hash와 일치해야 한다.
+- Then snapshot과 migration은 12개 policy/document, 12개 placement, 전 문서 `version=v1.1`, source-derived SHA-256 hash와 일치해야 한다.
+- And `signup_location`은 signup의 optional 문서이며 footer `location_terms`와 ID가 다른 독립 관리 문서여야 한다.
 - And 회원가입 이용약관과 하단 이용약관은 본문이 같아도 서로 다른 policy/document ID를 가져 독립적으로 관리되어야 한다.
 
 ### TERMS-DATA-002 — signup legacy preservation
@@ -38,13 +39,13 @@
 - Given active owner/ops and support administrators exist.
 - When owner/ops creates and edits a draft, publishes or archives it with a reason, or changes placement settings.
 - Then every mutation is persisted with an audit record, the prior published version is archived atomically, and published/archived bodies cannot be edited or deleted.
-- And support can read the same 11 policies and consent counts but every mutation returns `403` with zero rows written.
+- And support can read the same 12 policies and consent counts but every mutation returns `403` with zero rows written.
 
 ### TERMS-ADMIN-006 — responsive actual-content preview
 
-- Given the 11 `v1.1` documents are loaded from the API.
+- Given the 12 `v1.1` documents are loaded from the API.
 - When `/admin/terms` is opened at desktop, tablet, and mobile widths.
-- Then all 11 policies are selectable, the preview uses the selected document's actual stored title/body, and there is no horizontal overflow, console error, or failed network request.
+- Then all 12 policies are selectable, the preview uses the selected document's actual stored title/body, and there is no horizontal overflow, console error, or failed network request.
 
 ### TERMS-RUNTIME-007 — exact current documents on signup
 
@@ -52,6 +53,7 @@
 - When an email or social signup submits the accepted document IDs.
 - Then the server creates the user/advances social signup only when every current required ID is present.
 - And stale IDs fail with `TERMS_DOCUMENT_STALE`, missing current IDs fail with `TERMS_REQUIRED`, and no managed or legacy consent row is partially rewritten.
+- And `signup_location` is returned as the third optional item; checking it records `accepted`, leaving it unchecked records `not_accepted`, and either decision leaves the two required documents as the only signup gate.
 
 ### TERMS-RUNTIME-008 — existing-user re-consent
 

@@ -76,7 +76,7 @@ try {
 const failures = results.filter(
   (result) =>
     result.status !== 200 ||
-    result.policyButtons !== 11 ||
+    result.policyButtons !== 12 ||
     !result.heading ||
     !result.preview ||
     result.horizontalOverflow ||

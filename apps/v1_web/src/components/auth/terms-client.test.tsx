@@ -25,7 +25,7 @@ function currentTerms(renewal = false) {
         title: '서비스 이용약관',
         version: 'v1.1',
         content: '기존 약관 본문',
-        subtitle: '서비스 이용 기준',
+        subtitle: '팀밋 서비스 이용을 위한 기본 약관이에요.',
         changeSummary: null,
         requirement: 'required',
         accepted: renewal,
@@ -47,7 +47,7 @@ function currentTerms(renewal = false) {
         title: '위치기반서비스 이용 동의',
         version: 'v1.1',
         content: '선택 약관 본문',
-        subtitle: '주변 경기 추천을 위한 선택 동의',
+        subtitle: '선택 · 주변 매치 추천에 사용되는 동의예요.',
         changeSummary: '주변 경기 추천을 위한 선택 동의',
         requirement: 'optional',
         accepted: false,
@@ -157,7 +157,7 @@ describe('TermsClient GA events (email signup)', () => {
     const optionalCard = optionalTitle.closest('.tm-auth-agreement-card');
     expect(optionalCard).toBeInTheDocument();
     expect(optionalCard).toHaveTextContent('선택');
-    expect(screen.getByText('주변 경기 추천을 위한 선택 동의')).toHaveClass('tm-text-label');
+    expect(screen.getByText('선택 · 주변 매치 추천에 사용되는 동의예요.')).toHaveClass('tm-text-label');
     expect(screen.queryByText(/회원가입 동의로 저장하지 않으며/)).not.toBeInTheDocument();
 
     fireEvent.click(optionalTitle);
@@ -171,6 +171,14 @@ describe('TermsClient GA events (email signup)', () => {
       NEW_DOCUMENT_ID,
       OPTIONAL_DOCUMENT_ID,
     ]);
+  });
+
+  it('renders the final required-consent summary copy', () => {
+    render(<TermsClient />);
+
+    expect(screen.getByText(
+      '서비스 이용약관, 개인정보 수집 및 이용 동의에 모두 동의합니다.',
+    )).toHaveClass('tm-text-caption');
   });
 });
 
@@ -187,7 +195,7 @@ describe('TermsClient existing-user renewal contract', () => {
   it('keeps prior consent checked and submits only the newly required document', async () => {
     render(<TermsClient />);
 
-    expect(screen.getByText(/서비스 이용약관/).closest('.tm-auth-agreement-card'))
+    expect(screen.getByText('서비스 이용약관 (필수)').closest('.tm-auth-agreement-card'))
       .toHaveTextContent('동의 완료');
     expect(screen.getByText(/신규 필수 약관/).closest('.tm-auth-agreement-card'))
       .toHaveTextContent('새 동의 필요');

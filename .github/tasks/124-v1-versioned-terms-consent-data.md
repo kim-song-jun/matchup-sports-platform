@@ -13,7 +13,7 @@
   - `apps/v1_web/src/components/auth/auth.view-model.ts`
   - `apps/v1_web/src/app/tournaments/[id]/apply/tournament-apply-client.tsx`
   - `apps/v1_web/src/components/v1-ui/shell.tsx`
-- Admin API/UI management, signup/existing-user re-consent runtime, tournament application, and footer/direct-document runtime cutover are included. The locally added `sinup_location` policy normalization and baseline inclusion remain explicitly excluded by user request.
+- Admin API/UI management, signup/existing-user re-consent runtime, tournament application, and footer/direct-document runtime cutover are included. The signup location choice is included as the independently managed `signup_location` optional policy; the footer `location_terms` document remains a separate public policy.
 
 ## Non-negotiable Data Rules
 
@@ -84,8 +84,9 @@
 - [x] Re-running the backfill creates no duplicates and changes no original values.
 - [x] Prisma generation, focused tests, API regression suite, build, and scoped diff checks pass.
 - [x] Active owner/ops can manage policies and immutable versions; active support can read but cannot mutate.
-- [x] Admin desktop/tablet/mobile views show all 11 policies, the actual stored body preview, no horizontal overflow, and no console/network failures.
+- [ ] Admin desktop/tablet/mobile views show all 12 policies, the actual stored body preview, no horizontal overflow, and no console/network failures.
 - [x] New signups submit the exact current required document IDs; a stale or incomplete document set is rejected server-side.
+- [x] Signup exposes `signup_location` as an optional third item, stores accepted/not-accepted append-only decisions, and never blocks signup or existing-user compliance when unchecked.
 - [x] Existing users keep their onboarding state and prior events, see satisfied current terms checked, and cannot continue through protected routes until newly enforced required documents are accepted.
 - [x] Re-consent creates append-only `web` events and never rewrites legacy consent rows or prior managed events.
 - [x] A new document version can explicitly require re-consent and can schedule when enforcement begins for existing users.
@@ -101,6 +102,12 @@
 - Footer support content is not itself a consent document and must not create user consent history.
 
 ## Progress Snapshot
+
+- 2026-07-23 final signup copy: The required-consent summary and all three signup document subtitles were pinned to the user-approved Korean copy. The canonical JSON, baseline generator, subtitle migration, Web rendering test, current local DB, and live signup terms API must remain byte-for-byte aligned with these strings.
+- 2026-07-23 final footer copy: The user separately pinned the four footer document title/subtitle pairs for service terms, privacy policy, location terms, and tournament policy. These footer copies remain independent from the three signup policies even where the approved subtitle text is identical.
+- 2026-07-23 final tournament copy: The four tournament-application document subtitles were pinned to the user-approved eligibility/identity, participant privacy, payment/refund, and media-usage summaries while retaining the existing immutable titles and policy IDs.
+- 2026-07-22 extension in progress: Before production rollout, the user requested restoring the signup location choice into the v1.1 baseline. It is normalized as `signup_location`, optional in the signup context, and independently versioned from footer `location_terms`; existing policy/document IDs 1-11 remain stable.
+- 2026-07-22 extension verification: The regenerated production baseline contains 12 policies/documents/placements, baseline contract tests passed 7/7, and the existing Web optional-selection contract passed 6/6. The current `db push` local database received only policy/document/placement 12 plus its subtitle in one transaction; the live API returned `ready=true` with required items at display order 0/1 and optional `signup_location` at order 2.
 
 - 2026-07-22 final extension: Added independent subtitles for all 11 canonical documents; ordinary views use `subtitle` and renewal guidance uses `changeSummary`. The local migration verified 11/11 populated subtitles.
 - 2026-07-22 final extension: Scheduled publication retained the effective version until `effectiveAt`; an immediate version became current. Tournament application and footer/direct legal reads now consume managed runtime documents.

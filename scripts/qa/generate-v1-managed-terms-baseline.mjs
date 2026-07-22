@@ -138,6 +138,14 @@ const policies = [
     content: sectionsToText(supportSections),
     placements: [['footer', 'display_only', 4]],
   }),
+  policy({
+    sequence: 12,
+    code: 'signup_location',
+    name: '회원가입 위치기반서비스 이용 선택 동의',
+    title: '위치기반서비스 이용 동의',
+    content: sectionsToText(locationSections),
+    placements: [['signup', 'optional', 2]],
+  }),
 ];
 
 const snapshot = {
@@ -289,16 +297,17 @@ function sectionsToText(sections) {
 
 function subtitleForCode(code) {
   return {
-    signup_service_terms: '회원가입 및 서비스 이용에 필요한 기본 약관',
-    signup_privacy: '회원가입과 서비스 제공을 위한 개인정보 수집·이용 기준',
-    footer_service_terms: '팀밋 서비스 이용에 적용되는 기본 약관',
-    privacy_policy: '팀밋이 개인정보를 처리하고 보호하는 기준',
-    location_terms: '주변 경기·팀·대회 추천을 위한 위치정보 이용 기준',
-    tournament_rules: '참가 자격, 경기 운영, 노쇼 및 실격 기준',
-    tournament_privacy: '대회 신청·운영을 위한 참가자 개인정보 이용 기준',
-    tournament_refund: '참가비 입금 기한과 취소·환불 기준',
-    tournament_media: '대회 기록과 홍보를 위한 사진·영상 활용 선택 동의',
-    tournament_policy: '대회 신청부터 경기 운영·제재까지의 운영 기준',
+    signup_service_terms: '팀밋 서비스 이용을 위한 기본 약관이에요.',
+    signup_privacy: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
+    footer_service_terms: '팀밋 서비스 이용을 위한 기본 약관이에요.',
+    privacy_policy: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
+    location_terms: '팀밋 서비스 이용을 위한 기본 약관이에요.',
+    signup_location: '선택 · 주변 매치 추천에 사용되는 동의예요.',
+    tournament_rules: '참가 자격, 경기 운영, 노쇼, 실격, 허위 신분 제출 금지에 대한 동의입니다.',
+    tournament_privacy: '대회 참가자 확인 및 참가 자격 검토를 위한 동의입니다.',
+    tournament_refund: '입금 기한, 신청 취소, 환불 기준에 대한 동의입니다.',
+    tournament_media: '대회 기록, 홍보 콘텐츠, 협찬사 결과 보고에 활용될 수 있습니다.',
+    tournament_policy: '팀밋 서비스 이용을 위한 기본 약관이에요.',
     support: '계정·대회·입금·환불·신고 문의 안내',
   }[code];
 }

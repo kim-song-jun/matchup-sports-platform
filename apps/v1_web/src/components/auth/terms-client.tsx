@@ -252,7 +252,7 @@ export function TermsClient() {
           <TermsCheck checked={requiredChecked} />
           <span style={{ display: 'grid', gap: 3 }}>
             <span className="tm-text-body-lg">필수 약관 전체 동의 (필수)</span>
-            <span className="tm-text-caption">현재 적용되는 필수 약관에 모두 동의합니다.</span>
+            <span className="tm-text-caption">서비스 이용약관, 개인정보 수집 및 이용 동의에 모두 동의합니다.</span>
           </span>
         </button>
         <div className="tm-auth-stack">
@@ -901,7 +901,7 @@ function getTournamentPolicyDocumentSections(): LegalDocumentSection[] {
 회사명: 아이위(IWI)
 대표자: 김봉목
 개인정보 보호책임자: 김봉목
-이메일: kpb880605@gmail.com
+이메일: teameetsports@naver.com
 시행일: 2026년 7월 1일`,
     },
   ];

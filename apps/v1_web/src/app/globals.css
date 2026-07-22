@@ -2353,6 +2353,77 @@ button:disabled {
   margin-top: 22px;
 }
 
+.tm-team-logo-picker {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.tm-team-logo-current {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tm-team-logo-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 52px);
+  gap: 8px;
+}
+
+.tm-team-logo-preset {
+  position: relative;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  padding: 5px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-surface);
+  cursor: pointer;
+}
+
+.tm-team-logo-preset:hover {
+  border-color: var(--grey400);
+}
+
+.tm-team-logo-preset[aria-pressed='true'] {
+  border-color: var(--blue500);
+  box-shadow: 0 0 0 1px var(--blue500);
+}
+
+.tm-team-logo-preset:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-team-logo-preset:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.tm-team-logo-check {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 2px solid var(--card-surface);
+  border-radius: 50%;
+  background: var(--blue500);
+  color: var(--static-white);
+}
+
+@media (min-width: 720px) {
+  .tm-team-logo-picker {
+    grid-template-columns: minmax(210px, 1fr) auto;
+    align-items: center;
+  }
+}
+
 .tm-create-input {
   min-height: 48px;
   margin-top: 10px;

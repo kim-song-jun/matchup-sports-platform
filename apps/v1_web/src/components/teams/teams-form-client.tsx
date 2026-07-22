@@ -7,6 +7,7 @@ import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
+import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
@@ -29,7 +30,10 @@ export function TeamCreatePageClient() {
     if (!url) throw new Error('이미지를 올리지 못했어요. 다시 시도해 주세요.');
     return url;
   };
-  const [draft, setDraft] = useState<TeamDraft>(() => getTeamFormViewModel('create').team);
+  const [draft, setDraft] = useState<TeamDraft>(() => {
+    const vm = getTeamFormViewModel('create').team;
+    return { ...vm, logoUrl: vm.logoUrl || getRandomTeamLogoPreset() };
+  });
   const [sportId, setSportId] = useState('');
   const [regionId, setRegionId] = useState('');
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
@@ -37,6 +41,7 @@ export function TeamCreatePageClient() {
   const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
   const selectedSportId = sportId || sports.data?.[0]?.id || '';
+
   const createTeamWithActivityCompatibility = async (payload: V1TeamMutationPayload, draft: TeamDraft) => {
     try {
       return await createTeam.mutateAsync(payload);

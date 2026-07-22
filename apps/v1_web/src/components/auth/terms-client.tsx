@@ -1,14 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Button } from '@/components/v1-ui/button';
-import { useV1CompleteSocialTerms } from '@/hooks/use-v1-api';
+import {
+  useV1AcceptSignupTerms,
+  useV1CompleteSocialTerms,
+  useV1CurrentSignupTerms,
+  useV1CurrentTerms,
+} from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { saveSignupTermsAccepted } from '@/lib/signup-terms-storage';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { saveSignupTermsDocumentIds } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
 
@@ -17,31 +22,52 @@ export function TermsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const socialTerms = useV1CompleteSocialTerms();
+  const acceptTerms = useV1AcceptSignupTerms();
   const mode = searchParams.get('mode');
   const document = searchParams.get('document');
   const isSocialMode = mode === 'social';
-  const [checkedByTitle, setCheckedByTitle] = useState(() =>
-    Object.fromEntries(model.agreements.map((agreement) => [agreement.title, false])),
-  );
-  const [openByTitle, setOpenByTitle] = useState<Record<string, boolean>>({});
+  const currentTerms = useV1CurrentSignupTerms({ enabled: !document });
+  const footerTerms = useV1CurrentTerms('footer', { enabled: Boolean(document) });
+  const isRenewalMode = mode === 'renewal'
+    || (!isSocialMode && currentTerms.data?.compliance?.compliant === false);
+  const [checkedByDocumentId, setCheckedByDocumentId] = useState<Record<string, boolean>>({});
+  const [openByDocumentId, setOpenByDocumentId] = useState<Record<string, boolean>>({});
   const [legalDialog, setLegalDialog] = useState<null | { title: string; sections: LegalDocumentSection[] }>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const requiredAccepted = useMemo(
-    () => model.agreements.every((agreement) => !agreement.required || checkedByTitle[agreement.title]),
-    [checkedByTitle, model.agreements],
-  );
-  const requiredChecked = model.agreements.filter((agreement) => agreement.required).every((agreement) => checkedByTitle[agreement.title]);
+  const agreements = useMemo(() => currentTerms.data?.items ?? [], [currentTerms.data?.items]);
+  const requiredAgreements = agreements.filter((agreement) => agreement.requirement === 'required');
+  const requiredAccepted = requiredAgreements.length > 0
+    && requiredAgreements.every(
+      (agreement) => agreement.accepted || checkedByDocumentId[agreement.documentId],
+    );
+  const requiredChecked = requiredAccepted;
+
+  useEffect(() => {
+    if (!currentTerms.data) return;
+    setCheckedByDocumentId((current) =>
+      Object.fromEntries(
+        currentTerms.data.items.map((item) => [
+          item.documentId,
+          item.accepted || current[item.documentId] || false,
+        ]),
+      ),
+    );
+  }, [currentTerms.data]);
 
   const setRequired = (checked: boolean) => {
-    setCheckedByTitle((current) => ({
+    setCheckedByDocumentId((current) => ({
       ...current,
-      ...Object.fromEntries(model.agreements.filter((agreement) => agreement.required).map((agreement) => [agreement.title, checked])),
+      ...Object.fromEntries(
+        agreements
+          .filter((agreement) => agreement.requirement === 'required' && !agreement.accepted)
+          .map((agreement) => [agreement.documentId, checked]),
+      ),
     }));
   };
 
-  const toggleAgreement = (title: string, nextChecked: boolean) => {
-    setCheckedByTitle((current) => ({ ...current, [title]: nextChecked }));
+  const toggleAgreement = (documentId: string, nextChecked: boolean) => {
+    setCheckedByDocumentId((current) => ({ ...current, [documentId]: nextChecked }));
   };
 
   useEffect(() => {
@@ -59,6 +85,17 @@ export function TermsClient() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [legalDialog]);
 
+  useEffect(() => {
+    if (!isRenewalMode || document) return undefined;
+    const renewalUrl = window.location.href;
+    window.history.pushState({ termsRenewal: true }, '', renewalUrl);
+    const preventBack = () => {
+      window.history.pushState({ termsRenewal: true }, '', renewalUrl);
+    };
+    window.addEventListener('popstate', preventBack);
+    return () => window.removeEventListener('popstate', preventBack);
+  }, [document, isRenewalMode]);
+
   const continueToSignup = () => {
     if (!requiredAccepted) {
       return;
@@ -66,12 +103,15 @@ export function TermsClient() {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
     // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
     // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-    if (socialTerms.isPending) return;
+    if (socialTerms.isPending || acceptTerms.isPending) return;
 
     setError(null);
+    const acceptedTermsDocumentIds = agreements
+      .filter((agreement) => agreement.accepted || checkedByDocumentId[agreement.documentId])
+      .map((agreement) => agreement.documentId);
     if (isSocialMode) {
       socialTerms.mutate(
-        { requiredTermsAccepted: true },
+        { requiredTermsAccepted: true, acceptedTermsDocumentIds },
         {
           onSuccess: (result) => router.replace(result.next.route),
           onError: (nextError) => {
@@ -87,30 +127,70 @@ export function TermsClient() {
       return;
     }
 
+    if (isRenewalMode) {
+      const documentIds = agreements
+        .filter((agreement) => !agreement.accepted && checkedByDocumentId[agreement.documentId])
+        .map((agreement) => agreement.documentId);
+      if (documentIds.length === 0) {
+        const redirect = sanitizeRedirectPath(searchParams.get('redirect'));
+        router.replace(redirect ?? '/home');
+        return;
+      }
+      acceptTerms.mutate(
+        { documentIds },
+        {
+          onSuccess: () => {
+            const redirect = sanitizeRedirectPath(searchParams.get('redirect'));
+            router.replace(redirect ?? '/home');
+          },
+          onError: (nextError) =>
+            setError(nextError instanceof Error ? nextError.message : '약관 동의를 저장하지 못했어요.'),
+        },
+      );
+      return;
+    }
+
     trackEvent('sign_up_start', { method: 'email' });
-    saveSignupTermsAccepted(true);
+    saveSignupTermsDocumentIds(acceptedTermsDocumentIds);
     router.push('/signup');
   };
 
   const legalDocument = resolveLegalDocument(document);
   if (legalDocument) {
-    const item = model.agreements.find((agreement) =>
-      legalDocument.key === 'privacy' ? agreement.title.includes('개인정보') : agreement.title.includes('이용약관'),
+    const codeByDocument: Record<LegalDocumentKey, string> = {
+      terms: 'footer_service_terms',
+      privacy: 'privacy_policy',
+      location: 'location_terms',
+      'tournament-policy': 'tournament_policy',
+      support: 'support',
+    };
+    const managedDocument = footerTerms.data?.items.find(
+      (item) => item.code === codeByDocument[legalDocument.key],
     );
 
     return (
-      <AuthFrame topTitle={legalDocument.title} backHref="/login">
+      <AuthFrame topTitle={managedDocument?.title ?? legalDocument.title} backHref="/login">
         <div className="tm-auth-body">
-          <h1 className="tm-text-heading tm-auth-heading">{legalDocument.title}</h1>
-          <p className="tm-text-body tm-auth-sub">{item?.detail ?? legalDocument.description}</p>
-          <div className="tm-auth-soft-card" style={{ display: 'grid', gap: 14, marginTop: 18 }}>
-            {legalDocument.sections.map((section) => (
-              <section key={section.title}>
-                <h2 className="tm-text-body-lg" style={{ margin: 0 }}>{section.title}</h2>
-                <p className="tm-text-caption" style={{ margin: '6px 0 0', lineHeight: 1.65, whiteSpace: 'pre-line' }}>{section.body}</p>
-              </section>
-            ))}
-          </div>
+          <h1 className="tm-text-heading tm-auth-heading">{managedDocument?.title ?? legalDocument.title}</h1>
+          {footerTerms.isPending ? <p className="tm-text-body tm-auth-sub">약관을 불러오고 있어요.</p> : null}
+          {footerTerms.isError || (footerTerms.data && !managedDocument) ? (
+            <div className="tm-auth-soft-card tm-auth-soft-card-error">
+              <div className="tm-text-body-lg">현재 약관을 불러오지 못했어요</div>
+              <div className="tm-text-caption">잠시 후 다시 시도해 주세요.</div>
+            </div>
+          ) : null}
+          {managedDocument ? (
+            <>
+              {managedDocument.subtitle ? (
+                <p className="tm-text-body tm-auth-sub">{managedDocument.subtitle}</p>
+              ) : null}
+              <div className="tm-auth-soft-card" style={{ display: 'grid', gap: 14, marginTop: 18 }}>
+                <p className="tm-text-caption" style={{ margin: 0, lineHeight: 1.65, whiteSpace: 'pre-line' }}>
+                  {managedDocument.content}
+                </p>
+              </div>
+            </>
+          ) : null}
         </div>
       </AuthFrame>
     );
@@ -119,24 +199,49 @@ export function TermsClient() {
   return (
     <AuthFrame
       topTitle="약관 동의"
-      backHref={isSocialMode ? undefined : model.backHref}
+      backHref={isSocialMode || isRenewalMode ? undefined : model.backHref}
       fixedAction={
         <Button
           block
-          disabled={!requiredAccepted}
-          loading={socialTerms.isPending}
+          disabled={!currentTerms.data?.ready || !requiredAccepted}
+          loading={currentTerms.isPending || socialTerms.isPending || acceptTerms.isPending}
           onClick={continueToSignup}
           size="lg"
           type="button"
           variant="primary"
         >
-          {requiredAccepted ? model.primary.label : '필수 약관에 동의해 주세요'}
+          {requiredAccepted
+            ? isRenewalMode
+              ? '동의하고 계속하기'
+              : model.primary.label
+            : '필수 약관에 동의해 주세요'}
         </Button>
       }
     >
       <div className="tm-auth-body" style={{ paddingBottom: 112 }}>
-        <h1 className="tm-text-heading tm-auth-heading" style={{ overflowWrap: 'break-word', textWrap: 'balance' }}>{model.title}</h1>
-        <p className="tm-text-body tm-auth-sub" style={{ whiteSpace: 'pre-line' }}>{model.sub}</p>
+        <h1 className="tm-text-heading tm-auth-heading" style={{ overflowWrap: 'break-word', textWrap: 'balance' }}>
+          {isRenewalMode ? '새 필수 약관을 확인해 주세요' : model.title}
+        </h1>
+        <p className="tm-text-body tm-auth-sub" style={{ whiteSpace: 'pre-line' }}>
+          {isRenewalMode
+            ? '기존에 동의한 약관은 그대로 유지돼요. 새로 추가되거나 재동의가 필요한 항목만 확인하면 됩니다.'
+            : model.sub}
+        </p>
+        {currentTerms.isPending ? (
+          <div className="tm-auth-soft-card"><div className="tm-text-caption">현재 약관을 불러오고 있어요.</div></div>
+        ) : null}
+        {currentTerms.isError ? (
+          <div className="tm-auth-soft-card tm-auth-soft-card-error">
+            <div className="tm-text-body-lg">현재 약관을 불러오지 못했어요</div>
+            <div className="tm-text-caption">잠시 후 다시 시도해 주세요.</div>
+          </div>
+        ) : null}
+        {currentTerms.data && !currentTerms.data.ready ? (
+          <div className="tm-auth-soft-card tm-auth-soft-card-error">
+            <div className="tm-text-body-lg">필수 약관이 준비되지 않았어요</div>
+            <div className="tm-text-caption">운영자에게 문의해 주세요.</div>
+          </div>
+        ) : null}
         {error ? (
           <div className="tm-auth-soft-card tm-auth-soft-card-error">
             <div className="tm-text-body-lg">약관을 저장하지 못했어요</div>
@@ -151,48 +256,55 @@ export function TermsClient() {
           </span>
         </button>
         <div className="tm-auth-stack">
-          {model.agreements.map((item) => {
-            const checked = checkedByTitle[item.title];
-            const open = openByTitle[item.title] ?? false;
-            const documentSections = getAgreementDocumentSections(item.title);
+          {agreements.map((item) => {
+            const checked = item.accepted || checkedByDocumentId[item.documentId];
+            const open = openByDocumentId[item.documentId] ?? false;
 
             return (
-              <div key={item.title} className="tm-card tm-auth-agreement-card">
+              <div key={item.documentId} className="tm-card tm-auth-agreement-card">
                 <div className="tm-auth-agreement">
                   <button
                     aria-pressed={checked}
                     className="tm-auth-check-button tm-pressable"
-                    onClick={() => toggleAgreement(item.title, !checked)}
+                    disabled={item.accepted}
+                    onClick={() => toggleAgreement(item.documentId, !checked)}
                     type="button"
                   >
                     <TermsCheck checked={checked} />
                   </button>
                   <button
                     className="tm-auth-agreement-main tm-pressable"
-                    onClick={() => toggleAgreement(item.title, !checked)}
+                    onClick={() => {
+                      if (!item.accepted) toggleAgreement(item.documentId, !checked);
+                    }}
                     type="button"
                   >
                     <span
                       className="tm-text-body-lg"
-                      style={{ fontSize: 15, lineHeight: '20px', whiteSpace: 'nowrap' }}
+                      style={{ fontSize: 15, lineHeight: '20px', overflowWrap: 'anywhere' }}
                     >
-                      {item.title} ({item.required ? '필수' : '선택'})
+                      {item.title} ({item.requirement === 'required' ? '필수' : '선택'})
                     </span>
-                    {item.meta === '필수' ? null : <span className="tm-text-caption">{item.meta}</span>}
-                    {item.detail ? <span className="tm-text-caption" style={{ lineHeight: 1.5 }}>{item.detail}</span> : null}
+                    {item.subtitle ? (
+                      <span className="tm-text-label" style={{ lineHeight: '20px' }}>
+                        {item.subtitle}
+                      </span>
+                    ) : null}
+                    {isRenewalMode && item.requiresAction && item.changeSummary ? (
+                      <span className={'tm-text-caption'} style={{ lineHeight: '20px' }}>
+                        이번 변경: {item.changeSummary}
+                      </span>
+                    ) : null}
+                    <span className="tm-text-caption">
+                      {item.version}{item.accepted ? ' · 동의 완료' : item.requiresAction ? ' · 새 동의 필요' : ''}
+                    </span>
                   </button>
                   <button
-                    aria-expanded={documentSections ? undefined : open}
-                    aria-haspopup={documentSections ? 'dialog' : undefined}
+                    aria-expanded={open}
                     aria-label={`${item.title} 내용 보기`}
                     className="tm-auth-agreement-arrow tm-pressable"
                     onClick={() => {
-                      if (documentSections) {
-                        setLegalDialog({ title: item.title, sections: documentSections });
-                        return;
-                      }
-
-                      setOpenByTitle((current) => ({ ...current, [item.title]: !open }));
+                      setOpenByDocumentId((current) => ({ ...current, [item.documentId]: !open }));
                     }}
                     type="button"
                   >
@@ -201,23 +313,13 @@ export function TermsClient() {
                 </div>
                 {open ? (
                   <div className="tm-auth-agreement-detail">
-                    <div className="tm-text-caption">{item.detail}</div>
+                    <div className="tm-text-caption" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>{item.content}</div>
                   </div>
                 ) : null}
               </div>
             );
           })}
         </div>
-        <Link
-          className="tm-card tm-auth-agree-button tm-pressable"
-          href="/terms?document=location"
-          style={{ width: '100%', textAlign: 'left' }}
-        >
-          <span className="tm-text-body-lg">위치 기능은 사용할 때마다 따로 동의해요</span>
-          <span className="tm-text-caption">
-            회원가입 동의로 저장하지 않으며, 현재 위치 버튼을 누르기 전에 좌표 전송 범위를 안내해요.
-          </span>
-        </Link>
         {legalDialog ? (
           <LegalDocumentDialog
             title={legalDialog.title}
@@ -799,7 +901,7 @@ function getTournamentPolicyDocumentSections(): LegalDocumentSection[] {
 회사명: 아이위(IWI)
 대표자: 김봉목
 개인정보 보호책임자: 김봉목
-이메일: kpb880605@gmail.com
+이메일: teameetsports@naver.com
 시행일: 2026년 7월 1일`,
     },
   ];

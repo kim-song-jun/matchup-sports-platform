@@ -48,7 +48,13 @@ export function EmailLoginClient() {
           saveStoredV1Session(result.session);
           trackEvent('login', { method: 'email' });
           const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
-          router.replace(redirect ?? '/home');
+          const apiNext = sanitizeRedirectPath(result.next?.route);
+          if (apiNext?.startsWith('/terms?mode=renewal')) {
+            const separator = apiNext.includes('?') ? '&' : '?';
+            router.replace(redirect ? `${apiNext}${separator}redirect=${encodeURIComponent(redirect)}` : apiNext);
+            return;
+          }
+          router.replace(redirect ?? apiNext ?? '/home');
         },
         onError: (nextError) => {
           trackEvent('login_failed', { method: 'email', reason: nextError instanceof V1ApiError ? nextError.code : 'unknown' });

@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -13,12 +14,21 @@ import {
 } from './social-signup-access';
 import type { V1AuthUser } from './v1-auth-user';
 import { currentRuntimeConfiguration, resolveV1RequestIdentity, type V1RequestIdentity } from './v1-session';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
+import { isTermsReconsentRequestAllowed } from '../terms/terms-reconsent-access';
 
 type V1Request = Request & { v1User?: V1AuthUser };
 
 @Injectable()
 export class V1AuthGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly managedTerms: ManagedTermsRuntimeService;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() managedTerms?: ManagedTermsRuntimeService,
+  ) {
+    this.managedTerms = managedTerms ?? new ManagedTermsRuntimeService(prisma);
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<V1Request>();
@@ -68,6 +78,21 @@ export class V1AuthGuard implements CanActivate {
         message: 'Social signup must be completed before accessing this resource',
         details: { next: { route: pendingSignupRoute } },
       });
+    }
+
+    const requestUrl = request.originalUrl ?? request.url;
+    if (!pendingSignupRoute && !isTermsReconsentRequestAllowed(requestUrl)) {
+      const compliance = await this.managedTerms.signupCompliance(user.id);
+      if (!compliance.compliant) {
+        throw new ForbiddenException({
+          code: 'TERMS_RECONSENT_REQUIRED',
+          message: '새 필수 약관에 동의해야 계속할 수 있어요.',
+          details: {
+            pendingDocumentIds: compliance.pendingRequiredDocumentIds,
+            next: { route: compliance.nextRoute },
+          },
+        });
+      }
     }
 
     request.v1User = user;

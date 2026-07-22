@@ -40,6 +40,7 @@ All compatibility agents inherit `.codex/qa-rules.md`. Required anchors include 
 - 상세 문서: `.codex/agents/backend-dev.md`
 - 범위: NestJS controller/service/module/DTO, Prisma schema/seed, fixtures, integration tests.
 - 필수 계약: `/api/v1`, `TransformInterceptor`, strict `ValidationPipe`, `JwtAuthGuard`, `AdminGuard`, `TeamMembershipService.assertRole(...)`.
+- Windows DB 작업에서 한글 SQL을 PowerShell 문자열 파이프로 psql에 넘기지 않는다. UTF-8 migration runner 또는 parameterized Prisma script를 사용하고 DB/API 한글 round-trip을 확인한다.
 - sync 대상: `apps/v1_api/test/fixtures/`, `apps/v1_web/src/test/msw/`, `e2e/fixtures/`, inline mocks.
 
 ### `frontend-dev`

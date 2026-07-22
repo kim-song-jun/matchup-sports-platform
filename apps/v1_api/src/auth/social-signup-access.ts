@@ -25,6 +25,10 @@ export function isPendingSocialSignupRequestAllowed(
     return true;
   }
 
+  if (pathname.endsWith('/terms/current')) {
+    return true;
+  }
+
   if (status === 'social_terms_required') {
     return pathname.endsWith('/auth/social-terms');
   }

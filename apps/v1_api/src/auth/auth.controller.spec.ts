@@ -100,6 +100,7 @@ describe('AuthController', () => {
       birthDate: '19900102',
       profileImageUrl: 'data:image/png;base64,profile',
       requiredTermsAccepted: true,
+      acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
     };
 
     await expect(controller.register(dto)).resolves.toEqual({
@@ -166,7 +167,10 @@ describe('AuthController', () => {
       accountStatus: 'active' as const,
       onboardingStatus: 'social_terms_required' as const,
     };
-    const dto = { requiredTermsAccepted: true };
+    const dto = {
+      requiredTermsAccepted: true,
+      acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
+    };
 
     await expect(controller.completeSocialTerms(user, dto)).resolves.toEqual({
       session: { userId: 'user-1', userEmail: null },

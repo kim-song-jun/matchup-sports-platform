@@ -13,6 +13,7 @@ const VALID_REGISTER_INPUT = {
   gender: 'male',
   profileImageUrl: 'data:image/png;base64,profile',
   requiredTermsAccepted: true,
+  acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
 } as const;
 
 async function failedProperties(input: Record<string, unknown>): Promise<string[]> {
@@ -32,7 +33,14 @@ describe('RegisterDto (required signup profile contract)', () => {
 
     // Then
     expect(failures).toEqual(
-      expect.arrayContaining(['nickname', 'email', 'password', 'requiredTermsAccepted', 'gender']),
+      expect.arrayContaining([
+        'nickname',
+        'email',
+        'password',
+        'requiredTermsAccepted',
+        'acceptedTermsDocumentIds',
+        'gender',
+      ]),
     );
   });
 

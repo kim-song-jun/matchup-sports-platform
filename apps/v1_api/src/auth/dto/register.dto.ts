@@ -1,4 +1,4 @@
-import { IsBoolean, IsString, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsString, IsUUID, MinLength } from 'class-validator';
 import { RequiredSignupProfileDto } from './required-signup-profile.dto';
 
 export class RegisterDto extends RequiredSignupProfileDto {
@@ -16,4 +16,11 @@ export class RegisterDto extends RequiredSignupProfileDto {
 
   @IsBoolean()
   requiredTermsAccepted!: boolean;
+
+  @IsArray()
+  @IsDefined()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  acceptedTermsDocumentIds?: string[];
 }

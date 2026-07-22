@@ -68,6 +68,11 @@ export type V1AuthMe = {
     regionSummary?: string | null;
   };
   onboarding?: unknown;
+  termsCompliance?: {
+    compliant: boolean;
+    pendingRequiredDocumentIds: string[];
+    nextRoute: string | null;
+  };
   reputation?: unknown;
 };
 
@@ -1384,6 +1389,112 @@ export type V1AdminNoticeDeleteResult = {
   deleted: true;
 };
 
+export type V1ManagedTermsContext = 'signup' | 'tournament_application' | 'footer';
+export type V1ManagedTermsRequirement = 'required' | 'optional' | 'display_only';
+export type V1ManagedTermsDocumentStatus = 'draft' | 'published' | 'archived';
+
+export type V1AdminTermsPlacement = {
+  placementId: string;
+  context: V1ManagedTermsContext;
+  requirement: V1ManagedTermsRequirement;
+  displayOrder: number;
+  isActive: boolean;
+};
+
+export type V1AdminTermsDocument = {
+  documentId: string;
+  version: string;
+  title: string;
+  subtitle: string | null;
+  content: string;
+  contentHash: string;
+  changeSummary: string | null;
+  requiresReconsent: boolean;
+  enforcementAt: string | null;
+  status: V1ManagedTermsDocumentStatus;
+  effectiveAt: string | null;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  supersedesDocumentId: string | null;
+  consentEventCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminTermsPolicy = {
+  policyId: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  currentDocumentId: string | null;
+  placements: V1AdminTermsPlacement[];
+  documents: V1AdminTermsDocument[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminTermsListResult = {
+  items: V1AdminTermsPolicy[];
+  summary: { total: number; active: number; draftDocuments: number };
+};
+
+export type V1AdminTermsPlacementPayload = Omit<V1AdminTermsPlacement, 'placementId'>;
+export type V1AdminTermsVersionPayload = {
+  version: string;
+  title: string;
+  subtitle?: string;
+  content: string;
+  changeSummary?: string;
+  effectiveAt?: string | null;
+  requiresReconsent?: boolean;
+  enforcementAt?: string | null;
+};
+export type V1AdminTermsPolicyCreatePayload = V1AdminTermsVersionPayload & {
+  code: string;
+  name: string;
+  placements: V1AdminTermsPlacementPayload[];
+};
+export type V1AdminTermsPolicyUpdatePayload = {
+  name: string;
+  isActive: boolean;
+  placements: V1AdminTermsPlacementPayload[];
+};
+export type V1AdminTermsStatusPayload = {
+  status: Extract<V1ManagedTermsDocumentStatus, 'published' | 'archived'>;
+  reason: string;
+};
+
+export type V1CurrentTermsItem = {
+  policyId: string;
+  code: string;
+  documentId: string;
+  version: string;
+  title: string;
+  subtitle: string | null;
+  content: string;
+  changeSummary: string | null;
+  requirement: V1ManagedTermsRequirement;
+  displayOrder: number;
+  requiresReconsent: boolean;
+  enforcementAt: string | null;
+  effectiveAt: string | null;
+  accepted: boolean;
+  requiresAction: boolean;
+};
+
+export type V1CurrentTerms = {
+  context: V1ManagedTermsContext;
+  ready: boolean;
+  items: V1CurrentTermsItem[];
+  compliance: {
+    compliant: boolean;
+    pendingRequiredDocumentIds: string[];
+    nextRoute: string | null;
+  } | null;
+};
+export type V1CurrentSignupTermsItem = V1CurrentTermsItem;
+export type V1CurrentSignupTerms = V1CurrentTerms & { context: 'signup' };
+
 export type V1AdminPopupStatus = 'draft' | 'published' | 'archived';
 
 export type V1AdminPopupRow = {
@@ -2414,6 +2525,7 @@ export type V1CreateRegistrationPayload = {
 };
 
 export type V1SubmitRegistrationPayload = {
+  termsDocumentIds: string[];
   paymentMethod: V1TournamentPaymentMethod;
   depositorName?: string;
   agreedRules: boolean;

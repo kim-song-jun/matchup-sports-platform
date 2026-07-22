@@ -17,7 +17,10 @@ import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { saveStoredV1Session } from '@/lib/session-storage';
-import { readSignupTermsAccepted } from '@/lib/signup-terms-storage';
+import {
+  clearSignupTermsDocumentIds,
+  readSignupTermsDocumentIds,
+} from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
 import {
   formatBirthDate,
@@ -70,7 +73,7 @@ export function SignupClient() {
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
-  const [requiredTermsAccepted, setRequiredTermsAccepted] = useState(false);
+  const [acceptedTermsDocumentIds, setAcceptedTermsDocumentIds] = useState<string[]>([]);
   const [termsReady, setTermsReady] = useState(false);
   const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -80,12 +83,12 @@ export function SignupClient() {
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
 
   useEffect(() => {
-    const accepted = readSignupTermsAccepted();
-    if (!accepted) {
+    const documentIds = readSignupTermsDocumentIds();
+    if (documentIds.length === 0) {
       router.replace('/terms');
       return;
     }
-    setRequiredTermsAccepted(true);
+    setAcceptedTermsDocumentIds(documentIds);
     setTermsReady(true);
   }, [router]);
 
@@ -223,7 +226,8 @@ export function SignupClient() {
         gender: profileDraft.gender,
         phone: profileDraft.phone,
         birthDate: profileDraft.birthDate,
-        requiredTermsAccepted,
+        requiredTermsAccepted: true,
+        acceptedTermsDocumentIds,
       });
 
       saveStoredV1Session(result.session);
@@ -248,6 +252,7 @@ export function SignupClient() {
       }
 
       window.sessionStorage.removeItem(onboardingDraftKey);
+      clearSignupTermsDocumentIds();
       router.replace('/signup/complete');
     } catch (nextError) {
       if (nextError instanceof V1ApiError && nextError.statusCode === 409) {
@@ -270,7 +275,7 @@ export function SignupClient() {
         setError('필수 약관 문서가 아직 준비되지 않았어요.');
         return;
       }
-      if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || !requiredTermsAccepted)) {
+      if (nextError instanceof V1ApiError && (nextError.code === 'TERMS_REQUIRED' || nextError.code === 'TERMS_DOCUMENT_STALE')) {
         router.replace('/terms');
         return;
       }

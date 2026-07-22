@@ -8,6 +8,7 @@ import { RegisterDto } from './dto/register.dto';
 import { isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { hashPassword, verifyPassword } from './password-hash';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -19,7 +20,10 @@ type KakaoProfile = {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly managedTerms: ManagedTermsRuntimeService,
+  ) {}
 
   async register(dto: RegisterDto) {
     if (!dto.requiredTermsAccepted) {
@@ -43,6 +47,10 @@ export class AuthService {
         message: 'Birth date must be a valid YYYYMMDD value',
       });
     }
+
+    const signupTermsDecisions = await this.managedTerms.assertSignupAcceptances(
+      dto.acceptedTermsDocumentIds ?? [],
+    );
 
     const existing = await this.prisma.v1User.findUnique({
       where: { email },
@@ -88,7 +96,8 @@ export class AuthService {
     });
 
     const passwordHash = await hashPassword(dto.password);
-    const user = await this.prisma.v1User.create({
+    const user = await this.prisma.$transaction(async (transaction) => {
+      const created = await transaction.v1User.create({
       data: {
         email,
         phone,
@@ -130,7 +139,14 @@ export class AuthService {
         },
         ...(buildTermsConsentCreate(requiredTerms)),
       },
-      select: { id: true, email: true },
+        select: { id: true, email: true },
+      });
+      await this.managedTerms.recordSignupDecisions(
+        transaction,
+        created.id,
+        signupTermsDecisions,
+      );
+      return created;
     });
 
     return this.sessionResponse(user.id, user.email);
@@ -413,6 +429,11 @@ export class AuthService {
       });
     }
 
+    const signupTermsDecisions = await this.managedTerms.assertSignupAcceptances(
+      dto.acceptedTermsDocumentIds ?? [],
+      userId,
+    );
+
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: 'social_terms_required' },
@@ -443,6 +464,11 @@ export class AuthService {
           skipDuplicates: true,
         });
       }
+      await this.managedTerms.recordSignupDecisions(
+        transaction,
+        userId,
+        signupTermsDecisions,
+      );
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });
@@ -657,6 +683,7 @@ export class AuthService {
       hasRequiredTerms: hasAcceptedRequiredTerms(user.onboardingStatus, user.termsConsents.length),
       hasProfile: Boolean(user.profile?.nickname),
     });
+    const termsCompliance = await this.managedTerms.signupCompliance(user.id);
 
     return {
       user: {
@@ -682,6 +709,7 @@ export class AuthService {
         regionSummary: user.profile?.displayRegion ?? user.regions[0]?.region.name ?? null,
       },
       onboarding,
+      termsCompliance,
       reputation: {
         mannerScore: user.reputationSummary?.mannerScore
           ? Number(user.reputationSummary.mannerScore)
@@ -694,7 +722,11 @@ export class AuthService {
 
   private async sessionResponse(userId: string, userEmail: string | null, options?: { social?: boolean }) {
     const snapshot = await this.me(userId);
-    const nextRoute = getAuthNextRoute(snapshot.onboarding, options);
+    const onboardingRoute = getAuthNextRoute(snapshot.onboarding, options);
+    const nextRoute = onboardingRoute
+      ?? (snapshot.termsCompliance?.compliant === false
+        ? snapshot.termsCompliance.nextRoute ?? '/terms?mode=renewal'
+        : null);
 
     return {
       session: {

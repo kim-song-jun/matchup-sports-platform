@@ -13,6 +13,7 @@ const tournamentApplyApiMocks = vi.hoisted(() => ({
   useV1Registration: vi.fn(),
   useV1CreateRegistration: vi.fn(),
   useV1SubmitRegistration: vi.fn(),
+  useV1CurrentTerms: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -148,6 +149,21 @@ describe('TournamentApplyPageClient GA events', () => {
     });
     tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false });
     tournamentApplyApiMocks.useV1Registration.mockReturnValue({ data: undefined });
+    tournamentApplyApiMocks.useV1CurrentTerms.mockReturnValue({
+      data: {
+        context: 'tournament_application',
+        ready: true,
+        compliance: null,
+        items: [
+          { documentId: '11111111-1111-4111-8111-111111111111', code: 'tournament_rules', title: '대회 규정', subtitle: '참가 기준', content: '규정 본문', version: 'v1.1', requirement: 'required' },
+          { documentId: '22222222-2222-4222-8222-222222222222', code: 'tournament_privacy', title: '개인정보 동의', subtitle: '개인정보 기준', content: '개인정보 본문', version: 'v1.1', requirement: 'required' },
+          { documentId: '33333333-3333-4333-8333-333333333333', code: 'tournament_refund', title: '환불 정책', subtitle: '환불 기준', content: '환불 본문', version: 'v1.1', requirement: 'required' },
+          { documentId: '44444444-4444-4444-8444-444444444444', code: 'tournament_media', title: '사진·영상 동의', subtitle: '선택 활용', content: '미디어 본문', version: 'v1.1', requirement: 'optional' },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
   });
 
   it('tracks tournament_apply_complete once the registration is submitted', async () => {
@@ -195,6 +211,16 @@ describe('TournamentApplyPageClient GA events', () => {
 
     await waitFor(() => {
       expect(submitRegistrationMutateAsync).toHaveBeenCalled();
+      expect(submitRegistrationMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          termsDocumentIds: [
+            '11111111-1111-4111-8111-111111111111',
+            '22222222-2222-4222-8222-222222222222',
+            '33333333-3333-4333-8333-333333333333',
+            '44444444-4444-4444-8444-444444444444',
+          ],
+        }),
+      );
       expect(trackEvent).toHaveBeenCalledWith('tournament_apply_complete', { tournamentId: 'tournament-1' });
     });
   });

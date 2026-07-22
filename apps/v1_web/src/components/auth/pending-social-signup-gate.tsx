@@ -34,16 +34,20 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   }, [authMe.isError, hasSessionHint]);
 
   const onboardingStatus = authMe.data?.user.onboardingStatus;
-  const requiredRoute = getPendingSocialSignupRoute(onboardingStatus);
+  const socialRequiredRoute = getPendingSocialSignupRoute(onboardingStatus);
+  const termsRequired = authMe.data?.termsCompliance?.compliant === false;
+  const isLoginRoute = pathname === '/login' || pathname.startsWith('/login/');
   const currentMode =
     typeof window === 'undefined'
       ? null
       : new URLSearchParams(window.location.search).get('mode');
-  const routeAllowed = isPendingSocialSignupRouteAllowed(
-    onboardingStatus,
-    pathname,
-    currentMode,
-  );
+  const renewalRoute = termsRequired && pathname !== '/terms' && !isLoginRoute
+    ? `/terms?mode=renewal&redirect=${encodeURIComponent(pathname)}`
+    : null;
+  const requiredRoute = socialRequiredRoute ?? renewalRoute;
+  const routeAllowed = socialRequiredRoute
+    ? isPendingSocialSignupRouteAllowed(onboardingStatus, pathname, currentMode)
+    : !renewalRoute;
 
   useEffect(() => {
     if (!requiredRoute || routeAllowed) return;

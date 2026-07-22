@@ -21,10 +21,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './dto/register.dto';
 import { hashPassword } from './password-hash';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const NOW = new Date('2026-06-21T00:00:00.000Z');
+const TERMS_DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
 
 function registerInput(overrides: Partial<RegisterDto> = {}): RegisterDto {
   return {
@@ -36,6 +38,7 @@ function registerInput(overrides: Partial<RegisterDto> = {}): RegisterDto {
     birthDate: '20000229',
     gender: 'male',
     requiredTermsAccepted: true,
+    acceptedTermsDocumentIds: [TERMS_DOCUMENT_ID],
     ...overrides,
   };
 }
@@ -124,6 +127,18 @@ function buildPrismaMock() {
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof buildPrismaMock>;
+  const managedTerms = {
+    assertSignupAcceptances: jest.fn(async (documentIds: string[]) => ({
+      acceptedDocumentIds: documentIds,
+      notAcceptedDocumentIds: [],
+    })),
+    recordSignupDecisions: jest.fn(),
+    signupCompliance: jest.fn().mockResolvedValue({
+      compliant: true,
+      pendingRequiredDocumentIds: [],
+      nextRoute: null,
+    }),
+  };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
@@ -144,6 +159,7 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
+        { provide: ManagedTermsRuntimeService, useValue: managedTerms },
       ],
     }).compile();
 

@@ -28,7 +28,10 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 type LoginCallbacks = {
-  readonly onSuccess?: (result: { readonly session: { readonly userId: string; readonly userEmail: string | null } }) => void;
+  readonly onSuccess?: (result: {
+    readonly session: { readonly userId: string; readonly userEmail: string | null };
+    readonly next?: { readonly route: string };
+  }) => void;
   readonly onError?: (error: unknown) => void;
   readonly onSettled?: () => void;
 };
@@ -47,7 +50,10 @@ describe('EmailLoginClient GA events', () => {
   it('tracks a login event with method=email on successful sign-in', async () => {
     // Given
     hooks.loginMutate.mockImplementation((_body: unknown, callbacks: LoginCallbacks) =>
-      callbacks.onSuccess?.({ session: { userId: 'user-1', userEmail: 'me@example.com' } }),
+      callbacks.onSuccess?.({
+        session: { userId: 'user-1', userEmail: 'me@example.com' },
+        next: { route: '/home' },
+      }),
     );
     render(<EmailLoginClient />);
 
@@ -56,6 +62,23 @@ describe('EmailLoginClient GA events', () => {
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('login', { method: 'email' }));
+  });
+
+  it('routes a non-compliant user straight to mandatory renewal and preserves the original destination', async () => {
+    window.history.replaceState({}, '', '/login/email?redirect=%2Fmy');
+    hooks.loginMutate.mockImplementation((_body: unknown, callbacks: LoginCallbacks) =>
+      callbacks.onSuccess?.({
+        session: { userId: 'user-1', userEmail: 'me@example.com' },
+        next: { route: '/terms?mode=renewal' },
+      }),
+    );
+    render(<EmailLoginClient />);
+
+    await submitLogin('me@example.com', 'password123');
+
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal&redirect=%2Fmy'),
+    );
   });
 
   it('tracks a login_failed event carrying the API error code as reason', async () => {

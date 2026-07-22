@@ -17,6 +17,7 @@ import {
   useV1Registration,
   useV1CreateRegistration,
   useV1SubmitRegistration,
+  useV1CurrentTerms,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -33,6 +34,7 @@ import type {
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
   V1TournamentPaymentInstructions,
+  V1CurrentTermsItem,
 } from '@/types/api';
 
 /* ── Helpers ── */
@@ -563,6 +565,7 @@ function ExpandableCheckRow({
 /* ── Step 2: Agreements + payment method ── */
 
 type AgreementsState = {
+  acceptedTermsDocumentIds: string[];
   agreedRules: boolean;
   agreedPrivacy: boolean;
   agreedRefund: boolean;
@@ -849,6 +852,7 @@ function AgreementsStep({
   onSubmit,
   isSubmitting,
   error,
+  terms,
 }: {
   tournament: V1TournamentDetail;
   selectedTeam: V1MyTeam | undefined;
@@ -858,15 +862,27 @@ function AgreementsStep({
   onSubmit: () => void;
   isSubmitting: boolean;
   error: string | null;
+  terms: V1CurrentTermsItem[];
 }) {
   const [activeConsentDocument, setActiveConsentDocument] = useState<TournamentConsentDocument | null>(null);
-  const allRequired = state.agreedRules && state.agreedPrivacy && state.agreedRefund;
-  const allAgreed = allRequired && state.agreedMediaConsent;
+  const stateKeyByCode = {
+    tournament_rules: 'agreedRules',
+    tournament_privacy: 'agreedPrivacy',
+    tournament_refund: 'agreedRefund',
+    tournament_media: 'agreedMediaConsent',
+  } as const;
+  const visibleTerms = terms;
+  const isChecked = (term: V1CurrentTermsItem) =>
+    (state.acceptedTermsDocumentIds ?? []).includes(term.documentId);
+  const allRequired = visibleTerms.length > 0
+    && visibleTerms.filter((term) => term.requirement === 'required').every(isChecked);
+  const allAgreed = visibleTerms.length > 0 && visibleTerms.every(isChecked);
   const bankTransferValid =
     state.paymentMethod !== 'bank_transfer' || state.depositorName.trim().length > 0;
   const canSubmit = allRequired && bankTransferValid;
   const toggleAllAgreements = (checked: boolean) => {
     onChange({
+      acceptedTermsDocumentIds: checked ? visibleTerms.map((term) => term.documentId) : [],
       agreedRules: checked,
       agreedPrivacy: checked,
       agreedRefund: checked,
@@ -889,50 +905,31 @@ function AgreementsStep({
             checked={allAgreed}
             onChange={toggleAllAgreements}
           />
-          <ExpandableCheckRow
-            id="agree-rules"
-            label="대회 규정 및 안내사항 동의"
-            consentType="required"
-            summary="참가 자격, 경기 운영, 노쇼, 실격, 허위 신분 제출 금지에 대한 동의입니다."
-            checked={state.agreedRules}
-            onChange={(v) => onChange({ agreedRules: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.rules}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
-          <ExpandableCheckRow
-            id="agree-privacy"
-            label="대회 참가 개인정보 수집·이용 동의"
-            consentType="required"
-            summary="대회 참가자 확인 및 참가 자격 검토를 위한 동의입니다."
-            checked={state.agreedPrivacy}
-            onChange={(v) => onChange({ agreedPrivacy: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.privacy}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
-          <ExpandableCheckRow
-            id="agree-refund"
-            label="참가비 입금·취소·환불 정책 동의"
-            consentType="required"
-            summary="입금 기한, 신청 취소, 환불 기준에 대한 동의입니다."
-            checked={state.agreedRefund}
-            onChange={(v) => onChange({ agreedRefund: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.refund}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
-          <ExpandableCheckRow
-            id="agree-media"
-            label="사진·영상 촬영 및 홍보 활용 동의"
-            consentType="optional"
-            summary="대회 기록, 홍보 콘텐츠, 협찬사 결과 보고에 활용될 수 있습니다."
-            checked={state.agreedMediaConsent}
-            onChange={(v) => onChange({ agreedMediaConsent: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.media}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
+          {visibleTerms.map((term) => {
+            const stateKey = stateKeyByCode[term.code as keyof typeof stateKeyByCode];
+            return (
+              <ExpandableCheckRow
+                key={term.documentId}
+                id={`agree-${term.code}`}
+                label={term.title}
+                consentType={term.requirement === 'required' ? 'required' : 'optional'}
+                summary={term.subtitle ?? term.changeSummary ?? `${term.version} 약관`}
+                checked={isChecked(term)}
+                onChange={(value) => {
+                  const acceptedTermsDocumentIds = value
+                    ? [...new Set([...(state.acceptedTermsDocumentIds ?? []), term.documentId])]
+                    : (state.acceptedTermsDocumentIds ?? []).filter((id) => id !== term.documentId);
+                  onChange({
+                    acceptedTermsDocumentIds,
+                    ...(stateKey ? { [stateKey]: value } : {}),
+                  });
+                }}
+                document={{ title: term.title, body: term.content }}
+                onOpenDocument={setActiveConsentDocument}
+                divider
+              />
+            );
+          })}
         </Card>
       </section>
 
@@ -1462,6 +1459,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
+  const tournamentTerms = useV1CurrentTerms('tournament_application');
 
   const myTeams = normalizeMyTeams(myTeamsData) ?? [];
   const eligibleTeams = tournament
@@ -1474,6 +1472,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const [registrationId, setRegistrationId] = useState<string | null>(null);
   const [paymentDueAt, setPaymentDueAt] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<AgreementsState>({
+    acceptedTermsDocumentIds: [],
     agreedRules: false,
     agreedPrivacy: false,
     agreedRefund: false,
@@ -1637,10 +1636,18 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     setSubmitError(null);
   }
 
-  const allRequiredAgreed = agreements.agreedRules && agreements.agreedPrivacy && agreements.agreedRefund;
+  const allRequiredAgreed = (tournamentTerms.data?.items ?? [])
+    .filter((term) => term.requirement === 'required')
+    .every((term) => (agreements.acceptedTermsDocumentIds ?? []).includes(term.documentId));
   const bankTransferValid =
     agreements.paymentMethod !== 'bank_transfer' || agreements.depositorName.trim().length > 0;
-  const canSubmitAgreements = allRequiredAgreed && bankTransferValid;
+  const requiredTournamentTerms = tournamentTerms.data?.items.filter(
+    (term) => term.requirement === 'required',
+  ) ?? [];
+  const canSubmitAgreements = allRequiredAgreed
+    && bankTransferValid
+    && tournamentTerms.data?.ready === true
+    && requiredTournamentTerms.length > 0;
 
   const isCreating = createRegistration.isPending;
   const isSubmittingApplication = createRegistration.isPending || submitRegistration.isPending;
@@ -1748,6 +1755,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       setRegistrationId(targetRegistrationId);
       const submittedRegistration = await submitRegistration.mutateAsync({
         registrationIdOverride: targetRegistrationId,
+        termsDocumentIds: agreements.acceptedTermsDocumentIds ?? [],
         paymentMethod: agreements.paymentMethod,
         depositorName: agreements.paymentMethod === 'bank_transfer' ? agreements.depositorName : undefined,
         agreedRules: agreements.agreedRules,
@@ -1825,7 +1833,15 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 onBack={handleAgreementsBack}
                 onSubmit={requestAgreementsSubmit}
                 isSubmitting={isSubmittingApplication}
-                error={submitError}
+                error={
+                  submitError
+                  ?? (tournamentTerms.isError
+                    ? '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+                    : tournamentTerms.data && !tournamentTerms.data.ready
+                      ? '현재 대회 필수 약관이 준비되지 않아 신청할 수 없어요.'
+                      : null)
+                }
+                terms={tournamentTerms.data?.items ?? []}
               />
             ) : registrationId ? (
               <PaymentGuideStep

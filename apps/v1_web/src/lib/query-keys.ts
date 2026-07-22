@@ -1,6 +1,9 @@
 export const v1Keys = {
   all: ['v1'] as const,
   authMe: () => [...v1Keys.all, 'auth', 'me'] as const,
+  currentTerms: (context: 'signup' | 'tournament_application' | 'footer') =>
+    [...v1Keys.all, 'terms', 'current', context] as const,
+  currentSignupTerms: () => v1Keys.currentTerms('signup'),
   onboarding: () => [...v1Keys.all, 'onboarding'] as const,
   masterSports: () => [...v1Keys.all, 'master', 'sports'] as const,
   masterRegions: () => [...v1Keys.all, 'master', 'regions'] as const,
@@ -44,6 +47,8 @@ export const v1Keys = {
   adminPopup: (id: string) => [...v1Keys.all, 'admin', 'popups', id] as const,
   adminNotices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'notices', filters ?? {}] as const,
   adminNotice: (id: string) => [...v1Keys.all, 'admin', 'notices', id] as const,
+  adminTerms: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'terms', filters ?? {}] as const,
+  adminTermsPolicy: (id: string) => [...v1Keys.all, 'admin', 'terms', id] as const,
   adminInquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'inquiries', filters ?? {}] as const,
   adminInquiry: (id: string) => [...v1Keys.all, 'admin', 'inquiries', id] as const,
   adminInquiriesPendingCount: () => [...v1Keys.all, 'admin', 'inquiries', 'pending-count'] as const,

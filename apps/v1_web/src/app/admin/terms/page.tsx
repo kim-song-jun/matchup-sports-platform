@@ -571,7 +571,7 @@ export default function AdminTermsPage() {
                   {form.subtitle ? <p className="mt-2 text-sm text-gray-600">{form.subtitle}</p> : null}
                   <p className="mt-1 text-xs text-gray-400">{form.version || '버전 미입력'}</p>
                   <div className="mt-6 whitespace-pre-wrap break-words text-sm leading-7 text-gray-700">
-                    {form.content || '약관 본문이 여기에 표시됩니다.'}
+                    {form.content || '약관 본문이 여기에 표시돼요.'}
                   </div>
                 </article>
               </div>

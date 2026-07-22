@@ -1,6 +1,12 @@
 export const V1_USER_ID_KEY = 'teameet.v1.userId';
 export const V1_USER_EMAIL_KEY = 'teameet.v1.userEmail';
 export const V1_SESSION_HINT_KEY = 'teameet.v1.session';
+// sessionStorage (not localStorage): the push nudge banner should reappear on
+// every fresh login, not stay dismissed forever — sessionStorage clears itself
+// when the tab/browser closes, and saveStoredV1Session() below also clears it
+// explicitly on every successful login so a logout+login within the same tab
+// resets it too.
+export const V1_PUSH_NUDGE_DISMISSED_KEY = 'teameet.v1.pushNudgeDismissed';
 
 export type StoredV1Session = {
   userId: string | null;
@@ -31,6 +37,7 @@ export function shouldProbeV1Session() {
 
 export function saveStoredV1Session(session: { userId: string; userEmail?: string | null }) {
   window.localStorage.setItem(V1_SESSION_HINT_KEY, 'active');
+  window.sessionStorage.removeItem(V1_PUSH_NUDGE_DISMISSED_KEY);
   if (process.env.NODE_ENV === 'production') {
     window.localStorage.removeItem(V1_USER_ID_KEY);
     window.localStorage.removeItem(V1_USER_EMAIL_KEY);
@@ -50,6 +57,16 @@ export function clearStoredV1Session() {
   window.localStorage.removeItem(V1_SESSION_HINT_KEY);
   window.localStorage.removeItem(V1_USER_ID_KEY);
   window.localStorage.removeItem(V1_USER_EMAIL_KEY);
+}
+
+export function shouldShowPushNudge() {
+  if (typeof window === 'undefined') return false;
+  return window.sessionStorage.getItem(V1_PUSH_NUDGE_DISMISSED_KEY) !== 'true';
+}
+
+export function dismissPushNudge() {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(V1_PUSH_NUDGE_DISMISSED_KEY, 'true');
 }
 
 export function sanitizeRedirectPath(value: string | null | undefined) {

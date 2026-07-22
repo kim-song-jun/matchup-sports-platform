@@ -110,6 +110,47 @@ describe('useV1PushRegistration', () => {
     expect(v1Post).not.toHaveBeenCalled();
   });
 
+  it('subscribes via the pushManager from navigator.serviceWorker.ready, not the one register() resolves to immediately', async () => {
+    // Real-world bug (found via live E2E testing on first-ever subscription):
+    // register() resolves as soon as the registration exists, while the worker
+    // is still installing — calling pushManager.subscribe() on THAT registration
+    // throws "Failed to execute 'subscribe' on 'PushManager': Subscription
+    // failed - no active Service Worker". Model that exact split here: register()
+    // resolves to a not-yet-active registration whose subscribe() rejects, while
+    // .ready resolves (once the worker activates) to a registration that works.
+    const installingRegistration = {
+      pushManager: {
+        subscribe: vi.fn().mockRejectedValue(
+          new Error("Failed to execute 'subscribe' on 'PushManager': Subscription failed - no active Service Worker"),
+        ),
+      },
+    };
+    Object.defineProperty(global.navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        register: vi.fn().mockResolvedValue(installingRegistration),
+        ready: Promise.resolve(registration),
+      },
+    });
+
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(installingRegistration.pushManager.subscribe).not.toHaveBeenCalled();
+    expect(pushManager.subscribe).toHaveBeenCalled();
+    expect(v1Post).toHaveBeenCalledWith('/notifications/push-subscribe', {
+      endpoint: 'https://push.example/abc',
+      keys: { p256dh: 'p', auth: 'a' },
+    });
+    expect(reportClientError).not.toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'push-subscribe' }) }),
+    );
+  });
+
   it('does nothing when permission is already denied', async () => {
     Object.defineProperty(global, 'Notification', {
       configurable: true,
@@ -193,7 +234,7 @@ describe('useV1PushRegistration', () => {
     const { result } = renderHook(() => useV1PushRegistration());
 
     await act(async () => {
-      await expect(result.current.subscribe()).resolves.toBeUndefined();
+      await expect(result.current.subscribe()).resolves.toBe(false);
     });
 
     expect(reportClientError).toHaveBeenCalledWith(

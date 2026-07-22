@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import {
+  BellIcon,
   ChatIcon,
   ChevronRightIcon,
   MatchIcon,
@@ -51,6 +53,8 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
         {/* ── LEFT: main content column ─────────────────────────────────── */}
         <div className="tm-home-main">
+
+          {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
 
           {/* Greeting + activity stats */}
           <div className="tm-home-greeting-block">
@@ -321,6 +325,51 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
         <span className="tm-floating-count tab-num" aria-hidden="true">{model.chatUnreadCount}</span>
       ) : null}
     </Link>
+  );
+}
+
+function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['pushNudge']> }) {
+  return (
+    <Card pad={14} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--blue-soft)',
+          color: 'var(--blue500)',
+        }}
+      >
+        <BellIcon size={18} strokeWidth={2} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label">알림을 받아보세요</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>매칭, 채팅, 경기 결과 소식을 놓치지 않아요.</div>
+      </div>
+      <button
+        type="button"
+        className="tm-btn tm-btn-sm tm-btn-primary"
+        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        disabled={pushNudge.subscribing}
+        onClick={pushNudge.onSubscribe}
+      >
+        {pushNudge.subscribing ? '확인 중' : '알림 받기'}
+      </button>
+      <button
+        type="button"
+        aria-label="알림 받기 안내 닫기"
+        className="tm-pressable"
+        style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onClick={pushNudge.onDismiss}
+      >
+        <X size={18} aria-hidden="true" />
+      </button>
+    </Card>
   );
 }
 

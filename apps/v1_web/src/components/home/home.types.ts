@@ -88,4 +88,10 @@ export type HomeViewModel = {
   refreshWeather?: () => void;
   popup: HomePopup | null;
   notices: HomeNotice[];
+  /** 온보딩에서 알림을 거부/미응답한 기존 유저에게 로그인마다 1번 다시 유도하는 닫을 수 있는 배너. undefined면 렌더하지 않는다. */
+  pushNudge?: {
+    subscribing: boolean;
+    onSubscribe: () => void;
+    onDismiss: () => void;
+  };
 };

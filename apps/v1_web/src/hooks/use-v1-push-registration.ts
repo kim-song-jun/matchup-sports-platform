@@ -12,7 +12,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 }
 
 export interface V1PushRegistration {
-  subscribe: () => Promise<void>;
+  subscribe: () => Promise<boolean>;
   unsubscribe: () => Promise<void>;
   permission: NotificationPermission | 'unsupported';
   isSubscribed: boolean;
@@ -37,17 +37,23 @@ export function useV1PushRegistration(): V1PushRegistration {
       });
   }, [supported]);
 
-  const subscribe = useCallback(async () => {
-    if (!supported || Notification.permission === 'denied') return;
+  const subscribe = useCallback(async (): Promise<boolean> => {
+    if (!supported || Notification.permission === 'denied') return false;
 
     try {
       const permissionResult = await Notification.requestPermission();
-      if (permissionResult !== 'granted') return;
+      if (permissionResult !== 'granted') return false;
 
       const { publicKey } = await v1Get<{ publicKey: string | null }>('/notifications/vapid-public-key');
-      if (!publicKey) return;
+      if (!publicKey) return false;
 
-      const registration = await navigator.serviceWorker.register('/sw-push.js');
+      // register() only resolves once the registration exists — on a brand-new
+      // registration the worker is still installing, and pushManager.subscribe()
+      // throws "no active Service Worker" if called before it activates. Wait for
+      // navigator.serviceWorker.ready (resolves once *this page* has an active
+      // controller), matching the pattern already used in unsubscribe() below.
+      await navigator.serviceWorker.register('/sw-push.js');
+      const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
@@ -57,12 +63,14 @@ export function useV1PushRegistration(): V1PushRegistration {
       await v1Post('/notifications/push-subscribe', { endpoint: json.endpoint, keys: json.keys });
       trackEvent('push_subscribe_complete', {});
       setIsSubscribed(true);
+      return true;
     } catch (err) {
       reportClientError({
         message: extractErrorMessage(err, '푸시 알림 구독에 실패했어요.'),
         level: 'warn',
         context: { flow: 'push-subscribe' },
       });
+      return false;
     }
   }, [supported]);
 

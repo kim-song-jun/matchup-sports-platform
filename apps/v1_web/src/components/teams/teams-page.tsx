@@ -4,12 +4,13 @@ import Link from 'next/link';
 import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, Lock } from 'lucide-react';
+import { Check, ChevronDown, Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
+import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -832,9 +833,8 @@ function labelFromOptions(options: ReadonlyArray<{ value: string; label: string 
 }
 
 /**
- * Optional team-logo upload. Uploads via form.uploadImage (→ /uploads) and stores
- * the returned URL in draft.logoUrl. Skippable — without a logo the team falls back
- * to its first character, matching the listing card.
+ * Team-logo presets and custom upload share the existing draft.logoUrl contract.
+ * TeamAvatar remains the final fallback when the selected URL cannot be loaded.
  */
 function TeamLogoField({
   logoUrl,
@@ -868,32 +868,43 @@ function TeamLogoField({
 
   return (
     <div className="tm-create-field">
-      <div className="tm-text-label">
-        팀 로고 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
-        {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용(TeamAvatar 자체 fallback과 동일 규칙). */}
-        <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+      <div className="tm-text-label">팀 로고</div>
+      <div className="tm-team-logo-picker">
+        <div className="tm-team-logo-current">
+          {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용(TeamAvatar 자체 fallback과 동일 규칙). */}
+          <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
               disabled={uploading || !uploadImage}
               onClick={() => inputRef.current?.click()}
             >
-              {uploading ? '올리는 중…' : logoUrl ? '변경' : '이미지 선택'}
+              {uploading ? '올리는 중…' : '내 이미지 업로드'}
             </button>
-            {logoUrl ? (
-              <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={uploading} onClick={() => onChange(null)}>
-                삭제
+            <div className="tm-text-caption">
+              기본 로고를 고르거나 정사각형 이미지를 직접 올릴 수 있어요.
+            </div>
+          </div>
+        </div>
+        <div className="tm-team-logo-presets" role="group" aria-label="기본 팀 로고 선택">
+          {TEAM_LOGO_PRESETS.map((presetUrl, index) => {
+            const selected = isTeamLogoPreset(logoUrl) && logoUrl === presetUrl;
+            return (
+              <button
+                key={presetUrl}
+                type="button"
+                className="tm-team-logo-preset"
+                aria-label={'기본 팀 로고 ' + (index + 1)}
+                aria-pressed={selected}
+                disabled={uploading}
+                onClick={() => onChange(presetUrl)}
+              >
+                <TeamAvatar seed={presetUrl} name={'기본 팀 로고 ' + (index + 1)} logoUrl={presetUrl} size="md" />
+                {selected ? <span className="tm-team-logo-check" aria-hidden="true"><Check size={12} strokeWidth={3} /></span> : null}
               </button>
-            ) : null}
-          </div>
-          <div className="tm-text-caption">
-            정사각형·투명 배경 이미지를 권장해요. 배경색이 있는 이미지는 테두리처럼 보일 수 있어요.
-            안 올려도 팀 아이콘이 자동으로 만들어져요.
-          </div>
+            );
+          })}
         </div>
         <input
           ref={inputRef}

@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { TeamMembersPageClient } from './teams-client';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView } from './teams-page';
 import { getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
@@ -377,6 +378,7 @@ describe('TeamMembersPageView — 보낸 초대 목록', () => {
 describe('TeamFormPageView', () => {
   it('renders and updates the team join policy control', () => {
     const onJoinPolicyChange = vi.fn();
+    const onFieldChange = vi.fn();
     const model: TeamFormViewModel = {
       mode: 'edit',
       team: {
@@ -405,7 +407,7 @@ describe('TeamFormPageView', () => {
         sports: [{ id: 'sport-1', name: '풋살' }],
         joinPolicy: 'approval_required',
         membersVisibilityEnabled: true,
-        onFieldChange: vi.fn(),
+        onFieldChange,
         onSportChange: vi.fn(),
         onRegionChange: vi.fn(),
         onJoinPolicyChange,
@@ -422,6 +424,10 @@ describe('TeamFormPageView', () => {
     fireEvent.click(screen.getByRole('button', { name: '가입 닫힘' }));
 
     expect(onJoinPolicyChange).toHaveBeenCalledWith('closed');
+    expect(screen.getAllByRole('button', { name: /기본 팀 로고 \d+/ })).toHaveLength(10);
+
+    fireEvent.click(screen.getByRole('button', { name: '기본 팀 로고 4' }));
+    expect(onFieldChange).toHaveBeenCalledWith('logoUrl', TEAM_LOGO_PRESETS[3]);
   });
 });
 

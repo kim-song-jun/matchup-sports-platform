@@ -242,6 +242,7 @@ describe('TeamsService', () => {
           sportId: 'sport-1',
           regionId: 'region-seoul',
           name: '서울 전체 팀',
+          logoUrl: '/images/team-logos/team-logo-04.jpg',
           joinPolicy: 'approval_required',
         }),
       ).resolves.toMatchObject({
@@ -258,6 +259,11 @@ describe('TeamsService', () => {
           data: expect.objectContaining({
             membersVisible: true,
             regionId: 'region-seoul',
+            profile: {
+              create: expect.objectContaining({
+                logoUrl: '/images/team-logos/team-logo-04.jpg',
+              }),
+            },
           }),
         }),
       );
@@ -283,7 +289,7 @@ describe('TeamsService', () => {
           sportId: 'sport-1',
           regionId: 'region-seoul',
           name: '서울 전체 팀',
-          logoUrl: null,
+          logoUrl: '/images/team-logos/team-logo-07.jpg',
           coverImageUrl: null,
           introduction: null,
           activityAreaText: null,
@@ -314,6 +320,17 @@ describe('TeamsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             regionId: 'region-seoul',
+          }),
+        }),
+      );
+      expect(prisma.v1TeamProfile.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { teamId: 'team-1' },
+          update: expect.objectContaining({
+            logoUrl: '/images/team-logos/team-logo-07.jpg',
+          }),
+          create: expect.objectContaining({
+            logoUrl: '/images/team-logos/team-logo-07.jpg',
           }),
         }),
       );

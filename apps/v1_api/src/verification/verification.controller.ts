@@ -2,7 +2,7 @@ import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { ConfirmVerificationDto, RequestPhoneVerificationDto } from './dto/verification.dto';
+import { ConfirmPhoneArrivedDto, ConfirmVerificationDto, RequestPhoneVerificationDto } from './dto/verification.dto';
 import { VerificationService } from './verification.service';
 
 @Controller('verification')
@@ -25,12 +25,12 @@ export class VerificationController {
   @Post('phone/request')
   @HttpCode(200)
   requestPhone(@CurrentUser() user: V1AuthUser, @Body() dto: RequestPhoneVerificationDto) {
-    return this.verificationService.requestPhone(user, dto.phone);
+    return this.verificationService.requestPhone(user, dto.phone, dto.channel);
   }
 
   @Post('phone/confirm')
   @HttpCode(200)
-  confirmPhone(@CurrentUser() user: V1AuthUser, @Body() dto: ConfirmVerificationDto) {
-    return this.verificationService.confirm(user, 'phone', dto.code);
+  confirmPhone(@CurrentUser() user: V1AuthUser, @Body() dto: ConfirmPhoneArrivedDto) {
+    return this.verificationService.confirmPhoneArrived(user, dto.phone);
   }
 }

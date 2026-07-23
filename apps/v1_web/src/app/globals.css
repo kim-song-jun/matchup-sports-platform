@@ -1220,6 +1220,30 @@ button:disabled {
   color: var(--text);
 }
 
+/* 인라인 로딩 스피너 (문자 도착 자동 확인 등). light-only + reduced-motion 대응. */
+.tm-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--blue500);
+  animation: tm-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes tm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-spinner {
+    animation: none;
+  }
+}
+
 .tm-btn-primary {
   background: var(--button-fill-primary); /* [P1 component token] --blue500 직접 참조 → component 계층 */
   color: var(--button-text-primary);

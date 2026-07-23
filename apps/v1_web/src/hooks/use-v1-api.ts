@@ -240,6 +240,7 @@ export function useV1Register() {
       profileImageUrl?: string;
       requiredTermsAccepted: boolean;
       acceptedTermsDocumentIds: string[];
+      phoneProofToken?: string;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
     onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
@@ -268,6 +269,35 @@ export function useV1CompleteSocialTerms() {
   return useMutation({
     mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[] }) =>
       v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-terms', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1PhoneIssue() {
+  return useMutation({
+    mutationFn: (body: { phone: string; channel: 'mobile' | 'desktop' }) =>
+      v1Post<{ code: string; destNumber: string; qrCode?: string; expiresAt: string }>('/auth/phone/issue', body),
+  });
+}
+
+export function useV1PhoneVerify() {
+  return useMutation({
+    mutationFn: (body: { phone: string }) =>
+      v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+  });
+}
+
+export function useV1AuthedPhoneRequest() {
+  return useMutation({
+    mutationFn: (body: { phone: string; channel: 'mobile' | 'desktop' }) =>
+      v1Post<{ code: string; destNumber: string; qrCode?: string; expiresAt: string }>('/verification/phone/request', body),
+  });
+}
+
+export function useV1AuthedPhoneConfirm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { phone: string }) => v1Post<{ verified: boolean }>('/verification/phone/confirm', body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -1268,8 +1298,13 @@ export function useV1UpdateProfile() {
       gender: 'male' | 'female';
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
+    // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에
+    // 호출부가 다음 화면으로 이동해 버려 마이페이지 등에서 방금 저장한 값 대신
+    // 이전 캐시 값이 잠깐(또는 리페치 실패 시 계속) 보였다. setQueryData로 즉시 반영.
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1Profile>(v1Keys.profile(), (current) =>
+        current ? { ...current, profile: result.profile } : current,
+      );
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });

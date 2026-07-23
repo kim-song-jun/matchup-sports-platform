@@ -14,6 +14,10 @@ const hooks = vi.hoisted(() => ({
   uploadImagesMutateAsync: vi.fn(),
   checkNicknameMutate: vi.fn(),
   checkEmailMutate: vi.fn(),
+  phoneIssueMutateAsync: vi.fn(),
+  phoneVerifyMutateAsync: vi.fn(),
+  authedPhoneRequestMutateAsync: vi.fn(),
+  authedPhoneConfirmMutateAsync: vi.fn(),
 }));
 
 const analytics = vi.hoisted(() => ({
@@ -30,15 +34,33 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UploadImages: () => ({ mutateAsync: hooks.uploadImagesMutateAsync, isPending: false }),
   useV1CheckNickname: () => ({ mutate: hooks.checkNicknameMutate, isPending: false }),
   useV1CheckEmail: () => ({ mutate: hooks.checkEmailMutate, isPending: false }),
+  useV1PhoneIssue: () => ({ mutateAsync: hooks.phoneIssueMutateAsync, isPending: false }),
+  useV1PhoneVerify: () => ({ mutateAsync: hooks.phoneVerifyMutateAsync, isPending: false }),
+  useV1AuthedPhoneRequest: () => ({ mutateAsync: hooks.authedPhoneRequestMutateAsync, isPending: false }),
+  useV1AuthedPhoneConfirm: () => ({ mutateAsync: hooks.authedPhoneConfirmMutateAsync, isPending: false }),
 }));
 
 vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
 }));
 
+// 부모(회원가입 폼)는 register 게이트만 검증한다. 카드 내부(자동 발급·폴링)와 디커플하기 위해
+// PhoneVerificationCard를 stub으로 대체하고 onVerified만 직접 트리거한다.
+vi.mock('@/components/auth/phone-verification/phone-verification-card', () => ({
+  PhoneVerificationCard: ({ onVerified }: { onVerified: (proofToken?: string) => void }) => (
+    <button type="button" onClick={() => onVerified('PROOF-TOKEN')}>
+      __stub_verify__
+    </button>
+  ),
+}));
+
 type AvailabilityCallbacks = {
   readonly onSuccess: (result: { readonly available: boolean }) => void;
 };
+
+async function completePhoneVerification(): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: '__stub_verify__' }));
+}
 
 async function advanceToProfile(): Promise<void> {
   fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '테스트닉' } });
@@ -72,6 +94,12 @@ describe('SignupClient required profile contract', () => {
     hooks.registerMutateAsync.mockResolvedValue({
       session: { userId: 'user-email', userEmail: 'signup@example.com' },
     });
+    hooks.phoneIssueMutateAsync.mockResolvedValue({
+      code: 'ABC123',
+      destNumber: '16663538',
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+    });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN' });
   });
 
   it('redirects direct signup entry to terms before accepting account input', async () => {
@@ -109,7 +137,7 @@ describe('SignupClient required profile contract', () => {
     await waitFor(() => expect(hooks.registerMutateAsync).not.toHaveBeenCalled());
   });
 
-  it('submits all four required profile values when email signup is complete', async () => {
+  it('submits all four required profile values plus the phone proof token when email signup is complete', async () => {
     // Given
     render(<SignupClient />);
     await advanceToProfile();
@@ -117,6 +145,7 @@ describe('SignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    await completePhoneVerification();
 
     // When
     fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
@@ -130,6 +159,7 @@ describe('SignupClient required profile contract', () => {
           birthDate: '20000229',
           gender: 'male',
           acceptedTermsDocumentIds: ['11111111-1111-4111-8111-111111111111'],
+          phoneProofToken: 'PROOF-TOKEN',
         }),
       ),
     );
@@ -143,12 +173,30 @@ describe('SignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    await completePhoneVerification();
 
     // When
     fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'email' }));
+  });
+
+  it('blocks email signup submission until phone verification is completed', async () => {
+    // Given
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+
+    // When — submitting without completing phone verification
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    // Then
+    await waitFor(() => expect(screen.getByText('휴대폰 본인인증을 완료해 주세요.')).toBeInTheDocument());
+    expect(hooks.registerMutateAsync).not.toHaveBeenCalled();
   });
 
   it.each([

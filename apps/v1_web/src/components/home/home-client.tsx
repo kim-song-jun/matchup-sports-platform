@@ -1,11 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
+import { useRouter } from 'next/navigation';
+import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
+import {
+  dismissPhoneVerifyNudge,
+  dismissPushNudge,
+  shouldShowPhoneVerifyNudge,
+  shouldShowPushNudge,
+} from '@/lib/session-storage';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
@@ -14,6 +20,8 @@ import type { HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
 
 export function HomePageClient() {
+  const router = useRouter();
+
   useEffect(() => {
     trackEvent('home_view', {});
   }, []);
@@ -21,6 +29,7 @@ export function HomePageClient() {
   const query = useV1Home();
   const isAuthenticated = query.data?.viewer?.authenticated === true;
   const onboardingCompleted = query.data?.viewer?.onboardingStatus === 'completed';
+  const authMe = useV1AuthMe({ enabled: isAuthenticated });
   const chatRooms = useV1ChatRooms({ enabled: isAuthenticated });
   const {
     weather,
@@ -60,6 +69,23 @@ export function HomePageClient() {
         },
       }
     : undefined;
+  const [phoneNudgeDismissed, setPhoneNudgeDismissed] = useState(true);
+  useEffect(() => {
+    setPhoneNudgeDismissed(!shouldShowPhoneVerifyNudge());
+  }, []);
+  const showPhoneVerifyNudge =
+    isAuthenticated &&
+    authMe.data?.verification?.phoneVerified === false &&
+    !phoneNudgeDismissed;
+  const phoneVerifyNudge = showPhoneVerifyNudge
+    ? {
+        onVerify: () => router.push('/my/phone-verify'),
+        onDismiss: () => {
+          dismissPhoneVerifyNudge();
+          setPhoneNudgeDismissed(true);
+        },
+      }
+    : undefined;
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
@@ -83,6 +109,7 @@ export function HomePageClient() {
             weatherRefreshing,
             refreshWeather,
             retry: () => void query.refetch(),
+            phoneVerifyNudge,
           }}
         />
       </>
@@ -103,8 +130,9 @@ export function HomePageClient() {
                 weatherRefreshing,
                 refreshWeather,
                 pushNudge,
+                phoneVerifyNudge,
               }
-            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather }
+            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge }
         }
       />
     </>

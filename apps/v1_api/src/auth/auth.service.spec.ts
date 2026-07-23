@@ -22,6 +22,8 @@ import { AuthService } from './auth.service';
 import type { RegisterDto } from './dto/register.dto';
 import { hashPassword } from './password-hash';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
+import { PhoneVerificationService } from '../verification/phone-verification.service';
+import { issuePhoneProofToken } from '../verification/phone-proof-token';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -139,10 +141,12 @@ describe('AuthService', () => {
       nextRoute: null,
     }),
   };
+  const phoneVerification = { enabled: false };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
     prisma.v1User.updateMany.mockResolvedValue({ count: 1 });
+    phoneVerification.enabled = false;
 
     // $transaction: execute the callback with prisma itself (no real tx isolation)
     (prisma.$transaction as jest.Mock).mockImplementation(
@@ -160,6 +164,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: PrismaService, useValue: prisma },
         { provide: ManagedTermsRuntimeService, useValue: managedTerms },
+        { provide: PhoneVerificationService, useValue: phoneVerification },
       ],
     }).compile();
 
@@ -328,6 +333,98 @@ describe('AuthService', () => {
             ],
           },
         }),
+      }),
+    );
+  });
+
+  // ─── register: phone verification gate ──────────────────────────────────
+
+  it('register: phoneVerification enabled + phoneProofToken 없음 → 400 PHONE_NOT_VERIFIED (가입 진행 안 함)', async () => {
+    phoneVerification.enabled = true;
+    prisma.v1User.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.register(registerInput()),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'PHONE_NOT_VERIFIED' },
+    });
+
+    expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  it('register: phoneVerification enabled + 무효한 proof token → 400 PHONE_NOT_VERIFIED (가입 진행 안 함)', async () => {
+    phoneVerification.enabled = true;
+    prisma.v1User.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.register(registerInput({ phoneProofToken: 'tampered.invalid-signature' })),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'PHONE_NOT_VERIFIED' },
+    });
+
+    expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  it('register: phoneVerification enabled + 유효한 proof token → 가입을 진행하고 phoneVerifiedAt을 세팅한다', async () => {
+    const OLD_SECRET = process.env.V1_SESSION_SECRET;
+    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+    try {
+      phoneVerification.enabled = true;
+      const phone = '01012345678';
+      const validToken = issuePhoneProofToken(phone);
+
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(completedUserRow({
+          id: 'new-user',
+          email: 'new@teameet.v1',
+          onboardingStatus: 'signup_done',
+          onboardingProgress: { currentStep: 'sport' },
+        }));
+      prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+      prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+      prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
+
+      await service.register(registerInput({ phone, phoneProofToken: validToken }));
+
+      expect(prisma.v1User.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            phone,
+            phoneVerifiedAt: expect.any(Date),
+          }),
+        }),
+      );
+    } finally {
+      process.env.V1_SESSION_SECRET = OLD_SECRET;
+    }
+  });
+
+  it('register: phoneVerification disabled → proof token 없이도 가입을 진행하고 phoneVerifiedAt은 null이다', async () => {
+    phoneVerification.enabled = false;
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(completedUserRow({
+        id: 'new-user',
+        email: 'new@teameet.v1',
+        onboardingStatus: 'signup_done',
+        onboardingProgress: { currentStep: 'sport' },
+      }));
+    prisma.v1UserProfile.findFirst.mockResolvedValue(null);
+    prisma.v1TermsDocument.findMany.mockResolvedValue([]);
+    prisma.v1User.create.mockResolvedValue({ id: 'new-user', email: 'new@teameet.v1' });
+
+    await service.register(registerInput());
+
+    expect(prisma.v1User.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ phoneVerifiedAt: null }),
       }),
     );
   });

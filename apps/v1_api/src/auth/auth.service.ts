@@ -9,6 +9,8 @@ import { isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/requir
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { hashPassword, verifyPassword } from './password-hash';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
+import { PhoneVerificationService } from '../verification/phone-verification.service';
+import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -23,6 +25,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly managedTerms: ManagedTermsRuntimeService,
+    private readonly phoneVerification: PhoneVerificationService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -90,6 +93,14 @@ export class AuthService {
       }
     }
 
+    const phoneVerificationRequired = this.phoneVerification.enabled;
+    if (phoneVerificationRequired && (!dto.phoneProofToken || !verifyPhoneProofToken(dto.phoneProofToken, phone))) {
+      throw new BadRequestException({
+        code: 'PHONE_NOT_VERIFIED',
+        message: '휴대폰 본인인증을 먼저 완료해 주세요.',
+      });
+    }
+
     const requiredTerms = await this.prisma.v1TermsDocument.findMany({
       where: { isRequired: true, status: 'published' },
       select: { id: true },
@@ -101,6 +112,7 @@ export class AuthService {
       data: {
         email,
         phone,
+        phoneVerifiedAt: phoneVerificationRequired ? new Date() : null,
         accountStatus: 'active',
         onboardingStatus: 'signup_done',
         lastLoginAt: new Date(),
@@ -583,6 +595,19 @@ export class AuthService {
         throw new ConflictException({
           code: 'PHONE_CONFLICT',
           message: 'Phone is already registered',
+        });
+      }
+    }
+
+    if (this.phoneVerification.enabled) {
+      const verified = await this.prisma.v1User.findUnique({
+        where: { id: userId },
+        select: { phone: true, phoneVerifiedAt: true },
+      });
+      if (!verified?.phoneVerifiedAt || verified.phone !== phone) {
+        throw new BadRequestException({
+          code: 'PHONE_NOT_VERIFIED',
+          message: '휴대폰 본인인증을 먼저 완료해 주세요.',
         });
       }
     }

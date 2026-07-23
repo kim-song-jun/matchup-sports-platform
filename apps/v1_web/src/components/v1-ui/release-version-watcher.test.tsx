@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReleaseVersionWatcher } from './release-version-watcher';
 
@@ -25,14 +25,27 @@ describe('ReleaseVersionWatcher', () => {
     vi.useRealTimers();
   });
 
+  async function renderAndFlush() {
+    render(<ReleaseVersionWatcher />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  async function advance(ms: number) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  }
+
   it('does nothing when the environment has no release header (local dev / production without the header)', async () => {
     fetchMock.mockResolvedValue(mockHealthResponse(null));
 
-    render(<ReleaseVersionWatcher />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await renderAndFlush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await advance(3 * 60 * 1000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(reloadMock).not.toHaveBeenCalled();
@@ -41,8 +54,8 @@ describe('ReleaseVersionWatcher', () => {
   it('only captures a baseline on the first check and shows nothing yet', async () => {
     fetchMock.mockResolvedValue(mockHealthResponse('1.0.0-alpha.20260723.gaaaaaaaaaaa'));
 
-    render(<ReleaseVersionWatcher />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await renderAndFlush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(reloadMock).not.toHaveBeenCalled();
@@ -53,16 +66,16 @@ describe('ReleaseVersionWatcher', () => {
       .mockResolvedValueOnce(mockHealthResponse('1.0.0-alpha.20260723.gaaaaaaaaaaa'))
       .mockResolvedValueOnce(mockHealthResponse('1.0.0-alpha.20260723.gbbbbbbbbbbb'));
 
-    render(<ReleaseVersionWatcher />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await renderAndFlush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await advance(3 * 60 * 1000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     expect(screen.getByRole('status')).toHaveTextContent('새 버전으로 업데이트하고 있어요');
     expect(reloadMock).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(1500);
+    await advance(1500);
     expect(reloadMock).toHaveBeenCalledTimes(1);
   });
 
@@ -71,13 +84,13 @@ describe('ReleaseVersionWatcher', () => {
       .mockResolvedValueOnce(mockHealthResponse('1.0.0-alpha.20260723.gaaaaaaaaaaa'))
       .mockResolvedValueOnce(mockHealthResponse('1.0.0-alpha.20260723.gbbbbbbbbbbb'));
 
-    render(<ReleaseVersionWatcher />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await renderAndFlush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await advance(3 * 60 * 1000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+    await advance(3 * 60 * 1000);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

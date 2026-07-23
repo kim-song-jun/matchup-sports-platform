@@ -1,3 +1,5 @@
+import type { QueryClient } from '@tanstack/react-query';
+
 export const v1Keys = {
   all: ['v1'] as const,
   authMe: () => [...v1Keys.all, 'auth', 'me'] as const,
@@ -89,3 +91,9 @@ export const v1Keys = {
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
 };
+
+// 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아
+// 이전 사용자 데이터(채팅방/알림 등)가 새 사용자에게 그대로 노출되는 것을 막는다.
+export function clearV1IdentityCache(queryClient: QueryClient) {
+  queryClient.removeQueries({ queryKey: v1Keys.all });
+}

@@ -2,12 +2,14 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { clearV1IdentityCache } from '@/lib/query-keys';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
 import {
@@ -28,6 +30,7 @@ type DuplicateCheckState = {
 
 export function SocialSignupClient() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const completeProfile = useV1CompleteSocialProfile();
   const checkNickname = useV1CheckNickname();
   const [nickname, setNickname] = useState('');
@@ -106,6 +109,7 @@ export function SocialSignupClient() {
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
+          clearV1IdentityCache(queryClient);
           trackEvent('sign_up_complete', { method: 'kakao' });
           router.replace(result.next.route);
         },

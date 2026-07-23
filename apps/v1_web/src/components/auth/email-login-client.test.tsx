@@ -19,6 +19,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }));
 
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ removeQueries: vi.fn() }),
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1EmailLogin: () => ({ mutate: hooks.loginMutate, isPending: false }),
 }));

@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { V1ApiError, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { clearV1IdentityCache } from '@/lib/query-keys';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
 import { AuthFrame } from './auth-page';
@@ -32,6 +34,7 @@ function getStoredKakaoOAuthState() {
 
 export function KakaoCallbackClient() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const calledRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +67,7 @@ export function KakaoCallbackClient() {
     })
       .then((result) => {
         saveStoredV1Session(result.session);
+        clearV1IdentityCache(queryClient);
         const nextRoute = result.next?.route ?? getSavedRedirectPath() ?? '/home';
         // next.route가 사회 가입 미완료 상태로 안내하면 신규 가입 진행 중, 그 외에는 기존 계정 로그인.
         if (nextRoute === '/terms?mode=social' || nextRoute === '/signup/social') {

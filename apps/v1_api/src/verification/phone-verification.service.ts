@@ -5,7 +5,9 @@ import { OctomoClient } from './octomo.client';
 import { issuePhoneProofToken } from './phone-proof-token';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
-const MAX_POLL_ATTEMPTS = 10;
+// 프론트가 발급 후 자동 폴링(4초 간격)으로 도착을 감지하므로 상한을 넉넉히 둔다.
+// 4초 간격 × ~2분 = ~30회. 5분 만료가 최종 상한을 유지한다.
+const MAX_POLL_ATTEMPTS = 30;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 6;
 

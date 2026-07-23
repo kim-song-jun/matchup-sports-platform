@@ -44,16 +44,22 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
 }));
 
+// 부모(회원가입 폼)는 register 게이트만 검증한다. 카드 내부(자동 발급·폴링)와 디커플하기 위해
+// PhoneVerificationCard를 stub으로 대체하고 onVerified만 직접 트리거한다.
+vi.mock('@/components/auth/phone-verification/phone-verification-card', () => ({
+  PhoneVerificationCard: ({ onVerified }: { onVerified: (proofToken?: string) => void }) => (
+    <button type="button" onClick={() => onVerified('PROOF-TOKEN')}>
+      __stub_verify__
+    </button>
+  ),
+}));
+
 type AvailabilityCallbacks = {
   readonly onSuccess: (result: { readonly available: boolean }) => void;
 };
 
 async function completePhoneVerification(): Promise<void> {
-  const issueButton = await screen.findByRole('button', { name: '인증번호 받기' });
-  fireEvent.click(issueButton);
-  const verifyButton = await screen.findByRole('button', { name: '인증 확인' });
-  fireEvent.click(verifyButton);
-  await waitFor(() => expect(screen.getByText('휴대폰 본인인증이 완료됐어요')).toBeInTheDocument());
+  fireEvent.click(await screen.findByRole('button', { name: '__stub_verify__' }));
 }
 
 async function advanceToProfile(): Promise<void> {

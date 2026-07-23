@@ -75,7 +75,7 @@ describe('PhoneVerificationService', () => {
     const prisma = prismaMock();
     const svc = new PhoneVerificationService(prisma, octomo);
     await svc.issueChallenge('01012345678', 'mobile');
-    (prisma as never as { __store: Map<string, { attemptCount: number }> }).__store.get('01012345678')!.attemptCount = 10;
+    (prisma as never as { __store: Map<string, { attemptCount: number }> }).__store.get('01012345678')!.attemptCount = 30;
     await expect(svc.pollArrived('01012345678')).rejects.toBeInstanceOf(BadRequestException);
   });
 

@@ -180,6 +180,25 @@ describe('v1 signed session', () => {
       }),
     );
   });
+
+  it('also clears legacy parent-domain cookies so a stale wildcard-domain session cannot survive logout', () => {
+    // Given
+    const response = { cookie: jest.fn(), clearCookie: jest.fn() };
+
+    // When
+    clearV1SessionCookie(response, 'production');
+
+    // Then
+    expect(response.clearCookie).toHaveBeenCalledWith(
+      V1_SESSION_COOKIE_NAME,
+      expect.objectContaining({ domain: '.teameet.co.kr' }),
+    );
+    expect(response.clearCookie).toHaveBeenCalledWith(
+      V1_SESSION_COOKIE_NAME,
+      expect.objectContaining({ domain: 'teameet.co.kr' }),
+    );
+    expect(response.clearCookie).toHaveBeenCalledTimes(3);
+  });
 });
 
 type RequestHeaders = Readonly<Record<string, string>>;

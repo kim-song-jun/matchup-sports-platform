@@ -23,6 +23,10 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsValue,
 }));
 
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ removeQueries: vi.fn() }),
+}));
+
 vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
 }));

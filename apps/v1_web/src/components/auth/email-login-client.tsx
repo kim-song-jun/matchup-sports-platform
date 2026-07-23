@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
@@ -11,6 +12,7 @@ import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { useV1EmailLogin } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { clearV1IdentityCache } from '@/lib/query-keys';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
@@ -26,6 +28,7 @@ function mapEmailLoginError(err: unknown): string {
 export function EmailLoginClient() {
   const model = getEmailLoginViewModel();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const login = useV1EmailLogin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,6 +49,7 @@ export function EmailLoginClient() {
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
+          clearV1IdentityCache(queryClient);
           trackEvent('login', { method: 'email' });
           const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
           const apiNext = sanitizeRedirectPath(result.next?.route);

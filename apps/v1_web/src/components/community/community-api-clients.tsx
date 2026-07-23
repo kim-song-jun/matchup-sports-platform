@@ -88,17 +88,21 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const fallback = getChatRoomViewModel();
   const isError = room.isError || messages.isError;
   const isLoading = room.isPending || messages.isPending;
-  const messageItems = messages.data ? items.map(toChatMessageModel) : fallback.messages;
+  // fallback은 로딩 중 스켈레톤 배경용 placeholder일 뿐이다 — 조회 실패(isError) 시에도
+  // 노출되면 알림으로 들어온 실제 채팅방 대신 엉뚱한 채팅방이 보이는 것처럼 보인다.
+  const messageItems = messages.data ? items.map(toChatMessageModel) : isLoading ? fallback.messages : [];
   const model: ChatRoomViewModel = {
-    title: room.data?.title ?? fallback.title,
+    title: room.data?.title ?? (isLoading ? fallback.title : '채팅'),
     context: room.data
       ? {
           title: room.data.linkedTarget.title,
           sub: room.data.roomType === 'match' ? '개인매치 채팅' : room.data.roomType === 'team' ? '팀 채팅' : '팀매치 채팅',
           href: room.data.linkedTarget.route ?? '/chat',
         }
-      : fallback.context,
-    messages: messages.data ? messageItems : isLoading ? [] : fallback.messages,
+      : isLoading
+        ? fallback.context
+        : { title: '', sub: '', href: '/chat' },
+    messages: messageItems,
     status: isLoading ? 'loading' : isError ? 'error' : 'ready',
     emptyTitle: isError ? '채팅방을 불러오지 못했어요' : messages.data && items.length === 0 ? '아직 메시지가 없어요' : undefined,
     emptyBody: isError ? '네트워크 상태를 확인하고 다시 시도해 주세요.' : messages.data && items.length === 0 ? '먼저 말을 걸어 대화를 시작해 보세요' : undefined,

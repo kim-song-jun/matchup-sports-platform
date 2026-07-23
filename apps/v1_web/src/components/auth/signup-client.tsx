@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
@@ -17,6 +18,7 @@ import {
 import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { clearV1IdentityCache } from '@/lib/query-keys';
 import { saveStoredV1Session } from '@/lib/session-storage';
 import {
   clearSignupTermsDocumentIds,
@@ -53,6 +55,7 @@ const onboardingDraftKey = 'teameet.v1.onboardingDraft';
 
 export function SignupClient() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const register = useV1Register();
   const updateProfile = useV1UpdateProfile();
   const uploadImages = useV1UploadImages();
@@ -239,6 +242,7 @@ export function SignupClient() {
       });
 
       saveStoredV1Session(result.session);
+      clearV1IdentityCache(queryClient);
       trackEvent('sign_up_complete', { method: 'email' });
 
       if (profileImageFile) {

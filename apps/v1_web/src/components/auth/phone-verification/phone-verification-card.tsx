@@ -1,0 +1,276 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, CheckCircle2, MessageSquare, QrCode, RefreshCw, Send, Smartphone } from 'lucide-react';
+import { AlertBanner, Card } from '@/components/v1-ui/primitives';
+import { detectDeviceKind, type DeviceKind } from '@/lib/device-kind';
+import { buildSmsLink } from '@/lib/octomo-sms-link';
+import {
+  useV1AuthedPhoneConfirm,
+  useV1AuthedPhoneRequest,
+  useV1PhoneIssue,
+  useV1PhoneVerify,
+} from '@/hooks/use-v1-api';
+
+type Props = {
+  /** public: 비로그인 회원가입 전 pre-account 인증(proofToken 발급). authed: 로그인 후 카카오/레거시 구제. */
+  mode: 'public' | 'authed';
+  phone: string;
+  /** public 모드는 proofToken을 전달하고, authed 모드는 서버가 이미 phoneVerifiedAt을 세팅하므로 인자 없이 호출된다. */
+  onVerified: (proofToken?: string) => void;
+};
+
+type Issued = { code: string; destNumber: string; qrCode?: string; expiresAt: string };
+
+const COUNTDOWN_TICK_MS = 1000;
+/** 문자 도착 자동 감지 폴링 간격. 백엔드 MAX_POLL_ATTEMPTS(30)·verify @Throttle(20/60s)와 정합. */
+const POLL_INTERVAL_MS = 4000;
+
+export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
+  const publicIssue = useV1PhoneIssue();
+  const publicVerify = useV1PhoneVerify();
+  const authedRequest = useV1AuthedPhoneRequest();
+  const authedConfirm = useV1AuthedPhoneConfirm();
+
+  const [device, setDevice] = useState<DeviceKind>('desktop');
+  const [issued, setIssued] = useState<Issued | null>(null);
+  const [issuing, setIssuing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [remainingMs, setRemainingMs] = useState(0);
+  const [verified, setVerified] = useState(false);
+  // 모바일은 "인증 문자 보내기"를 누른 뒤부터(문자앱 진입) 자동 감지를 시작한다.
+  // 데스크탑은 QR 스캔에 명시적 신호가 없어 발급 직후부터 감지한다.
+  const [sending, setSending] = useState(false);
+  const inFlightRef = useRef(false);
+
+  const issue = useCallback(
+    async (channel: DeviceKind) => {
+      setError(null);
+      setIssuing(true);
+      setSending(false);
+      try {
+        const res =
+          mode === 'public'
+            ? await publicIssue.mutateAsync({ phone, channel })
+            : await authedRequest.mutateAsync({ phone, channel });
+        setIssued(res);
+        setRemainingMs(Math.max(0, new Date(res.expiresAt).getTime() - Date.now()));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '인증번호 준비에 실패했어요. 잠시 후 다시 시도해 주세요.');
+      } finally {
+        setIssuing(false);
+      }
+    },
+    [mode, phone, publicIssue, authedRequest],
+  );
+
+  // 마운트/번호 변경 시 기기 판별 후 자동 발급(별도 "인증번호 받기" 단계 제거).
+  useEffect(() => {
+    const detected = detectDeviceKind();
+    setDevice(detected);
+    void issue(detected);
+    // issue는 phone에만 의존하도록 유지 — device 갱신으로 재발급 루프를 만들지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone, mode]);
+
+  const expired = issued !== null && !verified && remainingMs <= 0;
+
+  // "다른 방법으로" — QR은 desktop 채널로 발급된 코드에만 딸려 오므로, 기기 뷰를 바꾸면
+  // 새 채널로 즉시 재발급해 QR/딥링크 불일치를 막는다.
+  const toggleDevice = useCallback(() => {
+    const next: DeviceKind = device === 'mobile' ? 'desktop' : 'mobile';
+    setDevice(next);
+    void issue(next);
+  }, [device, issue]);
+
+  const verifyOnce = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      if (mode === 'public') {
+        const res = await publicVerify.mutateAsync({ phone });
+        if (res.verified) {
+          setVerified(true);
+          onVerified(res.proofToken);
+        }
+      } else {
+        const res = await authedConfirm.mutateAsync({ phone });
+        if (res.verified) {
+          setVerified(true);
+          onVerified();
+        }
+      }
+    } catch {
+      // 폴링 중 실패(만료/시도초과/스로틀)는 조용히 삼키고, 만료 UI 또는 재발급으로 유도한다.
+      setSending(false);
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [mode, phone, publicVerify, authedConfirm, onVerified]);
+
+  // 문자 도착 자동 감지: 데스크탑은 발급 직후, 모바일은 "보내기" 이후 폴링.
+  const polling = issued !== null && !verified && !expired && (device === 'desktop' || sending);
+  useEffect(() => {
+    if (!polling) return;
+    const id = window.setInterval(() => {
+      void verifyOnce();
+    }, POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [polling, verifyOnce]);
+
+  // 카운트다운
+  useEffect(() => {
+    if (!issued || verified) return;
+    const id = window.setInterval(() => {
+      const left = new Date(issued.expiresAt).getTime() - Date.now();
+      setRemainingMs(left > 0 ? left : 0);
+    }, COUNTDOWN_TICK_MS);
+    return () => window.clearInterval(id);
+  }, [issued, verified]);
+
+  const minutes = Math.floor(remainingMs / 60000);
+  const seconds = Math.floor((remainingMs % 60000) / 1000);
+  const smsLink = useMemo(() => (issued ? buildSmsLink(issued.destNumber, issued.code) : '#'), [issued]);
+
+  if (verified) {
+    return (
+      <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}>
+        <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
+        <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue500)' }}>
+          휴대폰 본인인증이 완료됐어요.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card pad={18} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <p className="tm-text-label" style={{ margin: 0 }}>
+          휴대폰 본인인증
+        </p>
+        {issued && !expired ? (
+          <button
+            type="button"
+            className="tm-btn tm-btn-sm tm-btn-ghost"
+            onClick={toggleDevice}
+            disabled={issuing}
+            aria-label={device === 'mobile' ? 'QR 코드로 인증 방법 바꾸기' : '문자 보내기로 인증 방법 바꾸기'}
+          >
+            {device === 'mobile' ? <QrCode size={16} aria-hidden="true" /> : <Smartphone size={16} aria-hidden="true" />}
+            다른 방법으로
+          </button>
+        ) : null}
+      </div>
+
+      {!issued ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 0', color: 'var(--text-muted)' }}>
+          <span className="tm-spinner" aria-hidden="true" />
+          <span className="tm-text-caption">인증을 준비하고 있어요…</span>
+        </div>
+      ) : expired ? (
+        <>
+          <p className="tm-text-caption" style={{ margin: 0, color: 'var(--red500)' }}>
+            인증 시간이 지났어요. 다시 시작해 주세요.
+          </p>
+          <button
+            type="button"
+            className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+            disabled={issuing}
+            onClick={() => void issue(device)}
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            다시 시작하기
+          </button>
+        </>
+      ) : (
+        <>
+          {/* 아이콘 + ①보내기 → ②자동 인증 한 줄 안내 (미니멀 + 스텝 하이브리드) */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <span
+              aria-hidden="true"
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 14,
+                display: 'grid',
+                placeItems: 'center',
+                background: 'var(--blue50)',
+                color: 'var(--blue500)',
+              }}
+            >
+              <MessageSquare size={24} strokeWidth={2} />
+            </span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <span>① 문자 보내기</span>
+              <ArrowRight size={14} aria-hidden="true" />
+              <span>② 자동으로 인증</span>
+            </div>
+          </div>
+
+          {device === 'desktop' ? (
+            issued.qrCode ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <img
+                  src={issued.qrCode}
+                  alt="휴대폰 카메라로 스캔하면 인증 문자가 자동으로 준비돼요"
+                  width={180}
+                  height={180}
+                  style={{ borderRadius: 12, border: '1px solid var(--border)' }}
+                />
+                <p className="tm-text-caption" style={{ margin: 0, textAlign: 'center' }}>
+                  휴대폰 카메라로 QR을 스캔하면 문자 앱이 열려요. 그대로 전송하면 자동으로 인증돼요.
+                </p>
+              </div>
+            ) : (
+              <p className="tm-text-caption" style={{ margin: 0, textAlign: 'center' }}>
+                QR을 준비하고 있어요. 잠시만 기다려 주세요.
+              </p>
+            )
+          ) : (
+            <>
+              <p className="tm-text-caption" style={{ margin: 0, textAlign: 'center' }}>
+                버튼을 누르면 문자 앱이 열려요. <b style={{ color: 'var(--text)' }}>내용 그대로 전송</b>하면 자동으로 인증돼요.
+              </p>
+              <a
+                href={smsLink}
+                className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+                aria-label="인증 문자 보내기"
+                onClick={() => setSending(true)}
+              >
+                <Send size={18} aria-hidden="true" />
+                인증 문자 보내기
+              </a>
+            </>
+          )}
+
+          {polling ? (
+            <div
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, color: 'var(--text-muted)' }}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="tm-spinner" aria-hidden="true" />
+              <span className="tm-text-caption">문자 도착을 확인하고 있어요…</span>
+            </div>
+          ) : null}
+
+          <p className="tm-text-caption" style={{ margin: 0, textAlign: 'center', color: 'var(--text-subtle, var(--text-muted))' }}>
+            남은 시간 {minutes}:{String(seconds).padStart(2, '0')}
+          </p>
+        </>
+      )}
+
+      {error ? <AlertBanner message={error} tone="error" /> : null}
+    </Card>
+  );
+}

@@ -1,6 +1,6 @@
-import { IsIn, IsString, Length, Matches } from 'class-validator';
+import { IsIn, IsString, Matches } from 'class-validator';
 
-export class RequestPhoneVerificationDto {
+export class PhoneIssueDto {
   @IsString()
   @Matches(/^\d{11}$/, { message: '휴대폰 번호는 숫자 11자리예요.' })
   phone!: string;
@@ -9,14 +9,8 @@ export class RequestPhoneVerificationDto {
   channel!: 'mobile' | 'desktop';
 }
 
-export class ConfirmPhoneArrivedDto {
+export class PhoneVerifyDto {
   @IsString()
   @Matches(/^\d{11}$/, { message: '휴대폰 번호는 숫자 11자리예요.' })
   phone!: string;
-}
-
-export class ConfirmVerificationDto {
-  @IsString()
-  @Length(6, 6, { message: '인증번호는 6자리예요.' })
-  code!: string;
 }

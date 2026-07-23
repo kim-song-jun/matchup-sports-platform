@@ -94,4 +94,9 @@ export type HomeViewModel = {
     onSubscribe: () => void;
     onDismiss: () => void;
   };
+  /** 휴대폰 본인인증을 아직 완료하지 않은 레거시 계정에게 로그인마다 다시 유도하는 닫을 수 있는 배너. undefined면 렌더하지 않는다. */
+  phoneVerifyNudge?: {
+    onVerify: () => void;
+    onDismiss: () => void;
+  };
 };

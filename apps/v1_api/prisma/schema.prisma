@@ -419,6 +419,20 @@ model V1VerificationToken {
   @@map("v1_verification_tokens")
 }
 
+model V1PhoneVerificationChallenge {
+  id           String    @id @default(uuid())
+  phone        String    @unique
+  code         String
+  channel      String
+  expiresAt    DateTime  @map("expires_at")
+  attemptCount Int       @default(0) @map("attempt_count")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("v1_phone_verification_challenges")
+}
+
 model V1UserProfile {
   id              String    @id @default(uuid())
   userId          String    @unique @map("user_id")

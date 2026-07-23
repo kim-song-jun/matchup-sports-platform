@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
+import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import {
   useV1CheckEmail,
   useV1CheckNickname,
@@ -71,6 +72,7 @@ export function SignupClient() {
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [realName, setRealName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
+  const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [acceptedTermsDocumentIds, setAcceptedTermsDocumentIds] = useState<string[]>([]);
@@ -215,6 +217,11 @@ export function SignupClient() {
       return;
     }
 
+    if (!phoneProofToken) {
+      setProfileError('휴대폰 본인인증을 완료해 주세요.');
+      return;
+    }
+
     try {
       const normalizedRealName = normalizeSignupDisplayName(profileDraft.displayName);
       const result = await register.mutateAsync({
@@ -228,6 +235,7 @@ export function SignupClient() {
         birthDate: profileDraft.birthDate,
         requiredTermsAccepted: true,
         acceptedTermsDocumentIds,
+        phoneProofToken: phoneProofToken ?? undefined,
       });
 
       saveStoredV1Session(result.session);
@@ -269,6 +277,11 @@ export function SignupClient() {
         setEmailCheck({ status: 'taken', value: normalizedEmail });
         setStep('account');
         setEmailError('이미 가입된 이메일이에요.');
+        return;
+      }
+      if (nextError instanceof V1ApiError && nextError.code === 'PHONE_NOT_VERIFIED') {
+        setProfileError('휴대폰 본인인증을 완료해 주세요.');
+        setPhoneProofToken(null);
         return;
       }
       if (nextError instanceof V1ApiError && nextError.code === 'TERMS_NOT_READY') {
@@ -547,12 +560,38 @@ export function SignupClient() {
                 <input
                   className="tm-input tm-auth-input"
                   inputMode="numeric"
-                  onChange={(event) => { setPhoneDigits(normalizeSeparatedDigits(event.target.value)); setProfileError(null); }}
+                  onChange={(event) => {
+                    setPhoneDigits(normalizeSeparatedDigits(event.target.value));
+                    setPhoneProofToken(null);
+                    setProfileError(null);
+                  }}
                   placeholder="010-0000-0000"
                   required
                   value={formatPhone(phoneDigits)}
                 />
               </label>
+
+              {phoneDigits.length === 11 && !phoneProofToken ? (
+                <PhoneVerificationCard
+                  mode="public"
+                  phone={phoneDigits}
+                  onVerified={(token) => setPhoneProofToken(token ?? null)}
+                />
+              ) : null}
+
+              {phoneProofToken ? (
+                <div
+                  className="tm-text-caption"
+                  role="status"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--blue500)' }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
+                  />
+                  휴대폰 본인인증이 완료됐어요
+                </div>
+              ) : null}
 
               <label className="tm-auth-field">
                 <span className="tm-text-label">생년월일</span>

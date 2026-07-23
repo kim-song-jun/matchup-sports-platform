@@ -10,6 +10,10 @@ const router = vi.hoisted(() => ({
 const hooks = vi.hoisted(() => ({
   checkNicknameMutate: vi.fn(),
   completeProfileMutate: vi.fn(),
+  phoneIssueMutateAsync: vi.fn(),
+  phoneVerifyMutateAsync: vi.fn(),
+  authedPhoneRequestMutateAsync: vi.fn(),
+  authedPhoneConfirmMutateAsync: vi.fn(),
 }));
 
 const analytics = vi.hoisted(() => ({
@@ -23,6 +27,10 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1CheckNickname: () => ({ mutate: hooks.checkNicknameMutate, isPending: false }),
   useV1CompleteSocialProfile: () => ({ mutate: hooks.completeProfileMutate, isPending: false }),
+  useV1PhoneIssue: () => ({ mutateAsync: hooks.phoneIssueMutateAsync, isPending: false }),
+  useV1PhoneVerify: () => ({ mutateAsync: hooks.phoneVerifyMutateAsync, isPending: false }),
+  useV1AuthedPhoneRequest: () => ({ mutateAsync: hooks.authedPhoneRequestMutateAsync, isPending: false }),
+  useV1AuthedPhoneConfirm: () => ({ mutateAsync: hooks.authedPhoneConfirmMutateAsync, isPending: false }),
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -47,12 +55,31 @@ async function verifyNicknameAndSelectGender(): Promise<void> {
   await waitFor(() => expect(screen.getByText('사용 가능한 닉네임이에요.')).toBeInTheDocument());
 }
 
+// 부모는 완성 게이트만 검증한다. 카드 내부(자동 발급·폴링)와 디커플하기 위해 stub으로 대체.
+vi.mock('@/components/auth/phone-verification/phone-verification-card', () => ({
+  PhoneVerificationCard: ({ onVerified }: { onVerified: (proofToken?: string) => void }) => (
+    <button type="button" onClick={() => onVerified()}>
+      __stub_verify__
+    </button>
+  ),
+}));
+
+async function completePhoneVerification(): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: '__stub_verify__' }));
+}
+
 describe('SocialSignupClient required profile contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hooks.checkNicknameMutate.mockImplementation(
       (_value: string, callbacks: AvailabilityCallbacks) => callbacks.onSuccess({ available: true }),
     );
+    hooks.authedPhoneRequestMutateAsync.mockResolvedValue({
+      code: 'ABC123',
+      destNumber: '16663538',
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+    });
+    hooks.authedPhoneConfirmMutateAsync.mockResolvedValue({ verified: true });
   });
 
   it.each([
@@ -89,6 +116,7 @@ describe('SocialSignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
 
     // When
     fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
@@ -118,6 +146,7 @@ describe('SocialSignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
 
     // When
     fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
@@ -139,12 +168,29 @@ describe('SocialSignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
 
     // When
     fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
 
     // Then
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/region'));
+  });
+
+  it('blocks social signup submission until phone verification is completed', async () => {
+    // Given
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+
+    // When — submitting without completing phone verification
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    // Then
+    await waitFor(() => expect(screen.getByText('휴대폰 본인인증을 완료해 주세요.')).toBeInTheDocument());
+    expect(hooks.completeProfileMutate).not.toHaveBeenCalled();
   });
 
   it.each([

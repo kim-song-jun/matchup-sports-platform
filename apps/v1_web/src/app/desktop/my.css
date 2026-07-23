@@ -429,10 +429,18 @@
     margin-right: auto;
   }
 
+  /* .tm-my-sports-cta(444-455)와 동일 패턴: fixed 바는 --v1-app-chrome-frame-width(480px)로
+   * 폭이 고정돼 max-width:580px만으로는 콘텐츠 컬럼과 안 맞음 — static 인라인으로 전환. */
   .tm-my-withdrawal-cta {
+    position: static;
+    transform: none;
+    width: 100%;
     max-width: 580px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+    z-index: auto;
   }
 }
 

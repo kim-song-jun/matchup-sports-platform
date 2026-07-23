@@ -1368,8 +1368,8 @@ export function WithdrawalPageClient() {
             <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
           </section>
           <Card pad={16}>
-            <ListItem title="요청 상태" sub="탈퇴 신청 후 계정 확인 절차가 진행돼요" />
-            <ListItem title="보관 데이터" sub="법령에 따른 보관 기간이 지나면 삭제돼요" />
+            <ListItem title="요청 상태" sub="탈퇴 신청 후 계정 확인 절차가 진행돼요" trailing="신청 전" />
+            <ListItem title="보관 데이터" sub="법령에 따른 보관 기간이 지나면 삭제돼요" trailing="안내" />
           </Card>
           <label className="tm-create-field">
             <span className="tm-text-label">탈퇴 사유</span>

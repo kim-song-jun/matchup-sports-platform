@@ -9,6 +9,7 @@ import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitiv
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
+import { clearStoredV1Session } from '@/lib/session-storage';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
@@ -1333,12 +1334,20 @@ export function WithdrawalPageClient() {
   const handleWithdraw = () => {
     confirm({
       title: '탈퇴 요청',
-      message: '정말 탈퇴 요청할까요? 되돌릴 수 없어요.',
+      message: '정말 탈퇴 요청할까요? 신청 후에는 직접 취소할 수 없고, 운영팀 확인을 거쳐 처리돼요.',
       confirmLabel: '탈퇴 요청',
       tone: 'danger',
     }).then((ok) => {
       if (ok) {
-        withdrawal.mutate({ reason: reason || null }, { onSuccess: () => router.replace('/login') });
+        withdrawal.mutate(
+          { reason: reason || null },
+          {
+            onSuccess: () => {
+              clearStoredV1Session();
+              router.replace('/login');
+            },
+          },
+        );
       }
     });
   };
@@ -1356,17 +1365,23 @@ export function WithdrawalPageClient() {
           </div>
           <section className="tm-danger-panel">
             <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
-            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 있으면 탈퇴가 제한될 수 있어요.</p>
+            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
           </section>
           <Card pad={16}>
-            <ListItem title="요청 상태" sub="탈퇴 신청 후 계정 확인 절차가 진행돼요" trailing="검토" />
-            <ListItem title="보관 데이터" sub="법령에 따른 보관 기간이 지나면 삭제돼요" trailing="필수" />
+            <ListItem title="요청 상태" sub="탈퇴 신청 후 계정 확인 절차가 진행돼요" />
+            <ListItem title="보관 데이터" sub="법령에 따른 보관 기간이 지나면 삭제돼요" />
           </Card>
           <label className="tm-create-field">
             <span className="tm-text-label">탈퇴 사유</span>
             <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
           </label>
-          {withdrawal.isError ? <Card pad={14} className="tm-auth-soft-card-error"><div className="tm-text-label">탈퇴 요청에 실패했어요</div></Card> : null}
+          {withdrawal.isError ? (
+            <Card pad={14} className="tm-auth-soft-card-error">
+              <div className="tm-text-label">
+                {withdrawal.error instanceof Error ? withdrawal.error.message : '탈퇴 요청에 실패했어요'}
+              </div>
+            </Card>
+          ) : null}
         </div>
       </div>
       <div className="tm-fixed-cta tm-my-withdrawal-cta">

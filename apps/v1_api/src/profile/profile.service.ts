@@ -579,6 +579,7 @@ export class ProfileService {
 
   async withdrawalRequest(user: V1AuthUser, dto: WithdrawalRequestDto) {
     this.assertMutableAccount(user);
+    await this.assertWithdrawable(user.id);
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM "v1_users" WHERE id = ${user.id} FOR UPDATE
@@ -665,6 +666,40 @@ export class ProfileService {
   private assertMutableAccount(user: V1AuthUser) {
     if (user.accountStatus !== 'active') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Account cannot be modified' });
+    }
+  }
+
+  private async assertWithdrawable(userId: string) {
+    const [ongoingMatch, teamAuthority] = await Promise.all([
+      this.prisma.v1MatchParticipant.findFirst({
+        where: {
+          userId,
+          status: 'active',
+          match: { status: { in: ['recruiting', 'closed'] } },
+        },
+        select: { id: true },
+      }),
+      this.prisma.v1TeamMembership.findFirst({
+        where: {
+          userId,
+          status: 'active',
+          role: { in: ['owner', 'manager'] },
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (ongoingMatch) {
+      throw new ConflictException({
+        code: 'WITHDRAWAL_BLOCKED_ACTIVE_MATCH',
+        message: '진행 중인 매치가 있어 탈퇴할 수 없어요. 매치를 종료하거나 나간 뒤 다시 시도해주세요.',
+      });
+    }
+    if (teamAuthority) {
+      throw new ConflictException({
+        code: 'WITHDRAWAL_BLOCKED_TEAM_AUTHORITY',
+        message: '운영 중인 팀이 있어 탈퇴할 수 없어요. 팀 관리 권한을 다른 멤버에게 넘긴 뒤 다시 시도해주세요.',
+      });
     }
   }
 

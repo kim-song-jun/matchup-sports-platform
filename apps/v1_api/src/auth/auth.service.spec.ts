@@ -396,6 +396,30 @@ describe('AuthService', () => {
     });
   });
 
+  it('login: accountStatus=withdrawal_pending 계정 → 403 ACCOUNT_WITHDRAWAL_PENDING (일반 PERMISSION_DENIED와 구분되는 메시지)', async () => {
+    const correctHash = await hashPassword('ValidPass1!');
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+      id: 'identity-1',
+      passwordHash: correctHash,
+      status: 'active',
+      user: {
+        id: 'user-1',
+        email: 'user@teameet.v1',
+        accountStatus: 'withdrawal_pending', // ← 탈퇴 신청 상태
+        onboardingStatus: 'completed',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    });
+
+    await expect(
+      service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }),
+    ).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'ACCOUNT_WITHDRAWAL_PENDING' },
+    });
+  });
+
   it('login: 이메일 대소문자 정규화 — Upper@Example.com 로 로그인해도 email 키는 소문자로 조회', async () => {
     // identity lookup should be called with the lower-cased email as providerUserKey
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);

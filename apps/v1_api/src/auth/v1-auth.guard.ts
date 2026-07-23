@@ -61,7 +61,7 @@ export class V1AuthGuard implements CanActivate {
       });
     }
 
-    if (['suspended', 'blocked', 'deleted'].includes(user.accountStatus)) {
+    if (['suspended', 'blocked', 'deleted', 'withdrawal_pending'].includes(user.accountStatus)) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: '이용이 제한된 계정이에요.',

@@ -130,7 +130,7 @@ function ReviewsTable({ reviews }: { reviews: V1TournamentReview[] }) {
                     <div className="tm-reviews-table-photos">
                       {photoUrls.slice(0, 3).map((url) => (
                         <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer">
-                          <img src={publicAssetPath(url)} alt="" />
+                          <img src={publicAssetPath(url)} alt="" loading="lazy" />
                         </a>
                       ))}
                       {photoUrls.length > 3 && (

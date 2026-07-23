@@ -42,12 +42,21 @@ type V1SessionCookieOptions = {
 
 type V1SessionClearCookieOptions = Omit<V1SessionCookieOptions, 'httpOnly' | 'maxAge'> & {
   readonly httpOnly: true;
+  readonly domain?: string;
 };
 
 export type V1SessionCookieResponse = {
   cookie(name: string, value: string, options: V1SessionCookieOptions): unknown;
   clearCookie(name: string, options: V1SessionClearCookieOptions): unknown;
 };
+
+// alpha.teameet.co.kr와 teameet.co.kr는 같은 등록 도메인(teameet.co.kr)을 공유한다.
+// 지금 코드는 항상 host-only(도메인 미지정) 쿠키만 발급하지만, 과거 배포에서
+// 와일드카드/apex 도메인으로 발급된 쿠키가 세션 TTL(7일) 안에 남아있으면 이름이
+// 같아도 다른 쿠키로 취급돼 host-only clearCookie로는 지워지지 않는다 — 로그아웃
+// 직후에도 그 잔존 쿠키로 재인증되는 문제가 실제로 재현됐다. 발급 시 쓰지 않는
+// 도메인이라도 로그아웃 시에는 방어적으로 함께 지운다.
+const LEGACY_SESSION_COOKIE_DOMAINS = ['.teameet.co.kr', 'teameet.co.kr'];
 
 export class V1SessionConfigurationError extends Error {
   constructor(message: string) {
@@ -173,12 +182,17 @@ export function clearV1SessionCookie(
   response: Pick<V1SessionCookieResponse, 'clearCookie'>,
   nodeEnv: string | undefined = process.env.NODE_ENV,
 ): void {
-  response.clearCookie(V1_SESSION_COOKIE_NAME, {
+  const base: V1SessionClearCookieOptions = {
     httpOnly: true,
     secure: nodeEnv === 'production',
     sameSite: 'lax',
     path: SESSION_COOKIE_PATH,
-  });
+  };
+
+  response.clearCookie(V1_SESSION_COOKIE_NAME, base);
+  for (const domain of LEGACY_SESSION_COOKIE_DOMAINS) {
+    response.clearCookie(V1_SESSION_COOKIE_NAME, { ...base, domain });
+  }
 }
 
 export function currentRuntimeConfiguration(): V1SessionRuntimeConfiguration {

@@ -1,4 +1,4 @@
-// Withdrawal page capture: mobile/tablet/desktop for PR gallery (PR #144).
+// Withdrawal page capture: mobile/tablet/desktop for PR gallery.
 // Requires the v1 stack running (web :3013 + api :8121 + seeded pg).
 // Run: node scripts/capture_withdrawal.js
 const { chromium } = require('@playwright/test');

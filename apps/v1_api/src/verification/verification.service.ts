@@ -4,6 +4,7 @@ import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { PhoneVerificationService } from './phone-verification.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
@@ -14,6 +15,7 @@ export class VerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: VerificationDispatcherService,
+    private readonly phoneVerification: PhoneVerificationService,
   ) {}
 
   async requestEmail(authUser: V1AuthUser) {
@@ -30,7 +32,7 @@ export class VerificationService {
     return this.issue('email', user.id, user.email);
   }
 
-  async requestPhone(authUser: V1AuthUser, phone: string) {
+  async requestPhone(authUser: V1AuthUser, phone: string, channel: 'mobile' | 'desktop') {
     const user = await this.loadUser(authUser.id);
     const owner = await this.prisma.v1User.findFirst({
       where: { phone, id: { not: user.id } },
@@ -45,7 +47,19 @@ export class VerificationService {
     if (user.phoneVerifiedAt && user.phone === phone) {
       return { sent: false, alreadyVerified: true, channel: 'phone' as const };
     }
-    return this.issue('phone', user.id, phone);
+    return this.phoneVerification.issueChallenge(phone, channel);
+  }
+
+  async confirmPhoneArrived(authUser: V1AuthUser, phone: string) {
+    const arrived = await this.phoneVerification.pollArrived(phone);
+    if (!arrived) return { verified: false as const };
+
+    const owner = await this.prisma.v1User.findFirst({ where: { phone, id: { not: authUser.id } }, select: { id: true } });
+    if (owner) {
+      throw new ConflictException({ code: 'PHONE_CONFLICT', message: '이미 다른 계정에서 사용 중인 번호예요.' });
+    }
+    await this.prisma.v1User.update({ where: { id: authUser.id }, data: { phoneVerifiedAt: new Date(), phone } });
+    return { verified: true as const, verification: { phoneVerified: true } };
   }
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {

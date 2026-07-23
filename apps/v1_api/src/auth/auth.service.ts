@@ -596,6 +596,19 @@ export class AuthService {
       }
     }
 
+    if (this.phoneVerification.enabled) {
+      const verified = await this.prisma.v1User.findUnique({
+        where: { id: userId },
+        select: { phone: true, phoneVerifiedAt: true },
+      });
+      if (!verified?.phoneVerifiedAt || verified.phone !== phone) {
+        throw new BadRequestException({
+          code: 'PHONE_NOT_VERIFIED',
+          message: '휴대폰 본인인증을 먼저 완료해 주세요.',
+        });
+      }
+    }
+
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: 'social_profile_required' },

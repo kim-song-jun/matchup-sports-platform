@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { ShieldAlert, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import {
   BellIcon,
@@ -55,6 +55,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         <div className="tm-home-main">
 
           {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
+          {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
 
           {/* Greeting + activity stats */}
           <div className="tm-home-greeting-block">
@@ -366,6 +367,50 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
         className="tm-pressable"
         style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         onClick={pushNudge.onDismiss}
+      >
+        <X size={18} aria-hidden="true" />
+      </button>
+    </Card>
+  );
+}
+
+function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable<HomeViewModel['phoneVerifyNudge']> }) {
+  return (
+    <Card pad={14} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--orange-soft)',
+          color: 'var(--orange500)',
+        }}
+      >
+        <ShieldAlert size={18} strokeWidth={2} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label">휴대폰 본인인증이 필요해요</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>안전한 이용을 위해 번호를 인증해 주세요.</div>
+      </div>
+      <button
+        type="button"
+        className="tm-btn tm-btn-sm tm-btn-primary"
+        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        onClick={phoneVerifyNudge.onVerify}
+      >
+        인증하기
+      </button>
+      <button
+        type="button"
+        aria-label="휴대폰 본인인증 안내 닫기"
+        className="tm-pressable"
+        style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onClick={phoneVerifyNudge.onDismiss}
       >
         <X size={18} aria-hidden="true" />
       </button>

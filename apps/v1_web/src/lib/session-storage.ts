@@ -69,6 +69,21 @@ export function dismissPushNudge() {
   window.sessionStorage.setItem(V1_PUSH_NUDGE_DISMISSED_KEY, 'true');
 }
 
+// sessionStorage (not localStorage): same rationale as the push nudge above —
+// the phone-verify nudge should reappear on every fresh login for legacy
+// unverified accounts, not stay dismissed forever once the tab closes.
+export const V1_PHONE_VERIFY_NUDGE_DISMISSED_KEY = 'teameet.v1.phoneVerifyNudgeDismissed';
+
+export function shouldShowPhoneVerifyNudge() {
+  if (typeof window === 'undefined') return false;
+  return window.sessionStorage.getItem(V1_PHONE_VERIFY_NUDGE_DISMISSED_KEY) !== 'true';
+}
+
+export function dismissPhoneVerifyNudge() {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(V1_PHONE_VERIFY_NUDGE_DISMISSED_KEY, 'true');
+}
+
 export function sanitizeRedirectPath(value: string | null | undefined) {
   if (!value) return null;
   if (!value.startsWith('/') || value.startsWith('//')) return null;

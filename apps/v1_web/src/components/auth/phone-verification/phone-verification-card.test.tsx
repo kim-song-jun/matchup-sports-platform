@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PhoneVerificationCard } from './phone-verification-card';
 import * as api from '@/hooks/use-v1-api';
 
-const POLL_MS = 4000;
+const POLL_MS = 2000;
 
 function wrap(ui: ReactNode) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -50,8 +50,7 @@ describe('PhoneVerificationCard', () => {
 
     wrap(<PhoneVerificationCard mode="public" phone="01012345678" onVerified={onVerified} />);
     await flush(); // 자동 발급
-    expect(onVerified).not.toHaveBeenCalled(); // 폴링 전
-    await advance(POLL_MS + 10); // 폴링 1회 발화 → 도착 확인
+    await advance(POLL_MS + 10); // 진입 즉시 확인/폴링 → 도착 확인
 
     expect(onVerified).toHaveBeenCalledWith('PROOF');
     expect(screen.getByText('휴대폰 본인인증이 완료됐어요.')).toBeInTheDocument();

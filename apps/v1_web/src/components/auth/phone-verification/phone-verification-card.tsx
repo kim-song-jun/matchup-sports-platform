@@ -23,8 +23,8 @@ type Props = {
 type Issued = { code: string; destNumber: string; qrCode?: string; expiresAt: string };
 
 const COUNTDOWN_TICK_MS = 1000;
-/** 문자 도착 자동 감지 폴링 간격. 백엔드 MAX_POLL_ATTEMPTS(30)·verify @Throttle(20/60s)와 정합. */
-const POLL_INTERVAL_MS = 4000;
+/** 문자 도착 자동 감지 폴링 간격. 백엔드 MAX_POLL_ATTEMPTS(180)·verify @Throttle(40/60s)와 정합. */
+const POLL_INTERVAL_MS = 2000;
 
 export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
   const publicIssue = useV1PhoneIssue();
@@ -110,8 +110,18 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
 
   // 문자 도착 자동 감지: 데스크탑은 발급 직후, 모바일은 "보내기" 이후 폴링.
   const polling = issued !== null && !verified && !expired && (device === 'desktop' || sending);
+  const primedRef = useRef(false);
   useEffect(() => {
-    if (!polling) return;
+    if (!polling) {
+      primedRef.current = false;
+      return;
+    }
+    // 폴링 진입 즉시 1회 확인(간격만큼 기다리지 않아 체감 지연을 없앤다). 이후 주기 폴링.
+    // verifyOnce 재생성으로 effect가 재실행돼도 즉시확인을 중복하지 않도록 primedRef로 1회만 발화.
+    if (!primedRef.current) {
+      primedRef.current = true;
+      void verifyOnce();
+    }
     const id = window.setInterval(() => {
       void verifyOnce();
     }, POLL_INTERVAL_MS);

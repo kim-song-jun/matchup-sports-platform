@@ -41,14 +41,14 @@ describe('V1 phone verification (MO) integration', () => {
     }
   });
 
-  it('issues a mobile challenge with a 6-char code and the octomo dest number (no QR for mobile)', async () => {
+  it('issues a mobile challenge with an 8-char code and the octomo dest number (no QR for mobile)', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/phone/issue')
       .send({ phone: '01011112222', channel: 'mobile' })
       .expect(200);
 
     expect(response.body.data.destNumber).toBe('16663538');
-    expect(response.body.data.code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/);
+    expect(response.body.data.code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/);
     expect(response.body.data.qrCode).toBeUndefined();
     expect(new Date(response.body.data.expiresAt).toISOString()).toBe(response.body.data.expiresAt);
   });

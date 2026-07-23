@@ -20,6 +20,11 @@ export interface OctomoQrOptions {
   width?: number;
 }
 
+// 옥토모는 무료 MO API라 느려지거나 rate-limit으로 응답이 지연될 수 있다. timeout이 없으면
+// fetch가 무한정 매달려 백엔드 커넥션이 쌓이고(폴링이라 반복), upstream이 503으로 죽는다.
+// 따라서 모든 호출에 상한을 두고, 초과 시 504로 끊어 커넥션을 즉시 회수한다.
+const OCTOMO_TIMEOUT_MS = 5000;
+
 @Injectable()
 export class OctomoClient {
   private readonly logger = new Logger(OctomoClient.name);
@@ -53,15 +58,26 @@ export class OctomoClient {
 
   private async post<T>(path: string, body: unknown): Promise<T> {
     if (!this.enabled) throw new OctomoDisabledError();
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers: {
-        accept: 'application/json',
-        'content-type': 'application/json',
-        authorization: `Octomo ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OCTOMO_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          authorization: `Octomo ${this.apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (controller.signal.aborted) throw new OctomoApiError(504, `Octomo request timed out after ${OCTOMO_TIMEOUT_MS}ms`);
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new OctomoApiError(res.status, text);

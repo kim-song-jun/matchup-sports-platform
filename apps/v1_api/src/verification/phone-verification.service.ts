@@ -1,18 +1,23 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { OctomoClient } from './octomo.client';
 import { issuePhoneProofToken } from './phone-proof-token';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
-// 프론트가 발급 후 자동 폴링(4초 간격)으로 도착을 감지하므로 상한을 넉넉히 둔다.
-// 4초 간격 × ~2분 = ~30회. 5분 만료가 최종 상한을 유지한다.
-const MAX_POLL_ATTEMPTS = 30;
+// 프론트가 발급 후 자동 폴링(2초 간격, 진입 즉시 1회)으로 도착을 감지한다.
+// desktop은 QR 스캔·전송을 마치기 전부터 폴링이 돌기 때문에, 사용자가 문자를
+// 보내기도 전에 상한이 소진돼 자멸하면 안 된다 → CODE_TTL(5분) 전체를 커버한다.
+// 2초 간격 × 5분 = 최대 150회. 5분 만료(TTL)가 실질 상한이고, 이 값은 무한 폴링 백스톱이다.
+const MAX_POLL_ATTEMPTS = 180;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const CODE_LENGTH = 6;
+// 6자(≈10.7억) → 8자(≈1.1조)로 강화. 딥링크가 코드를 자동 삽입하므로 사용자 입력 부담이 없다.
+const CODE_LENGTH = 8;
 
 @Injectable()
 export class PhoneVerificationService {
+  private readonly logger = new Logger(PhoneVerificationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly octomo: OctomoClient,
@@ -62,9 +67,19 @@ export class PhoneVerificationService {
       data: { attemptCount: { increment: 1 } },
     });
 
-    const exists = this.octomo.enabled
-      ? await this.octomo.messageExists(phone, challenge.code, 5)
-      : this.devEcho;
+    let exists = false;
+    if (this.octomo.enabled) {
+      try {
+        exists = await this.octomo.messageExists(phone, challenge.code, 5);
+      } catch (err) {
+        // 옥토모 일시 오류·timeout·rate-limit은 "아직 도착 안 함"으로 흡수해, 폴링이 다음 주기에
+        // 재시도하게 한다. 여기서 throw하면 매 폴링이 500이 되고 커넥션이 쌓여 upstream이 죽는다.
+        this.logger.warn(`octomo messageExists failed during poll: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
+      }
+    } else {
+      exists = this.devEcho;
+    }
 
     if (exists) {
       await this.prisma.v1PhoneVerificationChallenge.update({ where: { phone }, data: { verifiedAt: new Date() } });

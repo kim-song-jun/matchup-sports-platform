@@ -17,7 +17,8 @@ export class PhoneVerificationPublicController {
 
   @Post('verify')
   @HttpCode(200)
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  // 프론트 폴링 2초 간격 → 분당 최대 ~30회(+진입 즉시 1회). 여유를 두어 40/60s.
+  @Throttle({ default: { limit: 40, ttl: 60_000 } })
   async verify(@Body() dto: PhoneVerifyDto) {
     const arrived = await this.phoneVerification.pollArrived(dto.phone);
     if (!arrived) return { verified: false };

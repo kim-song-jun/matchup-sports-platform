@@ -42,4 +42,19 @@ describe('OctomoClient', () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify({ qrCode: 'data:image/png;base64,AAA' }), { status: 201 }));
     expect(await new OctomoClient().createQrCode('ABC123')).toBe('data:image/png;base64,AAA');
   });
+
+  it('aborts with OctomoApiError(504) when a hung request exceeds the timeout', async () => {
+    process.env.OCTOMO_API_KEY = 'test-key';
+    jest.useFakeTimers();
+    // 옥토모가 응답하지 않는 상황: abort 신호에만 반응하는 영원히 pending인 fetch를 모사한다.
+    jest.spyOn(global, 'fetch').mockImplementation(((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')));
+      })) as never);
+    const pending = new OctomoClient().messageExists('01012345678', 'ABC123');
+    const assertion = expect(pending).rejects.toMatchObject({ name: 'OctomoApiError', status: 504 });
+    await jest.advanceTimersByTimeAsync(5001); // OCTOMO_TIMEOUT_MS(5000) 초과 → controller.abort()
+    await assertion;
+    jest.useRealTimers();
+  });
 });

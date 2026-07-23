@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
@@ -1328,6 +1328,7 @@ export function WithdrawalPageClient() {
   const router = useRouter();
   const withdrawal = useV1WithdrawalRequest();
   const [reason, setReason] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false);
   // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
   const { confirm, ConfirmModal } = useConfirm();
 
@@ -1368,8 +1369,29 @@ export function WithdrawalPageClient() {
             <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
           </section>
           <Card pad={16}>
-            <ListItem title="요청 상태" sub="탈퇴 신청 후 계정 확인 절차가 진행돼요" trailing="신청 전" />
-            <ListItem title="보관 데이터" sub="법령에 따른 보관 기간이 지나면 삭제돼요" trailing="안내" />
+            <button
+              type="button"
+              className="tm-withdrawal-info-toggle tm-pressable"
+              aria-expanded={infoOpen}
+              onClick={() => setInfoOpen((current) => !current)}
+            >
+              <span className="tm-text-body">탈퇴 처리 안내</span>
+              <span className="tm-withdrawal-info-arrow" aria-hidden="true">
+                <ChevronRightIcon size={16} strokeWidth={2} />
+              </span>
+            </button>
+            {infoOpen ? (
+              <div className="tm-withdrawal-info-detail">
+                <div>
+                  <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>요청 상태</div>
+                  <div className="tm-text-caption">탈퇴 신청 후 계정 확인 절차가 진행돼요</div>
+                </div>
+                <div>
+                  <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>보관 데이터</div>
+                  <div className="tm-text-caption">법령에 따른 보관 기간이 지나면 삭제돼요</div>
+                </div>
+              </div>
+            ) : null}
           </Card>
           <label className="tm-create-field">
             <span className="tm-text-label">탈퇴 사유</span>

@@ -9,6 +9,7 @@ import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitiv
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
+import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session } from '@/lib/session-storage';
 import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -1409,7 +1410,7 @@ export function WithdrawalPageClient() {
           {withdrawal.isError ? (
             <Card pad={14} className="tm-auth-soft-card-error">
               <div className="tm-text-label">
-                {withdrawal.error instanceof Error ? withdrawal.error.message : '탈퇴 요청에 실패했어요'}
+                {extractErrorMessage(withdrawal.error, '탈퇴 요청에 실패했어요')}
               </div>
             </Card>
           ) : null}

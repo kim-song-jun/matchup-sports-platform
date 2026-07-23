@@ -1973,7 +1973,7 @@ export class TeamsService {
       viewerJoinState: viewer.joinState,
       owner: {
         userId: team.ownerUser.id,
-        displayName: team.ownerUser.profile?.displayName ?? team.ownerUser.profile?.nickname ?? '팀장',
+        displayName: team.ownerUser.profile?.nickname ?? team.ownerUser.profile?.displayName ?? '팀장',
         profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
       },
       manager: this.findManager(team),
@@ -1987,7 +1987,7 @@ export class TeamsService {
     }
     return {
       userId: manager.userId,
-      displayName: manager.user.profile?.displayName ?? manager.user.profile?.nickname ?? '감독',
+      displayName: manager.user.profile?.nickname ?? manager.user.profile?.displayName ?? '감독',
     };
   }
 

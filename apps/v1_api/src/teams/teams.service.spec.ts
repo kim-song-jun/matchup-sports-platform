@@ -370,12 +370,12 @@ describe('TeamsService', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0].owner).toEqual({
         userId: owner.id,
-        displayName: '오너',
+        displayName: 'owner-nick',
         profileImageUrl: 'https://example.com/owner.png',
       });
       expect(result.items[0].manager).toEqual({
         userId: manager.id,
-        displayName: '감독님',
+        displayName: 'manager-nick',
       });
     });
 

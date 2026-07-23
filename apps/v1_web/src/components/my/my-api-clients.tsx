@@ -1391,7 +1391,6 @@ function toMyHomeModel(
   hasPendingReviews?: boolean,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
-  const displayName = profile.profile.realName?.trim() || nickname;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
@@ -1425,11 +1424,11 @@ function toMyHomeModel(
     sections,
     user: {
       ...myHomeModel.user,
-      name: displayName,
+      name: nickname,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
       genderLabel: formatGender(profile.profile.gender),
-      initials: initials(displayName || nickname),
+      initials: initials(nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
       loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
       loginMethodProvider: profile.authProvider,

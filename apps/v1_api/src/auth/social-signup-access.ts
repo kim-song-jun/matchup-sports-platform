@@ -34,7 +34,14 @@ export function isPendingSocialSignupRequestAllowed(
   }
 
   if (status === 'social_profile_required') {
-    return pathname.endsWith('/auth/social-profile');
+    // 프로필 완성 화면이 실제로 호출하는 것: 닉네임 중복확인 + authed 휴대폰 인증 카드
+    // (옥토모 카카오 hard-block) + 최종 제출. 이 셋을 막으면 소셜 가입이 원천 봉쇄된다.
+    return (
+      pathname.endsWith('/auth/social-profile') ||
+      pathname.endsWith('/auth/check-nickname') ||
+      pathname.endsWith('/verification/phone/request') ||
+      pathname.endsWith('/verification/phone/confirm')
+    );
   }
 
   return true;

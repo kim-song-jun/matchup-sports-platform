@@ -74,6 +74,10 @@ export type V1AuthMe = {
     nextRoute: string | null;
   };
   reputation?: unknown;
+  verification?: {
+    emailVerified: boolean;
+    phoneVerified: boolean;
+  };
 };
 
 export type V1AuthSessionResponse = V1AuthMe & {

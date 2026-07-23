@@ -429,10 +429,26 @@
     margin-right: auto;
   }
 
+  /* .tm-my-sports-cta와 동일 패턴: 이 페이지엔 .tm-fixed-cta 폭을 콘텐츠 컬럼(580px)에
+   * 맞춰 재스코프하는 규칙이 없어 fixed 바가 콘텐츠와 어긋난다 — static 인라인으로 전환. */
   .tm-my-withdrawal-cta {
+    position: static;
+    transform: none;
+    width: 100%;
     max-width: 580px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 auto;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+    z-index: auto;
+  }
+
+  /* 짧은 폼(탈퇴 사유 + 버튼)이 스크롤 영역 상단에 붙어 하단에 큰 빈 공간을
+   * 남기던 문제 — 카드+버튼 묶음을 뷰포트 안에서 세로 중앙 정렬한다. */
+  .tm-scroll-area:has(.tm-my-withdrawal-desktop) {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
 }
 

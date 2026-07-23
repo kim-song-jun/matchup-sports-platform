@@ -44,7 +44,7 @@ export class OptionalV1AuthGuard implements CanActivate {
       return true;
     }
 
-    if (['suspended', 'blocked', 'deleted'].includes(user.accountStatus)) {
+    if (['suspended', 'blocked', 'deleted', 'withdrawal_pending'].includes(user.accountStatus)) {
       return true;
     }
 

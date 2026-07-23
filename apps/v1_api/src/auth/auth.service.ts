@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { V1AuthProvider } from '@prisma/client';
+import { V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
@@ -233,6 +233,7 @@ export class AuthService {
     }
 
     if (identity.status !== 'active' || identity.user.accountStatus !== 'active') {
+      this.assertNotWithdrawalPending(identity.user.accountStatus);
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: 'This account cannot sign in',
@@ -284,6 +285,7 @@ export class AuthService {
         await this.prisma.v1User.delete({ where: { id: existingIdentity.user.id } });
       } else {
         if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
+          this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
           throw new ForbiddenException({
             code: 'PERMISSION_DENIED',
             message: 'This account cannot sign in',
@@ -322,6 +324,7 @@ export class AuthService {
 
     if (existingUser) {
       if (existingUser.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(existingUser.accountStatus);
         throw new ForbiddenException({
           code: 'PERMISSION_DENIED',
           message: 'This account cannot sign in',
@@ -743,6 +746,15 @@ export class AuthService {
         trustState: user.reputationSummary?.trustState ?? 'none',
       },
     };
+  }
+
+  private assertNotWithdrawalPending(accountStatus: V1AccountStatus) {
+    if (accountStatus === 'withdrawal_pending') {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_WITHDRAWAL_PENDING',
+        message: '탈퇴 신청 중인 계정이에요. 문의는 고객센터로 연락해 주세요.',
+      });
+    }
   }
 
   private async sessionResponse(userId: string, userEmail: string | null, options?: { social?: boolean }) {

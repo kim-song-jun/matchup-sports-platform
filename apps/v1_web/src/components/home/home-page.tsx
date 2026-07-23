@@ -331,7 +331,7 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
 
 function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['pushNudge']> }) {
   return (
-    <Card pad={14} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{
@@ -376,7 +376,7 @@ function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['
 
 function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable<HomeViewModel['phoneVerifyNudge']> }) {
   return (
-    <Card pad={14} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{

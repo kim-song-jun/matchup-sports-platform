@@ -1268,8 +1268,13 @@ export function useV1UpdateProfile() {
       gender: 'male' | 'female';
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
+    // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에
+    // 호출부가 다음 화면으로 이동해 버려 마이페이지 등에서 방금 저장한 값 대신
+    // 이전 캐시 값이 잠깐(또는 리페치 실패 시 계속) 보였다. setQueryData로 즉시 반영.
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1Profile>(v1Keys.profile(), (current) =>
+        current ? { ...current, profile: result.profile } : current,
+      );
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });

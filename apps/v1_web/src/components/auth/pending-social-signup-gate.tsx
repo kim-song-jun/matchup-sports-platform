@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
 import { browserAppRoute } from '@/lib/app-route';
 import {
   clearStoredV1Session,
@@ -27,11 +28,13 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
-    if (hasSessionHint !== true || !authMe.isError) return;
+    if (hasSessionHint !== true) return;
+    if (!authMe.isError || authMe.isFetching || !isUnauthenticated(authMe.error)) return;
+
     clearStoredV1Session();
     disconnectV1Socket();
     setHasSessionHint(false);
-  }, [authMe.isError, hasSessionHint]);
+  }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);
 
   const onboardingStatus = authMe.data?.user.onboardingStatus;
   const socialRequiredRoute = getPendingSocialSignupRoute(onboardingStatus);
@@ -64,4 +67,9 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   if (requiredRoute && !routeAllowed) return <SessionFallback />;
 
   return <>{children}</>;
+}
+
+function isUnauthenticated(error: unknown) {
+  return error instanceof V1ApiError
+    && (error.statusCode === 401 || error.code === 'UNAUTHENTICATED');
 }

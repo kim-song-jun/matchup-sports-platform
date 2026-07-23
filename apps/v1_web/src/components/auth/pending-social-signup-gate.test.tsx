@@ -1,11 +1,14 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   useV1AuthMe: vi.fn(),
   pathname: '/my',
+  clearStoredV1Session: vi.fn(),
+  disconnectV1Socket: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -19,10 +22,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 vi.mock('@/lib/session-storage', () => ({
   hasStoredV1Session: () => true,
-  clearStoredV1Session: vi.fn(),
+  clearStoredV1Session: mocks.clearStoredV1Session,
 }));
 
-vi.mock('@/lib/v1-socket', () => ({ disconnectV1Socket: vi.fn() }));
+vi.mock('@/lib/v1-socket', () => ({ disconnectV1Socket: mocks.disconnectV1Socket }));
 
 vi.mock('@/lib/app-route', () => ({ browserAppRoute: (route: string) => route }));
 
@@ -114,5 +117,55 @@ describe('PendingSocialSignupGate required terms renewal', () => {
 
     expect(await screen.findByText('이메일 로그인')).toBeInTheDocument();
     expect(mocks.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('PendingSocialSignupGate session preservation on transient errors', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.pathname = '/my';
+  });
+
+  it('does not clear the stored session on a transient 503 — only a genuine 401 means unauthenticated', async () => {
+    mocks.useV1AuthMe.mockReturnValue({
+      isSuccess: false,
+      isError: true,
+      isFetching: false,
+      data: undefined,
+      error: new V1ApiError({
+        status: 'error',
+        statusCode: 503,
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'unavailable',
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    render(<PendingSocialSignupGate><div>마이 페이지</div></PendingSocialSignupGate>);
+
+    expect(await screen.findByText('마이 페이지')).toBeInTheDocument();
+    expect(mocks.clearStoredV1Session).not.toHaveBeenCalled();
+    expect(mocks.disconnectV1Socket).not.toHaveBeenCalled();
+  });
+
+  it('clears the stored session on a genuine 401', async () => {
+    mocks.useV1AuthMe.mockReturnValue({
+      isSuccess: false,
+      isError: true,
+      isFetching: false,
+      data: undefined,
+      error: new V1ApiError({
+        status: 'error',
+        statusCode: 401,
+        code: 'UNAUTHORIZED',
+        message: 'unauthorized',
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    render(<PendingSocialSignupGate><div>마이 페이지</div></PendingSocialSignupGate>);
+
+    await waitFor(() => expect(mocks.clearStoredV1Session).toHaveBeenCalled());
+    expect(mocks.disconnectV1Socket).toHaveBeenCalled();
   });
 });

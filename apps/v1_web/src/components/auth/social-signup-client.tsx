@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
+import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
@@ -32,6 +33,7 @@ export function SocialSignupClient() {
   const [nickname, setNickname] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
@@ -88,6 +90,11 @@ export function SocialSignupClient() {
       return;
     }
 
+    if (!phoneVerified) {
+      setError('휴대폰 본인인증을 완료해 주세요.');
+      return;
+    }
+
     completeProfile.mutate(
       {
         nickname: nickname.trim(),
@@ -121,6 +128,12 @@ export function SocialSignupClient() {
 
           if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
             setError('가입 가능 시간이 지났어요. 카카오 로그인부터 다시 시작해 주세요.');
+            return;
+          }
+
+          if (nextError instanceof V1ApiError && nextError.code === 'PHONE_NOT_VERIFIED') {
+            setError('휴대폰 본인인증을 완료해 주세요.');
+            setPhoneVerified(false);
             return;
           }
 
@@ -229,12 +242,34 @@ export function SocialSignupClient() {
             <input
               className="tm-input tm-auth-input"
               inputMode="numeric"
-              onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
+              onChange={(event) => {
+                setPhoneDigits(normalizeSeparatedDigits(event.target.value));
+                setPhoneVerified(false);
+              }}
               placeholder="010-0000-0000"
               required
               value={formatPhone(phoneDigits)}
             />
           </label>
+
+          {phoneDigits.length === 11 && !phoneVerified ? (
+            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} />
+          ) : null}
+
+          {phoneVerified ? (
+            <div
+              className="tm-text-caption"
+              role="status"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--blue500)' }}
+            >
+              <span
+                aria-hidden="true"
+                style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
+              />
+              휴대폰 본인인증이 완료됐어요
+            </div>
+          ) : null}
+
           <label className="tm-auth-field">
             <span className="tm-text-label">생년월일</span>
             <DatePickerTextInput

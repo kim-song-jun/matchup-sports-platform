@@ -1,10 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LogoutButton } from './logout-button';
-
-const router = vi.hoisted(() => ({
-  replace: vi.fn(),
-}));
 
 const hooks = vi.hoisted(() => ({
   logoutMutate: vi.fn(),
@@ -20,10 +16,6 @@ const session = vi.hoisted(() => ({
 
 const socket = vi.hoisted(() => ({
   disconnectV1Socket: vi.fn(),
-}));
-
-vi.mock('next/navigation', () => ({
-  useRouter: () => router,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -65,12 +57,20 @@ describe('LogoutButton GA events', () => {
 });
 
 describe('LogoutButton session cleanup', () => {
+  let replaceMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    replaceMock = vi.fn();
+    vi.stubGlobal('location', { ...window.location, replace: replaceMock });
     // 로그아웃 mutation이 완료되면 컴포넌트가 넘긴 onSettled 콜백을 즉시 실행하도록 스텁한다.
     hooks.logoutMutate.mockImplementation((_variables, opts?: { onSettled?: () => void }) => {
       opts?.onSettled?.();
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('disconnects the realtime socket together with clearing the stored session', () => {
@@ -84,6 +84,8 @@ describe('LogoutButton session cleanup', () => {
     // 로그아웃 후에도 살아남아 다음 사용자 탭으로 데이터가 새는 것을 막는다.
     expect(session.clearStoredV1Session).toHaveBeenCalledTimes(1);
     expect(socket.disconnectV1Socket).toHaveBeenCalledTimes(1);
-    expect(router.replace).toHaveBeenCalledWith('/login');
+    // router.replace()(소프트 네비게이션)는 로그인 상태에서 prefetch된 /login 인스턴스를
+    // 재사용해 로그아웃 이전 세션 스냅샷에 멈추는 버그가 있어 하드 네비게이션으로 전환했다.
+    expect(replaceMock).toHaveBeenCalledWith('/login');
   });
 });

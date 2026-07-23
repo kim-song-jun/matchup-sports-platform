@@ -4755,6 +4755,32 @@ button:disabled {
   gap: 10px;
 }
 
+.tm-danger-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tm-danger-panel-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--red500);
+  display: grid;
+  place-items: center;
+}
+
+.tm-withdrawal-info-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--blue50);
+  color: var(--blue500);
+  display: grid;
+  place-items: center;
+}
+
 @media (min-width: 760px) {
   .v1-root {
     padding: 28px 0;

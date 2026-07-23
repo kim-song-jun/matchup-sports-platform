@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
+import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
@@ -1365,7 +1365,12 @@ export function WithdrawalPageClient() {
             <h1 className="tm-text-heading">회원 탈퇴</h1>
           </div>
           <section className="tm-danger-panel">
-            <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
+            <div className="tm-danger-panel-head">
+              <span className="tm-danger-panel-icon" aria-hidden="true">
+                <AlertTriangleIcon size={20} strokeWidth={2} />
+              </span>
+              <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
+            </div>
             <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
           </section>
           <Card pad={16}>
@@ -1375,7 +1380,10 @@ export function WithdrawalPageClient() {
               aria-expanded={infoOpen}
               onClick={() => setInfoOpen((current) => !current)}
             >
-              <span className="tm-text-body">탈퇴 처리 안내</span>
+              <span className="tm-withdrawal-info-icon" aria-hidden="true">
+                <InfoCircleIcon size={18} strokeWidth={2} />
+              </span>
+              <span className="tm-text-body" style={{ flex: 1, textAlign: 'left' }}>탈퇴 처리 안내</span>
               <span className="tm-withdrawal-info-arrow" aria-hidden="true">
                 <ChevronRightIcon size={16} strokeWidth={2} />
               </span>

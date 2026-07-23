@@ -442,6 +442,14 @@
     background: transparent;
     z-index: auto;
   }
+
+  /* 짧은 폼(탈퇴 사유 + 버튼)이 스크롤 영역 상단에 붙어 하단에 큰 빈 공간을
+   * 남기던 문제 — 카드+버튼 묶음을 뷰포트 안에서 세로 중앙 정렬한다. */
+  .tm-scroll-area:has(.tm-my-withdrawal-desktop) {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
 }
 
 /* ─── Sports settings page: constrained + sport grid 3-up ───────────────────

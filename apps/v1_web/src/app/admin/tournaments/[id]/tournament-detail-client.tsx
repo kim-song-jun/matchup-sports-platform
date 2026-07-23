@@ -4931,6 +4931,7 @@ function ReviewModerationCard({
             src={publicAssetPath(review.authorProfileImageUrl)}
             alt=""
             aria-hidden="true"
+            loading="lazy"
             className="w-9 h-9 rounded-full object-cover shrink-0"
           />
         ) : (
@@ -4985,7 +4986,7 @@ function ReviewModerationCard({
               rel="noreferrer"
               className="block w-14 h-14 rounded-lg overflow-hidden border border-gray-100 shrink-0"
             >
-              <img src={publicAssetPath(url)} alt="" className="w-full h-full object-cover" />
+              <img src={publicAssetPath(url)} alt="" loading="lazy" className="w-full h-full object-cover" />
             </a>
           ))}
         </div>

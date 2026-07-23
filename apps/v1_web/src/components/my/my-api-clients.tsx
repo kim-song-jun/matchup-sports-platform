@@ -1378,6 +1378,7 @@ export function WithdrawalPageClient() {
               type="button"
               className="tm-withdrawal-info-toggle tm-pressable"
               aria-expanded={infoOpen}
+              aria-controls="withdrawal-info-detail"
               onClick={() => setInfoOpen((current) => !current)}
             >
               <span className="tm-withdrawal-info-icon" aria-hidden="true">
@@ -1389,7 +1390,7 @@ export function WithdrawalPageClient() {
               </span>
             </button>
             {infoOpen ? (
-              <div className="tm-withdrawal-info-detail">
+              <div className="tm-withdrawal-info-detail" id="withdrawal-info-detail">
                 <div>
                   <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>요청 상태</div>
                   <div className="tm-text-caption">탈퇴 신청 후 계정 확인 절차가 진행돼요</div>

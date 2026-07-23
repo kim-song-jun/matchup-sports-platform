@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Providers } from './providers';
+import { ReleaseVersionWatcher } from '@/components/v1-ui/release-version-watcher';
 import { RouteProgressBar } from '@/components/v1-ui/route-progress';
 import { publicAssetPath } from '@/lib/assets';
 import { getSiteOrigin } from '@/lib/seo';
@@ -45,6 +46,7 @@ export default function RootLayout({
       </head>
       <body>
         <RouteProgressBar />
+        <ReleaseVersionWatcher />
         <Providers>{children}</Providers>
       </body>
     </html>

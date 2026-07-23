@@ -447,7 +447,7 @@ describe('ProfileService withdrawal admin lockout', () => {
     expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
   });
 
-  it('진행 중인 매치가 있으면 409 WITHDRAWAL_BLOCKED_ACTIVE_MATCH — 트랜잭션 진입 전 차단', async () => {
+  it('진행 중인 매치가 있으면 409 WITHDRAWAL_BLOCKED_ACTIVE_MATCH — 트랜잭션 진입 전 차단, soft-delete된 매치는 제외 조회', async () => {
     const prisma = createPrisma(null);
     prisma.v1MatchParticipant.findFirst.mockResolvedValue({ id: 'participant-1' });
     const service = new ProfileService(prisma as unknown as PrismaService);
@@ -458,9 +458,16 @@ describe('ProfileService withdrawal admin lockout', () => {
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(prisma.v1MatchParticipant.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          match: expect.objectContaining({ deletedAt: null }),
+        }),
+      }),
+    );
   });
 
-  it('운영 중인 팀(owner/manager)이 있으면 409 WITHDRAWAL_BLOCKED_TEAM_AUTHORITY — 트랜잭션 진입 전 차단', async () => {
+  it('운영 중인 팀(owner/manager)이 있으면 409 WITHDRAWAL_BLOCKED_TEAM_AUTHORITY — 트랜잭션 진입 전 차단, soft-delete/비활성 팀은 제외 조회', async () => {
     const prisma = createPrisma(null);
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'membership-1' });
     const service = new ProfileService(prisma as unknown as PrismaService);
@@ -471,5 +478,12 @@ describe('ProfileService withdrawal admin lockout', () => {
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.v1User.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMembership.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          team: { status: 'active', deletedAt: null },
+        }),
+      }),
+    );
   });
 });

@@ -675,7 +675,7 @@ export class ProfileService {
         where: {
           userId,
           status: 'active',
-          match: { status: { in: ['recruiting', 'closed'] } },
+          match: { status: { in: ['recruiting', 'closed'] }, deletedAt: null },
         },
         select: { id: true },
       }),
@@ -684,6 +684,7 @@ export class ProfileService {
           userId,
           status: 'active',
           role: { in: ['owner', 'manager'] },
+          team: { status: 'active', deletedAt: null },
         },
         select: { id: true },
       }),

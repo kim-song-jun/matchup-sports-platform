@@ -1,10 +1,10 @@
 import { PhoneVerificationPublicController } from './phone-verification-public.controller';
 
-describe('PhoneVerificationPublicController', () => {
+describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
   function buildController(overrides: Partial<Record<string, jest.Mock>> = {}) {
     const phoneVerification = {
       issueChallenge: jest.fn(),
-      pollArrived: jest.fn(),
+      verifyCode: jest.fn(),
       issueProof: jest.fn(),
       ...overrides,
     };
@@ -13,50 +13,39 @@ describe('PhoneVerificationPublicController', () => {
   }
 
   describe('issue', () => {
-    it('delegates to phoneVerification.issueChallenge and returns its fields', async () => {
+    it('delegates to issueChallenge(phone) and returns its result', async () => {
       const { controller, phoneVerification } = buildController({
-        issueChallenge: jest.fn().mockResolvedValue({
-          code: 'ABC123',
-          destNumber: '16663538',
-          qrCode: undefined,
-          expiresAt: '2026-07-23T00:05:00.000Z',
-        }),
+        issueChallenge: jest.fn().mockResolvedValue({ expiresAt: '2026-07-25T00:05:00.000Z', devCode: '123456' }),
       });
 
-      const result = await controller.issue({ phone: '01012345678', channel: 'mobile' });
+      const result = await controller.issue({ phone: '01012345678' });
 
-      expect(phoneVerification.issueChallenge).toHaveBeenCalledWith('01012345678', 'mobile');
-      expect(result).toEqual({
-        code: 'ABC123',
-        destNumber: '16663538',
-        qrCode: undefined,
-        expiresAt: '2026-07-23T00:05:00.000Z',
-      });
+      expect(phoneVerification.issueChallenge).toHaveBeenCalledWith('01012345678');
+      expect(result).toEqual({ expiresAt: '2026-07-25T00:05:00.000Z', devCode: '123456' });
     });
   });
 
   describe('verify', () => {
-    it('returns verified:false without a proofToken when the code has not arrived', async () => {
+    it('verifies the code and returns verified:true with a proofToken', async () => {
       const { controller, phoneVerification } = buildController({
-        pollArrived: jest.fn().mockResolvedValue(false),
-      });
-
-      const result = await controller.verify({ phone: '01012345678' });
-
-      expect(result).toEqual({ verified: false });
-      expect(phoneVerification.issueProof).not.toHaveBeenCalled();
-    });
-
-    it('returns verified:true with a proofToken when the code has arrived', async () => {
-      const { controller, phoneVerification } = buildController({
-        pollArrived: jest.fn().mockResolvedValue(true),
+        verifyCode: jest.fn().mockResolvedValue(true),
         issueProof: jest.fn().mockReturnValue('proof-token-value'),
       });
 
-      const result = await controller.verify({ phone: '01012345678' });
+      const result = await controller.verify({ phone: '01012345678', code: '123456' });
 
+      expect(phoneVerification.verifyCode).toHaveBeenCalledWith('01012345678', '123456');
       expect(phoneVerification.issueProof).toHaveBeenCalledWith('01012345678');
       expect(result).toEqual({ verified: true, proofToken: 'proof-token-value' });
+    });
+
+    it('propagates a mismatch error from verifyCode without issuing a proofToken', async () => {
+      const { controller, phoneVerification } = buildController({
+        verifyCode: jest.fn().mockRejectedValue(new Error('VERIFICATION_CODE_MISMATCH')),
+      });
+
+      await expect(controller.verify({ phone: '01012345678', code: '000000' })).rejects.toThrow();
+      expect(phoneVerification.issueProof).not.toHaveBeenCalled();
     });
   });
 });

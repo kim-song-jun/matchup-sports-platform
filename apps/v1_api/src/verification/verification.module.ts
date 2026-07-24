@@ -1,14 +1,21 @@
 import { Module } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
-import { OctomoClient } from './octomo.client';
 import { PhoneVerificationService } from './phone-verification.service';
+import { SMS_SENDER } from './sms/sms-sender';
+import { SolapiSmsSender } from './sms/solapi-sms-sender';
 import { VerificationController } from './verification.controller';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 import { VerificationService } from './verification.service';
 
 @Module({
   controllers: [VerificationController],
-  providers: [VerificationService, VerificationDispatcherService, OctomoClient, PhoneVerificationService, V1AuthGuard],
-  exports: [PhoneVerificationService, OctomoClient],
+  providers: [
+    VerificationService,
+    VerificationDispatcherService,
+    { provide: SMS_SENDER, useClass: SolapiSmsSender },
+    PhoneVerificationService,
+    V1AuthGuard,
+  ],
+  exports: [PhoneVerificationService],
 })
 export class VerificationModule {}

@@ -100,14 +100,25 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     await expect(svc.verifyCode(PHONE, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' } });
   });
 
-  it('verifyCode is idempotent once verified (returns true without another attempt)', async () => {
+  it('verifyCode stays idempotent for the correct code but rejects a wrong code even after verification', async () => {
     const prisma = prismaMock();
     const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
     const { devCode } = await svc.issueChallenge(PHONE);
-    await svc.verifyCode(PHONE, devCode!);
-    const before = (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount;
-    expect(await svc.verifyCode(PHONE, 'anything')).toBe(true);
-    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount).toBe(before);
+    await svc.verifyCode(PHONE, devCode!); // 최초 정상 인증
+
+    // 올바른 코드 재제출 → 멱등 성공
+    expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
+
+    // 잘못된 코드 → 이미 verified 라도 성공하지 않는다(인증 우회 방지: verifiedAt 만으로 단락 금지)
+    const wrong = devCode === '000000' ? '111111' : '000000';
+    await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+  });
+
+  it('issueChallenge enforces a resend cooldown for the same phone (paid-SMS abuse guard)', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    await svc.issueChallenge(PHONE);
+    await expect(svc.issueChallenge(PHONE)).rejects.toMatchObject({ response: { code: 'VERIFICATION_RESEND_COOLDOWN' } });
   });
 
   it('issueProof returns a token bound to the phone', () => {

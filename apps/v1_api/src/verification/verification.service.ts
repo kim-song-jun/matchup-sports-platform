@@ -8,6 +8,8 @@ import { VerificationDispatcherService } from './verification-dispatcher.service
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+// 동일 번호로 유료 SMS 를 반복 발송하지 못하게 막는 재발송 쿨다운(대상 번호 기준).
+const RESEND_COOLDOWN_MS = 30 * 1000;
 
 @Injectable()
 export class VerificationService {
@@ -44,6 +46,19 @@ export class VerificationService {
     }
     if (user.phoneVerifiedAt && user.phone === phone) {
       return { sent: false, alreadyVerified: true, channel: 'phone' as const };
+    }
+    // 대상 번호 기준 재발송 쿨다운 — 로그인 사용자가 임의 번호로 유료 SMS 를 반복 발송하는 남용 차단.
+    const recent = await this.prisma.v1VerificationToken.findFirst({
+      where: { channel: 'phone', target: phone },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+      const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - (Date.now() - recent.createdAt.getTime())) / 1000);
+      throw new BadRequestException({
+        code: 'VERIFICATION_RESEND_COOLDOWN',
+        message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,
+      });
     }
     return this.issue('phone', user.id, phone);
   }

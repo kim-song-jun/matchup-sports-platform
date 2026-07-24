@@ -205,6 +205,23 @@ describe('VerificationService.requestPhone (MT)', () => {
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
   });
 
+  it('rejects a phone resend within the cooldown window (paid-SMS abuse guard)', async () => {
+    const prisma = buildPrismaMock();
+    const handle = prisma as never as {
+      v1User: { findUnique: jest.Mock; findFirst: jest.Mock };
+      v1VerificationToken: { findFirst: jest.Mock; create: jest.Mock };
+    };
+    handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.com', phone: null, emailVerifiedAt: null, phoneVerifiedAt: null });
+    handle.v1User.findFirst.mockResolvedValue(null);
+    handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date() });
+    const service = new VerificationService(prisma, dispatcher);
+
+    await expect(service.requestPhone(authUser, '01012345678')).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_RESEND_COOLDOWN' },
+    });
+    expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
   it('does not re-issue when the phone is already verified for this user', async () => {
     const prisma = buildPrismaMock();
     const handle = prisma as never as {

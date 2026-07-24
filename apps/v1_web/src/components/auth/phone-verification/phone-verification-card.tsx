@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle2, MessageSquare, QrCode, RefreshCw, Send, Smartphone } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, Copy, MessageSquare, QrCode, RefreshCw, Send, Smartphone } from 'lucide-react';
 import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import { detectDeviceKind, type DeviceKind } from '@/lib/device-kind';
 import { buildSmsLink } from '@/lib/octomo-sms-link';
@@ -41,6 +41,7 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
   // 모바일은 "인증 문자 보내기"를 누른 뒤부터(문자앱 진입) 자동 감지를 시작한다.
   // 데스크탑은 QR 스캔에 명시적 신호가 없어 발급 직후부터 감지한다.
   const [sending, setSending] = useState(false);
+  const [copied, setCopied] = useState(false);
   const inFlightRef = useRef(false);
 
   const issue = useCallback(
@@ -142,6 +143,18 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
   const seconds = Math.floor((remainingMs % 60000) / 1000);
   const smsLink = useMemo(() => (issued ? buildSmsLink(issued.destNumber, issued.code) : '#'), [issued]);
 
+  const copyCode = useCallback(() => {
+    if (!issued) return;
+    // clipboard 실패(비지원·권한거부)해도 코드는 화면에 노출돼 있어 수동 선택 복사가 가능하므로 무시한다.
+    void navigator.clipboard
+      ?.writeText(issued.code)
+      .then(() => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {});
+  }, [issued]);
+
   if (verified) {
     return (
       <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}>
@@ -227,6 +240,48 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
             </div>
           </div>
 
+          {/* 인증 코드 — 딥링크가 본문을 못 채우는 기기가 있어 명확히 노출·복사 지원(오타 방지). */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              padding: 14,
+              borderRadius: 14,
+              background: 'var(--blue50)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              받는 번호 <b style={{ color: 'var(--text)' }}>1666-3538</b>
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <code
+                style={{
+                  flex: 1,
+                  margin: 0,
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                  fontSize: 26,
+                  fontWeight: 700,
+                  letterSpacing: '0.16em',
+                  color: 'var(--blue500)',
+                  textAlign: 'center',
+                }}
+              >
+                {issued.code}
+              </code>
+              <button
+                type="button"
+                className="tm-btn tm-btn-sm tm-btn-ghost"
+                onClick={copyCode}
+                aria-label="인증 코드 복사"
+              >
+                {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
+                {copied ? '복사됨' : '복사'}
+              </button>
+            </div>
+          </div>
+
           {device === 'desktop' ? (
             issued.qrCode ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -238,7 +293,7 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
                   style={{ borderRadius: 12, border: '1px solid var(--border)' }}
                 />
                 <p className="tm-text-caption" style={{ margin: 0, textAlign: 'center' }}>
-                  휴대폰 카메라로 QR을 스캔하면 문자 앱이 열려요. 그대로 전송하면 자동으로 인증돼요.
+                  휴대폰 카메라로 QR을 스캔하면 문자 앱이 열려요. 그대로 전송하면 자동 인증돼요. 스캔이 어려우면 위 코드를 직접 보내도 돼요.
                 </p>
               </div>
             ) : (
@@ -249,16 +304,16 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
           ) : (
             <>
               <p className="tm-text-caption" style={{ margin: 0, textAlign: 'center' }}>
-                버튼을 누르면 문자 앱이 열려요. <b style={{ color: 'var(--text)' }}>내용 그대로 전송</b>하면 자동으로 인증돼요.
+                위 코드를 문자 앱에서 <b style={{ color: 'var(--text)' }}>그대로 전송</b>하면 자동으로 인증돼요. 버튼을 누르면 문자 앱이 코드와 함께 열려요(안 채워지면 위 코드를 복사해 붙여넣어 주세요).
               </p>
               <a
                 href={smsLink}
                 className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-                aria-label="인증 문자 보내기"
+                aria-label="문자 앱 열기"
                 onClick={() => setSending(true)}
               >
                 <Send size={18} aria-hidden="true" />
-                인증 문자 보내기
+                문자 앱 열기
               </a>
             </>
           )}

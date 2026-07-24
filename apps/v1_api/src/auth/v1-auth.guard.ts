@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Logger,
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -21,6 +22,7 @@ type V1Request = Request & { v1User?: V1AuthUser };
 
 @Injectable()
 export class V1AuthGuard implements CanActivate {
+  private readonly logger = new Logger(V1AuthGuard.name);
   private readonly managedTerms: ManagedTermsRuntimeService;
 
   constructor(
@@ -38,6 +40,19 @@ export class V1AuthGuard implements CanActivate {
     );
 
     if (!identity) {
+      // [authdrop-diag] 임시 진단 — /my 간헐 401 원인 확정용. 확정 후 제거.
+      // sessionCookieCount: 0=쿠키 자체가 안 실림(브라우저/수명주기 유실), 1=쿠키는 있는데
+      // 서명·만료 검증 실패(서버 secret/토큰 문제), 2+=중복(apex/host-only 충돌).
+      const cookieHeader = request.headers?.cookie ?? '';
+      const cookieNames = cookieHeader
+        .split(';')
+        .map((c) => c.split('=')[0].trim())
+        .filter(Boolean);
+      const sessionCookieCount = cookieNames.filter((name) => name === 'teameet_v1_session').length;
+      this.logger.warn(
+        `[authdrop-diag] 401 !identity path=${request.originalUrl ?? request.url} ` +
+          `sessionCookieCount=${sessionCookieCount} cookieNames=[${cookieNames.join(',')}]`,
+      );
       throw new UnauthorizedException({
         code: 'UNAUTHENTICATED',
         message: 'V1 authentication is required',

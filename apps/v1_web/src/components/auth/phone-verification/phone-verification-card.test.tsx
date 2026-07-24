@@ -84,7 +84,7 @@ describe('PhoneVerificationCard', () => {
     expect(screen.getByText('문자 도착을 확인하고 있어요…')).toBeInTheDocument();
   });
 
-  it('데스크탑: 발급된 QR을 렌더한다(코드/번호는 노출하지 않음)', async () => {
+  it('데스크탑: QR과 인증 코드를 함께 렌더하고 복사 버튼을 제공한다(오타 방지)', async () => {
     vi.spyOn(api, 'useV1AuthedPhoneRequest').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(issuedResult({ qrCode: 'data:image/png;base64,QR' })), isPending: false } as never);
     vi.spyOn(api, 'useV1AuthedPhoneConfirm').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ verified: false }), isPending: false } as never);
 
@@ -92,8 +92,24 @@ describe('PhoneVerificationCard', () => {
     await flush();
 
     expect(screen.getByAltText('휴대폰 카메라로 스캔하면 인증 문자가 자동으로 준비돼요')).toHaveAttribute('src', 'data:image/png;base64,QR');
-    // 인증번호 코드가 화면에 노출되지 않아야 한다.
-    expect(screen.queryByText('ABC123')).not.toBeInTheDocument();
+    // 딥링크가 본문을 못 채우는 기기 대비 — 인증 코드를 노출하고 복사 버튼을 제공한다.
+    expect(screen.getByText('ABC123')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인증 코드 복사' })).toBeInTheDocument();
+  });
+
+  it('복사 버튼은 인증 코드를 클립보드에 쓴다', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText }, userAgent: 'Android' });
+    vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(issuedResult()), isPending: false } as never);
+    vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({ verified: false }), isPending: false } as never);
+
+    wrap(<PhoneVerificationCard mode="public" phone="01012345678" onVerified={vi.fn()} />);
+    await flush();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '인증 코드 복사' }));
+    });
+
+    expect(writeText).toHaveBeenCalledWith('ABC123');
   });
 
   it('모바일: "인증 문자 보내기"를 누르기 전에는 폴링하지 않고, 누른 뒤부터 자동 확인한다', async () => {
@@ -109,7 +125,7 @@ describe('PhoneVerificationCard', () => {
     expect(verifyMock).not.toHaveBeenCalled();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('link', { name: '인증 문자 보내기' }));
+      fireEvent.click(screen.getByRole('link', { name: '문자 앱 열기' }));
     });
     await advance(POLL_MS + 10); // 보낸 뒤 → 폴링 발화
 
@@ -126,7 +142,7 @@ describe('PhoneVerificationCard', () => {
 
     expect(screen.getByText('인증 시간이 지났어요. 다시 시작해 주세요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /다시 시작하기/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '인증 문자 보내기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '문자 앱 열기' })).not.toBeInTheDocument();
   });
 
   it('"다른 방법으로" 토글은 새 채널로 즉시 재발급한다', async () => {

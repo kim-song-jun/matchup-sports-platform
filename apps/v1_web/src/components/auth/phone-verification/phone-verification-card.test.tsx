@@ -112,7 +112,8 @@ describe('PhoneVerificationCard', () => {
     expect(writeText).toHaveBeenCalledWith('ABC123');
   });
 
-  it('모바일: "인증 문자 보내기"를 누르기 전에는 폴링하지 않고, 누른 뒤부터 자동 확인한다', async () => {
+  it('모바일: "문자 앱 열기"를 누르지 않아도(복사 경로) 발급 직후 폴링해 도착을 확인한다', async () => {
+    // 회귀 방지: 코드 노출·복사 UX에서 사용자가 딥링크 버튼을 안 눌러도 폴링이 시작돼야 한다.
     vi.stubGlobal('navigator', { userAgent: 'Android' });
     vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(issuedResult()), isPending: false } as never);
     const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF' });
@@ -121,14 +122,9 @@ describe('PhoneVerificationCard', () => {
 
     wrap(<PhoneVerificationCard mode="public" phone="01012345678" onVerified={onVerified} />);
     await flush();
-    await advance(POLL_MS + 10); // 보내기 전 → 폴링 없음
-    expect(verifyMock).not.toHaveBeenCalled();
+    await advance(POLL_MS + 10); // 버튼 클릭 없이 발급 직후 폴링 발화
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole('link', { name: '문자 앱 열기' }));
-    });
-    await advance(POLL_MS + 10); // 보낸 뒤 → 폴링 발화
-
+    expect(verifyMock).toHaveBeenCalled();
     expect(onVerified).toHaveBeenCalledWith('PROOF');
   });
 

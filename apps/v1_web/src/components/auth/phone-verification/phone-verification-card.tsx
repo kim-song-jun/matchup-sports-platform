@@ -38,9 +38,6 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
   const [verified, setVerified] = useState(false);
-  // 모바일은 "인증 문자 보내기"를 누른 뒤부터(문자앱 진입) 자동 감지를 시작한다.
-  // 데스크탑은 QR 스캔에 명시적 신호가 없어 발급 직후부터 감지한다.
-  const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
   const inFlightRef = useRef(false);
 
@@ -48,7 +45,6 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
     async (channel: DeviceKind) => {
       setError(null);
       setIssuing(true);
-      setSending(false);
       try {
         const res =
           mode === 'public'
@@ -102,15 +98,16 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
         }
       }
     } catch {
-      // 폴링 중 실패(만료/시도초과/스로틀)는 조용히 삼키고, 만료 UI 또는 재발급으로 유도한다.
-      setSending(false);
+      // 폴링 중 실패(만료·시도초과·스로틀)는 조용히 삼킨다. 다음 폴링 주기가 재시도하고,
+      // 만료 시엔 카운트다운이 만료 UI(다시 시작하기)로 전환한다.
     } finally {
       inFlightRef.current = false;
     }
   }, [mode, phone, publicVerify, authedConfirm, onVerified]);
 
-  // 문자 도착 자동 감지: 데스크탑은 발급 직후, 모바일은 "보내기" 이후 폴링.
-  const polling = issued !== null && !verified && !expired && (device === 'desktop' || sending);
+  // 문자 도착 자동 감지: 코드를 노출·복사 제공하므로 사용자가 어떤 경로(복사·딥링크·직접 입력)로
+  // 보내든 감지되도록, 기기 구분 없이 발급 직후부터 폴링한다. (MAX_POLL_ATTEMPTS·throttle가 상한을 보장)
+  const polling = issued !== null && !verified && !expired;
   const primedRef = useRef(false);
   useEffect(() => {
     if (!polling) {
@@ -310,7 +307,6 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
                 href={smsLink}
                 className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
                 aria-label="문자 앱 열기"
-                onClick={() => setSending(true)}
               >
                 <Send size={18} aria-hidden="true" />
                 문자 앱 열기

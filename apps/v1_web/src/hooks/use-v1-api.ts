@@ -275,29 +275,36 @@ export function useV1CompleteSocialTerms() {
 
 export function useV1PhoneIssue() {
   return useMutation({
-    mutationFn: (body: { phone: string; channel: 'mobile' | 'desktop' }) =>
-      v1Post<{ code: string; destNumber: string; qrCode?: string; expiresAt: string }>('/auth/phone/issue', body),
+    mutationFn: (body: { phone: string }) =>
+      v1Post<{ expiresAt: string; devCode?: string }>('/auth/phone/issue', body),
   });
 }
 
 export function useV1PhoneVerify() {
   return useMutation({
-    mutationFn: (body: { phone: string }) =>
+    mutationFn: (body: { phone: string; code: string }) =>
       v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
   });
 }
 
 export function useV1AuthedPhoneRequest() {
   return useMutation({
-    mutationFn: (body: { phone: string; channel: 'mobile' | 'desktop' }) =>
-      v1Post<{ code: string; destNumber: string; qrCode?: string; expiresAt: string }>('/verification/phone/request', body),
+    mutationFn: (body: { phone: string }) =>
+      v1Post<{ sent: boolean; channel: 'phone'; target?: string; alreadyVerified?: boolean; devCode?: string }>(
+        '/verification/phone/request',
+        body,
+      ),
   });
 }
 
 export function useV1AuthedPhoneConfirm() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { phone: string }) => v1Post<{ verified: boolean }>('/verification/phone/confirm', body),
+    mutationFn: (body: { code: string }) =>
+      v1Post<{ verified: boolean; verification: { emailVerified: boolean; phoneVerified: boolean } }>(
+        '/verification/phone/confirm',
+        body,
+      ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }

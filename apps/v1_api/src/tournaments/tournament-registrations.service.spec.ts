@@ -66,6 +66,7 @@ describe('TournamentRegistrationsService', () => {
   let service: TournamentRegistrationsService;
   let prisma: {
     v1TeamMembership: { findFirst: jest.Mock };
+    v1User: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
@@ -82,6 +83,11 @@ describe('TournamentRegistrationsService', () => {
   beforeEach(async () => {
     prisma = {
       v1TeamMembership: { findFirst: jest.fn() },
+      // 기본은 "본인인증을 마친 신청자" — 제출 게이트의 정상 경로.
+      // 미인증 케이스는 개별 테스트에서 phoneVerifiedAt: null 로 덮어쓴다.
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({ phoneVerifiedAt: new Date('2026-07-01T00:00:00.000Z') }),
+      },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
@@ -262,6 +268,32 @@ describe('TournamentRegistrationsService', () => {
   });
 
   // ─── submit ───────────────────────────────────────────────────────────────────
+
+  it('submit: 본인인증을 안 한 신청자는 403 PHONE_NOT_VERIFIED 로 막고 약관 검증까지 가지 않는다', async () => {
+    prisma.v1User.findUnique.mockResolvedValue({ phoneVerifiedAt: null });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+
+    await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+      response: { code: 'PHONE_NOT_VERIFIED' },
+    });
+    expect(managedTerms.assertTournamentAcceptances).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('submit: 인증 강제가 꺼진 환경에서는 미인증이어도 제출을 막지 않는다', async () => {
+    process.env.V1_PHONE_VERIFICATION_DISABLED = 'true';
+    try {
+      prisma.v1User.findUnique.mockResolvedValue({ phoneVerifiedAt: null });
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+
+      // 인증이 아니라 그 다음 가드(draft 아님)에서 걸려야 한다 = 인증 게이트를 통과했다는 뜻
+      await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+        response: { code: 'REGISTRATION_NOT_DRAFT' },
+      });
+    } finally {
+      delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+    }
+  });
 
   it('submit: not draft → 409 REGISTRATION_NOT_DRAFT', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));

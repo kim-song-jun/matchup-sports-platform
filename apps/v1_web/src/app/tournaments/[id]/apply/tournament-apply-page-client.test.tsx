@@ -7,6 +7,7 @@ import type { V1MyTeam, V1TournamentDetail } from '@/types/api';
 import { TournamentApplyPageClient } from './tournament-apply-client';
 
 const tournamentApplyApiMocks = vi.hoisted(() => ({
+  useV1AuthMe: vi.fn(),
   useV1Tournament: vi.fn(),
   useV1MyTeams: vi.fn(),
   useV1MyRegistrations: vi.fn(),
@@ -138,6 +139,10 @@ describe('TournamentApplyPageClient GA events', () => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
 
+    // 기본은 본인인증을 마친 신청자 — 신청 위저드의 정상 경로.
+    tournamentApplyApiMocks.useV1AuthMe.mockReturnValue({
+      data: { verification: { phoneVerified: true } },
+    });
     tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
       data: makeTournament(),
       isLoading: false,
@@ -223,6 +228,36 @@ describe('TournamentApplyPageClient GA events', () => {
         }),
       );
       expect(trackEvent).toHaveBeenCalledWith('tournament_apply_complete', { tournamentId: 'tournament-1' });
+    });
+  });
+
+  describe('휴대폰 본인인증 게이트', () => {
+    it('미인증 사용자는 신청 위저드 대신 인증 유도 화면을 보고, 인증 후 이 화면으로 돌아온다', async () => {
+      tournamentApplyApiMocks.useV1AuthMe.mockReturnValue({
+        data: { verification: { phoneVerified: false } },
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      const cta = await screen.findByRole('link', { name: '본인인증 하러 가기' });
+      expect(cta).toHaveAttribute(
+        'href',
+        `/my/phone-verify?redirect=${encodeURIComponent('/tournaments/tournament-1/apply')}`,
+      );
+      // 위저드로 진입시키지 않는다 — 서버도 submit 에서 막으므로 화면만 열어두면 헛걸음이 된다.
+      expect(screen.queryAllByRole('button', { name: /^다음 단계/ })).toHaveLength(0);
+    });
+
+    it('이미 인증한 사용자는 게이트 없이 신청 위저드로 들어간다', async () => {
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      expect(screen.queryByRole('link', { name: '본인인증 하러 가기' })).not.toBeInTheDocument();
+      expect((await screen.findAllByRole('button', { name: /^다음 단계/ })).length).toBeGreaterThan(0);
     });
   });
 });

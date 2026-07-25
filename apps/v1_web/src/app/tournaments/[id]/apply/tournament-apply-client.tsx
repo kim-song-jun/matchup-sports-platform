@@ -17,6 +17,7 @@ import {
   useV1Registration,
   useV1CreateRegistration,
   useV1SubmitRegistration,
+  useV1AuthMe,
   useV1CurrentTerms,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
@@ -1460,6 +1461,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
   const tournamentTerms = useV1CurrentTerms('tournament_application');
+  const authMe = useV1AuthMe();
+  // undefined = 아직 모름(로딩 중이라 막지 않는다), false = 미인증으로 확인됨.
+  const phoneVerified = authMe.data?.verification?.phoneVerified;
 
   const myTeams = normalizeMyTeams(myTeamsData) ?? [];
   const eligibleTeams = tournament
@@ -1670,6 +1674,36 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 14 }}
+          >
+            대회 상세로 돌아가기
+          </Link>
+        </div>
+      </AppChrome>
+    );
+  }
+
+  // 대회 신청은 본인확인이 전제다(서버도 submit에서 403 PHONE_NOT_VERIFIED로 막는다).
+  // 이미 인증한 사용자는 이 화면을 보지 않고 그대로 통과하고, 미인증이면 인증 화면으로 보낸 뒤
+  // 인증이 끝나면 이 신청 화면으로 정확히 되돌아오게 한다.
+  if (phoneVerified === false) {
+    return (
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
+        <div style={{ padding: '0 20px', marginTop: 24 }}>
+          <AlertBanner
+            message="대회 신청은 휴대폰 본인인증을 마친 계정만 할 수 있어요. 인증 후 이 화면으로 돌아옵니다."
+            tone="info"
+          />
+          <Link
+            href={`/my/phone-verify?redirect=${encodeURIComponent(`/tournaments/${tournamentId}/apply`)}`}
+            className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+            style={{ marginTop: 14 }}
+          >
+            본인인증 하러 가기
+          </Link>
+          <Link
+            href={`/tournaments/${tournamentId}`}
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 10 }}
           >
             대회 상세로 돌아가기
           </Link>

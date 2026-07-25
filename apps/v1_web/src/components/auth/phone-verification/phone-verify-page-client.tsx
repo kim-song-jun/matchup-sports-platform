@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card } from '@/components/v1-ui/primitives';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { formatPhone, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from './phone-verification-card';
@@ -17,6 +18,10 @@ import { PhoneVerificationCard } from './phone-verification-card';
  */
 export function PhoneVerifyPageClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // 대회 신청처럼 "인증 때문에 막힌 화면"에서 넘어온 경우 그 자리로 돌려보낸다.
+  // 외부 URL·javascript: 주입을 막기 위해 상대 경로만 통과시킨다(sanitizeRedirectPath).
+  const redirectTo = sanitizeRedirectPath(searchParams.get('redirect')) ?? '/home';
   const authMe = useV1AuthMe();
   const existingPhone = authMe.data?.user.phone ?? '';
   const alreadyVerified = authMe.data?.verification?.phoneVerified === true;
@@ -29,7 +34,7 @@ export function PhoneVerifyPageClient() {
 
   const handleVerified = () => {
     setDone(true);
-    router.push('/home');
+    router.push(redirectTo);
   };
 
   const verified = alreadyVerified || done;

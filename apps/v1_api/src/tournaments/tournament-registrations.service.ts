@@ -9,6 +9,7 @@ import { Prisma, V1Tournament, V1TournamentPayment, V1TournamentRegistration } f
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
+import { isPhoneVerificationEnforced } from '../verification/phone-verification.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   CancelRegistrationRequestDto,
@@ -212,9 +213,29 @@ export class TournamentRegistrationsService {
     }
   }
 
+  /**
+   * 신청 제출은 대회 운영·정산·본인확인의 시작점이라 신청 주체가 확인된 사람이어야 한다.
+   * 조회(목록·상세)와 draft 생성은 그대로 열어 두고 **제출 시점에만** 막는다 — 유입을 막지 않고
+   * 실명성이 실제로 필요해지는 지점에서만 거른다.
+   */
+  private async assertPhoneVerified(userId: string) {
+    if (!isPhoneVerificationEnforced()) return;
+    const account = await this.prisma.v1User.findUnique({
+      where: { id: userId },
+      select: { phoneVerifiedAt: true },
+    });
+    if (!account?.phoneVerifiedAt) {
+      throw new ForbiddenException({
+        code: 'PHONE_NOT_VERIFIED',
+        message: '휴대폰 본인인증을 완료해야 대회에 신청할 수 있어요.',
+      });
+    }
+  }
+
   async submit(user: V1AuthUser, tournamentId: string, registrationId: string, dto: SubmitRegistrationDto) {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     const teamSportId = await this.assertTeamManager(registration.teamId, user.id);
+    await this.assertPhoneVerified(user.id);
     const termsDecisions = await this.managedTerms.assertTournamentAcceptances(dto.termsDocumentIds);
 
     if (registration.status !== 'draft') {

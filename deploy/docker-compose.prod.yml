@@ -63,6 +63,10 @@ services:
       GABIA_SMS_ID: ${GABIA_SMS_ID:-}
       GABIA_API_KEY: ${GABIA_API_KEY:-}
       GABIA_SENDER_NUMBER: ${GABIA_SENDER_NUMBER:-}
+      # SES 이메일 발송. 자격증명은 인스턴스 IAM 역할에 맡기고 리전/발신주소만 준다.
+      # 둘 중 하나라도 비면 EmailSender.enabled=false → 기존 로그 스텁 그대로다.
+      SES_REGION: ${SES_REGION:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
       API_PORT: 8121
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}

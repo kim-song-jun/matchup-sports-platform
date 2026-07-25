@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { V1VerificationChannel } from '@prisma/client';
+import { EMAIL_SENDER, EmailSender, OTP_EMAIL_SUBJECT, buildOtpEmailText } from './email/email-sender';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { SMS_SENDER, SmsSender, buildOtpSmsText } from './sms/sms-sender';
 
@@ -19,15 +20,20 @@ export class VerificationDispatcherService {
 
   constructor(
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
+    @Inject(EMAIL_SENDER) private readonly email: EmailSender,
     private readonly smsEventLog: SmsEventLogService,
   ) {}
 
   /**
-   * devCode 를 응답에 노출해도 되는 유일한 경우: 실제 SMS 발송이 없고(dev-echo 경로) devEcho 가 켜진
-   * 개발/CI 환경. 실발송이 가능한 환경(sms.enabled)에서는 devEcho 설정 실수가 있어도 OTP 를 노출하지 않는다.
+   * devCode 를 응답에 노출해도 되는 유일한 경우: 실제 발송 수단이 하나도 없고(dev-echo 경로)
+   * devEcho 가 켜진 개발/CI 환경. 실발송이 가능한 환경에서는 devEcho 설정 실수가 있어도 OTP 를
+   * 노출하지 않는다.
+   *
+   * email 도 함께 본다 — 이 값은 채널과 무관하게 쓰이므로, 이메일만 설정된 환경에서 sms 만
+   * 검사하면 실제로 메일을 보내면서 응답에 코드까지 실어 보내게 된다.
    */
   get devEchoActive(): boolean {
-    return this.devEcho && !this.sms.enabled;
+    return this.devEcho && !this.sms.enabled && !this.email.enabled;
   }
 
   async send(channel: V1VerificationChannel, target: string, code: string): Promise<void> {
@@ -64,8 +70,25 @@ export class VerificationDispatcherService {
         message: '문자 인증을 사용할 수 없어요. 잠시 후 다시 시도해 주세요.',
       });
     }
-    // email: 로그 스텁. dev code 는 phone 과 동일하게 devEchoActive(실발송 provider 없음 + dev-echo)일
-    // 때만 로그에 남겨, 운영 가능한 환경에서 dev-echo 가 실수로 켜져도 OTP 가 로그로 새지 않게 한다.
+    if (this.email.enabled) {
+      try {
+        await this.email.send(target, OTP_EMAIL_SUBJECT, buildOtpEmailText(code));
+      } catch (err) {
+        this.logger.warn(
+          `[verification:email] 메일 발송 실패 → ${masked}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        throw new ServiceUnavailableException({
+          code: 'EMAIL_SEND_FAILED',
+          message: '인증번호 발송에 실패했어요. 잠시 후 다시 시도해 주세요.',
+        });
+      }
+      this.logger.log(`[verification:email] 메일 발송 완료 → ${masked}`);
+      return;
+    }
+
+    // provider 미설정 시에는 기존 동작(로그 스텁)을 유지한다 — 여기서 503 을 던지면 지금까지
+    // 조용히 통과하던 이메일 인증 요청이 배포 순간 전부 실패로 바뀐다. dev code 는 실발송
+    // 수단이 하나도 없을 때만 남겨, dev-echo 가 실수로 켜져도 OTP 가 로그로 새지 않게 한다.
     this.logger.log(
       `[verification:email] dispatched code to ${masked}${this.devEchoActive ? ` (dev code=${code})` : ''}`,
     );

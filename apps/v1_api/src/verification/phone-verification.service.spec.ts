@@ -98,12 +98,21 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     await expect(svc.verifyCode(PHONE, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
   });
 
-  it('verifyCode throws TOO_MANY_ATTEMPTS after 5 attempts', async () => {
+  it('verifyCode throws TOO_MANY_ATTEMPTS on a wrong code once attempts hit the cap', async () => {
     const prisma = prismaMock();
     const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
-    await svc.issueChallenge(PHONE);
+    const { devCode } = await svc.issueChallenge(PHONE);
+    const wrong = devCode === '000000' ? '111111' : '000000';
     (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount = 5;
-    await expect(svc.verifyCode(PHONE, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' } });
+    await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' } });
+  });
+
+  it('verifyCode still accepts the correct code even at the attempt cap (cap은 불일치에만 적용, 멱등)', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const { devCode } = await svc.issueChallenge(PHONE);
+    (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount = 5;
+    expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
   });
 
   it('verifyCode stays idempotent for the correct code but rejects a wrong code even after verification', async () => {

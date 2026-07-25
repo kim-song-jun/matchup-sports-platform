@@ -64,19 +64,21 @@ export class PhoneVerificationService {
         message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
       });
     }
-    if (challenge.attemptCount >= MAX_ATTEMPTS) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
-        message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
-
     // verifiedAt 여부와 무관하게 항상 제출된 코드를 codeHash 와 대조한다.
     // 이미 검증된 challenge 라도 잘못된 코드로는 절대 성공시키지 않는다(인증 우회 방지) —
     // verifiedAt 만으로 단락하면 공격자가 번호만 알아도 임의 코드로 proofToken 을 탈취할 수 있다.
     // 올바른 코드 재제출은 그대로 멱등 성공한다.
     const matches = await verifyPassword(code, challenge.codeHash);
     if (!matches) {
+      // 시도 횟수 상한은 '불일치' 경로에서만 적용한다 — 올바른 코드 재제출은 상한과 무관하게
+      // 멱등 성공해야 하므로, cap 을 코드 대조보다 앞에 두면 verified 이후 오입력이 쌓였을 때
+      // 정상 재제출까지 막히는 문제가 생긴다.
+      if (challenge.attemptCount >= MAX_ATTEMPTS) {
+        throw new BadRequestException({
+          code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
+          message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
+        });
+      }
       await this.prisma.v1PhoneVerificationChallenge.update({
         where: { phone },
         data: { attemptCount: { increment: 1 } },

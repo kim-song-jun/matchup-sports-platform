@@ -48,6 +48,13 @@ export type V1User = {
   onboardingStatus: string;
 };
 
+/** 휴대폰 본인인증으로 찾은 계정. 이메일은 마스킹된 값만 내려온다. */
+export type V1FoundAccount = {
+  maskedEmail: string | null;
+  providers: string[];
+  hasPassword: boolean;
+};
+
 export type V1AuthMe = {
   /**
    * 카카오 가입 진행 중에만 채워진다 — 카카오 동의항목이 승인된 앱에서만 값이 오고,

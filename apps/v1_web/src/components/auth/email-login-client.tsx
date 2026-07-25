@@ -129,7 +129,9 @@ export function EmailLoginClient() {
           {model.primary.label}
         </Button>
         <div className="tm-auth-link-row">
-          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/auth/password-reset">비밀번호 찾기</Link>
+          {/* /auth/password-reset 은 안내 문구만 있던 자리표시자였다 — 실제로 동작하는
+              계정 찾기 화면으로 연결한다(아이디 찾기·비밀번호 재설정 한 화면). */}
+          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/auth/find-account">아이디·비밀번호 찾기</Link>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>
         </div>
         {!error && model.notice ? (

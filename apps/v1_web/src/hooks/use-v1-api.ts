@@ -41,6 +41,7 @@ import type {
   V1AdminTermsVersionPayload,
   V1AdminRow,
   V1PushFailureSummary,
+  V1FoundAccount,
   V1SmsFailureSummary,
   V1AdminOpsSummary,
   V1AdminPushSendPayload,
@@ -202,7 +203,12 @@ import type {
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
 type QueryOptions = { enabled?: boolean };
 
-export function useV1AuthMe(options?: { enabled?: boolean; retry?: boolean | number }) {
+export function useV1AuthMe(options?: {
+  enabled?: boolean;
+  // 함수형 retry를 허용한다 — 세션 확인은 4xx면 즉시 포기하고 5xx는 재시도해야 해서
+  // boolean 하나로는 두 정책을 같이 표현할 수 없다(retryTransientFailure 참고).
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+}) {
   return useQuery({
     queryKey: v1Keys.authMe(),
     queryFn: () => v1Get<V1AuthMe>('/auth/me'),
@@ -285,8 +291,24 @@ export function useV1PhoneIssue() {
 
 export function useV1PhoneVerify() {
   return useMutation({
-    mutationFn: (body: { phone: string; code: string }) =>
+    // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
+    // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
       v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+  });
+}
+
+export function useV1FindAccountByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
+  });
+}
+
+export function useV1ResetPasswordByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string; newPassword: string }) =>
+      v1Post<{ ok: true }>('/auth/recovery/reset-password', body),
   });
 }
 

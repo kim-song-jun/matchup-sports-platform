@@ -330,6 +330,12 @@ export function SignupClient() {
 
   return (
     <AuthFrame
+      // 이 화면만 상단바 없이 렌더돼 회원가입을 시작하면 빠져나갈 컨트롤이 없었다.
+      // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms'
+      // (직전 단계)를 그대로 쓴다 — 약관 화면에 다시 /login 으로 나가는 뒤로가기가 있어
+      // /signup → /terms → /login 으로 로그인 화면까지 이어진다.
+      topTitle="회원가입"
+      backHref="/terms"
       fixedAction={
         <>
           <button
@@ -365,9 +371,13 @@ export function SignupClient() {
             <span key={value} data-on={index <= stepIndex} aria-hidden="true" />
           ))}
         </div>
-        <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계">
-          <ChevronLeftIcon size={18} strokeWidth={2.2} />이전
-        </button>
+        {/* 첫 단계에서 goBack() 은 상단 뒤로가기와 똑같이 /terms 로 나간다 — 같은 동작을 두 번
+            보여주지 않도록, 이 인라인 버튼은 의미가 갈리는 두 번째 단계(프로필 → 계정)에서만 낸다. */}
+        {step !== 'account' ? (
+          <button className="tm-btn tm-btn-sm tm-btn-ghost tm-signup-back" type="button" onClick={goBack} aria-label="이전 단계">
+            <ChevronLeftIcon size={18} strokeWidth={2.2} />이전
+          </button>
+        ) : null}
         <div className="tm-signup-hero">
           <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
           <p className="tm-text-body tm-auth-sub">{copy.sub}</p>

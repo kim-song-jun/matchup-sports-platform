@@ -14,6 +14,8 @@ import {
 type Props = {
   /** public: 비로그인 회원가입 전 pre-account 인증(proofToken 발급). authed: 로그인 후 카카오/레거시 구제. */
   mode: 'public' | 'authed';
+  /** public 모드에서 발급받을 증명 토큰의 용도. 생략하면 가입용. */
+  purpose?: 'signup' | 'password_reset';
   phone: string;
   /** public 모드는 proofToken을 전달하고, authed 모드는 서버가 이미 phoneVerifiedAt을 세팅하므로 인자 없이 호출된다. */
   onVerified: (proofToken?: string) => void;
@@ -32,7 +34,7 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const COUNTDOWN_TICK_MS = 1000;
 
-export function PhoneVerificationCard({ mode, phone, onVerified, surface = 'card' }: Props) {
+export function PhoneVerificationCard({ mode, purpose, phone, onVerified, surface = 'card' }: Props) {
   const publicIssue = useV1PhoneIssue();
   const publicVerify = useV1PhoneVerify();
   const authedRequest = useV1AuthedPhoneRequest();
@@ -110,7 +112,7 @@ export function PhoneVerificationCard({ mode, phone, onVerified, surface = 'card
     setErrorTone('error');
     try {
       if (mode === 'public') {
-        const res = await publicVerify.mutateAsync({ phone, code });
+        const res = await publicVerify.mutateAsync({ phone, code, purpose });
         if (res.verified) {
           setVerified(true);
           onVerified(res.proofToken);
@@ -125,7 +127,7 @@ export function PhoneVerificationCard({ mode, phone, onVerified, surface = 'card
     } catch (err) {
       showFailure(err, '인증번호가 올바르지 않아요. 다시 확인해 주세요.');
     }
-  }, [mode, phone, code, publicVerify, authedConfirm, onVerified, showFailure]);
+  }, [mode, purpose, phone, code, publicVerify, authedConfirm, onVerified, showFailure]);
 
   /**
    * 이 카드는 번호 11자리를 채우는 순간 폼 중간에 새로 나타난다. 모바일에서는 하단 고정 CTA가

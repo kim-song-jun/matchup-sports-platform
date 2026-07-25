@@ -35,8 +35,21 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       const result = await controller.verify({ phone: '01012345678', code: '123456' });
 
       expect(phoneVerification.verifyCode).toHaveBeenCalledWith('01012345678', '123456');
-      expect(phoneVerification.issueProof).toHaveBeenCalledWith('01012345678');
+      // purpose 를 생략하면 기존 동작 그대로 가입용 토큰이 발급된다(service 기본값 'signup').
+      expect(phoneVerification.issueProof).toHaveBeenCalledWith('01012345678', undefined);
       expect(result).toEqual({ verified: true, proofToken: 'proof-token-value' });
+    });
+
+    // 계정 찾기·비밀번호 재설정은 가입용 토큰과 섞이면 안 되므로 용도를 그대로 전달해야 한다.
+    it('요청한 용도를 그대로 넘겨 증명 토큰을 발급한다', async () => {
+      const { controller, phoneVerification } = buildController({
+        verifyCode: jest.fn().mockResolvedValue(true),
+        issueProof: jest.fn().mockReturnValue('reset-token-value'),
+      });
+
+      await controller.verify({ phone: '01012345678', code: '123456', purpose: 'password_reset' });
+
+      expect(phoneVerification.issueProof).toHaveBeenCalledWith('01012345678', 'password_reset');
     });
 
     it('propagates a mismatch error from verifyCode without issuing a proofToken', async () => {

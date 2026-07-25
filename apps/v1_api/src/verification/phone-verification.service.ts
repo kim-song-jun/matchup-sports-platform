@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
-import { issuePhoneProofToken } from './phone-proof-token';
+import { issuePhoneProofToken, type PhoneProofPurpose } from './phone-proof-token';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 
@@ -121,8 +121,8 @@ export class PhoneVerificationService {
     return true;
   }
 
-  issueProof(phone: string): string {
-    return issuePhoneProofToken(phone);
+  issueProof(phone: string, purpose: PhoneProofPurpose = 'signup'): string {
+    return issuePhoneProofToken(phone, purpose);
   }
 
   // 마지막 발송 시각 = expiresAt - CODE_TTL_MS (verify 는 expiresAt 를 바꾸지 않으므로 신뢰 가능).

@@ -16,10 +16,19 @@ describe('AuthFrame 뒤로가기 컨트롤', () => {
     expect(screen.getAllByRole('button', { name: '가입 그만두기' })).toHaveLength(2);
   });
 
-  // 둘 다 오면 상단바는 링크, in-card 는 버튼이 되어 동작이 다른 뒤로가기가 둘 생긴다.
-  it('backHref 가 함께 오면 in-card 내비는 렌더하지 않는다', () => {
+  // 상단바는 데스크톱에서 통째로 숨겨지므로, 단순 이동(backHref)도 in-card 내비가 있어야
+  // 그 폭에서 화면을 빠져나갈 수 있다.
+  it('backHref 만 주면 상단바와 데스크톱 in-card 내비 두 벌을 링크로 렌더한다', () => {
+    render(<AuthFrame topTitle="회원가입" backHref="/terms">본문</AuthFrame>);
+    const links = screen.getAllByRole('link', { name: '뒤로가기' });
+    expect(links).toHaveLength(2);
+    for (const link of links) expect(link).toHaveAttribute('href', '/terms');
+  });
+
+  // 둘 다 오면 이동과 동작이 섞인 뒤로가기가 둘 생기므로 backHref 를 정본으로 하나만 쓴다.
+  it('backHref 와 onBack 이 함께 오면 버튼 뒤로가기는 렌더하지 않는다', () => {
     render(<AuthFrame topTitle="약관 동의" backHref="/login" onBack={vi.fn()}>본문</AuthFrame>);
-    expect(screen.getByRole('link', { name: '뒤로가기' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '뒤로가기' }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: '뒤로가기' })).not.toBeInTheDocument();
   });
 

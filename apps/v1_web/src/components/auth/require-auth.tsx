@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { V1ApiError } from '@/lib/api-client';
+import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
 import {
   clearStoredV1Session,
   getCurrentRedirectPath,
@@ -16,7 +16,10 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const [hasSessionHint, setHasSessionHint] = useState<boolean | null>(null);
-  const authMe = useV1AuthMe({ enabled: hasSessionHint === true, retry: false });
+  // 401·403은 다시 물어도 답이 같으니 재시도 없이 곧장 처리하고, 일시 오류(rate limit
+  // 503 등)만 몇 번 다시 시도해 스스로 복구한다 — 재시도가 없으면 서버가 잠깐 밀린 것만으로도
+  // 화면 전체가 "로그인 상태를 확인하지 못했어요"로 바뀌어 인증이 풀린 것처럼 보인다.
+  const authMe = useV1AuthMe({ enabled: hasSessionHint === true, retry: retryTransientFailure });
 
   useEffect(() => {
     const nextHasSessionHint = shouldProbeV1Session();
@@ -30,7 +33,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (hasSessionHint !== true) return;
-    if (!authMe.isError || authMe.isFetching || !isUnauthenticated(authMe.error)) return;
+    if (!authMe.isError || authMe.isFetching || !isUnauthenticatedError(authMe.error)) return;
 
     clearStoredV1Session();
     disconnectV1Socket();
@@ -39,7 +42,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (hasSessionHint && authMe.isSuccess) return <>{children}</>;
 
-  if (hasSessionHint && authMe.isError && !authMe.isFetching && !isUnauthenticated(authMe.error)) {
+  if (hasSessionHint && authMe.isError && !authMe.isFetching && !isUnauthenticatedError(authMe.error)) {
     return (
       <ErrorState
         message={'로그인 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'}
@@ -49,9 +52,4 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   return <SessionFallback />;
-}
-
-function isUnauthenticated(error: unknown) {
-  return error instanceof V1ApiError
-    && (error.statusCode === 401 || error.code === 'UNAUTHENTICATED');
 }

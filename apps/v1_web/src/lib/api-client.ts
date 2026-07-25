@@ -19,6 +19,28 @@ export class V1ApiError extends Error {
   }
 }
 
+// 401(만료·미인증)과 5xx·네트워크 오류는 대응이 정반대다. 전자는 즉시 로그아웃 처리해야
+// 하지만 후자는 서버가 잠시 밀린 것이라 재시도해야 한다. 이 구분을 각 화면이 따로 구현하다
+// 놓치면, 세션이 멀쩡한데도 로그인이 풀린 것처럼 보인다.
+export function isUnauthenticatedError(error: unknown): boolean {
+  return error instanceof V1ApiError
+    && (error.statusCode === 401 || error.code === 'UNAUTHENTICATED');
+}
+
+// React Query의 retry 옵션용. 서버가 잠시 밀린 경우(5xx·요청량 초과·네트워크 단절)만
+// 두 번까지 다시 시도한다.
+//
+// 4xx는 같은 요청을 반복해도 답이 같으므로 재시도하지 않는다 — /auth/me만 해도 401(만료)
+// 외에 403이 계정 정지·소셜 가입 미완·약관 재동의로 흔하게 나오는데, 이걸 재시도하면
+// 사용자에게는 지수 백오프만큼 지연이 얹히고 서버에는 요청이 3배로 간다. rate limit을
+// 고치려는 코드가 스스로 한도를 3배로 소모하는 셈이 된다.
+export function retryTransientFailure(failureCount: number, error: unknown): boolean {
+  if (failureCount >= 2) return false;
+  // 네트워크 단절은 응답 자체가 없어 V1ApiError로 감싸이지 않고 그대로 전파된다.
+  if (!(error instanceof V1ApiError)) return true;
+  return error.statusCode >= 500 || error.statusCode === 429;
+}
+
 function toErrorMessage(message: unknown) {
   if (typeof message === 'string') return message;
   if (Array.isArray(message)) return message.join(', ');

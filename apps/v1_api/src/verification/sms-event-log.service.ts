@@ -33,13 +33,21 @@ export interface SmsEventLogInput {
 /** detail 은 provider 응답 본문 등 길이를 통제할 수 없는 값을 받으므로 상한을 둔다. */
 const DETAIL_MAX_LENGTH = 500;
 
+/** 전화번호로 인정하는 문자만 — 숫자와 구분자(+, -, 공백, 괄호). */
+const PHONE_SHAPED = /^[0-9+\-\s()]+$/;
+
 /**
- * 대상 식별자를 끝 4자리 숫자로만 축약한다. 숫자만 남기므로 '010-1234-5678' →
- * '5678' 이 되고, 이메일처럼 숫자가 4자 미만인 대상은 '****' 로 떨어져 원본이
- * 어떤 형태여도 전체 값이 저장되지 않는다.
+ * 대상 식별자를 끝 4자리 숫자로만 축약한다. '010-1234-5678' → '5678'.
+ *
+ * 전화번호 형태가 아닌 대상(이메일 등)은 숫자를 뽑지 않고 항상 '****' 로 만든다 —
+ * 단순히 숫자만 추출하면 'user2026@example.com' 의 로컬파트에서 '2026' 이 뽑혀
+ * phoneMasked 컬럼에 전화번호가 아닌 개인정보 조각이 남는다(email 채널의 인증 실패도
+ * 이 테이블에 기록되므로 실제로 도달하는 경로다).
  */
 export function maskPhoneTail(phone: string): string {
-  const digits = (phone ?? '').replace(/\D/g, '');
+  const raw = phone ?? '';
+  if (!PHONE_SHAPED.test(raw)) return '****';
+  const digits = raw.replace(/\D/g, '');
   return digits.length >= 4 ? digits.slice(-4) : '****';
 }
 

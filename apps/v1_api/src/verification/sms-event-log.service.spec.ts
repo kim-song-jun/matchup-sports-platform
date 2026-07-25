@@ -22,10 +22,19 @@ describe('SmsEventLogService', () => {
     expect(JSON.stringify(data)).not.toContain('010-1234-5678');
   });
 
-  it('숫자가 4자 미만인 대상(이메일 등)은 ****로 떨어진다', () => {
+  it('전화번호 형태가 아닌 대상(이메일 등)은 항상 ****로 떨어진다', () => {
     expect(maskPhoneTail('user@example.com')).toBe('****');
     expect(maskPhoneTail('')).toBe('****');
+    // 로컬파트에 숫자가 있어도 그 조각이 새면 안 된다(이메일 채널 인증 실패도 기록되는 경로).
+    expect(maskPhoneTail('user2026@example.com')).toBe('****');
+    expect(maskPhoneTail('20260725@corp.co.kr')).toBe('****');
+  });
+
+  it('전화번호는 구분자가 있어도 끝 4자리를 남긴다', () => {
     expect(maskPhoneTail('821012345678')).toBe('5678');
+    expect(maskPhoneTail('010-1234-5678')).toBe('5678');
+    expect(maskPhoneTail('+82 10 1234 5678')).toBe('5678');
+    expect(maskPhoneTail('123')).toBe('****');
   });
 
   it('detail 은 상한(500자)으로 잘라 저장한다', async () => {

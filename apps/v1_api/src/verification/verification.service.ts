@@ -82,8 +82,8 @@ export class VerificationService {
       });
     }
     // 인증 실패 기록은 email 채널에서도 남긴다("인증 실패" 트래킹이 목적) — 다만 저장
-    // 컬럼은 번호 끝 4자리(phoneMasked)라, 숫자가 부족한 이메일 대상은 '****' 로 떨어진다.
-    // 어느 채널인지는 detail 로 구분한다.
+    // 컬럼은 번호 끝 4자리(phoneMasked)라, 전화번호 형태가 아닌 이메일 대상은 항상
+    // '****' 로 마스킹된다(로컬파트 숫자 유출 방지). 어느 채널인지는 detail 로 구분한다.
     if (token.attemptCount >= MAX_ATTEMPTS) {
       await this.smsEventLog.record({
         eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,

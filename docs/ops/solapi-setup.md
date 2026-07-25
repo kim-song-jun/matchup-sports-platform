@@ -10,7 +10,9 @@
 - 솔라피 API: `POST https://api.solapi.com/messages/v4/send`, 인증 헤더 `Authorization: HMAC-SHA256 apiKey=…, date=…, salt=…, signature=…`(HMAC-SHA256(secret, date+salt))
 - 설계 근거: `docs/superpowers/specs/2026-07-25-mt-sms-otp-solapi-design.md`, 구현 계획: `docs/superpowers/plans/2026-07-25-mt-sms-otp-solapi.md`
 
-`SOLAPI_API_KEY` / `SOLAPI_API_SECRET` / `SOLAPI_SENDER_NUMBER` **3개 값이 모두** 설정돼야 `SolapiSmsSender.enabled`가 `true`가 된다. 하나라도 비어 있으면 비활성 상태로 폴백하며, 이때는 `V1_VERIFICATION_DEV_ECHO=true`인 경우에만 dev-echo(코드가 API 응답 `devCode`로 노출)로 인증 흐름을 끝까지 검증할 수 있다. 두 조건 모두 아니면 실제 SMS는 발송되지 않는다(이 경로에서는 인증번호를 받을 방법이 없으므로 phone 인증이 요구되는 가입 플로우가 막힌다 — 옥토모와 달리 MT 경로는 "키 없으면 인증 기능 자체를 건너뛰는" fail-open이 아니라, 코드 발송이 전제인 구조다. 운영에서는 3개 값을 반드시 채워야 한다).
+`SOLAPI_API_KEY` / `SOLAPI_API_SECRET` / `SOLAPI_SENDER_NUMBER` **3개 값이 모두** 설정돼야 `SolapiSmsSender.enabled`가 `true`가 되어 실제 SMS 가 발송된다. 하나라도 비면 발송이 비활성화되고, `V1_VERIFICATION_DEV_ECHO=true`인 경우에만 dev-echo(응답 `devCode`)로 인증 흐름을 검증할 수 있다.
+
+**휴대폰 인증은 fail-closed 다.** 가입(register/social)의 휴대폰 인증 강제 여부(`PhoneVerificationService.enabled`)는 provider 설정과 무관하게 **기본적으로 항상 필수**이며, 명시적 opt-out(`V1_PHONE_VERIFICATION_DISABLED=true`)로만 해제된다. 따라서 3개 시크릿을 빠뜨리면 `/auth/phone/issue` 가 503 `SMS_NOT_CONFIGURED` 로 실패하고, register 는 `phoneProofToken` 을 계속 요구하므로 **가입이 진행되지 못하고 막힌다**(설정 실수가 인증 통제를 조용히 끄지 못하게 하는 의도된 동작). 운영에서는 3개 값을 반드시 채워야 하며, 불가피하게 인증을 일시 비활성화해야 하면 `V1_PHONE_VERIFICATION_DISABLED=true` 를 명시적으로 설정한다.
 
 ---
 
@@ -101,13 +103,14 @@ V1_VERIFICATION_DEV_ECHO=true
 - API Key/Secret을 재발급하면 **기존 Secret은 즉시 무효화**될 수 있다. 재발급 직후 GitHub 저장소 시크릿을 함께 갱신하고, 다음 `dev` push(또는 `deploy-alpha.yml`의 `workflow_dispatch`)로 재배포해 반영한다 — 반영 전까지는 이전 키로 발송이 계속 실패한다(발송 실패는 사용자에게 명확한 에러로 노출되므로 조기에 알아챌 수 있다).
 - 발신번호를 바꾸는 경우 솔라피 콘솔의 발신번호 등록·승인이 먼저 완료돼야 하며, 승인 전에 `SOLAPI_SENDER_NUMBER`만 먼저 바꾸면 발송이 거부된다. 반드시 "콘솔 승인 완료 → 시크릿 갱신 → 재배포" 순서를 지킨다.
 
-### 롤백
-배포 없이 인증 기능을 비활성화하려면:
+### 롤백 / 인증 일시 비활성화
 
-1. `SOLAPI_API_KEY`(또는 `SOLAPI_API_SECRET`, `SOLAPI_SENDER_NUMBER`) GitHub 저장소 시크릿 중 하나를 제거하거나 값을 비운다.
-2. 재배포를 트리거한다(다음 `dev` push, 또는 `deploy-alpha.yml`의 `workflow_dispatch`).
-3. `v1_api`가 3개 값 중 하나가 빈 상태로 부팅되면 `SolapiSmsSender.enabled`가 `false`가 된다. 이 상태에서 `V1_VERIFICATION_DEV_ECHO`도 설정돼 있지 않다면(프로덕션 기본값) 실제 SMS 발송이 전혀 이뤄지지 않으므로, phone 인증이 필요한 가입 플로우가 막힌다는 점에 주의한다 — 옥토모처럼 "인증 기능만 조용히 꺼지고 가입은 그대로 동작"하는 구조가 아니다. 완전한 기능 롤백이 필요하면 이 값들을 되돌리는 것과 별개로, 코드 배포본을 이전 커밋(옥토모 또는 다른 채널)으로 되돌리는 것을 함께 검토해야 한다.
-4. 이미 인증 완료된 계정(`phoneVerifiedAt`)은 영향받지 않는다.
+**주의(fail-closed):** 시크릿을 지우는 것만으로는 인증이 "꺼지지" 않는다 — `/auth/phone/issue` 가 503 `SMS_NOT_CONFIGURED` 로 실패하고 register 가 계속 `phoneProofToken` 을 요구해 **신규 가입이 전면 막힌다**. 상황별로 다음을 사용한다.
+
+- **발송 채널만 교정(키/발신번호 교체):** GitHub 시크릿 3개를 새 값으로 갱신 → 재배포(다음 `dev` push 또는 `deploy-alpha.yml` `workflow_dispatch`). 3개가 모두 유효하면 정상 발송이 재개된다.
+- **인증을 의도적으로 일시 비활성화(가입은 계속 받되 phone 인증 스킵):** 환경변수 `V1_PHONE_VERIFICATION_DISABLED=true` 를 주입 → 재배포. `PhoneVerificationService.enabled` 가 `false` 가 되어 register/social 이 `phoneProofToken` 을 요구하지 않는다(**비상용 opt-out — 상시 사용 금지**, 프론트 카드는 별개로 노출될 수 있음).
+- 이미 인증 완료된 계정(`phoneVerifiedAt`)은 어떤 경우에도 영향받지 않는다.
+- 코드 레벨 롤백(이전 커밋 복원)이 필요하면 별도로 검토한다.
 
 스키마·데이터 마이그레이션은 이 시크릿 롤백만으로는 필요하지 않다.
 

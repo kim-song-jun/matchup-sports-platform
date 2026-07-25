@@ -126,4 +126,15 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
     expect(typeof svc.issueProof(PHONE)).toBe('string');
   });
+
+  it('enabled is fail-closed: 기본 true, 명시적 opt-out 일 때만 false', () => {
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
+    const OLD = process.env.V1_PHONE_VERIFICATION_DISABLED;
+    delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+    expect(svc.enabled).toBe(true);
+    process.env.V1_PHONE_VERIFICATION_DISABLED = 'true';
+    expect(svc.enabled).toBe(false);
+    if (OLD === undefined) delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+    else process.env.V1_PHONE_VERIFICATION_DISABLED = OLD;
+  });
 });

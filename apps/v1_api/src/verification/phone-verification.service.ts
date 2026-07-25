@@ -23,11 +23,14 @@ export class PhoneVerificationService {
   ) {}
 
   /**
-   * 휴대폰 인증이 운영 가능한지 — SMS provider 가 설정됐거나 dev-echo 일 때 true.
-   * register/social 가입 흐름이 휴대폰 인증 강제 여부를 이 값으로 게이팅한다(provider 미설정 시 게이트 skip).
+   * 휴대폰 인증 강제 여부(register/social 게이팅). 인증은 핵심 anti-abuse 통제이므로 **fail-closed** —
+   * 기본적으로 항상 필수다. SOLAPI 시크릿 누락 같은 설정 실수가 인증을 조용히 선택사항으로 만들지
+   * 못하도록, 비활성화는 명시적 환경변수(V1_PHONE_VERIFICATION_DISABLED=true)로만 허용한다(비상용 opt-out).
+   * (이 경우 issueChallenge 는 provider 미설정이면 503 SMS_NOT_CONFIGURED 로 실패하므로, 시크릿이
+   *  없으면 가입이 진행되지 못하고 막힌다.)
    */
   get enabled(): boolean {
-    return this.dispatcher.smsEnabled || this.dispatcher.devEcho;
+    return process.env.V1_PHONE_VERIFICATION_DISABLED !== 'true';
   }
 
   async issueChallenge(phone: string): Promise<{ expiresAt: string; devCode?: string }> {

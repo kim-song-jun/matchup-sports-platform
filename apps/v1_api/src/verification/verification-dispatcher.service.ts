@@ -18,14 +18,9 @@ export class VerificationDispatcherService {
 
   constructor(@Inject(SMS_SENDER) private readonly sms: SmsSender) {}
 
-  /** phone 채널 실발송이 가능한지(provider 시크릿 설정 여부). */
-  get smsEnabled(): boolean {
-    return this.sms.enabled;
-  }
-
   /**
    * devCode 를 응답에 노출해도 되는 유일한 경우: 실제 SMS 발송이 없고(dev-echo 경로) devEcho 가 켜진
-   * 개발/CI 환경. 실발송이 가능한 환경(smsEnabled)에서는 devEcho 설정 실수가 있어도 OTP 를 노출하지 않는다.
+   * 개발/CI 환경. 실발송이 가능한 환경(sms.enabled)에서는 devEcho 설정 실수가 있어도 OTP 를 노출하지 않는다.
    */
   get devEchoActive(): boolean {
     return this.devEcho && !this.sms.enabled;

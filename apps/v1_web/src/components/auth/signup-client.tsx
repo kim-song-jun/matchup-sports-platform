@@ -226,6 +226,12 @@ export function SignupClient() {
   const goBack = () => {
     setError(null);
     setProfileError(null);
+    // 인증 직후 900ms 안에 '이전'을 누르면, 예약된 자동 이동이 나중에 발동해 사용자가
+    // 되돌아온 단계를 덮어쓴다. 단계를 바꾸기 전에 예약을 취소한다.
+    if (advanceTimerRef.current !== null) {
+      window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
     if (step === 'account') {
       router.push('/terms');
       return;
@@ -653,8 +659,15 @@ export function SignupClient() {
 
 
               <div className="tm-auth-field">
-                <span className="tm-text-label">성별<RequiredMark /></span>
-                <div className="tm-auth-segmented" role="radiogroup" aria-label="성별">
+                {/* radiogroup 은 label 로 감싸지지 않으므로 aria-labelledby 로 라벨을 직접 물린다 —
+                    aria-label="성별" 만 두면 라벨 안의 "(필수)" 가 접근성 이름에서 빠진다. */}
+                <span className="tm-text-label" id="signup-gender-label">성별<RequiredMark /></span>
+                <div
+                  className="tm-auth-segmented"
+                  role="radiogroup"
+                  aria-labelledby="signup-gender-label"
+                  aria-required="true"
+                >
                   <button
                     className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`}
                     type="button"

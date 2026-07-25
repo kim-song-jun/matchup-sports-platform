@@ -223,9 +223,39 @@ describe('SignupClient required profile contract', () => {
     // Given
     render(<SignupClient />);
 
-    // Then — 색(빨간 별)에만 의존하면 색각 이상·스크린리더에서 정보가 사라진다
-    expect(screen.getByLabelText(/^닉네임\s*\*\(필수\)/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^이메일\s*\*\(필수\)/)).toBeInTheDocument();
+    // Then — 색(빨간 별)에만 의존하면 색각 이상·스크린리더에서 정보가 사라진다.
+    // 별표는 장식(aria-hidden)이므로 단언하지 않는다 — 의미를 지고 있는 건 "(필수)" 텍스트다.
+    for (const field of [/닉네임/, /이메일/]) {
+      const label = screen.getByLabelText(field).closest('label');
+      expect(label?.textContent).toContain('(필수)');
+    }
+  });
+
+  it('인증 직후 이전을 누르면 예약된 자동 이동이 취소된다', async () => {
+    // Given — 인증 성공 ~ 자동 이동 사이(900ms)에 사용자가 되돌아가는 경우
+    render(<SignupClient />);
+    await advanceToVerify();
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+    await completePhoneVerification();
+
+    // When — 자동 이동이 발동하기 전에 '이전'
+    fireEvent.click(screen.getByRole('button', { name: '이전 단계' }));
+
+    // Then — 예약이 남아 있으면 잠시 뒤 프로필로 끌려간다. 그러면 안 된다.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^닉네임/)).toBeInTheDocument();
+  });
+
+  it('성별 라디오그룹도 필수임을 접근성 이름으로 알린다', async () => {
+    // Given — label 로 감싸지지 않는 radiogroup 은 aria-labelledby 로 라벨을 물려야 한다
+    render(<SignupClient />);
+    await advanceToProfile();
+
+    // Then
+    const group = screen.getByRole('radiogroup');
+    expect(group).toHaveAccessibleName(expect.stringContaining('(필수)'));
+    expect(group).toHaveAttribute('aria-required', 'true');
   });
 
   it.each([

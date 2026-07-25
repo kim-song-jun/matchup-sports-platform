@@ -16,9 +16,12 @@ export class AdminErrorLogListQueryDto {
   @IsIn(ERROR_LOG_SOURCES)
   source?: ErrorLogSourceFilter;
 
+  // HTTP status code 필터이므로 실제 범위 밖 값은 경계에서 막는다.
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(100)
+  @Max(599)
   statusCode?: number;
 
   @IsOptional()

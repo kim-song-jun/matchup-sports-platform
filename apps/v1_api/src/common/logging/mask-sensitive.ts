@@ -30,10 +30,21 @@ export const SENSITIVE_KEYS: readonly string[] = [
 
 const REDACTED = '[REDACTED]' as const;
 
-const SENSITIVE_KEY_SET = new Set(SENSITIVE_KEYS.map((key) => key.toLowerCase()));
+const SENSITIVE_KEY_SET = new Set(SENSITIVE_KEYS.map((key) => normalizeKey(key)));
+
+/**
+ * 키를 비교하기 전에 대소문자와 구분자(-, _)를 지운다.
+ *
+ * HTTP 헤더는 `set-cookie`·`x-api-key`처럼 하이픈으로 오고 JS 객체는 `setCookie`처럼
+ * camelCase로 온다. 소문자 정확 일치만 하면 같은 뜻의 키가 표기만 달라 마스킹을 통째로
+ * 빠져나간다 — 실제로 `set-cookie` 헤더가 그렇게 새어 나갈 수 있었다.
+ */
+function normalizeKey(key: string): string {
+  return key.toLowerCase().replace(/[-_]/g, '');
+}
 
 function isSensitiveKey(key: string): boolean {
-  return SENSITIVE_KEY_SET.has(key.toLowerCase());
+  return SENSITIVE_KEY_SET.has(normalizeKey(key));
 }
 
 /**

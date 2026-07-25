@@ -21,6 +21,22 @@ describe('maskSensitive', () => {
     expect(masked.note).toBe('no secret here');
   });
 
+  // HTTP 헤더는 `set-cookie`·`x-api-key`처럼 하이픈으로 오고 JS 객체는 camelCase 로 온다.
+  // 표기가 다르다고 마스킹을 빠져나가면 안 된다.
+  it('matches keys regardless of hyphen/underscore/camelCase spelling', () => {
+    const masked = maskSensitive({
+      'set-cookie': 'teameet_v1_session=abc; Path=/',
+      set_cookie: 'another=def',
+      setCookie: 'third=ghi',
+      Authorization: 'Bearer xyz',
+    });
+
+    expect(masked['set-cookie']).toBe('[REDACTED]');
+    expect(masked.set_cookie).toBe('[REDACTED]');
+    expect(masked.setCookie).toBe('[REDACTED]');
+    expect(masked.Authorization).toBe('[REDACTED]');
+  });
+
   it('masks sensitive keys nested inside objects', () => {
     const input = {
       user: {

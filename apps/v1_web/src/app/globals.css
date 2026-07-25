@@ -702,15 +702,19 @@ button:disabled {
 }
 
 /* 모드 탭 아래 한 단계 낮은 선택지(계정 찾기의 '본인 확인 방법')에 쓰는 축소 변형.
-   같은 크기의 세그먼트를 두 줄로 쌓으면 어느 쪽이 상위인지 읽히지 않는다. */
+   같은 무게의 세그먼트를 두 줄로 쌓으면 어느 쪽이 상위인지 읽히지 않는다.
+   단 높이는 기본값(터치 타겟)을 그대로 두고, 위계는 자족·간격·모서리로만 낮춘다 —
+   여기서 높이를 줄이면 손가락으로 누르기 어려운 표면이 하나 생긴다. */
 .tm-auth-segmented-sm {
+  gap: 4px;
   padding: 3px;
   border-radius: 12px;
 }
 
 .tm-auth-segmented-sm .tm-auth-segment {
-  min-height: 34px;
+  border-radius: 9px;
   font-size: 12px;
+  font-weight: 700;
 }
 
 /* 인증 폼 안의 보조 영역(사진 업로드·휴대폰 인증) 공통 표면.

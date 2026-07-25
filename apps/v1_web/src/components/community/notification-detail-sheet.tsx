@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useId, useRef } from 'react';
-import { BellIcon } from '@/components/v1-ui/icons';
 import type { NotificationModel } from './community.types';
+import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
 
 interface NotificationDetailSheetProps {
   /** null이면 닫힌 상태 — 열려 있는 동안에만 알림 모델을 넘긴다. */
@@ -121,13 +121,15 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
 
         <div className="tm-notification-sheet-head">
           <div className="tm-notification-icon" aria-hidden="true">
-            <BellIcon size={18} />
+            <NotificationTypeIcon type={notification.type} size={18} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 id={titleId} className="tm-text-body-lg" style={{ margin: 0 }}>
               {notification.title}
             </h2>
-            <div className="tm-notification-meta">{notification.time}</div>
+            <div className="tm-notification-meta">
+              {notificationTypeLabel(notification.type)} · {notification.time}
+            </div>
           </div>
         </div>
 

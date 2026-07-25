@@ -108,4 +108,75 @@ describe('PushSendForm', () => {
       expect(within(result).getByText('1')).toBeInTheDocument();
     });
   });
+
+  /**
+   * 회귀 방지: 앱 알림 생성 건수만 보여주면 "푸시도 갔다"고 읽힌다. 구독이 0건이면
+   * 푸시는 한 건도 나가지 않는데(alpha 에서 실제로 겪은 상황), 예전 화면은 그걸
+   * 성공으로만 표시해 운영자가 원인을 알 수 없었다.
+   */
+  it('푸시 구독이 0건이면 앱 알림만 남았다고 결과에 밝힌다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 5,
+        skipped: 0,
+        failed: 0,
+        push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    await waitFor(() => {
+      const result = screen.getByTestId('push-send-result');
+      expect(within(result).getByText(/브라우저 알림을 켠 사용자가 없어 푸시는 나가지 않았어요/)).toBeInTheDocument();
+    });
+  });
+
+  it('서버 VAPID 가 꺼져 있으면 그 사실을 결과에 밝힌다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 3,
+        skipped: 0,
+        failed: 0,
+        push: { subscriptions: 0, delivered: 0, failed: 0, disabled: true },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    await waitFor(() => {
+      const result = screen.getByTestId('push-send-result');
+      expect(within(result).getByText(/VAPID 키가 설정되지 않아/)).toBeInTheDocument();
+    });
+  });
+
+  it('실제로 푸시가 전송되면 구독·전송 건수를 보여준다', async () => {
+    sendMutate.mockImplementation((_payload, options) => {
+      options.onSuccess({
+        sent: 2,
+        skipped: 0,
+        failed: 0,
+        push: { subscriptions: 3, delivered: 2, failed: 1, disabled: false },
+      });
+    });
+    const user = userEvent.setup();
+    render(<PushSendForm />);
+
+    await pickUser(user);
+    await user.type(screen.getByLabelText(/제목/), '테스트 알림');
+    await user.click(screen.getByRole('button', { name: '발송하기' }));
+
+    await waitFor(() => {
+      const result = screen.getByTestId('push-send-result');
+      expect(within(result).getByText(/구독 3건 중 2건 전송, 1건 실패/)).toBeInTheDocument();
+    });
+  });
 });

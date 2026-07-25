@@ -1830,9 +1830,20 @@ export type V1AdminPushSendPayload = {
 };
 
 export type V1AdminPushSendResult = {
+  /** 인앱 알림을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
   sent: number;
   skipped: number;
   failed: number;
+  /**
+   * 웹 푸시 결과. 서버 구버전 응답에는 없을 수 있어 optional 로 둔다.
+   * subscriptions 가 0이면 푸시로는 아무 데도 가지 않았다는 뜻이다.
+   */
+  push?: {
+    subscriptions: number;
+    delivered: number;
+    failed: number;
+    disabled: boolean;
+  };
 };
 
 // ---------------------------------------------------------------------------

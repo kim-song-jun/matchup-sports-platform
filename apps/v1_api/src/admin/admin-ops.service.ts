@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService, V1ActiveAdmin } from '../common/admin-context.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { WebPushService } from '../notifications/web-push.service';
+import { WebPushService, type PushDeliverySummary } from '../notifications/web-push.service';
 import { AdminPushSendDto } from './dto/admin-push-send.dto';
 
 export interface PushFailureSummary {
@@ -37,9 +37,24 @@ export interface AdminOpsSummary {
 }
 
 export interface ManualPushSendResult {
+  /** 인앱 알림(V1Notification)을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
   sent: number;
   skipped: number;
   failed: number;
+  /**
+   * 웹 푸시 쪽 결과. sent 만 보면 "인앱 알림은 만들었지만 푸시는 아무에게도 못 갔다"를
+   * 구분할 수 없어 운영자가 발송을 성공으로 오인한다(구독 0건이 대표적).
+   */
+  push: {
+    /** 수신자들에게 등록돼 있던 구독 수 합계. 0이면 푸시로는 아무 데도 가지 않았다. */
+    subscriptions: number;
+    /** 푸시 서비스가 접수한 수. */
+    delivered: number;
+    /** 전송 실패 수. */
+    failed: number;
+    /** VAPID 미설정으로 웹 푸시가 꺼져 있으면 true. */
+    disabled: boolean;
+  };
 }
 
 /**
@@ -200,11 +215,17 @@ export class AdminOpsService {
         throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User was not found' });
       }
       targetId = userId;
-      const outcome = await this.sendToOneRecipient(userId, dto);
-      result = { sent: outcome === 'sent' ? 1 : 0, skipped: outcome === 'skipped' ? 1 : 0, failed: outcome === 'failed' ? 1 : 0 };
+      const { outcome, push } = await this.sendToOneRecipient(userId, dto);
+      result = {
+        sent: outcome === 'sent' ? 1 : 0,
+        skipped: outcome === 'skipped' ? 1 : 0,
+        failed: outcome === 'failed' ? 1 : 0,
+        push: emptyPushTally(),
+      };
+      addPushTally(result.push, push);
     } else {
       targetId = 'broadcast';
-      result = { sent: 0, skipped: 0, failed: 0 };
+      result = { sent: 0, skipped: 0, failed: 0, push: emptyPushTally() };
       // 대상 전체를 findMany로 한 번에 메모리에 올리지 않고, id 커서로 DB에서
       // 청크 단위로 페이지네이션해 가져온다 — 사용자 수가 커져도 한 번에 들고
       // 있는 row 수는 BROADCAST_CHUNK_SIZE로 고정된다.
@@ -221,8 +242,9 @@ export class AdminOpsService {
         cursor = page[page.length - 1].id;
 
         const outcomes = await Promise.all(page.map((row) => this.sendToOneRecipient(row.id, dto)));
-        for (const outcome of outcomes) {
+        for (const { outcome, push } of outcomes) {
           result[outcome === 'sent' ? 'sent' : outcome === 'skipped' ? 'skipped' : 'failed'] += 1;
+          addPushTally(result.push, push);
         }
 
         if (page.length < BROADCAST_CHUNK_SIZE) break;
@@ -262,7 +284,7 @@ export class AdminOpsService {
   private async sendToOneRecipient(
     userId: string,
     dto: AdminPushSendDto,
-  ): Promise<'sent' | 'skipped' | 'failed'> {
+  ): Promise<{ outcome: 'sent' | 'skipped' | 'failed'; push: PushDeliverySummary | null }> {
     try {
       const pref = await this.prisma.v1NotificationPreference.findUnique({
         where: { userId },
@@ -270,7 +292,7 @@ export class AdminOpsService {
       });
       // row 없으면 기존 notifications.service.ts와 동일하게 default enabled로 처리한다.
       const enabled = pref ? pref.noticeEnabled !== false : true;
-      if (!enabled) return 'skipped';
+      if (!enabled) return { outcome: 'skipped', push: null };
 
       const notification = await this.prisma.v1Notification.create({
         data: {
@@ -284,14 +306,31 @@ export class AdminOpsService {
       });
 
       this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
-      await this.webPushService.sendToUser(userId, { title: dto.title, body: dto.body, url: dto.url });
+      const push = await this.webPushService.sendToUser(userId, {
+        title: dto.title,
+        body: dto.body,
+        url: dto.url,
+      });
 
-      return 'sent';
+      return { outcome: 'sent', push };
     } catch (err: unknown) {
       this.logger.warn(
         `수동 푸시 발송 실패 [userId=${userId}]: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return 'failed';
+      return { outcome: 'failed', push: null };
     }
   }
+}
+
+function emptyPushTally(): ManualPushSendResult['push'] {
+  return { subscriptions: 0, delivered: 0, failed: 0, disabled: false };
+}
+
+/** 수신자별 푸시 결과를 누적한다. disabled는 한 번이라도 꺼져 있었다면 true로 남긴다. */
+function addPushTally(tally: ManualPushSendResult['push'], summary: PushDeliverySummary | null): void {
+  if (!summary) return;
+  tally.subscriptions += summary.subscriptions;
+  tally.delivered += summary.delivered;
+  tally.failed += summary.failed;
+  if (summary.disabled) tally.disabled = true;
 }

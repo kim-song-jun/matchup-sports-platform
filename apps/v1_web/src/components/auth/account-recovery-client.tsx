@@ -250,8 +250,11 @@ export function AccountRecoveryClient() {
                 />
               </label>
 
-              {looksLikeEmail(emailInput) && !emailProofToken ? (
+              {looksLikeEmail(emailInput) ? (
                 <>
+                  {/* 인증 뒤에도 카드를 남긴다 — 휴대폰 경로는 찾은 계정 카드가 인증 성공을
+                      대신 알려 주지만, 이메일 경로는 카드가 사라지면 성공했다는 표시가
+                      아무 데도 남지 않는다. 카드가 스스로 완료 상태를 보여 준다. */}
                   <EmailVerificationCard
                     email={normalizedEmail}
                     onVerified={(token) => {
@@ -262,10 +265,12 @@ export function AccountRecoveryClient() {
                   />
                   {/* 가입 여부는 서버도 알려 주지 않는다(아무나 이메일만으로 가입 여부를 훑지
                       못하게). 메일이 오지 않는 이유를 사용자가 스스로 좁힐 수 있게 안내한다. */}
-                  <p className="tm-text-caption" style={{ margin: 0 }}>
-                    가입된 이메일이면 인증번호를 보내드려요. 메일이 오지 않으면 주소를 다시 확인하거나
-                    스팸함을 확인해 주세요.
-                  </p>
+                  {emailProofToken ? null : (
+                    <p className="tm-text-caption" style={{ margin: 0 }}>
+                      가입된 이메일이면 인증번호를 보내드려요. 메일이 오지 않으면 주소를 다시 확인하거나
+                      스팸함을 확인해 주세요.
+                    </p>
+                  )}
                 </>
               ) : null}
             </>

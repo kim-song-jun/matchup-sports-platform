@@ -223,6 +223,21 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
     expect(screen.getByText(/가입된 이메일이면 인증번호를 보내드려요/)).toBeInTheDocument();
   });
 
+  /**
+   * 휴대폰 경로는 찾은 계정 카드가 인증 성공을 대신 알려 주지만 이메일 경로는 그런 카드가
+   * 없다 — 인증 카드까지 사라지면 성공했다는 표시가 화면 어디에도 남지 않는다.
+   */
+  it('인증 뒤에도 인증 카드는 남고, 발송 안내만 내려간다', async () => {
+    render(<AccountRecoveryClient />);
+    goToEmailReset();
+    enterEmail();
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+    await screen.findByLabelText('새 비밀번호');
+
+    expect(screen.getByRole('button', { name: '__stub_email_verify__' })).toBeInTheDocument();
+    expect(screen.queryByText(/가입된 이메일이면 인증번호를 보내드려요/)).not.toBeInTheDocument();
+  });
+
   it('주소를 바꾸면 이전 인증 증명을 버린다', async () => {
     render(<AccountRecoveryClient />);
     goToEmailReset();

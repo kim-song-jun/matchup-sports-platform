@@ -67,8 +67,12 @@ const SESSION = {
 
 const VIEWPORTS = [
   { name: 'mobile', width: 390, height: 844 },
+  { name: 'tablet', width: 768, height: 1024 },
   { name: 'desktop', width: 1440, height: 900 },
 ];
+
+/** dev 서버의 Next devtools 오버레이는 캡처에 잡히면 안 된다(런북 §3.3). */
+const HIDE_DEVTOOLS = `nextjs-portal,[data-nextjs-dev-tools-button],#__next-dev-tools-indicator,[data-nextjs-toast]{display:none!important}`;
 
 async function main() {
   await mkdir(OUT, { recursive: true });
@@ -108,6 +112,7 @@ async function main() {
     // dev 서버는 HMR 소켓 때문에 networkidle에 도달하지 않는다 — DOM 준비 후 셀렉터로 대기한다.
     await page.goto(`${BASE}/notifications`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.tm-notification-card', { timeout: 15_000 });
+    await page.addStyleTag({ content: HIDE_DEVTOOLS });
 
     await page.screenshot({ path: `${OUT}/${viewport.name}-list.png`, fullPage: true });
 

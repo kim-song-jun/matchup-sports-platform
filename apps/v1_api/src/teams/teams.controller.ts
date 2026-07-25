@@ -101,6 +101,12 @@ export class TeamsController {
     return this.teamsService.joinApplications(user, teamId, query);
   }
 
+  @Get('me/join-applications')
+  @UseGuards(V1AuthGuard)
+  myJoinApplications(@CurrentUser() user: V1AuthUser) {
+    return this.teamsService.myJoinApplications(user);
+  }
+
   @Get('me/teams')
   @UseGuards(V1AuthGuard)
   myTeams(@CurrentUser() user: V1AuthUser, @Query() query: MyTeamsQueryDto) {

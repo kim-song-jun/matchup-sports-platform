@@ -75,6 +75,11 @@ interface ConfirmModalProps {
   open: boolean;
   title: string;
   message: string;
+  /**
+   * 확인 버튼 문구. **취소 버튼 문구(기본 '취소')와 같아지지 않게** 실행할 행동을 적는다.
+   * 취소 성격의 작업이면 '취소'가 아니라 '초대 취소' / '신청 취소'처럼 대상을 붙인다
+   * — 같은 문구가 나란히 두 개 있으면 어느 쪽이 실행인지 구분되지 않는다.
+   */
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;

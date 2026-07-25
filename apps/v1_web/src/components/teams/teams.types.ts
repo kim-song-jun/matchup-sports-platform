@@ -89,6 +89,11 @@ export type TeamDetailViewModel = {
   onShare?: () => void | Promise<void>;
   ctaSuccessMessage?: string;
   ctaFailureMessage?: string;
+  /**
+   * 승인 대기 중일 때만 채워진다(mode === 'pending'). 토스트는 2초 뒤 사라지므로
+   * "무엇을 기다리는 중인지"는 화면에 계속 남아 있어야 한다.
+   */
+  joinRequest?: { requestedAtLabel?: string };
   operations?: Array<{ label: string; sub: string; href: string }>;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;

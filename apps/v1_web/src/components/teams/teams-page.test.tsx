@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { TeamMembersPageClient } from './teams-client';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView } from './teams-page';
-import { getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
+import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
 import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel } from './teams.types';
 
 const teamApiMocks = vi.hoisted(() => ({
@@ -307,6 +307,29 @@ describe('TeamDetailPageView', () => {
 
     expect(onCta).toHaveBeenCalledTimes(2);
   });
+
+  it('승인 대기 상태에서는 무엇을 기다리는지 알려주는 안내가 화면에 남는다', () => {
+    const model: TeamDetailViewModel = {
+      ...getTeamDetailViewModel('pending'),
+      ctaLabel: '신청 취소',
+      joinRequest: { requestedAtLabel: '2026. 07. 20. 신청' },
+    };
+
+    render(<TeamDetailPageView model={model} />);
+
+    // 토스트는 사라지지만 이 안내는 남아야 한다 — 모바일/데스크톱 레이아웃 양쪽에 렌더된다.
+    expect(screen.getAllByText('승인 대기 중').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.').length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('2026. 07. 20. 신청').length).toBeGreaterThan(0);
+  });
+
+  it('가입 신청 가능 상태에서는 승인 대기 안내를 띄우지 않는다', () => {
+    render(<TeamDetailPageView model={getTeamDetailViewModel('default')} />);
+
+    expect(screen.queryByText('승인 대기 중')).not.toBeInTheDocument();
+  });
 });
 
 describe('TeamMembersPageView — 보낸 초대 목록', () => {
@@ -485,5 +508,40 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
       { reason: 'left_from_v1_web_member_page' },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     ));
+  });
+
+  it('두 초대를 연달아 취소해도 먼저 시작한 카드의 pending이 풀리지 않는다', async () => {
+    mockOwnerMembersPage(2);
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({
+      data: {
+        items: [
+          { invitationId: 'inv-a', invitedUser: { userId: 'u-a', displayName: '김도윤', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
+          { invitationId: 'inv-b', invitedUser: { userId: 'u-b', displayName: '박서준', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    // onSettled를 부르지 않아 두 취소 요청 모두 "진행 중"인 상태를 만든다.
+    const cancelMutate = vi.fn();
+    teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: true, mutate: cancelMutate });
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^초대 \d+$/ }));
+
+    for (const name of ['김도윤', '박서준']) {
+      fireEvent.click(screen.getByRole('button', { name: `${name}님 초대 취소` }));
+      const dialog = await screen.findByRole('dialog', { name: '초대 취소' });
+      // 확인 버튼('초대 취소')과 닫기 버튼('취소')이 서로 다른 문구여야 이 셀렉터가 성립한다.
+      fireEvent.click(within(dialog).getByRole('button', { name: '초대 취소' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '초대 취소' })).not.toBeInTheDocument());
+    }
+
+    // 단일 id 추적이면 뒤엣것이 앞엣것의 pending을 덮어써 A가 다시 눌리게 된다(중복 취소 요청).
+    await waitFor(() => expect(cancelMutate).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: '김도윤님 초대 취소' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '박서준님 초대 취소' })).toBeDisabled();
   });
 });

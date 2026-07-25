@@ -90,6 +90,7 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'popups'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
+  myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
 };

@@ -12,7 +12,7 @@ import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
 import { clearStoredV1Session } from '@/lib/session-storage';
-import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
+import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
   useV1ApproveTeamJoinApplication,
@@ -25,6 +25,7 @@ import {
   useV1MyTeamMatches,
   useV1MasterRegions,
   useV1MasterSports,
+  useV1MyJoinApplications,
   useV1Notifications,
   useV1Profile,
   useV1ReceivedInvitations,
@@ -42,13 +43,17 @@ import {
   useV1UpdateProfile,
   useV1UpdateSettings,
   useV1WithdrawalRequest,
+  useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
+import { usePendingIds } from '@/hooks/use-pending-ids';
+import { formatMonthDay } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   MyInvitationsPageView,
+  MyJoinApplicationsPageView,
   SettingsPageView,
   MyTeamDetailPageView,
   MyTeamMembersPageView,
@@ -56,7 +61,7 @@ import {
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import type { MyHomeViewModel, MyInvitationItem, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
@@ -146,11 +151,12 @@ export function MyInvitationsPageClient() {
   const { confirm, ConfirmModal } = useConfirm();
   const router = useRouter();
 
-  // 처리 중인 초대 1건만 추적 — 아이템별 pending 상태(전역 boolean이면 무관한 카드도 함께 비활성화됨)
-  const [pendingInvitationId, setPendingInvitationId] = useState<string | null>(null);
+  // 아이템별 pending — 전역 boolean이면 무관한 카드까지 잠기고, 단일 id면 두 건을
+  // 연달아 처리할 때 뒤엣것이 앞엣것의 pending을 덮어쓴다(usePendingIds 주석 참조).
+  const pendingInvitations = usePendingIds();
 
   const onAccept = (invitationId: string) => {
-    setPendingInvitationId(invitationId);
+    pendingInvitations.start(invitationId);
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
@@ -159,7 +165,7 @@ export function MyInvitationsPageClient() {
           void query.refetch();
         }
       },
-      onSettled: () => setPendingInvitationId(null),
+      onSettled: () => pendingInvitations.finish(invitationId),
     });
   };
 
@@ -173,14 +179,14 @@ export function MyInvitationsPageClient() {
       tone: 'danger',
     }).then((ok) => {
       if (ok) {
-        setPendingInvitationId(invitationId);
-        decline.mutate({ invitationId }, { onSettled: () => setPendingInvitationId(null) });
+        pendingInvitations.start(invitationId);
+        decline.mutate({ invitationId }, { onSettled: () => pendingInvitations.finish(invitationId) });
       }
     });
   };
 
   const model = {
-    invitations: (query.data?.items ?? []).map((item) => toMyInvitationItem(item, pendingInvitationId === item.invitationId)),
+    invitations: (query.data?.items ?? []).map((item) => toMyInvitationItem(item, pendingInvitations.has(item.invitationId))),
     error: query.isError,
     onAccept,
     onDecline,
@@ -191,6 +197,50 @@ export function MyInvitationsPageClient() {
     <>
       {ConfirmModal}
       <MyInvitationsPageView model={model} />
+    </>
+  );
+}
+
+export function MyJoinApplicationsPageClient() {
+  const query = useV1MyJoinApplications();
+  const withdraw = useV1WithdrawMyJoinApplication();
+  const { confirm, ConfirmModal } = useConfirm();
+
+  // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
+  const pendingApplications = usePendingIds();
+
+  const onWithdraw = (applicationId: string) => {
+    const application = (query.data?.items ?? []).find((item) => item.applicationId === applicationId);
+    if (!application) return;
+    void confirm({
+      title: '가입 신청 취소',
+      message: `${application.team.name}에 보낸 가입 신청을 취소할까요?`,
+      confirmLabel: '신청 취소',
+      tone: 'danger',
+    }).then((ok) => {
+      if (!ok) return;
+      pendingApplications.start(applicationId);
+      withdraw.mutate(
+        { applicationId, teamId: application.teamId, reason: 'team_join_withdrawn_from_v1_web_my_page' },
+        { onSettled: () => pendingApplications.finish(applicationId) },
+      );
+    });
+  };
+
+  const model: MyJoinApplicationsViewModel = {
+    applications: (query.data?.items ?? []).map((item) =>
+      toMyJoinApplicationItem(item, pendingApplications.has(item.applicationId)),
+    ),
+    loading: query.isLoading,
+    error: query.isError,
+    onWithdraw,
+    onRetry: () => void query.refetch(),
+  };
+
+  return (
+    <>
+      {ConfirmModal}
+      <MyJoinApplicationsPageView model={model} />
     </>
   );
 }
@@ -1688,7 +1738,45 @@ function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boo
     logoUrl: invitation.team.logoUrl ?? null,
     invitedByName: invitation.invitedBy.displayName,
     message: invitation.message,
-    dateLabel: new Date(invitation.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
+    dateLabel: formatMonthDay(invitation.createdAt) ?? '',
+    actionPending,
+  };
+}
+
+/**
+ * 상태별 "그래서 지금 어떻게 되는 건지"를 한 줄로 알려준다.
+ * 상태 라벨만 있으면 승인됐다는 사실은 알아도 다음에 뭘 해야 할지 모른다.
+ */
+const JOIN_APPLICATION_HINTS: Record<string, string> = {
+  requested: '관리자가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
+  approved: '가입이 승인됐어요. 이제 팀 활동에 참여할 수 있어요.',
+  rejected: '이번에는 승인되지 않았어요. 다시 신청할 수 있어요.',
+  withdrawn: '내가 취소한 신청이에요. 다시 신청할 수 있어요.',
+  expired: '신청이 만료됐어요. 다시 신청할 수 있어요.',
+};
+
+function joinApplicationStatusTone(status: string): MyJoinApplicationItem['statusTone'] {
+  if (status === 'requested') return 'pending';
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  return 'neutral';
+}
+
+function toMyJoinApplicationItem(
+  application: V1MyJoinApplication,
+  actionPending: boolean,
+): MyJoinApplicationItem {
+  return {
+    applicationId: application.applicationId,
+    teamId: application.teamId,
+    teamName: application.team.name,
+    logoUrl: application.team.logoUrl ?? null,
+    status: application.status,
+    statusLabel: myJoinApplicationStatusLabel(application.status),
+    statusTone: joinApplicationStatusTone(application.status),
+    statusHint: JOIN_APPLICATION_HINTS[application.status] ?? '신청이 처리됐어요.',
+    message: application.message,
+    dateLabel: formatMonthDay(application.createdAt) ?? '',
     actionPending,
   };
 }

@@ -2,8 +2,8 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MyInvitationsPageView } from './my-page';
-import type { MyInvitationsViewModel } from './my.types';
+import { MyInvitationsPageView, MyJoinApplicationsPageView } from './my-page';
+import type { MyInvitationsViewModel, MyJoinApplicationItem, MyJoinApplicationsViewModel } from './my.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/my/invitations',
@@ -87,5 +87,83 @@ describe('MyInvitationsPageView — 받은 초대 아이템별 처리 상태', (
     expect(screen.getByText('초대 목록을 불러오지 못했어요')).toBeInTheDocument();
     fireEvent.click(screen.getByText('다시 시도'));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MyJoinApplicationsPageView — 보낸 가입 신청 상태 표시', () => {
+  function joinApplication(overrides: Partial<MyJoinApplicationItem> = {}): MyJoinApplicationItem {
+    return {
+      applicationId: 'app-a',
+      teamId: 'team-a',
+      teamName: '성수 러너스 FC',
+      logoUrl: null,
+      status: 'requested',
+      statusLabel: '승인 대기',
+      statusTone: 'pending',
+      statusHint: '관리자가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
+      message: null,
+      dateLabel: '7월 1일',
+      actionPending: false,
+      ...overrides,
+    };
+  }
+
+  function applicationsModel(
+    overrides: Partial<MyJoinApplicationsViewModel> = {},
+  ): MyJoinApplicationsViewModel {
+    return {
+      applications: [],
+      loading: false,
+      error: false,
+      onWithdraw: vi.fn(),
+      onRetry: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('승인 대기 건에만 취소 버튼이 붙고, 처리된 건은 결과만 보여준다', () => {
+    const onWithdraw = vi.fn();
+    const model = applicationsModel({
+      applications: [
+        joinApplication(),
+        joinApplication({
+          applicationId: 'app-b',
+          teamId: 'team-b',
+          teamName: '마포 농구 클럽',
+          status: 'rejected',
+          statusLabel: '거절됨',
+          statusTone: 'rejected',
+          statusHint: '이번에는 승인되지 않았어요. 다시 신청할 수 있어요.',
+        }),
+      ],
+      onWithdraw,
+    });
+
+    render(<MyJoinApplicationsPageView model={model} />);
+
+    // 상태는 색이 아니라 텍스트로도 구분돼야 한다(색만으로 정보 전달 금지).
+    expect(screen.getByText('승인 대기')).toBeInTheDocument();
+    expect(screen.getByText('거절됨')).toBeInTheDocument();
+    expect(screen.getByText('이번에는 승인되지 않았어요. 다시 신청할 수 있어요.')).toBeInTheDocument();
+
+    // 이미 처리된 신청은 취소할 수 없다 — 버튼 자체가 없어야 한다.
+    expect(screen.queryByRole('button', { name: '마포 농구 클럽 가입 신청 취소' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '성수 러너스 FC 가입 신청 취소' }));
+    expect(onWithdraw).toHaveBeenCalledWith('app-a');
+  });
+
+  it('취소 처리 중인 카드의 버튼만 비활성화된다', () => {
+    const model = applicationsModel({
+      applications: [
+        joinApplication({ actionPending: true }),
+        joinApplication({ applicationId: 'app-b', teamId: 'team-b', teamName: '마포 농구 클럽' }),
+      ],
+    });
+
+    render(<MyJoinApplicationsPageView model={model} />);
+
+    expect(screen.getByRole('button', { name: '성수 러너스 FC 가입 신청 취소' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '마포 농구 클럽 가입 신청 취소' })).not.toBeDisabled();
   });
 });

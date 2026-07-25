@@ -689,6 +689,8 @@ export type V1TeamJoinEligibility = {
   viewerRole: string;
   joinState: string;
   applicationId: string | null;
+  /** 승인 대기(joinState === 'requested') 중일 때의 신청 시각. 그 외에는 null. */
+  requestedAt: string | null;
   requiresApproval: boolean;
   immediateJoinSupported: boolean;
 };
@@ -725,6 +727,30 @@ export type V1TeamJoinApplicationsPage = {
     nextCursor: string | null;
     hasNext: boolean;
   };
+};
+
+/** 내가 보낸 가입 신청 1건 (GET /me/join-applications items 요소) */
+export type V1MyJoinApplication = {
+  applicationId: string;
+  teamId: string;
+  /** V1TeamJoinApplicationStatus — requested | approved | rejected | withdrawn | expired */
+  status: string;
+  message: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  withdrawnAt: string | null;
+  team: {
+    teamId: string;
+    name: string;
+    sportId: string;
+    logoUrl: string | null;
+    introductionPreview: string | null;
+  };
+};
+
+/** GET /me/join-applications 응답 */
+export type V1MyJoinApplicationsPage = {
+  items: V1MyJoinApplication[];
 };
 
 export type V1TeamMembershipMutationResult = {

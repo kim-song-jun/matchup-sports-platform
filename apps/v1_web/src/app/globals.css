@@ -2938,6 +2938,26 @@ button:disabled {
   padding: 18px 20px 128px;
 }
 
+/* 가입 승인 대기 안내 — 토스트가 사라진 뒤에도 상태를 알려주는 상시 카드.
+   배경은 팀매치·매치 안내 카드와 같은 --tint-orange 톤을 쓴다(주황 안내 카드 관례). */
+.tm-team-join-pending {
+  margin-top: 12px;
+  background: var(--tint-orange);
+}
+
+.tm-team-join-pending-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-team-join-pending-body {
+  margin: 8px 0 0;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
 .tm-section-title {
   margin-top: 22px;
   margin-bottom: 10px;
@@ -5256,6 +5276,23 @@ button:disabled {
   border-radius: 10px;
   padding: 10px 12px;
   line-height: 1.5;
+}
+
+/* 보낸 가입 신청 카드 — 초대 카드(.tm-invitation-card)와 같은 골격을 쓰고 차이만 덧댄다 */
+.tm-join-application-team-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tm-join-application-team-link:hover {
+  text-decoration: underline;
+}
+
+.tm-join-application-hint {
+  margin: 0;
+  font-size: var(--font-size-label);    /* 13px */
+  color: var(--text-muted);
+  line-height: 1.55;
 }
 
 /* 카드 하단 CTA 버튼 그룹 */

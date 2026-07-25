@@ -3,9 +3,9 @@ services:
     image: teameet-v1-api:${ALPHA_RELEASE_VERSION:-alpha}
     environment:
       # release-metadata.alpha.conf(nginx)의 X-Teameet-Release 헤더와 동일한 값을 주입한다.
-      # deploy-alpha.sh 가 실제 배포 시 export 하는 값을 그대로 사용하고, 미설정(로컬 등)이면
-      # 빈 문자열 fallback — ErrorLogService 는 releaseSha = process.env.V1_RELEASE ?? null 로
-      # 처리하므로 컨테이너는 값 없이도 정상 기동한다.
+      # deploy-alpha.sh 가 실제 배포 시 export 하는 값을 그대로 사용한다. 미설정(로컬 등)이면
+      # 여기서 들어오는 값은 "없음"이 아니라 빈 문자열이므로, ErrorLogService 는 trim 후
+      # 비어 있으면 null 로 바꿔 저장한다 — 값 없음의 표현을 null 하나로 통일하기 위함이다.
       V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}
 
   v1_web:

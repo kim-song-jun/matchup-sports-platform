@@ -48,6 +48,9 @@ function formatRelativeTime(dateStr: string): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
   const diffMs = Date.now() - d.getTime();
+  // 서버 시계가 브라우저보다 조금 앞서면 diff가 음수가 되어 "-1분 전"이 찍힌다.
+  // admin/page.tsx의 같은 헬퍼와 동일하게 미래 시각은 '방금 전'으로 눌러 둔다.
+  if (diffMs < 0) return '방금 전';
   const diffMin = Math.floor(diffMs / 60_000);
   if (diffMin < 1) return '방금 전';
   if (diffMin < 60) return `${diffMin}분 전`;

@@ -64,7 +64,10 @@ export interface ErrorLogDetail extends ErrorLogListItem {
 // 정규화: UUID·연속 숫자를 각각 ':id'/':n'으로 치환해 대상만 다른 같은 유형의 에러를
 // 하나의 fingerprint로 접는다 (예: /tournaments/abc-123 → /tournaments/:id).
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
-const DIGIT_RUN_PATTERN = /\d+/g;
+// 숫자는 "경로 세그먼트 전체가 숫자일 때"만 접는다(/matches/42/join → /matches/:n/join).
+// 그냥 \d+ 로 접으면 API 버전까지 먹어 /api/v1/... 이 /api/v:n/... 으로 표시돼, 정작
+// 어느 API 에서 난 에러인지 읽기 어려워진다 — route 는 화면에도 그대로 보이는 값이다.
+const DIGIT_RUN_PATTERN = /(?<=\/)\d+(?=\/|$)/g;
 // 경로처럼 보이는 토큰('/'로 시작) 뒤의 쿼리스트링은 통째로 버린다. NestJS의 404 메시지는
 // `Cannot GET /api/v1/x?token=...`처럼 원본 URL을 그대로 담는데, 그 값이 fingerprint에
 // 들어가면 쿼리 값이 바뀔 때마다 다른 지문이 나온다. 스캐너가 매번 다른 값으로 없는 경로를
@@ -112,18 +115,30 @@ function truncateString(value: string, max: number): string {
 }
 
 /**
+ * 배포 버전. compose가 `V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}` 형태라 값이 없으면
+ * 미설정이 아니라 **빈 문자열**이 주입된다 — `?? null`은 ''를 걸러내지 못해 그대로
+ * 저장되고, 화면에는 버전 칸만 비어 보인다. 값이 없다는 뜻은 null 하나로 통일한다.
+ */
+function readReleaseSha(): string | null {
+  const value = process.env.V1_RELEASE?.trim();
+  return value ? value : null;
+}
+
+/**
  * requestBody/requestHeaders/responseBody/context는 Json? 컬럼이므로 마스킹된 "구조"를
  * 그대로 저장한다 — 프론트가 JSON.stringify(value, null, 2)로 바로 예쁘게 렌더링할 수
  * 있어야 하기 때문에, 여기서 미리 문자열로 직렬화해 넣지 않는다(직렬화해 넣으면 프론트가
  * 그 문자열을 다시 JSON.stringify해 이스케이프된 한 줄로 뭉개버리는 이중 인코딩이 된다).
  * 4000자를 넘는 대용량 payload만 예외적으로 구조를 버리고 truncated 표시용 placeholder
  * 객체로 대체한다 — 이 경우에도 컬럼 값은 항상 object|null이지 bare string이 아니다.
- * Prisma의 nullable Json 컬럼에 SQL NULL을 쓰려면 (JS null이 아니라) Prisma.JsonNull을
- * 명시해야 한다 — 그냥 null을 넘기면 "필드 생략"으로 취급돼 컬럼 기본값이 적용된다.
+ * Prisma의 nullable Json 컬럼에서 null은 두 가지다 — Prisma.DbNull은 컬럼 자체가 SQL
+ * NULL이고, Prisma.JsonNull은 컬럼 안에 JSON `null` 리터럴을 넣는다. 여기서 뜻하는 것은
+ * "담을 값이 없다"이므로 DbNull이 맞다(JsonNull로 쓰면 `WHERE request_body IS NULL`이
+ * 걸리지 않는다). JS의 그냥 null을 넘기면 "필드 생략"으로 취급돼 둘 다 아니게 된다.
  */
-function toStoredJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+function toStoredJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull {
   if (value === null || value === undefined) {
-    return Prisma.JsonNull;
+    return Prisma.DbNull;
   }
 
   const masked = maskSensitive(value);
@@ -131,7 +146,7 @@ function toStoredJson(value: unknown): Prisma.InputJsonValue | typeof Prisma.Jso
   // 그대로 저장하며, 상한 초과/직렬화 실패 시에만 그 문자열을 placeholder 안에 담아 재사용한다.
   const serializedForSizeCheck = truncateForLog(masked);
   if (serializedForSizeCheck === null) {
-    return Prisma.JsonNull;
+    return Prisma.DbNull;
   }
   if (serializedForSizeCheck.endsWith('…[TRUNCATED]') || serializedForSizeCheck === '[UNSERIALIZABLE]') {
     return { _truncated: true, preview: serializedForSizeCheck };
@@ -199,7 +214,7 @@ export class ErrorLogService {
         context: toStoredJson(input.context),
         userId: input.userId ?? null,
         userAgent: input.userAgent ?? null,
-        releaseSha: process.env.V1_RELEASE ?? null,
+        releaseSha: readReleaseSha(),
         firstSeenAt: now,
         lastSeenAt: now,
       },

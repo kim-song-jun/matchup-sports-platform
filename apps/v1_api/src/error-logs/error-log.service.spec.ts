@@ -11,6 +11,13 @@ describe('normalizeForFingerprint / computeFingerprint', () => {
     expect(normalizeForFingerprint('/matches/42/join')).toBe('/matches/:n/join');
   });
 
+  // route 는 어드민 목록·상세에 그대로 보이는 값이다. 숫자를 무조건 접으면 API 버전까지
+  // 먹혀 /api/v1/... 이 /api/v:n/... 으로 표시돼 어느 API 인지 읽을 수 없다.
+  it('keeps the API version segment — only fully numeric segments fold', () => {
+    expect(normalizeForFingerprint('/api/v1/auth/login')).toBe('/api/v1/auth/login');
+    expect(normalizeForFingerprint('/api/v1/matches/42/join')).toBe('/api/v1/matches/:n/join');
+  });
+
   it('produces a 32-hex-char fingerprint', () => {
     const fp = computeFingerprint('server', 500, '/x', 'boom');
     expect(fp).toMatch(/^[0-9a-f]{32}$/);
@@ -29,8 +36,8 @@ describe('normalizeForFingerprint / computeFingerprint', () => {
     const a = computeFingerprint('server', 404, '/api/v1/nope', 'Cannot GET /api/v1/nope?token=abcXYZ');
     const b = computeFingerprint('server', 404, '/api/v1/nope', 'Cannot GET /api/v1/nope?token=zzTOP');
     expect(a).toBe(b);
-    // 쿼리스트링은 사라지고, 경로의 숫자는 기존 규칙대로 :n 이 된다(v1 → v:n).
-    expect(normalizeForFingerprint('Cannot GET /api/v1/nope?token=abcXYZ')).toBe('Cannot GET /api/v:n/nope');
+    // 쿼리스트링만 사라지고 API 버전(v1)은 그대로 남는다.
+    expect(normalizeForFingerprint('Cannot GET /api/v1/nope?token=abcXYZ')).toBe('Cannot GET /api/v1/nope');
   });
 
   it('keeps a question mark that is not a URL query — Korean copy must survive normalization', () => {
@@ -196,6 +203,25 @@ describe('ErrorLogService.record', () => {
       expect(prisma.v1ErrorLog.upsert.mock.calls[0][0].create.releaseSha).toBeNull();
     } finally {
       if (previous !== undefined) process.env.V1_RELEASE = previous;
+    }
+  });
+
+  // compose 가 `V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}` 라 미설정 시 빈 문자열이 주입된다.
+  // `?? null` 로는 걸러지지 않아 DB 에 ''가 남고 화면의 버전 칸만 비어 보인다.
+  it('stores a blank V1_RELEASE as null rather than an empty string', async () => {
+    const previous = process.env.V1_RELEASE;
+    process.env.V1_RELEASE = '   ';
+    try {
+      const prisma = buildPrismaMock();
+      const service = new ErrorLogService(prisma as never, logger as never);
+
+      service.record({ source: 'server', level: 'error', statusCode: 500, route: '/x', message: 'boom' });
+      await flushMicrotasks();
+
+      expect(prisma.v1ErrorLog.upsert.mock.calls[0][0].create.releaseSha).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.V1_RELEASE;
+      else process.env.V1_RELEASE = previous;
     }
   });
 

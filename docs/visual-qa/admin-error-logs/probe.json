@@ -2,8 +2,8 @@
   {
     "name": "mobile",
     "width": 390,
-    "listPath": "/Users/sungjun/Documents/projects/matchup-sports-platform/.claude/worktrees/tournament-bottom-nav/docs/visual-qa/admin-error-logs/errors-list-mobile-390.png",
-    "modalPath": "/Users/sungjun/Documents/projects/matchup-sports-platform/.claude/worktrees/tournament-bottom-nav/docs/visual-qa/admin-error-logs/errors-detail-mobile-390.png",
+    "list": "errors-list-mobile-390.png",
+    "detail": "errors-detail-mobile-390.png",
     "rows": 4,
     "dialog": 1,
     "hasRedacted": true,
@@ -13,8 +13,8 @@
   {
     "name": "tablet",
     "width": 768,
-    "listPath": "/Users/sungjun/Documents/projects/matchup-sports-platform/.claude/worktrees/tournament-bottom-nav/docs/visual-qa/admin-error-logs/errors-list-tablet-768.png",
-    "modalPath": "/Users/sungjun/Documents/projects/matchup-sports-platform/.claude/worktrees/tournament-bottom-nav/docs/visual-qa/admin-error-logs/errors-detail-tablet-768.png",
+    "list": "errors-list-tablet-768.png",
+    "detail": "errors-detail-tablet-768.png",
     "rows": 4,
     "dialog": 1,
     "hasRedacted": true,
@@ -24,8 +24,8 @@
   {
     "name": "desktop",
     "width": 1440,
-    "listPath": "/Users/sungjun/Documents/projects/matchup-sports-platform/.claude/worktrees/tournament-bottom-nav/docs/visual-qa/admin-error-logs/errors-list-desktop-1440.png",
-    "modalPath": "/Users/sungjun/Documents/projects/matchup-sports-platform/.claude/worktrees/tournament-bottom-nav/docs/visual-qa/admin-error-logs/errors-detail-desktop-1440.png",
+    "list": "errors-list-desktop-1440.png",
+    "detail": "errors-detail-desktop-1440.png",
     "rows": 4,
     "dialog": 2,
     "hasRedacted": true,

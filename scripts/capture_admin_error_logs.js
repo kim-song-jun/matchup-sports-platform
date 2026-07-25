@@ -63,7 +63,14 @@ const WIDTHS = [
       hasTraceback: /at MyPageClient|Traceback|스택/.test(document.body.innerText),
       text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 260),
     }));
-    results.push({ name, width, listPath, modalPath, ...probe });
+    // 파일명만 남긴다 — 절대 경로를 커밋하면 다른 환경에서 의미가 없고 로컬 경로가 노출된다.
+    results.push({
+      name,
+      width,
+      list: path.basename(listPath),
+      detail: modalPath ? path.basename(modalPath) : null,
+      ...probe,
+    });
     console.log(`${name}(${width}) rows=${probe.rows} dialog=${probe.dialog} redacted=${probe.hasRedacted} traceback=${probe.hasTraceback}`);
 
     await page.close();

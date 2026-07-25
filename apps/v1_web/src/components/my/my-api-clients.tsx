@@ -1365,9 +1365,13 @@ export function NotificationSettingsPageClient() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="tm-text-body">브라우저 알림 받기</div>
                   <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {/* 상태별로 다른 문장을 쓴다 — 꺼져 있는데 "받아요"라고 하면 켜진 것으로 읽힌다.
+                        웹 푸시 구독은 브라우저·기기 단위라 그 사실도 켜졌을 때 알려준다. */}
                     {pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed
-                      ? '브라우저 설정에서 알림 권한을 허용해주세요'
-                      : '매치, 팀, 채팅 알림을 브라우저 푸시로 받아요'}
+                      ? '브라우저 설정에서 이 사이트의 알림을 허용해 주세요'
+                      : pushRegistration.isSubscribed
+                        ? '지금 이 브라우저에서 받고 있어요. 다른 기기에서는 따로 켜야 해요'
+                        : '켜면 앱을 닫아도 새 소식을 받을 수 있어요'}
                   </div>
                 </div>
                 <span
@@ -1388,9 +1392,13 @@ export function NotificationSettingsPageClient() {
             </Card>
           ) : null}
           <Card pad={14} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">앱 안 알림</div>
+            <div className="tm-text-label">받을 알림 고르기</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              아래 설정은 팀밋 알림함에 적용돼요.
+              {/* 위 푸시 토글과의 관계를 명시한다 — 예전에는 두 영역이 무관해 보여서,
+                  푸시를 켜지 않은 사용자가 왜 폰으로 알림이 안 오는지 알 수 없었다. */}
+              {pushRegistration.isSubscribed
+                ? '여기서 끈 종류는 알림함과 브라우저 알림 모두에서 빠져요.'
+                : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 브라우저 알림을 켜면 같은 종류를 폰으로도 받아요.'}
             </div>
           </Card>
           {toggleError ? (

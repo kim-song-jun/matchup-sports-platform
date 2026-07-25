@@ -14,7 +14,7 @@ describe('AdminOpsService', () => {
   const prisma = {
     v1WebPushFailureLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1SmsEventLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
-    v1User: { findUnique: jest.fn() },
+    v1User: { findUnique: jest.fn(), findMany: jest.fn() },
     v1PushSubscription: { findMany: jest.fn() },
     v1NotificationPreference: { findUnique: jest.fn() },
     v1Notification: { create: jest.fn() },
@@ -277,13 +277,13 @@ describe('AdminOpsService', () => {
       expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
     });
 
-    it('broadcasts to every distinct push subscriber via cursor pagination, skipping those with noticeEnabled off, and audit-logs targetId "broadcast"', async () => {
+    it('broadcasts to every active user via cursor pagination, skipping those with noticeEnabled off, and audit-logs targetId "broadcast"', async () => {
       // Page has only 3 rows (< BROADCAST_CHUNK_SIZE), so the loop makes exactly
       // one findMany call and stops — no second page mock needed.
-      prisma.v1PushSubscription.findMany.mockResolvedValueOnce([
-        { id: 'sub-1', userId: 'user-1' },
-        { id: 'sub-2', userId: 'user-2' },
-        { id: 'sub-3', userId: 'user-3' },
+      prisma.v1User.findMany.mockResolvedValueOnce([
+        { id: 'user-1' },
+        { id: 'user-2' },
+        { id: 'user-3' },
       ]);
       prisma.v1NotificationPreference.findUnique.mockImplementation(({ where }: { where: { userId: string } }) =>
         Promise.resolve(where.userId === 'user-2' ? { noticeEnabled: false } : { noticeEnabled: true }),
@@ -291,10 +291,11 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(prisma.v1PushSubscription.findMany).toHaveBeenNthCalledWith(1, {
+      expect(prisma.v1User.findMany).toHaveBeenNthCalledWith(1, {
+        where: { accountStatus: 'active' },
         take: 30,
         orderBy: { id: 'asc' },
-        select: { id: true, userId: true },
+        select: { id: true },
       });
       expect(result).toEqual({ sent: 2, skipped: 1, failed: 0 });
       expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
@@ -304,31 +305,49 @@ describe('AdminOpsService', () => {
       );
     });
 
-    it('pages through multiple chunks of subscribers using an id cursor instead of loading them all at once', async () => {
-      const page1 = Array.from({ length: 30 }, (_, i) => ({ id: `sub-${i}`, userId: `user-${i}` }));
-      const page2 = [{ id: 'sub-30', userId: 'user-30' }];
-      prisma.v1PushSubscription.findMany.mockResolvedValueOnce(page1).mockResolvedValueOnce(page2);
+    /**
+     * 회귀 방지: 예전 구현은 V1PushSubscription 을 훑어 "푸시 구독자"만 대상으로
+     * 삼아서, 구독이 하나도 없으면 sent:0 으로 끝나고 인앱 알림함에도 아무것도
+     * 남지 않았다(실제 alpha 에서 재현된 증상). 전체 공지는 푸시 구독 여부와
+     * 무관하게 인앱 알림이 전원에게 생성돼야 한다.
+     */
+    it('still delivers in-app notifications to users who have no push subscription at all', async () => {
+      prisma.v1User.findMany.mockResolvedValueOnce([{ id: 'user-1' }, { id: 'user-2' }]);
+      prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
+      // 구독 테이블은 비어 있다 — 그래도 결과가 sent:2 여야 한다.
+      prisma.v1PushSubscription.findMany.mockResolvedValue([]);
+
+      const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
+
+      expect(result).toEqual({ sent: 2, skipped: 0, failed: 0 });
+      expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
+      // 대상 선정에 구독 테이블을 쓰지 않는다.
+      expect(prisma.v1PushSubscription.findMany).not.toHaveBeenCalled();
+    });
+
+    it('pages through multiple chunks of users using an id cursor instead of loading them all at once', async () => {
+      const page1 = Array.from({ length: 30 }, (_, i) => ({ id: `user-${i}` }));
+      const page2 = [{ id: 'user-30' }];
+      prisma.v1User.findMany.mockResolvedValueOnce(page1).mockResolvedValueOnce(page2);
       prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
       expect(result).toEqual({ sent: 31, skipped: 0, failed: 0 });
-      expect(prisma.v1PushSubscription.findMany).toHaveBeenNthCalledWith(2, {
+      expect(prisma.v1User.findMany).toHaveBeenNthCalledWith(2, {
+        where: { accountStatus: 'active' },
         take: 30,
         skip: 1,
-        cursor: { id: 'sub-29' },
+        cursor: { id: 'user-29' },
         orderBy: { id: 'asc' },
-        select: { id: true, userId: true },
+        select: { id: true },
       });
     });
 
     it('isolates a per-recipient failure during broadcast so the rest still send', async () => {
       // Page has only 2 rows (< BROADCAST_CHUNK_SIZE), so the loop makes exactly
       // one findMany call and stops — no second page mock needed.
-      prisma.v1PushSubscription.findMany.mockResolvedValueOnce([
-        { id: 'sub-1', userId: 'user-1' },
-        { id: 'sub-2', userId: 'user-2' },
-      ]);
+      prisma.v1User.findMany.mockResolvedValueOnce([{ id: 'user-1' }, { id: 'user-2' }]);
       prisma.v1NotificationPreference.findUnique.mockResolvedValue({ noticeEnabled: true });
       prisma.v1Notification.create
         .mockRejectedValueOnce(new Error('db write failed'))

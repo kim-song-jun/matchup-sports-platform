@@ -147,6 +147,40 @@ describe('NotificationSettingsPageClient push toggle', () => {
     expect(subscribe).not.toHaveBeenCalled();
   });
 
+  /**
+   * 상태별 문구 회귀 방지: 예전에는 꺼져 있을 때도 "브라우저 푸시로 받아요"라고 적혀 있어
+   * 이미 켜진 것으로 읽혔고, 웹 푸시가 기기·브라우저 단위라는 사실이 어디에도 없었다.
+   */
+  it('구독 중이면 이 브라우저에서 받는 중이라고 알리고, 기기마다 따로 켜야 함을 밝힌다', () => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'granted',
+      isSubscribed: true,
+    });
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    expect(screen.getByText(/지금 이 브라우저에서 받고 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/다른 기기에서는 따로 켜야 해요/)).toBeInTheDocument();
+    // 켜져 있으면 항목 설명도 "알림함 + 브라우저 알림 모두"로 바뀐다.
+    expect(screen.getByText(/알림함과 브라우저 알림 모두에서 빠져요/)).toBeInTheDocument();
+  });
+
+  it('구독 전이면 켰을 때 무엇이 달라지는지 알리고, 지금은 알림함에서만 보인다고 안내한다', () => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+    });
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    expect(screen.getByText(/켜면 앱을 닫아도 새 소식을 받을 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/지금은 앱 안 알림함에서만 볼 수 있어요/)).toBeInTheDocument();
+    // 꺼져 있는데 "받아요"라고 단정하지 않는다.
+    expect(screen.queryByText(/브라우저 푸시로 받아요/)).not.toBeInTheDocument();
+  });
+
   it('hides the toggle entirely when push is unsupported', () => {
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe: vi.fn(),

@@ -185,4 +185,34 @@ describe('PhoneVerificationCard', () => {
     expect(screen.getByText('인증번호를 다시 받아 주세요')).toBeInTheDocument();
     expect(screen.getByLabelText('인증번호 6자리')).toBeDisabled();
   });
+
+  it('phone prop이 바뀌면 idle 상태로 리셋되어 이전 번호 코드로 verify하지 않는다', async () => {
+    vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue(
+      mutation({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(), devCode: '111111' }),
+    );
+    vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue(mutation({ verified: false }));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const onVerified = vi.fn();
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <PhoneVerificationCard mode="public" phone="01011112222" onVerified={onVerified} />
+      </QueryClientProvider>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    });
+    await flush();
+    expect(screen.getByLabelText('인증번호 6자리')).toBeInTheDocument();
+
+    // 번호를 다른 11자리로 변경 → idle 리셋(입력 필드 사라지고 "인증번호 받기"로 복귀)
+    rerender(
+      <QueryClientProvider client={qc}>
+        <PhoneVerificationCard mode="public" phone="01033334444" onVerified={onVerified} />
+      </QueryClientProvider>,
+    );
+    await flush();
+
+    expect(screen.queryByLabelText('인증번호 6자리')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeInTheDocument();
+  });
 });

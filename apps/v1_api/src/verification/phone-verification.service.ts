@@ -44,7 +44,7 @@ export class PhoneVerificationService {
 
     await this.dispatcher.send('phone', phone, code);
 
-    return { expiresAt: expiresAt.toISOString(), ...(this.dispatcher.devEcho ? { devCode: code } : {}) };
+    return { expiresAt: expiresAt.toISOString(), ...(this.dispatcher.devEchoActive ? { devCode: code } : {}) };
   }
 
   async verifyCode(phone: string, code: string): Promise<boolean> {

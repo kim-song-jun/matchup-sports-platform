@@ -41,6 +41,19 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
   const [resendRemainingMs, setResendRemainingMs] = useState(0);
   const [verified, setVerified] = useState(false);
 
+  // phone 또는 mode 가 바뀌면(사용자가 번호를 계속 수정 가능) 이전 번호의 발급/입력 상태를 버린다 —
+  // 같은 컴포넌트 인스턴스가 유지될 때 이전 번호로 발급한 코드로 verify 하는 것을 막는다.
+  useEffect(() => {
+    setPhase('idle');
+    setCode('');
+    setError(null);
+    setExpiresAt(null);
+    setResendAvailableAt(null);
+    setRemainingMs(0);
+    setResendRemainingMs(0);
+    setVerified(false);
+  }, [phone, mode]);
+
   const issuing = mode === 'public' ? publicIssue.isPending : authedRequest.isPending;
   const verifying = mode === 'public' ? publicVerify.isPending : authedConfirm.isPending;
 

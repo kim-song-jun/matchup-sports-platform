@@ -31,7 +31,8 @@ function prismaMock() {
 }
 
 function dispatcherMock(devEcho = true) {
-  return { devEcho, send: jest.fn().mockResolvedValue(undefined) } as unknown as VerificationDispatcherService;
+  // 테스트에선 SMS provider 가 비활성이라 devEchoActive === devEcho.
+  return { devEcho, devEchoActive: devEcho, send: jest.fn().mockResolvedValue(undefined) } as unknown as VerificationDispatcherService;
 }
 
 const PHONE = '01012345678';

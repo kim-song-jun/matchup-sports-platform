@@ -3,6 +3,9 @@ import { createHmac, randomBytes } from 'crypto';
 import type { SmsSender } from './sms-sender';
 
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send';
+// 유료 SMS 발송 경로 — 응답이 지연되면 fetch 가 무기한 매달려 워커/커넥션이 고갈된다.
+// 상한을 두고 초과 시 abort 하여 커넥션을 즉시 회수한다(옥토모 클라이언트와 동일 방어).
+const SOLAPI_TIMEOUT_MS = 8000;
 
 /**
  * 솔라피(SOLAPI) SMS 발송 어댑터.
@@ -39,14 +42,28 @@ export class SolapiSmsSender implements SmsSender {
   }
 
   async send(to: string, text: string): Promise<void> {
-    const res = await fetch(SOLAPI_SEND_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        Authorization: this.authorization(),
-      },
-      body: JSON.stringify({ message: { to, from: this.sender, text } }),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SOLAPI_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(SOLAPI_SEND_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Authorization: this.authorization(),
+        },
+        body: JSON.stringify({ message: { to, from: this.sender, text } }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        this.logger.warn(`solapi send timed out after ${SOLAPI_TIMEOUT_MS}ms`);
+        throw new Error(`Solapi send timed out after ${SOLAPI_TIMEOUT_MS}ms`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       this.logger.warn(`solapi send failed: ${res.status} ${body.slice(0, 200)}`);

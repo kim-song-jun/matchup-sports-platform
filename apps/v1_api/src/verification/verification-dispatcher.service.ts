@@ -1,12 +1,13 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { V1VerificationChannel } from '@prisma/client';
 import { SMS_SENDER, SmsSender, buildOtpSmsText } from './sms/sms-sender';
 
 /**
  * 인증코드 발송기.
  * phone 채널은 SmsSender 어댑터(솔라피 등)로 실제 SMS 를 발송한다. 어댑터가 비활성(시크릿 미설정)
- * 이거나 email 채널이면 로그 스텁으로만 남기고, V1_VERIFICATION_DEV_ECHO=true 일 때 서비스가
- * 응답에 devCode 를 포함해 개발/검증 흐름을 가능하게 한다.
+ * 이고 dev-echo 이면 로그로만 남기고 응답에 devCode 를 노출해 개발/CI 검증을 가능하게 한다.
+ * 어댑터도 dev-echo 도 없으면 실제 발송도 devCode 도 없어 인증을 진행할 수 없으므로, 설정 오류를
+ * 성공(200)으로 숨기지 않고 503 으로 표면화한다.
  * 발송 실패는 흡수하지 않고 throw 를 전파해 사용자에게 알린다(fire-and-forget 아님).
  */
 @Injectable()
@@ -22,16 +23,34 @@ export class VerificationDispatcherService {
     return this.sms.enabled;
   }
 
+  /**
+   * devCode 를 응답에 노출해도 되는 유일한 경우: 실제 SMS 발송이 없고(dev-echo 경로) devEcho 가 켜진
+   * 개발/CI 환경. 실발송이 가능한 환경(smsEnabled)에서는 devEcho 설정 실수가 있어도 OTP 를 노출하지 않는다.
+   */
+  get devEchoActive(): boolean {
+    return this.devEcho && !this.sms.enabled;
+  }
+
   async send(channel: V1VerificationChannel, target: string, code: string): Promise<void> {
     const masked = target.length > 4 ? `${target.slice(0, 2)}***${target.slice(-2)}` : '***';
-    if (channel === 'phone' && this.sms.enabled) {
-      await this.sms.send(target, buildOtpSmsText(code));
-      this.logger.log(`[verification:phone] SMS 발송 완료 → ${masked}`);
-      return;
+    if (channel === 'phone') {
+      if (this.sms.enabled) {
+        await this.sms.send(target, buildOtpSmsText(code));
+        this.logger.log(`[verification:phone] SMS 발송 완료 → ${masked}`);
+        return;
+      }
+      if (this.devEcho) {
+        this.logger.log(`[verification:phone] dev-echo (실발송 없음) → ${masked} (dev code=${code})`);
+        return;
+      }
+      throw new ServiceUnavailableException({
+        code: 'SMS_NOT_CONFIGURED',
+        message: '문자 인증을 사용할 수 없어요. 잠시 후 다시 시도해 주세요.',
+      });
     }
-    // provider 미설정(email 로그 스텁 포함): dev-echo 로만 코드 노출
+    // email: 로그 스텁
     this.logger.log(
-      `[verification:${channel}] dispatched code to ${masked}${this.devEcho ? ` (dev code=${code})` : ''}`,
+      `[verification:email] dispatched code to ${masked}${this.devEcho ? ` (dev code=${code})` : ''}`,
     );
   }
 }

@@ -56,6 +56,19 @@ describe('SolapiSmsSender', () => {
     });
   });
 
+  it('fetch에 AbortSignal을 넘긴다 (무기한 hang 방지 timeout guard)', async () => {
+    process.env.SOLAPI_API_KEY = 'k';
+    process.env.SOLAPI_API_SECRET = 's';
+    process.env.SOLAPI_SENDER_NUMBER = '01000000000';
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}), text: async () => '' });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await new SolapiSmsSender().send('01033334444', 't');
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('비2xx 응답이면 throw (발송 실패는 흡수하지 않음)', async () => {
     process.env.SOLAPI_API_KEY = 'k';
     process.env.SOLAPI_API_SECRET = 's';

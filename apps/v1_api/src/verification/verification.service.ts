@@ -172,7 +172,7 @@ export class VerificationService {
       sent: true,
       channel,
       target: maskTarget(channel, target),
-      ...(this.dispatcher.devEcho ? { devCode: code } : {}),
+      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
     };
   }
 

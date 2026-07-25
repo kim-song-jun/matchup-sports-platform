@@ -32,9 +32,13 @@ const WIDTHS = [
 
     await page.goto(`${BASE}/admin/ops/errors`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForLoadState('load', { timeout: 30000 }).catch(() => {});
-    // 목록 행이 실제로 그려질 때까지 기다린다 — 로딩 스켈레톤만 찍히면 검증이 안 된다.
+    // 목록이 실제로 그려질 때까지 기다린다 — 로딩 스켈레톤만 찍히면 검증이 안 된다.
+    // 본문 텍스트로 판정하면 안 된다: 사이드바에 '약관' 같은 메뉴가 항상 떠 있어서
+    // 페이지가 뜨기만 해도 조건이 참이 되고, 행이 없는 화면을 찍게 된다.
+    // 목록 행이 생겼거나 "없어요" 빈 상태가 확정된 시점만 신호로 받는다.
     await page.waitForFunction(
-      () => /Cannot GET|TypeError|약관/.test(document.body.innerText),
+      () => document.querySelectorAll('tbody tr').length > 0
+        || /없어요|없습니다/.test(document.querySelector('main')?.innerText ?? ''),
       { timeout: 30000 },
     ).catch(() => {});
     await page.addStyleTag({ content: HIDE }).catch(() => {});

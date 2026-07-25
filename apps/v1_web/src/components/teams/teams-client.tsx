@@ -452,7 +452,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             onCancel: () =>
               confirmAction(
                 confirm,
-                { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '취소', tone: 'danger' },
+                { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '초대 취소', tone: 'danger' },
                 () => {
                   cancellingInvitations.start(inv.invitationId);
                   cancelInvitation.mutate(

@@ -534,10 +534,8 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
     for (const name of ['김도윤', '박서준']) {
       fireEvent.click(screen.getByRole('button', { name: `${name}님 초대 취소` }));
       const dialog = await screen.findByRole('dialog', { name: '초대 취소' });
-      // 확인 모달은 confirmLabel('취소')과 기본 cancelLabel('취소')이 같아 버튼 이름만으로는
-      // 구분되지 않는다. 확인 버튼이 뒤에 렌더되므로 마지막 것을 누른다.
-      const buttons = within(dialog).getAllByRole('button', { name: '취소' });
-      fireEvent.click(buttons[buttons.length - 1]);
+      // 확인 버튼('초대 취소')과 닫기 버튼('취소')이 서로 다른 문구여야 이 셀렉터가 성립한다.
+      fireEvent.click(within(dialog).getByRole('button', { name: '초대 취소' }));
       await waitFor(() => expect(screen.queryByRole('dialog', { name: '초대 취소' })).not.toBeInTheDocument());
     }
 

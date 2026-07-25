@@ -16,10 +16,13 @@ const BREAKPOINTS = [
   { key: 'tablet', w: 768, h: 1024 },
   { key: 'desktop', w: 1440, h: 900 },
 ];
+const RID = process.env.RID || 'aa100000-0000-4000-8000-000000000001';
 const PAGES = [
   ['my-registration', `/tournaments/${TID}/my`],
   ['tournament-detail', `/tournaments/${TID}`],
   ['notices', '/notices'],
+  // 선수 명단은 스크롤 영역 내부에 sticky 저장 CTA가 있어 탭바와의 공존 확인이 필요하다.
+  ['roster', `/tournaments/${TID}/registrations/${RID}/roster`],
 ];
 
 (async () => {

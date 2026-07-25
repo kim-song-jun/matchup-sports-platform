@@ -20,6 +20,13 @@
     "homeShortcutVisible": true,
     "visibleHomeLinks": 2
   },
+  "roster-mobile": {
+    "navInDom": true,
+    "navVisible": true,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
   "_console_mobile": [],
   "my-registration-tablet": {
     "navInDom": true,
@@ -42,6 +49,13 @@
     "homeShortcutVisible": true,
     "visibleHomeLinks": 2
   },
+  "roster-tablet": {
+    "navInDom": true,
+    "navVisible": true,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
   "_console_tablet": [],
   "my-registration-desktop": {
     "navInDom": true,
@@ -63,6 +77,13 @@
     "homeShortcutInDom": true,
     "homeShortcutVisible": false,
     "visibleHomeLinks": 3
+  },
+  "roster-desktop": {
+    "navInDom": true,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 2
   },
   "_console_desktop": []
 }

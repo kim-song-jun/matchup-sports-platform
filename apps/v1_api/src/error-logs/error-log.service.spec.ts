@@ -1,0 +1,223 @@
+import { ErrorLogService, computeFingerprint, normalizeForFingerprint } from './error-log.service';
+
+describe('normalizeForFingerprint / computeFingerprint', () => {
+  it('normalizes UUIDs in a route to :id so different targets fold into the same fingerprint', () => {
+    const a = computeFingerprint('server', 500, '/tournaments/11111111-2222-3333-4444-555555555555', 'boom');
+    const b = computeFingerprint('server', 500, '/tournaments/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'boom');
+    expect(a).toBe(b);
+  });
+
+  it('normalizes consecutive digits to :n', () => {
+    expect(normalizeForFingerprint('/matches/42/join')).toBe('/matches/:n/join');
+  });
+
+  it('produces a 32-hex-char fingerprint', () => {
+    const fp = computeFingerprint('server', 500, '/x', 'boom');
+    expect(fp).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('differs by statusCode even when route/message are identical', () => {
+    const a = computeFingerprint('server', 500, '/x', 'boom');
+    const b = computeFingerprint('server', 404, '/x', 'boom');
+    expect(a).not.toBe(b);
+  });
+
+  // NestJS 내장 404는 message에 원본 URL을 그대로 담는다("Cannot GET /path?token=..").
+  // 쿼리스트링을 지문에서 걷어내지 않으면 스캐너가 값만 바꿔 훑어도 매번 새 행이 생겨,
+  // 보존이 무기한인 이 테이블에서 dedupe가 통째로 무력해진다.
+  it('folds URL query strings so scanning with different values reuses one fingerprint', () => {
+    const a = computeFingerprint('server', 404, '/api/v1/nope', 'Cannot GET /api/v1/nope?token=abcXYZ');
+    const b = computeFingerprint('server', 404, '/api/v1/nope', 'Cannot GET /api/v1/nope?token=zzTOP');
+    expect(a).toBe(b);
+    // 쿼리스트링은 사라지고, 경로의 숫자는 기존 규칙대로 :n 이 된다(v1 → v:n).
+    expect(normalizeForFingerprint('Cannot GET /api/v1/nope?token=abcXYZ')).toBe('Cannot GET /api/v:n/nope');
+  });
+
+  it('keeps a question mark that is not a URL query — Korean copy must survive normalization', () => {
+    expect(normalizeForFingerprint('정말 삭제할까요?')).toBe('정말 삭제할까요?');
+  });
+});
+
+describe('ErrorLogService.record', () => {
+  function buildPrismaMock() {
+    return { v1ErrorLog: { upsert: jest.fn().mockResolvedValue({}) } };
+  }
+  const logger = { warn: jest.fn(), error: jest.fn() };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('buckets 401 responses into a 24-hour window', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    const fixedNow = new Date('2026-07-26T10:15:00.000Z');
+    // process.nextTick은 실제로 남겨둔다 — flushMicrotasks()가 이걸로 record()의
+    // fire-and-forget persist()가 끝나길 기다리기 때문에, 가짜 타이머가 이를 삼키면
+    // 영원히 resolve되지 않는다.
+    jest.useFakeTimers({ doNotFake: ['nextTick'] }).setSystemTime(fixedNow);
+
+    service.record({ source: 'server', level: 'error', statusCode: 401, route: '/auth/me', message: 'unauthorized' });
+    await flushMicrotasks();
+
+    const call = prisma.v1ErrorLog.upsert.mock.calls[0][0];
+    const expectedBucket = new Date(Math.floor(fixedNow.getTime() / (24 * 60 * 60 * 1000)) * 24 * 60 * 60 * 1000);
+    expect(call.where.fingerprint_windowBucket.windowBucket).toEqual(expectedBucket);
+  });
+
+  it('buckets 403 responses into a 24-hour window', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    service.record({ source: 'server', level: 'error', statusCode: 403, route: '/teams/1', message: 'forbidden' });
+    await flushMicrotasks();
+
+    const call = prisma.v1ErrorLog.upsert.mock.calls[0][0];
+    const bucketMs = call.where.fingerprint_windowBucket.windowBucket.getTime();
+    expect(bucketMs % (24 * 60 * 60 * 1000)).toBe(0);
+  });
+
+  it('buckets 500 responses into a 1-hour window', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    service.record({ source: 'server', level: 'error', statusCode: 500, route: '/x', message: 'boom' });
+    await flushMicrotasks();
+
+    const call = prisma.v1ErrorLog.upsert.mock.calls[0][0];
+    const bucketMs = call.where.fingerprint_windowBucket.windowBucket.getTime();
+    expect(bucketMs % (60 * 60 * 1000)).toBe(0);
+    // and it must NOT be 24h-aligned unless coincidentally so — assert the size directly via update path below instead.
+  });
+
+  it('upserts with occurrenceCount increment + lastSeenAt refresh on update, and preserves body/stack via create-only fields', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    service.record({ source: 'server', level: 'error', statusCode: 500, route: '/x', message: 'boom', stack: 'stack trace' });
+    await flushMicrotasks();
+
+    const call = prisma.v1ErrorLog.upsert.mock.calls[0][0];
+    expect(call.update).toEqual({ occurrenceCount: { increment: 1 }, lastSeenAt: expect.any(Date) });
+    expect(call.create.stack).toBe('stack trace');
+    expect(call.create.occurrenceCount).toBe(1);
+  });
+
+  it('folds a UUID-varying route into the same fingerprint (same where clause) across two records', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    service.record({ source: 'server', level: 'error', statusCode: 500, route: '/tournaments/11111111-2222-3333-4444-555555555555', message: 'boom' });
+    service.record({ source: 'server', level: 'error', statusCode: 500, route: '/tournaments/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', message: 'boom' });
+    await flushMicrotasks();
+
+    const [first, second] = prisma.v1ErrorLog.upsert.mock.calls;
+    expect(first[0].where.fingerprint_windowBucket.fingerprint).toBe(
+      second[0].where.fingerprint_windowBucket.fingerprint,
+    );
+  });
+
+  it('masks sensitive keys in requestBody/requestHeaders before storing', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    service.record({
+      source: 'server',
+      level: 'error',
+      statusCode: 500,
+      route: '/auth/kakao',
+      message: 'boom',
+      requestBody: { password: 'hunter2', nested: { token: 'abc' } },
+      requestHeaders: { authorization: 'Bearer abc', cookie: 'sid=1' },
+    });
+    await flushMicrotasks();
+
+    const call = prisma.v1ErrorLog.upsert.mock.calls[0][0];
+    // requestBody/requestHeaders는 마스킹된 "구조"(object)로 저장된다 — Json 컬럼에 미리
+    // 직렬화한 문자열을 넣으면 어드민 프론트가 그 문자열을 재차 JSON.stringify해 이스케이프된
+    // 한 줄로 뭉개는 이중 인코딩 버그가 생기므로, 여기서는 object 그대로임을 고정한다.
+    expect(call.create.requestBody).toEqual({ password: '[REDACTED]', nested: { token: '[REDACTED]' } });
+    expect(JSON.stringify(call.create.requestBody)).not.toContain('hunter2');
+    expect(call.create.requestHeaders).toEqual({ authorization: '[REDACTED]', cookie: '[REDACTED]' });
+    expect(JSON.stringify(call.create.requestHeaders)).not.toContain('Bearer abc');
+  });
+
+  it('masks sensitive query-string values embedded in the message text (e.g. NestJS 404 "Cannot GET /path?token=...")', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    service.record({
+      source: 'server',
+      level: 'warn',
+      statusCode: 404,
+      route: '/aaaaa',
+      message: 'Cannot GET /api/v1/aaaaa?password=hunter2&token=eyJhbGciOiJIUzI1NiJ9',
+    });
+    await flushMicrotasks();
+
+    const call = prisma.v1ErrorLog.upsert.mock.calls[0][0];
+    expect(call.create.message).not.toContain('hunter2');
+    expect(call.create.message).not.toContain('eyJhbGciOiJIUzI1NiJ9');
+    expect(call.create.message).toBe('Cannot GET /api/v1/aaaaa?password=[REDACTED]&token=[REDACTED]');
+  });
+
+  it('replaces requestBody with a truncated placeholder object (not a bare string) when serialized size exceeds the cap', async () => {
+    const prisma = buildPrismaMock();
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    service.record({
+      source: 'server',
+      level: 'error',
+      statusCode: 500,
+      route: '/x',
+      message: 'boom',
+      requestBody: { blob: 'x'.repeat(5000) },
+    });
+    await flushMicrotasks();
+
+    const call = prisma.v1ErrorLog.upsert.mock.calls[0][0];
+    expect(typeof call.create.requestBody).toBe('object');
+    expect(call.create.requestBody._truncated).toBe(true);
+    expect(typeof call.create.requestBody.preview).toBe('string');
+  });
+
+  it('defaults releaseSha to null when V1_RELEASE is not set', async () => {
+    const previous = process.env.V1_RELEASE;
+    delete process.env.V1_RELEASE;
+    try {
+      const prisma = buildPrismaMock();
+      const service = new ErrorLogService(prisma as never, logger as never);
+
+      service.record({ source: 'server', level: 'error', statusCode: 500, route: '/x', message: 'boom' });
+      await flushMicrotasks();
+
+      expect(prisma.v1ErrorLog.upsert.mock.calls[0][0].create.releaseSha).toBeNull();
+    } finally {
+      if (previous !== undefined) process.env.V1_RELEASE = previous;
+    }
+  });
+
+  it('never throws when the underlying prisma call rejects, and logs a warning instead', async () => {
+    const prisma = { v1ErrorLog: { upsert: jest.fn().mockRejectedValue(new Error('db down')) } };
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    expect(() =>
+      service.record({ source: 'server', level: 'error', statusCode: 500, route: '/x', message: 'boom' }),
+    ).not.toThrow();
+
+    await flushMicrotasks();
+    await flushMicrotasks();
+
+    expect(logger.warn).toHaveBeenCalled();
+  });
+});
+
+/** record()는 fire-and-forget(내부 promise를 await하지 않음)이므로 마이크로태스크 큐가
+ * 비워질 때까지 명시적으로 양보해 upsert 호출이 기록될 시간을 준다.
+ * process.nextTick은 jest의 fake timers(setTimeout/setImmediate 등을 가짜로 만듦)에
+ * 영향받지 않으므로 401/403 버킷 테스트(fake timers 사용)에서도 안전하다. */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => process.nextTick(resolve));
+}

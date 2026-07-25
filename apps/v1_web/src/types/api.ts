@@ -1789,6 +1789,60 @@ export type V1AdminOpsSummary = {
 };
 
 // ---------------------------------------------------------------------------
+// Admin — 에러 로그 뷰어
+// ---------------------------------------------------------------------------
+
+/** source 는 서버(server) / 클라이언트(client) 두 값만 존재한다. */
+export type V1AdminErrorLogSource = 'server' | 'client';
+
+/** level 은 error / warn 두 값만 존재한다. */
+export type V1AdminErrorLogLevel = 'error' | 'warn';
+
+export type V1AdminErrorLogListItem = {
+  id: string;
+  source: V1AdminErrorLogSource;
+  level: V1AdminErrorLogLevel;
+  statusCode: number | null;
+  errorCode: string | null;
+  method: string | null;
+  route: string | null;
+  message: string;
+  occurrenceCount: number;
+  releaseSha: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+};
+
+export type V1AdminErrorLogDetail = V1AdminErrorLogListItem & {
+  stack: string | null;
+  requestBody: unknown;
+  requestHeaders: unknown;
+  responseBody: unknown;
+  context: unknown;
+  userId: string | null;
+  userAgent: string | null;
+};
+
+export type V1AdminErrorLogsPage = {
+  items: V1AdminErrorLogListItem[];
+  pageInfo: {
+    nextCursor: string | null;
+    hasNext: boolean;
+  };
+};
+
+export type V1AdminErrorLogFilters = {
+  source?: V1AdminErrorLogSource;
+  statusCode?: number;
+  level?: V1AdminErrorLogLevel;
+  from?: string;
+  to?: string;
+  q?: string;
+  cursor?: string;
+  limit?: number;
+};
+
+// ---------------------------------------------------------------------------
 // Admin — manual web push send
 // ---------------------------------------------------------------------------
 

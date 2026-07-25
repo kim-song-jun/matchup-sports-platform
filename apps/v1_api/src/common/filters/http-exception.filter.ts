@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Request, Response } from 'express';
+import { ErrorLogService } from '../../error-logs/error-log.service';
 
 type V1Request = Request & { id?: string; v1User?: { id: string } };
 
@@ -20,7 +21,10 @@ const MAX_LOGGED_STACK_LENGTH = 4000;
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  constructor(@InjectPinoLogger(AllExceptionsFilter.name) private readonly logger: PinoLogger) {}
+  constructor(
+    @InjectPinoLogger(AllExceptionsFilter.name) private readonly logger: PinoLogger,
+    private readonly errorLogService: ErrorLogService,
+  ) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -44,29 +48,60 @@ export class AllExceptionsFilter implements ExceptionFilter {
       userId: request.v1User?.id,
     };
 
-    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      const rawStack = exception instanceof Error ? exception.stack : String(exception);
+    const isServerError = status >= HttpStatus.INTERNAL_SERVER_ERROR;
+    const rawStack = isServerError ? (exception instanceof Error ? exception.stack : String(exception)) : undefined;
+    const truncatedStack = rawStack?.slice(0, MAX_LOGGED_STACK_LENGTH);
+
+    if (isServerError) {
       this.logger.error(
-        { ...logContext, stack: rawStack?.slice(0, MAX_LOGGED_STACK_LENGTH) },
+        { ...logContext, stack: truncatedStack },
         `Unhandled exception at ${logContext.method} ${logContext.route}`,
       );
     } else {
       this.logger.warn(logContext, `HTTP ${status} ${logContext.method} ${logContext.route}`);
     }
 
-    response.status(status).json({
+    const responseMessage =
+      typeof message === 'string'
+        ? message
+        : messageObj && typeof messageObj.message === 'string'
+          ? (messageObj.message as string)
+          : `HTTP ${status}`;
+
+    const responseBody = {
       status: 'error',
       statusCode: status,
       code: code ?? 'INTERNAL_ERROR',
-      message:
-        typeof message === 'string'
-          ? message
-          : messageObj && typeof messageObj.message === 'string'
-            ? (messageObj.message as string)
-            : message,
+      message: typeof message === 'string' || (messageObj && typeof messageObj.message === 'string') ? responseMessage : message,
       details: messageObj?.details ?? null,
       requestId: request.id,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    // 어드민 에러 로그 뷰어 적재 — fire-and-forget. AllExceptionsFilter 는 전역 예외 필터라
+    // 여기서 예외가 새어나가면 에러 응답 자체가 깨진다. ErrorLogService.record() 는 계약상
+    // throw 하지 않지만, 방어적으로 감싸 그 계약이 깨지거나(혹은 테스트가 의도적으로
+    // throw 하도록 mock 하더라도) 아래 response.status().json() 이 항상 실행되게 한다.
+    try {
+      this.errorLogService.record({
+        source: 'server',
+        level: isServerError ? 'error' : 'warn',
+        statusCode: status,
+        errorCode: code ?? null,
+        method: logContext.method,
+        route: logContext.route,
+        message: responseMessage,
+        stack: truncatedStack ?? null,
+        requestBody: request.body,
+        requestHeaders: request.headers,
+        responseBody,
+        userId: request.v1User?.id ?? null,
+        userAgent: request.headers?.['user-agent'] as string | undefined,
+      });
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to record server error log');
+    }
+
+    response.status(status).json(responseBody);
   }
 }

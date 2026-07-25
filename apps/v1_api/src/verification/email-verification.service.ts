@@ -41,6 +41,7 @@ export class EmailVerificationService {
   ): Promise<{ expiresAt: string; devCode?: string }> {
     const email = normalizeEmail(rawEmail);
     await this.assertResendCooldown(email);
+    await this.sweepExpired();
 
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const codeHash = await hashPassword(code);
@@ -120,6 +121,20 @@ export class EmailVerificationService {
   /** 이 흐름이 발급할 수 있는 증명은 비밀번호 재설정용 하나뿐이다(용도를 요청자가 고르지 못한다). */
   issueProof(email: string): string {
     return issueEmailProofToken(normalizeEmail(email), 'password_reset');
+  }
+
+  /**
+   * 만료된 챌린지를 치운다.
+   *
+   * 이 표는 가입 여부와 무관하게 행이 생기므로(계정 열거 방어) 남겨 두면 시도된 주소 수만큼
+   * 끝없이 자란다 — 로그인도 필요 없는 공개 경로라 상한이 레이트리밋뿐이다. 만료된 행은
+   * verifyCode 가 어차피 NO_PENDING 으로 거부하고 쿨다운(30초)도 TTL(5분)보다 짧아,
+   * 지워도 달라지는 동작이 없다. 별도 스케줄러 없이 발급 때마다 함께 치워 표를 짧게 유지한다.
+   */
+  private async sweepExpired(): Promise<void> {
+    await this.prisma.v1EmailVerificationChallenge.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    });
   }
 
   // 마지막 발송 시각 = expiresAt - CODE_TTL_MS (verify 는 expiresAt 를 바꾸지 않으므로 신뢰 가능).

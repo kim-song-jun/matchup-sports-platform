@@ -55,11 +55,19 @@ function prismaMock() {
           return row;
         },
       ),
-      deleteMany: jest.fn(async ({ where }: { where: { email: string } }) => {
-        const existed = store.has(where.email);
-        store.delete(where.email);
-        return { count: existed ? 1 : 0 };
-      }),
+      deleteMany: jest.fn(
+        async ({ where }: { where: { email?: string; expiresAt?: { lt: Date } } }) => {
+          if (where.expiresAt) {
+            const cutoff = where.expiresAt.lt.getTime();
+            const doomed = [...store.values()].filter((row) => row.expiresAt.getTime() < cutoff);
+            doomed.forEach((row) => store.delete(row.email));
+            return { count: doomed.length };
+          }
+          const existed = store.has(where.email!);
+          store.delete(where.email!);
+          return { count: existed ? 1 : 0 };
+        },
+      ),
     },
     __store: store,
   } as never;
@@ -218,6 +226,23 @@ describe('EmailVerificationService (공개 이메일 OTP)', () => {
     await expect(svc.issueChallenge(EMAIL, { deliver: true })).rejects.toMatchObject({
       response: { code: 'VERIFICATION_RESEND_COOLDOWN' },
     });
+  });
+
+  /**
+   * 이 표는 가입 여부와 무관하게 행이 생기므로, 치우지 않으면 시도된 주소 수만큼 끝없이 자란다
+   * (로그인도 필요 없는 공개 경로라 상한이 레이트리밋뿐이다).
+   */
+  it('발급할 때 만료된 챌린지를 함께 치운다', async () => {
+    const prisma = prismaMock();
+    const svc = new EmailVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    await svc.issueChallenge('stale@example.com', { deliver: false });
+    storeOf(prisma).get('stale@example.com')!.expiresAt = new Date(Date.now() - 1000);
+
+    await svc.issueChallenge(EMAIL, { deliver: true });
+
+    expect(storeOf(prisma).has('stale@example.com')).toBe(false);
+    // 아직 살아 있는 챌린지까지 쓸어 가면 진행 중인 인증이 끊긴다.
+    expect(storeOf(prisma).has(EMAIL)).toBe(true);
   });
 
   it('발송이 실패하면 챌린지를 지워 바로 다시 요청할 수 있게 한다', async () => {

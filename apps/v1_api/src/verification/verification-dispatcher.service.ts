@@ -55,9 +55,10 @@ export class VerificationDispatcherService {
         message: '문자 인증을 사용할 수 없어요. 잠시 후 다시 시도해 주세요.',
       });
     }
-    // email: 로그 스텁
+    // email: 로그 스텁. dev code 는 phone 과 동일하게 devEchoActive(실발송 provider 없음 + dev-echo)일
+    // 때만 로그에 남겨, 운영 가능한 환경에서 dev-echo 가 실수로 켜져도 OTP 가 로그로 새지 않게 한다.
     this.logger.log(
-      `[verification:email] dispatched code to ${masked}${this.devEcho ? ` (dev code=${code})` : ''}`,
+      `[verification:email] dispatched code to ${masked}${this.devEchoActive ? ` (dev code=${code})` : ''}`,
     );
   }
 }

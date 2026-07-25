@@ -290,7 +290,7 @@ export function useV1PhoneVerify() {
 export function useV1AuthedPhoneRequest() {
   return useMutation({
     mutationFn: (body: { phone: string }) =>
-      v1Post<{ sent: boolean; channel: 'phone'; target?: string; alreadyVerified?: boolean; devCode?: string }>(
+      v1Post<{ sent: boolean; channel: 'phone'; target?: string; alreadyVerified?: boolean; expiresAt?: string; devCode?: string }>(
         '/verification/phone/request',
         body,
       ),

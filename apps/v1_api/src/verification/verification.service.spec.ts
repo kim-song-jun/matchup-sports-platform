@@ -182,7 +182,7 @@ describe('VerificationService.requestPhone (MT)', () => {
 
     const result = await service.requestPhone(authUser, '01012345678');
 
-    expect(result).toMatchObject({ sent: true, channel: 'phone' });
+    expect(result).toMatchObject({ sent: true, channel: 'phone', expiresAt: expect.any(String) });
     expect(handle.v1VerificationToken.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', target: '01012345678' }) }),
     );

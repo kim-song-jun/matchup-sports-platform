@@ -156,13 +156,14 @@ export class VerificationService {
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const codeHash = await hashPassword(code);
 
+    const expiresAt = new Date(Date.now() + CODE_TTL_MS);
     const [, created] = await this.prisma.$transaction([
       this.prisma.v1VerificationToken.updateMany({
         where: { userId, channel, consumedAt: null },
         data: { consumedAt: new Date() },
       }),
       this.prisma.v1VerificationToken.create({
-        data: { userId, channel, target, codeHash, expiresAt: new Date(Date.now() + CODE_TTL_MS) },
+        data: { userId, channel, target, codeHash, expiresAt },
       }),
     ]);
 
@@ -178,6 +179,8 @@ export class VerificationService {
       sent: true,
       channel,
       target: maskTarget(channel, target),
+      // 프론트가 서버 TTL 기준으로 카운트다운하도록 만료 시각을 내려준다(클라이언트 하드코딩 드리프트 방지).
+      expiresAt: expiresAt.toISOString(),
       ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
     };
   }

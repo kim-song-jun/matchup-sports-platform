@@ -72,9 +72,10 @@ export function PhoneVerificationCard({ mode, phone, onVerified }: Props) {
           onVerified();
           return;
         }
-        const fallbackExpiresAt = new Date(Date.now() + CODE_TTL_MS).toISOString();
-        setExpiresAt(fallbackExpiresAt);
-        setRemainingMs(CODE_TTL_MS);
+        // 서버가 내려준 expiresAt 을 우선 사용(서버 TTL 기준). 없으면 CODE_TTL_MS 로 폴백.
+        const resolvedExpiresAt = res.expiresAt ?? new Date(Date.now() + CODE_TTL_MS).toISOString();
+        setExpiresAt(resolvedExpiresAt);
+        setRemainingMs(Math.max(0, new Date(resolvedExpiresAt).getTime() - Date.now()));
         setCode(res.devCode ?? '');
       }
       setResendAvailableAt(Date.now() + RESEND_COOLDOWN_MS);

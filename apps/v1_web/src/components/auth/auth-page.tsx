@@ -141,14 +141,20 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
           {skipHref ? <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={skipHref}>건너뛰기</Link> : null}
         </header>
       ) : null}
-      {/* 데스크톱(≥1024)에서는 desktop/auth.css 가 .tm-auth-topbar 를 숨긴다. 단순 이동이면
-          카드 프레임만으로 맥락이 서지만, onBack 은 "이 화면을 빠져나가는 유일한 수단"이라
-          숨겨지면 안 된다 — 온보딩 위저드와 같은 in-card 내비로 복원한다.
-          backHref 가 함께 오면 상단바는 링크, 여기는 버튼이 되어 동작이 다른 뒤로가기가
-          둘 생기므로, 그때는 상단바 쪽을 정본으로 두고 렌더하지 않는다. */}
-      {onBack && !backHref ? (
+      {/* 데스크톱(≥1024)에서는 desktop/auth.css 가 .tm-auth-topbar 를 통째로 숨긴다. 상단바에만
+          뒤로가기를 두면 그 폭에서는 화면을 빠져나갈 컨트롤이 아예 사라지므로(로그인·약관·
+          회원가입이 실제로 그랬다), 온보딩 위저드와 같은 in-card 내비로 복원한다.
+          backHref 는 링크, onBack 은 버튼 — 둘 다 오면 동작이 다른 뒤로가기가 둘 생기니
+          backHref 를 정본으로 하나만 렌더한다. */}
+      {hasBack ? (
         <div className="tm-onboarding-desktop-nav tm-show-desktop">
-          <AuthBackButton className="tm-onboarding-desktop-back" label={backLabel ?? '뒤로가기'} onClick={onBack} />
+          {backHref ? (
+            <Link className="tm-onboarding-desktop-back" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
+              <ChevronLeftIcon size={22} strokeWidth={2.2} />
+            </Link>
+          ) : (
+            <AuthBackButton className="tm-onboarding-desktop-back" label={backLabel ?? '뒤로가기'} onClick={onBack!} />
+          )}
           {topTitle ? <span className="tm-onboarding-desktop-nav-title">{topTitle}</span> : null}
         </div>
       ) : null}

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SMS_EVENT_TYPE, SmsEventLogService } from '../sms-event-log.service';
+import { SMS_EVENT_TYPE, SmsEventLogService, redactPhoneLike } from '../sms-event-log.service';
 import type { SmsSender } from './sms-sender';
 
 /** 실패 기록의 provider 컬럼에 남길 식별자 — 어드민에서 어느 provider 장애인지 구분한다. */
@@ -164,7 +164,8 @@ export class GabiaSmsSender implements SmsSender {
     // issueToken()·솔라피와 동일한 'Gabia send failed: <status>' 형태로 표면화한다
     // (그대로 res.json() 에 넘기면 통제되지 않은 SyntaxError 가 전파된다).
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      // provider 응답 본문이 수신자 번호를 에코할 수 있어 로그로도 새지 않게 가린다.
+      const body = redactPhoneLike(await res.text().catch(() => ''));
       this.logger.warn(`gabia send failed(HTTP): ${res.status} ${body.slice(0, 200)}`);
       throw new Error(`Gabia send failed: ${res.status}`);
     }
@@ -204,7 +205,7 @@ export class GabiaSmsSender implements SmsSender {
     if (String(result.code) !== '200') {
       const failure = result as GabiaSendFailureResponse;
       this.logger.warn(
-        `gabia send failed: code=${String(failure.code)} message=${(failure.message ?? '').slice(0, 200)}`,
+        `gabia send failed: code=${String(failure.code)} message=${redactPhoneLike(failure.message ?? '').slice(0, 200)}`,
       );
       throw new Error(`Gabia send failed: ${String(failure.code)}`);
     }

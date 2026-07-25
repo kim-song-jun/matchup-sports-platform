@@ -1,5 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service';
-import { SMS_EVENT_TYPE, SmsEventLogService, maskPhoneTail } from './sms-event-log.service';
+import { SMS_EVENT_TYPE, SmsEventLogService, maskPhoneTail, redactPhoneLike } from './sms-event-log.service';
 
 function prismaMock(create = jest.fn().mockResolvedValue({ id: 'log-1' })) {
   return { v1SmsEventLog: { create } } as unknown as PrismaService;
@@ -35,6 +35,32 @@ describe('SmsEventLogService', () => {
     expect(maskPhoneTail('010-1234-5678')).toBe('5678');
     expect(maskPhoneTail('+82 10 1234 5678')).toBe('5678');
     expect(maskPhoneTail('123')).toBe('****');
+  });
+
+  // provider 응답 본문은 수신자 번호를 그대로 에코하는 경우가 있다. detail 로 원본 번호가
+  // 새면 phoneMasked 로 지킨 "끝 4자리만" 보장이 우회되므로 여기서 막는다.
+  it('detail 에 섞인 전화번호를 끝 4자리만 남기고 가린다', async () => {
+    const create = jest.fn().mockResolvedValue({ id: 'log-1' });
+    const svc = new SmsEventLogService(prismaMock(create));
+
+    await svc.record({
+      eventType: SMS_EVENT_TYPE.SEND_FAILED,
+      phone: '01012345678',
+      detail: 'invalid receiver 01012345678 / alt 010-9876-5432',
+    });
+
+    const { detail } = create.mock.calls[0][0].data;
+    expect(detail).not.toContain('01012345678');
+    expect(detail).not.toContain('010-9876-5432');
+    expect(detail).toContain('***5678');
+    expect(detail).toContain('***5432');
+  });
+
+  it('전화번호가 아닌 진단용 숫자는 그대로 남긴다 (detail 의 쓸모 유지)', () => {
+    expect(redactPhoneLike('timed out after 8000ms')).toBe('timed out after 8000ms');
+    expect(redactPhoneLike('Bad Request: 400')).toBe('Bad Request: 400');
+    expect(redactPhoneLike('occurred 2026-07-25')).toBe('occurred 2026-07-25');
+    expect(redactPhoneLike('인증 시도 2/5')).toBe('인증 시도 2/5');
   });
 
   it('detail 은 상한(500자)으로 잘라 저장한다', async () => {

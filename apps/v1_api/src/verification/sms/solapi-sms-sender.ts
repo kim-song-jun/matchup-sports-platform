@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHmac, randomBytes } from 'crypto';
-import { SMS_EVENT_TYPE, SmsEventLogService } from '../sms-event-log.service';
+import { SMS_EVENT_TYPE, SmsEventLogService, redactPhoneLike } from '../sms-event-log.service';
 import type { SmsSender } from './sms-sender';
 
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send';
@@ -84,7 +84,9 @@ export class SolapiSmsSender implements SmsSender {
       clearTimeout(timer);
     }
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      // provider 응답 본문은 수신자 번호를 그대로 에코하는 경우가 있어, DB(detail)뿐
+      // 아니라 애플리케이션 로그로도 새지 않도록 같은 규칙으로 가린다.
+      const body = redactPhoneLike(await res.text().catch(() => ''));
       this.logger.warn(`solapi send failed: ${res.status} ${body.slice(0, 200)}`);
       await this.smsEventLog.record({
         eventType: SMS_EVENT_TYPE.SEND_FAILED,

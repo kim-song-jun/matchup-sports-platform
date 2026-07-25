@@ -52,6 +52,22 @@ export function maskPhoneTail(phone: string): string {
 }
 
 /**
+ * 전화번호로 볼 만한 긴 숫자열(구분자 포함 9자리 이상)을 끝 4자리만 남기고 가린다.
+ *
+ * detail 에는 provider 응답 본문이 그대로 들어오는데, SMS provider 는 실패 사유에
+ * 수신자 번호를 그대로 에코하는 경우가 많다("invalid receiver 01012345678").
+ * 그대로 저장하면 phoneMasked 로 지킨 "끝 4자리만" 보장이 detail 로 우회돼 무너진다.
+ *
+ * 9자리 기준: 국내/국제 번호는 10자리 이상이라 걸리고, 'YYYY-MM-DD'(8자리)나
+ * '8000ms' 같은 진단값은 그대로 남아 detail 의 쓸모가 유지된다.
+ */
+const PHONE_LIKE_RUN = /\d(?:[\d\s-]*\d){8,}/g;
+
+export function redactPhoneLike(text: string): string {
+  return text.replace(PHONE_LIKE_RUN, (match) => `***${match.replace(/\D/g, '').slice(-4)}`);
+}
+
+/**
  * SMS/인증 실패 이벤트 기록기.
  *
  * **계약: record() 는 어떤 경우에도 throw 하지 않는다.** 인증은 서비스 진입 경로라
@@ -74,7 +90,8 @@ export class SmsEventLogService {
           resultCode: input.resultCode ?? null,
           phoneMasked: maskPhoneTail(input.phone),
           provider: input.provider ?? null,
-          detail: input.detail ? input.detail.slice(0, DETAIL_MAX_LENGTH) : null,
+          // 자르기 전에 가린다 — 잘라낸 뒤에 가리면 경계에 걸린 번호가 그대로 남는다.
+          detail: input.detail ? redactPhoneLike(input.detail).slice(0, DETAIL_MAX_LENGTH) : null,
         },
       });
     } catch (err: unknown) {

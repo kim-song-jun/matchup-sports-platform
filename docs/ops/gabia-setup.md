@@ -19,6 +19,11 @@
 2. 가비아 SMS(문자메시지) 서비스를 신청한다(별도 유료 서비스).
 3. SMS 서비스 관리 화면에서 **API 연동 정보**(SMS 서비스 아이디, API Key)를 발급받는다.
 4. 한국 「전기통신사업법」 제84조의2에 따라 문자메시지 발신에 사용하는 전화번호는 **사전등록된 번호만** 사용할 수 있다. 가비아 SMS 관리 화면에서 발신번호(콜백번호)를 등록하고 명의자 인증을 완료한다. 등록되지 않은 번호로는 발송 요청 자체가 API 단에서 거부된다.
+5. **API 발송 허용 IP를 등록한다.** 가비아 SMS 관리툴은 API 호출을 **사전 등록된 발신 서버 IP에서만** 허용한다. 등록 전에는 발송 단계까지 가지도 못하고 **토큰 발급(`POST /oauth/token`)부터 HTTP 400 으로 거부**되며, 시크릿 3개가 모두 정확해도 발송이 전혀 되지 않는다(→ [7. 트러블슈팅](#7-트러블슈팅)).
+   - 등록할 값은 **서버의 아웃바운드 공인 IP**다. alpha 환경은 EC2 인스턴스(`i-06efc23f226edccd7`)에 연결된 Elastic IP **`54.116.11.231`**(`teameet-alpha-eip`)이며, EIP 이므로 인스턴스를 재시작해도 바뀌지 않는다.
+   - 확인 명령: `aws ec2 describe-instances --region ap-northeast-2 --instance-ids i-06efc23f226edccd7 --query 'Reservations[].Instances[].PublicIpAddress' --output text`
+   - 가비아는 400 응답 본문에 요청이 실제로 도달한 IP(`현재 IP : x.x.x.x`)를 그대로 돌려주므로, 값이 헷갈리면 그 메시지의 IP 를 등록하면 된다.
+   - 서버를 다른 인스턴스/리전으로 옮기거나 NAT 게이트웨이를 경유하도록 바꾸면 아웃바운드 IP 가 달라진다 — 이전 IP 는 지우고 새 IP 를 다시 등록해야 한다.
 
 ---
 
@@ -88,6 +93,35 @@ V1_VERIFICATION_DEV_ECHO=true
 - 이미 인증 완료된 계정(`phoneVerifiedAt`)은 어떤 경우에도 영향받지 않는다.
 
 스키마·데이터 마이그레이션은 이 발송처 전환/롤백만으로는 필요하지 않다.
+
+---
+
+## 7. 트러블슈팅
+
+### `503 SMS_SEND_FAILED` + 로그에 `gabia token issue failed: 400`
+
+토큰 발급 자체가 거부된 상태다. **원인은 응답 본문에만 들어 있고**(한글이 유니코드 이스케이프로 인코딩돼 있다) HTTP status 만 보면 구분되지 않으므로, 반드시 본문을 확인한다.
+
+```bash
+# alpha EC2 에서
+docker logs --since 10m teameet_v1_api 2>&1 | grep -a 'token issue failed' | tail -3
+```
+
+| 응답 본문 | 원인 | 조치 |
+|---|---|---|
+| `관리툴에서 API 발송 IP 설정을 해주세요. (현재 IP : x.x.x.x)` | 발신 서버 IP 미등록 | 가비아 SMS 관리툴에 그 IP 등록([1장 5번](#1-가비아-계정-준비--sms-서비스-신청--발신번호-사전등록)). **시크릿 값 문제가 아니므로 `GABIA_SMS_ID`/`GABIA_API_KEY` 를 건드려도 해결되지 않는다** |
+| 아이디·키 인증 실패 계열 | `GABIA_SMS_ID`/`GABIA_API_KEY` 불일치 | 관리툴 발급값과 GitHub 시크릿을 재대조한 뒤 재배포 |
+
+### 시크릿을 고쳤는데 그대로일 때
+
+시크릿은 **배포 시점에만** 컨테이너 환경변수로 주입된다. 시크릿 갱신 시각보다 **나중에 시작된** 배포인지부터 확인하고 판정한다.
+
+```bash
+docker inspect -f '{{.State.StartedAt}}' teameet_v1_api
+docker exec teameet_v1_api sh -c 'echo "$SMS_PROVIDER / $GABIA_SMS_ID / $GABIA_SENDER_NUMBER / len=${#GABIA_API_KEY}"'
+```
+
+`GABIA_API_KEY` 는 길이만 찍는다 — 값 자체를 출력하거나 공유 로그에 붙여넣지 않는다.
 
 ---
 

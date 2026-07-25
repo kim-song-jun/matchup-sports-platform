@@ -4,13 +4,32 @@ import { issuePhoneProofToken, verifyPhoneProofToken } from './phone-proof-token
 const EMAIL = 'runner@example.com';
 const PHONE = '01012345678';
 
+/**
+ * 시크릿 env 는 프로세스 전역이라 같은 worker 의 다른 테스트 파일과 공유된다.
+ * 단순히 `process.env.X = saved` 로 되돌리면 원래 없던 값이 문자열 "undefined" 로 남아
+ * "시크릿이 있다"고 오인된다 — 없던 것은 delete 로 되돌린다.
+ */
+const SECRET_KEYS = ['V1_SESSION_SECRET', 'V1_JWT_SECRET', 'JWT_SECRET'] as const;
+
+function snapshotSecrets(): Record<string, string | undefined> {
+  return Object.fromEntries(SECRET_KEYS.map((key) => [key, process.env[key]]));
+}
+
+function restoreSecrets(saved: Record<string, string | undefined>): void {
+  for (const key of SECRET_KEYS) {
+    if (saved[key] === undefined) delete process.env[key];
+    else process.env[key] = saved[key];
+  }
+}
+
 describe('email-proof-token', () => {
-  const OLD = process.env.V1_SESSION_SECRET;
+  let saved: Record<string, string | undefined>;
   beforeEach(() => {
+    saved = snapshotSecrets();
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);
   });
   afterEach(() => {
-    process.env.V1_SESSION_SECRET = OLD;
+    restoreSecrets(saved);
   });
 
   it('같은 주소로 발급한 토큰은 통과한다', () => {
@@ -45,11 +64,12 @@ describe('email-proof-token', () => {
     expect(verifyEmailProofToken('nodot', EMAIL)).toBe(false);
   });
 
-  it('시크릿이 없으면 검증은 무조건 거부한다', () => {
+  it('시크릿이 없으면 발급은 예외로 드러나고 검증은 무조건 거부한다', () => {
     const token = issueEmailProofToken(EMAIL);
-    process.env.V1_SESSION_SECRET = '';
-    process.env.V1_JWT_SECRET = '';
-    process.env.JWT_SECRET = '';
+    for (const key of SECRET_KEYS) delete process.env[key];
+
+    expect(() => issueEmailProofToken(EMAIL)).toThrow(/secret is not configured/i);
+    // 빈 키로 서명을 대조하면 위조 토큰이 통과하므로 검증은 fail-closed 여야 한다.
     expect(verifyEmailProofToken(token, EMAIL)).toBe(false);
   });
 

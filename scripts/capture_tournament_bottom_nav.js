@@ -54,13 +54,20 @@ const PAGES = [
         await page.screenshot({ path: path.join(ROOT, `${name}-${bp.key}.png`), fullPage: true, scale: 'css' });
         // 탈출 경로 실측: 하단 탭바 렌더 여부 + 상단 홈 단축키 존재 + 홈 링크 총계.
         const probe = await page.evaluate(() => {
+          // 가시성은 레이아웃 박스 유무로 판정한다. getComputedStyle(el).display 는
+          // 조상이 display:none 이어도 자기 값을 그대로 돌려주므로(데스크톱에서
+          // .tm-topbar 가 숨겨져도 자식 버튼이 'inline-flex' 로 보임) 오측정된다.
+          const isRendered = (el) => Boolean(el) && el.getClientRects().length > 0;
           const nav = document.querySelector('.tm-bottom-nav');
-          const navVisible = nav ? getComputedStyle(nav).display !== 'none' : false;
           const homeShortcut = document.querySelector('.tm-topbar-actions a[aria-label="홈으로"]');
-          const homeShortcutVisible = homeShortcut ? getComputedStyle(homeShortcut).display !== 'none' : false;
-          const homeLinks = Array.from(document.querySelectorAll('a[href="/home"]'))
-            .filter((el) => getComputedStyle(el).display !== 'none' && el.offsetParent !== null);
-          return { navInDom: Boolean(nav), navVisible, homeShortcutInDom: Boolean(homeShortcut), homeShortcutVisible, visibleHomeLinks: homeLinks.length };
+          const homeLinks = Array.from(document.querySelectorAll('a[href="/home"]')).filter(isRendered);
+          return {
+            navInDom: Boolean(nav),
+            navVisible: isRendered(nav),
+            homeShortcutInDom: Boolean(homeShortcut),
+            homeShortcutVisible: isRendered(homeShortcut),
+            visibleHomeLinks: homeLinks.length,
+          };
         });
         out[`${name}-${bp.key}`] = probe;
         console.log(`  OK ${name}-${bp.key} ${JSON.stringify(probe)}`);

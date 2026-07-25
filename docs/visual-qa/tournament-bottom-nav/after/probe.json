@@ -54,14 +54,14 @@
     "navInDom": false,
     "navVisible": false,
     "homeShortcutInDom": true,
-    "homeShortcutVisible": true,
+    "homeShortcutVisible": false,
     "visibleHomeLinks": 2
   },
   "notices-desktop": {
     "navInDom": false,
     "navVisible": false,
     "homeShortcutInDom": true,
-    "homeShortcutVisible": true,
+    "homeShortcutVisible": false,
     "visibleHomeLinks": 3
   },
   "_console_desktop": []

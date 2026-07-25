@@ -136,6 +136,11 @@ jobs:
           # 공개 동의항목 목록이라 시크릿이 아니라 repository variable 로 둔다.
           # 미설정이면 빈 값 → scope 파라미터를 붙이지 않아 지금 동작 그대로다.
           KAKAO_SCOPE: ${{ vars.KAKAO_SCOPE }}
+          # SES 발송 설정. 자격증명은 인스턴스 IAM 역할이 주므로 리전/발신주소만 넘긴다.
+          # compose 는 셸 환경변수를 --env-file 보다 우선해 치환하므로, 여기로 넘기면
+          # 호스트 deploy/.env 를 건드리지 않고도 적용된다. 미설정이면 빈 값 → 기존 로그 스텁.
+          SES_REGION: ${{ vars.SES_REGION }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
           SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
           SOLAPI_SENDER_NUMBER: ${{ secrets.SOLAPI_SENDER_NUMBER }}
@@ -160,7 +165,7 @@ jobs:
             --arg prepare "install -d -o ec2-user -g ec2-user '${stage}'" \
             --arg download "aws s3 cp '${object}' '${archive}' --only-show-errors" \
             --arg extract "tar -xzf '${archive}' -C '${stage}' && chown -R ec2-user:ec2-user '${stage}'" \
-            --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' GA_MEASUREMENT_ID='${GA_MEASUREMENT_ID}' KAKAO_CLIENT_ID='${KAKAO_CLIENT_ID}' KAKAO_CLIENT_SECRET='${KAKAO_CLIENT_SECRET}' KAKAO_REDIRECT_URI='${KAKAO_REDIRECT_URI}' KAKAO_SCOPE='${KAKAO_SCOPE}' SOLAPI_API_KEY='${SOLAPI_API_KEY}' SOLAPI_API_SECRET='${SOLAPI_API_SECRET}' SOLAPI_SENDER_NUMBER='${SOLAPI_SENDER_NUMBER}' SMS_PROVIDER='${SMS_PROVIDER}' GABIA_SMS_ID='${GABIA_SMS_ID}' GABIA_API_KEY='${GABIA_API_KEY}' GABIA_SENDER_NUMBER='${GABIA_SENDER_NUMBER}' VAPID_PUBLIC_KEY='${VAPID_PUBLIC_KEY}' VAPID_PRIVATE_KEY='${VAPID_PRIVATE_KEY}' VAPID_SUBJECT='${VAPID_SUBJECT}' bash '${stage}/deploy/deploy-alpha.sh'" \
+            --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' GA_MEASUREMENT_ID='${GA_MEASUREMENT_ID}' KAKAO_CLIENT_ID='${KAKAO_CLIENT_ID}' KAKAO_CLIENT_SECRET='${KAKAO_CLIENT_SECRET}' KAKAO_REDIRECT_URI='${KAKAO_REDIRECT_URI}' KAKAO_SCOPE='${KAKAO_SCOPE}' SES_REGION='${SES_REGION}' EMAIL_FROM='${EMAIL_FROM}' SOLAPI_API_KEY='${SOLAPI_API_KEY}' SOLAPI_API_SECRET='${SOLAPI_API_SECRET}' SOLAPI_SENDER_NUMBER='${SOLAPI_SENDER_NUMBER}' SMS_PROVIDER='${SMS_PROVIDER}' GABIA_SMS_ID='${GABIA_SMS_ID}' GABIA_API_KEY='${GABIA_API_KEY}' GABIA_SENDER_NUMBER='${GABIA_SENDER_NUMBER}' VAPID_PUBLIC_KEY='${VAPID_PUBLIC_KEY}' VAPID_PRIVATE_KEY='${VAPID_PRIVATE_KEY}' VAPID_SUBJECT='${VAPID_SUBJECT}' bash '${stage}/deploy/deploy-alpha.sh'" \
             '{commands: [$strict, $cleanup, $prepare, $download, $extract, $deploy]}'
           )"
 

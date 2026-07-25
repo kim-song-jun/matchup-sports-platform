@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { V1VerificationChannel } from '@prisma/client';
-import { EMAIL_SENDER, EmailSender, OTP_EMAIL_SUBJECT, buildOtpEmailText } from './email/email-sender';
+import { EMAIL_SENDER, EmailSender } from './email/email-sender';
+import { buildOtpEmailHtml, buildOtpEmailText, otpEmailSubject } from './email/otp-email-template';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { SMS_SENDER, SmsSender, buildOtpSmsText } from './sms/sms-sender';
 
@@ -72,7 +73,12 @@ export class VerificationDispatcherService {
     }
     if (this.email.enabled) {
       try {
-        await this.email.send(target, OTP_EMAIL_SUBJECT, buildOtpEmailText(code));
+        await this.email.send(
+          target,
+          otpEmailSubject('verify'),
+          buildOtpEmailText(code, 'verify'),
+          buildOtpEmailHtml(code, 'verify'),
+        );
       } catch (err) {
         this.logger.warn(
           `[verification:email] 메일 발송 실패 → ${masked}: ${err instanceof Error ? err.message : String(err)}`,

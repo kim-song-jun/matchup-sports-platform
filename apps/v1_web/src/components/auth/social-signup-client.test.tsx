@@ -324,6 +324,18 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     expect(screen.getByRole('radio', { name: '남' })).toBeDisabled();
   });
 
+  // 게이트가 /auth/me 를 먼저 받아 두지만 캐시가 비면 프리필이 늦게 도착할 수 있다.
+  // 그때 이미 입력 중이던 번호를 덮어쓰면 사용자의 입력이 소리 없이 사라진다.
+  it('프리필이 늦게 와도 이미 입력한 전화번호를 덮어쓰지 않는다', async () => {
+    const { rerender } = render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+
+    hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
+    rerender(<SocialSignupClient />);
+
+    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-8765-4321'));
+  });
+
   // 카카오 번호와 실제 쓰는 번호가 다를 수 있는데 잠그면 OTP 본인인증을 통과할 방법이 없어진다.
   it('전화번호는 채우되 수정할 수 있게 둔다', async () => {
     hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };

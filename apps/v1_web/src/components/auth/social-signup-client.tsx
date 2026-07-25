@@ -58,9 +58,13 @@ export function SocialSignupClient() {
   const [prefillApplied, setPrefillApplied] = useState(false);
   useEffect(() => {
     if (!prefill || prefillApplied) return;
+    // 보통은 게이트가 이미 /auth/me 를 받아 둔 뒤라 첫 렌더에 값이 있지만, 캐시가 비어
+    // 늦게 도착할 수 있다. 그때 이미 입력 중이던 값을 덮어쓰면 입력이 유실된다.
+    // 잠기는 필드(이름·성별)는 카카오 값이 권위이므로 그대로 반영하고,
+    // 사용자가 직접 고치라고 열어 둔 전화번호만 비어 있을 때에만 채운다.
     if (prefill.name) setDisplayName(prefill.name);
     if (prefill.gender) setGender(prefill.gender);
-    if (prefill.phone) setPhoneDigits(prefill.phone);
+    if (prefill.phone) setPhoneDigits((current) => (current.length > 0 ? current : prefill.phone!));
     setPrefillApplied(true);
   }, [prefill, prefillApplied]);
 

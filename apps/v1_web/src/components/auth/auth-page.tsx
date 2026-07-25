@@ -144,8 +144,10 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
       ) : null}
       {/* 데스크톱(≥1024)에서는 desktop/auth.css 가 .tm-auth-topbar 를 숨긴다. 단순 이동이면
           카드 프레임만으로 맥락이 서지만, onBack 은 "이 화면을 빠져나가는 유일한 수단"이라
-          숨겨지면 안 된다 — 온보딩 위저드와 같은 in-card 내비로 복원한다. */}
-      {onBack ? (
+          숨겨지면 안 된다 — 온보딩 위저드와 같은 in-card 내비로 복원한다.
+          backHref 가 함께 오면 상단바는 링크, 여기는 버튼이 되어 동작이 다른 뒤로가기가
+          둘 생기므로, 그때는 상단바 쪽을 정본으로 두고 렌더하지 않는다. */}
+      {onBack && !backHref ? (
         <div className="tm-onboarding-desktop-nav tm-show-desktop">
           <button className="tm-onboarding-desktop-back" type="button" onClick={onBack} aria-label={backLabel ?? '뒤로가기'}>
             <ChevronLeftIcon size={22} strokeWidth={2.2} />

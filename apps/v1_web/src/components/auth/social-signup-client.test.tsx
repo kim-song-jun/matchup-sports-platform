@@ -79,11 +79,13 @@ describe('SocialSignupClient required profile contract', () => {
       (_value: string, callbacks: AvailabilityCallbacks) => callbacks.onSuccess({ available: true }),
     );
     hooks.authedPhoneRequestMutateAsync.mockResolvedValue({
-      code: 'ABC123',
-      destNumber: '16663538',
-      expiresAt: new Date(Date.now() + 300000).toISOString(),
+      sent: true,
+      channel: 'phone',
     });
-    hooks.authedPhoneConfirmMutateAsync.mockResolvedValue({ verified: true });
+    hooks.authedPhoneConfirmMutateAsync.mockResolvedValue({
+      verified: true,
+      verification: { emailVerified: false, phoneVerified: true },
+    });
   });
 
   it.each([

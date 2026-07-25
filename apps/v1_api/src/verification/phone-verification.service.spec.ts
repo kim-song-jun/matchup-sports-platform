@@ -1,13 +1,20 @@
 import { BadRequestException } from '@nestjs/common';
-import { OctomoApiError, OctomoClient } from './octomo.client';
 import { PhoneVerificationService } from './phone-verification.service';
+import { VerificationDispatcherService } from './verification-dispatcher.service';
+
+type ChallengeRow = { phone: string; codeHash: string; expiresAt: Date; attemptCount: number; verifiedAt: Date | null };
 
 function prismaMock() {
-  const store = new Map<string, { phone: string; code: string; channel: string; expiresAt: Date; attemptCount: number; verifiedAt: Date | null }>();
+  const store = new Map<string, ChallengeRow>();
   return {
     v1PhoneVerificationChallenge: {
-      upsert: jest.fn(async ({ where, create }: { where: { phone: string }; create: { phone: string; code: string; channel: string; expiresAt: Date } }) => {
-        const row = { phone: create.phone, code: create.code, channel: create.channel, expiresAt: create.expiresAt, attemptCount: 0, verifiedAt: null };
+      upsert: jest.fn(async ({ where, update, create }: { where: { phone: string }; update: Partial<ChallengeRow>; create: { phone: string; codeHash: string; expiresAt: Date } }) => {
+        const existing = store.get(where.phone);
+        if (existing) {
+          Object.assign(existing, update);
+          return existing;
+        }
+        const row: ChallengeRow = { phone: create.phone, codeHash: create.codeHash, expiresAt: create.expiresAt, attemptCount: 0, verifiedAt: null };
         store.set(where.phone, row);
         return row;
       }),
@@ -15,93 +22,144 @@ function prismaMock() {
       update: jest.fn(async ({ where, data }: { where: { phone: string }; data: Record<string, unknown> }) => {
         const row = store.get(where.phone)!;
         if ((data.attemptCount as { increment?: number })?.increment) row.attemptCount += 1;
-        if ('verifiedAt' in data) row.verifiedAt = data.verifiedAt as Date;
+        if ('verifiedAt' in data) row.verifiedAt = data.verifiedAt as Date | null;
         return row;
+      }),
+      deleteMany: jest.fn(async ({ where }: { where: { phone: string } }) => {
+        const existed = store.has(where.phone);
+        store.delete(where.phone);
+        return { count: existed ? 1 : 0 };
       }),
     },
     __store: store,
   } as never;
 }
 
-describe('PhoneVerificationService', () => {
-  const OLD = { key: process.env.OCTOMO_API_KEY, echo: process.env.V1_VERIFICATION_DEV_ECHO };
-  afterEach(() => { process.env.OCTOMO_API_KEY = OLD.key; process.env.V1_VERIFICATION_DEV_ECHO = OLD.echo; jest.restoreAllMocks(); });
+function dispatcherMock(devEcho = true) {
+  // 테스트에선 SMS provider 가 비활성이라 devEchoActive === devEcho.
+  return { devEcho, devEchoActive: devEcho, send: jest.fn().mockResolvedValue(undefined) } as unknown as VerificationDispatcherService;
+}
 
-  it('issues an 8-char challenge and (desktop) fetches a QR from octomo', async () => {
-    process.env.OCTOMO_API_KEY = 'k';
-    const octomo = new OctomoClient();
-    jest.spyOn(octomo, 'createQrCode').mockResolvedValue('data:image/png;base64,QR');
+const PHONE = '01012345678';
+
+describe('PhoneVerificationService (MT SMS OTP)', () => {
+  it('issueChallenge upserts a codeHash challenge and dispatches a 6-digit code via SMS', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, octomo);
-    const res = await svc.issueChallenge('01012345678', 'desktop');
-    expect(res.code).toMatch(/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/);
-    expect(res.destNumber).toBe('16663538');
-    expect(res.qrCode).toBe('data:image/png;base64,QR');
-    expect(octomo.createQrCode).toHaveBeenCalledWith(res.code);
+    const dispatcher = dispatcherMock(true);
+    const svc = new PhoneVerificationService(prisma, dispatcher);
+
+    const res = await svc.issueChallenge(PHONE);
+
+    expect(res.expiresAt).toBeDefined();
+    expect(res.devCode).toMatch(/^\d{6}$/);
+    expect(dispatcher.send).toHaveBeenCalledWith('phone', PHONE, res.devCode);
+    const row = (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!;
+    expect(row.codeHash).toBeTruthy();
+    expect(row.codeHash).not.toBe(res.devCode); // 평문 저장 금지
   });
 
-  it('mobile issue does not fetch a QR', async () => {
-    process.env.OCTOMO_API_KEY = 'k';
-    const octomo = new OctomoClient();
-    const qr = jest.spyOn(octomo, 'createQrCode');
-    const svc = new PhoneVerificationService(prismaMock(), octomo);
-    const res = await svc.issueChallenge('01012345678', 'mobile');
-    expect(res.qrCode).toBeUndefined();
-    expect(qr).not.toHaveBeenCalled();
+  it('does not expose devCode when dispatcher.devEcho is false', async () => {
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(false));
+    const res = await svc.issueChallenge(PHONE);
+    expect(res.devCode).toBeUndefined();
   });
 
-  it('pollArrived calls octomo messageExists with the stored code and marks verifiedAt', async () => {
-    process.env.OCTOMO_API_KEY = 'k';
-    const octomo = new OctomoClient();
+  it('verifyCode returns true and sets verifiedAt on a correct code', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, octomo);
-    const { code } = await svc.issueChallenge('01012345678', 'mobile');
-    const spy = jest.spyOn(octomo, 'messageExists').mockResolvedValue(true);
-    expect(await svc.pollArrived('01012345678')).toBe(true);
-    expect(spy).toHaveBeenCalledWith('01012345678', code, 5);
-    expect((prisma as never as { __store: Map<string, { verifiedAt: Date | null }> }).__store.get('01012345678')!.verifiedAt).toBeInstanceOf(Date);
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const { devCode } = await svc.issueChallenge(PHONE);
+
+    expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.verifiedAt).toBeInstanceOf(Date);
   });
 
-  it('pollArrived returns false with no challenge', async () => {
-    process.env.OCTOMO_API_KEY = 'k';
-    const svc = new PhoneVerificationService(prismaMock(), new OctomoClient());
-    expect(await svc.pollArrived('01000000000')).toBe(false);
-  });
-
-  it('throws when poll attempts exceed the cap (180, covers 2s polling over the 5min TTL)', async () => {
-    process.env.OCTOMO_API_KEY = 'k';
-    const octomo = new OctomoClient();
-    jest.spyOn(octomo, 'messageExists').mockResolvedValue(false);
+  it('verifyCode rejects a wrong code with CODE_MISMATCH and increments attemptCount', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, octomo);
-    await svc.issueChallenge('01012345678', 'mobile');
-    // 30회로는 더 이상 막히지 않는다(desktop 자동폴링이 문자 전송 전에 자멸하던 회귀 방지).
-    (prisma as never as { __store: Map<string, { attemptCount: number }> }).__store.get('01012345678')!.attemptCount = 30;
-    await expect(svc.pollArrived('01012345678')).resolves.toBe(false);
-    (prisma as never as { __store: Map<string, { attemptCount: number }> }).__store.get('01012345678')!.attemptCount = 180;
-    await expect(svc.pollArrived('01012345678')).rejects.toBeInstanceOf(BadRequestException);
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const { devCode } = await svc.issueChallenge(PHONE);
+    const wrong = devCode === '000000' ? '111111' : '000000';
+
+    await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount).toBe(1);
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.verifiedAt).toBeNull();
   });
 
-  it('swallows octomo errors during poll as not-arrived (no 500, keeps polling alive)', async () => {
-    process.env.OCTOMO_API_KEY = 'k';
-    const octomo = new OctomoClient();
-    // timeout(504)·rate-limit(429)·5xx 등 옥토모 일시 오류가 verify를 500으로 터뜨리면
-    // 매 폴링이 실패하고 커넥션이 쌓여 upstream이 죽는다 → 조용히 false로 흡수해야 한다.
-    jest.spyOn(octomo, 'messageExists').mockRejectedValue(new OctomoApiError(504, 'Octomo request timed out'));
+  it('verifyCode throws NO_PENDING when there is no challenge', async () => {
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
+    await expect(svc.verifyCode(PHONE, '123456')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(svc.verifyCode(PHONE, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
+  });
+
+  it('verifyCode throws NO_PENDING when the challenge is expired', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, octomo);
-    await svc.issueChallenge('01012345678', 'mobile');
-    await expect(svc.pollArrived('01012345678')).resolves.toBe(false);
-    // 도착으로 오판하지 않았는지(verifiedAt 미세팅) 확인
-    expect((prisma as never as { __store: Map<string, { verifiedAt: Date | null }> }).__store.get('01012345678')!.verifiedAt).toBeNull();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    await svc.issueChallenge(PHONE);
+    (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.expiresAt = new Date(Date.now() - 1000);
+    await expect(svc.verifyCode(PHONE, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
   });
 
-  it('dev echo auto-passes when octomo disabled', async () => {
-    delete process.env.OCTOMO_API_KEY;
-    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
-    const svc = new PhoneVerificationService(prismaMock(), new OctomoClient());
+  it('verifyCode throws TOO_MANY_ATTEMPTS on a wrong code once attempts hit the cap', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const { devCode } = await svc.issueChallenge(PHONE);
+    const wrong = devCode === '000000' ? '111111' : '000000';
+    (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount = 5;
+    await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' } });
+  });
+
+  it('verifyCode still accepts the correct code even at the attempt cap (cap은 불일치에만 적용, 멱등)', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const { devCode } = await svc.issueChallenge(PHONE);
+    (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount = 5;
+    expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
+  });
+
+  it('verifyCode stays idempotent for the correct code but rejects a wrong code even after verification', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const { devCode } = await svc.issueChallenge(PHONE);
+    await svc.verifyCode(PHONE, devCode!); // 최초 정상 인증
+
+    // 올바른 코드 재제출 → 멱등 성공
+    expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
+
+    // 잘못된 코드 → 이미 verified 라도 성공하지 않는다(인증 우회 방지: verifiedAt 만으로 단락 금지)
+    const wrong = devCode === '000000' ? '111111' : '000000';
+    await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+  });
+
+  it('issueChallenge enforces a resend cooldown for the same phone (paid-SMS abuse guard)', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    await svc.issueChallenge(PHONE);
+    await expect(svc.issueChallenge(PHONE)).rejects.toMatchObject({ response: { code: 'VERIFICATION_RESEND_COOLDOWN' } });
+  });
+
+  it('issueChallenge cleans up the challenge when SMS dispatch fails (즉시 재요청 가능)', async () => {
+    const prisma = prismaMock();
+    const dispatcher = dispatcherMock(true);
+    (dispatcher.send as unknown as jest.Mock).mockRejectedValueOnce(new Error('SMS_SEND_FAILED'));
+    const svc = new PhoneVerificationService(prisma, dispatcher);
+
+    await expect(svc.issueChallenge(PHONE)).rejects.toThrow();
+    // 챌린지가 삭제되어 다음 요청이 쿨다운에 걸리지 않는다.
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)).toBeUndefined();
+  });
+
+  it('issueProof returns a token bound to the phone', () => {
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
+    expect(typeof svc.issueProof(PHONE)).toBe('string');
+  });
+
+  it('enabled is fail-closed: 기본 true, 명시적 opt-out 일 때만 false', () => {
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
+    const OLD = process.env.V1_PHONE_VERIFICATION_DISABLED;
+    delete process.env.V1_PHONE_VERIFICATION_DISABLED;
     expect(svc.enabled).toBe(true);
-    await svc.issueChallenge('01012345678', 'mobile');
-    expect(await svc.pollArrived('01012345678')).toBe(true);
+    process.env.V1_PHONE_VERIFICATION_DISABLED = 'true';
+    expect(svc.enabled).toBe(false);
+    if (OLD === undefined) delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+    else process.env.V1_PHONE_VERIFICATION_DISABLED = OLD;
   });
 });

@@ -4,18 +4,18 @@ import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { PhoneVerificationService } from './phone-verification.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+// 동일 번호로 유료 SMS 를 반복 발송하지 못하게 막는 재발송 쿨다운(대상 번호 기준).
+const RESEND_COOLDOWN_MS = 30 * 1000;
 
 @Injectable()
 export class VerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: VerificationDispatcherService,
-    private readonly phoneVerification: PhoneVerificationService,
   ) {}
 
   async requestEmail(authUser: V1AuthUser) {
@@ -32,7 +32,7 @@ export class VerificationService {
     return this.issue('email', user.id, user.email);
   }
 
-  async requestPhone(authUser: V1AuthUser, phone: string, channel: 'mobile' | 'desktop') {
+  async requestPhone(authUser: V1AuthUser, phone: string) {
     const user = await this.loadUser(authUser.id);
     const owner = await this.prisma.v1User.findFirst({
       where: { phone, id: { not: user.id } },
@@ -47,19 +47,20 @@ export class VerificationService {
     if (user.phoneVerifiedAt && user.phone === phone) {
       return { sent: false, alreadyVerified: true, channel: 'phone' as const };
     }
-    return this.phoneVerification.issueChallenge(phone, channel);
-  }
-
-  async confirmPhoneArrived(authUser: V1AuthUser, phone: string) {
-    const arrived = await this.phoneVerification.pollArrived(phone);
-    if (!arrived) return { verified: false as const };
-
-    const owner = await this.prisma.v1User.findFirst({ where: { phone, id: { not: authUser.id } }, select: { id: true } });
-    if (owner) {
-      throw new ConflictException({ code: 'PHONE_CONFLICT', message: '이미 다른 계정에서 사용 중인 번호예요.' });
+    // 대상 번호 기준 재발송 쿨다운 — 로그인 사용자가 임의 번호로 유료 SMS 를 반복 발송하는 남용 차단.
+    const recent = await this.prisma.v1VerificationToken.findFirst({
+      where: { channel: 'phone', target: phone },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+      const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - (Date.now() - recent.createdAt.getTime())) / 1000);
+      throw new BadRequestException({
+        code: 'VERIFICATION_RESEND_COOLDOWN',
+        message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,
+      });
     }
-    await this.prisma.v1User.update({ where: { id: authUser.id }, data: { phoneVerifiedAt: new Date(), phone } });
-    return { verified: true as const, verification: { phoneVerified: true } };
+    return this.issue('phone', user.id, phone);
   }
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {
@@ -155,23 +156,32 @@ export class VerificationService {
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const codeHash = await hashPassword(code);
 
-    await this.prisma.$transaction([
+    const expiresAt = new Date(Date.now() + CODE_TTL_MS);
+    const [, created] = await this.prisma.$transaction([
       this.prisma.v1VerificationToken.updateMany({
         where: { userId, channel, consumedAt: null },
         data: { consumedAt: new Date() },
       }),
       this.prisma.v1VerificationToken.create({
-        data: { userId, channel, target, codeHash, expiresAt: new Date(Date.now() + CODE_TTL_MS) },
+        data: { userId, channel, target, codeHash, expiresAt },
       }),
     ]);
 
-    this.dispatcher.send(channel, target, code);
+    try {
+      await this.dispatcher.send(channel, target, code);
+    } catch (err) {
+      // 발송 실패 시 방금 만든 토큰을 삭제해, 사용자가 재발송 쿨다운(대상 번호 기준)에 걸리지 않고 즉시 재요청할 수 있게 한다.
+      await this.prisma.v1VerificationToken.deleteMany({ where: { id: created.id } });
+      throw err;
+    }
 
     return {
       sent: true,
       channel,
       target: maskTarget(channel, target),
-      ...(this.dispatcher.devEcho ? { devCode: code } : {}),
+      // 프론트가 서버 TTL 기준으로 카운트다운하도록 만료 시각을 내려준다(클라이언트 하드코딩 드리프트 방지).
+      expiresAt: expiresAt.toISOString(),
+      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
     };
   }
 

@@ -422,8 +422,7 @@ model V1VerificationToken {
 model V1PhoneVerificationChallenge {
   id           String    @id @default(uuid())
   phone        String    @unique
-  code         String
-  channel      String
+  codeHash     String    @map("code_hash")
   expiresAt    DateTime  @map("expires_at")
   attemptCount Int       @default(0) @map("attempt_count")
   verifiedAt   DateTime? @map("verified_at")

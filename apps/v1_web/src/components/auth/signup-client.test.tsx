@@ -99,8 +99,6 @@ describe('SignupClient required profile contract', () => {
       session: { userId: 'user-email', userEmail: 'signup@example.com' },
     });
     hooks.phoneIssueMutateAsync.mockResolvedValue({
-      code: 'ABC123',
-      destNumber: '16663538',
       expiresAt: new Date(Date.now() + 300000).toISOString(),
     });
     hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN' });

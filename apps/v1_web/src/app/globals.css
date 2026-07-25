@@ -701,6 +701,18 @@ button:disabled {
   box-shadow: var(--sh-1);
 }
 
+/* 모드 탭 아래 한 단계 낮은 선택지(계정 찾기의 '본인 확인 방법')에 쓰는 축소 변형.
+   같은 크기의 세그먼트를 두 줄로 쌓으면 어느 쪽이 상위인지 읽히지 않는다. */
+.tm-auth-segmented-sm {
+  padding: 3px;
+  border-radius: 12px;
+}
+
+.tm-auth-segmented-sm .tm-auth-segment {
+  min-height: 34px;
+  font-size: 12px;
+}
+
 /* 인증 폼 안의 보조 영역(사진 업로드·휴대폰 인증) 공통 표면.
    폼 자체가 카드(데스크톱)인 곳에서 흰 카드를 또 겹치면 테두리가 이중으로 보이므로,
    내부 영역은 카드가 아니라 tint 된 inset 으로 통일한다. */

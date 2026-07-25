@@ -433,6 +433,24 @@ model V1PhoneVerificationChallenge {
   @@map("v1_phone_verification_challenges")
 }
 
+/**
+ * 비로그인 이메일 OTP 챌린지(비밀번호 재설정). V1VerificationToken 은 userId 가 필수라
+ * 가입되지 않은 주소로는 행을 만들 수 없고, 그러면 "가입 안 된 이메일"만 응답이 갈려
+ * 계정 존재 여부가 새어 나간다. 그래서 휴대폰 챌린지와 같은 모양으로 따로 둔다.
+ */
+model V1EmailVerificationChallenge {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  codeHash     String    @map("code_hash")
+  expiresAt    DateTime  @map("expires_at")
+  attemptCount Int       @default(0) @map("attempt_count")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("v1_email_verification_challenges")
+}
+
 model V1UserProfile {
   id              String    @id @default(uuid())
   userId          String    @unique @map("user_id")

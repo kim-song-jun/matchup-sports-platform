@@ -220,6 +220,16 @@
   .tm-auth-segment {
     min-height: 44px;
   }
+
+  /* 축소 변형은 데스크톱에서도 상위 탭보다 작게 유지한다(위계 유지). */
+  .tm-auth-segmented-sm {
+    gap: 6px;
+    padding: 4px;
+  }
+
+  .tm-auth-segmented-sm .tm-auth-segment {
+    min-height: 38px;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

@@ -313,6 +313,35 @@ export function useV1ResetPasswordByPhone() {
   });
 }
 
+/**
+ * 비로그인 이메일 OTP — 비밀번호 재설정 전용. 로그인 후 이메일 인증(/verification/email/*)은
+ * 인증 가드 뒤라 여기 쓸 수 없어 공개 엔드포인트가 따로 있다.
+ *
+ * 응답은 가입 여부와 무관하게 같다(계정 열거 방어) — 화면도 "가입된 주소면 보냈다"는 식으로만
+ * 안내하고, 없는 계정을 드러내는 문구를 쓰지 않는다.
+ */
+export function useV1RecoveryEmailIssue() {
+  return useMutation({
+    mutationFn: (body: { email: string }) =>
+      v1Post<{ sent: true; expiresAt: string; devCode?: string }>('/auth/recovery/email/request', body),
+  });
+}
+
+export function useV1RecoveryEmailVerify() {
+  return useMutation({
+    // 용도(purpose)를 보내지 않는다 — 이 경로가 발급하는 증명은 서버가 재설정용으로 고정한다.
+    mutationFn: (body: { email: string; code: string }) =>
+      v1Post<{ verified: boolean; proofToken?: string }>('/auth/recovery/email/confirm', body),
+  });
+}
+
+export function useV1ResetPasswordByEmail() {
+  return useMutation({
+    mutationFn: (body: { email: string; proofToken: string; newPassword: string }) =>
+      v1Post<{ ok: true }>('/auth/recovery/email/reset-password', body),
+  });
+}
+
 export function useV1AuthedPhoneRequest() {
   return useMutation({
     mutationFn: (body: { phone: string }) =>

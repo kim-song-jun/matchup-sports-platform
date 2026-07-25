@@ -25,6 +25,7 @@ import {
   useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
+import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
@@ -300,8 +301,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
-  // 취소 중인 초대 1건만 추적 — 아이템별 pending 상태(전역 boolean이면 무관한 카드도 함께 비활성화됨)
-  const [cancellingInvitationId, setCancellingInvitationId] = useState<string | null>(null);
+  // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
+  const cancellingInvitations = usePendingIds();
 
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
@@ -447,16 +448,16 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             displayName: inv.invitedUser.displayName,
             createdAt: inv.createdAt,
             message: inv.message,
-            cancelPending: cancellingInvitationId === inv.invitationId,
+            cancelPending: cancellingInvitations.has(inv.invitationId),
             onCancel: () =>
               confirmAction(
                 confirm,
                 { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '취소', tone: 'danger' },
                 () => {
-                  setCancellingInvitationId(inv.invitationId);
+                  cancellingInvitations.start(inv.invitationId);
                   cancelInvitation.mutate(
                     { invitationId: inv.invitationId },
-                    { onSettled: () => setCancellingInvitationId(null) },
+                    { onSettled: () => cancellingInvitations.finish(inv.invitationId) },
                   );
                 },
               ),

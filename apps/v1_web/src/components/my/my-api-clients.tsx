@@ -44,6 +44,7 @@ import {
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
+import { usePendingIds } from '@/hooks/use-pending-ids';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -148,11 +149,12 @@ export function MyInvitationsPageClient() {
   const { confirm, ConfirmModal } = useConfirm();
   const router = useRouter();
 
-  // 처리 중인 초대 1건만 추적 — 아이템별 pending 상태(전역 boolean이면 무관한 카드도 함께 비활성화됨)
-  const [pendingInvitationId, setPendingInvitationId] = useState<string | null>(null);
+  // 아이템별 pending — 전역 boolean이면 무관한 카드까지 잠기고, 단일 id면 두 건을
+  // 연달아 처리할 때 뒤엣것이 앞엣것의 pending을 덮어쓴다(usePendingIds 주석 참조).
+  const pendingInvitations = usePendingIds();
 
   const onAccept = (invitationId: string) => {
-    setPendingInvitationId(invitationId);
+    pendingInvitations.start(invitationId);
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
@@ -161,7 +163,7 @@ export function MyInvitationsPageClient() {
           void query.refetch();
         }
       },
-      onSettled: () => setPendingInvitationId(null),
+      onSettled: () => pendingInvitations.finish(invitationId),
     });
   };
 
@@ -175,14 +177,14 @@ export function MyInvitationsPageClient() {
       tone: 'danger',
     }).then((ok) => {
       if (ok) {
-        setPendingInvitationId(invitationId);
-        decline.mutate({ invitationId }, { onSettled: () => setPendingInvitationId(null) });
+        pendingInvitations.start(invitationId);
+        decline.mutate({ invitationId }, { onSettled: () => pendingInvitations.finish(invitationId) });
       }
     });
   };
 
   const model = {
-    invitations: (query.data?.items ?? []).map((item) => toMyInvitationItem(item, pendingInvitationId === item.invitationId)),
+    invitations: (query.data?.items ?? []).map((item) => toMyInvitationItem(item, pendingInvitations.has(item.invitationId))),
     error: query.isError,
     onAccept,
     onDecline,
@@ -202,10 +204,8 @@ export function MyJoinApplicationsPageClient() {
   const withdraw = useV1WithdrawMyJoinApplication();
   const { confirm, ConfirmModal } = useConfirm();
 
-  // 취소 중인 신청을 집합으로 추적한다.
-  // 전역 boolean이면 무관한 카드까지 잠기고, 단일 id면 두 건을 연달아 취소할 때
-  // 뒤엣것이 앞엣것의 pending을 덮어써 아직 요청 중인 카드가 다시 활성화된다(중복 요청 가능).
-  const [pendingApplicationIds, setPendingApplicationIds] = useState<ReadonlySet<string>>(new Set());
+  // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
+  const pendingApplications = usePendingIds();
 
   const onWithdraw = (applicationId: string) => {
     const application = (query.data?.items ?? []).find((item) => item.applicationId === applicationId);
@@ -217,24 +217,17 @@ export function MyJoinApplicationsPageClient() {
       tone: 'danger',
     }).then((ok) => {
       if (!ok) return;
-      setPendingApplicationIds((prev) => new Set(prev).add(applicationId));
+      pendingApplications.start(applicationId);
       withdraw.mutate(
         { applicationId, teamId: application.teamId, reason: 'team_join_withdrawn_from_v1_web_my_page' },
-        {
-          onSettled: () =>
-            setPendingApplicationIds((prev) => {
-              const next = new Set(prev);
-              next.delete(applicationId);
-              return next;
-            }),
-        },
+        { onSettled: () => pendingApplications.finish(applicationId) },
       );
     });
   };
 
   const model: MyJoinApplicationsViewModel = {
     applications: (query.data?.items ?? []).map((item) =>
-      toMyJoinApplicationItem(item, pendingApplicationIds.has(item.applicationId)),
+      toMyJoinApplicationItem(item, pendingApplications.has(item.applicationId)),
     ),
     loading: query.isLoading,
     error: query.isError,

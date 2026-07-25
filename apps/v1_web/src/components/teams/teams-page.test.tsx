@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { TeamMembersPageClient } from './teams-client';
@@ -508,5 +508,42 @@ describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
       { reason: 'left_from_v1_web_member_page' },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     ));
+  });
+
+  it('두 초대를 연달아 취소해도 먼저 시작한 카드의 pending이 풀리지 않는다', async () => {
+    mockOwnerMembersPage(2);
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({
+      data: {
+        items: [
+          { invitationId: 'inv-a', invitedUser: { userId: 'u-a', displayName: '김도윤', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
+          { invitationId: 'inv-b', invitedUser: { userId: 'u-b', displayName: '박서준', profileImageUrl: null }, status: 'pending', message: null, createdAt: '2026-07-01T00:00:00Z' },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    // onSettled를 부르지 않아 두 취소 요청 모두 "진행 중"인 상태를 만든다.
+    const cancelMutate = vi.fn();
+    teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: true, mutate: cancelMutate });
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^초대 \d+$/ }));
+
+    for (const name of ['김도윤', '박서준']) {
+      fireEvent.click(screen.getByRole('button', { name: `${name}님 초대 취소` }));
+      const dialog = await screen.findByRole('dialog', { name: '초대 취소' });
+      // 확인 모달은 confirmLabel('취소')과 기본 cancelLabel('취소')이 같아 버튼 이름만으로는
+      // 구분되지 않는다. 확인 버튼이 뒤에 렌더되므로 마지막 것을 누른다.
+      const buttons = within(dialog).getAllByRole('button', { name: '취소' });
+      fireEvent.click(buttons[buttons.length - 1]);
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '초대 취소' })).not.toBeInTheDocument());
+    }
+
+    // 단일 id 추적이면 뒤엣것이 앞엣것의 pending을 덮어써 A가 다시 눌리게 된다(중복 취소 요청).
+    await waitFor(() => expect(cancelMutate).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: '김도윤님 초대 취소' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '박서준님 초대 취소' })).toBeDisabled();
   });
 });

@@ -14,7 +14,8 @@ function buildPrismaMock() {
     findFirst: jest.fn(),
     update: jest.fn().mockResolvedValue({}),
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-    create: jest.fn().mockResolvedValue({}),
+    create: jest.fn().mockResolvedValue({ id: 'tok' }),
+    deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
   };
   prisma.v1User = {
     findUnique: jest.fn(),
@@ -186,6 +187,24 @@ describe('VerificationService.requestPhone (MT)', () => {
       expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', target: '01012345678' }) }),
     );
     expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/));
+    sendSpy.mockRestore();
+  });
+
+  it('deletes the just-created token when SMS dispatch fails (즉시 재요청 가능)', async () => {
+    const prisma = buildPrismaMock();
+    const handle = prisma as never as {
+      v1User: { findUnique: jest.Mock; findFirst: jest.Mock };
+      v1VerificationToken: { findFirst: jest.Mock; create: jest.Mock; deleteMany: jest.Mock };
+    };
+    handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.com', phone: null, emailVerifiedAt: null, phoneVerifiedAt: null });
+    handle.v1User.findFirst.mockResolvedValue(null);
+    handle.v1VerificationToken.findFirst.mockResolvedValue(null);
+    handle.v1VerificationToken.create.mockResolvedValue({ id: 'tok-new' });
+    const sendSpy = jest.spyOn(dispatcher, 'send').mockRejectedValue(new Error('SMS_NOT_CONFIGURED'));
+    const service = new VerificationService(prisma, dispatcher);
+
+    await expect(service.requestPhone(authUser, '01012345678')).rejects.toThrow();
+    expect(handle.v1VerificationToken.deleteMany).toHaveBeenCalledWith({ where: { id: 'tok-new' } });
     sendSpy.mockRestore();
   });
 

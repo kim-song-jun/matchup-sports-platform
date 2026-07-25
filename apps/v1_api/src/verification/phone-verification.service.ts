@@ -45,7 +45,13 @@ export class PhoneVerificationService {
       create: { phone, codeHash, expiresAt },
     });
 
-    await this.dispatcher.send('phone', phone, code);
+    try {
+      await this.dispatcher.send('phone', phone, code);
+    } catch (err) {
+      // 발송 실패 시 방금 만든 챌린지를 정리해, 사용자가 재발송 쿨다운에 걸리지 않고 즉시 재요청할 수 있게 한다.
+      await this.prisma.v1PhoneVerificationChallenge.deleteMany({ where: { phone } });
+      throw err;
+    }
 
     return { expiresAt: expiresAt.toISOString(), ...(this.dispatcher.devEchoActive ? { devCode: code } : {}) };
   }

@@ -25,6 +25,11 @@ function prismaMock() {
         if ('verifiedAt' in data) row.verifiedAt = data.verifiedAt as Date | null;
         return row;
       }),
+      deleteMany: jest.fn(async ({ where }: { where: { phone: string } }) => {
+        const existed = store.has(where.phone);
+        store.delete(where.phone);
+        return { count: existed ? 1 : 0 };
+      }),
     },
     __store: store,
   } as never;
@@ -120,6 +125,17 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
     await svc.issueChallenge(PHONE);
     await expect(svc.issueChallenge(PHONE)).rejects.toMatchObject({ response: { code: 'VERIFICATION_RESEND_COOLDOWN' } });
+  });
+
+  it('issueChallenge cleans up the challenge when SMS dispatch fails (즉시 재요청 가능)', async () => {
+    const prisma = prismaMock();
+    const dispatcher = dispatcherMock(true);
+    (dispatcher.send as unknown as jest.Mock).mockRejectedValueOnce(new Error('SMS_SEND_FAILED'));
+    const svc = new PhoneVerificationService(prisma, dispatcher);
+
+    await expect(svc.issueChallenge(PHONE)).rejects.toThrow();
+    // 챌린지가 삭제되어 다음 요청이 쿨다운에 걸리지 않는다.
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)).toBeUndefined();
   });
 
   it('issueProof returns a token bound to the phone', () => {

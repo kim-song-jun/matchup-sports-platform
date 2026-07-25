@@ -156,7 +156,7 @@ export class VerificationService {
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const codeHash = await hashPassword(code);
 
-    await this.prisma.$transaction([
+    const [, created] = await this.prisma.$transaction([
       this.prisma.v1VerificationToken.updateMany({
         where: { userId, channel, consumedAt: null },
         data: { consumedAt: new Date() },
@@ -166,7 +166,13 @@ export class VerificationService {
       }),
     ]);
 
-    await this.dispatcher.send(channel, target, code);
+    try {
+      await this.dispatcher.send(channel, target, code);
+    } catch (err) {
+      // 발송 실패 시 방금 만든 토큰을 삭제해, 사용자가 재발송 쿨다운(대상 번호 기준)에 걸리지 않고 즉시 재요청할 수 있게 한다.
+      await this.prisma.v1VerificationToken.deleteMany({ where: { id: created.id } });
+      throw err;
+    }
 
     return {
       sent: true,

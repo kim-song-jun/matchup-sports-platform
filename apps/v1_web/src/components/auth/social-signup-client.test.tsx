@@ -251,9 +251,17 @@ describe('SocialSignupClient required profile contract', () => {
 // PendingSocialSignupGate 가 이 단계에서 다른 경로를 전부 되돌리므로, 이 버튼이 없으면
 // 사용자는 가입을 끝내기 전까지 화면을 빠져나갈 방법이 아예 없다(원래 증상).
 describe('SocialSignupClient 가입 중 탈출구', () => {
+  // 출구는 하드 내비게이션으로 /login 에 도달하는 것까지가 계약이다. jsdom 은 실제
+  // 이동을 구현하지 않아 경고만 내고 지나가므로, replace 를 가로채 목적지를 단언한다.
+  const locationReplace = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
     hooks.authMe.socialSignupPrefill = null;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, replace: locationReplace },
+    });
   });
 
   // AuthFrame 은 모바일 상단바와 데스크톱 in-card 내비 두 벌을 함께 렌더하고 실제로는 CSS
@@ -276,7 +284,7 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
     expect(hooks.logoutMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('그만두기를 고르면 로그아웃한다', async () => {
+  it('그만두기를 고르면 로그아웃하고 로그인 화면으로 보낸다', async () => {
     const user = userEvent.setup();
     hooks.logoutMutateAsync.mockResolvedValue({ ok: true });
     render(<SocialSignupClient />);
@@ -285,6 +293,8 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
     await user.click(await screen.findByRole('button', { name: '그만두기' }));
 
     await waitFor(() => expect(hooks.logoutMutateAsync).toHaveBeenCalledTimes(1));
+    // 로그아웃만 하고 머무르면 화면을 빠져나오지 못한 채 그대로다 — 도달지까지가 계약.
+    await waitFor(() => expect(locationReplace).toHaveBeenCalledWith('/login'));
   });
 
   // 로그아웃 실패를 조용히 넘기면 로그인 화면으로 가도 게이트가 다시 끌어와
@@ -298,6 +308,8 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
     await user.click(await screen.findByRole('button', { name: '그만두기' }));
 
     expect(await screen.findByText(/가입 취소를 완료하지 못했어요/)).toBeInTheDocument();
+    // 서버 세션이 남은 채 로그인 화면으로 보내면 게이트가 다시 끌어와 원래 증상이 된다.
+    expect(locationReplace).not.toHaveBeenCalled();
   });
 });
 

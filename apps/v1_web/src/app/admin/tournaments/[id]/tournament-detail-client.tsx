@@ -32,6 +32,7 @@ import {
   TimerOff,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
+import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import { extractYoutubeVideoId, youtubeThumbnailUrl, videoKind } from '@/lib/video-utils';
@@ -1636,7 +1637,12 @@ export function BracketTab({
   const hasData = groups.length > 0 || fixtures.length > 0;
 
   // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
-  const isBracketPublished = !!bracketPublishedAt;
+  // 예약 시각이 지나면 서버는 공개로 판정하지만 bracketPublishedAt 은 null 로 남는다.
+  // 여기서 bracketPublishedAt 만 보면 이미 공개된 대진표를 계속 "예약됨"으로 표시하고
+  // 공개 버튼도 노출하게 되므로, 서버와 같은 규칙(bracket-visibility)을 쓴다.
+  const isBracketPublished = isBracketPublishedNow(bracketPublishedAt, bracketPublishScheduledAt);
+  // 아직 오지 않은 예약만 "예약됨" 안내·취소 대상이다.
+  const hasPendingSchedule = !!bracketPublishScheduledAt && !isBracketPublished;
   const deadlinePassed = registrationDeadlineAt
     ? new Date(registrationDeadlineAt).getTime() < Date.now()
     : false;
@@ -1721,8 +1727,8 @@ export function BracketTab({
             <p className="text-xs text-gray-500">
               {isBracketPublished
                 ? `${formatDate(bracketPublishedAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
-                : bracketPublishScheduledAt
-                ? `${formatDate(bracketPublishScheduledAt)}에 자동 공개돼요. 그 전까지는 계속 수정할 수 있어요.`
+                : hasPendingSchedule
+                ? `${formatDate(bracketPublishScheduledAt ?? null)}에 자동 공개돼요. 그 전까지는 계속 수정할 수 있어요.`
                 : '아직 비공개예요. 공개 전까지 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요.'}
             </p>
             {!isBracketPublished && publishBlockedReason && (
@@ -1741,7 +1747,7 @@ export function BracketTab({
                 지금 전체 공개
               </button>
             )}
-            {canWrite && (isBracketPublished || bracketPublishScheduledAt) && (
+            {canWrite && (isBracketPublished || hasPendingSchedule) && (
               <button
                 type="button"
                 onClick={handleUnpublishBracket}
@@ -1777,7 +1783,7 @@ export function BracketTab({
               title={publishBlockedReason ?? undefined}
               className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-blue-600 border border-blue-200 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
             >
-              {bracketPublishScheduledAt ? '예약 변경' : '이 시각에 공개 예약'}
+              {hasPendingSchedule ? '예약 변경' : '이 시각에 공개 예약'}
             </button>
             <p className="text-xs text-gray-400 basis-full">
               예약한 시각이 되면 스케줄러 없이 자동으로 공개돼요. 그 전까지는 조·경기를 계속 수정할 수 있어요.

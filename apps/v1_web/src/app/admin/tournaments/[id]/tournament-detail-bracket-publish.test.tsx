@@ -320,6 +320,29 @@ describe('BracketTab — 대진표 전체 공개', () => {
     await waitFor(() => expect(unpublishMutate).toHaveBeenCalled());
   });
 
+  it('예약 시각이 이미 지났으면 publishedAt 이 null 이어도 공개로 취급한다', () => {
+    // 예약 공개는 조회 시점 판정이라 시각이 지나도 bracketPublishedAt 은 null 로 남는다.
+    // 어드민이 bracketPublishedAt 만 보면 이미 공개된 대진표에 "지금 전체 공개" 버튼을
+    // 계속 노출하게 된다(서버는 이미 공개 상태).
+    vi.mocked(useV1PublishTournamentBracket).mockReturnValue(noopMutationHook());
+
+    render(
+      <BracketTab
+        tournamentId="tournament-1"
+        showToast={showToast}
+        registrations={[]}
+        registrationDeadlineAt="2020-01-01T00:00:00.000Z"
+        bracketPublishedAt={null}
+        bracketPublishScheduledAt="2020-01-01T00:00:00.000Z"
+        canWrite
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '지금 전체 공개' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('공개 예약 시각')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '공개 취소' })).toBeInTheDocument();
+  });
+
   it('공개된 상태에서 공개 취소를 확인하면 unpublish mutate 한다', async () => {
     const unpublishMutate = vi.fn();
     vi.mocked(useV1PublishTournamentBracket).mockReturnValue(noopMutationHook());

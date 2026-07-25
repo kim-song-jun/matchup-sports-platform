@@ -1900,7 +1900,11 @@ export type V1Tournament = {
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
   rosterDeadlineAt: string | null;
-  /** null이면 대진표(조/픽스처) 비공개 — 공개 상세 API는 이 값이 채워질 때까지 groups/fixtures를 숨긴다 */
+  /**
+   * 즉시 공개한 시각. **이 값 단독으로 공개 여부를 판단하지 말 것** — 예약 공개는 조회
+   * 시점에 판정하므로 예약 시각이 지나도 여기는 null 로 남는다. 판정은
+   * `lib/bracket-visibility.ts`의 `isBracketPublished()` 를 쓴다.
+   */
   bracketPublishedAt: string | null;
   /** 공개 예약 시각. 아직 공개 전일 때만 내려오며(공개 후 null), "N에 공개 예정" 안내에 쓴다. */
   bracketPublishScheduledAt: string | null;
@@ -2081,7 +2085,11 @@ export type V1TournamentDetail = {
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
   rosterDeadlineAt: string | null;
-  /** null이면 groups/fixtures가 빈 배열로 내려온다(대진표 비공개). 관리자가 일괄 공개하면 타임스탬프가 채워진다. */
+  /**
+   * 관리자가 즉시 공개한 시각. **공개 여부 판정은 이 값 단독으로 하지 말 것** —
+   * `bracketPublishScheduledAt` 이 지나도 여기는 null 로 남으므로,
+   * `lib/bracket-visibility.ts`의 `isBracketPublished()` 로 판정한다.
+   */
   bracketPublishedAt: string | null;
   /** 공개 예약 시각. 이 시각이 지나면 스케줄러 없이 조회 시점 판정으로 공개된다. */
   bracketPublishScheduledAt: string | null;

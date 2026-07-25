@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PhoneVerificationService } from './phone-verification.service';
+import { EMAIL_SENDER } from './email/email-sender';
+import { SesEmailSender } from './email/ses-email-sender';
 import { SmsEventLogService } from './sms-event-log.service';
 import { GabiaSmsSender } from './sms/gabia-sms-sender';
 import { SMS_SENDER } from './sms/sms-sender';
@@ -23,6 +25,7 @@ import { VerificationService } from './verification.service';
         (process.env.SMS_PROVIDER ?? 'solapi').trim().toLowerCase() === 'gabia' ? gabia : solapi,
       inject: [SolapiSmsSender, GabiaSmsSender],
     },
+    { provide: EMAIL_SENDER, useClass: SesEmailSender },
     PhoneVerificationService,
     V1AuthGuard,
   ],

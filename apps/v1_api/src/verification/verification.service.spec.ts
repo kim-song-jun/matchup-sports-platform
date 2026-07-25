@@ -9,7 +9,8 @@ const authUser = { id: 'u1', email: 'a@b.com', accountStatus: 'active', onboardi
 const smsStub: SmsSender = { enabled: false, send: jest.fn().mockResolvedValue(undefined) };
 const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
 const eventLogStub = () => smsEventLog as unknown as SmsEventLogService;
-const dispatcher = new VerificationDispatcherService(smsStub, eventLogStub());
+const emailStub = { enabled: false, send: jest.fn().mockResolvedValue(undefined) };
+const dispatcher = new VerificationDispatcherService(smsStub, emailStub, eventLogStub());
 
 function buildPrismaMock() {
   const prisma: Record<string, unknown> = {};

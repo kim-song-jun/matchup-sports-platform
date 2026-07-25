@@ -20,6 +20,6 @@ export class PhoneVerificationPublicController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async verify(@Body() dto: PhoneVerifyDto) {
     await this.phoneVerification.verifyCode(dto.phone, dto.code);
-    return { verified: true, proofToken: this.phoneVerification.issueProof(dto.phone) };
+    return { verified: true, proofToken: this.phoneVerification.issueProof(dto.phone, dto.purpose) };
   }
 }

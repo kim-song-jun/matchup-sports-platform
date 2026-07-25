@@ -41,6 +41,7 @@ import type {
   V1AdminTermsVersionPayload,
   V1AdminRow,
   V1PushFailureSummary,
+  V1FoundAccount,
   V1SmsFailureSummary,
   V1AdminOpsSummary,
   V1AdminPushSendPayload,
@@ -290,8 +291,24 @@ export function useV1PhoneIssue() {
 
 export function useV1PhoneVerify() {
   return useMutation({
-    mutationFn: (body: { phone: string; code: string }) =>
+    // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
+    // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
       v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+  });
+}
+
+export function useV1FindAccountByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
+  });
+}
+
+export function useV1ResetPasswordByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string; newPassword: string }) =>
+      v1Post<{ ok: true }>('/auth/recovery/reset-password', body),
   });
 }
 

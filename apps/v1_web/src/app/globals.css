@@ -701,13 +701,22 @@ button:disabled {
   box-shadow: var(--sh-1);
 }
 
+/* 인증 폼 안의 보조 영역(사진 업로드·휴대폰 인증) 공통 표면.
+   폼 자체가 카드(데스크톱)인 곳에서 흰 카드를 또 겹치면 테두리가 이중으로 보이므로,
+   내부 영역은 카드가 아니라 tint 된 inset 으로 통일한다. */
+.tm-auth-inset {
+  border: 1px solid var(--grey200);
+  border-radius: 16px;
+  background: var(--grey50);
+}
+
 .tm-auth-profile-upload {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   padding: 14px;
-  border: 1px dashed var(--grey300);
+  border: 1px solid var(--grey200);
   border-radius: 16px;
   background: var(--grey50);
 }

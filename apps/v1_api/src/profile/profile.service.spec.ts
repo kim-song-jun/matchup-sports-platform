@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { issuePhoneProofToken } from '../verification/phone-proof-token';
 import { ProfileService } from './profile.service';
 
 const user = {
@@ -48,7 +49,8 @@ describe('ProfileService identity binding', () => {
       displayName: profile.displayName,
       nickname: profile.nickname,
       email: 'new@teameet.test',
-      phone: '01033334444',
+      // 번호는 그대로 둔다 — 번호 변경은 본인인증 증명을 요구하므로 아래 별도 describe 에서 다룬다.
+      phone: '01011112222',
       profileImageUrl: null,
       birthDate: null,
       gender: 'male',
@@ -58,15 +60,134 @@ describe('ProfileService identity binding', () => {
       where: { id: user.id },
       data: {
         email: 'new@teameet.test',
-        phone: '01033334444',
+        phone: '01011112222',
         emailVerifiedAt: null,
-        phoneVerifiedAt: null,
       },
     });
     expect(prisma.v1AuthIdentity.updateMany).toHaveBeenCalledWith({
       where: { userId: user.id, provider: 'email', status: 'active' },
       data: { email: 'new@teameet.test', providerUserKey: 'new@teameet.test' },
     });
+  });
+});
+
+describe('ProfileService phone change proof gate', () => {
+  const OLD_PHONE = '01011112222';
+  const NEW_PHONE = '01033334444';
+
+  function buildPrisma() {
+    const profile = {
+      displayName: '테스트 사용자',
+      nickname: '테스트닉',
+      profileImageUrl: null,
+      birthDate: null,
+      gender: 'male',
+      updatedAt: new Date(),
+    };
+    const prisma = {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          email: user.email,
+          phone: OLD_PHONE,
+          authIdentities: [{ provider: 'email', passwordHash: 'hash' }],
+          profile,
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      v1AuthIdentity: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      v1UserProfile: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue(profile),
+      },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+    return { prisma, profile };
+  }
+
+  function payload(phone: string, phoneProofToken?: string) {
+    return {
+      displayName: '테스트 사용자',
+      nickname: '테스트닉',
+      email: user.email,
+      phone,
+      phoneProofToken,
+      profileImageUrl: null,
+      birthDate: null,
+      gender: 'male' as const,
+    };
+  }
+
+  const originalSecret = process.env.V1_SESSION_SECRET;
+
+  beforeEach(() => {
+    process.env.V1_SESSION_SECRET = 'test-proof-secret';
+    delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+  });
+
+  afterEach(() => {
+    if (originalSecret === undefined) delete process.env.V1_SESSION_SECRET;
+    else process.env.V1_SESSION_SECRET = originalSecret;
+    delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+  });
+
+  it('증명 없이 번호를 바꾸려 하면 400 PHONE_NOT_VERIFIED 로 막고 아무것도 저장하지 않는다', async () => {
+    const { prisma } = buildPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await expect(service.updateMe(user, payload(NEW_PHONE))).rejects.toMatchObject({
+      response: { code: 'PHONE_NOT_VERIFIED' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+  });
+
+  it('다른 번호로 발급된 증명은 거부한다 (토큰 재사용 차단)', async () => {
+    const { prisma } = buildPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+    const tokenForOtherPhone = issuePhoneProofToken('01099998888');
+
+    await expect(service.updateMe(user, payload(NEW_PHONE, tokenForOtherPhone))).rejects.toMatchObject({
+      response: { code: 'PHONE_NOT_VERIFIED' },
+    });
+    expect(prisma.v1User.update).not.toHaveBeenCalled();
+  });
+
+  it('유효한 증명이면 번호를 바꾸고 phoneVerifiedAt 을 새로 세운다 (인증 직후 미인증으로 떨어지지 않음)', async () => {
+    const { prisma } = buildPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await service.updateMe(user, payload(NEW_PHONE, issuePhoneProofToken(NEW_PHONE)));
+
+    expect(prisma.v1User.update).toHaveBeenCalledTimes(1);
+    const data = prisma.v1User.update.mock.calls[0][0].data;
+    expect(data.phone).toBe(NEW_PHONE);
+    expect(data.phoneVerifiedAt).toBeInstanceOf(Date);
+  });
+
+  it('번호를 바꾸지 않는 저장은 증명 없이 통과하고 phoneVerifiedAt 을 건드리지 않는다', async () => {
+    const { prisma } = buildPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await service.updateMe(user, payload(OLD_PHONE));
+
+    expect(prisma.v1User.update).toHaveBeenCalledTimes(1);
+    expect(prisma.v1User.update.mock.calls[0][0].data).not.toHaveProperty('phoneVerifiedAt');
+  });
+
+  it('인증 강제가 꺼진 환경(V1_PHONE_VERIFICATION_DISABLED=true)에서는 증명 없이 바꾸되 미인증으로 떨어뜨린다', async () => {
+    process.env.V1_PHONE_VERIFICATION_DISABLED = 'true';
+    const { prisma } = buildPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await service.updateMe(user, payload(NEW_PHONE));
+
+    expect(prisma.v1User.update.mock.calls[0][0].data.phoneVerifiedAt).toBeNull();
   });
 });
 

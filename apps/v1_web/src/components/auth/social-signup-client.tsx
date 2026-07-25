@@ -291,7 +291,7 @@ export function SocialSignupClient() {
           </label>
 
           {phoneDigits.length === 11 && !phoneVerified ? (
-            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} />
+            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" />
           ) : null}
 
           {phoneVerified ? (

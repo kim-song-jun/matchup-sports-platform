@@ -7,6 +7,7 @@ import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -316,6 +317,8 @@ export function ProfileEditPageClient() {
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
+  /** 번호를 바꿨을 때만 채워지는 본인인증 증명. 번호를 다시 고치면 무효가 되므로 함께 비운다. */
+  const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile.data) return;
@@ -329,6 +332,7 @@ export function ProfileEditPageClient() {
     setProfileImageName('');
     setNicknameCheck({ status: 'idle', value: '' });
     setEmailCheck({ status: 'idle', value: '' });
+    setPhoneProofToken(null);
   }, [profile.data]);
 
   if (profile.isPending) {
@@ -354,6 +358,8 @@ export function ProfileEditPageClient() {
 
   const originalNickname = profile.data.profile.nickname ?? '';
   const originalEmail = profile.data.email ?? '';
+  const originalPhone = profile.data.phone ?? '';
+  const phoneChanged = phoneDigits !== originalPhone;
   const emailRequired = Boolean(profile.data.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
@@ -485,6 +491,13 @@ export function ProfileEditPageClient() {
       return;
     }
 
+    // 번호를 바꿨다면 서버가 본인인증 증명을 요구한다(가입과 동일). 저장 버튼을 눌러서야
+    // 알게 되면 입력을 다 마친 뒤 되돌아가야 하므로, 아래 필드에 인증 카드를 함께 띄운다.
+    if (phoneChanged && phoneDigits && !phoneProofToken) {
+      setFieldErrors({ phone: '변경한 번호로 본인인증을 완료해 주세요.' });
+      return;
+    }
+
     if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
       setFieldErrors({ birthDate: '올바른 생년월일을 입력해 주세요. (예: 1995-01-15)' });
       return;
@@ -502,6 +515,7 @@ export function ProfileEditPageClient() {
         email: normalizedEmail || null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
+        phoneProofToken: phoneChanged ? phoneProofToken : null,
         birthDate: birthDateDigits || null,
         gender,
       });
@@ -639,13 +653,33 @@ export function ProfileEditPageClient() {
             value={formatPhone(phoneDigits)}
             onChange={(event) => {
               setPhoneDigits(toDigits(event.target.value, 11));
+              // 번호가 바뀌면 직전 번호로 받은 증명은 더 이상 유효하지 않다.
+              setPhoneProofToken(null);
               setFieldErrors((current) => ({ ...current, phone: undefined }));
             }}
             aria-invalid={fieldErrors.phone ? true : undefined}
             aria-describedby={fieldErrors.phone ? 'profile-phone-error' : undefined}
           />
           {fieldErrors.phone ? <span id="profile-phone-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.phone}</span> : null}
+          {phoneChanged && !phoneProofToken ? (
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              번호를 바꾸면 본인인증을 다시 해야 해요.
+            </span>
+          ) : null}
         </label>
+
+        {/* 번호를 바꾼 경우에만 인증을 요구한다 — 저장을 누르기 전에 이 자리에서 끝낼 수 있게 필드 바로 아래 둔다. */}
+        {phoneChanged && phoneDigits.length === 11 ? (
+          <PhoneVerificationCard
+            mode="public"
+            phone={phoneDigits}
+            surface="inset"
+            onVerified={(token) => {
+              setPhoneProofToken(token ?? null);
+              setFieldErrors((current) => ({ ...current, phone: undefined }));
+            }}
+          />
+        ) : null}
         <label className="tm-create-field">
           <span className="tm-text-label">생년월일</span>
           <DatePickerTextInput

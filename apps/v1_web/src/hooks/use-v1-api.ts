@@ -1304,6 +1304,8 @@ export function useV1UpdateProfile() {
       email?: string | null;
       profileImageUrl?: string | null;
       phone?: string | null;
+      /** 번호를 바꿀 때만 필요 — 서버가 register 와 동일하게 본인인증 증명을 요구한다. */
+      phoneProofToken?: string | null;
       birthDate?: string | null;
       gender: 'male' | 'female';
     }) =>

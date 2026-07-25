@@ -12,6 +12,17 @@ const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 
 /**
+ * 휴대폰 인증 강제 여부의 단일 판정.
+ *
+ * register 게이트(PhoneVerificationService.enabled)와 프로필 번호 변경 게이트(ProfileService)가
+ * 같은 판정을 써야 한다 — 한쪽만 env 를 다시 읽으면 "가입은 막는데 번호 변경은 통과" 같은
+ * 반쪽 강제가 생기고, 그게 실제로 인증 우회 경로였다.
+ */
+export function isPhoneVerificationEnforced(): boolean {
+  return process.env.V1_PHONE_VERIFICATION_DISABLED !== 'true';
+}
+
+/**
  * 회원가입 전(pre-account) 공개 휴대폰 인증 — MT SMS OTP.
  * userId 가 없으므로 phone 기준 V1PhoneVerificationChallenge(codeHash) 로 코드를 발급/대조한다.
  * 성공 시 issueProof() 로 proofToken 을 발급해 register 에서 재검증한다.
@@ -32,7 +43,7 @@ export class PhoneVerificationService {
    *  없으면 가입이 진행되지 못하고 막힌다.)
    */
   get enabled(): boolean {
-    return process.env.V1_PHONE_VERIFICATION_DISABLED !== 'true';
+    return isPhoneVerificationEnforced();
   }
 
   async issueChallenge(phone: string): Promise<{ expiresAt: string; devCode?: string }> {

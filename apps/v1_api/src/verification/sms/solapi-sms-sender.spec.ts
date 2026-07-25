@@ -1,4 +1,8 @@
+import type { SmsEventLogService } from '../sms-event-log.service';
 import { SolapiSmsSender } from './solapi-sms-sender';
+
+const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
+const eventLogStub = () => smsEventLog as unknown as SmsEventLogService;
 
 describe('SolapiSmsSender', () => {
   const OLD_ENV = process.env;
@@ -20,10 +24,10 @@ describe('SolapiSmsSender', () => {
     process.env.SOLAPI_API_KEY = 'k';
     process.env.SOLAPI_API_SECRET = 's';
     process.env.SOLAPI_SENDER_NUMBER = '01000000000';
-    expect(new SolapiSmsSender().enabled).toBe(true);
+    expect(new SolapiSmsSender(eventLogStub()).enabled).toBe(true);
 
     delete process.env.SOLAPI_API_SECRET;
-    expect(new SolapiSmsSender().enabled).toBe(false);
+    expect(new SolapiSmsSender(eventLogStub()).enabled).toBe(false);
   });
 
   it('send는 solapi /messages/v4/send로 from/to/text를 POST하고 HMAC-SHA256 Authorization을 붙인다', async () => {
@@ -38,7 +42,7 @@ describe('SolapiSmsSender', () => {
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await new SolapiSmsSender().send('01033334444', '[Teameet] 인증번호 123456');
+    await new SolapiSmsSender(eventLogStub()).send('01033334444', '[Teameet] 인증번호 123456');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -63,7 +67,7 @@ describe('SolapiSmsSender', () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}), text: async () => '' });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await new SolapiSmsSender().send('01033334444', 't');
+    await new SolapiSmsSender(eventLogStub()).send('01033334444', 't');
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBeInstanceOf(AbortSignal);
@@ -80,6 +84,6 @@ describe('SolapiSmsSender', () => {
       text: async () => 'bad number',
     }) as unknown as typeof fetch;
 
-    await expect(new SolapiSmsSender().send('01033334444', 't')).rejects.toThrow('Solapi send failed: 400');
+    await expect(new SolapiSmsSender(eventLogStub()).send('01033334444', 't')).rejects.toThrow('Solapi send failed: 400');
   });
 });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { PhoneVerificationService } from './phone-verification.service';
+import { SmsEventLogService } from './sms-event-log.service';
 import { GabiaSmsSender } from './sms/gabia-sms-sender';
 import { SMS_SENDER } from './sms/sms-sender';
 import { SolapiSmsSender } from './sms/solapi-sms-sender';
@@ -13,6 +14,7 @@ import { VerificationService } from './verification.service';
   providers: [
     VerificationService,
     VerificationDispatcherService,
+    SmsEventLogService,
     SolapiSmsSender,
     GabiaSmsSender,
     {

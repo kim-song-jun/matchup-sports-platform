@@ -41,6 +41,8 @@ import type {
   V1AdminTermsVersionPayload,
   V1AdminRow,
   V1PushFailureSummary,
+  V1SmsFailureSummary,
+  V1AdminOpsSummary,
   V1AdminPushSendPayload,
   V1AdminPushSendResult,
   V1AdminMatchDetail,
@@ -1995,6 +1997,39 @@ export function useV1AdminSendPush() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — ops (SMS / 인증 실패 로그 + 운영 KPI 요약)
+// ---------------------------------------------------------------------------
+
+export function useV1RecentSmsFailures(limit = 20) {
+  return useQuery({
+    queryKey: v1Keys.adminSmsFailures({ limit }),
+    queryFn: () => v1Get<V1SmsFailureSummary[]>('/admin/ops/recent-sms-failures', { limit }),
+  });
+}
+
+export function useV1AckSmsFailures() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => v1Post('/admin/ops/sms-failures/ack', { ids }),
+    onSuccess: () => {
+      // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminSmsFailures() });
+    },
+  });
+}
+
+/**
+ * 운영 대시보드 KPI(최근 5분 웹 푸시 / SMS·인증 실패 건수).
+ * ack 는 "최근 5분 발생 건수"를 바꾸지 않으므로(집계 기준이 createdAt) 무효화 대상이 아니다.
+ */
+export function useV1AdminOpsSummary() {
+  return useQuery({
+    queryKey: v1Keys.adminOpsSummary(),
+    queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
   });
 }
 

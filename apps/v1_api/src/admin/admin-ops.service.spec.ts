@@ -12,7 +12,8 @@ const admin = { id: 'admin-row-1', userId: 'admin-user-1', adminRole: 'ops' as c
 describe('AdminOpsService', () => {
   let service: AdminOpsService;
   const prisma = {
-    v1WebPushFailureLog: { findMany: jest.fn(), updateMany: jest.fn() },
+    v1WebPushFailureLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
+    v1SmsEventLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1User: { findUnique: jest.fn() },
     v1PushSubscription: { findMany: jest.fn() },
     v1NotificationPreference: { findUnique: jest.fn() },
@@ -63,6 +64,78 @@ describe('AdminOpsService', () => {
     expect(result[0].userIdHash).toBe(expectedHash);
     expect(result[0].endpointSuffix).toBe('ghijkl');
     expect(result[0]).not.toHaveProperty('userId');
+  });
+
+  // ── SMS / 인증 실패 로그 ───────────────────────────────────────────────
+  it('recentSmsFailures returns the stored masked tail as-is and never exposes a raw phone number', async () => {
+    prisma.v1SmsEventLog.findMany.mockResolvedValue([
+      {
+        id: 'sms-1',
+        eventType: 'SMS_SEND_FAILED',
+        resultCode: '400',
+        phoneMasked: '5678',
+        provider: 'solapi',
+        detail: 'Bad Request',
+        createdAt: new Date('2026-07-25T00:00:00Z'),
+        acknowledgedAt: null,
+      },
+    ]);
+
+    const result = await service.recentSmsFailures(20);
+
+    expect(prisma.v1SmsEventLog.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+    // 마스킹은 기록 시점(SmsEventLogService)에 끝나므로 조회는 저장값을 그대로 통과시킨다.
+    expect(result[0].phoneMasked).toBe('5678');
+    expect(result[0].eventType).toBe('SMS_SEND_FAILED');
+    expect(result[0].provider).toBe('solapi');
+  });
+
+  it('opsSummary counts push and sms failures in the last 5 minutes', async () => {
+    prisma.v1WebPushFailureLog.count.mockResolvedValue(3);
+    prisma.v1SmsEventLog.count.mockResolvedValue(7);
+
+    const result = await service.opsSummary();
+
+    expect(result).toEqual({ pushFailures5m: 3, smsFailures5m: 7 });
+    // 집계 기준은 발생 시각이며 5분 창을 넘어서는 안 된다.
+    const smsWhere = prisma.v1SmsEventLog.count.mock.calls[0][0].where;
+    const cutoff = smsWhere.createdAt.gte as Date;
+    expect(Date.now() - cutoff.getTime()).toBeGreaterThanOrEqual(5 * 60_000 - 1_000);
+    expect(Date.now() - cutoff.getTime()).toBeLessThanOrEqual(5 * 60_000 + 1_000);
+  });
+
+  it('ackSmsFailures updates only the still-unacknowledged ids and logs one audit entry each, in one transaction', async () => {
+    prisma.v1SmsEventLog.findMany.mockResolvedValue([{ id: 'sms-2' }]);
+
+    await service.ackSmsFailures(['sms-1', 'sms-2'], admin);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.v1SmsEventLog.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['sms-1', 'sms-2'] }, acknowledgedAt: null },
+      select: { id: true },
+    });
+    expect(prisma.v1SmsEventLog.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['sms-2'] } },
+      data: { acknowledgedAt: expect.any(Date) },
+    });
+    expect(adminContext.logAdminAction).toHaveBeenCalledTimes(1);
+    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({ action: 'sms_event_log.ack', targetType: 'sms_event_log', targetId: 'sms-2' }),
+      prisma,
+    );
+  });
+
+  it('ackSmsFailures does nothing when every id is already acknowledged', async () => {
+    prisma.v1SmsEventLog.findMany.mockResolvedValue([]);
+
+    await service.ackSmsFailures(['sms-1'], admin);
+
+    expect(prisma.v1SmsEventLog.updateMany).not.toHaveBeenCalled();
+    expect(adminContext.logAdminAction).not.toHaveBeenCalled();
   });
 
   it('ack records acknowledgedAt/acknowledgedBy in one bulk update and an audit log per id, inside one transaction', async () => {

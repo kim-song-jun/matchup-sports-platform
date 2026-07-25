@@ -15,6 +15,27 @@ export interface PushFailureSummary {
   acknowledgedAt: Date | null;
 }
 
+/**
+ * SMS/인증 실패 요약. 저장 시점에 이미 번호 끝 4자리(phoneMasked)로만 적재되므로
+ * 푸시 실패(userIdHash 해싱)와 달리 조회 시점의 추가 마스킹이 필요 없다.
+ */
+export interface SmsFailureSummary {
+  id: string;
+  eventType: string;
+  resultCode: string | null;
+  phoneMasked: string;
+  provider: string | null;
+  detail: string | null;
+  createdAt: Date;
+  acknowledgedAt: Date | null;
+}
+
+/** 운영 대시보드 KPI — 최근 5분 실패 건수. */
+export interface AdminOpsSummary {
+  pushFailures5m: number;
+  smsFailures5m: number;
+}
+
 export interface ManualPushSendResult {
   sent: number;
   skipped: number;
@@ -88,6 +109,65 @@ export class AdminOpsService {
   async pushFailuresLast5Minutes(): Promise<number> {
     return this.prisma.v1WebPushFailureLog.count({
       where: { occurredAt: { gte: new Date(Date.now() - 5 * 60_000) } },
+    });
+  }
+
+  async recentSmsFailures(limit: number): Promise<SmsFailureSummary[]> {
+    const failures = await this.prisma.v1SmsEventLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    return failures.map((failure) => ({
+      id: failure.id,
+      eventType: failure.eventType,
+      resultCode: failure.resultCode,
+      phoneMasked: failure.phoneMasked,
+      provider: failure.provider,
+      detail: failure.detail,
+      createdAt: failure.createdAt,
+      acknowledgedAt: failure.acknowledgedAt,
+    }));
+  }
+
+  async smsFailuresLast5Minutes(): Promise<number> {
+    return this.prisma.v1SmsEventLog.count({
+      where: { createdAt: { gte: new Date(Date.now() - 5 * 60_000) } },
+    });
+  }
+
+  /** 대시보드 KPI 두 건을 한 번의 왕복으로 모아 준다. */
+  async opsSummary(): Promise<AdminOpsSummary> {
+    const [pushFailures5m, smsFailures5m] = await Promise.all([
+      this.pushFailuresLast5Minutes(),
+      this.smsFailuresLast5Minutes(),
+    ]);
+    return { pushFailures5m, smsFailures5m };
+  }
+
+  /** acknowledgeFailures(웹 푸시)와 동일 계약 — 실제로 미확인인 id만 갱신하고 건별 감사 로그를 남긴다. */
+  async ackSmsFailures(ids: string[], admin: V1ActiveAdmin): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const toAck = await tx.v1SmsEventLog.findMany({
+        where: { id: { in: ids }, acknowledgedAt: null },
+        select: { id: true },
+      });
+      if (toAck.length === 0) return;
+
+      await tx.v1SmsEventLog.updateMany({
+        where: { id: { in: toAck.map((row) => row.id) } },
+        data: { acknowledgedAt: new Date() },
+      });
+
+      // V1SmsEventLog 에는 acknowledgedBy 컬럼이 없다 — "누가 확인했는지"는 이 감사 로그가
+      // 소유하며, 같은 트랜잭션에 묶어 ack 와 감사 기록이 어긋나지 않게 한다.
+      for (const { id } of toAck) {
+        await this.adminContext.logAdminAction(
+          admin,
+          { action: 'sms_event_log.ack', targetType: 'sms_event_log', targetId: id },
+          tx,
+        );
+      }
     });
   }
 

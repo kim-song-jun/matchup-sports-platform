@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { SmsEventLogService } from '../sms-event-log.service';
 import { GabiaSmsSender } from './gabia-sms-sender';
 import { SMS_SENDER } from './sms-sender';
 import { SolapiSmsSender } from './solapi-sms-sender';
@@ -17,6 +18,8 @@ describe('SMS_SENDER provider selection', () => {
   async function resolveSmsSender() {
     const moduleRef = await Test.createTestingModule({
       providers: [
+        // 두 어댑터 모두 실패 기록기를 주입받으므로 DI 그래프에 함께 넣어야 compile 된다.
+        { provide: SmsEventLogService, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
         SolapiSmsSender,
         GabiaSmsSender,
         {

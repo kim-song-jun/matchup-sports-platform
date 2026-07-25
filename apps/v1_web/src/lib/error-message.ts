@@ -49,15 +49,18 @@ export function extractErrorMessage(err: unknown, fallback: string): string {
 export function extractErrorCode(err: unknown): string | null {
   if (!err || typeof err !== 'object') return null;
 
-  const maybeApiError = err as { code?: unknown };
-  if (typeof maybeApiError.code === 'string' && maybeApiError.code) {
-    return maybeApiError.code;
-  }
-
+  // 응답 본문의 코드를 먼저 본다 — Axios 에러는 최상위 `code` 에 자기 내부 코드
+  // (`ERR_BAD_REQUEST` 등)를 담아서, 순서를 바꾸면 그 값이 도메인 코드를 가려 버린다.
   const maybeAxios = err as { response?: { data?: { code?: unknown } } };
   const responseCode = maybeAxios.response?.data?.code;
   if (typeof responseCode === 'string' && responseCode) {
     return responseCode;
+  }
+
+  // V1ApiError 는 응답 래퍼 없이 최상위 code 에 도메인 코드를 그대로 담는다.
+  const maybeApiError = err as { code?: unknown };
+  if (typeof maybeApiError.code === 'string' && maybeApiError.code) {
+    return maybeApiError.code;
   }
 
   return null;

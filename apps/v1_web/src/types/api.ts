@@ -1745,6 +1745,30 @@ export type V1PushFailureSummary = {
 };
 
 // ---------------------------------------------------------------------------
+// Admin — SMS / 인증 실패 로그
+// ---------------------------------------------------------------------------
+
+/**
+ * eventType 은 서버에서 자유 문자열(String 컬럼)로 내려온다 — 프론트는 알고 있는 값만
+ * 한국어로 치환하고 모르는 값은 원문 그대로 보여준다(새 이벤트 추가 시 UI 배포 없이도 노출).
+ */
+export type V1SmsFailureSummary = {
+  id: string;
+  eventType: string;
+  resultCode: string | null;
+  phoneMasked: string;
+  provider: string | null;
+  detail: string | null;
+  createdAt: string;
+  acknowledgedAt: string | null;
+};
+
+export type V1AdminOpsSummary = {
+  pushFailures5m: number;
+  smsFailures5m: number;
+};
+
+// ---------------------------------------------------------------------------
 // Admin — manual web push send
 // ---------------------------------------------------------------------------
 

@@ -26,6 +26,23 @@ class AckPushFailuresDto {
   ids!: string[];
 }
 
+class RecentSmsFailuresQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
+}
+
+class AckSmsFailuresDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  ids!: string[];
+}
+
 @Controller('admin/ops')
 @UseGuards(V1AuthGuard)
 export class AdminOpsController {
@@ -44,6 +61,25 @@ export class AdminOpsController {
   async ackPushFailures(@CurrentUser() user: V1AuthUser, @Body() dto: AckPushFailuresDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     return this.adminOpsService.acknowledgeFailures(dto.ids, admin);
+  }
+
+  @Get('recent-sms-failures')
+  async recentSmsFailures(@CurrentUser() user: V1AuthUser, @Query() query: RecentSmsFailuresQueryDto) {
+    await this.adminContext.getActiveAdmin(user.id);
+    return this.adminOpsService.recentSmsFailures(query.limit ?? 20);
+  }
+
+  /** 운영 대시보드 KPI(최근 5분 웹 푸시 / SMS·인증 실패 건수). */
+  @Get('summary')
+  async summary(@CurrentUser() user: V1AuthUser) {
+    await this.adminContext.getActiveAdmin(user.id);
+    return this.adminOpsService.opsSummary();
+  }
+
+  @Post('sms-failures/ack')
+  async ackSmsFailures(@CurrentUser() user: V1AuthUser, @Body() dto: AckSmsFailuresDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.adminOpsService.ackSmsFailures(dto.ids, admin);
   }
 
   // broadcast는 전체 구독자에게 즉시 도달하는 파급력 큰 작업이라 낮은 한도로 남용을 막는다.

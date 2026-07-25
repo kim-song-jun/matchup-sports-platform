@@ -4,6 +4,7 @@ import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
@@ -16,6 +17,7 @@ export class VerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: VerificationDispatcherService,
+    private readonly smsEventLog: SmsEventLogService,
   ) {}
 
   async requestEmail(authUser: V1AuthUser) {
@@ -55,6 +57,11 @@ export class VerificationService {
     });
     if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS) {
       const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - (Date.now() - recent.createdAt.getTime())) / 1000);
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.RESEND_COOLDOWN,
+        phone,
+        detail: `channel=phone 재발송 쿨다운 ${retryAfter}초 남음`,
+      });
       throw new BadRequestException({
         code: 'VERIFICATION_RESEND_COOLDOWN',
         message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,
@@ -74,7 +81,15 @@ export class VerificationService {
         message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
       });
     }
+    // 인증 실패 기록은 email 채널에서도 남긴다("인증 실패" 트래킹이 목적) — 다만 저장
+    // 컬럼은 번호 끝 4자리(phoneMasked)라, 숫자가 부족한 이메일 대상은 '****' 로 떨어진다.
+    // 어느 채널인지는 detail 로 구분한다.
     if (token.attemptCount >= MAX_ATTEMPTS) {
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
+        phone: token.target,
+        detail: `channel=${channel} 인증 시도 ${token.attemptCount}회 초과`,
+      });
       throw new BadRequestException({
         code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
         message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
@@ -88,6 +103,11 @@ export class VerificationService {
 
     const matches = await verifyPassword(code, token.codeHash);
     if (!matches) {
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.CODE_MISMATCH,
+        phone: token.target,
+        detail: `channel=${channel} 인증 시도 ${token.attemptCount + 1}/${MAX_ATTEMPTS}`,
+      });
       throw new BadRequestException({
         code: 'VERIFICATION_CODE_MISMATCH',
         message: '인증번호가 올바르지 않아요.',

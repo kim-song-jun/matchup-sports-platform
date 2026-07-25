@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { V1VerificationChannel } from '@prisma/client';
+import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { SMS_SENDER, SmsSender, buildOtpSmsText } from './sms/sms-sender';
 
 /**
@@ -16,7 +17,10 @@ export class VerificationDispatcherService {
 
   readonly devEcho = process.env.V1_VERIFICATION_DEV_ECHO === 'true';
 
-  constructor(@Inject(SMS_SENDER) private readonly sms: SmsSender) {}
+  constructor(
+    @Inject(SMS_SENDER) private readonly sms: SmsSender,
+    private readonly smsEventLog: SmsEventLogService,
+  ) {}
 
   /**
    * devCode 를 응답에 노출해도 되는 유일한 경우: 실제 SMS 발송이 없고(dev-echo 경로) devEcho 가 켜진
@@ -50,6 +54,11 @@ export class VerificationDispatcherService {
         this.logger.log(`[verification:phone] dev-echo (실발송 없음) → ${masked} (dev code=${code})`);
         return;
       }
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.NOT_CONFIGURED,
+        phone: target,
+        detail: 'SMS provider 시크릿 미설정 + dev-echo 비활성',
+      });
       throw new ServiceUnavailableException({
         code: 'SMS_NOT_CONFIGURED',
         message: '문자 인증을 사용할 수 없어요. 잠시 후 다시 시도해 주세요.',

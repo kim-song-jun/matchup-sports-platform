@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createHmac, randomBytes } from 'crypto';
+import { SMS_EVENT_TYPE, SmsEventLogService } from '../sms-event-log.service';
 import type { SmsSender } from './sms-sender';
 
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send';
+/** 실패 기록의 provider 컬럼에 남길 식별자 — 어드민에서 어느 provider 장애인지 구분한다. */
+const PROVIDER = 'solapi';
 // 유료 SMS 발송 경로 — 응답이 지연되면 fetch 가 무기한 매달려 워커/커넥션이 고갈된다.
 // 상한을 두고 초과 시 abort 하여 커넥션을 즉시 회수한다(옥토모 클라이언트와 동일 방어).
 const SOLAPI_TIMEOUT_MS = 8000;
@@ -17,6 +20,8 @@ const SOLAPI_TIMEOUT_MS = 8000;
 @Injectable()
 export class SolapiSmsSender implements SmsSender {
   private readonly logger = new Logger(SolapiSmsSender.name);
+
+  constructor(private readonly smsEventLog: SmsEventLogService) {}
 
   private get apiKey(): string {
     return process.env.SOLAPI_API_KEY ?? '';
@@ -58,8 +63,22 @@ export class SolapiSmsSender implements SmsSender {
     } catch (err) {
       if (controller.signal.aborted) {
         this.logger.warn(`solapi send timed out after ${SOLAPI_TIMEOUT_MS}ms`);
+        await this.smsEventLog.record({
+          eventType: SMS_EVENT_TYPE.SEND_FAILED,
+          resultCode: 'TIMEOUT',
+          phone: to,
+          provider: PROVIDER,
+          detail: `timed out after ${SOLAPI_TIMEOUT_MS}ms`,
+        });
         throw new Error(`Solapi send timed out after ${SOLAPI_TIMEOUT_MS}ms`);
       }
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.SEND_FAILED,
+        resultCode: 'NETWORK',
+        phone: to,
+        provider: PROVIDER,
+        detail: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     } finally {
       clearTimeout(timer);
@@ -67,6 +86,13 @@ export class SolapiSmsSender implements SmsSender {
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       this.logger.warn(`solapi send failed: ${res.status} ${body.slice(0, 200)}`);
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.SEND_FAILED,
+        resultCode: String(res.status),
+        phone: to,
+        provider: PROVIDER,
+        detail: body.slice(0, 200),
+      });
       throw new Error(`Solapi send failed: ${res.status}`);
     }
   }

@@ -256,16 +256,21 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
     hooks.authMe.socialSignupPrefill = null;
   });
 
-  it('상단에 가입 그만두기 버튼을 노출한다', () => {
+  // AuthFrame 은 모바일 상단바와 데스크톱 in-card 내비 두 벌을 함께 렌더하고 실제로는 CSS
+  // (min-width:1024px)로 한쪽만 보인다. jsdom 에는 둘 다 남으므로 getAllBy* 로 받아 첫 번째를 쓴다.
+  const exitButtons = () => screen.getAllByRole('button', { name: '가입 그만두기' });
+
+  it('모바일·데스크톱 양쪽에 가입 그만두기 버튼을 노출한다', () => {
     render(<SocialSignupClient />);
-    expect(screen.getByRole('button', { name: '가입 그만두기' })).toBeInTheDocument();
+    // 한쪽이라도 빠지면 그 폭에서는 화면을 빠져나갈 방법이 사라진다(데스크톱은 상단바가 숨겨짐).
+    expect(exitButtons()).toHaveLength(2);
   });
 
   it('확인 모달에서 계속 쓰기를 고르면 로그아웃하지 않는다', async () => {
     const user = userEvent.setup();
     render(<SocialSignupClient />);
 
-    await user.click(screen.getByRole('button', { name: '가입 그만두기' }));
+    await user.click(exitButtons()[0]);
     await user.click(await screen.findByRole('button', { name: '계속 쓰기' }));
 
     expect(hooks.logoutMutateAsync).not.toHaveBeenCalled();
@@ -276,7 +281,7 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
     hooks.logoutMutateAsync.mockResolvedValue({ ok: true });
     render(<SocialSignupClient />);
 
-    await user.click(screen.getByRole('button', { name: '가입 그만두기' }));
+    await user.click(exitButtons()[0]);
     await user.click(await screen.findByRole('button', { name: '그만두기' }));
 
     await waitFor(() => expect(hooks.logoutMutateAsync).toHaveBeenCalledTimes(1));
@@ -289,7 +294,7 @@ describe('SocialSignupClient 가입 중 탈출구', () => {
     hooks.logoutMutateAsync.mockRejectedValue(new Error('network down'));
     render(<SocialSignupClient />);
 
-    await user.click(screen.getByRole('button', { name: '가입 그만두기' }));
+    await user.click(exitButtons()[0]);
     await user.click(await screen.findByRole('button', { name: '그만두기' }));
 
     expect(await screen.findByText(/가입 취소를 완료하지 못했어요/)).toBeInTheDocument();

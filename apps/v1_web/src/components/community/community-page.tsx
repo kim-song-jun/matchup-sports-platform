@@ -7,10 +7,11 @@ import { Check, Pin, Send } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { BellIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
 import { NotificationDetailSheet } from './notification-detail-sheet';
+import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
@@ -488,10 +489,15 @@ function NotificationCard({ notification, onOpen }: { notification: Notification
       aria-haspopup="dialog"
       onClick={() => onOpen(notification)}
     >
-      <div className="tm-notification-icon" aria-hidden="true"><BellIcon size={18} /></div>
+      <div className="tm-notification-icon" aria-hidden="true">
+        <NotificationTypeIcon type={notification.type} size={18} />
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* 읽지 않음 상태를 컬러 외에 텍스트로도 전달 — 컬러만 의존 금지 */}
-        {notification.unread ? <span className="sr-only">읽지 않음</span> : null}
+        {/* 종류와 읽음 상태를 아이콘·컬러 외에 텍스트로도 전달 — 컬러만 의존 금지 */}
+        <span className="sr-only">
+          {notificationTypeLabel(notification.type)}
+          {notification.unread ? ', 읽지 않음' : ''}
+        </span>
         <div className="tm-notification-card-title">
           <span className="tm-text-body-lg">{notification.title}</span>
           {notification.unread ? <span className="tm-notification-dot" aria-hidden="true" /> : null}

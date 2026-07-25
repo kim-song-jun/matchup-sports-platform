@@ -30,7 +30,7 @@ const NOTIFICATIONS = {
     },
     {
       notificationId: 'n-match',
-      type: 'match',
+      type: 'team_match',
       title: '매치 신청이 승인됐어요',
       body: '매치 참가가 확정됐어요.',
       target: { type: 'match', id: 'm-1', route: '/matches/m-1' },
@@ -40,7 +40,7 @@ const NOTIFICATIONS = {
     },
     {
       notificationId: 'n-team',
-      type: 'team',
+      type: 'tournament',
       title: '팀 가입 신청이 수락됐어요',
       body: '팀 가입이 승인됐어요.',
       target: { type: 'team', id: 't-1', route: '/teams/t-1' },
@@ -65,6 +65,17 @@ const SESSION = {
   socialSignupPrefill: null,
 };
 
+const SETTINGS = {
+  notifications: {
+    matchEnabled: true,
+    teamEnabled: true,
+    teamMatchEnabled: true,
+    chatEnabled: true,
+    noticeEnabled: true,
+    marketingEnabled: false,
+  },
+};
+
 const VIEWPORTS = [
   { name: 'mobile', width: 390, height: 844 },
   { name: 'tablet', width: 768, height: 1024 },
@@ -82,6 +93,10 @@ async function main() {
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       deviceScaleFactor: 2,
+      // 권한을 주지 않으면 헤드리스에서 Notification.permission 이 'denied' 로 잡혀
+      // 설정 화면의 푸시 토글이 비활성(차단 안내) 상태로만 찍힌다. 실제 사용자가
+      // 처음 보는 상태를 캡처하려면 알림 권한을 허용한 컨텍스트가 필요하다.
+      permissions: ['notifications'],
     });
 
     // 헤더 dev 인증에 쓰이는 세션 값 주입 (require-auth 게이트 통과용)
@@ -102,6 +117,7 @@ async function main() {
       const url = route.request().url();
       if (url.includes('/notifications')) return route.fulfill(json(NOTIFICATIONS));
       if (url.includes('/auth/me')) return route.fulfill(json(SESSION));
+      if (url.includes('/settings')) return route.fulfill(json(SETTINGS));
       if (url.includes('/popups/active')) return route.fulfill(json({ items: [] }));
       if (url.includes('/health')) return route.fulfill(json({ ok: true }));
       // 그 외는 빈 성공 응답 — 이 화면의 렌더를 막지 않으면서 실제 호출 흐름은 유지한다.
@@ -121,6 +137,12 @@ async function main() {
     await page.waitForSelector('[role="dialog"]', { timeout: 5_000 });
     await page.waitForTimeout(350); // 시트 진입 애니메이션(.22s) 종료 대기
     await page.screenshot({ path: `${OUT}/${viewport.name}-sheet.png` });
+
+    // 알림 설정 화면 — 푸시 토글 문구가 상태에 따라 정확한지 확인한다.
+    await page.goto(`${BASE}/my/settings/notifications`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[role="switch"]', { timeout: 15_000 });
+    await page.addStyleTag({ content: HIDE_DEVTOOLS });
+    await page.screenshot({ path: `${OUT}/${viewport.name}-settings.png`, fullPage: true });
 
     await context.close();
     console.log(`captured ${viewport.name}`);

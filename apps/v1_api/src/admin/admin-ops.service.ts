@@ -172,8 +172,15 @@ export class AdminOpsService {
   }
 
   /**
-   * 어드민 수동 웹 푸시 발송 — 특정 유저 1명 또는 현재 구독 중인 전체 유저에게
-   * V1Notification 생성 + 실시간 소켓 알림 + 웹 푸시를 순서대로 처리한다.
+   * 어드민 수동 발송 — 특정 유저 1명 또는 전체 유저에게 V1Notification 생성 +
+   * 실시간 소켓 알림 + 웹 푸시를 순서대로 처리한다.
+   *
+   * 브로드캐스트 대상은 **활성 계정 전체**다. 예전에는 V1PushSubscription 을
+   * 훑어 "푸시를 구독한 사람"만 대상으로 삼았는데, 그러면 푸시를 켜지 않은
+   * 사용자는 인앱 알림함에서조차 공지를 볼 수 없었다(구독 0명이면 발송 결과가
+   * sent:0 으로 나오고 아무 일도 일어나지 않는다). 인앱 알림은 전원에게 남기고,
+   * 웹 푸시는 sendToUser 가 구독이 있는 사람에게만 실제로 나가므로 이 순서가
+   * "전체 공지"의 의미와 맞다.
    *
    * targetType은 'notice'를 쓴다: schema의 V1NotificationTargetType에는
    * 'admin_broadcast' 같은 값이 없고, 이미 존재하는 'notice' + 이에 대응하는
@@ -198,26 +205,22 @@ export class AdminOpsService {
     } else {
       targetId = 'broadcast';
       result = { sent: 0, skipped: 0, failed: 0 };
-      // 구독자 전체를 findMany로 한 번에 메모리에 올리지 않고, id 커서로 DB에서
-      // 청크 단위로 페이지네이션해 가져온다 — 구독자 수가 커져도 한 번에 들고
+      // 대상 전체를 findMany로 한 번에 메모리에 올리지 않고, id 커서로 DB에서
+      // 청크 단위로 페이지네이션해 가져온다 — 사용자 수가 커져도 한 번에 들고
       // 있는 row 수는 BROADCAST_CHUNK_SIZE로 고정된다.
-      const sentUserIds = new Set<string>();
       let cursor: string | undefined;
       for (;;) {
-        const page = await this.prisma.v1PushSubscription.findMany({
+        const page = await this.prisma.v1User.findMany({
+          where: { accountStatus: 'active' },
           take: BROADCAST_CHUNK_SIZE,
           ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
           orderBy: { id: 'asc' },
-          select: { id: true, userId: true },
+          select: { id: true },
         });
         if (page.length === 0) break;
         cursor = page[page.length - 1].id;
 
-        const newUserIds = [...new Set(page.map((row) => row.userId))].filter(
-          (userId) => !sentUserIds.has(userId),
-        );
-        newUserIds.forEach((userId) => sentUserIds.add(userId));
-        const outcomes = await Promise.all(newUserIds.map((userId) => this.sendToOneRecipient(userId, dto)));
+        const outcomes = await Promise.all(page.map((row) => this.sendToOneRecipient(row.id, dto)));
         for (const outcome of outcomes) {
           result[outcome === 'sent' ? 'sent' : outcome === 'skipped' ? 'skipped' : 'failed'] += 1;
         }

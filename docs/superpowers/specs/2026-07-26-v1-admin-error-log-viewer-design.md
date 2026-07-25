@@ -97,17 +97,14 @@ model V1ErrorLog {
 
 `apps/v1_api/src/common/logging/mask-sensitive.ts` (신규)에 **단일 상수 목록**을 두고 재귀 치환한다.
 
-```
-password, passwordConfirm, token, accessToken, refreshToken, code, authorization,
-cookie, secret, phone, phoneNumber, ssn, birthDate, cardNumber
-```
+키 목록의 정본은 그 파일의 `SENSITIVE_KEYS`다. 여기에 사본을 두면 목록이 늘어날 때마다 문서만 뒤처져 실제와 어긋난 설명이 남으므로, 구체적인 항목은 코드를 참조한다. 최소한 카카오 인가코드(`code`)·세션 쿠키·`authorization`은 반드시 포함되어야 한다 — 실제로 콜백 URL과 헤더로 들어온다.
 
-- 키 이름이 목록에 있으면(대소문자 무시) 값을 `[REDACTED]`로 치환
+- 키 이름이 목록에 있으면 값을 `[REDACTED]`로 치환. 비교 전 대소문자와 `-`·`_`를 지워 `set-cookie`·`setCookie`가 같은 키로 취급되게 한다
 - 중첩 객체·배열을 재귀 순회
+- **문자열 leaf도 스크러빙한다** — 키가 안전해 보여도 값 안에 시크릿이 박혀 오는 자리가 있다(`referer`에 담긴 카카오 콜백 URL이 대표적)
+- OAuth `state`는 URL 쿼리스트링 형태에서만 가린다. 객체 필드 `state`는 대회·분쟁 상태 등으로 흔히 쓰여 통째로 가리면 조사에 필요한 값이 사라진다
 - 직렬화 후 4000자 상한 (기존 `client-error-reporter.ts`·`http-exception.filter.ts`와 같은 컨벤션)
-- `requestHeaders`는 화이트리스트가 아니라 위 목록 기준 마스킹 후 저장 (`authorization`·`cookie`가 걸린다)
-
-카카오 인가코드(`code`)와 세션 쿠키가 목록에 포함되는 것이 중요하다 — 실제로 콜백 URL과 헤더로 들어온다.
+- `requestHeaders`는 화이트리스트가 아니라 위 규칙 기준 마스킹 후 저장
 
 ### 5. 서버 버전
 

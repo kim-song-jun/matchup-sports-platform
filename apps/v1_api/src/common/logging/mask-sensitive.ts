@@ -118,7 +118,15 @@ const SENSITIVE_KEY_ALTERNATION = SENSITIVE_KEYS.map(escapeRegExp).join('|');
 // 쿼리스트링 포함)처럼 시크릿이 쿼리스트링 형태로 메시지 텍스트 안에 그대로 박혀 들어오는
 // 경로가 있다. 아래 두 패턴으로 "쿼리스트링 key=value" / "JSON 텍스트 \"key\":\"value\""
 // 형태에서 SENSITIVE_KEYS 이름의 값만 골라 [REDACTED]로 치환한다.
-const QUERY_PAIR_PATTERN = new RegExp(`([?&](?:${SENSITIVE_KEY_ALTERNATION}))=([^&\\s]*)`, 'gi');
+// URL 쿼리스트링에서만 추가로 가리는 키. OAuth 콜백의 state 는 CSRF 토큰이라 콜백 URL 에
+// 실려 오면 가려야 하지만, SENSITIVE_KEYS 에 넣으면 객체 필드의 state 까지 전부 가려진다 —
+// 이 코드베이스에서 state 는 대회·분쟁 상태 등으로 흔히 쓰이는 이름이라(v1_api 만 13곳)
+// 정작 조사에 필요한 값이 사라진다. 그래서 URL 형태에서만 가린다.
+const QUERY_ONLY_SENSITIVE_KEYS: readonly string[] = ['state'];
+const QUERY_KEY_ALTERNATION = [...SENSITIVE_KEYS, ...QUERY_ONLY_SENSITIVE_KEYS]
+  .map(escapeRegExp)
+  .join('|');
+const QUERY_PAIR_PATTERN = new RegExp(`([?&](?:${QUERY_KEY_ALTERNATION}))=([^&\\s]*)`, 'gi');
 const JSON_TEXT_PAIR_PATTERN = new RegExp(`("(?:${SENSITIVE_KEY_ALTERNATION})"\\s*:\\s*")([^"]*)(")`, 'gi');
 
 /**

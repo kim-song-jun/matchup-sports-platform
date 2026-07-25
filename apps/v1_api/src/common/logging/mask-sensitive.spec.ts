@@ -15,10 +15,22 @@ describe('maskSensitive', () => {
       note: 'no secret here',
     });
 
-    expect(masked.referer).toContain('[REDACTED]');
     expect(masked.referer).not.toContain('REAL_AUTH_CODE');
+    // OAuth state 는 CSRF 토큰이라 콜백 URL 에서는 함께 가린다.
+    expect(masked.referer).not.toContain('xyz');
+    expect(masked.referer).toContain('code=[REDACTED]');
+    expect(masked.referer).toContain('state=[REDACTED]');
     // 시크릿이 없는 문자열은 건드리지 않는다.
     expect(masked.note).toBe('no secret here');
+  });
+
+  // state 는 대회·분쟁 상태 등 이 코드베이스에서 흔한 필드명이다. URL 에서만 가리고
+  // 객체 필드는 그대로 둬야 조사에 필요한 값이 남는다.
+  it('keeps a plain object field named state — only the OAuth callback URL form is scrubbed', () => {
+    const masked = maskSensitive({ state: 'in_progress', dispute: { state: 'filed' } });
+
+    expect(masked.state).toBe('in_progress');
+    expect(masked.dispute.state).toBe('filed');
   });
 
   // HTTP 헤더는 `set-cookie`·`x-api-key`처럼 하이픈으로 오고 JS 객체는 camelCase 로 온다.

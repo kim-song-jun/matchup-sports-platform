@@ -115,12 +115,15 @@ export function ErrorLogsClient() {
   const validStatusCode =
     parsedStatusCode !== undefined && Number.isFinite(parsedStatusCode) ? parsedStatusCode : undefined;
 
+  const fromIso = dayBoundaryIso(from, 'start');
+  const toIso = dayBoundaryIso(to, 'end');
+
   const filters: V1AdminErrorLogFilters = {
     ...(source ? { source } : {}),
     ...(level ? { level } : {}),
     ...(validStatusCode !== undefined ? { statusCode: validStatusCode } : {}),
-    ...(dayBoundaryIso(from, 'start') ? { from: dayBoundaryIso(from, 'start')! } : {}),
-    ...(dayBoundaryIso(to, 'end') ? { to: dayBoundaryIso(to, 'end')! } : {}),
+    ...(fromIso ? { from: fromIso } : {}),
+    ...(toIso ? { to: toIso } : {}),
     ...(search.trim() ? { q: search.trim() } : {}),
     ...(cursor ? { cursor } : {}),
     limit: PAGE_SIZE,

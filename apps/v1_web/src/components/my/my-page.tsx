@@ -10,11 +10,13 @@ import {
   Mail,
   MapPin,
   Plus,
+  Send,
   Settings,
   Star,
   Users,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
@@ -25,6 +27,8 @@ import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
   MyInvitationsViewModel,
+  MyJoinApplicationItem,
+  MyJoinApplicationsViewModel,
   MyMatch,
   MyMatchesViewModel,
   MyMember,
@@ -51,6 +55,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   FileText,
   LogOut,
   Mail,
+  Send,
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
@@ -247,6 +252,83 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                 </div>
                 {invitation.actionPending ? (
                   <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 6 }}>
+                    처리 중…
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </AppChrome>
+  );
+}
+
+/** 상태 뱃지 톤 → 뱃지 클래스. 색만으로 구분하지 않도록 라벨 텍스트를 항상 함께 렌더한다. */
+const JOIN_APPLICATION_BADGE_CLASS: Record<MyJoinApplicationItem['statusTone'], string> = {
+  pending: 'tm-badge-orange',
+  approved: 'tm-badge-green',
+  rejected: 'tm-badge-red',
+  neutral: 'tm-badge-grey',
+};
+
+export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplicationsViewModel }) {
+  return (
+    <AppChrome title="보낸 가입 신청" activeTab="my" bottomNav={false} backHref="/my">
+      <div className="tm-my-shell">
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">보낸 가입 신청</h1>
+        </div>
+        {model.error ? (
+          <EmptyState
+            title="가입 신청 목록을 불러오지 못했어요"
+            sub="잠시 후 다시 시도해 주세요."
+            cta="다시 시도"
+            onCta={model.onRetry}
+          />
+        ) : model.loading ? (
+          <PageSkeleton />
+        ) : model.applications.length === 0 ? (
+          <EmptyState title="보낸 가입 신청이 없어요" sub="팀에 가입 신청하면 진행 상태를 여기에서 확인할 수 있어요." />
+        ) : (
+          <div className="tm-my-list-stack">
+            {model.applications.map((application) => (
+              <div key={application.applicationId} className="tm-invitation-card tm-join-application-card">
+                <div className="tm-invitation-card-head">
+                  <TeamAvatar seed={application.teamId} name={application.teamName} logoUrl={application.logoUrl} size="lg" />
+                  <div className="tm-invitation-meta">
+                    <Link className="tm-invitation-meta-name tm-join-application-team-link" href={`/teams/${application.teamId}`}>
+                      {application.teamName}
+                    </Link>
+                    <div className="tm-invitation-meta-date">{application.dateLabel} 신청</div>
+                  </div>
+                  <span className={`tm-badge ${JOIN_APPLICATION_BADGE_CLASS[application.statusTone]}`}>
+                    {application.statusLabel}
+                  </span>
+                </div>
+                <p className="tm-join-application-hint">{application.statusHint}</p>
+                {application.message ? (
+                  <div className="tm-invitation-message">{application.message}</div>
+                ) : null}
+                {application.status === 'requested' ? (
+                  <div className="tm-invitation-actions">
+                    <button
+                      className="tm-btn tm-btn-sm tm-btn-ghost"
+                      type="button"
+                      disabled={application.actionPending}
+                      onClick={() => model.onWithdraw(application.applicationId)}
+                      aria-label={`${application.teamName} 가입 신청 취소`}
+                    >
+                      신청 취소
+                    </button>
+                  </div>
+                ) : null}
+                {application.actionPending ? (
+                  <div className="tm-text-caption" role="status" aria-live="polite">
                     처리 중…
                   </div>
                 ) : null}

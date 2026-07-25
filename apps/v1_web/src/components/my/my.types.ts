@@ -145,6 +145,31 @@ export type MyInvitationsViewModel = {
   onRetry: () => void;
 };
 
+export type MyJoinApplicationItem = {
+  applicationId: string;
+  teamId: string;
+  teamName: string;
+  logoUrl: string | null;
+  /** 백엔드 원본 status — 'requested'일 때만 취소 가능 */
+  status: string;
+  statusLabel: string;
+  statusTone: 'pending' | 'approved' | 'rejected' | 'neutral';
+  /** 상태별 다음 행동 안내 ("관리자가 확인하고 있어요" 등) */
+  statusHint: string;
+  message: string | null;
+  dateLabel: string;
+  /** 이 신청건의 취소 처리 중 여부 — 아이템별 상태(전역이면 무관한 카드까지 비활성화됨) */
+  actionPending: boolean;
+};
+
+export type MyJoinApplicationsViewModel = {
+  applications: MyJoinApplicationItem[];
+  loading: boolean;
+  error: boolean;
+  onWithdraw: (applicationId: string) => void;
+  onRetry: () => void;
+};
+
 export type NotificationSetting = {
   label: string;
   sub: string;

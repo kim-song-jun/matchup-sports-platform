@@ -118,7 +118,7 @@ describe('TeamsService', () => {
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; updateMany: jest.Mock; count: jest.Mock };
-    v1TeamJoinApplication: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1TeamJoinApplication: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1User: { findUnique: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
@@ -150,6 +150,7 @@ describe('TeamsService', () => {
       },
       v1TeamJoinApplication: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
       },
@@ -2086,6 +2087,70 @@ describe('TeamsService', () => {
       expect(result.items[0].team).toMatchObject({ teamId: 'team-1', name: '테스트팀', sportId: 'sport-1' });
       expect(result.items[0].team.introductionPreview).toHaveLength(120); // 200자 → 120 컷
       expect(result.items[0].invitedBy.displayName).toBe('매니저'); // displayName null → nickname fallback
+    });
+  });
+
+  describe('myJoinApplications', () => {
+    it('승인 대기 건이 처리 완료 건보다 항상 앞에 오고, 두 그룹을 따로 조회한다', async () => {
+      prisma.v1TeamJoinApplication.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'app-pending',
+            teamId: 'team-1',
+            status: 'requested',
+            message: '가입하고 싶어요',
+            createdAt: new Date('2026-06-01'),
+            reviewedAt: null,
+            withdrawnAt: null,
+            team: { id: 'team-1', name: '대기팀', sportId: 'sport-1', profile: { logoUrl: null, description: null } },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'app-rejected',
+            teamId: 'team-2',
+            status: 'rejected',
+            message: null,
+            createdAt: new Date('2026-06-20'), // 대기 건보다 최신이지만 뒤에 와야 한다
+            reviewedAt: new Date('2026-06-21'),
+            withdrawnAt: null,
+            team: { id: 'team-2', name: '거절팀', sportId: 'sport-1', profile: { logoUrl: null, description: null } },
+          },
+        ]);
+
+      const result = await service.myJoinApplications(invitee);
+
+      // 본인 신청만 조회 — requested / not requested 두 그룹
+      expect(prisma.v1TeamJoinApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { applicantUserId: invitee.id, status: 'requested' } }),
+      );
+      expect(prisma.v1TeamJoinApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { applicantUserId: invitee.id, status: { not: 'requested' } } }),
+      );
+      expect(result.items.map((item) => item.applicationId)).toEqual(['app-pending', 'app-rejected']);
+      expect(result.items[0].team).toMatchObject({ teamId: 'team-1', name: '대기팀' });
+      expect(result.items[1].status).toBe('rejected');
+    });
+
+    it('팀 소개는 120자로 자른다', async () => {
+      prisma.v1TeamJoinApplication.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'app-1',
+            teamId: 'team-1',
+            status: 'requested',
+            message: null,
+            createdAt: new Date('2026-06-01'),
+            reviewedAt: null,
+            withdrawnAt: null,
+            team: { id: 'team-1', name: '팀', sportId: 'sport-1', profile: { logoUrl: null, description: 'a'.repeat(200) } },
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.myJoinApplications(invitee);
+
+      expect(result.items[0].team.introductionPreview).toHaveLength(120);
     });
   });
 

@@ -83,6 +83,7 @@ import type {
   V1MatchMutationResult,
   V1MatchUpdatePayload,
   V1MyActivitySummary,
+  V1MyJoinApplicationsPage,
   V1MyRegionUpdateResult,
   V1MyTeamsResponse,
   V1MyTeamMatch,
@@ -820,16 +821,54 @@ export function useV1TeamJoinEligibility(teamId: string, options?: { enabled?: b
   });
 }
 
+/**
+ * 가입 신청/철회 후 다시 읽어야 하는 쿼리들.
+ *
+ * `invalidateQueries`의 프라미스를 **await**하는 것이 핵심이다. React Query는
+ * onSuccess가 resolve될 때까지 `isPending`을 유지하므로, 버튼이 "처리 중"에서
+ * 풀리는 시점엔 이미 새 상태가 캐시에 들어와 있다. await하지 않으면 버튼만 먼저
+ * 활성화되고 라벨·배지는 한 박자 뒤에 바뀌어 "상태가 안 바뀐다"로 보인다.
+ */
+async function refetchTeamJoinState(queryClient: QueryClient, teamId: string) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.teams() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.myJoinApplications() }),
+  ]);
+}
+
 export function useV1CreateTeamJoinApplication(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body?: { message?: string | null }) =>
       v1Post<V1TeamJoinApplicationResult>(`/teams/${teamId}/join-applications`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
-    },
+    onSuccess: () => refetchTeamJoinState(queryClient, teamId),
+  });
+}
+
+/** GET /me/join-applications — 내가 보낸 가입 신청 목록(승인 대기 + 최근 처리 결과) */
+export function useV1MyJoinApplications() {
+  return useQuery({
+    queryKey: v1Keys.myJoinApplications(),
+    queryFn: () => v1Get<V1MyJoinApplicationsPage>('/me/join-applications'),
+  });
+}
+
+/**
+ * 신청 현황 목록에서의 신청 취소.
+ *
+ * 팀 상세용 `useV1WithdrawTeamJoinApplication`은 teamId·applicationId를 훅 인자로 받아
+ * 한 팀에 고정된다. 목록은 여러 팀의 신청을 한 화면에서 다루므로 대상 식별자를
+ * mutate 인자로 받는 훅이 따로 필요하다.
+ */
+export function useV1WithdrawMyJoinApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, reason }: { applicationId: string; teamId: string; reason?: string | null }) =>
+      v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/withdraw`, {
+        reason: reason ?? null,
+      }),
+    onSuccess: (_result, variables) => refetchTeamJoinState(queryClient, variables.teamId),
   });
 }
 
@@ -847,11 +886,7 @@ export function useV1WithdrawTeamJoinApplication(teamId: string, applicationId?:
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/withdraw`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
-    },
+    onSuccess: () => refetchTeamJoinState(queryClient, teamId),
   });
 }
 

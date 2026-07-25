@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { TeamMembersPageClient } from './teams-client';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView } from './teams-page';
-import { getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
+import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
 import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel } from './teams.types';
 
 const teamApiMocks = vi.hoisted(() => ({
@@ -306,6 +306,29 @@ describe('TeamDetailPageView', () => {
     });
 
     expect(onCta).toHaveBeenCalledTimes(2);
+  });
+
+  it('승인 대기 상태에서는 무엇을 기다리는지 알려주는 안내가 화면에 남는다', () => {
+    const model: TeamDetailViewModel = {
+      ...getTeamDetailViewModel('pending'),
+      ctaLabel: '신청 취소',
+      joinRequest: { requestedAtLabel: '2026. 07. 20. 신청' },
+    };
+
+    render(<TeamDetailPageView model={model} />);
+
+    // 토스트는 사라지지만 이 안내는 남아야 한다 — 모바일/데스크톱 레이아웃 양쪽에 렌더된다.
+    expect(screen.getAllByText('승인 대기 중').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.').length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('2026. 07. 20. 신청').length).toBeGreaterThan(0);
+  });
+
+  it('가입 신청 가능 상태에서는 승인 대기 안내를 띄우지 않는다', () => {
+    render(<TeamDetailPageView model={getTeamDetailViewModel('default')} />);
+
+    expect(screen.queryByText('승인 대기 중')).not.toBeInTheDocument();
   });
 });
 

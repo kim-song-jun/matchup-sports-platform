@@ -35,7 +35,19 @@ export class VerificationDispatcherService {
     const masked = target.length > 4 ? `${target.slice(0, 2)}***${target.slice(-2)}` : '***';
     if (channel === 'phone') {
       if (this.sms.enabled) {
-        await this.sms.send(target, buildOtpSmsText(code));
+        try {
+          await this.sms.send(target, buildOtpSmsText(code));
+        } catch (err) {
+          // provider 오류(4xx/timeout/네트워크)를 도메인 HttpException 으로 감싸 일관된
+          // 코드/한국어 메시지로 내려준다(그대로 던지면 Nest 기본 500 이 된다).
+          this.logger.warn(
+            `[verification:phone] SMS 발송 실패 → ${masked}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          throw new ServiceUnavailableException({
+            code: 'SMS_SEND_FAILED',
+            message: '인증번호 발송에 실패했어요. 잠시 후 다시 시도해 주세요.',
+          });
+        }
         this.logger.log(`[verification:phone] SMS 발송 완료 → ${masked}`);
         return;
       }

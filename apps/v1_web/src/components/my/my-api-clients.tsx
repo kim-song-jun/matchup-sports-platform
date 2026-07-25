@@ -45,6 +45,7 @@ import {
   useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
+import { formatMonthDay } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -1675,7 +1676,7 @@ function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boo
     logoUrl: invitation.team.logoUrl ?? null,
     invitedByName: invitation.invitedBy.displayName,
     message: invitation.message,
-    dateLabel: new Date(invitation.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
+    dateLabel: formatMonthDay(invitation.createdAt) ?? '',
     actionPending,
   };
 }
@@ -1713,7 +1714,7 @@ function toMyJoinApplicationItem(
     statusTone: joinApplicationStatusTone(application.status),
     statusHint: JOIN_APPLICATION_HINTS[application.status] ?? '신청이 처리됐어요.',
     message: application.message,
-    dateLabel: new Date(application.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
+    dateLabel: formatMonthDay(application.createdAt) ?? '',
     actionPending,
   };
 }

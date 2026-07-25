@@ -143,6 +143,11 @@ jobs:
           GABIA_SMS_ID: ${{ secrets.GABIA_SMS_ID }}
           GABIA_API_KEY: ${{ secrets.GABIA_API_KEY }}
           GABIA_SENDER_NUMBER: ${{ secrets.GABIA_SENDER_NUMBER }}
+          # Web Push — alpha 는 프로덕션과 같은 VAPID 키를 공유한다. 세 값이 모두
+          # 있어야 WebPushService 가 켜지고, 하나라도 비면 graceful disable 된다.
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         run: |
           set -Eeuo pipefail
           stage="/home/ec2-user/.teameet-alpha-staging/${RELEASE_SHA}"
@@ -155,7 +160,7 @@ jobs:
             --arg prepare "install -d -o ec2-user -g ec2-user '${stage}'" \
             --arg download "aws s3 cp '${object}' '${archive}' --only-show-errors" \
             --arg extract "tar -xzf '${archive}' -C '${stage}' && chown -R ec2-user:ec2-user '${stage}'" \
-            --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' GA_MEASUREMENT_ID='${GA_MEASUREMENT_ID}' KAKAO_CLIENT_ID='${KAKAO_CLIENT_ID}' KAKAO_CLIENT_SECRET='${KAKAO_CLIENT_SECRET}' KAKAO_REDIRECT_URI='${KAKAO_REDIRECT_URI}' KAKAO_SCOPE='${KAKAO_SCOPE}' SOLAPI_API_KEY='${SOLAPI_API_KEY}' SOLAPI_API_SECRET='${SOLAPI_API_SECRET}' SOLAPI_SENDER_NUMBER='${SOLAPI_SENDER_NUMBER}' SMS_PROVIDER='${SMS_PROVIDER}' GABIA_SMS_ID='${GABIA_SMS_ID}' GABIA_API_KEY='${GABIA_API_KEY}' GABIA_SENDER_NUMBER='${GABIA_SENDER_NUMBER}' bash '${stage}/deploy/deploy-alpha.sh'" \
+            --arg deploy "sudo -u ec2-user -H env ALPHA_SOURCE_DIR='${stage}' ALPHA_SHA='${RELEASE_SHA}' ALPHA_RELEASE_VERSION='${RELEASE_VERSION}' GA_MEASUREMENT_ID='${GA_MEASUREMENT_ID}' KAKAO_CLIENT_ID='${KAKAO_CLIENT_ID}' KAKAO_CLIENT_SECRET='${KAKAO_CLIENT_SECRET}' KAKAO_REDIRECT_URI='${KAKAO_REDIRECT_URI}' KAKAO_SCOPE='${KAKAO_SCOPE}' SOLAPI_API_KEY='${SOLAPI_API_KEY}' SOLAPI_API_SECRET='${SOLAPI_API_SECRET}' SOLAPI_SENDER_NUMBER='${SOLAPI_SENDER_NUMBER}' SMS_PROVIDER='${SMS_PROVIDER}' GABIA_SMS_ID='${GABIA_SMS_ID}' GABIA_API_KEY='${GABIA_API_KEY}' GABIA_SENDER_NUMBER='${GABIA_SENDER_NUMBER}' VAPID_PUBLIC_KEY='${VAPID_PUBLIC_KEY}' VAPID_PRIVATE_KEY='${VAPID_PRIVATE_KEY}' VAPID_SUBJECT='${VAPID_SUBJECT}' bash '${stage}/deploy/deploy-alpha.sh'" \
             '{commands: [$strict, $cleanup, $prepare, $download, $extract, $deploy]}'
           )"
 

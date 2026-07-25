@@ -48,6 +48,32 @@ readonly release_version="${ALPHA_RELEASE_VERSION}"
 
 echo "[alpha-deploy] Preparing ${release_version} from ${ALPHA_SHA:0:12}"
 
+# GitHub Secrets에서 넘어온 값을 운영자 관리 .env 에 반영한다(prod deploy.yml 의
+# sync_env_from_github_secret 과 같은 역할). 값이 비어 있으면 건드리지 않는다 —
+# alpha 의 .env 는 운영자가 직접 관리하는 파일이라, secret 미설정이 기존 값을
+# 지우는 부작용을 내면 안 된다.
+sync_env_from_secret() {
+  local key="$1"
+  local value="$2"
+  local tmp_env
+
+  [[ -z "${value}" ]] && return 0
+
+  tmp_env="$(mktemp)"
+  awk -v key="${key}=" 'index($0, key) != 1' "${ENV_FILE}" > "${tmp_env}"
+  {
+    cat "${tmp_env}"
+    printf '%s=%s\n' "${key}" "${value}"
+  } > "${ENV_FILE}"
+  rm -f "${tmp_env}"
+}
+
+# Web Push(VAPID) — 셋 중 하나라도 비면 WebPushService 가 graceful disable 되므로
+# 세 값을 함께 동기화한다.
+sync_env_from_secret VAPID_PUBLIC_KEY "${VAPID_PUBLIC_KEY:-}"
+sync_env_from_secret VAPID_PRIVATE_KEY "${VAPID_PRIVATE_KEY:-}"
+sync_env_from_secret VAPID_SUBJECT "${VAPID_SUBJECT:-}"
+
 set -a
 # shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
 source "${ENV_FILE}"

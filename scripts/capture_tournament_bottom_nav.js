@@ -8,7 +8,10 @@ const fs = require('fs');
 const BASE = 'http://localhost:3013';
 const PHASE = process.env.PHASE || 'after';
 const ROOT = path.resolve(__dirname, '../docs/visual-qa/tournament-bottom-nav', PHASE);
-const HOST = ['1b6166db-cf64-4a0e-a236-42520ac73a68', 'host@teameet.v1'];
+// 시드마다 사용자 UUID 는 새로 생성되므로 ID 를 박아두면 다른 DB 에서 401 이 난다.
+// v1-session.ts 는 x-v1-user-id 가 없으면 x-v1-user-email 로 사용자를 resolve 하므로
+// 시드 고정값인 이메일만 넣는다. 특정 사용자로 찍어야 하면 HOST_USER_ID 로 넘긴다.
+const HOST = [process.env.HOST_USER_ID || '', process.env.HOST_EMAIL || 'host@teameet.v1'];
 const TID = process.env.TID || 'aa000000-0000-4000-8000-000000000001';
 const HIDE = `nextjs-portal,[data-nextjs-dev-tools-button],#__next-dev-tools-indicator,[data-nextjs-toast]{display:none!important}`;
 const BREAKPOINTS = [
@@ -32,7 +35,7 @@ const PAGES = [
   for (const bp of BREAKPOINTS) {
     const ctx = await browser.newContext({ viewport: { width: bp.w, height: bp.h }, deviceScaleFactor: 2 });
     await ctx.addInitScript(([i, e]) => {
-      localStorage.setItem('teameet.v1.userId', i);
+      if (i) localStorage.setItem('teameet.v1.userId', i);
       localStorage.setItem('teameet.v1.userEmail', e);
     }, HOST);
     const page = await ctx.newPage();

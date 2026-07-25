@@ -43,7 +43,6 @@ const PAGE_SIZE = 20;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/** 상대 시각: 방금 전 / N분 전 / N시간 전 / N일 전, 그 이후는 절대 일시로. */
 /**
  * `<input type="date">`가 주는 YYYY-MM-DD를 조회 구간의 경계로 바꾼다.
  *
@@ -57,6 +56,7 @@ function dayBoundaryIso(value: string, edge: 'start' | 'end'): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/** 상대 시각: 방금 전 / N분 전 / N시간 전 / N일 전, 그 이후는 절대 일시로. */
 function formatRelativeTime(dateStr: string): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
@@ -97,7 +97,16 @@ export function ErrorLogsClient() {
   const [statusCode, setStatusCode] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  // 입력값과 조회에 쓰는 값을 분리한다. 매 키 입력마다 쿼리 키가 바뀌면 글자 수만큼
+  // GET /admin/ops/errors 가 나가고, 이 엔드포인트는 @Throttle 60/60s 라 타이핑만으로도
+  // 429 를 맞는다.
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [rows, setRows] = useState<V1AdminErrorLogListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -239,8 +248,8 @@ export function ErrorLogsClient() {
       <AdminFilterBar
         searchLabel="에러 검색"
         searchPlaceholder="메시지·route 검색"
-        searchValue={search}
-        onSearchChange={setSearch}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
       />
 
       {/* source / level chip filters */}

@@ -249,7 +249,10 @@ export class ErrorLogService {
 
     const rows = await this.prisma.v1ErrorLog.findMany({
       where,
-      orderBy: { lastSeenAt: 'desc' },
+      // id 를 tie-breaker 로 둔다 — lastSeenAt 만으로 정렬하면 같은 시각의 행들 사이 순서가
+      // 비결정적이라 cursor 페이지 경계에서 같은 행이 두 번 나오거나 통째로 건너뛴다.
+      // dedupe 특성상 여러 종류의 에러가 같은 순간에 적재되는 일이 흔하다.
+      orderBy: [{ lastSeenAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });

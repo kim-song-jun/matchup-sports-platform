@@ -202,8 +202,10 @@ export function MyJoinApplicationsPageClient() {
   const withdraw = useV1WithdrawMyJoinApplication();
   const { confirm, ConfirmModal } = useConfirm();
 
-  // 취소 중인 신청 1건만 추적 — 전역 boolean이면 무관한 카드까지 함께 비활성화된다.
-  const [pendingApplicationId, setPendingApplicationId] = useState<string | null>(null);
+  // 취소 중인 신청을 집합으로 추적한다.
+  // 전역 boolean이면 무관한 카드까지 잠기고, 단일 id면 두 건을 연달아 취소할 때
+  // 뒤엣것이 앞엣것의 pending을 덮어써 아직 요청 중인 카드가 다시 활성화된다(중복 요청 가능).
+  const [pendingApplicationIds, setPendingApplicationIds] = useState<ReadonlySet<string>>(new Set());
 
   const onWithdraw = (applicationId: string) => {
     const application = (query.data?.items ?? []).find((item) => item.applicationId === applicationId);
@@ -215,17 +217,24 @@ export function MyJoinApplicationsPageClient() {
       tone: 'danger',
     }).then((ok) => {
       if (!ok) return;
-      setPendingApplicationId(applicationId);
+      setPendingApplicationIds((prev) => new Set(prev).add(applicationId));
       withdraw.mutate(
         { applicationId, teamId: application.teamId, reason: 'team_join_withdrawn_from_v1_web_my_page' },
-        { onSettled: () => setPendingApplicationId(null) },
+        {
+          onSettled: () =>
+            setPendingApplicationIds((prev) => {
+              const next = new Set(prev);
+              next.delete(applicationId);
+              return next;
+            }),
+        },
       );
     });
   };
 
   const model: MyJoinApplicationsViewModel = {
     applications: (query.data?.items ?? []).map((item) =>
-      toMyJoinApplicationItem(item, pendingApplicationId === item.applicationId),
+      toMyJoinApplicationItem(item, pendingApplicationIds.has(item.applicationId)),
     ),
     loading: query.isLoading,
     error: query.isError,

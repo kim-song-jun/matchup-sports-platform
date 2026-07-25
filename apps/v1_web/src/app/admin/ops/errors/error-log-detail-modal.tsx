@@ -17,13 +17,23 @@ interface ErrorLogDetailModalProps {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function safeJsonStringify(value: unknown): string {
-  if (value === null || value === undefined) return '없음';
+/**
+ * 값이 없을 때의 표기를 호출부가 정한다. 화면에는 '없음'이 읽기 좋지만, 마크다운 복사본은
+ * ```json 펜스 안에 들어가므로 '없음'을 넣으면 유효한 JSON이 아니게 된다 — 이슈에 그대로
+ * 붙여넣는 것이 이 버튼의 용도라 복사 쪽은 `null`을 쓴다.
+ */
+function safeJsonStringify(value: unknown, emptyLabel = '없음'): string {
+  if (value === null || value === undefined) return emptyLabel;
   try {
     return JSON.stringify(value, null, 2);
   } catch {
     return String(value);
   }
+}
+
+/** 마크다운 코드펜스 안에 들어갈 JSON — 값 없음은 JSON으로도 유효한 null 로 적는다. */
+function jsonForMarkdown(value: unknown): string {
+  return safeJsonStringify(value, 'null');
 }
 
 function metaMarkdown(detail: V1AdminErrorLogDetail): string {
@@ -53,11 +63,11 @@ function requestMarkdown(detail: V1AdminErrorLogDetail): string {
     `- route: ${detail.route ?? '없음'}`,
     '### headers',
     '```json',
-    safeJsonStringify(detail.requestHeaders),
+    jsonForMarkdown(detail.requestHeaders),
     '```',
     '### body',
     '```json',
-    safeJsonStringify(detail.requestBody),
+    jsonForMarkdown(detail.requestBody),
     '```',
   ].join('\n');
 }
@@ -69,13 +79,13 @@ function responseMarkdown(detail: V1AdminErrorLogDetail): string {
     `- errorCode: ${detail.errorCode ?? '없음'}`,
     '### body',
     '```json',
-    safeJsonStringify(detail.responseBody),
+    jsonForMarkdown(detail.responseBody),
     '```',
   ].join('\n');
 }
 
 function contextMarkdown(detail: V1AdminErrorLogDetail): string {
-  return ['## Context', '```json', safeJsonStringify(detail.context), '```'].join('\n');
+  return ['## Context', '```json', jsonForMarkdown(detail.context), '```'].join('\n');
 }
 
 function fullMarkdown(detail: V1AdminErrorLogDetail): string {

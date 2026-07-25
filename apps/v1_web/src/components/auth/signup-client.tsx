@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,23 +35,44 @@ import {
   SIGNUP_PROFILE_ERROR_MESSAGES,
 } from './signup-profile-validation';
 
-type WizardStep = 'account' | 'profile';
+type WizardStep = 'account' | 'verify' | 'profile';
 type DuplicateCheckState = { status: 'idle' | 'available' | 'taken' | 'error'; value: string };
 
-const STEP_ORDER: WizardStep[] = ['account', 'profile'];
+const STEP_ORDER: WizardStep[] = ['account', 'verify', 'profile'];
 
 const STEP_COPY: Record<WizardStep, { title: string; sub: ReactNode }> = {
   account: {
     title: '가입 정보를\n확인해 주세요',
-    sub: '닉네임과 이메일은 먼저 중복 확인이 필요해요. 비밀번호까지 입력하면 프로필 단계로 넘어가요.',
+    sub: '닉네임과 이메일은 먼저 중복 확인이 필요해요. 비밀번호까지 입력하면 본인인증 단계로 넘어가요.',
+  },
+  verify: {
+    title: '본인인증을\n먼저 해주세요',
+    sub: '이 단계만 통과하면 나머지는 실패 없이 끝나요. 인증이 끝나면 자동으로 다음으로 넘어가요.',
   },
   profile: {
     title: '프로필을\n완성해 주세요',
-    sub: <>대회 참여 시 이름, 휴대폰 번호, 생년월일은 <span style={{ whiteSpace: 'nowrap' }}>본인 확인에 필요해요.</span></>,
+    sub: <>대회 참여 시 이름과 생년월일이 <span style={{ whiteSpace: 'nowrap' }}>본인 확인에 쓰여요.</span></>,
   },
 };
 
+/** 인증 성공 표시를 볼 시간을 준 뒤 다음 단계로 넘긴다 — 즉시 전환하면 무엇이 처리됐는지 알 수 없다. */
+const VERIFY_ADVANCE_DELAY_MS = 900;
+
 const onboardingDraftKey = 'teameet.v1.onboardingDraft';
+
+/**
+ * 필수 입력 표시. 별표는 장식(aria-hidden)이고 실제 의미는 sr-only 텍스트가 전달한다 —
+ * 빨간 별 하나만 두면 색으로만 정보를 주게 되어 색각 이상·스크린리더 사용자에게는 사라진다.
+ * 어드민 폼(admin/admins, tournaments/new)이 쓰는 표기와 같은 형태다.
+ */
+function RequiredMark() {
+  return (
+    <>
+      <span aria-hidden="true" style={{ marginLeft: 2, color: 'var(--red500)' }}>*</span>
+      <span className="sr-only">(필수)</span>
+    </>
+  );
+}
 
 export function SignupClient() {
   const router = useRouter();
@@ -86,6 +107,15 @@ export function SignupClient() {
   const [error, setError] = useState<string | null>(null);
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
+  /** 인증 완료 → 다음 단계 자동 이동 타이머. 언마운트 시 정리해 사라진 화면에 setState 하지 않는다. */
+  const advanceTimerRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const documentIds = readSignupTermsDocumentIds();
@@ -110,6 +140,9 @@ export function SignupClient() {
   const passwordTooShort = password.length > 0 && password.length < 8;
   const passwordLongEnough = password.length >= 8;
   const accountReady = nicknameVerified && emailVerified && passwordLongEnough && passwordMatch;
+  // normalizeSeparatedDigits 는 하이픈·공백만 걷어내므로 'ROLLING10ab' 같은 값도 길이 11이 된다.
+  // 길이만 보고 인증을 열면 문자가 섞인 값으로 유료 SMS 발송을 시도하게 되므로 숫자 11자리만 허용한다.
+  const isSendablePhone = /^\d{11}$/.test(phoneDigits);
   const profileDraft = { displayName: realName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
   const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || profileIssue !== null;
@@ -197,14 +230,39 @@ export function SignupClient() {
       router.push('/terms');
       return;
     }
-    setStep('account');
+    // 인증 단계로 되돌아와도 이미 받은 증명은 유지한다 — 되돌아왔다는 이유로 재인증을 시키면
+    // 유료 SMS 를 한 번 더 쓰게 되고 쿨다운에도 걸린다.
+    setStep(step === 'profile' ? 'verify' : 'account');
   };
 
-  const goProfile = () => {
+  const goVerify = () => {
     if (!accountReady) return;
     setError(null);
     setProfileError(null);
+    setStep('verify');
+  };
+
+  const goProfile = () => {
+    if (!phoneProofToken) return;
+    setError(null);
+    setProfileError(null);
     setStep('profile');
+  };
+
+  /**
+   * 인증이 끝나면 사용자가 버튼을 한 번 더 누르지 않아도 다음 단계로 넘어간다.
+   * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
+   * 완료 상태를 잠깐 보여준 뒤 이동한다.
+   */
+  const handlePhoneVerified = (token?: string) => {
+    setPhoneProofToken(token ?? null);
+    setProfileError(null);
+    if (!token) return;
+    if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
+    advanceTimerRef.current = window.setTimeout(() => {
+      advanceTimerRef.current = null;
+      setStep('profile');
+    }, VERIFY_ADVANCE_DELAY_MS);
   };
 
   const submitAccount = async () => {
@@ -302,8 +360,15 @@ export function SignupClient() {
   const primary =
     step === 'account'
       ? {
-          label: '프로필 입력하기',
+          label: '본인인증 하기',
           disabled: checkNickname.isPending || checkEmail.isPending || !accountReady,
+          onClick: goVerify,
+        }
+      : step === 'verify'
+      ? {
+          // 인증 성공 시 자동으로 넘어가므로 이 버튼은 되돌아온 사용자를 위한 경로다.
+          label: '다음',
+          disabled: !phoneProofToken,
           onClick: goProfile,
         }
       : {
@@ -321,11 +386,15 @@ export function SignupClient() {
           : !passwordLongEnough
             ? '비밀번호는 8자 이상이어야 해요.'
             : '비밀번호 확인이 일치해야 해요.'
-      : profileIssue
-        ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue]
-        : uploadingProfileImage
-        ? '프로필 사진을 업로드하는 중이에요.'
-        : null
+      : step === 'verify'
+        ? isSendablePhone
+          ? '인증번호 확인까지 마치면 다음으로 넘어가요.'
+          : '휴대폰 번호를 숫자 11자리로 입력해 주세요.'
+        : profileIssue
+          ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue]
+          : uploadingProfileImage
+          ? '프로필 사진을 업로드하는 중이에요.'
+          : null
     : null;
 
   return (
@@ -383,11 +452,15 @@ export function SignupClient() {
           <p className="tm-text-body tm-auth-sub">{copy.sub}</p>
         </div>
 
+        <p className="tm-text-caption" style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>
+          <span aria-hidden="true" style={{ color: 'var(--red500)' }}>*</span> 표시는 필수 입력이에요.
+        </p>
+
         <form className="tm-auth-form tm-auth-signup-form" onSubmit={(event: FormEvent) => event.preventDefault()}>
           {step === 'account' ? (
             <>
               <label className="tm-auth-field">
-                <span className="tm-text-label">닉네임</span>
+                <span className="tm-text-label">닉네임<RequiredMark /></span>
                 <span className="tm-auth-field-with-action">
                   <input
                     className={`tm-input tm-auth-input ${nicknameError ? 'tm-auth-input-error' : nicknameVerified ? 'tm-auth-input-success' : ''}`}
@@ -421,7 +494,7 @@ export function SignupClient() {
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">이메일</span>
+                <span className="tm-text-label">이메일<RequiredMark /></span>
                 <span className="tm-auth-field-with-action">
                   <input
                     className={`tm-input tm-auth-input ${emailError ? 'tm-auth-input-error' : emailVerified ? 'tm-auth-input-success' : ''}`}
@@ -452,7 +525,7 @@ export function SignupClient() {
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">비밀번호</span>
+                <span className="tm-text-label">비밀번호<RequiredMark /></span>
                 <span className="tm-auth-password-field">
                   <input
                     className={`tm-input tm-auth-input ${passwordTooShort ? 'tm-auth-input-error' : passwordLongEnough ? 'tm-auth-input-success' : ''}`}
@@ -476,7 +549,7 @@ export function SignupClient() {
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">비밀번호 확인</span>
+                <span className="tm-text-label">비밀번호 확인<RequiredMark /></span>
                 <span className="tm-auth-password-field">
                   <input
                     className={`tm-input tm-auth-input ${passwordMismatch ? 'tm-auth-input-error' : passwordMatch ? 'tm-auth-input-success' : ''}`}
@@ -498,6 +571,52 @@ export function SignupClient() {
                   <span id="signup-password-confirm-helper" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">비밀번호가 일치해요.</span>
                 ) : null}
               </label>
+            </>
+          ) : null}
+
+          {step === 'verify' ? (
+            <>
+              <label className="tm-auth-field">
+                <span className="tm-text-label">휴대폰 번호<RequiredMark /></span>
+                <input
+                  className="tm-input tm-auth-input"
+                  inputMode="numeric"
+                  onChange={(event) => {
+                    setPhoneDigits(normalizeSeparatedDigits(event.target.value));
+                    // 번호가 바뀌면 직전 번호로 받은 증명은 무효다.
+                    setPhoneProofToken(null);
+                    setProfileError(null);
+                  }}
+                  placeholder="010-0000-0000"
+                  required
+                  value={formatPhone(phoneDigits)}
+                />
+              </label>
+
+              {isSendablePhone && !phoneProofToken ? (
+                <PhoneVerificationCard
+                  mode="public"
+                  phone={phoneDigits}
+                  onVerified={handlePhoneVerified}
+                  surface="inset"
+                />
+              ) : null}
+
+              {phoneProofToken ? (
+                <div
+                  className="tm-auth-inset"
+                  role="status"
+                  style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
+                  />
+                  <span className="tm-text-label" style={{ color: 'var(--blue500)' }}>
+                    휴대폰 본인인증이 완료됐어요
+                  </span>
+                </div>
+              ) : null}
             </>
           ) : null}
 
@@ -534,7 +653,7 @@ export function SignupClient() {
 
 
               <div className="tm-auth-field">
-                <span className="tm-text-label">성별</span>
+                <span className="tm-text-label">성별<RequiredMark /></span>
                 <div className="tm-auth-segmented" role="radiogroup" aria-label="성별">
                   <button
                     className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`}
@@ -557,7 +676,7 @@ export function SignupClient() {
                 </div>
               </div>
               <label className="tm-auth-field">
-                <span className="tm-text-label">이름</span>
+                <span className="tm-text-label">이름<RequiredMark /></span>
                 <input
                   className="tm-input tm-auth-input"
                   maxLength={40}
@@ -570,46 +689,7 @@ export function SignupClient() {
               </label>
 
               <label className="tm-auth-field">
-                <span className="tm-text-label">휴대폰 번호</span>
-                <input
-                  className="tm-input tm-auth-input"
-                  inputMode="numeric"
-                  onChange={(event) => {
-                    setPhoneDigits(normalizeSeparatedDigits(event.target.value));
-                    setPhoneProofToken(null);
-                    setProfileError(null);
-                  }}
-                  placeholder="010-0000-0000"
-                  required
-                  value={formatPhone(phoneDigits)}
-                />
-              </label>
-
-              {phoneDigits.length === 11 && !phoneProofToken ? (
-                <PhoneVerificationCard
-                  mode="public"
-                  phone={phoneDigits}
-                  onVerified={(token) => setPhoneProofToken(token ?? null)}
-                  surface="inset"
-                />
-              ) : null}
-
-              {phoneProofToken ? (
-                <div
-                  className="tm-text-caption"
-                  role="status"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--blue500)' }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
-                  />
-                  휴대폰 본인인증이 완료됐어요
-                </div>
-              ) : null}
-
-              <label className="tm-auth-field">
-                <span className="tm-text-label">생년월일</span>
+                <span className="tm-text-label">생년월일<RequiredMark /></span>
                 <DatePickerTextInput
                   dateValue={formatBirthDate(birthDateDigits)}
                   inputClassName="tm-auth-input"

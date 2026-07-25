@@ -84,7 +84,15 @@ function maskInternal(value: unknown, seen: WeakMap<object, unknown>): unknown {
     return result;
   }
 
-  // string / number / boolean / bigint / symbol / function 등 원시값은 그대로 반환한다.
+  // 문자열 leaf는 키 이름 기준 마스킹이 닿지 않는 자리다. 대표적으로 `referer` 헤더에는
+  // 카카오 콜백 URL이 통째로 담겨(`/callback/kakao?code=...&state=...`) 인가코드가 값
+  // 안쪽에 박혀 들어온다 — 키가 'referer'라 위 isSensitiveKey를 통과하지 못한다.
+  // 보존이 무기한이라 여기서 놓치면 영구 저장이므로, 문자열은 텍스트 스크러빙을 한 번 더 건다.
+  if (typeof value === 'string') {
+    return maskSensitiveText(value);
+  }
+
+  // number / boolean / bigint / symbol / function 등 나머지 원시값은 그대로 반환한다.
   return value;
 }
 

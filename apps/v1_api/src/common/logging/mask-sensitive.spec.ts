@@ -7,6 +7,20 @@ describe('maskSensitive', () => {
     expect(result).toEqual({ password: '[REDACTED]', nickname: 'jun' });
   });
 
+  // 키 이름이 안전해 보여도 값 안에 시크릿이 박혀 오는 자리가 있다. referer 헤더가
+  // 대표적이다 — 카카오 콜백 URL이 통째로 담겨 인가코드가 값 안쪽에 들어온다.
+  it('scrubs secrets embedded inside string values whose key is not sensitive', () => {
+    const masked = maskSensitive({
+      referer: 'https://alpha.teameet.co.kr/callback/kakao?code=REAL_AUTH_CODE&state=xyz',
+      note: 'no secret here',
+    });
+
+    expect(masked.referer).toContain('[REDACTED]');
+    expect(masked.referer).not.toContain('REAL_AUTH_CODE');
+    // 시크릿이 없는 문자열은 건드리지 않는다.
+    expect(masked.note).toBe('no secret here');
+  });
+
   it('masks sensitive keys nested inside objects', () => {
     const input = {
       user: {

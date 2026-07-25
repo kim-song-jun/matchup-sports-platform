@@ -245,4 +245,12 @@ describe('SignupClient required profile contract', () => {
     expect(input).toHaveValue(expectedValue);
     expect(screen.getByRole('button', { name: '가입하고 계속' })).toBeDisabled();
   });
+
+  // 이 화면만 상단바 없이 렌더돼 가입을 시작하면 빠져나갈 컨트롤이 없었다.
+  // 목적지는 직전 단계인 약관 화면이고, 거기서 다시 /login 으로 나갈 수 있다.
+  it('상단에 약관 화면으로 돌아가는 뒤로가기를 노출한다', () => {
+    render(<SignupClient />);
+
+    expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', '/terms');
+  });
 });

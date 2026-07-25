@@ -3,6 +3,8 @@ import { V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
+import { buildKakaoSignupPrefill, readKakaoSignupPrefill, type KakaoSignupPrefill } from './kakao-profile';
+import { isPendingSocialSignup } from './social-signup-access';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
@@ -18,6 +20,8 @@ type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
   profileImageUrl: string | null;
+  /** 콘솔 동의항목이 승인된 앱에서만 값이 온다. 미승인이면 null. */
+  signupPrefill: KakaoSignupPrefill | null;
 };
 
 @Injectable()
@@ -369,8 +373,17 @@ export class AuthService {
         onboardingProgress: {
           create: {
             currentStep: 'terms',
+            // 카카오가 준 값은 가입 완료 전까지 여기 보관했다가 프로필 입력 화면에서 자동 채움에 쓴다
+            // (별도 테이블 없이 기존 draftJson 을 확장 — 동의항목 미승인이면 kakao* 키가 아예 없다).
             draftJson: {
               kakaoProfileImageUrl: profile.profileImageUrl,
+              ...(profile.signupPrefill
+                ? {
+                    kakaoName: profile.signupPrefill.name,
+                    kakaoPhone: profile.signupPrefill.phone,
+                    kakaoGender: profile.signupPrefill.gender,
+                  }
+                : {}),
             },
           },
         },
@@ -712,8 +725,14 @@ export class AuthService {
       hasProfile: Boolean(user.profile?.nickname),
     });
     const termsCompliance = await this.managedTerms.signupCompliance(user.id);
+    // 소셜 가입이 진행 중일 때만 내려준다 — 가입이 끝나면 같은 값이 프로필/유저에 저장되므로
+    // 이 필드를 계속 실어 보낼 이유가 없고, 노출 범위도 필요한 순간으로 좁힌다.
+    const socialSignupPrefill = isPendingSocialSignup(user.onboardingStatus)
+      ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)
+      : null;
 
     return {
+      socialSignupPrefill,
       user: {
         id: user.id,
         email: user.email,
@@ -829,6 +848,11 @@ export class AuthService {
       id?: number | string;
       kakao_account?: {
         email?: string;
+        // 이름/전화번호/성별은 카카오 콘솔 동의항목이 승인된 앱에만 내려온다(미승인 시 필드 자체가 없음).
+        // 따라서 전부 optional 로 두고, 없으면 프리필을 포기한다.
+        name?: string;
+        phone_number?: string;
+        gender?: string;
         profile?: {
           nickname?: string;
           profile_image_url?: string;
@@ -855,6 +879,11 @@ export class AuthService {
         userData.kakao_account?.profile?.profile_image_url ??
         userData.properties?.profile_image ??
         null,
+      signupPrefill: buildKakaoSignupPrefill({
+        name: userData.kakao_account?.name,
+        phone: userData.kakao_account?.phone_number,
+        gender: userData.kakao_account?.gender,
+      }),
     };
   }
 

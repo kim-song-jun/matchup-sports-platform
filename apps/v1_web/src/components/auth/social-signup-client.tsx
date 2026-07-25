@@ -1,12 +1,13 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
-import { useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
+import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile } from '@/hooks/use-v1-api';
+import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
@@ -42,6 +43,26 @@ export function SocialSignupClient() {
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
+  const exitFlow = useSocialSignupExit();
+
+  // 카카오가 동의항목 승인 하에 내려준 값(이름·번호·성별)을 자동으로 채운다.
+  // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
+  const authMe = useV1AuthMe();
+  const prefill = authMe.data?.socialSignupPrefill ?? null;
+  // 카카오가 확인해 준 값은 사용자가 임의로 바꾸지 못하게 잠근다. 단 전화번호는 예외 —
+  // 카카오 계정 번호와 실제 쓰는 번호가 다를 수 있고, 잠그면 OTP 본인인증을 통과할 방법이
+  // 사라져 가입 자체가 막힌다. 그래서 채워 주기만 하고 수정은 허용한다.
+  const lockedName = Boolean(prefill?.name);
+  const lockedGender = Boolean(prefill?.gender);
+
+  const [prefillApplied, setPrefillApplied] = useState(false);
+  useEffect(() => {
+    if (!prefill || prefillApplied) return;
+    if (prefill.name) setDisplayName(prefill.name);
+    if (prefill.gender) setGender(prefill.gender);
+    if (prefill.phone) setPhoneDigits(prefill.phone);
+    setPrefillApplied(true);
+  }, [prefill, prefillApplied]);
 
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
@@ -150,6 +171,8 @@ export function SocialSignupClient() {
   return (
     <AuthFrame
       topTitle="카카오 가입"
+      onBack={() => void exitFlow.exit()}
+      backLabel="가입 그만두기"
       fixedAction={
         <>
           <Button
@@ -210,19 +233,22 @@ export function SocialSignupClient() {
               aria-invalid={fieldErrors.gender ? true : undefined}
               aria-describedby={fieldErrors.gender ? 'social-signup-gender-error' : undefined}
             >
-              <button className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'male'} onClick={() => {
+              <button className={`tm-auth-segment ${gender === 'male' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'male'} disabled={lockedGender} onClick={() => {
                 setGender('male');
                 setFieldErrors((current) => ({ ...current, gender: undefined }));
               }}>
                 남
               </button>
-              <button className={`tm-auth-segment ${gender === 'female' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'female'} onClick={() => {
+              <button className={`tm-auth-segment ${gender === 'female' ? 'tm-auth-segment-active' : ''}`} type="button" role="radio" aria-checked={gender === 'female'} disabled={lockedGender} onClick={() => {
                 setGender('female');
                 setFieldErrors((current) => ({ ...current, gender: undefined }));
               }}>
                 여
               </button>
             </div>
+            {lockedGender ? (
+              <span className="tm-text-caption tm-auth-field-helper">카카오 계정에서 가져온 정보예요.</span>
+            ) : null}
             {fieldErrors.gender ? (
               <span id="social-signup-gender-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">
                 {fieldErrors.gender}
@@ -236,10 +262,14 @@ export function SocialSignupClient() {
               maxLength={40}
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder="실명 또는 확인 가능한 이름"
+              readOnly={lockedName}
               required
               type="text"
               value={displayName}
             />
+            {lockedName ? (
+              <span className="tm-text-caption tm-auth-field-helper">카카오 계정에서 가져온 정보예요.</span>
+            ) : null}
           </label>
           <label className="tm-auth-field">
             <span className="tm-text-label">휴대폰 번호</span>
@@ -293,7 +323,14 @@ export function SocialSignupClient() {
             <div className="tm-text-caption">{error}</div>
           </Card>
         ) : null}
+        {exitFlow.error ? (
+          <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
+            <div className="tm-text-body-lg">가입을 취소하지 못했어요</div>
+            <div className="tm-text-caption">{exitFlow.error}</div>
+          </Card>
+        ) : null}
       </form>
+      {exitFlow.ConfirmModal}
     </AuthFrame>
   );
 }

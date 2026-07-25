@@ -49,6 +49,15 @@ export type V1User = {
 };
 
 export type V1AuthMe = {
+  /**
+   * 카카오 가입 진행 중에만 채워진다 — 카카오 동의항목이 승인된 앱에서만 값이 오고,
+   * 미승인이면 null 이라 화면은 기존처럼 직접 입력을 받는다.
+   */
+  socialSignupPrefill?: {
+    name: string | null;
+    phone: string | null;
+    gender: 'male' | 'female' | null;
+  } | null;
   user: {
     id: string;
     email: string | null;

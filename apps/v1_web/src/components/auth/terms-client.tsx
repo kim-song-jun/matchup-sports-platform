@@ -16,6 +16,7 @@ import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { saveSignupTermsDocumentIds } from '@/lib/signup-terms-storage';
 import { AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
+import { useSocialSignupExit } from './use-social-signup-exit';
 
 export function TermsClient() {
   const model = getTermsViewModel();
@@ -23,6 +24,7 @@ export function TermsClient() {
   const searchParams = useSearchParams();
   const socialTerms = useV1CompleteSocialTerms();
   const acceptTerms = useV1AcceptSignupTerms();
+  const exitFlow = useSocialSignupExit();
   const mode = searchParams.get('mode');
   const document = searchParams.get('document');
   const isSocialMode = mode === 'social';
@@ -199,7 +201,12 @@ export function TermsClient() {
   return (
     <AuthFrame
       topTitle="약관 동의"
+      // social 모드는 가입이 끝날 때까지 게이트가 다른 경로를 전부 되돌리므로, 단순 이동 링크
+      // 대신 "가입 그만두기(로그아웃)" 출구를 준다. renewal(기존 회원 재동의)은 성격이 달라
+      // 이번 변경 범위에서 제외한다 — 여전히 backHref 없음.
       backHref={isSocialMode || isRenewalMode ? undefined : model.backHref}
+      onBack={isSocialMode ? () => void exitFlow.exit() : undefined}
+      backLabel={isSocialMode ? '가입 그만두기' : undefined}
       fixedAction={
         <Button
           block
@@ -320,6 +327,9 @@ export function TermsClient() {
             );
           })}
         </div>
+        {exitFlow.error ? (
+          <div className="tm-text-caption tm-auth-field-helper-error" role="alert">{exitFlow.error}</div>
+        ) : null}
         {legalDialog ? (
           <LegalDocumentDialog
             title={legalDialog.title}
@@ -328,6 +338,7 @@ export function TermsClient() {
           />
         ) : null}
       </div>
+      {exitFlow.ConfirmModal}
     </AuthFrame>
   );
 }

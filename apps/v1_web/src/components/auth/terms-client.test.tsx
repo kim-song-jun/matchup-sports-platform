@@ -10,6 +10,13 @@ const router = vi.hoisted(() => ({
 const hooks = vi.hoisted(() => ({
   completeSocialTermsMutate: vi.fn(),
   acceptSignupTermsMutate: vi.fn(),
+  logoutMutateAsync: vi.fn(),
+}));
+
+// 화면이 react-query 를 직접 쓰는 곳은 '가입 그만두기'가 캐시를 비우는 경로뿐이라
+// useQueryClient 만 대체한다(Provider 없이 렌더하기 위함).
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ removeQueries: vi.fn() }),
 }));
 
 const SERVICE_DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -71,6 +78,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  // social 모드 상단의 '가입 그만두기'(로그아웃) 출구가 쓰는 훅.
+  useV1Logout: () => ({ mutateAsync: hooks.logoutMutateAsync, isPending: false }),
   useV1CompleteSocialTerms: () => ({
     mutate: hooks.completeSocialTermsMutate,
     isPending: false,

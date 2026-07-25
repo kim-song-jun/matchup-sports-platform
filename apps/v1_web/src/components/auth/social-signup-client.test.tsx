@@ -14,6 +14,9 @@ const hooks = vi.hoisted(() => ({
   phoneVerifyMutateAsync: vi.fn(),
   authedPhoneRequestMutateAsync: vi.fn(),
   authedPhoneConfirmMutateAsync: vi.fn(),
+  logoutMutateAsync: vi.fn(),
+  // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
+  authMe: { socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null } },
 }));
 
 const analytics = vi.hoisted(() => ({
@@ -29,6 +32,8 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1AuthMe: () => ({ data: hooks.authMe }),
+  useV1Logout: () => ({ mutateAsync: hooks.logoutMutateAsync, isPending: false }),
   useV1CheckNickname: () => ({ mutate: hooks.checkNicknameMutate, isPending: false }),
   useV1CompleteSocialProfile: () => ({ mutate: hooks.completeProfileMutate, isPending: false }),
   useV1PhoneIssue: () => ({ mutateAsync: hooks.phoneIssueMutateAsync, isPending: false }),
@@ -240,5 +245,87 @@ describe('SocialSignupClient required profile contract', () => {
     // Then
     expect(input).toHaveValue(expectedValue);
     expect(screen.getByRole('button', { name: /입력 확인 후 계속|운동 설정으로 계속/ })).toBeDisabled();
+  });
+});
+
+// PendingSocialSignupGate 가 이 단계에서 다른 경로를 전부 되돌리므로, 이 버튼이 없으면
+// 사용자는 가입을 끝내기 전까지 화면을 빠져나갈 방법이 아예 없다(원래 증상).
+describe('SocialSignupClient 가입 중 탈출구', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.authMe.socialSignupPrefill = null;
+  });
+
+  it('상단에 가입 그만두기 버튼을 노출한다', () => {
+    render(<SocialSignupClient />);
+    expect(screen.getByRole('button', { name: '가입 그만두기' })).toBeInTheDocument();
+  });
+
+  it('확인 모달에서 계속 쓰기를 고르면 로그아웃하지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<SocialSignupClient />);
+
+    await user.click(screen.getByRole('button', { name: '가입 그만두기' }));
+    await user.click(await screen.findByRole('button', { name: '계속 쓰기' }));
+
+    expect(hooks.logoutMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('그만두기를 고르면 로그아웃한다', async () => {
+    const user = userEvent.setup();
+    hooks.logoutMutateAsync.mockResolvedValue({ ok: true });
+    render(<SocialSignupClient />);
+
+    await user.click(screen.getByRole('button', { name: '가입 그만두기' }));
+    await user.click(await screen.findByRole('button', { name: '그만두기' }));
+
+    await waitFor(() => expect(hooks.logoutMutateAsync).toHaveBeenCalledTimes(1));
+  });
+
+  // 로그아웃 실패를 조용히 넘기면 로그인 화면으로 가도 게이트가 다시 끌어와
+  // "눌러도 아무 일 없는" 원래 증상으로 되돌아간다.
+  it('로그아웃이 실패하면 이유를 알린다', async () => {
+    const user = userEvent.setup();
+    hooks.logoutMutateAsync.mockRejectedValue(new Error('network down'));
+    render(<SocialSignupClient />);
+
+    await user.click(screen.getByRole('button', { name: '가입 그만두기' }));
+    await user.click(await screen.findByRole('button', { name: '그만두기' }));
+
+    expect(await screen.findByText(/가입 취소를 완료하지 못했어요/)).toBeInTheDocument();
+  });
+});
+
+describe('SocialSignupClient 카카오 자동 채움', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hooks.authMe.socialSignupPrefill = null;
+  });
+
+  it('카카오 값이 없으면 기존처럼 직접 입력한다', () => {
+    render(<SocialSignupClient />);
+    expect(screen.getByLabelText(/^이름/)).toHaveValue('');
+    expect(screen.getByLabelText(/^이름/)).not.toHaveAttribute('readonly');
+    expect(screen.getByRole('radio', { name: '남' })).toBeEnabled();
+  });
+
+  it('이름·성별은 채우고 수정하지 못하게 잠근다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: '홍길동', phone: null, gender: 'female' };
+    render(<SocialSignupClient />);
+
+    await waitFor(() => expect(screen.getByLabelText(/^이름/)).toHaveValue('홍길동'));
+    expect(screen.getByLabelText(/^이름/)).toHaveAttribute('readonly');
+    expect(screen.getByRole('radio', { name: '여' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: '남' })).toBeDisabled();
+  });
+
+  // 카카오 번호와 실제 쓰는 번호가 다를 수 있는데 잠그면 OTP 본인인증을 통과할 방법이 없어진다.
+  it('전화번호는 채우되 수정할 수 있게 둔다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
+    render(<SocialSignupClient />);
+
+    const phone = screen.getByLabelText(/^휴대폰 번호/);
+    await waitFor(() => expect(phone).toHaveValue('010-1234-5678'));
+    expect(phone).not.toHaveAttribute('readonly');
   });
 });

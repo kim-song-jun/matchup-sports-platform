@@ -63,7 +63,11 @@ export function SmsFailureTable() {
       render: (failure) => (
         // detail 은 provider 응답 본문까지 들어올 수 있어 길다 — 한 줄로 자르고
         // 전체 내용은 title 로 확인하게 한다.
-        <span className="block max-w-[280px] truncate text-gray-500" title={failure.detail ?? undefined}>
+        // truncate(=white-space:nowrap)는 lg 이상에서만 건다. 모바일 카드의 값 셀(dd)은
+        // flex-1 이지만 min-w-0 가 없어, nowrap 텍스트가 곧 min-content 폭이 되어 셀이
+        // 줄어들지 못하고 카드 밖으로 넘친다. 모바일에선 줄바꿈시켜 전문을 그대로 읽히고,
+        // 폭이 넉넉한 데스크톱 테이블에서만 한 줄로 잘라 title 로 전문을 보게 한다.
+        <span className="block break-words text-gray-500 lg:max-w-[280px] lg:truncate" title={failure.detail ?? undefined}>
           {failure.detail ?? '—'}
         </span>
       ),

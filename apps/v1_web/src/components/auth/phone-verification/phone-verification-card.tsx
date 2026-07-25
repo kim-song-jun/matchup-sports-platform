@@ -20,8 +20,8 @@ type Props = {
 };
 
 const CODE_LENGTH = 6;
-/** 서버 OTP TTL(백엔드 VerificationService/PhoneVerificationService 공통 상수)과 정합. authed 응답엔
- * expiresAt이 없어 이 상수로 카운트다운을 계산한다. */
+/** 서버 OTP TTL(백엔드 VerificationService/PhoneVerificationService 공통 상수)과 정합.
+ * 발급 응답의 서버 expiresAt 을 우선 사용하고, 없을 때만 이 상수로 카운트다운을 폴백 계산한다. */
 const CODE_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const COUNTDOWN_TICK_MS = 1000;

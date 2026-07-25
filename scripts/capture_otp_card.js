@@ -1,6 +1,9 @@
 // MT SMS OTP 휴대폰 인증 카드 시각 캡처 (public signup 경로).
 // v1 스택 필요: web :3013 + api :8121 (V1_VERIFICATION_DEV_ECHO=true, migrate된 빈 DB).
-// 출력: docs/visual-qa/mt-sms-otp/{mobile,tablet,desktop}/{received,input}.png
+// 출력: docs/visual-qa/mt-sms-otp/{mobile,tablet,desktop}/{received,input,card}.png
+//  - received: 프로필 단계에서 "인증번호 받기"(idle) 상태의 전체 페이지
+//  - input: 발급 후 6자리 입력 상태의 전체 페이지
+//  - card: 카드 요소만 클립(입력·확인·다시받기·남은시간 전체가 보이도록)
 // Run: node scripts/capture_otp_card.js
 const { chromium } = require('@playwright/test');
 const path = require('path');

@@ -60,7 +60,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
   });
 
   it('subscribes to push notifications when the toggle is turned on', async () => {
-    const subscribe = vi.fn();
+    const subscribe = vi.fn().mockResolvedValue(true);
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe,
       unsubscribe: vi.fn(),
@@ -73,6 +73,44 @@ describe('NotificationSettingsPageClient push toggle', () => {
     await user.click(screen.getByRole('switch', { name: '브라우저 알림 받기' }));
 
     expect(subscribe).toHaveBeenCalled();
+    expect(screen.queryByText('브라우저 알림을 켜지 못했어요')).not.toBeInTheDocument();
+  });
+
+  it('구독에 실패하면 조용히 넘어가지 않고 이유를 화면에 알린다 (서버 VAPID 미설정 등)', async () => {
+    // 서버가 VAPID 공개키를 못 주면 subscribe()가 false를 반환한다 — 예전에는 토글이 OFF로
+    // 남기만 해서 사용자가 원인을 알 수 없었다.
+    vi.stubGlobal('Notification', { permission: 'granted' });
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn().mockResolvedValue(false),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+    });
+    const user = userEvent.setup();
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    await user.click(screen.getByRole('switch', { name: '브라우저 알림 받기' }));
+
+    expect(await screen.findByText('브라우저 알림을 켜지 못했어요')).toBeInTheDocument();
+    expect(screen.getByText(/지금은 브라우저 알림을 켤 수 없어요/)).toBeInTheDocument();
+  });
+
+  it('권한 팝업에서 차단하면 차단 해제 방법을 안내한다', async () => {
+    // 팝업 결과는 클릭 시점 렌더의 permission('default')에 반영돼 있지 않으므로,
+    // 실패 안내는 갱신된 실제 권한을 읽어 분기해야 한다.
+    vi.stubGlobal('Notification', { permission: 'denied' });
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn().mockResolvedValue(false),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+    });
+    const user = userEvent.setup();
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    await user.click(screen.getByRole('switch', { name: '브라우저 알림 받기' }));
+
+    expect(await screen.findByText(/브라우저 설정에서 이 사이트의 알림을 허용/)).toBeInTheDocument();
   });
 
   it('unsubscribes from push notifications when the toggle is turned off', async () => {

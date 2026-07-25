@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { isSafePopupLink } from '../popups/popup-screen';
 import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -97,6 +98,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     // status change."
     @Optional() private readonly realtimeGateway?: RealtimeGateway,
     @Optional() @InjectPinoLogger(AdminService.name) private readonly logger?: PinoLogger,
+    // Optional for the same reason as realtimeGateway: AdminModule imports
+    // NotificationsModule in production, so this always resolves there.
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   onModuleInit() {
@@ -1541,7 +1545,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    const asked = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.v1Inquiry.findUnique({ where: { id: inquiryId } });
       if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
 
@@ -1569,7 +1573,20 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         tx,
       );
+
+      return { userId: existing.userId, title: existing.title };
     });
+
+    // 커밋 이후에만 알림을 보낸다 — 롤백된 답변으로 "답변 등록" 알림만 남는 상황을 막는다.
+    // 게스트 문의(userId=null)는 계정이 없어 인앱/푸시 알림 대상이 아니다(연락처로만 회신).
+    if (asked.userId) {
+      void this.notifications?.emitNotification(
+        asked.userId,
+        'inquiry_answered',
+        inquiryId,
+        `"${asked.title}" 문의 답변: ${previewInquiryReply(body)}`,
+      );
+    }
 
     return this.getInquiry(user, inquiryId);
   }
@@ -2393,4 +2410,16 @@ function buildDeletedProviderUserKey(userId: string, identityId: string) {
 
 function buildDeletedNickname(userId: string) {
   return `deleted_${userId.slice(0, 8)}`;
+}
+
+/**
+ * 문의 답변 알림 본문에 넣을 답변 미리보기. 알림 본문은 인앱 목록·상세 시트와
+ * 웹 푸시 payload에 그대로 실리므로, 줄바꿈을 공백으로 접고 길이를 제한한다.
+ */
+const INQUIRY_REPLY_PREVIEW_LIMIT = 160;
+
+function previewInquiryReply(body: string): string {
+  const flattened = body.replace(/\s+/g, ' ').trim();
+  if (flattened.length <= INQUIRY_REPLY_PREVIEW_LIMIT) return flattened;
+  return `${flattened.slice(0, INQUIRY_REPLY_PREVIEW_LIMIT)}…`;
 }

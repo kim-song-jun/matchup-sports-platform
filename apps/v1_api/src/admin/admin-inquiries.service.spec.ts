@@ -10,6 +10,7 @@
 
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminService } from './admin.service';
 
@@ -160,6 +161,98 @@ describe('AdminService — inquiries null-safety (guest inquiries)', () => {
       where: { status: { in: ['received', 'reviewing'] } },
     });
     expect(result).toEqual({ count: 3 });
+  });
+});
+
+describe('AdminService — replyInquiry notifies the asker', () => {
+  let service: AdminService;
+  let notifications: { emitNotification: jest.Mock };
+  let prisma: {
+    v1AdminUser: { findUnique: jest.Mock };
+    v1Inquiry: { findUnique: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let tx: {
+    v1Inquiry: { findUnique: jest.Mock; update: jest.Mock };
+    v1InquiryReply: { create: jest.Mock };
+    v1AdminActionLog: { create: jest.Mock };
+    v1StatusChangeLog: { create: jest.Mock };
+  };
+
+  beforeEach(async () => {
+    tx = {
+      v1Inquiry: { findUnique: jest.fn(), update: jest.fn() },
+      v1InquiryReply: { create: jest.fn() },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
+      v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+    };
+    prisma = {
+      v1AdminUser: { findUnique: jest.fn() },
+      v1Inquiry: { findUnique: jest.fn() },
+      $transaction: jest.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
+    };
+    notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
+      ],
+    }).compile();
+
+    service = module.get(AdminService);
+    prisma.v1AdminUser.findUnique.mockResolvedValue(activeAdminRecord);
+    tx.v1Inquiry.update.mockResolvedValue({ status: 'answered' });
+    // replyInquiry 마지막의 getInquiry 재조회
+    prisma.v1Inquiry.findUnique.mockResolvedValue({
+      ...makeGuestInquiryRow({ id: 'inquiry-1' }),
+      body: '문의 본문',
+      contact: null,
+      replies: [],
+    });
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it('emits an inquiry_answered notification to the member who asked, carrying a reply preview', async () => {
+    tx.v1Inquiry.findUnique.mockResolvedValue({
+      id: 'inquiry-1',
+      userId: 'asker-user-id',
+      title: '환불 언제 되나요',
+      status: 'received',
+    });
+
+    await service.replyInquiry(adminAuthUser, 'inquiry-1', { body: '3영업일 내에 처리됩니다.' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'asker-user-id',
+      'inquiry_answered',
+      'inquiry-1',
+      '"환불 언제 되나요" 문의 답변: 3영업일 내에 처리됩니다.',
+    );
+  });
+
+  it('does not notify for a guest inquiry (userId=null) — no account to deliver to', async () => {
+    tx.v1Inquiry.findUnique.mockResolvedValue({
+      id: 'inquiry-1',
+      userId: null,
+      title: '비회원 문의',
+      status: 'received',
+    });
+
+    await service.replyInquiry(adminAuthUser, 'inquiry-1', { body: '메일로 회신드렸어요.' });
+
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not notify when the inquiry does not exist (transaction throws before commit)', async () => {
+    tx.v1Inquiry.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.replyInquiry(adminAuthUser, 'missing-inquiry', { body: '답변' }),
+    ).rejects.toThrow(NotFoundException);
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
   });
 });
 

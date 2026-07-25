@@ -21,7 +21,14 @@ export interface V1PushRegistration {
 export function useV1PushRegistration(): V1PushRegistration {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
-  const permission = supported ? Notification.permission : 'unsupported';
+  // 권한은 state로 들고 requestPermission 결과로 갱신한다. 렌더 중 Notification.permission을
+  // 직접 읽으면 사용자가 권한 팝업에서 '차단'을 눌러도 리렌더가 없어 UI가 계속 '허용 가능'으로
+  // 남는다(구독 실패 → 상태 변화 없음 → 리렌더 없음).
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
+
+  useEffect(() => {
+    setPermission(supported ? Notification.permission : 'unsupported');
+  }, [supported]);
 
   useEffect(() => {
     if (!supported) return;
@@ -42,6 +49,7 @@ export function useV1PushRegistration(): V1PushRegistration {
 
     try {
       const permissionResult = await Notification.requestPermission();
+      setPermission(permissionResult);
       if (permissionResult !== 'granted') return false;
 
       const { publicKey } = await v1Get<{ publicKey: string | null }>('/notifications/vapid-public-key');

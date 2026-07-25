@@ -3,7 +3,9 @@
  *
  * 이메일 클라이언트는 외부 CSS·웹폰트·<style> 를 자주 잘라내므로 전부 인라인 스타일로 쓰고,
  * 레이아웃도 flex/grid 대신 테이블로 짠다(Outlook 은 지금도 Word 렌더러를 쓴다).
- * 이미지도 넣지 않는다 — 기본 차단하는 클라이언트가 많아, 이미지가 막히면 아무것도 안 보인다.
+ * 로고는 원격 이미지 하나만 쓴다. 다수 클라이언트가 이미지를 기본 차단하므로, 막혔을 때도
+ * 머리말이 멀쩡하도록 옆에 'Teameet' 워드마크를 텍스트로 함께 두고 alt 도 채운다.
+ * (data URI·SVG 는 Gmail 이 걸러내고, CID 첨부는 raw MIME 발송이 필요해 쓰지 않았다.)
  *
  * 링크는 넣지 않는다. 코드 입력 방식이라 링크가 필요 없고, 인증 메일의 링크는 피싱과
  * 구분이 어려워 사용자에게 "링크를 눌러도 된다"는 습관을 들이지 않는 편이 안전하다.
@@ -29,6 +31,9 @@ const COPY: Record<OtpEmailPurpose, Copy> = {
     lead: '아래 인증번호를 입력하면 새 비밀번호를 정할 수 있어요.',
   },
 };
+
+/** 프로덕션에 실제로 올라가 있는 브랜드 자산(앱이 /v1 basePath 아래로 서비스된다). */
+const LOGO_URL = 'https://teameet.co.kr/v1/brand/icon-192.png';
 
 /** 6자리 코드를 3자리씩 띄워 읽기 쉽게 — 값 자체는 바꾸지 않는다. */
 function spaced(code: string): string {
@@ -86,7 +91,17 @@ export function buildOtpEmailHtml(code: string, purpose: OtpEmailPurpose = 'veri
              style="max-width:480px;background:#ffffff;border-radius:16px;border:1px solid #e8eaed;">
         <tr>
           <td style="padding:32px 32px 8px 32px;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;">
-            <div style="font-size:15px;font-weight:700;color:#3182f6;letter-spacing:-0.2px;">Teameet</div>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding-right:8px;" valign="middle">
+                  <img src="${LOGO_URL}" width="28" height="28" alt="Teameet"
+                       style="display:block;width:28px;height:28px;border:0;border-radius:8px;">
+                </td>
+                <td valign="middle" style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;font-size:15px;font-weight:700;color:#3182f6;letter-spacing:-0.2px;">
+                  Teameet
+                </td>
+              </tr>
+            </table>
             <h1 style="margin:14px 0 0 0;font-size:22px;line-height:30px;font-weight:700;color:#191f28;letter-spacing:-0.4px;">
               ${escapeHtml(copy.heading)}
             </h1>

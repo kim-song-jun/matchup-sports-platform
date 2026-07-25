@@ -31,7 +31,7 @@
 기존 `GET /me/invitations`(`myInvitations`)를 미러링한다. 신청자 본인이 보낸 가입 신청 목록.
 
 - 정렬: `requested` 우선 → `createdAt desc`
-- 범위: 전 상태(`requested` / `approved` / `rejected` / `withdrawn`), 최근 20건
+- 범위: 전 상태(`requested` / `approved` / `rejected` / `withdrawn` / `expired`). 승인 대기와 처리 완료를 **각각 최대 20건**씩 조회해 합친다(응답 최대 40건). 합쳐서 한 번 더 자르면 대기 건이 처리 완료 건에 밀려 잘릴 수 있어 의도적으로 그룹별 상한을 쓴다.
 - 응답 항목: `applicationId`, `teamId`, `status`, `message`, `createdAt`, `reviewedAt`, `team { teamId, name, sportId, logoUrl, introductionPreview }`
 
 ### 프론트 (`apps/v1_web`)
@@ -43,7 +43,8 @@
 `useV1CreateTeamJoinApplication` / `useV1WithdrawTeamJoinApplication`의 `onSuccess`가 `invalidateQueries` 프라미스를 `await`한다. React Query는 onSuccess가 resolve될 때까지 `isPending`을 유지하므로, 버튼이 "처리 중"에서 풀리는 시점엔 이미 새 상태다.
 
 **5. 승인 대기 카드** — `teams-page.tsx`
-`mode === 'pending'`일 때 팀 상세에 상시 카드를 노출한다: 신청일 + "관리자가 확인하고 있어요" + 승인 시 알림 안내. 신청 취소 CTA는 이 카드 안에 둔다.
+`mode === 'pending'`일 때 팀 상세에 상시 카드를 노출한다: 신청일 + "관리자가 확인하고 있어요" + 승인 시 알림 안내.
+신청 취소 CTA는 기존 위치(모바일 고정 하단 / 데스크톱 사이드바)에 그대로 두되 톤을 주황 → neutral로 낮춘다. 상태 전달은 카드가 맡으므로, 파괴적 액션인 취소가 최강 강조로 남아 권장 행동처럼 읽히지 않게 한다.
 
 **6. 문구 구체화** — `teams-client.tsx`
 - 신청 성공: `'가입 신청을 보냈어요. 관리자가 승인하면 알림으로 알려드려요.'`
@@ -51,7 +52,7 @@
 - 실패: `extractErrorMessage(err, ...)`로 서버 사유를 그대로 노출
 
 **7. `/my/join-applications` 화면 신설**
-`/my/invitations`와 동일 구조(`MyJoinApplicationsPageView`). 상태 뱃지(승인 대기 / 승인됨 / 거절됨 / 취소함), `requested` 항목엔 신청 취소 버튼. `my.view-model.ts` 메뉴에 '보낸 가입 신청' 항목 추가.
+`/my/invitations`와 동일 구조(`MyJoinApplicationsPageView`). 상태 뱃지(승인 대기 / 승인됨 / 거절됨 / 취소함 / 만료됨) + 상태별 다음 행동 안내, `requested` 항목엔 신청 취소 버튼. `my.view-model.ts` 메뉴에 '보낸 가입 신청' 항목 추가.
 
 ## 테스트
 

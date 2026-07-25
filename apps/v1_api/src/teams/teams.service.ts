@@ -43,8 +43,15 @@ import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
  */
 const TEAM_FULL_MESSAGE = '정원이 다 찬 팀이에요.';
 
-/** 신청자 본인이 조회하는 가입 신청 목록의 최대 건수 */
-const MY_JOIN_APPLICATIONS_LIMIT = 20;
+/**
+ * 신청자 본인 가입 신청 목록의 **그룹(승인 대기 / 처리 완료)별** 상한.
+ *
+ * 두 그룹을 각각 이 값까지 조회해 합치므로 응답 items는 최대 2배가 될 수 있다.
+ * 합쳐서 한 번 더 자르지 않는 이유: 승인 대기 건은 사용자가 "지금 기다리는 중"인
+ * 항목이라 처리 완료 건에 밀려 잘리면 안 된다. 팀당 신청은 1건으로 유니크하므로
+ * (`@@unique([teamId, applicantUserId])`) 실사용에서 상한에 닿는 경우는 드물다.
+ */
+const MY_JOIN_APPLICATIONS_GROUP_LIMIT = 20;
 
 type TeamWithRelations = V1Team & {
   sport: { id: string; name: string };
@@ -1469,13 +1476,13 @@ export class TeamsService {
       this.prisma.v1TeamJoinApplication.findMany({
         where: { applicantUserId: user.id, status: 'requested' },
         orderBy: [{ createdAt: 'desc' }],
-        take: MY_JOIN_APPLICATIONS_LIMIT,
+        take: MY_JOIN_APPLICATIONS_GROUP_LIMIT,
         include,
       }),
       this.prisma.v1TeamJoinApplication.findMany({
         where: { applicantUserId: user.id, status: { not: 'requested' } },
         orderBy: [{ updatedAt: 'desc' }],
-        take: MY_JOIN_APPLICATIONS_LIMIT,
+        take: MY_JOIN_APPLICATIONS_GROUP_LIMIT,
         include,
       }),
     ]);

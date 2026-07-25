@@ -14,11 +14,31 @@ const PROOF_TTL_MS = 10 * 60 * 1000;
 export type PhoneProofPurpose = 'signup' | 'password_reset';
 
 function proofSecret(): string {
-  return process.env.V1_SESSION_SECRET ?? process.env.V1_JWT_SECRET ?? process.env.JWT_SECRET ?? '';
+  return (
+    process.env.V1_SESSION_SECRET ??
+    process.env.V1_JWT_SECRET ??
+    process.env.JWT_SECRET ??
+    ''
+  ).trim();
 }
 
-function sign(payload: string): string {
-  return createHmac('sha256', proofSecret()).update(payload).digest('base64url');
+/**
+ * 시크릿이 비어 있으면 HMAC 키가 ''(빈 문자열)이라 서명이 공개 상수가 된다 — 누구나 토큰을
+ * 위조해 휴대폰 인증을 통째로 우회할 수 있다(가입·프로필 번호 변경·대회 신청까지 이 증명에 걸려 있다).
+ * 설정 누락을 조용한 무방비 상태로 두지 않도록 발급은 예외로 즉시 드러내고, 검증은 무조건 거부한다.
+ */
+function assertProofSecret(): string {
+  const secret = proofSecret();
+  if (!secret) {
+    throw new Error(
+      'Phone proof token secret is not configured (V1_SESSION_SECRET / V1_JWT_SECRET / JWT_SECRET)',
+    );
+  }
+  return secret;
+}
+
+function sign(payload: string, secret: string): string {
+  return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
 function buildPayload(phone: string, purpose: PhoneProofPurpose, expMs: number): string {
@@ -30,8 +50,9 @@ export function issuePhoneProofToken(
   purpose: PhoneProofPurpose = 'signup',
   nowMs: number = Date.now(),
 ): string {
+  const secret = assertProofSecret();
   const payload = buildPayload(phone, purpose, nowMs + PROOF_TTL_MS);
-  return `${Buffer.from(payload).toString('base64url')}.${sign(payload)}`;
+  return `${Buffer.from(payload).toString('base64url')}.${sign(payload, secret)}`;
 }
 
 export function verifyPhoneProofToken(
@@ -40,6 +61,10 @@ export function verifyPhoneProofToken(
   purpose: PhoneProofPurpose = 'signup',
   nowMs: number = Date.now(),
 ): boolean {
+  // 시크릿 없이 검증하면 공개 상수 키로 서명을 대조하게 되어 위조 토큰이 통과한다 — 무조건 거부.
+  const secret = proofSecret();
+  if (!secret) return false;
+
   const parts = token.split('.');
   if (parts.length !== 2) return false;
   const [payloadB64, signature] = parts;
@@ -57,7 +82,7 @@ export function verifyPhoneProofToken(
   // 필드별 비교는 용도 검사를 빠뜨리기 쉽고, 빠진 순간 다른 용도의 토큰이 통과한다.
   if (payload !== buildPayload(phone, purpose, exp)) return false;
 
-  const expected = Buffer.from(sign(payload));
+  const expected = Buffer.from(sign(payload, secret));
   const actual = Buffer.from(signature);
   if (expected.length !== actual.length) return false;
   return timingSafeEqual(expected, actual);

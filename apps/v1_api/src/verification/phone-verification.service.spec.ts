@@ -1,4 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHmac } from 'crypto';
+import { verifyPhoneProofToken } from './phone-proof-token';
 import { PhoneVerificationService } from './phone-verification.service';
 import { SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
@@ -152,8 +154,43 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
   });
 
   it('issueProof returns a token bound to the phone', () => {
-    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true), eventLogStub());
-    expect(typeof svc.issueProof(PHONE)).toBe('string');
+    const previous = process.env.V1_SESSION_SECRET;
+    process.env.V1_SESSION_SECRET = 'test-proof-secret';
+    try {
+      const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true), eventLogStub());
+      expect(typeof svc.issueProof(PHONE)).toBe('string');
+    } finally {
+      if (previous === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = previous;
+    }
+  });
+
+  it('증명 시크릿이 없으면 발급이 예외로 드러나고 검증은 무조건 거부한다 (위조 방지 fail-closed)', () => {
+    const saved = {
+      session: process.env.V1_SESSION_SECRET,
+      v1Jwt: process.env.V1_JWT_SECRET,
+      jwt: process.env.JWT_SECRET,
+    };
+    delete process.env.V1_SESSION_SECRET;
+    delete process.env.V1_JWT_SECRET;
+    delete process.env.JWT_SECRET;
+    try {
+      const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true), eventLogStub());
+      expect(() => svc.issueProof(PHONE)).toThrow(/secret is not configured/i);
+      // 빈 키로 서명한 위조 토큰을 만들어도 검증은 통과하지 못한다.
+      const forgedPayload = `${PHONE}:${Date.now() + 60_000}`;
+      const forged = `${Buffer.from(forgedPayload).toString('base64url')}.${createHmac('sha256', '')
+        .update(forgedPayload)
+        .digest('base64url')}`;
+      expect(verifyPhoneProofToken(forged, PHONE)).toBe(false);
+    } finally {
+      if (saved.session === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = saved.session;
+      if (saved.v1Jwt === undefined) delete process.env.V1_JWT_SECRET;
+      else process.env.V1_JWT_SECRET = saved.v1Jwt;
+      if (saved.jwt === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = saved.jwt;
+    }
   });
 
   // 실패 로깅 훅이 인증 본흐름을 막지 않는지 — 스텁이 아니라 실제 SmsEventLogService 에

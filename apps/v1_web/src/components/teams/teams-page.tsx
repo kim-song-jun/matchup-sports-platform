@@ -304,7 +304,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
   const cta = model.ctaLabel ?? (mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 신청');
-  const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
+  // 승인 대기 중의 CTA는 "신청 취소"(파괴적 액션)다. 상태는 안내 카드가 이미 설명하므로
+  // 버튼까지 최강 강조로 두면 취소가 권장 행동처럼 읽힌다 → neutral로 낮춘다.
+  const ctaTone = mode === 'pending' || mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
   const memberCapacity = formatMemberCapacity(team);
   const capacity = formatCapacity(team);
   const [heroMessage, setHeroMessage] = useState('');

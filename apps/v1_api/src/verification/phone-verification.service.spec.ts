@@ -1,6 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { PhoneVerificationService } from './phone-verification.service';
+import { SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
+
+const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
+const eventLogStub = () => smsEventLog as unknown as SmsEventLogService;
 
 type ChallengeRow = { phone: string; codeHash: string; expiresAt: Date; attemptCount: number; verifiedAt: Date | null };
 
@@ -46,7 +50,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
   it('issueChallenge upserts a codeHash challenge and dispatches a 6-digit code via SMS', async () => {
     const prisma = prismaMock();
     const dispatcher = dispatcherMock(true);
-    const svc = new PhoneVerificationService(prisma, dispatcher);
+    const svc = new PhoneVerificationService(prisma, dispatcher, eventLogStub());
 
     const res = await svc.issueChallenge(PHONE);
 
@@ -59,14 +63,14 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
   });
 
   it('does not expose devCode when dispatcher.devEcho is false', async () => {
-    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(false));
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(false), eventLogStub());
     const res = await svc.issueChallenge(PHONE);
     expect(res.devCode).toBeUndefined();
   });
 
   it('verifyCode returns true and sets verifiedAt on a correct code', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(PHONE);
 
     expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
@@ -75,7 +79,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
 
   it('verifyCode rejects a wrong code with CODE_MISMATCH and increments attemptCount', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(PHONE);
     const wrong = devCode === '000000' ? '111111' : '000000';
 
@@ -85,14 +89,14 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
   });
 
   it('verifyCode throws NO_PENDING when there is no challenge', async () => {
-    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true), eventLogStub());
     await expect(svc.verifyCode(PHONE, '123456')).rejects.toBeInstanceOf(BadRequestException);
     await expect(svc.verifyCode(PHONE, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
   });
 
   it('verifyCode throws NO_PENDING when the challenge is expired', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     await svc.issueChallenge(PHONE);
     (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.expiresAt = new Date(Date.now() - 1000);
     await expect(svc.verifyCode(PHONE, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
@@ -100,7 +104,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
 
   it('verifyCode throws TOO_MANY_ATTEMPTS on a wrong code once attempts hit the cap', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(PHONE);
     const wrong = devCode === '000000' ? '111111' : '000000';
     (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount = 5;
@@ -109,7 +113,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
 
   it('verifyCode still accepts the correct code even at the attempt cap (cap은 불일치에만 적용, 멱등)', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(PHONE);
     (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount = 5;
     expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
@@ -117,7 +121,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
 
   it('verifyCode stays idempotent for the correct code but rejects a wrong code even after verification', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(PHONE);
     await svc.verifyCode(PHONE, devCode!); // 최초 정상 인증
 
@@ -131,7 +135,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
 
   it('issueChallenge enforces a resend cooldown for the same phone (paid-SMS abuse guard)', async () => {
     const prisma = prismaMock();
-    const svc = new PhoneVerificationService(prisma, dispatcherMock(true));
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     await svc.issueChallenge(PHONE);
     await expect(svc.issueChallenge(PHONE)).rejects.toMatchObject({ response: { code: 'VERIFICATION_RESEND_COOLDOWN' } });
   });
@@ -140,7 +144,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     const prisma = prismaMock();
     const dispatcher = dispatcherMock(true);
     (dispatcher.send as unknown as jest.Mock).mockRejectedValueOnce(new Error('SMS_SEND_FAILED'));
-    const svc = new PhoneVerificationService(prisma, dispatcher);
+    const svc = new PhoneVerificationService(prisma, dispatcher, eventLogStub());
 
     await expect(svc.issueChallenge(PHONE)).rejects.toThrow();
     // 챌린지가 삭제되어 다음 요청이 쿨다운에 걸리지 않는다.
@@ -148,12 +152,30 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
   });
 
   it('issueProof returns a token bound to the phone', () => {
-    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true), eventLogStub());
     expect(typeof svc.issueProof(PHONE)).toBe('string');
   });
 
+  // 실패 로깅 훅이 인증 본흐름을 막지 않는지 — 스텁이 아니라 실제 SmsEventLogService 에
+  // 죽은 prisma 를 물려, 로그 insert 가 터져도 원래 도메인 에러가 그대로 나오는지 본다.
+  it('로그 기록 DB가 죽어도 verifyCode 는 원래 CODE_MISMATCH 를 그대로 던진다', async () => {
+    const failingEventLog = new SmsEventLogService({
+      v1SmsEventLog: { create: jest.fn().mockRejectedValue(new Error('DB is down')) },
+    } as never);
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), failingEventLog);
+    const { devCode } = await svc.issueChallenge(PHONE);
+    const wrong = devCode === '000000' ? '111111' : '000000';
+
+    await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_CODE_MISMATCH' },
+    });
+    // 로깅 실패가 시도 횟수 증가 같은 본흐름 부수효과까지 되돌리지는 않는다.
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount).toBe(1);
+  });
+
   it('enabled is fail-closed: 기본 true, 명시적 opt-out 일 때만 false', () => {
-    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true));
+    const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(true), eventLogStub());
     const OLD = process.env.V1_PHONE_VERIFICATION_DISABLED;
     delete process.env.V1_PHONE_VERIFICATION_DISABLED;
     expect(svc.enabled).toBe(true);

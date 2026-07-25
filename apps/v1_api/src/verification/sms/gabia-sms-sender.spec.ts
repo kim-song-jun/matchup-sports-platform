@@ -1,4 +1,8 @@
+import { SmsEventLogService } from '../sms-event-log.service';
 import { GabiaSmsSender } from './gabia-sms-sender';
+
+const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
+const eventLogStub = () => smsEventLog as unknown as SmsEventLogService;
 
 describe('GabiaSmsSender', () => {
   const OLD_ENV = process.env;
@@ -49,10 +53,10 @@ describe('GabiaSmsSender', () => {
 
   it('3개 시크릿이 모두 있어야 enabled=true', () => {
     setEnv();
-    expect(new GabiaSmsSender().enabled).toBe(true);
+    expect(new GabiaSmsSender(eventLogStub()).enabled).toBe(true);
 
     delete process.env.GABIA_API_KEY;
-    expect(new GabiaSmsSender().enabled).toBe(false);
+    expect(new GabiaSmsSender(eventLogStub()).enabled).toBe(false);
   });
 
   it('첫 send는 토큰 발급 후 발송하며 각 요청 형식을 정확히 맞춘다', async () => {
@@ -64,7 +68,7 @@ describe('GabiaSmsSender', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await expect(
-      new GabiaSmsSender().send('01033334444', '[Teameet] 인증번호 123456'),
+      new GabiaSmsSender(eventLogStub()).send('01033334444', '[Teameet] 인증번호 123456'),
     ).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -101,10 +105,50 @@ describe('GabiaSmsSender', () => {
       );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await expect(new GabiaSmsSender().send('01033334444', 't')).rejects.toThrow(
+    await expect(new GabiaSmsSender(eventLogStub()).send('01033334444', 't')).rejects.toThrow(
       'Gabia send failed: false',
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('발송 실패를 SmsEventLog 에 정확히 1건 기록한다 (토큰 재시도 경로에서도 중복 없음)', async () => {
+    setEnv();
+    smsEventLog.record.mockClear();
+    // 1) 토큰 발급 → 2) token_verification_failed → 3) 토큰 재발급 → 4) 최종 실패
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(sendResponse({ code: 'token_verification_failed' }))
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(sendResponse({ code: false, message: '잘못된 번호' })) as unknown as typeof fetch;
+
+    await expect(new GabiaSmsSender(eventLogStub()).send('01033334444', 't')).rejects.toThrow(
+      'Gabia send failed: false',
+    );
+
+    expect(smsEventLog.record).toHaveBeenCalledTimes(1);
+    const recorded = smsEventLog.record.mock.calls[0][0];
+    expect(recorded).toMatchObject({ eventType: 'SMS_SEND_FAILED', provider: 'gabia', resultCode: 'false' });
+    // record() 는 원본 번호를 받지만 저장 시 끝 4자리로 마스킹된다(SmsEventLogService 책임).
+    expect(recorded.phone).toBe('01033334444');
+  });
+
+  it('로그 기록 DB가 죽어도 원래 발송 에러를 그대로 던진다', async () => {
+    setEnv();
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(sendResponse({ code: false, message: 'x' })) as unknown as typeof fetch;
+
+    // 스텁이 아니라 실제 SmsEventLogService 에 죽은 prisma 를 물려, 로깅 실패가
+    // 발송 실패 에러를 가리지 않는지(계약이 실제로 성립하는지) 확인한다.
+    const realLog = new SmsEventLogService({
+      v1SmsEventLog: { create: jest.fn().mockRejectedValue(new Error('DB is down')) },
+    } as never);
+
+    await expect(new GabiaSmsSender(realLog).send('01033334444', 't')).rejects.toThrow(
+      'Gabia send failed: false',
+    );
   });
 
   it('토큰 TTL 내 연속 2회 send는 토큰 발급을 1회만 호출한다', async () => {
@@ -116,7 +160,7 @@ describe('GabiaSmsSender', () => {
       .mockResolvedValueOnce(sendResponse({ code: '200' }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const sender = new GabiaSmsSender();
+    const sender = new GabiaSmsSender(eventLogStub());
     await sender.send('01033334444', 't1');
     await sender.send('01033334444', 't2');
 
@@ -142,7 +186,7 @@ describe('GabiaSmsSender', () => {
         .mockResolvedValueOnce(sendResponse({ code: '200' }));
       global.fetch = fetchMock as unknown as typeof fetch;
 
-      const sender = new GabiaSmsSender();
+      const sender = new GabiaSmsSender(eventLogStub());
       await sender.send('01033334444', 't1'); // expiresAt = 1_000_000 + 3_600_000 - 60_000 = 4_540_000
       now = 4_540_001; // 만료 경계(skew 반영)를 막 지난 시점
       await sender.send('01033334444', 't2'); // 캐시 만료 → 재발급
@@ -167,7 +211,7 @@ describe('GabiaSmsSender', () => {
       .mockResolvedValueOnce(sendResponse({ code: '200' }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await expect(new GabiaSmsSender().send('01033334444', 't')).resolves.toBeUndefined();
+    await expect(new GabiaSmsSender(eventLogStub()).send('01033334444', 't')).resolves.toBeUndefined();
 
     const tokenCalls = fetchMock.mock.calls.filter(
       ([url]) => url === 'https://sms.gabia.com/oauth/token',
@@ -192,7 +236,7 @@ describe('GabiaSmsSender', () => {
       );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await expect(new GabiaSmsSender().send('01033334444', 't')).rejects.toThrow(
+    await expect(new GabiaSmsSender(eventLogStub()).send('01033334444', 't')).rejects.toThrow(
       'Gabia send failed: false',
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);

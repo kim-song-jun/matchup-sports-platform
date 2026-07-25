@@ -1318,6 +1318,26 @@ model V1WebPushFailureLog {
   @@map("v1_web_push_failure_logs")
 }
 
+/// SMS 발송 / 휴대폰·이메일 인증 실패 이벤트 로그(V1WebPushFailureLog 미러).
+/// 실패·이슈만 기록하고 성공 이벤트는 남기지 않는다 — 운영자가 "지금 무엇이 깨졌나"만
+/// 보면 되고, 성공까지 적재하면 유료 SMS 트래픽 전량이 그대로 테이블이 되기 때문이다.
+/// 가입 전(pre-account) 인증에도 쓰이므로 userId 관계가 없고, 식별자는 번호 끝 4자리
+/// (phoneMasked)만 저장해 원본 번호가 어드민 표면에 도달하지 않게 한다.
+model V1SmsEventLog {
+  id             String    @id @default(uuid())
+  eventType      String    @map("event_type")
+  resultCode     String?   @map("result_code")
+  phoneMasked    String    @map("phone_masked")
+  provider       String?
+  detail         String?
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([acknowledgedAt])
+  @@map("v1_sms_event_logs")
+}
+
 model V1NotificationPreference {
   id               String   @id @default(uuid())
   userId           String   @unique @map("user_id")

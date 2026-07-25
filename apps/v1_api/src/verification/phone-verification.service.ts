@@ -3,6 +3,7 @@ import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
 import { issuePhoneProofToken } from './phone-proof-token';
+import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
@@ -20,6 +21,7 @@ export class PhoneVerificationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: VerificationDispatcherService,
+    private readonly smsEventLog: SmsEventLogService,
   ) {}
 
   /**
@@ -74,6 +76,11 @@ export class PhoneVerificationService {
       // 멱등 성공해야 하므로, cap 을 코드 대조보다 앞에 두면 verified 이후 오입력이 쌓였을 때
       // 정상 재제출까지 막히는 문제가 생긴다.
       if (challenge.attemptCount >= MAX_ATTEMPTS) {
+        await this.smsEventLog.record({
+          eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
+          phone,
+          detail: `pre-account 인증 시도 ${challenge.attemptCount}회 초과`,
+        });
         throw new BadRequestException({
           code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
           message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
@@ -82,6 +89,11 @@ export class PhoneVerificationService {
       await this.prisma.v1PhoneVerificationChallenge.update({
         where: { phone },
         data: { attemptCount: { increment: 1 } },
+      });
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.CODE_MISMATCH,
+        phone,
+        detail: `pre-account 인증 시도 ${challenge.attemptCount + 1}/${MAX_ATTEMPTS}`,
       });
       throw new BadRequestException({
         code: 'VERIFICATION_CODE_MISMATCH',
@@ -113,6 +125,11 @@ export class PhoneVerificationService {
     const elapsed = Date.now() - (existing.expiresAt.getTime() - CODE_TTL_MS);
     if (elapsed < RESEND_COOLDOWN_MS) {
       const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.RESEND_COOLDOWN,
+        phone,
+        detail: `pre-account 재발송 쿨다운 ${retryAfter}초 남음`,
+      });
       throw new BadRequestException({
         code: 'VERIFICATION_RESEND_COOLDOWN',
         message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,

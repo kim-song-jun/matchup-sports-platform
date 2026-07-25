@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useV1AdminOverview } from '@/hooks/use-v1-api';
+import { useV1AdminOpsSummary, useV1AdminOverview } from '@/hooks/use-v1-api';
 import {
   AdminKpiCard,
   AdminKpiGridSkeleton,
@@ -37,16 +37,19 @@ interface WarningCardProps {
   value: number;
   tone: 'warning' | 'danger';
   href: string;
+  /** 집계 구간처럼 값만으론 알 수 없는 단서(예: "최근 5분"). aria-label 에도 함께 실린다. */
+  sub?: string;
 }
 
-function WarningCard({ label, value, tone, href }: WarningCardProps) {
+function WarningCard({ label, value, tone, href, sub }: WarningCardProps) {
   return (
     <AdminKpiCard
       label={label}
       value={value}
+      sub={sub}
       tone={value > 0 ? tone : 'neutral'}
       href={href}
-      ariaLabel={`${label}: ${value}건`}
+      ariaLabel={sub ? `${label}(${sub}): ${value}건` : `${label}: ${value}건`}
     />
   );
 }
@@ -54,13 +57,24 @@ function WarningCard({ label, value, tone, href }: WarningCardProps) {
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function AdminOverviewPage() {
   const { data: overview, isPending, isError, refetch } = useV1AdminOverview();
+  const { data: opsSummary, isPending: opsPending, isError: opsError } = useV1AdminOpsSummary();
 
   // Warning items require attention
   const warningSuspendedBlocked =
     (overview?.users.suspended ?? 0) + (overview?.users.blocked ?? 0);
   const warningWithdrawalPending = overview?.users.withdrawalPending ?? 0;
   const warningCancelledMatches = overview?.matches.cancelled ?? 0;
-  const totalWarnings = warningSuspendedBlocked + warningWithdrawalPending + warningCancelledMatches;
+  // 운영 실패 KPI는 별도 쿼리라 아직 안 왔거나 실패했을 수 있다. 그때 0으로 접어 넣으면
+  // "조치 필요 없음"(초록 상태)을 근거 없이 주장하게 되므로, 값이 확정된 경우에만
+  // 카드를 띄우고 합계에도 반영한다 — 미확정일 땐 기존 4개 경고만 그대로 보여준다.
+  const opsCountsReady = !opsPending && !opsError;
+  const warningPushFailures = opsSummary?.pushFailures5m ?? 0;
+  const warningSmsFailures = opsSummary?.smsFailures5m ?? 0;
+  const totalWarnings =
+    warningSuspendedBlocked +
+    warningWithdrawalPending +
+    warningCancelledMatches +
+    (opsCountsReady ? warningPushFailures + warningSmsFailures : 0);
 
   return (
     <>
@@ -156,6 +170,24 @@ export default function AdminOverviewPage() {
                 tone="warning"
                 href="/admin/matches?status=cancelled"
               />
+              {opsCountsReady && (
+                <>
+                  <WarningCard
+                    label="웹 푸시 실패"
+                    value={warningPushFailures}
+                    tone="warning"
+                    href="/admin/ops/push-failures"
+                    sub="최근 5분"
+                  />
+                  <WarningCard
+                    label="SMS · 인증 실패"
+                    value={warningSmsFailures}
+                    tone="warning"
+                    href="/admin/ops/sms-failures"
+                    sub="최근 5분"
+                  />
+                </>
+              )}
             </div>
           )}
         </section>

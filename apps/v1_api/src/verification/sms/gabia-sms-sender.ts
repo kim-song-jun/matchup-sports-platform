@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { SMS_EVENT_TYPE, SmsEventLogService, redactPhoneLike } from '../sms-event-log.service';
 import type { SmsSender } from './sms-sender';
 
+/** 실패 기록의 provider 컬럼에 남길 식별자 — 어드민에서 어느 provider 장애인지 구분한다. */
+const PROVIDER = 'gabia';
 const GABIA_TOKEN_URL = 'https://sms.gabia.com/oauth/token';
 const GABIA_SEND_URL = 'https://sms.gabia.com/api/send/sms';
 // 유료 SMS 발송 경로 — 응답이 지연되면 fetch 가 무기한 매달려 워커/커넥션이 고갈된다.
@@ -53,6 +56,8 @@ interface TokenCache {
 export class GabiaSmsSender implements SmsSender {
   private readonly logger = new Logger(GabiaSmsSender.name);
   private tokenCache: TokenCache | null = null;
+
+  constructor(private readonly smsEventLog: SmsEventLogService) {}
 
   private get smsId(): string {
     return process.env.GABIA_SMS_ID ?? '';
@@ -159,14 +164,35 @@ export class GabiaSmsSender implements SmsSender {
     // issueToken()·솔라피와 동일한 'Gabia send failed: <status>' 형태로 표면화한다
     // (그대로 res.json() 에 넘기면 통제되지 않은 SyntaxError 가 전파된다).
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
+      // provider 응답 본문이 수신자 번호를 에코할 수 있어 로그로도 새지 않게 가린다.
+      const body = redactPhoneLike(await res.text().catch(() => ''));
       this.logger.warn(`gabia send failed(HTTP): ${res.status} ${body.slice(0, 200)}`);
       throw new Error(`Gabia send failed: ${res.status}`);
     }
     return (await res.json()) as GabiaSendResponse;
   }
 
+  /**
+   * 실패 기록은 send() 한 곳에서만 남긴다 — 실제 실패 지점(토큰 발급/타임아웃/HTTP/앱코드)이
+   * 전화번호를 모르는 내부 헬퍼에 흩어져 있고, 토큰 만료 재시도 경로 때문에 지점마다 기록하면
+   * 한 번의 발송 실패가 여러 건으로 중복 적재된다.
+   */
   async send(to: string, text: string): Promise<void> {
+    try {
+      await this.sendOnce(to, text);
+    } catch (err: unknown) {
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.SEND_FAILED,
+        resultCode: classifyGabiaFailure(err),
+        phone: to,
+        provider: PROVIDER,
+        detail: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
+  }
+
+  private async sendOnce(to: string, text: string): Promise<void> {
     const token = await this.getToken();
     let result = await this.postSend(token, to, text);
 
@@ -179,9 +205,26 @@ export class GabiaSmsSender implements SmsSender {
     if (String(result.code) !== '200') {
       const failure = result as GabiaSendFailureResponse;
       this.logger.warn(
-        `gabia send failed: code=${String(failure.code)} message=${(failure.message ?? '').slice(0, 200)}`,
+        `gabia send failed: code=${String(failure.code)} message=${redactPhoneLike(failure.message ?? '').slice(0, 200)}`,
       );
       throw new Error(`Gabia send failed: ${String(failure.code)}`);
     }
   }
+}
+
+/**
+ * 실패 원인을 어드민 표에 뜨는 짧은 resultCode 로 압축한다. 여기서 파싱하는 메시지는
+ * 모두 이 클래스가 직접 만든 문자열(`Gabia send failed: X` / `Gabia token issue failed: X`
+ * / `Gabia <label> timed out after Yms`)이라 형식이 이 파일 안에서 고정된다.
+ * 전문은 detail 컬럼에 그대로 남으므로, 분류에 실패해도 정보가 사라지지 않는다.
+ */
+export function classifyGabiaFailure(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (/timed out/i.test(message)) return 'TIMEOUT';
+  if (/token issue failed: (\S+)/.test(message)) {
+    return `TOKEN_${/token issue failed: (\S+)/.exec(message)![1]}`;
+  }
+  const sendFailure = /send failed: (\S+)/.exec(message);
+  if (sendFailure) return sendFailure[1];
+  return 'ERROR';
 }

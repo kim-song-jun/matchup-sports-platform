@@ -202,7 +202,12 @@ import type {
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
 type QueryOptions = { enabled?: boolean };
 
-export function useV1AuthMe(options?: { enabled?: boolean; retry?: boolean | number }) {
+export function useV1AuthMe(options?: {
+  enabled?: boolean;
+  // 함수형 retry를 허용한다 — 세션 확인은 401이면 즉시 포기하고 5xx는 재시도해야 해서
+  // boolean 하나로는 두 정책을 같이 표현할 수 없다(retryUnlessUnauthenticated 참고).
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+}) {
   return useQuery({
     queryKey: v1Keys.authMe(),
     queryFn: () => v1Get<V1AuthMe>('/auth/me'),

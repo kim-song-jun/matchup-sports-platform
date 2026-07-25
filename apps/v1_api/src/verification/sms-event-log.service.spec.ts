@@ -56,6 +56,14 @@ describe('SmsEventLogService', () => {
     expect(detail).toContain('***5432');
   });
 
+  it('구분자 표기가 달라도 가린다 (괄호·점·국가코드)', () => {
+    // 매치는 첫 숫자부터라 여는 괄호는 그대로 남는다 — 번호 자체가 가려지면 목적은 달성.
+    expect(redactPhoneLike('to=(010)1234-5678')).toBe('to=(***5678');
+    expect(redactPhoneLike('to=010.1234.5678')).toBe('to=***5678');
+    expect(redactPhoneLike('to=+82-10-1234-5678')).toBe('to=+***5678');
+    expect(redactPhoneLike('to=821012345678')).toBe('to=***5678');
+  });
+
   it('전화번호가 아닌 진단용 숫자는 그대로 남긴다 (detail 의 쓸모 유지)', () => {
     expect(redactPhoneLike('timed out after 8000ms')).toBe('timed out after 8000ms');
     expect(redactPhoneLike('Bad Request: 400')).toBe('Bad Request: 400');

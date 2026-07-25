@@ -60,11 +60,21 @@ export function maskPhoneTail(phone: string): string {
  *
  * 9자리 기준: 국내/국제 번호는 10자리 이상이라 걸리고, 'YYYY-MM-DD'(8자리)나
  * '8000ms' 같은 진단값은 그대로 남아 detail 의 쓸모가 유지된다.
+ *
+ * 구분자는 넓게(공백·하이픈·점·괄호·+) 잡는다 — '(010)1234-5678', '010.1234.5678',
+ * '+82-10-1234-5678' 처럼 표기가 조금만 달라도 못 잡으면 마스킹이 무의미해지기 때문이다.
+ * 그 대가로 '2026-07-25 (400)' 처럼 서로 다른 숫자가 이어져 9자리를 넘으면 함께 가려질
+ * 수 있는데, 진단 편의보다 번호 유출 차단을 우선한다.
  */
-const PHONE_LIKE_RUN = /\d(?:[\d\s-]*\d){8,}/g;
+const PHONE_LIKE_RUN = /\d[\d\s().+-]*\d/g;
+const PHONE_LIKE_MIN_DIGITS = 9;
 
 export function redactPhoneLike(text: string): string {
-  return text.replace(PHONE_LIKE_RUN, (match) => `***${match.replace(/\D/g, '').slice(-4)}`);
+  return text.replace(PHONE_LIKE_RUN, (match) => {
+    const digits = match.replace(/\D/g, '');
+    if (digits.length < PHONE_LIKE_MIN_DIGITS) return match;
+    return `***${digits.slice(-4)}`;
+  });
 }
 
 /**

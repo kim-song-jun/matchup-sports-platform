@@ -341,6 +341,9 @@ describe('BracketTab — 대진표 전체 공개', () => {
     expect(screen.queryByRole('button', { name: '지금 전체 공개' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('공개 예약 시각')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '공개 취소' })).toBeInTheDocument();
+    // 공개 근거가 예약 시각이므로 그 시각을 보여줘야 한다. fallback 이 없으면 "—에 공개됨".
+    expect(screen.getByText(/에 공개됨/)).toBeInTheDocument();
+    expect(screen.queryByText(/—에 공개됨/)).not.toBeInTheDocument();
   });
 
   it('공개된 상태에서 공개 취소를 확인하면 unpublish mutate 한다', async () => {

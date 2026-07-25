@@ -1726,7 +1726,9 @@ export function BracketTab({
             <h3 className="text-[15px] font-bold text-gray-900 mb-1">대진표 전체 공개</h3>
             <p className="text-xs text-gray-500">
               {isBracketPublished
-                ? `${formatDate(bracketPublishedAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
+                ? // 예약 시각이 지나 공개된 경우 bracketPublishedAt 은 null 이고 예약 시각이
+                  // 공개 근거다. fallback 이 없으면 "—에 공개됨"으로 표시된다.
+                  `${formatDate(bracketPublishedAt ?? bracketPublishScheduledAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
                 : hasPendingSchedule
                 ? `${formatDate(bracketPublishScheduledAt ?? null)}에 자동 공개돼요. 그 전까지는 계속 수정할 수 있어요.`
                 : '아직 비공개예요. 공개 전까지 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요.'}
@@ -3821,9 +3823,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* ── Tabs (f11: min-h-[44px], no shadow — active = border-b-2 blue-500) ──
+      {/* ── Tabs (f11: min-h-[44px], active = border-b-2 blue-500) ──
           sticky: 대회 정보·홍보 카드가 위를 길게 차지해 탭이 화면 밖으로 밀려나면
-          운영자가 대진 관리 진입점을 못 찾는다. 스크롤해도 탭이 따라오게 고정한다. */}
+          운영자가 대진 관리 진입점을 못 찾는다. 스크롤해도 탭이 따라오게 고정한다.
+          고정된 탭이 아래 내용 위로 겹쳐 지나가므로 경계를 위한 hairline 그림자만 둔다. */}
       <div
         role="tablist"
         aria-label="대회 운영 탭"

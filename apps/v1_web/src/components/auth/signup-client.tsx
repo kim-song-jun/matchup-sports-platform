@@ -590,6 +590,7 @@ export function SignupClient() {
                   mode="public"
                   phone={phoneDigits}
                   onVerified={(token) => setPhoneProofToken(token ?? null)}
+                  surface="inset"
                 />
               ) : null}
 

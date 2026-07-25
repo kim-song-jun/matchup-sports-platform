@@ -3,6 +3,8 @@ import { Prisma, V1AuthProvider } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
+import { verifyPhoneProofToken } from '../verification/phone-proof-token';
+import { isPhoneVerificationEnforced } from '../verification/phone-verification.service';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRegionsDto,
@@ -174,6 +176,20 @@ export class ProfileService {
 
     const emailChanged = email !== (before?.email ?? null);
     const phoneChanged = phone !== (before?.phone ?? null);
+
+    // 번호 변경은 인증 상태를 초기화한다(아래 phoneVerifiedAt: null). 증명 없이 허용하면
+    // "가입 때 인증 → 프로필에서 번호만 교체"로 인증을 우회해 미인증 번호를 붙일 수 있으므로,
+    // register 와 동일하게 proofToken 을 요구한다(fail-closed).
+    const phoneProofRequired = phoneChanged && Boolean(phone) && isPhoneVerificationEnforced();
+    if (phoneProofRequired) {
+      if (!dto.phoneProofToken || !verifyPhoneProofToken(dto.phoneProofToken, phone as string)) {
+        throw new BadRequestException({
+          code: 'PHONE_NOT_VERIFIED',
+          message: '휴대폰 본인인증을 먼저 완료해 주세요.',
+        });
+      }
+    }
+
     const profile = await this.prisma.$transaction(async (tx) => {
       await tx.v1User.update({
         where: { id: user.id },
@@ -181,7 +197,9 @@ export class ProfileService {
           email,
           phone,
           ...(emailChanged ? { emailVerifiedAt: null } : {}),
-          ...(phoneChanged ? { phoneVerifiedAt: null } : {}),
+          // 증명을 받고 바꾼 번호는 방금 인증된 번호다 — null 로 떨어뜨리면 인증을 막 끝낸
+          // 사용자에게 "인증이 필요해요" 배너가 다시 뜬다. 강제가 꺼진 환경에서만 미인증으로 둔다.
+          ...(phoneChanged ? { phoneVerifiedAt: phoneProofRequired ? new Date() : null } : {}),
         },
       });
 

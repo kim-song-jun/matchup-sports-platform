@@ -216,3 +216,62 @@ describe('PhoneVerificationCard', () => {
     expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeInTheDocument();
   });
 });
+
+describe('PhoneVerificationCard 실패 안내 배치·톤', () => {
+  async function toSentPhase(verifyMock: unknown, issueMock?: unknown) {
+    vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue(
+      (issueMock ?? mutation({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() })) as never,
+    );
+    vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue(verifyMock as never);
+    wrap(<PhoneVerificationCard mode="public" phone="01012345678" onVerified={vi.fn()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    });
+    await flush();
+  }
+
+  it('코드가 틀리면 에러가 입력칸 바로 다음에 붙고 입력이 오류 상태로 연결된다', async () => {
+    await toSentPhase(
+      rejectingMutation({ code: 'VERIFICATION_CODE_MISMATCH', message: '인증번호가 올바르지 않아요.' }),
+    );
+
+    fireEvent.change(screen.getByLabelText('인증번호 6자리'), { target: { value: '123456' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    });
+    await flush();
+
+    const input = screen.getByLabelText('인증번호 6자리');
+    const field = input.closest('label');
+    // 배너가 카드 맨 아래로 밀려나면 이 단언이 깨진다 — "입력칸 바로 아래"가 계약이다.
+    expect(field?.nextElementSibling?.id).toBe('phone-verification-error');
+    expect(screen.getByRole('alert')).toHaveTextContent('인증번호가 올바르지 않아요.');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain('phone-verification-error');
+  });
+
+  it('재발송 쿨다운은 오류가 아니라 안내(info)로 알리고 입력을 오류 상태로 만들지 않는다', async () => {
+    const issue = {
+      mutateAsync: vi
+        .fn()
+        .mockResolvedValueOnce({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() })
+        .mockRejectedValueOnce({
+          code: 'VERIFICATION_RESEND_COOLDOWN',
+          message: '잠시 후 다시 시도해 주세요. (7초 뒤에 다시 받을 수 있어요)',
+        }),
+      isPending: false,
+    };
+    await toSentPhase(mutation({ verified: false }), issue);
+
+    // 쿨다운이 끝나야 "다시 받기"가 활성화된다.
+    await advance(30_000);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /다시 받기/ }));
+    });
+    await flush();
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('잠시 후 다시 시도해 주세요.');
+    expect(screen.getByLabelText('인증번호 6자리')).toHaveAttribute('aria-invalid', 'false');
+  });
+});

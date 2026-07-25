@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, KeyRound, MessageSquare, RefreshCw } from 'lucide-react';
-import { AlertBanner, Card } from '@/components/v1-ui/primitives';
-import { extractErrorMessage } from '@/lib/error-message';
+import { AlertBanner } from '@/components/v1-ui/primitives';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import {
   useV1AuthedPhoneConfirm,
   useV1AuthedPhoneRequest,
@@ -19,6 +19,12 @@ type Props = {
   phone: string;
   /** public 모드는 proofToken을 전달하고, authed 모드는 서버가 이미 phoneVerifiedAt을 세팅하므로 인자 없이 호출된다. */
   onVerified: (proofToken?: string) => void;
+  /**
+   * card: 페이지 배경 위에 단독으로 놓일 때(예: /my/phone-verify).
+   * inset: 이미 카드인 폼 안에 끼워질 때(가입 위저드) — 카드 안 카드로 테두리가 겹쳐 보이지 않도록
+   * 흰 카드 대신 폼 내부 보조 영역(tint) 표면을 쓴다.
+   */
+  surface?: 'card' | 'inset';
 };
 
 const CODE_LENGTH = 6;
@@ -28,15 +34,21 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 30 * 1000;
 const COUNTDOWN_TICK_MS = 1000;
 
-export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Props) {
+export function PhoneVerificationCard({ mode, purpose, phone, onVerified, surface = 'card' }: Props) {
   const publicIssue = useV1PhoneIssue();
   const publicVerify = useV1PhoneVerify();
   const authedRequest = useV1AuthedPhoneRequest();
   const authedConfirm = useV1AuthedPhoneConfirm();
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<'idle' | 'sent'>('idle');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 재발송 쿨다운은 실패가 아니라 "조금 뒤에 다시" 안내다. 빨간 error 배너로 띄우면
+   * 사용자가 인증에 실패한 줄 알고 번호부터 다시 확인하게 되므로 info 톤으로 분리한다.
+   */
+  const [errorTone, setErrorTone] = useState<'error' | 'info'>('error');
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
   const [remainingMs, setRemainingMs] = useState(0);
@@ -49,6 +61,7 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
     setPhase('idle');
     setCode('');
     setError(null);
+    setErrorTone('error');
     setExpiresAt(null);
     setResendAvailableAt(null);
     setRemainingMs(0);
@@ -59,8 +72,14 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
   const issuing = mode === 'public' ? publicIssue.isPending : authedRequest.isPending;
   const verifying = mode === 'public' ? publicVerify.isPending : authedConfirm.isPending;
 
+  const showFailure = useCallback((err: unknown, fallback: string) => {
+    setError(extractErrorMessage(err, fallback));
+    setErrorTone(extractErrorCode(err) === 'VERIFICATION_RESEND_COOLDOWN' ? 'info' : 'error');
+  }, []);
+
   const requestCode = useCallback(async () => {
     setError(null);
+    setErrorTone('error');
     try {
       if (mode === 'public') {
         const res = await publicIssue.mutateAsync({ phone });
@@ -84,12 +103,13 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
       setResendRemainingMs(RESEND_COOLDOWN_MS);
       setPhase('sent');
     } catch (err) {
-      setError(extractErrorMessage(err, '인증번호 발송에 실패했어요. 잠시 후 다시 시도해 주세요.'));
+      showFailure(err, '인증번호 발송에 실패했어요. 잠시 후 다시 시도해 주세요.');
     }
-  }, [mode, phone, publicIssue, authedRequest, onVerified]);
+  }, [mode, phone, publicIssue, authedRequest, onVerified, showFailure]);
 
   const verifyCode = useCallback(async () => {
     setError(null);
+    setErrorTone('error');
     try {
       if (mode === 'public') {
         const res = await publicVerify.mutateAsync({ phone, code, purpose });
@@ -105,9 +125,29 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
         }
       }
     } catch (err) {
-      setError(extractErrorMessage(err, '인증번호가 올바르지 않아요. 다시 확인해 주세요.'));
+      showFailure(err, '인증번호가 올바르지 않아요. 다시 확인해 주세요.');
     }
-  }, [mode, purpose, phone, code, publicVerify, authedConfirm, onVerified]);
+  }, [mode, purpose, phone, code, publicVerify, authedConfirm, onVerified, showFailure]);
+
+  /**
+   * 이 카드는 번호 11자리를 채우는 순간 폼 중간에 새로 나타난다. 모바일에서는 하단 고정 CTA가
+   * 그 자리를 덮고 있어(390 기준 실측) "인증번호 받기"가 화면 밖/뒤에 깔린 채 등장한다 —
+   * 사용자가 스크롤을 내리기 전까지 인증을 시작할 방법이 없으므로 등장 시 뷰로 끌어온다.
+   *
+   * 폼 안에 끼워지는 inset 변형에서만 보정한다 — /my/phone-verify 처럼 카드가 화면의 주인공인
+   * 곳에는 가릴 고정 CTA가 없어서, 같은 스크롤이 이유 없는 화면 점프로만 남는다.
+   */
+  useEffect(() => {
+    const node = rootRef.current;
+    if (!node || verified || surface !== 'inset') return;
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // jsdom 등 레이아웃이 없는 환경에는 scrollIntoView 자체가 없다 — 스크롤 보정은 부가 기능이므로 건너뛴다.
+    node.scrollIntoView?.({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+    // phase 전환(idle→sent)마다 다시 맞춘다 — 입력칸이 새로 생기며 높이가 바뀌기 때문.
+  }, [phase, verified, surface]);
 
   // 남은 시간 · 재전송 쿨다운 카운트다운(1초 tick). phase가 'sent'인 동안만 동작.
   useEffect(() => {
@@ -126,19 +166,30 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
   const seconds = Math.floor((remainingMs % 60000) / 1000);
   const resendSeconds = Math.ceil(resendRemainingMs / 1000);
 
+  // 'inset'은 이미 카드인 폼 안에 들어갈 때 쓰는 표면 — 흰 카드 위 흰 카드로 테두리가 겹치지 않게 한다.
+  const surfaceClass = surface === 'inset' ? 'tm-auth-inset' : 'tm-card';
+
   if (verified) {
     return (
-      <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}>
+      <div
+        ref={rootRef}
+        className={surfaceClass}
+        style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}
+      >
         <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
         <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue500)' }}>
           휴대폰 본인인증이 완료됐어요.
         </p>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card pad={18} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div
+      ref={rootRef}
+      className={surfaceClass}
+      style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}
+    >
       <p className="tm-text-label" style={{ margin: 0 }}>
         휴대폰 본인인증
       </p>
@@ -159,7 +210,7 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
             <span className="tm-text-label">인증번호 6자리</span>
             <input
               id="phone-verification-otp-input"
-              className="tm-input tm-auth-input"
+              className={`tm-input tm-auth-input ${error && errorTone === 'error' ? 'tm-auth-input-error' : ''}`}
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={CODE_LENGTH}
@@ -168,9 +219,20 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
               value={code}
               disabled={expired || verifying}
               onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
-              aria-describedby="phone-verification-remaining"
+              aria-invalid={Boolean(error) && errorTone === 'error'}
+              aria-describedby={
+                error ? 'phone-verification-error phone-verification-remaining' : 'phone-verification-remaining'
+              }
             />
           </label>
+
+          {/* 에러는 입력칸 바로 아래에 둔다 — 카드 맨 아래(재전송 줄 밑)에 있으면 시선이 세 단계
+              떨어지고 "다시 받기"의 결과처럼 읽힌다. */}
+          {error ? (
+            <div id="phone-verification-error">
+              <AlertBanner message={error} tone={errorTone} />
+            </div>
+          ) : null}
 
           <button
             type="button"
@@ -203,7 +265,8 @@ export function PhoneVerificationCard({ mode, purpose, phone, onVerified }: Prop
         </>
       )}
 
-      {error ? <AlertBanner message={error} tone="error" /> : null}
-    </Card>
+      {/* idle 단계의 실패(발송 자체 실패·쿨다운)는 방금 누른 버튼의 결과이므로 버튼 아래에 남긴다. */}
+      {error && phase === 'idle' ? <AlertBanner message={error} tone={errorTone} /> : null}
+    </div>
   );
 }

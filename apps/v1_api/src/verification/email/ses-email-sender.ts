@@ -36,7 +36,7 @@ export class SesEmailSender implements EmailSender {
     return this.client;
   }
 
-  async send(to: string, subject: string, text: string): Promise<void> {
+  async send(to: string, subject: string, text: string, html?: string): Promise<void> {
     try {
       await this.getClient().send(
         new SendEmailCommand({
@@ -45,7 +45,11 @@ export class SesEmailSender implements EmailSender {
           Content: {
             Simple: {
               Subject: { Data: subject, Charset: 'UTF-8' },
-              Body: { Text: { Data: text, Charset: 'UTF-8' } },
+              // text 를 항상 함께 보낸다 — HTML 을 막아 둔 클라이언트에서도 코드가 보여야 한다.
+              Body: {
+                Text: { Data: text, Charset: 'UTF-8' },
+                ...(html ? { Html: { Data: html, Charset: 'UTF-8' } } : {}),
+              },
             },
           },
         }),

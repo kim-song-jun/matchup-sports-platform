@@ -1568,6 +1568,10 @@ model V1Tournament {
   registrationDeadlineAt DateTime?          @map("registration_deadline_at")
   rosterDeadlineAt       DateTime?          @map("roster_deadline_at")
   bracketPublishedAt     DateTime?          @map("bracket_published_at")
+  // 예약 공개 시각. 스케줄러 없이 조회 시점에 판정한다(now >= 이 값이면 공개로 간주하며,
+  // 이때 bracketPublishedAt 은 null 로 남는다 — 공개 근거가 이 컬럼이다).
+  // 즉시 공개(publishBracket)와 공개 취소(unpublishBracket)는 이 값을 null 로 비운다.
+  bracketPublishScheduledAt DateTime?       @map("bracket_publish_scheduled_at")
   scheduledAt            DateTime?          @map("scheduled_at")
   scheduledEndAt         DateTime?          @map("scheduled_end_at")
   venue                  String?

@@ -159,6 +159,7 @@ import type {
   V1DeleteTournamentPopupResult,
   V1AdminTournamentStatusChangeResult,
   V1PublishBracketResult,
+  V1UnpublishBracketResult,
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
   V1Tournament,
@@ -2480,11 +2481,32 @@ export function useV1ChangeTournamentStatus(id: string) {
   });
 }
 
-/** Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개. 성공 시 어드민 상세 + 공개 상세를 모두 invalidate. */
+/**
+ * Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개. 성공 시 어드민 상세 + 공개 상세를 모두 invalidate.
+ * `scheduledAt`(ISO)을 넘기면 즉시 공개하지 않고 그 시각에 공개되도록 예약한다.
+ * 과거 시각은 서버가 400 `TOURNAMENT_BRACKET_PUBLISH_SCHEDULE_PAST` 로 거부한다.
+ */
 export function useV1PublishTournamentBracket(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => v1Post<V1PublishBracketResult>(`/admin/tournaments/${id}/publish-bracket`, {}),
+    mutationFn: (vars?: { scheduledAt?: string }) =>
+      v1Post<V1PublishBracketResult>(
+        `/admin/tournaments/${id}/publish-bracket`,
+        vars?.scheduledAt ? { scheduledAt: vars.scheduledAt } : {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
+/** 대진표 공개 취소 — 즉시 공개분과 예약분을 모두 되돌린다(비공개 전환). */
+export function useV1UnpublishTournamentBracket(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<V1UnpublishBracketResult>(`/admin/tournaments/${id}/unpublish-bracket`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });

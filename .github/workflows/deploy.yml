@@ -207,6 +207,8 @@ jobs:
           KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
+          # 공개 동의항목 목록이라 시크릿이 아닌 repository variable.
+          KAKAO_SCOPE_SECRET: ${{ vars.KAKAO_SCOPE }}
           V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
           GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
           VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
@@ -216,6 +218,7 @@ jobs:
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
+          KAKAO_SCOPE_B64="$(printf '%s' "${KAKAO_SCOPE_SECRET:-}" | base64 | tr -d '\n')"
           V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
           GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
@@ -226,6 +229,7 @@ jobs:
             printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
             printf 'KAKAO_CLIENT_SECRET_B64=%s\n' "${KAKAO_CLIENT_SECRET_B64}"
             printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
+            printf 'KAKAO_SCOPE_B64=%s\n' "${KAKAO_SCOPE_B64}"
             printf 'V1_HOST_ADMIN_PASSWORD_B64=%s\n' "${V1_HOST_ADMIN_PASSWORD_B64}"
             printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
             printf 'VAPID_PUBLIC_KEY_B64=%s\n' "${VAPID_PUBLIC_KEY_B64}"
@@ -279,6 +283,7 @@ jobs:
           sync_env_from_github_secret "KAKAO_CLIENT_ID" "${KAKAO_CLIENT_ID_B64:-}"
           sync_env_from_github_secret "KAKAO_CLIENT_SECRET" "${KAKAO_CLIENT_SECRET_B64:-}"
           sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
+          sync_env_from_github_secret "KAKAO_SCOPE" "${KAKAO_SCOPE_B64:-}"
           sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
           sync_env_from_github_secret "GA_MEASUREMENT_ID" "${GA_MEASUREMENT_ID_B64:-}"
           sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
@@ -338,6 +343,7 @@ jobs:
             --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \
             --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
             --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
+            --build-arg NEXT_PUBLIC_KAKAO_SCOPE="${KAKAO_SCOPE:-}" \
             --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${GA_MEASUREMENT_ID:-}" \
             -t teameet-v1-web .
 

@@ -43,7 +43,13 @@ export function TermsClient() {
     && requiredAgreements.every(
       (agreement) => agreement.accepted || checkedByDocumentId[agreement.documentId],
     );
-  const requiredChecked = requiredAccepted;
+  // 전체 동의는 선택 항목까지 포함한다. 그래서 버튼의 켜짐 상태도 필수만이 아니라
+  // 모든 항목 기준이어야 한다 — 필수 기준으로 두면 선택 하나를 해제해도 버튼이 켜진 채라
+  // 실제 상태와 어긋난다. 이미 동의한 항목(accepted)은 체크된 것으로 센다.
+  const allChecked = agreements.length > 0
+    && agreements.every(
+      (agreement) => agreement.accepted || checkedByDocumentId[agreement.documentId],
+    );
 
   useEffect(() => {
     if (!currentTerms.data) return;
@@ -57,12 +63,17 @@ export function TermsClient() {
     );
   }, [currentTerms.data]);
 
-  const setRequired = (checked: boolean) => {
+  /**
+   * 전체 동의 — 필수와 선택을 함께 켜고 끈다. 선택 항목은 각 카드에서 개별로 다시 해제할 수
+   * 있고, 제출 게이트(requiredAccepted)는 여전히 필수 항목만 본다. 즉 선택을 꺼도 가입은
+   * 막히지 않는다.
+   */
+  const setAllAgreements = (checked: boolean) => {
     setCheckedByDocumentId((current) => ({
       ...current,
       ...Object.fromEntries(
         agreements
-          .filter((agreement) => agreement.requirement === 'required' && !agreement.accepted)
+          .filter((agreement) => !agreement.accepted)
           .map((agreement) => [agreement.documentId, checked]),
       ),
     }));
@@ -255,11 +266,11 @@ export function TermsClient() {
             <div className="tm-text-caption">{error}</div>
           </div>
         ) : null}
-        <button className="tm-card tm-auth-agree-all tm-auth-agree-button tm-pressable" onClick={() => setRequired(!requiredChecked)} type="button" aria-pressed={requiredChecked}>
-          <TermsCheck checked={requiredChecked} />
+        <button className="tm-card tm-auth-agree-all tm-auth-agree-button tm-pressable" onClick={() => setAllAgreements(!allChecked)} type="button" aria-pressed={allChecked}>
+          <TermsCheck checked={allChecked} />
           <span style={{ display: 'grid', gap: 3 }}>
-            <span className="tm-text-body-lg">필수 약관 전체 동의 (필수)</span>
-            <span className="tm-text-caption">서비스 이용약관, 개인정보 수집 및 이용 동의에 모두 동의합니다.</span>
+            <span className="tm-text-body-lg">전체 동의</span>
+            <span className="tm-text-caption">선택 항목을 포함한 모든 약관에 동의합니다. 선택 항목은 따로 해제할 수 있어요.</span>
           </span>
         </button>
         <div className="tm-auth-stack">
@@ -302,9 +313,9 @@ export function TermsClient() {
                         이번 변경: {item.changeSummary}
                       </span>
                     ) : null}
-                    <span className="tm-text-caption">
-                      {item.version}{item.accepted ? ' · 동의 완료' : item.requiresAction ? ' · 새 동의 필요' : ''}
-                    </span>
+                    {/* 문서 버전('v1')과 '새 동의 필요'·'동의 완료' 상태 문구는 표시하지 않는다 —
+                        내부 표기라 사용자에게 의미가 없고, 이미 동의한 항목은 체크가 켜진 채
+                        비활성이라 상태가 체크박스로 드러난다. */}
                   </button>
                   <button
                     aria-expanded={open}

@@ -124,7 +124,7 @@ describe('TermsClient social navigation contract', () => {
   it('follows the API next.route after social terms are accepted', async () => {
     // Given
     render(<TermsClient />);
-    fireEvent.click(screen.getByRole('button', { name: /필수 약관 전체 동의/ }));
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
     const continueButton = screen.getByRole('button', { name: '동의하고 회원가입하기' });
     await waitFor(() => expect(continueButton).toBeEnabled());
 
@@ -147,7 +147,7 @@ describe('TermsClient GA events (email signup)', () => {
   it('tracks a sign_up_start event with method=email before continuing to the account form', async () => {
     // Given
     render(<TermsClient />);
-    fireEvent.click(screen.getByRole('button', { name: /필수 약관 전체 동의/ }));
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
     const continueButton = screen.getByRole('button', { name: '동의하고 회원가입하기' });
     await waitFor(() => expect(continueButton).toBeEnabled());
 
@@ -170,7 +170,7 @@ describe('TermsClient GA events (email signup)', () => {
     expect(screen.queryByText(/회원가입 동의로 저장하지 않으며/)).not.toBeInTheDocument();
 
     fireEvent.click(optionalTitle);
-    fireEvent.click(screen.getByRole('button', { name: /필수 약관 전체 동의/ }));
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
     fireEvent.click(screen.getByRole('button', { name: '동의하고 회원가입하기' }));
 
     expect(JSON.parse(
@@ -182,12 +182,50 @@ describe('TermsClient GA events (email signup)', () => {
     ]);
   });
 
-  it('renders the final required-consent summary copy', () => {
+  it('renders the agree-all summary copy', () => {
     render(<TermsClient />);
 
     expect(screen.getByText(
-      '서비스 이용약관, 개인정보 수집 및 이용 동의에 모두 동의합니다.',
+      '선택 항목을 포함한 모든 약관에 동의합니다. 선택 항목은 따로 해제할 수 있어요.',
     )).toHaveClass('tm-text-caption');
+  });
+
+  // 전체 동의가 필수만 켜면 선택 항목을 일일이 눌러야 해 "전체"라는 이름과 어긋난다.
+  it('전체 동의는 선택 항목까지 함께 켜고 제출에 포함한다', () => {
+    render(<TermsClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
+    fireEvent.click(screen.getByRole('button', { name: '동의하고 회원가입하기' }));
+
+    expect(JSON.parse(
+      window.sessionStorage.getItem('teameet.v1.signupTermsDocumentIds') ?? '[]',
+    )).toEqual([SERVICE_DOCUMENT_ID, NEW_DOCUMENT_ID, OPTIONAL_DOCUMENT_ID]);
+  });
+
+  // 선택은 어디까지나 선택 — 개별로 해제할 수 있어야 하고, 해제해도 가입은 막히지 않는다.
+  it('전체 동의 후 선택 항목만 해제하면 제출에서 빠지고 가입은 계속 가능하다', async () => {
+    render(<TermsClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: /전체 동의/ }));
+    fireEvent.click(screen.getByText(/위치기반서비스 이용 동의/));
+
+    const continueButton = screen.getByRole('button', { name: '동의하고 회원가입하기' });
+    await waitFor(() => expect(continueButton).toBeEnabled());
+    // 하나라도 빠졌으면 전체 동의 버튼도 꺼진 상태로 따라와야 실제 상태와 어긋나지 않는다.
+    expect(screen.getByRole('button', { name: /전체 동의/ })).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(continueButton);
+    expect(JSON.parse(
+      window.sessionStorage.getItem('teameet.v1.signupTermsDocumentIds') ?? '[]',
+    )).toEqual([SERVICE_DOCUMENT_ID, NEW_DOCUMENT_ID]);
+  });
+
+  // 'v1 · 새 동의 필요' 같은 내부 표기는 사용자에게 의미가 없어 노출하지 않는다.
+  it('문서 버전과 동의 상태 문구를 노출하지 않는다', () => {
+    render(<TermsClient />);
+
+    expect(screen.queryByText(/새 동의 필요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/동의 완료/)).not.toBeInTheDocument();
   });
 });
 
@@ -204,10 +242,17 @@ describe('TermsClient existing-user renewal contract', () => {
   it('keeps prior consent checked and submits only the newly required document', async () => {
     render(<TermsClient />);
 
-    expect(screen.getByText('서비스 이용약관 (필수)').closest('.tm-auth-agreement-card'))
-      .toHaveTextContent('동의 완료');
-    expect(screen.getByText(/신규 필수 약관/).closest('.tm-auth-agreement-card'))
-      .toHaveTextContent('새 동의 필요');
+    // 상태는 '동의 완료'·'새 동의 필요' 문구가 아니라 체크박스로 드러난다 —
+    // 이미 동의한 항목은 켜진 채 비활성, 새로 동의할 항목은 꺼진 채 활성이다.
+    const acceptedCheck = screen.getByText('서비스 이용약관 (필수)')
+      .closest('.tm-auth-agreement-card')!.querySelector('.tm-auth-check-button')!;
+    expect(acceptedCheck).toBeDisabled();
+    expect(acceptedCheck).toHaveAttribute('aria-pressed', 'true');
+
+    const pendingCheck = screen.getByText(/신규 필수 약관/)
+      .closest('.tm-auth-agreement-card')!.querySelector('.tm-auth-check-button')!;
+    expect(pendingCheck).toBeEnabled();
+    expect(pendingCheck).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(screen.getByText(/신규 필수 약관/));
     fireEvent.click(screen.getByRole('button', { name: '동의하고 계속하기' }));

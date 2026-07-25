@@ -786,7 +786,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
   if (isLoading) {
     return (
-      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments">
         <ResultsPageSkeleton />
       </AppChrome>
     );
@@ -794,7 +794,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments">
         <div style={{ padding: '40px 20px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
@@ -802,7 +802,7 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
     );
   }
   return (
-    <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} bottomNav={false} activeTab="tournaments">
+    <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments">
       <ResultsPageContent tournament={data} />
       <div className="tm-tourn-sub-flownav">
         <TournamentFlowNav

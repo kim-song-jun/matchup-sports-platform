@@ -179,7 +179,6 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
     <AppChrome
       title="참가팀 후기"
       backHref={`/tournaments/${tournamentId}/awards`}
-      bottomNav={false}
       activeTab="tournaments"
     >
       <div className="tm-tourn-sub-page">

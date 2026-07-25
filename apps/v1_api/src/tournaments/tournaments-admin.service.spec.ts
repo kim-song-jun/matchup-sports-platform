@@ -359,7 +359,8 @@ describe('TournamentsAdminService', () => {
     expect(result.bracketPublishedAt).toEqual(expect.any(String));
     expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith({
       where: { id: 'tournament-1', deletedAt: null, bracketPublishedAt: null },
-      data: { bracketPublishedAt: expect.any(Date) },
+      // 즉시 공개는 남아 있던 예약을 함께 비운다(공개된 뒤의 예약은 의미가 없다).
+      data: { bracketPublishedAt: expect.any(Date), bracketPublishScheduledAt: null },
     });
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.bracket_publish' }) }),
@@ -409,6 +410,7 @@ describe('TournamentsAdminService', () => {
     expect(result).toEqual({
       tournamentId: 'tournament-1',
       bracketPublishedAt: publishedAt.toISOString(),
+      bracketPublishScheduledAt: null,
       alreadyPublished: true,
     });
     expect(prisma.v1Tournament.update).not.toHaveBeenCalled();

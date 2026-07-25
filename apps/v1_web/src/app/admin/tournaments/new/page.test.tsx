@@ -52,6 +52,7 @@ function previousTournament(): V1Tournament {
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
     bracketPublishedAt: null,
+    bracketPublishScheduledAt: null,
     scheduledAt: '2026-07-01T09:00:00.000Z',
     scheduledEndAt: null,
     venue: '서울 풋살장',

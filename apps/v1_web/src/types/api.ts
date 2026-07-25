@@ -1902,6 +1902,8 @@ export type V1Tournament = {
   rosterDeadlineAt: string | null;
   /** null이면 대진표(조/픽스처) 비공개 — 공개 상세 API는 이 값이 채워질 때까지 groups/fixtures를 숨긴다 */
   bracketPublishedAt: string | null;
+  /** 공개 예약 시각. 아직 공개 전일 때만 내려오며(공개 후 null), "N에 공개 예정" 안내에 쓴다. */
+  bracketPublishScheduledAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -2081,6 +2083,8 @@ export type V1TournamentDetail = {
   rosterDeadlineAt: string | null;
   /** null이면 groups/fixtures가 빈 배열로 내려온다(대진표 비공개). 관리자가 일괄 공개하면 타임스탬프가 채워진다. */
   bracketPublishedAt: string | null;
+  /** 공개 예약 시각. 이 시각이 지나면 스케줄러 없이 조회 시점 판정으로 공개된다. */
+  bracketPublishScheduledAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
@@ -2390,8 +2394,19 @@ export type V1AdminTournamentStatusChangeResult = {
 /** Task 109 Track 6 — 대진표 일괄 공개 응답 */
 export type V1PublishBracketResult = {
   tournamentId: string;
-  bracketPublishedAt: string;
+  /** 예약만 걸었을 때는 아직 공개 전이므로 null. */
+  bracketPublishedAt: string | null;
+  /** 예약 공개 시각. 즉시 공개했거나 예약이 없으면 null. */
+  bracketPublishScheduledAt: string | null;
   alreadyPublished: boolean;
+};
+
+export type V1UnpublishBracketResult = {
+  tournamentId: string;
+  bracketPublishedAt: null;
+  bracketPublishScheduledAt: null;
+  /** 이미 비공개였으면 true — 되돌릴 것이 없었다는 뜻. */
+  alreadyUnpublished: boolean;
 };
 
 export type V1StandingsRecalculateResult = {

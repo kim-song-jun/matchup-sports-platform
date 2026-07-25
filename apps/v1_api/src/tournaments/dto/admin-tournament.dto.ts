@@ -559,3 +559,13 @@ export class ChangeTournamentStatusDto {
   @MaxLength(500)
   reason?: string;
 }
+
+export class PublishBracketDto {
+  /**
+   * 공개 예약 시각(ISO). 생략하면 즉시 공개한다. 과거 시각은 서비스에서 거부한다
+   * (즉시 공개와 구분되지 않아 운영자가 의도를 확인할 수 없다).
+   */
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
+}

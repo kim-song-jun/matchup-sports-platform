@@ -16,6 +16,7 @@ function makeTournament(
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
     bracketPublishedAt: null,
+    bracketPublishScheduledAt: null,
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,

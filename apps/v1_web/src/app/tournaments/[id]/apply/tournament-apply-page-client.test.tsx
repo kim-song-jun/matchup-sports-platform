@@ -56,6 +56,7 @@ function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1Tourname
     registrationDeadlineAt: null,
     rosterDeadlineAt: null,
     bracketPublishedAt: null,
+    bracketPublishScheduledAt: null,
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,

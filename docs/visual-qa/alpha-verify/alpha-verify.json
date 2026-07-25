@@ -1,0 +1,46 @@
+[
+  {
+    "label": "404-임의경로",
+    "route": "/this-route-does-not-exist",
+    "http": 404,
+    "navVisible": true,
+    "activeTab": "",
+    "homeShortcut": false,
+    "homeWays": 2,
+    "totalLinks": 7,
+    "heading": "페이지를 찾을 수 없어요"
+  },
+  {
+    "label": "404-대회",
+    "route": "/tournaments/00000000-0000-4000-8000-999999999999",
+    "http": 404,
+    "navVisible": true,
+    "activeTab": "",
+    "homeShortcut": false,
+    "homeWays": 2,
+    "totalLinks": 7,
+    "heading": "페이지를 찾을 수 없어요"
+  },
+  {
+    "label": "대회목록",
+    "route": "/tournaments",
+    "http": 200,
+    "navVisible": true,
+    "activeTab": "대회",
+    "homeShortcut": false,
+    "homeWays": 1,
+    "totalLinks": 16,
+    "heading": "스포츠 대회"
+  },
+  {
+    "label": "랜딩",
+    "route": "/landing",
+    "http": 200,
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": false,
+    "homeWays": 0,
+    "totalLinks": 12,
+    "heading": "오늘 같이 뛸 사람을\n가장 빠르게 찾는 방법"
+  }
+]

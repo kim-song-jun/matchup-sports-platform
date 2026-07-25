@@ -75,6 +75,7 @@ describe('TournamentsAdminController (service stub)', () => {
     update: jest.fn(),
     changeStatus: jest.fn(),
     publishBracket: jest.fn(),
+    unpublishBracket: jest.fn(),
   };
 
   let controller: TournamentsAdminController;
@@ -131,11 +132,45 @@ describe('TournamentsAdminController (service stub)', () => {
     expect(tournamentsAdminService.changeStatus).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1', dto);
   });
 
-  it('publishBracket: delegates to service and returns result', async () => {
-    const payload = { tournamentId: 'tournament-1', bracketPublishedAt: '2026-07-18T00:00:00.000Z', alreadyPublished: false };
+  it('publishBracket: body 없이 호출하면 즉시 공개(예약 시각 미전달)', async () => {
+    const payload = {
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: '2026-07-18T00:00:00.000Z',
+      bracketPublishScheduledAt: null,
+      alreadyPublished: false,
+    };
     tournamentsAdminService.publishBracket.mockResolvedValue(payload);
-    await expect(controller.publishBracket(ownerAuthUser, 'tournament-1')).resolves.toEqual(payload);
-    expect(tournamentsAdminService.publishBracket).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1');
+    await expect(controller.publishBracket(ownerAuthUser, 'tournament-1', {})).resolves.toEqual(payload);
+    expect(tournamentsAdminService.publishBracket).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1', undefined);
+  });
+
+  it('publishBracket: scheduledAt 을 주면 Date 로 변환해 서비스에 넘긴다', async () => {
+    const scheduledAt = '2026-08-01T09:00:00.000Z';
+    const payload = {
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: null,
+      bracketPublishScheduledAt: scheduledAt,
+      alreadyPublished: false,
+    };
+    tournamentsAdminService.publishBracket.mockResolvedValue(payload);
+    await expect(controller.publishBracket(ownerAuthUser, 'tournament-1', { scheduledAt })).resolves.toEqual(payload);
+    expect(tournamentsAdminService.publishBracket).toHaveBeenCalledWith(
+      ownerAuthUser,
+      'tournament-1',
+      new Date(scheduledAt),
+    );
+  });
+
+  it('unpublishBracket: delegates to service and returns result', async () => {
+    const payload = {
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: null,
+      bracketPublishScheduledAt: null,
+      alreadyUnpublished: false,
+    };
+    tournamentsAdminService.unpublishBracket.mockResolvedValue(payload);
+    await expect(controller.unpublishBracket(ownerAuthUser, 'tournament-1')).resolves.toEqual(payload);
+    expect(tournamentsAdminService.unpublishBracket).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1');
   });
 });
 

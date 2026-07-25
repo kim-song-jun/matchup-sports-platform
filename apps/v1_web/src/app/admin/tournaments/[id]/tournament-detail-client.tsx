@@ -32,6 +32,7 @@ import {
   TimerOff,
 } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
+import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import { extractYoutubeVideoId, youtubeThumbnailUrl, videoKind } from '@/lib/video-utils';
@@ -41,6 +42,7 @@ import {
   useV1AdminMe,
   useV1ChangeTournamentStatus,
   useV1PublishTournamentBracket,
+  useV1UnpublishTournamentBracket,
   useV1UpdateTournament,
   useV1AdminTournamentRegistrations,
   useV1ConfirmPayment,
@@ -1190,6 +1192,7 @@ export function BracketTab({
   registrations,
   registrationDeadlineAt,
   bracketPublishedAt,
+  bracketPublishScheduledAt,
   canWrite,
 }: {
   tournamentId: string;
@@ -1197,6 +1200,7 @@ export function BracketTab({
   registrations: V1AdminTournamentRegistration[];
   registrationDeadlineAt: string | null | undefined;
   bracketPublishedAt: string | null | undefined;
+  bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
 }) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
@@ -1211,7 +1215,10 @@ export function BracketTab({
   const updateGroup = useV1UpdateGroup(tournamentId);
   const deleteGroup = useV1DeleteGroup(tournamentId);
   const publishBracket = useV1PublishTournamentBracket(tournamentId);
+  const unpublishBracket = useV1UnpublishTournamentBracket(tournamentId);
   const removeGroupTeam = useV1RemoveGroupTeam(tournamentId);
+  // datetime-local 입력값(로컬 시각 문자열). 예약 성공 시 비운다.
+  const [publishScheduleInput, setPublishScheduleInput] = useState('');
 
   // ── 경기 수정 모달 상태 ─────────────────────────────────────────────
   const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
@@ -1630,27 +1637,80 @@ export function BracketTab({
   const hasData = groups.length > 0 || fixtures.length > 0;
 
   // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
-  const isBracketPublished = !!bracketPublishedAt;
+  // 예약 시각이 지나면 서버는 공개로 판정하지만 bracketPublishedAt 은 null 로 남는다.
+  // 여기서 bracketPublishedAt 만 보면 이미 공개된 대진표를 계속 "예약됨"으로 표시하고
+  // 공개 버튼도 노출하게 되므로, 서버와 같은 규칙(bracket-visibility)을 쓴다.
+  const isBracketPublished = isBracketPublishedNow(bracketPublishedAt, bracketPublishScheduledAt);
+  // 아직 오지 않은 예약만 "예약됨" 안내·취소 대상이다.
+  const hasPendingSchedule = !!bracketPublishScheduledAt && !isBracketPublished;
   const deadlinePassed = registrationDeadlineAt
     ? new Date(registrationDeadlineAt).getTime() < Date.now()
     : false;
+  // 조가 하나도 없으면 공개해도 참가팀에게 보여줄 대진이 없다. 실수로 빈 대진표를
+  // 공개하는 사고를 막기 위해 공개·예약 진입 자체를 닫는다.
+  const publishBlockedReason = groups.length === 0 ? '조를 먼저 만들어야 공개할 수 있어요.' : null;
+
+  const runPublish = (scheduledAt?: string) => {
+    publishBracket.mutate(scheduledAt ? { scheduledAt } : undefined, {
+      onSuccess: (res) => {
+        if (res.alreadyPublished) showToast('이미 공개된 대진표예요.', 'success');
+        else if (res.bracketPublishScheduledAt)
+          showToast(`${formatDate(res.bracketPublishScheduledAt)}에 공개되도록 예약했어요.`, 'success');
+        else showToast('대진표를 공개했어요.', 'success');
+        setPublishScheduleInput('');
+      },
+      onError: (err) => showToast(extractErrorMessage(err, '대진표 공개에 실패했어요.'), 'error'),
+    });
+  };
+
   const handlePublishBracket = async () => {
-    const warningLine = deadlinePassed
-      ? ''
-      : '접수 마감 전이에요. 그래도 공개할까요?\n\n';
+    if (publishBlockedReason) return;
+    const warningLine = deadlinePassed ? '' : '접수 마감 전이에요. 그래도 공개할까요?\n\n';
     const ok = await confirmModal({
       title: '대진표 전체 공개',
-      message: `${warningLine}공개하면 참가팀·방문자가 조/일정/대진표를 볼 수 있어요. 이후에는 비공개로 되돌릴 수 없어요.`,
+      message: `${warningLine}공개하면 참가팀·방문자가 조/일정/대진표를 볼 수 있어요. 공개를 되돌릴 수는 있지만, 이미 본 참가자에게서 되돌릴 수는 없어요.`,
       confirmLabel: '전체 공개',
       tone: deadlinePassed ? 'default' : 'danger',
     });
     if (!ok) return;
-    publishBracket.mutate(undefined, {
-      onSuccess: (res) => {
-        showToast(res.alreadyPublished ? '이미 공개된 대진표예요.' : '대진표를 공개했어요.', 'success');
-      },
-      onError: (err) =>
-        showToast(extractErrorMessage(err, '대진표 공개에 실패했어요.'), 'error'),
+    runPublish();
+  };
+
+  const handleSchedulePublish = async () => {
+    if (publishBlockedReason || !publishScheduleInput) return;
+    // datetime-local 은 타임존 표기가 없는 로컬 시각 문자열이라 Date 로 감싸 ISO(UTC)로 바꾼다.
+    const scheduled = new Date(publishScheduleInput);
+    if (Number.isNaN(scheduled.getTime())) {
+      showToast('공개 예약 시각을 다시 확인해 주세요.', 'error');
+      return;
+    }
+    if (scheduled.getTime() <= Date.now()) {
+      showToast('공개 예약 시각은 현재 시각 이후여야 해요.', 'error');
+      return;
+    }
+    const ok = await confirmModal({
+      title: '대진표 공개 예약',
+      message: `${formatDate(scheduled.toISOString())}에 대진표가 자동으로 공개돼요. 그 전까지는 계속 수정할 수 있어요.`,
+      confirmLabel: '예약하기',
+    });
+    if (!ok) return;
+    runPublish(scheduled.toISOString());
+  };
+
+  const handleUnpublishBracket = async () => {
+    const ok = await confirmModal({
+      title: isBracketPublished ? '대진표 공개 취소' : '공개 예약 취소',
+      message: isBracketPublished
+        ? '대진표를 다시 비공개로 되돌려요. 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요. 이미 대진표를 본 참가자의 기억까지 되돌릴 수는 없어요.'
+        : '예약된 공개를 취소해요. 대진표는 계속 비공개로 남아요.',
+      confirmLabel: isBracketPublished ? '비공개로 되돌리기' : '예약 취소',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    unpublishBracket.mutate(undefined, {
+      onSuccess: (res) =>
+        showToast(res.alreadyUnpublished ? '이미 비공개 상태예요.' : '대진표를 비공개로 되돌렸어요.', 'success'),
+      onError: (err) => showToast(extractErrorMessage(err, '공개 취소에 실패했어요.'), 'error'),
     });
   };
 
@@ -1660,24 +1720,77 @@ export function BracketTab({
       {ConfirmModal}
 
       {/* ── 대진표 일괄 공개 ──────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-[15px] font-bold text-gray-900 mb-1">대진표 전체 공개</h3>
-          <p className="text-xs text-gray-500">
-            {isBracketPublished
-              ? `${formatDate(bracketPublishedAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
-              : '아직 비공개예요. 공개 전까지 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요.'}
-          </p>
+      <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 mb-6 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-bold text-gray-900 mb-1">대진표 전체 공개</h3>
+            <p className="text-xs text-gray-500">
+              {isBracketPublished
+                ? // 예약 시각이 지나 공개된 경우 bracketPublishedAt 은 null 이고 예약 시각이
+                  // 공개 근거다. fallback 이 없으면 "—에 공개됨"으로 표시된다.
+                  `${formatDate(bracketPublishedAt ?? bracketPublishScheduledAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
+                : hasPendingSchedule
+                ? `${formatDate(bracketPublishScheduledAt ?? null)}에 자동 공개돼요. 그 전까지는 계속 수정할 수 있어요.`
+                : '아직 비공개예요. 공개 전까지 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요.'}
+            </p>
+            {!isBracketPublished && publishBlockedReason && (
+              <p className="text-xs text-amber-600 mt-1">{publishBlockedReason}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {canWrite && !isBracketPublished && (
+              <button
+                type="button"
+                onClick={handlePublishBracket}
+                disabled={publishBracket.isPending || !!publishBlockedReason}
+                title={publishBlockedReason ?? undefined}
+                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+              >
+                지금 전체 공개
+              </button>
+            )}
+            {canWrite && (isBracketPublished || hasPendingSchedule) && (
+              <button
+                type="button"
+                onClick={handleUnpublishBracket}
+                disabled={unpublishBracket.isPending}
+                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-red-600 border border-red-200 bg-white hover:bg-red-50 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2 whitespace-nowrap"
+              >
+                {isBracketPublished ? '공개 취소' : '예약 취소'}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* 예약 공개 — 공개 전에만 노출한다(이미 공개된 대진표는 예약할 대상이 없다). */}
         {canWrite && !isBracketPublished && (
-          <button
-            type="button"
-            onClick={handlePublishBracket}
-            disabled={publishBracket.isPending}
-            className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
-          >
-            대진표 전체 공개
-          </button>
+          <div className="flex flex-wrap items-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="bracket-publish-schedule" className="text-xs font-medium text-gray-600">
+                공개 예약 시각
+              </label>
+              <input
+                id="bracket-publish-schedule"
+                type="datetime-local"
+                value={publishScheduleInput}
+                onChange={(e) => setPublishScheduleInput(e.target.value)}
+                disabled={!!publishBlockedReason}
+                className="h-[44px] px-3 rounded-xl border border-gray-200 text-[13px] text-gray-900 disabled:bg-gray-50 disabled:text-gray-400 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSchedulePublish}
+              disabled={publishBracket.isPending || !publishScheduleInput || !!publishBlockedReason}
+              title={publishBlockedReason ?? undefined}
+              className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-blue-600 border border-blue-200 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+            >
+              {hasPendingSchedule ? '예약 변경' : '이 시각에 공개 예약'}
+            </button>
+            <p className="text-xs text-gray-400 basis-full">
+              예약한 시각이 되면 스케줄러 없이 자동으로 공개돼요. 그 전까지는 조·경기를 계속 수정할 수 있어요.
+            </p>
+          </div>
         )}
       </div>
 
@@ -2171,7 +2284,18 @@ export function BracketTab({
                     rows={standings}
                     keyExtractor={(s) => s.id}
                     scrollOnMobile
-                    empty={<AdminEmpty title="팀이 없어요" description="배정된 팀이 없어요." />}
+                    empty={
+                      // 팀은 배정됐는데 순위 레코드가 아직 없을 수 있다(순위는 재계산 시점에 만들어진다).
+                      // 이때 "팀이 없어요"라고 하면 방금 배정한 팀이 사라진 것처럼 보인다.
+                      group.groupTeams.length > 0 ? (
+                        <AdminEmpty
+                          title="순위가 아직 없어요"
+                          description="배정은 됐지만 순위는 아직 계산 전이에요. '순위 재계산'을 눌러 주세요."
+                        />
+                      ) : (
+                        <AdminEmpty title="팀이 없어요" description="배정된 팀이 없어요." />
+                      )
+                    }
                   />
                 )}
               </div>
@@ -3699,11 +3823,14 @@ export default function TournamentDetailClient({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* ── Tabs (f11: min-h-[44px], no shadow — active = border-b-2 blue-500) ── */}
+      {/* ── Tabs (f11: min-h-[44px], active = border-b-2 blue-500) ──
+          sticky: 대회 정보·홍보 카드가 위를 길게 차지해 탭이 화면 밖으로 밀려나면
+          운영자가 대진 관리 진입점을 못 찾는다. 스크롤해도 탭이 따라오게 고정한다.
+          고정된 탭이 아래 내용 위로 겹쳐 지나가므로 경계를 위한 hairline 그림자만 둔다. */}
       <div
         role="tablist"
         aria-label="대회 운영 탭"
-        className="flex max-w-full gap-1 overflow-x-auto bg-gray-100 rounded-xl p-1 mb-4 w-fit"
+        className="sticky top-0 z-20 flex max-w-full gap-1 overflow-x-auto bg-gray-100 rounded-xl p-1 mb-4 w-fit shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
       >
         {TABS.map((tab) => {
           const active = activeTab === tab.id;
@@ -3784,6 +3911,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
             registrations={registrations}
             registrationDeadlineAt={tournament?.registrationDeadlineAt}
             bracketPublishedAt={tournament?.bracketPublishedAt}
+            bracketPublishScheduledAt={tournament?.bracketPublishScheduledAt}
             canWrite={canWrite}
           />
         )}

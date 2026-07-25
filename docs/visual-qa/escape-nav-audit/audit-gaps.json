@@ -1,0 +1,114 @@
+[
+  {
+    "label": "매치 상세",
+    "route": "/matches/00000000-0000-4000-8000-000000000201",
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": false,
+    "homeWays": 1,
+    "back": true,
+    "totalLinks": 4,
+    "heading": "강남 저녁 러닝 멤버 모집",
+    "url": "/matches/00000000-0000-4000-8000-000000000201",
+    "consoleErrors": []
+  },
+  {
+    "label": "매치 신청자관리",
+    "route": "/matches/00000000-0000-4000-8000-000000000201/applications",
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": true,
+    "homeWays": 1,
+    "back": true,
+    "totalLinks": 3,
+    "heading": "신청자 관리",
+    "url": "/matches/00000000-0000-4000-8000-000000000201/applications",
+    "consoleErrors": []
+  },
+  {
+    "label": "팀매칭 상세",
+    "route": "/team-matches/00000000-0000-4000-8000-000000000301",
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": false,
+    "homeWays": 1,
+    "back": true,
+    "totalLinks": 3,
+    "heading": "토요일 풋살 상대팀 모집",
+    "url": "/team-matches/00000000-0000-4000-8000-000000000301",
+    "consoleErrors": []
+  },
+  {
+    "label": "공개 프로필",
+    "route": "/users/5115c3d1-6373-44d7-a20a-c0552fb43078",
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": true,
+    "homeWays": 1,
+    "back": true,
+    "totalLinks": 3,
+    "heading": "프로필\n2\n프로필을 불러오지 못했어요\n사용자를 찾을 수",
+    "url": "/users/5115c3d1-6373-44d7-a20a-c0552fb43078",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "label": "404 매치",
+    "route": "/matches/00000000-0000-4000-8000-999999999999",
+    "navVisible": true,
+    "activeTab": "",
+    "homeShortcut": false,
+    "homeWays": 2,
+    "back": false,
+    "totalLinks": 7,
+    "heading": "페이지를 찾을 수 없어요",
+    "url": "/matches/00000000-0000-4000-8000-999999999999",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "label": "404 대회",
+    "route": "/tournaments/00000000-0000-4000-8000-999999999999",
+    "navVisible": true,
+    "activeTab": "",
+    "homeShortcut": false,
+    "homeWays": 2,
+    "back": false,
+    "totalLinks": 7,
+    "heading": "페이지를 찾을 수 없어요",
+    "url": "/tournaments/00000000-0000-4000-8000-999999999999",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "label": "404 임의경로",
+    "route": "/this-route-does-not-exist",
+    "navVisible": true,
+    "activeTab": "",
+    "homeShortcut": false,
+    "homeWays": 2,
+    "back": false,
+    "totalLinks": 7,
+    "heading": "페이지를 찾을 수 없어요",
+    "url": "/this-route-does-not-exist",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  {
+    "label": "참가신청 위저드",
+    "route": "/tournaments/aa000000-0000-4000-8000-000000000001/apply",
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": true,
+    "homeWays": 1,
+    "back": true,
+    "totalLinks": 4,
+    "heading": "참가 신청\n1\n3단계 중 1단계: 팀 선택\n1/3 단계",
+    "url": "/tournaments/aa000000-0000-4000-8000-000000000001/apply",
+    "consoleErrors": []
+  }
+]

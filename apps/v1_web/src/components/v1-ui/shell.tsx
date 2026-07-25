@@ -48,7 +48,9 @@ export function AppChrome({
   title,
   children,
   floatingSlot,
-  activeTab = 'home',
+  // 기본값을 두지 않는다. 검색처럼 5개 탭 어디에도 속하지 않는 화면이 'home' 으로
+  // 떨어져 엉뚱한 탭이 활성으로 표시되기 때문. 미지정이면 활성 탭이 없다.
+  activeTab,
   showSearch = false,
   showNotifications = true,
   hasNewNotification = false,
@@ -143,7 +145,7 @@ function DesktopFooter() {
   );
 }
 
-function BottomNav({ activeTab }: { activeTab: V1NavTab }) {
+function BottomNav({ activeTab }: { activeTab?: V1NavTab }) {
   return (
     <nav className="tm-bottom-nav" aria-label="주요 메뉴">
       {tabs.map(({ id, label, href, Icon }) => {
@@ -166,7 +168,7 @@ function DesktopNav({
   activeTab,
   hasNewNotification,
 }: {
-  activeTab: V1NavTab;
+  activeTab?: V1NavTab;
   hasNewNotification: boolean;
 }) {
   return (

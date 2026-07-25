@@ -96,7 +96,9 @@ export function SmsFailureTable() {
             onClick={() => ackMutation.mutate([failure.id])}
             disabled={ackMutation.isPending}
             className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[var(--font-size-label)] font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
-            aria-label={`${eventTypeLabel(failure.eventType)} 실패 기록 확인`}
+            // 유형 라벨에 이미 '실패'가 들어가는 경우가 많아 '… 실패 확인'은 중복이 된다.
+            // 대상까지 붙여 같은 유형의 행끼리도 스크린리더에서 구분되게 한다.
+            aria-label={`${eventTypeLabel(failure.eventType)} (대상 ${failure.phoneMasked}) 확인 처리`}
           >
             확인
           </button>

@@ -58,7 +58,8 @@ describe('SmsFailureTable', () => {
     // sms-2 is already acknowledged → rendered as a label, not a button.
     expect(screen.getAllByText(/확인됨/).length).toBeGreaterThan(0);
 
-    await user.click(screen.getAllByRole('button', { name: /SMS 발송 실패 실패 기록 확인/ })[0]);
+    // 라벨에 대상까지 들어가야 같은 유형의 행이 여러 개여도 스크린리더에서 구분된다.
+    await user.click(screen.getAllByRole('button', { name: 'SMS 발송 실패 (대상 5678) 확인 처리' })[0]);
     expect(ackMutate).toHaveBeenCalledWith(['sms-1']);
   });
 });

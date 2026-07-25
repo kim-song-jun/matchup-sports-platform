@@ -10,6 +10,18 @@ interface PushPayload {
   url?: string;
 }
 
+/** 한 사용자에 대한 푸시 발송 결과 요약. */
+export interface PushDeliverySummary {
+  /** 이 사용자에게 등록돼 있던 구독 수. 0이면 보낼 곳 자체가 없었다는 뜻이다. */
+  subscriptions: number;
+  /** 푸시 서비스가 접수한 수(기기 도착까지 보장하지는 않는다). */
+  delivered: number;
+  /** 전송 실패 수. 410/404(만료)로 구독을 정리한 경우도 포함한다. */
+  failed: number;
+  /** VAPID 미설정으로 웹 푸시 자체가 꺼져 있으면 true. */
+  disabled: boolean;
+}
+
 @Injectable()
 export class WebPushService implements OnModuleInit {
   private enabled = false;
@@ -69,10 +81,21 @@ export class WebPushService implements OnModuleInit {
     await this.prisma.v1PushSubscription.deleteMany({ where: { userId, endpoint } });
   }
 
-  async sendToUser(userId: string, payload: PushPayload): Promise<void> {
-    if (!this.enabled) return;
+  /**
+   * 사용자의 모든 구독으로 푸시를 시도하고 그 결과를 요약해 돌려준다.
+   *
+   * 예외는 여전히 전부 삼킨다 — 푸시 실패가 호출부(알림 생성)를 되돌리면 안 된다.
+   * 다만 아무 값도 돌려주지 않으면 호출부가 "성공"과 "구독이 하나도 없음"과
+   * "전송 실패"를 구분할 수 없어, 운영 화면이 실제로는 아무에게도 안 간 발송을
+   * 성공으로 표시하게 된다. 그래서 상태만 요약해 반환한다.
+   */
+  async sendToUser(userId: string, payload: PushPayload): Promise<PushDeliverySummary> {
+    if (!this.enabled) return { subscriptions: 0, delivered: 0, failed: 0, disabled: true };
 
     const subscriptions = await this.prisma.v1PushSubscription.findMany({ where: { userId } });
+    let delivered = 0;
+    let failed = 0;
+
     await Promise.all(
       subscriptions.map((subscription) =>
         webpush
@@ -83,7 +106,11 @@ export class WebPushService implements OnModuleInit {
             },
             JSON.stringify(payload),
           )
+          .then(() => {
+            delivered += 1;
+          })
           .catch(async (error: { statusCode?: number; message?: string }) => {
+            failed += 1;
             if (error.statusCode === 410 || error.statusCode === 404) {
               try {
                 await this.prisma.v1PushSubscription.delete({ where: { id: subscription.id } });
@@ -128,5 +155,7 @@ export class WebPushService implements OnModuleInit {
           }),
       ),
     );
+
+    return { subscriptions: subscriptions.length, delivered, failed, disabled: false };
   }
 }

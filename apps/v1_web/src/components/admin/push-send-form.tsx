@@ -186,6 +186,38 @@ function ResultStat({ label, value, tone }: { label: string; value: number; tone
   );
 }
 
+/**
+ * 웹 푸시 도달 상황 한 줄 요약.
+ *
+ * "앱 알림 생성" 숫자만 보면 푸시까지 나간 것으로 읽히지만, 구독이 0건이면 푸시는
+ * 한 건도 나가지 않는다(알림함에만 남는다). 그 상태를 숫자 대신 문장으로 밝힌다.
+ */
+function PushDeliveryNote({
+  push,
+}: {
+  push: NonNullable<V1AdminPushSendResult['push']>;
+}) {
+  const tone =
+    push.disabled || push.failed > 0
+      ? 'border-red-200 bg-red-50 text-red-700'
+      : push.subscriptions === 0
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : 'border-blue-200 bg-blue-50 text-blue-700';
+
+  const message = push.disabled
+    ? '서버에 VAPID 키가 설정되지 않아 웹 푸시가 꺼져 있어요. 알림함에만 남았어요.'
+    : push.subscriptions === 0
+      ? '브라우저 알림을 켠 사용자가 없어 푸시는 나가지 않았어요. 알림함에만 남았어요.'
+      : `구독 ${push.subscriptions}건 중 ${push.delivered}건 전송${push.failed > 0 ? `, ${push.failed}건 실패` : ''}`;
+
+  return (
+    <p className={`rounded-xl border px-3 py-2.5 text-[13px] leading-relaxed ${tone}`}>
+      <span className="font-semibold">웹 푸시 </span>
+      {message}
+    </p>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export function PushSendForm() {
   const [target, setTarget] = useState<V1AdminPushSendTarget>('user');
@@ -223,9 +255,14 @@ export function PushSendForm() {
     sendMutation.mutate(buildPayload(), {
       onSuccess: (data) => {
         setResult(data);
+        // 푸시가 한 건도 안 나간 경우를 성공 토스트로 덮지 않는다 — 상세는 아래 결과 카드에 있다.
+        const pushWentNowhere = data.push ? data.push.disabled || data.push.subscriptions === 0 : false;
         showToast(
-          `발송 완료 — 성공 ${data.sent}건 · 스킵 ${data.skipped}건 · 실패 ${data.failed}건`,
-          data.failed > 0 ? 'error' : 'success',
+          `발송 완료 — 앱 알림 ${data.sent}건 · 스킵 ${data.skipped}건 · 실패 ${data.failed}건` +
+            (pushWentNowhere ? ' (웹 푸시는 나가지 않았어요)' : ''),
+          // 토스트는 success/error 두 가지뿐이라, 푸시가 아무 데도 안 간 경우도
+          // '성공'으로 흘려보내지 않도록 error 로 띄워 눈에 걸리게 한다.
+          data.failed > 0 || pushWentNowhere ? 'error' : 'success',
         );
         setConfirmOpen(false);
         setTitle('');
@@ -428,15 +465,17 @@ export function PushSendForm() {
 
       {/* Result summary */}
       {result && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="grid grid-cols-3 gap-3"
-          data-testid="push-send-result"
-        >
-          <ResultStat label="성공" value={result.sent} tone="success" />
-          <ResultStat label="스킵" value={result.skipped} tone="neutral" />
-          <ResultStat label="실패" value={result.failed} tone={result.failed > 0 ? 'danger' : 'neutral'} />
+        <div role="status" aria-live="polite" className="flex flex-col gap-3" data-testid="push-send-result">
+          <div className="grid grid-cols-3 gap-3">
+            <ResultStat label="앱 알림 생성" value={result.sent} tone="success" />
+            <ResultStat label="스킵" value={result.skipped} tone="neutral" />
+            <ResultStat label="실패" value={result.failed} tone={result.failed > 0 ? 'danger' : 'neutral'} />
+          </div>
+          {/*
+            앱 알림 생성 건수만 보면 "푸시도 갔다"고 오해하기 쉽다. 실제로는 구독이
+            0건이면 푸시는 한 건도 나가지 않는다 — 그 경우를 눈에 보이게 만든다.
+          */}
+          {result.push && <PushDeliveryNote push={result.push} />}
         </div>
       )}
 

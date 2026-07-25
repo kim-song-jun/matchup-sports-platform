@@ -22,7 +22,7 @@ describe('AdminOpsService', () => {
   };
   const adminContext = { logAdminAction: jest.fn().mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null }) };
   const realtimeGateway = { emitToUser: jest.fn() };
-  const webPushService = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+  const webPushService = { sendToUser: jest.fn().mockResolvedValue({ subscriptions: 1, delivered: 1, failed: 0, disabled: false }) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -30,7 +30,7 @@ describe('AdminOpsService', () => {
     // same mock model object so individual model-mock assertions still work.
     prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
     adminContext.logAdminAction.mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null });
-    webPushService.sendToUser.mockResolvedValue(undefined);
+    webPushService.sendToUser.mockResolvedValue({ subscriptions: 1, delivered: 1, failed: 0, disabled: false });
     prisma.v1Notification.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: 'notif-1', ...data }),
     );
@@ -220,7 +220,7 @@ describe('AdminOpsService', () => {
         admin,
       );
 
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
       expect(prisma.v1Notification.create).toHaveBeenCalledWith({
         data: {
           recipientUserId: 'user-1',
@@ -264,7 +264,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
 
-      expect(result).toEqual({ sent: 0, skipped: 1, failed: 0 });
+      expect(result).toEqual({ sent: 0, skipped: 1, failed: 0, push: { subscriptions: 0, delivered: 0, failed: 0, disabled: false } });
       expect(prisma.v1Notification.create).not.toHaveBeenCalled();
     });
 
@@ -274,7 +274,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'user', userId: 'user-1', title: 'hi' }, admin);
 
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
     });
 
     it('broadcasts to every active user via cursor pagination, skipping those with noticeEnabled off, and audit-logs targetId "broadcast"', async () => {
@@ -297,7 +297,7 @@ describe('AdminOpsService', () => {
         orderBy: { id: 'asc' },
         select: { id: true },
       });
-      expect(result).toEqual({ sent: 2, skipped: 1, failed: 0 });
+      expect(result).toEqual({ sent: 2, skipped: 1, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false } });
       expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
       expect(adminContext.logAdminAction).toHaveBeenCalledWith(
         admin,
@@ -319,7 +319,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(result).toEqual({ sent: 2, skipped: 0, failed: 0 });
+      expect(result).toEqual({ sent: 2, skipped: 0, failed: 0, push: { subscriptions: 2, delivered: 2, failed: 0, disabled: false } });
       expect(prisma.v1Notification.create).toHaveBeenCalledTimes(2);
       // 대상 선정에 구독 테이블을 쓰지 않는다.
       expect(prisma.v1PushSubscription.findMany).not.toHaveBeenCalled();
@@ -333,7 +333,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(result).toEqual({ sent: 31, skipped: 0, failed: 0 });
+      expect(result).toEqual({ sent: 31, skipped: 0, failed: 0, push: { subscriptions: 31, delivered: 31, failed: 0, disabled: false } });
       expect(prisma.v1User.findMany).toHaveBeenNthCalledWith(2, {
         where: { accountStatus: 'active' },
         take: 30,
@@ -357,7 +357,7 @@ describe('AdminOpsService', () => {
 
       const result = await service.sendManualPush({ target: 'broadcast', title: '전체 공지' }, admin);
 
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 1 });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 1, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
     });
 
     it('does not fail the whole request when the audit log write fails after a successful send', async () => {
@@ -369,7 +369,7 @@ describe('AdminOpsService', () => {
 
       // The push was already sent — a failed audit log must not turn this into
       // an error response, or an operator could retry and duplicate-send.
-      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0 });
+      expect(result).toEqual({ sent: 1, skipped: 0, failed: 0, push: { subscriptions: 1, delivered: 1, failed: 0, disabled: false } });
     });
   });
 });

@@ -70,9 +70,49 @@ describe('WebPushService', () => {
     const service = await build({ VAPID_PUBLIC_KEY: undefined, VAPID_PRIVATE_KEY: undefined, VAPID_SUBJECT: undefined });
 
     expect(service.getPublicKey()).toBeNull();
-    await service.sendToUser('user-1', { title: 'hi' });
+    const summary = await service.sendToUser('user-1', { title: 'hi' });
 
     expect(prisma.v1PushSubscription.findMany).not.toHaveBeenCalled();
+    // 꺼져 있다는 사실을 호출부가 알 수 있어야 한다 — 그래야 운영 화면이 "보냈다"고
+    // 표시하지 않는다.
+    expect(summary).toEqual({ subscriptions: 0, delivered: 0, failed: 0, disabled: true });
+  });
+
+  /**
+   * sendToUser 는 예외를 전부 삼키므로, 반환하는 요약이 유일한 신호다. 이게 없으면
+   * 호출부(어드민 발송)가 "구독 0건이라 아무 데도 안 감"과 "정상 발송"을 구분할 수 없다.
+   */
+  it('sendToUser reports zero subscriptions instead of silently succeeding when the user has none', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([]);
+
+    const summary = await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(summary).toEqual({ subscriptions: 0, delivered: 0, failed: 0, disabled: false });
+    expect(webpush.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it('sendToUser counts delivered and failed sends separately across multiple subscriptions', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([
+      { id: 'sub-1', endpoint: 'https://fcm.googleapis.com/a', p256dh: 'p1', auth: 'a1' },
+      { id: 'sub-2', endpoint: 'https://fcm.googleapis.com/b', p256dh: 'p2', auth: 'a2' },
+    ]);
+    (webpush.sendNotification as jest.Mock)
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce({ statusCode: 500, message: 'server error' });
+
+    const summary = await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(summary).toEqual({ subscriptions: 2, delivered: 1, failed: 1, disabled: false });
   });
 
   it('enables and returns the configured public key when all three VAPID vars are set', async () => {

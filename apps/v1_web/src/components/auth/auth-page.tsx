@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { AuthBackButton } from './auth-back-button';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { KakaoLoginButton } from './kakao-login-button';
@@ -133,9 +134,7 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
             ) : onBack ? (
-              <button className="tm-btn tm-btn-icon tm-btn-ghost" type="button" onClick={onBack} aria-label={backLabel ?? '뒤로가기'}>
-                <ChevronLeftIcon size={22} strokeWidth={2.2} />
-              </button>
+              <AuthBackButton className="tm-btn tm-btn-icon tm-btn-ghost" label={backLabel ?? '뒤로가기'} onClick={onBack} />
             ) : null}
             {topTitle ? <div className="tm-text-body-lg">{topTitle}</div> : null}
           </div>
@@ -149,9 +148,7 @@ export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, ski
           둘 생기므로, 그때는 상단바 쪽을 정본으로 두고 렌더하지 않는다. */}
       {onBack && !backHref ? (
         <div className="tm-onboarding-desktop-nav tm-show-desktop">
-          <button className="tm-onboarding-desktop-back" type="button" onClick={onBack} aria-label={backLabel ?? '뒤로가기'}>
-            <ChevronLeftIcon size={22} strokeWidth={2.2} />
-          </button>
+          <AuthBackButton className="tm-onboarding-desktop-back" label={backLabel ?? '뒤로가기'} onClick={onBack} />
           {topTitle ? <span className="tm-onboarding-desktop-nav-title">{topTitle}</span> : null}
         </div>
       ) : null}

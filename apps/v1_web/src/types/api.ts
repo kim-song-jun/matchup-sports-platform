@@ -52,6 +52,10 @@ export type V1AuthMe = {
   /**
    * 카카오 가입 진행 중에만 채워진다 — 카카오 동의항목이 승인된 앱에서만 값이 오고,
    * 미승인이면 null 이라 화면은 기존처럼 직접 입력을 받는다.
+   *
+   * 서버는 항상 이 키를 내려주지만(해당 없으면 null) 타입은 optional 로 둔다 — 배포 직후
+   * 브라우저에 남아 있는 이전 /auth/me 캐시 응답에는 키 자체가 없어서, required 로 두면
+   * 실제로 들어올 수 있는 값을 타입이 부정하게 된다.
    */
   socialSignupPrefill?: {
     name: string | null;

@@ -64,6 +64,12 @@ export function AppChrome({
     bottomNav ? '' : 'tm-app-frame-no-bottom',
   ].filter(Boolean).join(' ');
 
+  // 하단 탭바가 없는 화면(상세·하위 페이지)은 모바일/태블릿 폭에서 뒤로가기 외 이동
+  // 수단이 없어 사용자가 갇힌다. 데스크톱 폭(≥1024px)에서는 .tm-desktop-nav 가 홈
+  // 링크를 제공하고 .tm-topbar 자체가 숨겨지므로, 이 단축키는 탭바가 없는 모바일·
+  // 태블릿 폭에서만 노출된다.
+  const showHomeShortcut = topBar && !bottomNav;
+
   return (
     <div className={frameClassName}>
       <DesktopNav activeTab={activeTab} hasNewNotification={hasNewNotification} />
@@ -78,6 +84,11 @@ export function AppChrome({
             <div className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</div>
           </div>
           <div className="tm-topbar-actions">
+            {showHomeShortcut ? (
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/home" aria-label="홈으로">
+                <HomeIcon size={21} strokeWidth={2} />
+              </Link>
+            ) : null}
             {topbarActions ?? (
               <>
                 {showSearch ? (

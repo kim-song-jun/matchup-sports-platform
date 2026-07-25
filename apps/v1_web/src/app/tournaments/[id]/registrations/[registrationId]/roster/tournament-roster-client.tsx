@@ -933,7 +933,7 @@ export function TournamentRosterPageClient({
 
   if (isLoading) {
     return (
-      <AppChrome title="선수 명단" backHref={backHref} bottomNav={false}>
+      <AppChrome title="선수 명단" backHref={backHref}>
         <div
           aria-busy="true"
           aria-label="명단 불러오는 중"
@@ -954,7 +954,7 @@ export function TournamentRosterPageClient({
   if (isError) {
     const msg = extractErrorMessage(rosterErr, '명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="선수 명단" backHref={backHref} bottomNav={false}>
+      <AppChrome title="선수 명단" backHref={backHref}>
         <div style={{ padding: '0 20px', marginTop: 40 }}>
           <ErrorState
             message={msg}
@@ -1067,7 +1067,7 @@ export function TournamentRosterPageClient({
   }
 
   return (
-    <AppChrome title="선수 명단" backHref={backHref} bottomNav={false} activeTab="tournaments">
+    <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments">
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
         {tournament && registration ? (

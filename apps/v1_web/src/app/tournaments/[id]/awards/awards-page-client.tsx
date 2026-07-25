@@ -707,7 +707,7 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
 
   if (isLoading) {
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments">
         <AwardsPageSkeleton />
       </AppChrome>
     );
@@ -716,7 +716,7 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments">
         <div style={{ padding: '40px 20px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
@@ -728,7 +728,6 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
     <AppChrome
       title="시상·리뷰"
       backHref={`/tournaments/${tournamentId}/results`}
-      bottomNav={false}
       activeTab="tournaments"
     >
       <AwardsPageContent tournament={data} />

@@ -64,5 +64,8 @@ export type NotificationsViewModel = {
   readAllPending?: boolean;
   readAllToastVisible?: boolean;
   onReadAll?: () => void;
+  /** 알림 카드 탭 — 읽음 처리·분석 이벤트만 담당하고, 화면 이동은 onNavigate가 맡는다. */
   onOpen?: (notification: NotificationModel) => void;
+  /** 상세 시트의 CTA — 알림 대상 화면으로 이동한다. */
+  onNavigate?: (notification: NotificationModel) => void;
 };

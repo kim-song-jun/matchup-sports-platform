@@ -1238,6 +1238,28 @@ export function NotificationSettingsPageClient() {
 
   const notifications = settings.data?.notifications;
   const [toggleError, setToggleError] = useState(false);
+  // 브라우저 알림 켜기 실패(권한 차단·서버 VAPID 미설정·SW 등록 실패)를 사용자에게 알린다.
+  // 이전에는 subscribe()가 false를 반환해도 토글이 OFF로 남기만 해 원인을 알 수 없었다.
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  const togglePush = async () => {
+    setPushError(null);
+    if (pushRegistration.isSubscribed) {
+      await pushRegistration.unsubscribe();
+      return;
+    }
+    const subscribed = await pushRegistration.subscribe();
+    if (!subscribed) {
+      // 권한은 방금 뜬 팝업의 결과라 클릭 시점 렌더의 pushRegistration.permission은 아직 옛 값이다.
+      // 이 블록은 푸시 지원 환경에서만 도달하므로 Notification을 직접 읽는 편이 정확하다.
+      const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
+      setPushError(
+        denied
+          ? '브라우저에서 알림이 차단돼 있어요. 브라우저 설정에서 이 사이트의 알림을 허용한 뒤 다시 시도해 주세요.'
+          : '지금은 브라우저 알림을 켤 수 없어요. 잠시 후 다시 시도해 주세요.',
+      );
+    }
+  };
   const items = [
     { key: 'matchEnabled', label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때' },
     { key: 'teamEnabled', label: '팀 가입 신청', sub: '내가 운영하는 팀에 신청이 들어올 때' },
@@ -1275,7 +1297,7 @@ export function NotificationSettingsPageClient() {
             <div className="tm-card" style={{ padding: 0, marginBottom: 8 }}>
               <button
                 className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-                onClick={() => void (pushRegistration.isSubscribed ? pushRegistration.unsubscribe() : pushRegistration.subscribe())}
+                onClick={() => void togglePush()}
                 type="button"
                 role="switch"
                 aria-checked={pushRegistration.isSubscribed}
@@ -1308,6 +1330,12 @@ export function NotificationSettingsPageClient() {
                 <span className={`tm-toggle ${pushRegistration.isSubscribed ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
               </button>
             </div>
+          ) : null}
+          {pushError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>브라우저 알림을 켜지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
+            </Card>
           ) : null}
           <Card pad={14} style={{ marginBottom: 8 }}>
             <div className="tm-text-label">앱 안 알림</div>

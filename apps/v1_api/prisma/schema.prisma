@@ -232,6 +232,7 @@ enum V1NotificationTargetType {
   notice
   system
   tournament
+  inquiry
 }
 
 enum V1AdminRole {

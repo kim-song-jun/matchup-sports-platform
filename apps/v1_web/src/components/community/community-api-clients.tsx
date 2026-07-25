@@ -170,16 +170,12 @@ export function NotificationsPageClient() {
           },
         },
       ),
+    // 카드 탭은 상세 시트를 여는 동작 — 읽음 처리만 하고 이동은 시트 CTA(onNavigate)가 맡는다.
     onOpen: (notification) => {
       trackEvent('notification_click', { type: notification.type });
-      if (!notification.unread) {
-        router.push(notification.href);
-        return;
-      }
-      read.mutate(notification.id, {
-        onSettled: () => router.push(notification.href),
-      });
+      if (notification.unread) read.mutate(notification.id);
     },
+    onNavigate: (notification) => router.push(notification.href),
   };
 
   return <NotificationsPageView model={model} />;

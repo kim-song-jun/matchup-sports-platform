@@ -35,12 +35,11 @@ export type NotificationEventType =
   | 'tournament_payment_confirmed'
   | 'tournament_announcement_published'
   | 'team_invitation_received'
-  | 'team_invitation_accepted';
+  | 'team_invitation_accepted'
+  | 'inquiry_answered';
 
-/** Preference field in V1NotificationPreference that gates the event type. */
-function preferenceFieldForEvent(
-  type: NotificationEventType,
-): keyof Pick<
+/** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
+type NotificationPrefField = keyof Pick<
   {
     matchEnabled: boolean;
     teamEnabled: boolean;
@@ -51,8 +50,16 @@ function preferenceFieldForEvent(
     noticeEnabled: boolean;
     marketingEnabled: boolean;
   },
-  'matchEnabled' | 'teamEnabled' | 'teamMatchEnabled' | 'activityEnabled'
-> {
+  'matchEnabled' | 'teamEnabled' | 'teamMatchEnabled' | 'activityEnabled' | 'importantEnabled'
+>;
+
+/** Preference field in V1NotificationPreference that gates the event type. */
+function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
+  // 사용자가 직접 접수한 1:1 문의의 답변은 놓치면 안 되는 알림이므로
+  // 활동 알림(activityEnabled)이 아니라 중요 알림(importantEnabled)으로 게이트한다.
+  if (type === 'inquiry_answered') {
+    return 'importantEnabled';
+  }
   if (
     type === 'match_application_received' ||
     type === 'match_application_approved' ||
@@ -96,6 +103,9 @@ function preferenceFieldForEvent(
 }
 
 function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetType {
+  if (type === 'inquiry_answered') {
+    return 'inquiry';
+  }
   if (
     type === 'match_application_received' ||
     type === 'match_application_approved' ||
@@ -137,6 +147,7 @@ const ROUTE_BASE_BY_TARGET_TYPE: Partial<Record<V1NotificationTargetType, string
   team: '/teams',
   team_match: '/team-matches',
   tournament: '/tournaments',
+  inquiry: '/my/inquiries',
 };
 
 function deepLinkForTarget(
@@ -183,6 +194,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_announcement_published: '대회 공지가 올라왔어요',
   team_invitation_received: '팀 초대가 도착했어요',
   team_invitation_accepted: '팀 초대를 수락했어요',
+  inquiry_answered: '문의에 답변이 등록됐어요',
 };
 
 /**
@@ -216,6 +228,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   tournament_announcement_published: '공지를 확인해 보세요.',
   team_invitation_received: '팀 초대를 확인해 보세요.',
   team_invitation_accepted: '팀 초대를 수락했어요.',
+  inquiry_answered: '답변 내용을 확인해 주세요.',
 };
 
 @Injectable()
@@ -301,7 +314,7 @@ export class NotificationsService {
     title: string,
     body: string | null,
     deepLink: string | null,
-    prefField: keyof { matchEnabled: boolean; teamEnabled: boolean; teamMatchEnabled: boolean; activityEnabled: boolean },
+    prefField: NotificationPrefField,
   ): void {
     this.createNotificationWithPrefCheck(userId, targetType, targetId, title, body, deepLink, prefField).catch(
       (err: unknown) => {
@@ -317,7 +330,7 @@ export class NotificationsService {
     title: string,
     body: string | null,
     deepLink: string | null,
-    prefField: keyof { matchEnabled: boolean; teamEnabled: boolean; teamMatchEnabled: boolean; activityEnabled: boolean },
+    prefField: NotificationPrefField,
   ): Promise<void> {
     const pref = await this.prisma.v1NotificationPreference.findUnique({
       where: { userId },

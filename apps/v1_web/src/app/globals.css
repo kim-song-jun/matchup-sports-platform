@@ -3552,23 +3552,25 @@ button:disabled {
 }
 
 .tm-notification-card {
+  width: 100%;
   min-height: 82px;
   border: 1px solid var(--grey100);
   border-radius: 16px;
   background: var(--bg);
   color: inherit;
   text-decoration: none;
+  text-align: left;
   padding: 14px;
   display: flex;
   gap: 12px;
+  cursor: pointer;
 }
 
 .tm-notification-card-unread {
-  /* 단일 액센트 규약: 카드 면은 중립 --bg, 미읽음 신호는 좌측 6px 마커로만 표현 */
+  /* 미읽음 신호는 굵은 좌측 마커 대신 아이콘 tint + 제목 옆 점으로 표현한다.
+     카드 테두리·라운드가 목록 전체에서 동일하게 유지돼 리듬이 흐트러지지 않는다. */
   background: var(--bg);
-  border-color: var(--grey100);
-  border-left: 6px solid var(--blue500);
-  padding-left: 10px; /* 좌측 border 6px 보정 — 전체 패딩 14px 유지 */
+  border-color: var(--blue100);
 }
 
 .tm-notification-icon {
@@ -3583,13 +3585,28 @@ button:disabled {
 }
 
 .tm-notification-card-unread .tm-notification-icon {
-  background: var(--blue500);
-  color: var(--static-white);
+  background: var(--blue50);
+  color: var(--blue500);
 }
 
-/* 미읽음 카드 제목 — blue500으로 마커 컬러와 일관성 */
-.tm-notification-card-unread .tm-text-body-lg {
-  color: var(--blue500);
+.tm-notification-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 미읽음 카드 제목 — 컬러 반전 대신 굵기로 강조(본문 대비 유지) */
+.tm-notification-card-unread .tm-notification-card-title .tm-text-body-lg {
+  font-weight: 800;
+}
+
+/* 미읽음 점 — sr-only "읽지 않음" 텍스트와 병행(컬러 단독 전달 금지) */
+.tm-notification-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue500);
+  flex: 0 0 auto;
 }
 
 .tm-notification-meta {
@@ -3597,6 +3614,78 @@ button:disabled {
   color: var(--text-caption);
   font-size: var(--font-size-caption); /* 12px — R-T2 토큰 */
   font-weight: 700;
+}
+
+/* ── 알림 상세 시트 ────────────────────────────────────────────────────────
+ * 카드 본문이 2줄로 잘리므로 전문·수신 시각·이동 CTA를 시트에서 제공한다.
+ * 모션·라운드·그림자는 기존 필터 시트(tm-filter-sheet) 규약을 그대로 따른다.
+ * ───────────────────────────────────────────────────────────────────────── */
+.tm-notification-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(25, 31, 40, 0.45);
+  animation: tm-filter-scrim-fade 0.18s ease-out;
+}
+
+.tm-notification-sheet {
+  width: min(100%, var(--v1-app-chrome-frame-width));
+  padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
+  border-radius: 24px 24px 0 0;
+  background: var(--bg);
+  box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
+  animation: tm-filter-sheet-up 0.22s ease-out;
+}
+
+.tm-notification-sheet-grabber {
+  width: 42px;
+  height: 4px;
+  margin: 0 auto 16px;
+  border-radius: 999px;
+  background: var(--grey300);
+}
+
+.tm-notification-sheet-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.tm-notification-sheet-body {
+  margin: 16px 0 20px;
+  color: var(--text-strong);
+  font-size: var(--font-size-body); /* 15px — R-T2 토큰 */
+  line-height: 1.65;
+  white-space: pre-wrap; /* 서버가 넣은 줄바꿈 보존 */
+  word-break: break-word;
+}
+
+.tm-notification-sheet-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 데스크톱에서는 하단 시트 대신 중앙 다이얼로그로 — 하단 고정 nav가 없는 폭이다 */
+@media (min-width: 1024px) {
+  .tm-notification-sheet-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .tm-notification-sheet {
+    width: min(100%, 440px);
+    padding: 20px 24px 24px;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(20, 28, 45, 0.14);
+    animation: fade-in 0.18s ease-out;
+  }
+
+  .tm-notification-sheet-grabber {
+    display: none;
+  }
 }
 
 .tm-empty-state {

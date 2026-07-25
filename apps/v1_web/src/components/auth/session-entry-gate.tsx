@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
-import { isUnauthenticatedError, retryUnlessUnauthenticated } from '@/lib/api-client';
+import { isUnauthenticatedError, retryTransientFailure } from '@/lib/api-client';
 import {
   clearStoredV1Session,
   sanitizeRedirectPath,
@@ -22,8 +22,8 @@ type SessionEntryGateProps = {
 export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
   const router = useRouter();
   const [hasSessionHint, setHasSessionHint] = useState<boolean | null>(null);
-  // 401은 재시도해도 답이 같으니 즉시 로그아웃 처리하고, 일시 오류는 몇 번 다시 시도한다.
-  const authMe = useV1AuthMe({ enabled: hasSessionHint === true, retry: retryUnlessUnauthenticated });
+  // 4xx는 재시도해도 답이 같으니 즉시 해당 경로로 보내고, 일시 오류만 몇 번 다시 시도한다.
+  const authMe = useV1AuthMe({ enabled: hasSessionHint === true, retry: retryTransientFailure });
 
   useEffect(() => {
     setHasSessionHint(shouldProbeV1Session());

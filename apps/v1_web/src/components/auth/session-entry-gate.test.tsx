@@ -103,7 +103,7 @@ describe('SessionEntryGate', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('retries transient failures but never retries a 401', () => {
+  it('retries only transient failures — never a 4xx, which would answer the same and waste the rate limit', () => {
     mocks.useV1AuthMe.mockReturnValue({ isError: false, isFetching: false, isSuccess: false });
 
     render(
@@ -126,10 +126,16 @@ describe('SessionEntryGate', () => {
 
     // 401은 다시 물어도 답이 같다 — 즉시 포기하고 로그아웃 경로로 가야 한다.
     expect(retry(0, apiError(401, 'UNAUTHENTICATED'))).toBe(false);
+    // 403도 마찬가지다. /auth/me는 계정 정지·소셜 가입 미완·약관 재동의로 403을 흔하게
+    // 돌려주는데, 이걸 재시도하면 사용자는 백오프만큼 기다리고 서버는 요청을 3배로 받는다.
+    expect(retry(0, apiError(403, 'TERMS_RECONSENT_REQUIRED'))).toBe(false);
+    expect(retry(0, apiError(403, 'SIGNUP_INCOMPLETE'))).toBe(false);
     // rate limit 503 등 일시 오류는 스스로 복구를 시도한다.
     expect(retry(0, apiError(503, 'SERVICE_UNAVAILABLE'))).toBe(true);
     expect(retry(1, apiError(503, 'SERVICE_UNAVAILABLE'))).toBe(true);
     // 무한히 재시도해 서버를 더 밀어붙이지는 않는다.
     expect(retry(2, apiError(503, 'SERVICE_UNAVAILABLE'))).toBe(false);
+    // 네트워크 단절은 응답이 없어 V1ApiError로 감싸이지 않는다 — 이 경로도 재시도 대상이다.
+    expect(retry(0, new TypeError('Failed to fetch'))).toBe(true);
   });
 });

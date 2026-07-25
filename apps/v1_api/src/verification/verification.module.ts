@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
+import { EmailVerificationService } from './email-verification.service';
 import { PhoneVerificationService } from './phone-verification.service';
 import { EMAIL_SENDER } from './email/email-sender';
 import { SesEmailSender } from './email/ses-email-sender';
@@ -27,8 +28,9 @@ import { VerificationService } from './verification.service';
     },
     { provide: EMAIL_SENDER, useClass: SesEmailSender },
     PhoneVerificationService,
+    EmailVerificationService,
     V1AuthGuard,
   ],
-  exports: [PhoneVerificationService],
+  exports: [PhoneVerificationService, EmailVerificationService],
 })
 export class VerificationModule {}

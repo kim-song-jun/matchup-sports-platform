@@ -1,7 +1,12 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { V1VerificationChannel } from '@prisma/client';
 import { EMAIL_SENDER, EmailSender } from './email/email-sender';
-import { buildOtpEmailHtml, buildOtpEmailText, otpEmailSubject } from './email/otp-email-template';
+import {
+  buildOtpEmailHtml,
+  buildOtpEmailText,
+  otpEmailSubject,
+  type OtpEmailPurpose,
+} from './email/otp-email-template';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { SMS_SENDER, SmsSender, buildOtpSmsText } from './sms/sms-sender';
 
@@ -37,7 +42,16 @@ export class VerificationDispatcherService {
     return this.devEcho && !this.sms.enabled && !this.email.enabled;
   }
 
-  async send(channel: V1VerificationChannel, target: string, code: string): Promise<void> {
+  /**
+   * emailPurpose 는 email 채널의 메일 문구만 고른다(제목·머리말). 기본값은 기존 호출자가
+   * 쓰던 이메일 인증 문구라, 넘기지 않던 곳의 동작은 그대로다.
+   */
+  async send(
+    channel: V1VerificationChannel,
+    target: string,
+    code: string,
+    emailPurpose: OtpEmailPurpose = 'verify',
+  ): Promise<void> {
     const masked = target.length > 4 ? `${target.slice(0, 2)}***${target.slice(-2)}` : '***';
     if (channel === 'phone') {
       if (this.sms.enabled) {
@@ -75,9 +89,9 @@ export class VerificationDispatcherService {
       try {
         await this.email.send(
           target,
-          otpEmailSubject('verify'),
-          buildOtpEmailText(code, 'verify'),
-          buildOtpEmailHtml(code, 'verify'),
+          otpEmailSubject(emailPurpose),
+          buildOtpEmailText(code, emailPurpose),
+          buildOtpEmailHtml(code, emailPurpose),
         );
       } catch (err) {
         this.logger.warn(

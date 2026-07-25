@@ -5,6 +5,7 @@ import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { buildKakaoSignupPrefill, readKakaoSignupPrefill, type KakaoSignupPrefill } from './kakao-profile';
 import { isPendingSocialSignup } from './social-signup-access';
+import { normalizeEmail } from './normalize-email';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
@@ -887,10 +888,6 @@ export class AuthService {
     };
   }
 
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
 }
 
 function getAuthNextRoute(onboarding: { status: string; missing: string[]; currentStep: string }, options?: { social?: boolean }) {

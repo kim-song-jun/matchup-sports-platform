@@ -15,6 +15,57 @@
 | `PATCH` | `/api/v1/onboarding/preferences` | user | `UpdateOnboardingPreferencesDto` | updated onboarding summary |
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" | "later" | "unknown" }` | deferred onboarding summary |
+| `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose? }` | `{ verified, proofToken }` |
+| `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword }` |
+| `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | `{ ok: true }` |
+| `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
+| `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
+| `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }` | `{ ok: true }` |
+
+## Account Recovery (Pre-session)
+
+Finding the signup email and resetting a password happen while logged out, so they cannot reuse
+`/api/v1/verification/*`, which sits behind `V1AuthGuard`. Two channels prove ownership; either one
+leads to a password reset, and only the phone channel can look up the email you signed up with —
+looking up an email by email is not a thing.
+
+| Concern | Contract |
+|---|---|
+| Rate limit | `phone/verify`, `find-account`, `email/confirm` 10/min · `phone/issue`, `email/request`, both reset paths 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
+| Resend cooldown | 30s per target, enforced per phone number and per email address (`VERIFICATION_RESEND_COOLDOWN`). |
+| Attempt cap | 5 wrong codes per challenge (`VERIFICATION_TOO_MANY_ATTEMPTS`). A correct code still succeeds at the cap, so a resubmit is never blocked by earlier typos. |
+| Code TTL | 5 minutes. Proof token TTL 10 minutes. |
+| Social-only accounts | Kakao-only accounts are never given a password. Both reset paths answer `PASSWORD_LOGIN_UNAVAILABLE` — and only after ownership is proven, never at request time. |
+
+### Proof tokens do not cross channels
+
+Both channels sign with the same secret (`V1_SESSION_SECRET` / `V1_JWT_SECRET` / `JWT_SECRET`), so
+the payload is what separates them. Signing, expiry, and constant-time comparison live in
+`verification/proof-token.ts`; each channel only decides what to sign.
+
+```
+phone  signup          {phone}:{exp}                      ← legacy shape, must not change
+phone  password_reset  password_reset:{phone}:{exp}
+email  password_reset  email:password_reset:{email}:{exp}  ← channel label
+```
+
+`/auth/phone/verify` takes `purpose` from the caller for compatibility. The email path does not:
+the server pins it to `password_reset`, so the caller cannot widen what the proof is good for.
+A missing secret is fail-closed — issuing throws, verifying always rejects.
+
+### Account enumeration
+
+Anyone can try any email address, so `email/request` must not reveal whether it belongs to an
+account. It always answers `{ sent: true, expiresAt }` and always writes a challenge row; only a
+registered address is actually mailed. Nobody can guess a code that was never sent, so an
+unregistered address and a wrong code fail identically (`VERIFICATION_CODE_MISMATCH`). `devCode`
+appears only where no real delivery channel is configured (dev-echo) *and* mail was actually sent,
+because otherwise its presence alone would answer the question. Expired challenges are swept on
+each issue so the table stays short — it grows with addresses tried, not with accounts.
+
+The phone path does not need this: `find-account` answers `ACCOUNT_NOT_FOUND` openly, but only
+after the caller has proven the number is theirs.
 
 ## Request DTOs
 
@@ -38,6 +89,11 @@ Primary tables:
 - `v1_user_regions`
 - `v1_user_terms_consents`
 - `v1_notification_preferences`
+- `v1_verification_tokens` — logged-in verification; requires `user_id`
+- `v1_phone_verification_challenges` — pre-session phone OTP, keyed by phone
+- `v1_email_verification_challenges` — pre-session email OTP, keyed by email. Separate from
+  `v1_verification_tokens` precisely because a row must exist for addresses that belong to no
+  account; a `user_id` requirement would make "no such account" observable.
 - `v1_status_change_logs`
 
 Managed terms phase-1 tables:

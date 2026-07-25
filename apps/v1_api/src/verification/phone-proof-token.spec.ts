@@ -1,9 +1,17 @@
 import { issuePhoneProofToken, verifyPhoneProofToken } from './phone-proof-token';
 
 describe('phone-proof-token', () => {
-  const OLD = process.env.V1_SESSION_SECRET;
-  beforeEach(() => { process.env.V1_SESSION_SECRET = 'x'.repeat(48); });
-  afterEach(() => { process.env.V1_SESSION_SECRET = OLD; });
+  // 원래 없던 값을 그대로 대입하면 문자열 "undefined" 가 남아 같은 worker 의 다른 테스트가
+  // "시크릿이 있다"고 오인한다 — 없던 것은 delete 로 되돌린다.
+  let saved: string | undefined;
+  beforeEach(() => {
+    saved = process.env.V1_SESSION_SECRET;
+    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.V1_SESSION_SECRET;
+    else process.env.V1_SESSION_SECRET = saved;
+  });
 
   it('round-trips a token for the same phone', () => {
     const token = issuePhoneProofToken('01012345678');

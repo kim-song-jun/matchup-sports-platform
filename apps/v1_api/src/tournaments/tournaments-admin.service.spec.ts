@@ -400,6 +400,54 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
   });
 
+  it('publishBracket: 예약 시각이 지나 이미 공개 중이면 재예약을 받지 않는다(재비공개 방지)', async () => {
+    // 예약 공개는 조회 시점 판정이라 시각이 지나도 bracketPublishedAt 은 null 이다.
+    // 여기서 미래 예약을 그대로 받으면 이미 공개된 대진표가 다시 감춰진다.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        bracketPublishedAt: null,
+        bracketPublishScheduledAt: new Date(Date.now() - 60_000),
+      }),
+    );
+
+    const result = await service.publishBracket(
+      ownerAuthUser,
+      'tournament-1',
+      new Date(Date.now() + 86_400_000),
+    );
+
+    expect(result.alreadyPublished).toBe(true);
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: 아직 오지 않은 예약이 있으면 재예약은 미래 조건 가드와 함께 기록된다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        bracketPublishedAt: null,
+        bracketPublishScheduledAt: new Date(Date.now() + 3_600_000),
+      }),
+    );
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+
+    const next = new Date(Date.now() + 7_200_000);
+    const result = await service.publishBracket(ownerAuthUser, 'tournament-1', next);
+
+    expect(result.bracketPublishScheduledAt).toBe(next.toISOString());
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          bracketPublishedAt: null,
+          // 이미 지난 예약(=공개 상태)에는 덮어쓰지 않도록 하는 레이스 가드
+          OR: [{ bracketPublishScheduledAt: null }, { bracketPublishScheduledAt: { gt: expect.any(Date) } }],
+        }),
+        data: { bracketPublishScheduledAt: next },
+      }),
+    );
+  });
+
   it('publishBracket: already published → idempotent no-op (no write)', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     const publishedAt = new Date('2026-07-01T00:00:00.000Z');

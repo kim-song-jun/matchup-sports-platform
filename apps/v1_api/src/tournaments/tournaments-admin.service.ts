@@ -10,6 +10,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
+import { isBracketPublished } from './tournament-detail.presenter';
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
@@ -435,10 +436,13 @@ export class TournamentsAdminService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
-    if (existing.bracketPublishedAt) {
+    // "이미 공개됨"은 조회 시점 판정과 같은 규칙으로 봐야 한다. bracketPublishedAt 만 보면
+    // 예약 시각이 지나 이미 공개 중인 대진표에 다시 미래 예약을 걸어 재비공개시키거나,
+    // 불필요한 즉시 공개로 공개 시각을 실제보다 늦게 기록하게 된다.
+    if (isBracketPublished(existing.bracketPublishedAt, existing.bracketPublishScheduledAt)) {
       return {
         tournamentId,
-        bracketPublishedAt: existing.bracketPublishedAt.toISOString(),
+        bracketPublishedAt: existing.bracketPublishedAt?.toISOString() ?? null,
         bracketPublishScheduledAt: existing.bracketPublishScheduledAt?.toISOString() ?? null,
         alreadyPublished: true,
       };
@@ -516,13 +520,22 @@ export class TournamentsAdminService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const now = new Date();
       const transition = await tx.v1Tournament.updateMany({
-        where: { id: tournamentId, deletedAt: null, bracketPublishedAt: null },
+        // 아직 공개 전일 때만 예약을 쓴다. bracketPublishedAt 만 검사하면, 예약 시각이
+        // 막 지나 공개로 간주되는 순간에 레이스로 예약을 미래로 덮어써서 공개된 대진표가
+        // 다시 감춰진다. "예약이 없거나 아직 오지 않았을 때"까지 조건에 넣는다.
+        where: {
+          id: tournamentId,
+          deletedAt: null,
+          bracketPublishedAt: null,
+          OR: [{ bracketPublishScheduledAt: null }, { bracketPublishScheduledAt: { gt: now } }],
+        },
         data: { bracketPublishScheduledAt: scheduledAt },
       });
 
       if (transition.count === 0) {
-        // 예약을 거는 사이 다른 관리자가 즉시 공개했을 수 있다.
+        // 예약을 거는 사이 다른 관리자가 즉시 공개했거나, 기존 예약 시각이 지나 공개된 상태.
         const current = await tx.v1Tournament.findUnique({
           where: { id: tournamentId },
           select: { bracketPublishedAt: true, deletedAt: true },

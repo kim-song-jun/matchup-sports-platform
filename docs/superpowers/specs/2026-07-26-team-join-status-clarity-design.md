@@ -30,9 +30,11 @@
 
 기존 `GET /me/invitations`(`myInvitations`)를 미러링한다. 신청자 본인이 보낸 가입 신청 목록.
 
-- 정렬: `requested` 우선 → `createdAt desc`
+- 정렬: 승인 대기(`requested`) 그룹이 항상 앞. 그룹 내 정렬은 각각
+  - 승인 대기: `createdAt desc` (언제 신청했는지가 기준)
+  - 처리 완료: `updatedAt desc` (언제 처리됐는지가 기준 — 승인/거절/철회 시각이 반영됨)
 - 범위: 전 상태(`requested` / `approved` / `rejected` / `withdrawn` / `expired`). 승인 대기와 처리 완료를 **각각 최대 20건**씩 조회해 합친다(응답 최대 40건). 합쳐서 한 번 더 자르면 대기 건이 처리 완료 건에 밀려 잘릴 수 있어 의도적으로 그룹별 상한을 쓴다.
-- 응답 항목: `applicationId`, `teamId`, `status`, `message`, `createdAt`, `reviewedAt`, `team { teamId, name, sportId, logoUrl, introductionPreview }`
+- 응답 항목: `applicationId`, `teamId`, `status`, `message`, `createdAt`, `reviewedAt`, `withdrawnAt`, `team { teamId, name, sportId, logoUrl, introductionPreview }`
 
 ### 프론트 (`apps/v1_web`)
 

@@ -29,7 +29,7 @@
 
 ```prisma
 model V1ErrorLog {
-  id              String    @id @default(uuid())
+  id              String    @default(uuid())
   fingerprint     String
   windowBucket    DateTime  @map("window_bucket")
   occurrenceCount Int       @default(1) @map("occurrence_count")
@@ -55,6 +55,7 @@ model V1ErrorLog {
   firstSeenAt     DateTime  @default(now()) @map("first_seen_at")
   lastSeenAt      DateTime  @default(now()) @map("last_seen_at")
 
+  @@id([id, windowBucket])
   @@unique([fingerprint, windowBucket])
   @@index([lastSeenAt])
   @@index([source, statusCode])
@@ -63,6 +64,10 @@ model V1ErrorLog {
 ```
 
 `source`는 `server | client`, `level`은 `error | warn`.
+
+**복합 PK인 이유는 파티셔닝 대비다.** Postgres 파티션 테이블은 PK·UNIQUE 제약에 파티션 키를 반드시 포함해야 한다. `id` 단독 PK로 두면 나중에 파티셔닝할 때 PK를 바꿔야 하고, 그건 테이블 재생성과 데이터 이관을 부른다. 지금 `windowBucket`을 PK에 넣어두면 전환 시 스키마 변경 없이 파티션만 얹으면 된다. `@@unique([fingerprint, windowBucket])`도 이미 파티션 키를 포함하고 있어 그대로 유효하다.
+
+조회는 `id` 단독으로 해도 되지만(사실상 유일), 상세 API는 `id` + `windowBucket`을 함께 받아 파티션 프루닝이 걸리게 한다 — 목록 응답에 두 값을 모두 실어 보내면 된다.
 
 ### 2. 중복 억제 (dedupe)
 
@@ -146,9 +151,27 @@ cookie, secret, phone, phoneNumber, ssn, birthDate, cardNumber
 - 상단에 **"전체 복사"** — 이슈에 그대로 붙여넣을 수 있는 마크다운 한 덩어리(메타 + traceback + request + response)
 - `navigator.clipboard` 실패 시 토스트로 알린다(조용히 실패 금지)
 
-### 7. 보존
+### 7. 보존 — 무제한, 파티셔닝으로 대비
 
-30일 초과 행을 정리하는 cron. 기존 선례대로 `DISABLE_ERROR_LOG_CLEANUP_CRON=true`로 끌 수 있어야 한다(테스트 환경에서 비활성화).
+**자동 삭제 cron을 두지 않는다.** 에러 이력은 오래된 것이 회귀 판단(“이 에러 지난 분기에도 있었나”)에 쓰이므로 보존한다.
+
+대신 무한히 커지는 단일 테이블이 되지 않도록 **파티셔닝 전환 경로를 미리 확보한다.**
+
+**지금 하는 것** — 전환 준비만, 파티션은 만들지 않는다.
+- PK를 `@@id([id, windowBucket])`로 잡아 파티션 키를 포함시킨다 (위 모델 참조)
+- 모든 목록 조회에 기간 조건을 넣어, 파티셔닝 후 프루닝이 그대로 걸리게 한다
+- `lastSeenAt` 인덱스로 최신순 조회를 받친다
+
+**나중에 하는 것** — 행 수가 임계에 다다르면(수천만 행 또는 테이블 수 GB) 월별 RANGE 파티션으로 전환한다. `windowBucket`이 파티션 키이므로 `PARTITION BY RANGE (window_bucket)`이 자연스럽고, 창 버킷 자체가 시간으로 내림된 값이라 경계에 걸치는 행이 없다.
+
+**전환 시 반드시 확인할 것 — 드리프트 게이트.** 이 레포 CI는 “빈 DB에 마이그레이션 전체 체인 재생 + `schema.prisma` 드리프트 0”을 강제한다. Prisma는 선언적 파티셔닝을 표현하지 못하고 파티션 자식 테이블을 별개 테이블로 introspect하므로, **파티션을 마이그레이션에 넣으면 게이트가 깨질 수 있다**. 이 레포에서 부분 인덱스를 포기한 것과 같은 제약이다(2026-07-25 대진표 예약 공개 작업 선례).
+
+전환 시점에 아래를 먼저 검증한다.
+1. raw SQL 마이그레이션으로 파티션 테이블을 만들었을 때 `prisma migrate diff`가 드리프트를 보고하는지
+2. 보고한다면 — 자식 파티션을 마이그레이션이 아니라 **운영 스크립트로 생성**해 마이그레이션 체인에서 빼는 방안
+3. 그래도 걸리면 게이트 예외 규칙을 명시적으로 추가할지 팀 결정
+
+검증 전에는 파티셔닝을 도입하지 않는다. 준비된 스키마만으로도 전환 비용은 이미 크게 낮아진 상태다.
 
 ## 테스트 시나리오
 
@@ -172,15 +195,16 @@ cookie, secret, phone, phoneNumber, ssn, birthDate, cardNumber
 - 마스킹 목록에 인증 관련 키를 전부 포함 (카카오 `code`, 세션 `cookie`, `authorization`)
 - 어드민 화면은 기존 `AdminGuard` + `_gate.tsx` 경유 — 신규 노출면 없음
 - 저장 상한 4000자로 대용량 payload 적재 차단
-- 30일 보존으로 개인정보 무기한 축적 방지
+- **보존이 무기한이므로 마스킹이 유일한 방어선이다.** 자동 삭제로 뒤늦게 지워지는 안전망이 없으니, 마스킹 목록 누락은 곧 영구 저장을 뜻한다. 신규 필드를 담을 때마다 목록을 점검하고, 목록은 테스트로 고정한다.
 
 ## 리스크
 
 | 리스크 | 대응 |
 |---|---|
 | 전수 적재로 쓰기 부하 증가 | dedupe upsert라 같은 에러는 UPDATE 1회. alpha 트래픽 규모에서 문제 없음 |
-| 마스킹 누락으로 민감정보 저장 | 목록을 단일 상수로 두고 테스트로 고정. 신규 필드 추가 시 목록 점검 |
+| 마스킹 누락으로 민감정보 **영구** 저장 | 보존 무기한이라 자동 삭제 안전망이 없다. 목록을 단일 상수로 두고 테스트로 고정, 신규 필드마다 점검 |
 | fingerprint 과도 통합 | route·message 정규화 규칙을 테스트로 고정 |
+| 무기한 보존으로 테이블 비대 | 파티션 키를 PK에 미리 포함해 전환 비용을 낮춰둔다. 임계 도달 시 월별 RANGE 파티션 — 단 드리프트 게이트 검증이 선행 조건 |
 
 ## 작업 순서
 
@@ -188,4 +212,5 @@ cookie, secret, phone, phoneNumber, ssn, birthDate, cardNumber
 2. 백엔드: 어드민 조회 API (`GET /admin/ops/errors`, `GET /admin/ops/errors/:id`)
 3. 인프라: `V1_RELEASE` 주입
 4. 프론트: 훅 → 테이블 → 상세 모달 → 복사
-5. 보존 cron
+
+보존 cron은 만들지 않는다(무기한 보존). 파티셔닝은 이번 범위 밖이며, 위 7절의 검증을 마친 뒤 별도 작업으로 다룬다.

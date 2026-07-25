@@ -44,6 +44,19 @@ const PAGE_SIZE = 20;
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /** 상대 시각: 방금 전 / N분 전 / N시간 전 / N일 전, 그 이후는 절대 일시로. */
+/**
+ * `<input type="date">`가 주는 YYYY-MM-DD를 조회 구간의 경계로 바꾼다.
+ *
+ * `new Date('2026-07-26')`는 UTC 자정으로 파싱된다 — 그대로 쓰면 KST에서 구간이 9시간
+ * 어긋나 하루가 밀리고, 종료일은 그날 00:00:00이 되어 하루치 로그가 통째로 빠진다.
+ * 시각을 붙이면 로컬 타임존으로 파싱되므로, 시작은 00:00:00 / 끝은 23:59:59.999로 맞춘다.
+ */
+function dayBoundaryIso(value: string, edge: 'start' | 'end'): string | null {
+  if (!value) return null;
+  const d = new Date(`${value}T${edge === 'start' ? '00:00:00.000' : '23:59:59.999'}`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 function formatRelativeTime(dateStr: string): string {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return dateStr;
@@ -97,8 +110,8 @@ export function ErrorLogsClient() {
     ...(source ? { source } : {}),
     ...(level ? { level } : {}),
     ...(validStatusCode !== undefined ? { statusCode: validStatusCode } : {}),
-    ...(from ? { from: new Date(from).toISOString() } : {}),
-    ...(to ? { to: new Date(to).toISOString() } : {}),
+    ...(dayBoundaryIso(from, 'start') ? { from: dayBoundaryIso(from, 'start')! } : {}),
+    ...(dayBoundaryIso(to, 'end') ? { to: dayBoundaryIso(to, 'end')! } : {}),
     ...(search.trim() ? { q: search.trim() } : {}),
     ...(cursor ? { cursor } : {}),
     limit: PAGE_SIZE,

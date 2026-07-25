@@ -197,6 +197,27 @@ describe('AllExceptionsFilter', () => {
     );
   });
 
+  // ValidationPipe 는 message 를 문자열 배열로 준다. 이걸 'HTTP 400' 으로 뭉개면 같은
+  // route 의 서로 다른 검증 실패가 한 fingerprint 로 접혀 어떤 필드가 틀렸는지 사라진다.
+  it('records the joined validation messages instead of a bare "HTTP 400", while the response keeps the array', () => {
+    const request = { id: 'req-9', method: 'POST', originalUrl: '/api/v1/auth/register' };
+    const { host, response } = buildHost(request);
+    const exception = new HttpException(
+      { message: ['email must be an email', 'password is too short'], error: 'Bad Request', statusCode: 400 },
+      HttpStatus.BAD_REQUEST,
+    );
+
+    filter.catch(exception, host);
+
+    expect(errorLogService.record).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'email must be an email, password is too short' }),
+    );
+    // 클라이언트 계약은 그대로 — 응답에는 예외 payload 원본이 실려 검증 메시지 배열이 보존된다.
+    expect(response.json.mock.calls[0][0].message).toEqual(
+      expect.objectContaining({ message: ['email must be an email', 'password is too short'] }),
+    );
+  });
+
   it('still sends the original error response when ErrorLogService.record throws', () => {
     errorLogService.record.mockImplementationOnce(() => {
       throw new Error('db write failed');

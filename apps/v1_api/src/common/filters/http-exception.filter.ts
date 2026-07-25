@@ -61,12 +61,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.warn(logContext, `HTTP ${status} ${logContext.method} ${logContext.route}`);
     }
 
+    // ValidationPipe 는 message 를 문자열 배열로 준다("email must be an email", ...).
+    // 이때 `HTTP 400` 으로만 기록하면 같은 route 의 서로 다른 검증 실패가 모두 같은
+    // fingerprint 가 되어 한 행으로 뭉치고, 어드민 목록에도 어떤 필드가 틀렸는지 남지
+    // 않는다 — 조사에 필요한 정보가 통째로 사라지므로 join 해서 남긴다.
+    // (아래 responseBody 의 message 는 배열 원본을 그대로 내보내 클라이언트 계약을 지킨다.)
     const responseMessage =
       typeof message === 'string'
         ? message
-        : messageObj && typeof messageObj.message === 'string'
-          ? (messageObj.message as string)
-          : `HTTP ${status}`;
+        : Array.isArray(messageObj?.message)
+          ? messageObj.message.filter((item) => typeof item === 'string').join(', ') || `HTTP ${status}`
+          : messageObj && typeof messageObj.message === 'string'
+            ? (messageObj.message as string)
+            : `HTTP ${status}`;
 
     const responseBody = {
       status: 'error',

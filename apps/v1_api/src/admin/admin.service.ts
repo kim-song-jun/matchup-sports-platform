@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { isSafePopupLink } from '../popups/popup-screen';
@@ -462,17 +463,22 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async actionLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const logs = await this.prisma.v1AdminActionLog.findMany({
-      where: {
-        ...(query.adminUserId ? { adminUserId: query.adminUserId } : {}),
-        ...(query.targetType ? { targetType: query.targetType } : {}),
-        ...(query.targetId ? { targetId: query.targetId } : {}),
-        ...(query.actionType ? { action: query.actionType } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const where = {
+      ...(query.adminUserId ? { adminUserId: query.adminUserId } : {}),
+      ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.actionType ? { action: query.actionType } : {}),
+    };
+    // 페이지 버튼을 그리려면 총 건수가 필요하다 — 목록과 함께 한 번에 집계한다.
+    const [logs, total] = await Promise.all([
+      this.prisma.v1AdminActionLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+      }),
+      this.prisma.v1AdminActionLog.count({ where }),
+    ]);
     const pageItems = logs.slice(0, limit);
     const hasNext = logs.length > limit;
     return {
@@ -487,23 +493,33 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         afterState: log.afterJson,
         createdAt: log.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
     };
   }
 
   async statusChangeLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const logs = await this.prisma.v1StatusChangeLog.findMany({
-      where: {
-        ...(query.targetType ? { targetType: query.targetType } : {}),
-        ...(query.targetId ? { targetId: query.targetId } : {}),
-        ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const where = {
+      ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
+    };
+    const [logs, total] = await Promise.all([
+      this.prisma.v1StatusChangeLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+      }),
+      this.prisma.v1StatusChangeLog.count({ where }),
+    ]);
     const pageItems = logs.slice(0, limit);
     const hasNext = logs.length > limit;
     return {
@@ -518,7 +534,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         reason: log.reason,
         createdAt: log.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
     };
   }
 

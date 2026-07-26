@@ -2005,7 +2005,7 @@ button:disabled {
 }
 
 .tm-match-list {
-  padding: 14px 20px 108px;
+  padding: 14px var(--v1-shell-page-x) 108px;
 }
 
 .tm-sport-chip-row {
@@ -2674,7 +2674,7 @@ button:disabled {
 }
 
 .tm-team-list {
-  padding: 14px 20px 104px;
+  padding: 14px var(--v1-shell-page-x) 104px;
 }
 
 .tm-list-search-input {
@@ -4391,7 +4391,7 @@ button:disabled {
 .tm-my-shell {
   display: grid;
   gap: 14px;
-  padding: 18px 20px 124px;
+  padding: 18px var(--v1-shell-page-x) 124px;
 }
 
 .tm-my-profile-head {
@@ -4601,10 +4601,25 @@ button:disabled {
   border-radius: 14px;
   background: var(--grey100);
 }
+
+/* 매치 유형(개인/팀) 세그먼트 — 스크롤 영역 직속 자식이라 좌우 여백을 스스로 확보해야 한다.
+   위 검색바 입력·아래 종목 칩/카드가 모두 --v1-shell-page-x 인셋이므로 같은 토큰으로 맞춘다. */
+.tm-match-type-segment {
+  margin: 0 var(--v1-shell-page-x) 12px;
+}
+
+@media (min-width: 1024px) {
+  /* 데스크탑에서는 리스트·검색바의 모바일 패딩이 0으로 리셋되고 스크롤 영역이 열 여백을 담당하므로
+     세그먼트도 열 가장자리에 맞춰야 제목·검색바와 정렬된다. */
+  .tm-match-type-segment {
+    margin-inline: 0;
+  }
+}
+
 .tm-review-shell {
   display: grid;
   gap: 14px;
-  padding: 18px 20px 124px;
+  padding: 18px var(--v1-shell-page-x) 124px;
 }
 
 .tm-review-compose-shell {

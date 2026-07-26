@@ -458,8 +458,11 @@ export function SignupClient() {
           <p className="tm-text-body tm-auth-sub">{copy.sub}</p>
         </div>
 
+        {/* 별표를 aria-hidden 으로만 두면 "표시는 필수 입력이에요"로 읽혀 무엇에 대한 설명인지
+            사라진다. 시각 사용자는 기호로, 보조공학은 sr-only 단어로 같은 문장을 받게 한다. */}
         <p className="tm-text-caption" style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>
-          <span aria-hidden="true" style={{ color: 'var(--red500)' }}>*</span> 표시는 필수 입력이에요.
+          <span aria-hidden="true" style={{ color: 'var(--red500)' }}>*</span>
+          <span className="sr-only">별표</span> 표시는 필수 입력이에요.
         </p>
 
         <form className="tm-auth-form tm-auth-signup-form" onSubmit={(event: FormEvent) => event.preventDefault()}>

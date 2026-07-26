@@ -1,0 +1,230 @@
+[
+  {
+    "label": "회원",
+    "slug": "users",
+    "name": "mobile",
+    "width": 390,
+    "file": "alpha-users-mobile-390.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 101건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 101건 중 21–40",
+      "file": "alpha-users-page2-mobile-390.png"
+    }
+  },
+  {
+    "label": "팀",
+    "slug": "teams",
+    "name": "mobile",
+    "width": 390,
+    "file": "alpha-teams-mobile-390.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 32건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 32건 중 21–32",
+      "file": "alpha-teams-page2-mobile-390.png"
+    }
+  },
+  {
+    "label": "감사 로그",
+    "slug": "audit",
+    "name": "mobile",
+    "width": 390,
+    "file": "alpha-audit-mobile-390.png",
+    "rows": 40,
+    "cards": 40,
+    "paginationBar": true,
+    "paginationText": "전체 167건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 167건 중 21–40",
+      "file": "alpha-audit-page2-mobile-390.png"
+    }
+  },
+  {
+    "label": "에러 로그",
+    "slug": "errors",
+    "name": "mobile",
+    "width": 390,
+    "file": "alpha-errors-mobile-390.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 22건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 22건 중 21–22",
+      "file": "alpha-errors-page2-mobile-390.png"
+    }
+  },
+  {
+    "label": "팝업",
+    "slug": "popups",
+    "name": "mobile",
+    "width": 390,
+    "file": "alpha-popups-mobile-390.png",
+    "rows": 0,
+    "cards": 1,
+    "paginationBar": false,
+    "paginationText": null,
+    "page2": null
+  },
+  {
+    "label": "회원",
+    "slug": "users",
+    "name": "tablet",
+    "width": 768,
+    "file": "alpha-users-tablet-768.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 101건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 101건 중 21–40",
+      "file": "alpha-users-page2-tablet-768.png"
+    }
+  },
+  {
+    "label": "팀",
+    "slug": "teams",
+    "name": "tablet",
+    "width": 768,
+    "file": "alpha-teams-tablet-768.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 32건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 32건 중 21–32",
+      "file": "alpha-teams-page2-tablet-768.png"
+    }
+  },
+  {
+    "label": "감사 로그",
+    "slug": "audit",
+    "name": "tablet",
+    "width": 768,
+    "file": "alpha-audit-tablet-768.png",
+    "rows": 40,
+    "cards": 40,
+    "paginationBar": true,
+    "paginationText": "전체 167건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 167건 중 21–40",
+      "file": "alpha-audit-page2-tablet-768.png"
+    }
+  },
+  {
+    "label": "에러 로그",
+    "slug": "errors",
+    "name": "tablet",
+    "width": 768,
+    "file": "alpha-errors-tablet-768.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 22건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 22건 중 21–22",
+      "file": "alpha-errors-page2-tablet-768.png"
+    }
+  },
+  {
+    "label": "팝업",
+    "slug": "popups",
+    "name": "tablet",
+    "width": 768,
+    "file": "alpha-popups-tablet-768.png",
+    "rows": 0,
+    "cards": 1,
+    "paginationBar": false,
+    "paginationText": null,
+    "page2": null
+  },
+  {
+    "label": "회원",
+    "slug": "users",
+    "name": "desktop",
+    "width": 1440,
+    "file": "alpha-users-desktop-1440.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 101건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 101건 중 21–40",
+      "file": "alpha-users-page2-desktop-1440.png"
+    }
+  },
+  {
+    "label": "팀",
+    "slug": "teams",
+    "name": "desktop",
+    "width": 1440,
+    "file": "alpha-teams-desktop-1440.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 32건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 32건 중 21–32",
+      "file": "alpha-teams-page2-desktop-1440.png"
+    }
+  },
+  {
+    "label": "감사 로그",
+    "slug": "audit",
+    "name": "desktop",
+    "width": 1440,
+    "file": "alpha-audit-desktop-1440.png",
+    "rows": 40,
+    "cards": 40,
+    "paginationBar": true,
+    "paginationText": "전체 167건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 167건 중 21–40",
+      "file": "alpha-audit-page2-desktop-1440.png"
+    }
+  },
+  {
+    "label": "에러 로그",
+    "slug": "errors",
+    "name": "desktop",
+    "width": 1440,
+    "file": "alpha-errors-desktop-1440.png",
+    "rows": 20,
+    "cards": 20,
+    "paginationBar": true,
+    "paginationText": "전체 22건 중 1–20",
+    "page2": {
+      "current": "2",
+      "text": "전체 22건 중 21–22",
+      "file": "alpha-errors-page2-desktop-1440.png"
+    }
+  },
+  {
+    "label": "팝업",
+    "slug": "popups",
+    "name": "desktop",
+    "width": 1440,
+    "file": "alpha-popups-desktop-1440.png",
+    "rows": 0,
+    "cards": 1,
+    "paginationBar": false,
+    "paginationText": null,
+    "page2": null
+  }
+]

@@ -103,19 +103,25 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
         timestamp: new Date().toISOString(),
       };
     const error = new V1ApiError(errorBody);
-    reportClientError({
-      message: error.message,
-      level: error.statusCode >= 500 ? 'error' : 'warn',
-      context: {
-        path: path.split('?')[0],
-        statusCode: error.statusCode,
-        code: error.code,
-        requestId: errorBody.requestId,
-      },
-    });
+    // 휴대폰 미인증 차단은 설계된 제품 상태이지 클라이언트 오류가 아니다. 리포터의 dedupe 는
+    // 10초 창이라 미인증 사용자 수만큼 에러 로그가 실제로 쌓이고, 그러면 어드민 에러 뷰어에서
+    // 진짜 장애가 이 잡음에 묻힌다 — 로그는 건너뛰고 안내 신호만 보낸다.
+    const phoneVerificationRequired = error.code === PHONE_VERIFICATION_REQUIRED_CODE;
+    if (!phoneVerificationRequired) {
+      reportClientError({
+        message: error.message,
+        level: error.statusCode >= 500 ? 'error' : 'warn',
+        context: {
+          path: path.split('?')[0],
+          statusCode: error.statusCode,
+          code: error.code,
+          requestId: errorBody.requestId,
+        },
+      });
+    }
     // 미인증 계정이 쓰기를 시도한 경우 — 실패 토스트만 남기면 사용자는 이유를 알 수 없다.
     // 전역 모달이 인증 화면으로 안내하도록 여기서 한 번만 신호를 쏜다.
-    if (error.code === PHONE_VERIFICATION_REQUIRED_CODE) notifyPhoneVerificationRequired();
+    if (phoneVerificationRequired) notifyPhoneVerificationRequired();
     throw error;
   }
 

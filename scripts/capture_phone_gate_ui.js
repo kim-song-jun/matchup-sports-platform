@@ -6,8 +6,10 @@ const path = require('path');
 
 const BASE = process.env.CAPTURE_BASE_URL || 'http://localhost:3023';
 const OUT = path.join(__dirname, '..', 'docs', 'visual-qa', 'phone-gate');
-const UNVERIFIED = { id: '86aced47-8168-443c-822e-a4c284bbda0b', email: 'member@teameet.v1' };
-const VERIFIED = { id: '9f2252f7-86ab-4a1f-827e-065bbc675c9c', email: 'host@teameet.v1' };
+// 세션은 이메일로만 심는다 — 시드가 만드는 userId 는 실행할 때마다 달라져서 UUID 를 박아 두면
+// 다른 환경에서 그 계정으로 인증되지 않는다(백엔드는 x-v1-user-id 를 먼저 해석한다).
+const UNVERIFIED = { email: process.env.CAPTURE_UNVERIFIED_EMAIL || 'member@teameet.v1' };
+const VERIFIED = { email: process.env.CAPTURE_VERIFIED_EMAIL || 'host@teameet.v1' };
 
 const VIEWPORTS = [
   { key: 'mobile', width: 390, height: 844 },
@@ -21,7 +23,7 @@ async function newContext(browser, viewport, user) {
     deviceScaleFactor: 2,
   });
   await context.addInitScript((session) => {
-    window.localStorage.setItem('teameet.v1.userId', session.id);
+    window.localStorage.removeItem('teameet.v1.userId');
     window.localStorage.setItem('teameet.v1.userEmail', session.email);
   }, user);
   return context;

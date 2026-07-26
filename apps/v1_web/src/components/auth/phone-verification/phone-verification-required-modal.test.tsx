@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { v1Post } from '@/lib/api-client';
 import { PhoneVerificationRequiredModal } from './phone-verification-required-modal';
 
+const reportClientError = vi.fn();
+vi.mock('@/lib/client-error-reporter', () => ({
+  reportClientError: (payload: unknown) => reportClientError(payload),
+}));
+
 const assign = vi.fn();
 
 function setLocation(pathname: string, search = '') {
@@ -31,6 +36,26 @@ describe('PhoneVerificationRequiredModal', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     assign.mockReset();
+    reportClientError.mockReset();
+  });
+
+  // 미인증 차단은 설계된 제품 상태다. 이걸 클라이언트 에러로 올리면 미인증 사용자 수만큼
+  // 로그가 쌓여(리포터 dedupe 는 10초 창) 어드민 에러 뷰어에서 진짜 장애가 묻힌다.
+  it('does not report the designed block as a client error, but still reports other failures', async () => {
+    setLocation('/tournaments/t-1/apply');
+    stubApiError('PHONE_VERIFICATION_REQUIRED');
+    render(<PhoneVerificationRequiredModal />);
+
+    await act(async () => {
+      await expect(v1Post('/tournaments/t-1/registrations', {})).rejects.toThrow();
+    });
+    expect(reportClientError).not.toHaveBeenCalled();
+
+    stubApiError('TOURNAMENT_REGISTRATION_CLOSED');
+    await act(async () => {
+      await expect(v1Post('/tournaments/t-1/registrations', {})).rejects.toThrow();
+    });
+    expect(reportClientError).toHaveBeenCalledTimes(1);
   });
 
   it('explains the block and sends the user to verification with a way back', async () => {

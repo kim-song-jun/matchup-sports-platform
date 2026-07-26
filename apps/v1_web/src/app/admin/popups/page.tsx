@@ -375,37 +375,22 @@ export default function AdminPopupsPage() {
                   </div>
                 ),
               },
-              {
-                key: 'targetScreens',
-                header: '노출 화면',
-                width: 'w-[150px]',
-                render: (row) => (
-                  <span
-                    className="block truncate text-gray-600"
-                    title={formatTargetScreens(row.targetScreens)}
-                  >
-                    {row.status === 'published'
-                      ? formatTargetScreens(row.targetScreens)
-                      : '미노출'}
-                  </span>
-                ),
-              },
+              // 이 목록은 우측 400px 상세 패널과 2단으로 나눠 쓰므로 표에 주어진 폭이 좁다.
+              // 컬럼을 더 늘리면 작업 버튼까지 밀려 잘린다 — 노출 화면·수정 시각은 상세
+              // 패널에서 확인하고, 목록에는 언제 걸려 있는지만 남긴다.
               {
                 key: 'displayWindow',
                 header: '게시 기간',
-                width: 'w-[190px]',
+                width: 'w-[172px]',
                 render: (row) => (
-                  <span className="whitespace-nowrap text-gray-600">
+                  <span
+                    className="block truncate text-gray-600"
+                    title={`${formatDisplayWindow(row.displayStartAt, row.displayEndAt)} · ${
+                      row.status === 'published' ? formatTargetScreens(row.targetScreens) : '미노출'
+                    }`}
+                  >
                     {formatDisplayWindow(row.displayStartAt, row.displayEndAt)}
                   </span>
-                ),
-              },
-              {
-                key: 'updatedAt',
-                header: '수정',
-                width: 'w-[124px]',
-                render: (row) => (
-                  <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.updatedAt)}</span>
                 ),
               },
             ]}

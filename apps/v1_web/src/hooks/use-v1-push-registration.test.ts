@@ -242,4 +242,45 @@ describe('useV1PushRegistration', () => {
     );
     expect(result.current.isSubscribed).toBe(false);
   });
+
+  /**
+   * isPending 이 풀리지 않으면 토글이 영원히 "켜는 중…" 으로 잠긴다 — 실패 경로에서
+   * 특히 위험해서(사용자는 재시도조차 못 한다) 성공/실패 양쪽을 확인한다.
+   */
+  it('subscribe 성공 후 isPending 이 풀린다', async () => {
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    expect(result.current.isPending).toBe(false);
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(result.current.isSubscribed).toBe(true);
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it('subscribe 가 실패해도 isPending 이 풀려 다시 시도할 수 있다', async () => {
+    (v1Post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('server exploded'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it('unsubscribe 가 실패해도 isPending 이 풀린다', async () => {
+    pushManager.getSubscription.mockRejectedValue(new Error('sw gone'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(result.current.isPending).toBe(false);
+  });
 });

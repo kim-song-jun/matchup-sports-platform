@@ -66,6 +66,7 @@ describe('OnboardingClient GA events', () => {
       unsubscribe: vi.fn(),
       permission: 'default',
       isSubscribed: false,
+      isPending: false,
     });
   });
 
@@ -108,6 +109,7 @@ describe('OnboardingClient GA events', () => {
       unsubscribe: vi.fn(),
       permission: 'default',
       isSubscribed: false,
+      isPending: false,
     });
     window.sessionStorage.setItem(
       'teameet.v1.onboardingDraft',
@@ -128,6 +130,7 @@ describe('OnboardingClient GA events', () => {
       unsubscribe: vi.fn(),
       permission: 'default',
       isSubscribed: false,
+      isPending: false,
     });
     window.sessionStorage.setItem(
       'teameet.v1.onboardingDraft',
@@ -149,6 +152,7 @@ describe('OnboardingClient GA events', () => {
       unsubscribe: vi.fn(),
       permission: 'granted',
       isSubscribed: true,
+      isPending: false,
     });
     window.sessionStorage.setItem(
       'teameet.v1.onboardingDraft',

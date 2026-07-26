@@ -66,8 +66,11 @@ async function shoot(page, name) {
     // 브라우저 알림 토글은 권한이 없으면 disabled 라 클릭해도 요청이 나가지 않는다 —
     // 실제 PATCH 를 보내는 알림 선호도 토글을 이름으로 집는다.
     const toggle = page.getByRole('switch', { name: '매치 승인 알림' });
-    await toggle.click().catch(() => {});
-    await page.waitForTimeout(1200);
+    await toggle.waitFor({ state: 'visible', timeout: 15000 });
+    await toggle.click();
+    // 모달이 실제로 떴는지 확인하고 찍는다. 클릭 실패를 삼키면 모달 없는 화면이 '차단 모달'
+    // 증거로 남는다 — 이 스크립트에서 실제로 한 번 그렇게 잘못 캡처된 적이 있다.
+    await page.getByText('휴대폰 본인인증이 필요해요').waitFor({ state: 'visible', timeout: 15000 });
     await shoot(page, `blocked-modal-${viewport.key}`);
     await unverified.close();
 

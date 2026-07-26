@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Calendar, Clock, Eye, LogIn, Shield, UserRound } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminUsers,
@@ -14,7 +14,8 @@ import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -229,56 +230,109 @@ function AdminUsersPageContent() {
         />
 
         {/* Card list */}
-        <AdminCardList<V1AdminUserRow>
+        {/* 회원 한 명에 8개 지표가 붙는데 카드 2열로는 값이 서로 붙어 읽히지 않았다.
+            숫자는 컬럼으로 세워야 회원 간 비교가 된다. */}
+        <AdminDataTable<V1AdminUserRow>
           rows={rows}
           keyExtractor={(row) => row.userId}
-          card={(row) => {
-            const teamRoles = getTeamRoleCounts(row);
-            return {
-              title: formatUserTitle(row),
-              subtitle: row.email ?? undefined,
-              status: row.accountStatus,
-              meta: [
-                {
-                  icon: <UserRound size={14} aria-hidden="true" />,
-                  label: formatGender(row.gender),
-                },
-                ...(row.adminRole
-                  ? [{ icon: <Shield size={14} aria-hidden="true" />, label: '운영자' }]
-                  : []),
-                {
-                  icon: <LogIn size={14} aria-hidden="true" />,
-                  label: formatAuthProviders(row.authProviders),
-                },
-                {
-                  icon: <Activity size={14} aria-hidden="true" />,
-                  label: `매치 ${row.hostedMatchCount} · 생성/소유 ${row.ownedTeamCount}`,
-                },
-                {
-                  icon: <Shield size={14} aria-hidden="true" />,
-                  label: `소속 ${row.membershipCount} · 팀장 ${teamRoles.owner}`,
-                },
-                {
-                  icon: <Shield size={14} aria-hidden="true" />,
-                  label: `운영진 ${teamRoles.manager} · 멤버 ${teamRoles.member}`,
-                },
-                {
-                  icon: <Calendar size={14} aria-hidden="true" />,
-                  label: formatDateCompact(row.createdAt),
-                },
-                {
-                  icon: <Clock size={14} aria-hidden="true" />,
-                  label: formatDateCompact(row.lastLoginAt),
-                },
-              ],
-              tone:
-              row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
-                ? 'danger'
-                : row.accountStatus === 'suspended' || row.accountStatus === 'withdrawal_pending'
-                  ? 'warning'
-                  : undefined,
-            };
-          }}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) =>
+            row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
+              ? 'danger'
+              : row.accountStatus === 'suspended' || row.accountStatus === 'withdrawal_pending'
+                ? 'warning'
+                : undefined
+          }
+          columns={[
+            {
+              key: 'user',
+              header: '회원',
+              render: (row) => (
+                <div className="min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-medium text-gray-900">{formatUserTitle(row)}</span>
+                    {row.adminRole ? (
+                      <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[var(--font-size-micro)] font-semibold text-blue-700">
+                        운영자
+                      </span>
+                    ) : null}
+                  </span>
+                  {row.email ? (
+                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500" title={row.email}>
+                      {row.email}
+                    </span>
+                  ) : null}
+                </div>
+              ),
+            },
+            {
+              key: 'accountStatus',
+              header: '상태',
+              width: 'w-[104px]',
+              render: (row) => <AdminStatusPill status={row.accountStatus} />,
+            },
+            {
+              key: 'gender',
+              header: '성별',
+              width: 'w-[72px]',
+              render: (row) => <span className="text-gray-600">{formatGender(row.gender)}</span>,
+            },
+            {
+              key: 'authProviders',
+              header: '로그인',
+              width: 'w-[124px]',
+              render: (row) => (
+                <span className="block truncate text-gray-600" title={formatAuthProviders(row.authProviders)}>
+                  {formatAuthProviders(row.authProviders)}
+                </span>
+              ),
+            },
+            {
+              key: 'activity',
+              header: '매치 / 소유팀',
+              align: 'center',
+              width: 'w-[110px]',
+              render: (row) => (
+                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                  {row.hostedMatchCount} / {row.ownedTeamCount}
+                </span>
+              ),
+            },
+            {
+              key: 'membership',
+              header: '소속 (팀장/운영진/멤버)',
+              align: 'center',
+              width: 'w-[168px]',
+              render: (row) => {
+                const teamRoles = getTeamRoleCounts(row);
+                return (
+                  <span className="tabular-nums whitespace-nowrap text-gray-600">
+                    {row.membershipCount}
+                    <span className="text-gray-400">
+                      {' '}
+                      ({teamRoles.owner}/{teamRoles.manager}/{teamRoles.member})
+                    </span>
+                  </span>
+                );
+              },
+            },
+            {
+              key: 'createdAt',
+              header: '가입',
+              width: 'w-[104px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDateCompact(row.createdAt)}</span>
+              ),
+            },
+            {
+              key: 'lastLoginAt',
+              header: '최근 로그인',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDateCompact(row.lastLoginAt)}</span>
+              ),
+            },
+          ]}
           renderActions={(row) => (
             <>
               <Link
@@ -321,7 +375,7 @@ function AdminUsersPageContent() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonCards={8}
+          skeletonRows={8}
         />
 
         {/* Load more trigger */}

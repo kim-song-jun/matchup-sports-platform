@@ -13,7 +13,8 @@ import { Activity, User, Clock, Users } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -202,29 +203,68 @@ function AdminMatchesPageContent() {
         />
 
         {/* Card list */}
-        <AdminCardList<V1AdminMatchRow>
+        <AdminDataTable<V1AdminMatchRow>
           rows={rows}
           keyExtractor={(row) => row.matchId}
-          card={(row) => ({
-            title: row.title,
-            subtitle: row.placeName,
-            status: row.status,
-            meta: [
-              { icon: <Activity size={14} aria-hidden="true" />, label: row.sportName },
-              { icon: <User size={14} aria-hidden="true" />, label: row.hostName ?? '—' },
-              { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.startAt) },
-              {
-                icon: <Users size={14} aria-hidden="true" />,
-                label: `${row.participantCount}/${row.maxParticipants}`,
-              },
-            ],
-            tone:
-              row.status === 'cancelled'
-                ? 'danger'
-                : row.status === 'closed'
-                  ? 'warning'
-                  : undefined,
-          })}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) =>
+            row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined
+          }
+          columns={[
+            {
+              key: 'startAt',
+              header: '시작',
+              width: 'w-[132px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.startAt)}</span>
+              ),
+            },
+            {
+              key: 'status',
+              header: '상태',
+              width: 'w-[104px]',
+              render: (row) => <AdminStatusPill status={row.status} />,
+            },
+            {
+              key: 'title',
+              header: '매치',
+              render: (row) => (
+                <div className="min-w-0">
+                  <span className="block truncate font-medium text-gray-900" title={row.title}>
+                    {row.title}
+                  </span>
+                  <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                    {row.placeName}
+                  </span>
+                </div>
+              ),
+            },
+            {
+              key: 'sportName',
+              header: '종목',
+              width: 'w-[96px]',
+              render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+            },
+            {
+              key: 'hostName',
+              header: '호스트',
+              width: 'w-[124px]',
+              render: (row) => (
+                <span className="block truncate text-gray-600">{row.hostName ?? '—'}</span>
+              ),
+            },
+            {
+              key: 'participants',
+              header: '참가',
+              align: 'center',
+              width: 'w-[88px]',
+              render: (row) => (
+                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                  {row.participantCount}/{row.maxParticipants}
+                </span>
+              ),
+            },
+          ]}
           renderActions={
             canWrite
               ? (row) => (
@@ -255,7 +295,7 @@ function AdminMatchesPageContent() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonCards={8}
+          skeletonRows={8}
         />
 
         {/* Load more trigger */}

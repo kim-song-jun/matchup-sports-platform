@@ -14,7 +14,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminCardList,
+  AdminDataTable,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -523,34 +523,67 @@ export default function AdminAdminsPage() {
         <AdminFilterBar hideSearch searchValue={''} onSearchChange={setActiveStatus} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
 
         {/* Card list */}
-        <AdminCardList<V1AdminRow>
+        <AdminDataTable<V1AdminRow>
           rows={rows}
           keyExtractor={(row) => row.adminUserId}
-          card={(row) => ({
-            title: formatUserTitle(row),
-            subtitle: row.email ?? undefined,
-            statusNode: <AdminRoleBadge role={row.adminRole} />,
-            meta: [
-              {
-                icon: <Activity size={14} aria-hidden="true" />,
-                label: row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지',
-              },
-              {
-                icon: <Calendar size={14} aria-hidden="true" />,
-                label: `부여 ${formatDateCompact(row.grantedAt)}`,
-              },
-              {
-                icon: <Clock size={14} aria-hidden="true" />,
-                label: row.revokedAt ? `회수 ${formatDateCompact(row.revokedAt)}` : '회수일 없음',
-              },
-            ],
-            tone:
-              row.status === 'revoked'
-                ? 'danger'
-                : row.status === 'suspended'
-                  ? 'warning'
-                  : undefined,
-          })}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) =>
+            row.status === 'revoked' ? 'danger' : row.status === 'suspended' ? 'warning' : undefined
+          }
+          columns={[
+            {
+              key: 'user',
+              header: '운영자',
+              render: (row) => (
+                <div className="min-w-0">
+                  <span className="block truncate font-medium text-gray-900">
+                    {formatUserTitle(row)}
+                  </span>
+                  {row.email ? (
+                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500" title={row.email}>
+                      {row.email}
+                    </span>
+                  ) : null}
+                </div>
+              ),
+            },
+            {
+              key: 'adminRole',
+              header: '권한',
+              width: 'w-[112px]',
+              render: (row) => <AdminRoleBadge role={row.adminRole} />,
+            },
+            {
+              key: 'status',
+              header: '상태',
+              width: 'w-[88px]',
+              render: (row) => (
+                <span className="text-gray-600">
+                  {row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지'}
+                </span>
+              ),
+            },
+            {
+              key: 'grantedAt',
+              header: '부여',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">
+                  {formatDateCompact(row.grantedAt)}
+                </span>
+              ),
+            },
+            {
+              key: 'revokedAt',
+              header: '회수',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">
+                  {row.revokedAt ? formatDateCompact(row.revokedAt) : '—'}
+                </span>
+              ),
+            },
+          ]}
           renderActions={(row) => {
             // Hide actions for owner rows — owner role cannot be changed via UI
             if (row.adminRole === 'owner') return null;
@@ -614,7 +647,7 @@ export default function AdminAdminsPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonCards={5}
+          skeletonRows={5}
         />
 
         {/* Load more */}

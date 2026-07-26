@@ -12,7 +12,8 @@ import { Activity, Clock, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminReasonModal,
   AdminEmpty,
   STATUS_META,
@@ -170,25 +171,57 @@ export default function AdminTeamMatchesPage() {
       </div>
 
       {/* Card list */}
-      <AdminCardList<V1AdminTeamMatchRow>
+      <AdminDataTable<V1AdminTeamMatchRow>
         rows={accumulatedRows}
         keyExtractor={(r) => r.teamMatchId}
-        card={(row) => ({
-          title: row.title,
-          subtitle: row.hostTeamName,
-          status: row.status,
-          meta: [
-            { icon: <Activity size={14} aria-hidden="true" />, label: row.sportName },
-            { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.startAt) },
-            { icon: <Calendar size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
-          ],
-          tone:
-            row.status === 'cancelled'
-              ? 'danger'
-              : row.status === 'archived'
-                ? 'warning'
-                : undefined,
-        })}
+        tableMaxWidth="max-w-none"
+        rowTone={(row) =>
+          row.status === 'cancelled' ? 'danger' : row.status === 'archived' ? 'warning' : undefined
+        }
+        columns={[
+          {
+            key: 'startAt',
+            header: '시작',
+            width: 'w-[132px]',
+            render: (row) => (
+              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.startAt)}</span>
+            ),
+          },
+          {
+            key: 'status',
+            header: '상태',
+            width: 'w-[104px]',
+            render: (row) => <AdminStatusPill status={row.status} />,
+          },
+          {
+            key: 'title',
+            header: '팀매칭',
+            render: (row) => (
+              <div className="min-w-0">
+                <span className="block truncate font-medium text-gray-900" title={row.title}>
+                  {row.title}
+                </span>
+                <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                  {row.hostTeamName}
+                </span>
+              </div>
+            ),
+          },
+          {
+            key: 'sportName',
+            header: '종목',
+            width: 'w-[96px]',
+            render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+          },
+          {
+            key: 'createdAt',
+            header: '생성',
+            width: 'w-[132px]',
+            render: (row) => (
+              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+            ),
+          },
+        ]}
         renderActions={
           canWrite
             ? (row) => (
@@ -220,7 +253,7 @@ export default function AdminTeamMatchesPage() {
             : undefined
         }
         onRetry={() => void refetch()}
-        skeletonCards={8}
+        skeletonRows={8}
       />
 
       {/* Load more */}

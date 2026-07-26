@@ -32,6 +32,14 @@ export class AdminUserListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -58,6 +66,14 @@ export class AdminMatchListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -80,6 +96,14 @@ export class AdminTeamListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -96,6 +120,14 @@ export class AdminTeamMatchListQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -127,6 +159,14 @@ export class AdminNoticeListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -152,6 +192,14 @@ export class AdminInquiryListQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -216,6 +264,14 @@ export class AdminPopupListQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -340,6 +396,14 @@ export class AdminListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -406,6 +470,14 @@ export class AdminLogsQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Type(() => Number)

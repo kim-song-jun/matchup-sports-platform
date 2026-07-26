@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { useV1AdminActionLogs, useV1AdminStatusChangeLogs } from '@/hooks/use-v1-api';
 import type { AdminListFilters, V1AdminLog, V1AdminStatusChangeLog } from '@/types/api';
 import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
@@ -81,57 +83,172 @@ function ReasonCell({ reason }: { reason: string | null | undefined }) {
   );
 }
 
-// ── Load-more shared UI ───────────────────────────────────────────────────
-function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+const PAGE_SIZE = 20;
+
+/**
+ * 로그 상세. 목록은 폭을 아끼려 ID 를 8자로 줄이고 사유를 잘라 두는데, 조사할 때 필요한 건
+ * 잘리지 않은 값이다 — 행을 누르면 전문과 before/after 를 여기서 펼친다.
+ */
+function LogDetailModal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => closeRef.current?.focus(), 60);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
-    <div className="flex justify-center">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={loading}
-        className="inline-flex items-center justify-center h-[44px] px-6 bg-white border border-gray-200 rounded-xl text-[var(--font-size-body-sm)] text-gray-700 font-medium hover:border-blue-300 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="audit-log-detail-title"
+        className="flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_32px_rgba(20,28,45,0.14)]"
       >
-        {loading ? '불러오는 중…' : '더 보기'}
-      </button>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
+          <h2 id="audit-log-detail-title" className="truncate text-[16px] font-bold text-gray-900">
+            {title}
+          </h2>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+      </div>
     </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex gap-3 py-1.5">
+      <dt className="w-[92px] shrink-0 text-[var(--font-size-label)] text-gray-500">{label}</dt>
+      <dd className="min-w-0 flex-1 break-all text-[var(--font-size-body-sm)] text-gray-800">{value}</dd>
+    </div>
+  );
+}
+
+function StateBlock({ label, value }: { label: string; value: unknown }) {
+  if (value === null || value === undefined) return null;
+  return (
+    <section className="mt-4">
+      <h3 className="mb-1.5 text-[var(--font-size-label)] font-semibold text-gray-700">{label}</h3>
+      <pre className="max-h-[220px] overflow-auto rounded-xl bg-gray-50 p-3 font-mono text-[var(--font-size-micro)] leading-relaxed text-gray-700">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    </section>
+  );
+}
+
+function ActionLogDetailModal({ log, onClose }: { log: V1AdminLog | null; onClose: () => void }) {
+  if (!log) return null;
+  return (
+    <LogDetailModal title={adminActionLabel(log.actionType)} onClose={onClose}>
+      <dl>
+        <DetailRow label="시각" value={formatDateTime(log.createdAt)} />
+        <DetailRow label="대상" value={adminTargetTypeLabel(log.targetType)} />
+        <DetailRow label="대상 ID" value={<span className="font-mono">{log.targetId ?? '—'}</span>} />
+        <DetailRow label="실행자" value={<span className="font-mono">{log.adminUserId ?? '—'}</span>} />
+        <DetailRow label="액션" value={<span className="font-mono">{log.actionType}</span>} />
+        <DetailRow label="사유" value={log.reason ?? '—'} />
+      </dl>
+      <StateBlock label="변경 전" value={log.beforeState} />
+      <StateBlock label="변경 후" value={log.afterState} />
+    </LogDetailModal>
+  );
+}
+
+function StatusLogDetailModal({
+  log,
+  onClose,
+}: {
+  log: V1AdminStatusChangeLog | null;
+  onClose: () => void;
+}) {
+  if (!log) return null;
+  return (
+    <LogDetailModal
+      title={`${adminTargetTypeLabel(log.targetType)} 상태 변경`}
+      onClose={onClose}
+    >
+      <dl>
+        <DetailRow label="시각" value={formatDateTime(log.createdAt)} />
+        <DetailRow label="대상" value={adminTargetTypeLabel(log.targetType)} />
+        <DetailRow label="대상 ID" value={<span className="font-mono">{log.targetId}</span>} />
+        <DetailRow
+          label="변경"
+          value={
+            <span className="flex items-center gap-1.5">
+              <AdminStatusPill status={log.fromStatus} />
+              <span className="text-gray-400" aria-hidden="true">→</span>
+              <AdminStatusPill status={log.toStatus} />
+            </span>
+          }
+        />
+        <DetailRow
+          label="실행자"
+          value={<span className="font-mono">{log.adminUserId ?? log.actorUserId ?? '—'}</span>}
+        />
+        <DetailRow label="사유" value={log.reason ?? '—'} />
+      </dl>
+    </LogDetailModal>
   );
 }
 
 // ── Action log panel ──────────────────────────────────────────────────────
 function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [rows, setRows] = useState<V1AdminLog[]>([]);
+  // 커서 누적("더 보기") 대신 페이지 단위 교체다. 로그는 "어디쯤 보고 있는지"와 총량을
+  // 알아야 조사가 되는데, 누적 목록은 그 감각을 주지 못한다.
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<V1AdminLog | null>(null);
 
-  // Reset on filter change
   useEffect(() => {
-    setRows([]);
-    setCursor(undefined);
+    setPage(1);
   }, [targetType]);
 
   const filters: AdminListFilters = {
     ...(targetType ? { targetType } : {}),
-    ...(cursor ? { cursor } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
   const { data, isPending, isError, refetch } = useV1AdminActionLogs(filters);
-
-  // Append new data to accumulated rows
-  useEffect(() => {
-    if (!data?.items?.length) return;
-    setRows((prev) => {
-      const existingIds = new Set(prev.map((r) => r.actionLogId));
-      const next = data.items.filter((r) => !existingIds.has(r.actionLogId));
-      return next.length > 0 ? [...prev, ...next] : prev;
-    });
-  }, [data]);
-
-  const hasMore = !!(data?.nextCursor ?? data?.pageInfo?.nextCursor);
-
-  function loadMore() {
-    const next = data?.nextCursor ?? data?.pageInfo?.nextCursor;
-    if (next) setCursor(next);
-  }
+  const rows = data?.items ?? [];
+  const pageInfo = data?.pageInfo;
 
   const errorMessage = isError && rows.length === 0 ? '감사 로그를 불러오지 못했어요.' : undefined;
 
@@ -197,48 +314,46 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
         error={errorMessage}
         onRetry={() => void refetch()}
         skeletonRows={8}
+        onRowClick={setSelected}
+        rowClickLabel={(row) => `${adminActionLabel(row.actionType)} 로그 상세 보기`}
+        pagination={
+          pageInfo?.totalPages
+            ? {
+                page: pageInfo.page ?? page,
+                totalPages: pageInfo.totalPages,
+                total: pageInfo.total ?? 0,
+                limit: pageInfo.limit ?? PAGE_SIZE,
+                onPageChange: setPage,
+                loading: isPending,
+              }
+            : undefined
+        }
       />
-      {hasMore && <LoadMoreButton onClick={loadMore} loading={isPending} />}
       {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
+
+      <ActionLogDetailModal log={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }
 
 // ── Status change log panel ───────────────────────────────────────────────
 function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [rows, setRows] = useState<V1AdminStatusChangeLog[]>([]);
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<V1AdminStatusChangeLog | null>(null);
 
-  // Reset on filter change
   useEffect(() => {
-    setRows([]);
-    setCursor(undefined);
+    setPage(1);
   }, [targetType]);
 
   const filters: AdminListFilters = {
     ...(targetType ? { targetType } : {}),
-    ...(cursor ? { cursor } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
   const { data, isPending, isError, refetch } = useV1AdminStatusChangeLogs(filters);
-
-  // Append new data to accumulated rows
-  useEffect(() => {
-    if (!data?.items?.length) return;
-    setRows((prev) => {
-      const existingIds = new Set(prev.map((r) => r.statusChangeLogId));
-      const next = data.items.filter((r) => !existingIds.has(r.statusChangeLogId));
-      return next.length > 0 ? [...prev, ...next] : prev;
-    });
-  }, [data]);
-
-  const hasMore = !!(data?.nextCursor ?? data?.pageInfo?.nextCursor);
-
-  function loadMore() {
-    const next = data?.nextCursor ?? data?.pageInfo?.nextCursor;
-    if (next) setCursor(next);
-  }
+  const rows = data?.items ?? [];
+  const pageInfo = data?.pageInfo;
 
   const errorMessage =
     isError && rows.length === 0 ? '상태 변경 로그를 불러오지 못했어요.' : undefined;
@@ -312,9 +427,24 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
         error={errorMessage}
         onRetry={() => void refetch()}
         skeletonRows={8}
+        onRowClick={setSelected}
+        rowClickLabel={(row) => `${adminTargetTypeLabel(row.targetType)} 상태 변경 상세 보기`}
+        pagination={
+          pageInfo?.totalPages
+            ? {
+                page: pageInfo.page ?? page,
+                totalPages: pageInfo.totalPages,
+                total: pageInfo.total ?? 0,
+                limit: pageInfo.limit ?? PAGE_SIZE,
+                onPageChange: setPage,
+                loading: isPending,
+              }
+            : undefined
+        }
       />
-      {hasMore && <LoadMoreButton onClick={loadMore} loading={isPending} />}
       {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
+
+      <StatusLogDetailModal log={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

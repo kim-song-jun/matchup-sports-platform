@@ -20,6 +20,13 @@ export type CursorPage<T> = {
   pageInfo?: {
     nextCursor: string | null;
     hasNext: boolean;
+    // 페이지 번호 페이지네이션. 서버가 buildPageInfo 로 내려주는 목록에만 존재하며,
+    // 아직 커서만 지원하는 목록에서는 undefined 다 — 화면은 있을 때만 페이지 UI 를 그린다.
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+    hasPrev?: boolean;
   };
 };
 
@@ -1763,6 +1770,8 @@ export type AdminListFilters = {
   category?: string;
   targetType?: string;
   cursor?: string;
+  /** 페이지 번호(1부터). cursor 와 함께 보내면 서버가 page 를 우선한다. */
+  page?: number;
   limit?: number;
 };
 

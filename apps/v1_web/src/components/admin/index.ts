@@ -7,7 +7,7 @@ export { AdminKpiCard } from './admin-kpi-card';
 
 // ── Data display ──────────────────────────────────────────────────────────
 export { AdminDataTable } from './admin-data-table';
-export type { AdminTableColumn } from './admin-data-table';
+export type { AdminTableColumn, AdminTablePagination } from './admin-data-table';
 export { AdminCardList } from './admin-card-list';
 export type { AdminCardModel, AdminCardMeta } from './admin-card-list';
 export { AdminStatusPill, STATUS_META } from './admin-status-pill';

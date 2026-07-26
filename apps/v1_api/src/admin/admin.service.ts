@@ -568,7 +568,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         email: true,
@@ -604,6 +604,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      USER_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.accountStatus, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         userId: row.id,
@@ -626,11 +631,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         adminRole: row.adminUser?.adminRole ?? null,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        USER_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.accountStatus, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -791,7 +799,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         title: true,
@@ -814,6 +822,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      MATCH_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         matchId: row.id,
@@ -829,11 +842,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         maxParticipants: row.maxParticipants,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        MATCH_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -898,7 +914,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         name: true,
@@ -919,6 +935,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      TEAM_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         teamId: row.id,
@@ -931,11 +952,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: row.status,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        TEAM_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -1019,7 +1043,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
     }), this.prisma.v1Popup.groupBy({
       by: ['status'],
       where: searchWhere,
@@ -1028,13 +1052,21 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+    const summary = buildListSummary(
+      POPUP_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => this.toAdminPopupRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        POPUP_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -1246,7 +1278,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
     }), this.prisma.v1Notice.groupBy({
       by: ['status'],
       where: statusFacetWhere,
@@ -1462,7 +1494,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         category: true,
@@ -1695,7 +1727,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         title: true,
@@ -1714,6 +1746,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      TEAM_MATCH_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         teamMatchId: row.id,
@@ -1725,11 +1762,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: row.status,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        TEAM_MATCH_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -1745,7 +1785,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { grantedAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       include: {
         user: {
           select: {
@@ -1762,6 +1802,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      ADMIN_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         adminUserId: row.id,
@@ -1775,11 +1820,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         grantedAt: row.grantedAt,
         revokedAt: row.revokedAt ?? null,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        ADMIN_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 

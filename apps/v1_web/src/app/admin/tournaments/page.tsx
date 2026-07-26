@@ -61,6 +61,8 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'cancelled', label: '취소됨' },
 ];
 
+const PAGE_SIZE = 20;
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTournamentsPage() {
@@ -76,56 +78,37 @@ export default function AdminTournamentsPage() {
     if (s) setActiveStatus(s);
   }, []);
 
-  // ── Cursor pagination ────────────────────────────────────────────────
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [accumulatedRows, setAccumulatedRows] = useState<V1Tournament[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
 
   const { toasts, showToast: _showToast } = useAdminToast();
   // showToast is available for future use (e.g. after bulk actions)
 
   const handleStatusChange = (value: string) => {
     setActiveStatus(value);
-    setAccumulatedRows([]);
-    setCursor(null);
-    setNextCursor(null);
+    // 필터를 좁히면 보던 페이지에 결과가 없을 수 있어 첫 페이지로 되돌린다.
+    setPage(1);
   };
 
   const filters = {
     ...(activeStatus ? { status: activeStatus as V1TournamentStatus } : {}),
-    ...(cursor ? { cursor } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
   const { data, isPending, isFetching, isError, error, refetch } =
     useV1AdminTournaments(filters);
+  const rows = data?.items ?? [];
+  const pageInfo = data?.pageInfo;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
     ...option,
     count: option.value ? data?.summary.byStatus[option.value] : data?.summary.total,
   }));
 
-  useEffect(() => {
-    if (!data?.items) return;
-    if (!cursor) {
-      setAccumulatedRows(data.items);
-    } else {
-      setAccumulatedRows((prev) => [...prev, ...data.items]);
-    }
-    setNextCursor(data.pageInfo?.nextCursor ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
-  const hasMore = !!nextCursor;
-  const loadMoreFailed = isError && accumulatedRows.length > 0;
-
-  const handleLoadMore = () => {
-    if (nextCursor) setCursor(nextCursor);
-  };
-
-  const isInitialLoad = isPending && accumulatedRows.length === 0;
+  const isInitialLoad = isPending && rows.length === 0;
 
   const errorMessage =
-    isError && accumulatedRows.length === 0
+    isError && rows.length === 0
       ? extractErrorMessage(error, '대회 목록을 불러오지 못했어요.')
       : undefined;
 
@@ -165,8 +148,20 @@ export default function AdminTournamentsPage() {
           <AdminTableSkeleton rows={8} />
         ) : (
           <AdminDataTable<V1Tournament>
-            rows={accumulatedRows}
+            rows={rows}
             keyExtractor={(r) => r.id}
+            pagination={
+              pageInfo?.totalPages
+                ? {
+                    page: pageInfo.page ?? page,
+                    totalPages: pageInfo.totalPages,
+                    total: pageInfo.total ?? 0,
+                    limit: pageInfo.limit ?? PAGE_SIZE,
+                    onPageChange: setPage,
+                    loading: isFetching,
+                  }
+                : undefined
+            }
             tableMaxWidth="max-w-none"
             rowTone={(row) =>
               row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined
@@ -263,16 +258,15 @@ export default function AdminTournamentsPage() {
         )}
 
         {/* Load more */}
-        {hasMore && !isInitialLoad && (
+        {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
+        {isError && rows.length > 0 && (
           <div className="flex flex-col items-center gap-1.5">
-            {loadMoreFailed && (
-              <p className="text-[var(--font-size-label)] text-red-500" role="alert">
-                {extractErrorMessage(error, '다음 목록을 불러오지 못했어요.')}
-              </p>
-            )}
+            <p className="text-[var(--font-size-label)] text-red-500" role="alert">
+              {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
+            </p>
             <button
               type="button"
-              onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
+              onClick={() => void refetch()}
               disabled={isFetching}
               className={[
                 'h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
@@ -281,13 +275,11 @@ export default function AdminTournamentsPage() {
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               ].join(' ')}
             >
-              {isFetching ? '불러오는 중…' : loadMoreFailed ? '다시 시도' : '더 보기'}
+              {isFetching ? '불러오는 중…' : '다시 시도'}
             </button>
           </div>
         )}
 
-        {/* Loading more skeleton */}
-        {isFetching && !isInitialLoad && <AdminTableSkeleton rows={4} />}
       </div>
 
       <AdminToasts toasts={toasts} />

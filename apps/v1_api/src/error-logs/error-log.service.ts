@@ -4,6 +4,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { maskSensitive, maskSensitiveText, truncateForLog } from '../common/logging/mask-sensitive';
+import { buildPageInfo, paginationArgs, type PageInfo } from '../common/pagination/page-args';
 import { AdminErrorLogListQueryDto } from './dto/admin-error-log-query.dto';
 
 export type ErrorLogSource = 'server' | 'client';
@@ -44,10 +45,7 @@ export interface ErrorLogListItem {
 
 export interface ErrorLogListResult {
   items: ErrorLogListItem[];
-  pageInfo: {
-    nextCursor: string | null;
-    hasNext: boolean;
-  };
+  pageInfo: PageInfo;
 }
 
 /** 상세 — 목록 필드 + traceback/request/response/context/식별정보. */
@@ -221,7 +219,7 @@ export class ErrorLogService {
     });
   }
 
-  /** GET /admin/ops/errors — cursor 페이지네이션 목록. */
+  /** GET /admin/ops/errors — page 번호(우선) 또는 cursor 페이지네이션 목록. */
   async list(query: AdminErrorLogListQueryDto): Promise<ErrorLogListResult> {
     const limit = query.limit ?? 20;
 
@@ -247,25 +245,33 @@ export class ErrorLogService {
         : {}),
     };
 
-    const rows = await this.prisma.v1ErrorLog.findMany({
-      where,
-      // id 를 tie-breaker 로 둔다 — lastSeenAt 만으로 정렬하면 같은 시각의 행들 사이 순서가
-      // 비결정적이라 cursor 페이지 경계에서 같은 행이 두 번 나오거나 통째로 건너뛴다.
-      // dedupe 특성상 여러 종류의 에러가 같은 순간에 적재되는 일이 흔하다.
-      orderBy: [{ lastSeenAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    // 표 하단에 "전체 N건 중 M–K"와 페이지 번호를 그리려면 총 건수가 필요하다.
+    // 필터가 걸린 where 그대로 세므로 목록과 항상 같은 모집단이다.
+    const [rows, total] = await Promise.all([
+      this.prisma.v1ErrorLog.findMany({
+        where,
+        // id 를 tie-breaker 로 둔다 — lastSeenAt 만으로 정렬하면 같은 시각의 행들 사이 순서가
+        // 비결정적이라 cursor 페이지 경계에서 같은 행이 두 번 나오거나 통째로 건너뛴다.
+        // dedupe 특성상 여러 종류의 에러가 같은 순간에 적재되는 일이 흔하다.
+        orderBy: [{ lastSeenAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+      }),
+      this.prisma.v1ErrorLog.count({ where }),
+    ]);
 
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
     return {
       items: pageItems.map((row) => this.toListItem(row)),
-      pageInfo: {
-        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
         hasNext,
-      },
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
     };
   }
 

@@ -240,6 +240,57 @@ describe('ErrorLogService.record', () => {
   });
 });
 
+describe('ErrorLogService.list pagination', () => {
+  const logger = { warn: jest.fn(), error: jest.fn() };
+
+  function buildPrismaMock(rowCount: number, total: number) {
+    const rows = Array.from({ length: rowCount }, (_, i) => ({
+      id: `err-${i}`,
+      source: 'server',
+      level: 'error',
+      statusCode: 500,
+      route: '/x',
+      method: 'GET',
+      message: 'boom',
+      fingerprint: 'f',
+      occurrenceCount: 1,
+      releaseSha: null,
+      firstSeenAt: new Date(),
+      lastSeenAt: new Date(),
+    }));
+    return {
+      v1ErrorLog: {
+        findMany: jest.fn().mockResolvedValue(rows),
+        count: jest.fn().mockResolvedValue(total),
+      },
+    };
+  }
+
+  it('skips the pages before the requested one and reports the total page count', async () => {
+    // 3페이지(20건씩)를 요청하면 앞의 2페이지 40건을 건너뛰어야 한다 — off-by-one 이 나면
+    // 페이지 경계에서 같은 행이 다시 보이거나 통째로 빠진다.
+    const prisma = buildPrismaMock(21, 55);
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    const result = await service.list({ page: 3, limit: 20 });
+
+    expect(prisma.v1ErrorLog.findMany.mock.calls[0][0]).toMatchObject({ skip: 40, take: 21 });
+    expect(result.items).toHaveLength(20);
+    expect(result.pageInfo).toMatchObject({ page: 3, limit: 20, total: 55, totalPages: 3, hasNext: true, hasPrev: true });
+  });
+
+  it('counts with the same where clause as the list so the total matches the filtered rows', async () => {
+    const prisma = buildPrismaMock(2, 2);
+    const service = new ErrorLogService(prisma as never, logger as never);
+
+    await service.list({ source: 'client', level: 'warn', limit: 20 });
+
+    const listWhere = prisma.v1ErrorLog.findMany.mock.calls[0][0].where;
+    expect(prisma.v1ErrorLog.count).toHaveBeenCalledWith({ where: listWhere });
+    expect(listWhere).toMatchObject({ source: 'client', level: 'warn' });
+  });
+});
+
 /** record()는 fire-and-forget(내부 promise를 await하지 않음)이므로 마이크로태스크 큐가
  * 비워질 때까지 명시적으로 양보해 upsert 호출이 기록될 시간을 준다.
  * process.nextTick은 jest의 fake timers(setTimeout/setImmediate 등을 가짜로 만듦)에

@@ -8,6 +8,7 @@ import {
 import { Prisma, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
 import { isBracketPublished } from './tournament-detail.presenter';
@@ -70,7 +71,7 @@ export class TournamentsAdminService {
       where,
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       include: { _count: { select: { registrations: true } } },
     }), this.prisma.v1Tournament.groupBy({
       by: ['status'],
@@ -87,9 +88,21 @@ export class TournamentsAdminService {
     >;
     for (const group of statusGroups) byStatus[group.status] = group._count._all;
 
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status
+      ? byStatus[query.status] ?? 0
+      : Object.values(byStatus).reduce((sum, count) => sum + count, 0);
+
     return {
       items: pageItems.map((row) => this.serialize(row, row._count.registrations)),
-      pageInfo: { nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
       summary: {
         total: Object.values(byStatus).reduce((sum, count) => sum + count, 0),
         byStatus,

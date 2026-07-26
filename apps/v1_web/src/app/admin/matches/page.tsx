@@ -17,7 +17,6 @@ import {
   AdminStatusPill,
   AdminReasonModal,
   AdminEmpty,
-  AdminTableSkeleton,
   STATUS_META,
   useAdminToast,
   AdminToasts,
@@ -57,6 +56,8 @@ const MATCH_STATUS_FILTER_OPTIONS = [
   { value: 'archived', label: '보관' },
 ];
 
+const PAGE_SIZE = 20;
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AdminMatchesPage() {
   return (
@@ -74,10 +75,8 @@ function AdminMatchesPageContent() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState(initialStatus);
 
-  // Accumulated rows across cursor pages
-  const [extraRows, setExtraRows] = useState<V1AdminMatchRow[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -95,8 +94,7 @@ function AdminMatchesPageContent() {
 
   // Reset extra pages when filters change
   useEffect(() => {
-    setExtraRows([]);
-    setNextCursor(null);
+    setPage(1);
   }, [debouncedSearch, activeStatus]);
 
   // Capability check
@@ -107,55 +105,28 @@ function AdminMatchesPageContent() {
   const filters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
-  // First page via React Query
   const {
     data: firstPage,
     isPending,
+    isFetching,
     isError,
     error,
     refetch,
   } = useV1AdminMatches(filters);
 
-  // Sync cursor from first page
-  useEffect(() => {
-    if (firstPage) {
-      setNextCursor(
-        firstPage.nextCursor ?? firstPage.pageInfo?.nextCursor ?? null,
-      );
-    }
-  }, [firstPage]);
-
   // Mutation
   const changeStatusMutation = useV1ChangeMatchStatus();
 
-  // Combined rows: first page + loaded extras
-  const firstRows = firstPage?.items ?? [];
-  const rows = [...firstRows, ...extraRows];
+  const rows = firstPage?.items ?? [];
+  const pageInfo = firstPage?.pageInfo;
   const statusOptions = MATCH_STATUS_FILTER_OPTIONS.map((option) => ({
     ...option,
     count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
   }));
-
-  // Load more handler
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await v1Get<CursorPage<V1AdminMatchRow>>('/admin/matches', {
-        ...filters,
-        cursor: nextCursor,
-      });
-      setExtraRows((prev) => [...prev, ...page.items]);
-      setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
-    } catch (err) {
-      showToast(extractErrorMessage(err, '추가 데이터를 불러오지 못했어요.'), 'error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   // Submit moderation modal
   function handleModalSubmit(status: string, reason: string) {
@@ -167,9 +138,7 @@ function AdminMatchesPageContent() {
           setModalOpen(false);
           setSelectedRow(null);
           // Reset to first page so the updated row (incl. page2+ extras) is
-          // re-fetched fresh instead of left stale in extraRows.
-          setExtraRows([]);
-          setNextCursor(null);
+          setPage(1);
           showToast('매치 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
@@ -286,7 +255,7 @@ function AdminMatchesPageContent() {
                 )
               : undefined
           }
-          loading={isPending}
+          loading={isPending && rows.length === 0}
           empty={
             <AdminEmpty
               title="조건에 맞는 매치가 없어요"
@@ -296,27 +265,19 @@ function AdminMatchesPageContent() {
           error={errorMessage}
           onRetry={() => void refetch()}
           skeletonRows={8}
+          pagination={
+            pageInfo?.totalPages
+              ? {
+                  page: pageInfo.page ?? page,
+                  totalPages: pageInfo.totalPages,
+                  total: pageInfo.total ?? 0,
+                  limit: pageInfo.limit ?? PAGE_SIZE,
+                  onPageChange: setPage,
+                  loading: isFetching,
+                }
+              : undefined
+          }
         />
-
-        {/* Load more trigger */}
-        {nextCursor && !isPending && !isError && !loadingMore && (
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              onClick={() => void loadMore()}
-              className={[
-                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
-                'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-              ].join(' ')}
-            >
-              더 보기
-            </button>
-          </div>
-        )}
-
-        {/* Loading more skeleton */}
-        {loadingMore && <AdminTableSkeleton rows={4} />}
       </div>
 
       {/* Reason modal */}

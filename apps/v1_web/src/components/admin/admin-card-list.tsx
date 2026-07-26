@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { AdminEmpty } from './admin-empty';
 import { AdminStatusPill } from './admin-status-pill';
+import { AdminTablePaginationBar, type AdminTablePagination } from './admin-data-table';
 
 // ── Card model ────────────────────────────────────────────────────────────
 export interface AdminCardMeta {
@@ -44,6 +45,8 @@ interface AdminCardListProps<T> {
   /** 로딩 중 스켈레톤 카드 수 (default: 6) */
   skeletonCards?: number;
   minCardWidth?: string;
+  /** 목록 하단 페이지네이션. 표와 같은 바를 쓴다 — 카드라고 위치 감각이 덜 필요하진 않다. */
+  pagination?: AdminTablePagination;
 }
 
 // ── tone → class (AdminDataTable 과 동일 매핑) ──────────────────────────────
@@ -67,6 +70,7 @@ export function AdminCardList<T>({
   onRetry,
   skeletonCards = 6,
   minCardWidth = '280px',
+  pagination,
 }: AdminCardListProps<T>) {
   const gridStyle = { gridTemplateColumns: `repeat(auto-fill,minmax(${minCardWidth},1fr))` };
 
@@ -129,6 +133,7 @@ export function AdminCardList<T>({
   const hasActions = !!renderActions;
 
   return (
+    <>
     <ul className={GRID_CLASS} style={gridStyle} role="list">
       {rows.map((row) => {
         const model = card(row);
@@ -204,5 +209,11 @@ export function AdminCardList<T>({
         );
       })}
     </ul>
+    {pagination && pagination.totalPages > 1 && (
+      <div className="mt-3">
+        <AdminTablePaginationBar {...pagination} />
+      </div>
+    )}
+    </>
   );
 }

@@ -8,8 +8,8 @@ export const ERROR_LOG_LEVELS = ['error', 'warn'] as const;
 export type ErrorLogLevelFilter = (typeof ERROR_LOG_LEVELS)[number];
 
 /**
- * GET /admin/ops/errors 쿼리. cursor 페이지네이션은 다른 어드민 목록(예:
- * AdminRegistrationListQueryDto)과 동일하게 `cursor`(마지막으로 받은 id) + `limit` 조합.
+ * GET /admin/ops/errors 쿼리. 페이지네이션은 다른 어드민 목록과 동일하게 `page`(우선) 또는
+ * `cursor`(마지막으로 받은 id) + `limit` 조합.
  */
 export class AdminErrorLogListQueryDto {
   @IsOptional()
@@ -47,6 +47,14 @@ export class AdminErrorLogListQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
   @IsOptional()
   @Type(() => Number)

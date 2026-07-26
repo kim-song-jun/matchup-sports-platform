@@ -233,7 +233,15 @@ describe('AdminService — list/detail endpoints', () => {
         teamRoleCounts: { owner: 1, manager: 0, member: 1 },
         adminRole: null,
       });
-      expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+      expect(result.pageInfo).toEqual({
+        nextCursor: null,
+        hasNext: false,
+        hasPrev: false,
+        page: 1,
+        limit: 20,
+        total: 23,
+        totalPages: 2,
+      });
       expect(result.summary).toEqual({
         total: 23,
         byStatus: { active: 21, suspended: 2, blocked: 0, withdrawal_pending: 0, deleted: 0 },
@@ -403,7 +411,15 @@ describe('AdminService — list/detail endpoints', () => {
         participantCount: 1,
         maxParticipants: 6,
       });
-      expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+      expect(result.pageInfo).toEqual({
+        nextCursor: null,
+        hasNext: false,
+        hasPrev: false,
+        page: 1,
+        limit: 20,
+        total: 12,
+        totalPages: 1,
+      });
       expect(result.summary).toEqual({
         total: 12,
         byStatus: { recruiting: 8, closed: 0, cancelled: 0, completed: 4, archived: 0 },

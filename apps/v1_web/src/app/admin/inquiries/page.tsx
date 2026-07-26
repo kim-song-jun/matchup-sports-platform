@@ -8,7 +8,6 @@ import {
   AdminFilterBar,
   AdminPageHeader,
   AdminStatusPill,
-  AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
@@ -84,14 +83,15 @@ function requesterContact(row: V1AdminInquiryRow) {
   return email ?? phone ?? '-';
 }
 
+const PAGE_SIZE = 20;
+
 export default function AdminInquiriesPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
-  const [extraRows, setExtraRows] = useState<V1AdminInquiryRow[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
   const { toasts, showToast } = useAdminToast();
 
   useEffect(() => {
@@ -100,26 +100,22 @@ export default function AdminInquiriesPage() {
   }, [search]);
 
   useEffect(() => {
-    setExtraRows([]);
-    setNextCursor(null);
+    setPage(1);
   }, [debouncedSearch, activeStatus, activeCategory]);
 
   const filters: AdminListFilters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(activeCategory ? { category: activeCategory } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
-  const { data: firstPage, isPending, isError, error, refetch } = useV1AdminInquiries(filters);
+  const { data: firstPage, isPending, isFetching, isError, error, refetch } =
+    useV1AdminInquiries(filters);
 
-  useEffect(() => {
-    if (firstPage) {
-      setNextCursor(firstPage.nextCursor ?? firstPage.pageInfo?.nextCursor ?? null);
-    }
-  }, [firstPage]);
-
-  const rows = [...(firstPage?.items ?? []), ...extraRows];
+  const rows = firstPage?.items ?? [];
+  const pageInfo = firstPage?.pageInfo;
   const errorMessage = isError ? extractErrorMessage(error, '문의 목록을 불러오지 못했어요.') : undefined;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
     ...option,
@@ -133,23 +129,6 @@ export default function AdminInquiriesPage() {
     ...option,
     count: option.value ? categoryCounts?.[option.value] : categoryTotal,
   }));
-
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await v1Get<CursorPage<V1AdminInquiryRow>>('/admin/inquiries', {
-        ...filters,
-        cursor: nextCursor,
-      });
-      setExtraRows((prev) => [...prev, ...page.items]);
-      setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
-    } catch (err) {
-      showToast(extractErrorMessage(err, '추가 문의를 불러오지 못했어요.'), 'error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   return (
     <>
@@ -193,6 +172,18 @@ export default function AdminInquiriesPage() {
           onRetry={() => void refetch()}
           empty={<AdminEmpty title="문의가 없어요" description="검색어나 필터를 바꿔서 확인해 보세요." />}
           skeletonRows={8}
+          pagination={
+            pageInfo?.totalPages
+              ? {
+                  page: pageInfo.page ?? page,
+                  totalPages: pageInfo.totalPages,
+                  total: pageInfo.total ?? 0,
+                  limit: pageInfo.limit ?? PAGE_SIZE,
+                  onPageChange: setPage,
+                  loading: isFetching,
+                }
+              : undefined
+          }
           tableMaxWidth="max-w-none"
           rowTone={(row) => (row.status === 'received' ? 'warning' : undefined)}
           columns={[
@@ -256,20 +247,6 @@ export default function AdminInquiriesPage() {
             </Link>
           )}
         />
-
-        {nextCursor && !isPending && !isError ? (
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              onClick={() => void loadMore()}
-              disabled={loadingMore}
-              className="h-[44px] rounded-xl border border-gray-200 bg-white px-6 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-            >
-              {loadingMore ? '불러오는 중...' : '더 보기'}
-            </button>
-          </div>
-        ) : null}
-        {loadingMore ? <AdminTableSkeleton rows={4} /> : null}
       </div>
 
       <AdminToasts toasts={toasts} />

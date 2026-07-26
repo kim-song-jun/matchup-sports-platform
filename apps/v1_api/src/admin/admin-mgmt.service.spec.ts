@@ -252,7 +252,15 @@ describe('AdminService — admin-management (owner-only)', () => {
         grantedByAdminUserId: 'owner-user-id',
         revokedAt: null,
       });
-      expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
+      expect(result.pageInfo).toEqual({
+        nextCursor: null,
+        hasNext: false,
+        hasPrev: false,
+        page: 1,
+        limit: 20,
+        total: 4,
+        totalPages: 1,
+      });
       expect(result.summary).toEqual({
         total: 4,
         byStatus: { active: 3, suspended: 0, revoked: 1 },

@@ -318,7 +318,7 @@ export function AdminDataTable<T>({
  * 표 하단 페이지네이션. "전체 N건 중 M–K"를 함께 보여준다 — 운영자가 목록 어디쯤을 보고
  * 있는지 알아야 하고, 커서 기반 "더 보기"만으로는 그 감각이 생기지 않는다.
  */
-function AdminTablePaginationBar({
+export function AdminTablePaginationBar({
   page,
   totalPages,
   total,

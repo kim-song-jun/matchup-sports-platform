@@ -14,6 +14,17 @@ const user = {
 
 const admin = { id: 'admin-row-1', userId: 'user-1', adminRole: 'ops' as const, status: 'active' as const };
 
+/** buildPageInfo 가 0건일 때 내려주는 형태 — 컨트롤러는 이 객체를 그대로 통과시켜야 한다. */
+const EMPTY_PAGE_INFO = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0,
+  hasNext: false,
+  hasPrev: false,
+  nextCursor: null,
+};
+
 describe('AdminErrorLogController', () => {
   const errorLogService = { list: jest.fn(), findById: jest.fn() };
   const adminContext = { getActiveAdmin: jest.fn().mockResolvedValue(admin) };
@@ -37,13 +48,13 @@ describe('AdminErrorLogController', () => {
 
   it('list() gates on getActiveAdmin and forwards the filter query untouched to the service', async () => {
     const query = { source: 'server' as const, statusCode: 500, level: 'error' as const, q: 'boom', cursor: 'c1', limit: 10 };
-    errorLogService.list.mockResolvedValue({ items: [], pageInfo: { nextCursor: null, hasNext: false } });
+    errorLogService.list.mockResolvedValue({ items: [], pageInfo: EMPTY_PAGE_INFO });
 
     const result = await controller.list(user, query);
 
     expect(adminContext.getActiveAdmin).toHaveBeenCalledWith('user-1');
     expect(errorLogService.list).toHaveBeenCalledWith(query);
-    expect(result).toEqual({ items: [], pageInfo: { nextCursor: null, hasNext: false } });
+    expect(result).toEqual({ items: [], pageInfo: EMPTY_PAGE_INFO });
   });
 
   it('list() rejects before hitting the service when the caller is not an active admin', async () => {

@@ -11,7 +11,6 @@ import {
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
-  AdminTableSkeleton,
 } from '@/components/admin';
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -246,7 +245,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
     limit: PAGE_SIZE,
   };
 
-  const { data, isPending, isError, refetch } = useV1AdminActionLogs(filters);
+  const { data, isPending, isFetching, isError, refetch } = useV1AdminActionLogs(filters);
   const rows = data?.items ?? [];
   const pageInfo = data?.pageInfo;
 
@@ -324,12 +323,11 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
                 total: pageInfo.total ?? 0,
                 limit: pageInfo.limit ?? PAGE_SIZE,
                 onPageChange: setPage,
-                loading: isPending,
+                loading: isFetching,
               }
             : undefined
         }
       />
-      {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
 
       <ActionLogDetailModal log={selected} onClose={() => setSelected(null)} />
     </div>
@@ -351,7 +349,7 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
     limit: PAGE_SIZE,
   };
 
-  const { data, isPending, isError, refetch } = useV1AdminStatusChangeLogs(filters);
+  const { data, isPending, isFetching, isError, refetch } = useV1AdminStatusChangeLogs(filters);
   const rows = data?.items ?? [];
   const pageInfo = data?.pageInfo;
 
@@ -437,12 +435,11 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
                 total: pageInfo.total ?? 0,
                 limit: pageInfo.limit ?? PAGE_SIZE,
                 onPageChange: setPage,
-                loading: isPending,
+                loading: isFetching,
               }
             : undefined
         }
       />
-      {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
 
       <StatusLogDetailModal log={selected} onClose={() => setSelected(null)} />
     </div>

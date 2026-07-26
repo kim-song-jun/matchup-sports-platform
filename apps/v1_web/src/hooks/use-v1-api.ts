@@ -1592,6 +1592,9 @@ export function useV1AdminActionLogs(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.adminActionLogs(), filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1AdminLog>>('/admin/action-logs', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1610,6 +1613,9 @@ export function useV1AdminUsers(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminUsers(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminUserRow>>('/admin/users', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1625,6 +1631,9 @@ export function useV1AdminMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminMatches(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminMatchRow>>('/admin/matches', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1640,6 +1649,9 @@ export function useV1AdminTeams(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeams(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminTeamRow>>('/admin/teams', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1669,6 +1681,9 @@ export function useV1AdminNotices(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1730,6 +1745,9 @@ export function useV1AdminInquiries(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminInquiryRow>>('/admin/inquiries', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1795,6 +1813,9 @@ export function useV1AdminTeamMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1802,6 +1823,9 @@ export function useV1AdminStatusChangeLogs(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminStatusChangeLogs(filters as Record<string, unknown>),
     queryFn: () => v1Get<CursorPage<V1AdminStatusChangeLog>>('/admin/status-change-logs', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -2028,6 +2052,9 @@ export function useV1AdminAdmins(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminAdmins(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminRow>>('/admin/admins', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -2134,6 +2161,9 @@ export function useAdminErrorLogs(filters?: V1AdminErrorLogFilters) {
   return useQuery({
     queryKey: [...v1Keys.all, 'admin', 'error-logs', filters ?? {}] as const,
     queryFn: () => v1Get<V1AdminErrorLogsPage>('/admin/ops/errors', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -2582,6 +2612,9 @@ export function useV1AdminTournaments(params?: AdminTournamentListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1AdminTournamentListPage>('/admin/tournaments', params),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -14,20 +14,24 @@ export type ApiErrorBody = {
   timestamp: string;
 };
 
+// 서버 buildPageInfo 응답과 1:1 대응한다. 커서 전용 목록과 페이지 번호 목록이
+// 같은 타입을 쓰도록 이름을 붙였다 — 목록마다 인라인으로 복사하면 확장이 어긋난다.
+export type PageInfo = {
+  nextCursor: string | null;
+  hasNext: boolean;
+  // 페이지 번호 페이지네이션. 서버가 buildPageInfo 로 내려주는 목록에만 존재하며,
+  // 아직 커서만 지원하는 목록에서는 undefined 다 — 화면은 있을 때만 페이지 UI 를 그린다.
+  page?: number;
+  limit?: number;
+  total?: number;
+  totalPages?: number;
+  hasPrev?: boolean;
+};
+
 export type CursorPage<T> = {
   items: T[];
   nextCursor: string | null;
-  pageInfo?: {
-    nextCursor: string | null;
-    hasNext: boolean;
-    // 페이지 번호 페이지네이션. 서버가 buildPageInfo 로 내려주는 목록에만 존재하며,
-    // 아직 커서만 지원하는 목록에서는 undefined 다 — 화면은 있을 때만 페이지 UI 를 그린다.
-    page?: number;
-    limit?: number;
-    total?: number;
-    totalPages?: number;
-    hasPrev?: boolean;
-  };
+  pageInfo?: PageInfo;
 };
 
 export type AdminListSummary = {
@@ -1860,10 +1864,7 @@ export type V1AdminErrorLogDetail = V1AdminErrorLogListItem & {
 
 export type V1AdminErrorLogsPage = {
   items: V1AdminErrorLogListItem[];
-  pageInfo: {
-    nextCursor: string | null;
-    hasNext: boolean;
-  };
+  pageInfo: PageInfo;
 };
 
 export type V1AdminErrorLogFilters = {
@@ -1874,6 +1875,7 @@ export type V1AdminErrorLogFilters = {
   to?: string;
   q?: string;
   cursor?: string;
+  page?: number;
   limit?: number;
 };
 
@@ -2582,10 +2584,7 @@ export type V1TournamentListPage = {
 
 export type V1AdminTournamentListPage = {
   items: V1Tournament[];
-  pageInfo: {
-    nextCursor: string | null;
-    hasNext: boolean;
-  };
+  pageInfo: PageInfo;
   summary: AdminListSummary;
 };
 

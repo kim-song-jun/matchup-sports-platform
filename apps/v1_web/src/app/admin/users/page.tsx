@@ -140,6 +140,7 @@ function AdminUsersPageContent() {
   const {
     data: firstPage,
     isPending,
+    isFetching,
     isError,
     error,
     refetch,
@@ -335,7 +336,7 @@ function AdminUsersPageContent() {
               ) : null}
             </>
           )}
-          loading={isPending}
+          loading={isPending && rows.length === 0}
           empty={
             <AdminEmpty
               title="조건에 맞는 회원이 없어요"
@@ -353,13 +354,11 @@ function AdminUsersPageContent() {
                   total: pageInfo.total ?? 0,
                   limit: pageInfo.limit ?? PAGE_SIZE,
                   onPageChange: setPage,
-                  loading: isPending,
+                  loading: isFetching,
                 }
               : undefined
           }
         />
-
-        {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
       </div>
 
       {/* Reason modal */}

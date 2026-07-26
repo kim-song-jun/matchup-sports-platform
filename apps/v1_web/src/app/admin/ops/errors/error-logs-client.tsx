@@ -107,8 +107,8 @@ export function ErrorLogsClient() {
     const timer = setTimeout(() => setSearch(searchInput), 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [rows, setRows] = useState<V1AdminErrorLogListItem[]>([]);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const parsedStatusCode = statusCode.trim() === '' ? undefined : Number(statusCode.trim());
@@ -125,38 +125,22 @@ export function ErrorLogsClient() {
     ...(fromIso ? { from: fromIso } : {}),
     ...(toIso ? { to: toIso } : {}),
     ...(search.trim() ? { q: search.trim() } : {}),
-    ...(cursor ? { cursor } : {}),
+    page,
     limit: PAGE_SIZE,
   };
 
-  const { data, isLoading, isError, error, refetch } = useAdminErrorLogs(filters);
+  const { data, isLoading, isFetching, isError, error, refetch } = useAdminErrorLogs(filters);
+  const rows = data?.items ?? [];
+  const pageInfo = data?.pageInfo;
 
-  // 필터가 바뀌면 누적 목록·커서를 리셋한다
+  // 필터를 좁히면 보던 페이지에 결과가 없을 수 있어 첫 페이지로 되돌린다.
   useEffect(() => {
-    setRows([]);
-    setCursor(undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPage(1);
   }, [source, level, validStatusCode, from, to, search]);
 
-  // 새 페이지 데이터를 누적 목록에 append (중복 id 제거)
-  useEffect(() => {
-    if (!data?.items?.length) return;
-    setRows((prev) => {
-      const existingIds = new Set(prev.map((r) => r.id));
-      const next = data.items.filter((r) => !existingIds.has(r.id));
-      return next.length > 0 ? [...prev, ...next] : prev;
-    });
-  }, [data]);
-
-  const hasMore = !!data?.pageInfo?.hasNext && !!data?.pageInfo?.nextCursor;
-  // 다음 페이지 요청이 실패하면 data 가 없어 hasMore 가 false 가 되고 '더 보기'가 사라진다.
-  // 그런데 커서는 이미 옮겨 둔 상태라 필터를 바꾸기 전에는 재시도할 방법이 없고, 앞서 쌓인
-  // 행은 그대로 남아 있어 사용자에겐 "여기가 끝"처럼 보인다 — 실패했다는 사실 자체가 사라진다.
-  const loadMoreFailed = isError && rows.length > 0 && !isLoading;
-
-  function loadMore() {
-    if (data?.pageInfo?.nextCursor) setCursor(data.pageInfo.nextCursor);
-  }
+  // 페이지 이동이 실패해도 keepPreviousData 로 직전 페이지가 남아 있어 목록은 비지 않는다 —
+  // 그대로 두면 "이동했는데 내용이 그대로"로 보이므로 실패 사실을 따로 알린다.
+  const pageChangeFailed = isError && rows.length > 0 && !isLoading;
 
   const columns: AdminTableColumn<V1AdminErrorLogListItem>[] = [
     {
@@ -352,6 +336,20 @@ export function ErrorLogsClient() {
           />
         }
         actionsHeader="상세"
+        onRowClick={(row) => setSelectedId(row.id)}
+        rowClickLabel={(row) => `${row.message} 상세 보기`}
+        pagination={
+          pageInfo?.totalPages
+            ? {
+                page: pageInfo.page ?? page,
+                totalPages: pageInfo.totalPages,
+                total: pageInfo.total ?? 0,
+                limit: pageInfo.limit ?? PAGE_SIZE,
+                onPageChange: setPage,
+                loading: isFetching,
+              }
+            : undefined
+        }
         renderActions={(row) => (
           <button
             type="button"
@@ -364,23 +362,10 @@ export function ErrorLogsClient() {
         )}
       />
 
-      {hasMore && (
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={isLoading}
-            className="inline-flex items-center justify-center h-[44px] px-6 bg-white border border-gray-200 rounded-xl text-[var(--font-size-body-sm)] text-gray-700 font-medium hover:border-blue-300 hover:text-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? '불러오는 중…' : '더 보기'}
-          </button>
-        </div>
-      )}
-
-      {loadMoreFailed && (
+      {pageChangeFailed && (
         <div className="flex flex-col items-center gap-2">
-          <p className="text-[var(--font-size-body-sm)] text-gray-500 dark:text-gray-400">
-            {extractErrorMessage(error, '목록을 더 불러오지 못했어요.')}
+          <p className="text-[var(--font-size-body-sm)] text-gray-500 dark:text-gray-400" role="alert">
+            {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
           </p>
           <button
             type="button"

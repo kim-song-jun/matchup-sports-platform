@@ -11,7 +11,8 @@ import type { V1Tournament, V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminFilterBar,
   AdminEmpty,
   AdminTableSkeleton,
@@ -60,6 +61,8 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'cancelled', label: '취소됨' },
 ];
 
+const PAGE_SIZE = 20;
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTournamentsPage() {
@@ -75,56 +78,37 @@ export default function AdminTournamentsPage() {
     if (s) setActiveStatus(s);
   }, []);
 
-  // ── Cursor pagination ────────────────────────────────────────────────
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [accumulatedRows, setAccumulatedRows] = useState<V1Tournament[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
 
   const { toasts, showToast: _showToast } = useAdminToast();
   // showToast is available for future use (e.g. after bulk actions)
 
   const handleStatusChange = (value: string) => {
     setActiveStatus(value);
-    setAccumulatedRows([]);
-    setCursor(null);
-    setNextCursor(null);
+    // 필터를 좁히면 보던 페이지에 결과가 없을 수 있어 첫 페이지로 되돌린다.
+    setPage(1);
   };
 
   const filters = {
     ...(activeStatus ? { status: activeStatus as V1TournamentStatus } : {}),
-    ...(cursor ? { cursor } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
   const { data, isPending, isFetching, isError, error, refetch } =
     useV1AdminTournaments(filters);
+  const rows = data?.items ?? [];
+  const pageInfo = data?.pageInfo;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
     ...option,
     count: option.value ? data?.summary.byStatus[option.value] : data?.summary.total,
   }));
 
-  useEffect(() => {
-    if (!data?.items) return;
-    if (!cursor) {
-      setAccumulatedRows(data.items);
-    } else {
-      setAccumulatedRows((prev) => [...prev, ...data.items]);
-    }
-    setNextCursor(data.pageInfo?.nextCursor ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
-  const hasMore = !!nextCursor;
-  const loadMoreFailed = isError && accumulatedRows.length > 0;
-
-  const handleLoadMore = () => {
-    if (nextCursor) setCursor(nextCursor);
-  };
-
-  const isInitialLoad = isPending && accumulatedRows.length === 0;
+  const isInitialLoad = isPending && rows.length === 0;
 
   const errorMessage =
-    isError && accumulatedRows.length === 0
+    isError && rows.length === 0
       ? extractErrorMessage(error, '대회 목록을 불러오지 못했어요.')
       : undefined;
 
@@ -138,7 +122,7 @@ export default function AdminTournamentsPage() {
           canWrite ? (
             <Link
               href="/admin/tournaments/new"
-              className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[14px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="inline-flex items-center gap-1.5 h-[44px] px-4 rounded-xl text-[var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               aria-label="새 대회 만들기"
             >
               <Plus size={16} aria-hidden="true" />
@@ -163,38 +147,89 @@ export default function AdminTournamentsPage() {
         {isInitialLoad ? (
           <AdminTableSkeleton rows={8} />
         ) : (
-          <AdminCardList<V1Tournament>
-            rows={accumulatedRows}
+          <AdminDataTable<V1Tournament>
+            rows={rows}
             keyExtractor={(r) => r.id}
-            card={(row) => ({
-              title: row.title,
-              subtitle: row.venue ?? undefined,
-              status: row.status,
-              meta: [
-                {
-                  icon: <Calendar size={14} aria-hidden="true" />,
-                  label: formatDateRange(row.scheduledAt, row.scheduledEndAt),
-                },
-                {
-                  icon: <Clock size={14} aria-hidden="true" />,
-                  label: `마감 ${formatDate(row.registrationDeadlineAt)}`,
-                },
-                {
-                  icon: <Users size={14} aria-hidden="true" />,
-                  label: `${row.registrationCount}팀`,
-                },
-                {
-                  icon: <Coins size={14} aria-hidden="true" />,
-                  label: formatCurrency(row.entryFee),
-                },
-              ],
-              tone:
-                row.status === 'cancelled'
-                  ? 'danger'
-                  : row.status === 'closed'
-                    ? 'warning'
-                    : undefined,
-            })}
+            pagination={
+              pageInfo?.totalPages
+                ? {
+                    page: pageInfo.page ?? page,
+                    totalPages: pageInfo.totalPages,
+                    total: pageInfo.total ?? 0,
+                    limit: pageInfo.limit ?? PAGE_SIZE,
+                    onPageChange: setPage,
+                    loading: isFetching,
+                  }
+                : undefined
+            }
+            tableMaxWidth="max-w-none"
+            rowTone={(row) =>
+              row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined
+            }
+            columns={[
+              {
+                key: 'schedule',
+                header: '일정',
+                width: 'w-[168px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-500">
+                    {formatDateRange(row.scheduledAt, row.scheduledEndAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: '상태',
+                width: 'w-[104px]',
+                render: (row) => <AdminStatusPill status={row.status} />,
+              },
+              {
+                key: 'title',
+                header: '대회',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium text-gray-900" title={row.title}>
+                      {row.title}
+                    </span>
+                    {row.venue ? (
+                      <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                        {row.venue}
+                      </span>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                key: 'deadline',
+                header: '접수 마감',
+                width: 'w-[124px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-500">
+                    {formatDate(row.registrationDeadlineAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'registrationCount',
+                header: '참가팀',
+                align: 'center',
+                width: 'w-[80px]',
+                render: (row) => (
+                  <span className="tabular-nums text-gray-600">{row.registrationCount}</span>
+                ),
+              },
+              {
+                key: 'entryFee',
+                header: '참가비',
+                align: 'right',
+                width: 'w-[112px]',
+                render: (row) => (
+                  <span className="tabular-nums whitespace-nowrap text-gray-600">
+                    {formatCurrency(row.entryFee)}
+                  </span>
+                ),
+              },
+            ]}
             renderActions={(row) => (
               <Link
                 href={`/admin/tournaments/${row.id}`}
@@ -218,36 +253,33 @@ export default function AdminTournamentsPage() {
             }
             error={errorMessage}
             onRetry={() => void refetch()}
-            skeletonCards={8}
+            skeletonRows={8}
           />
         )}
 
         {/* Load more */}
-        {hasMore && !isInitialLoad && (
+        {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
+        {isError && rows.length > 0 && (
           <div className="flex flex-col items-center gap-1.5">
-            {loadMoreFailed && (
-              <p className="text-[var(--font-size-label)] text-red-500" role="alert">
-                {extractErrorMessage(error, '다음 목록을 불러오지 못했어요.')}
-              </p>
-            )}
+            <p className="text-[var(--font-size-label)] text-red-500" role="alert">
+              {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
+            </p>
             <button
               type="button"
-              onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
+              onClick={() => void refetch()}
               disabled={isFetching}
               className={[
-                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
+                'h-[44px] px-6 rounded-xl text-[var(--font-size-label)] font-semibold transition-colors',
                 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
                 'disabled:opacity-50',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               ].join(' ')}
             >
-              {isFetching ? '불러오는 중…' : loadMoreFailed ? '다시 시도' : '더 보기'}
+              {isFetching ? '불러오는 중…' : '다시 시도'}
             </button>
           </div>
         )}
 
-        {/* Loading more skeleton */}
-        {isFetching && !isInitialLoad && <AdminTableSkeleton rows={4} />}
       </div>
 
       <AdminToasts toasts={toasts} />

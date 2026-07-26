@@ -10,19 +10,28 @@ import {
   Mail,
   MapPin,
   Plus,
+  Send,
   Settings,
+  ShieldAlert,
+  ShieldCheck,
   Star,
   Users,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
+import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { cssUrl, publicAssetPath } from '@/lib/assets';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { cssUrl } from '@/lib/assets';
+import { PendingTournamentReviewCard } from '@/components/tournaments/pending-review-card';
 import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
   MyInvitationsViewModel,
+  MyJoinApplicationItem,
+  MyJoinApplicationsViewModel,
   MyMatch,
   MyMatchesViewModel,
   MyMember,
@@ -49,6 +58,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   FileText,
   LogOut,
   Mail,
+  Send,
 };
 
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
@@ -56,6 +66,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
 
   return (
     <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
+      <h1 className="sr-only">마이페이지</h1>
       <div className="tm-my-shell">
         {/* Mobile layout: flat stack (unchanged) */}
         {/* Desktop layout: 2-column via tm-my-desktop-layout */}
@@ -67,16 +78,25 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               <div className="tm-my-profile-copy">
                 <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
                 <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region} · {model.user.genderLabel}</div>
-                {model.user.loginMethod ? (
-                  <div style={{ marginTop: 6 }}>
-                    <span
-                      className="tm-badge tm-badge-grey"
-                      style={model.user.loginMethodProvider === 'kakao'
-                        ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
-                        : undefined}
-                    >
-                      {model.user.loginMethod}
-                    </span>
+                {model.user.loginMethod || model.phoneVerified ? (
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {model.user.loginMethod ? (
+                      <span
+                        className="tm-badge tm-badge-grey"
+                        style={model.user.loginMethodProvider === 'kakao'
+                          ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
+                          : undefined}
+                      >
+                        {model.user.loginMethod}
+                      </span>
+                    ) : null}
+                    {/* 컬러만으로 상태를 전달하지 않도록 아이콘 + 텍스트를 함께 쓴다. */}
+                    {model.phoneVerified ? (
+                      <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+                        본인인증 완료
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
                 <div
@@ -93,6 +113,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               </div>
               <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
             </section>
+            {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
             {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
             <Card pad={16}>
               <div className="tm-text-body-lg">활동 요약</div>
@@ -105,12 +126,17 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
           {/* RIGHT: menu sections */}
           <div className="tm-my-desktop-main">
+            <PendingTournamentReviewCard />
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>
-            {/* 로그아웃: 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 (계정 설정 페이지에도 동일하게 있어 발견성 유지) */}
+            {/* 로그아웃: 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소.
+                메뉴 그리드 바로 아래 맨몸으로 떠 있으면 "깜빡 잊고 남은 링크"처럼 보여서
+                Card로 감싸 우측 정렬한다(계정 설정 페이지에도 동일하게 있어 발견성 유지). */}
             <div className="tm-my-logout-row">
-              <LogoutButton variant="ghost" />
+              <Card pad={16} className="tm-my-logout-card">
+                <LogoutButton variant="ghost" />
+              </Card>
             </div>
           </div>
         </div>
@@ -207,7 +233,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
             {model.invitations.map((invitation) => (
               <div key={invitation.invitationId} className="tm-invitation-card">
                 <div className="tm-invitation-card-head">
-                  <div className="tm-team-logo">{invitation.teamLogo}</div>
+                  <TeamAvatar seed={invitation.teamId} name={invitation.teamName} logoUrl={invitation.logoUrl} size="lg" />
                   <div className="tm-invitation-meta">
                     <div className="tm-invitation-meta-name">{invitation.teamName}</div>
                     <div className="tm-invitation-meta-sub">{invitation.invitedByName}님이 초대했어요</div>
@@ -221,7 +247,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                   <button
                     className="tm-btn tm-btn-sm tm-btn-primary"
                     type="button"
-                    disabled={model.actionPending}
+                    disabled={invitation.actionPending}
                     onClick={() => model.onAccept(invitation.invitationId)}
                     aria-label={`${invitation.teamName} 초대 수락`}
                   >
@@ -230,13 +256,95 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                   <button
                     className="tm-btn tm-btn-sm tm-btn-ghost"
                     type="button"
-                    disabled={model.actionPending}
+                    disabled={invitation.actionPending}
                     onClick={() => model.onDecline(invitation.invitationId)}
                     aria-label={`${invitation.teamName} 초대 거절`}
                   >
                     거절
                   </button>
                 </div>
+                {invitation.actionPending ? (
+                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 6 }}>
+                    처리 중…
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </AppChrome>
+  );
+}
+
+/** 상태 뱃지 톤 → 뱃지 클래스. 색만으로 구분하지 않도록 라벨 텍스트를 항상 함께 렌더한다. */
+const JOIN_APPLICATION_BADGE_CLASS: Record<MyJoinApplicationItem['statusTone'], string> = {
+  pending: 'tm-badge-orange',
+  approved: 'tm-badge-green',
+  rejected: 'tm-badge-red',
+  neutral: 'tm-badge-grey',
+};
+
+export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplicationsViewModel }) {
+  return (
+    <AppChrome title="보낸 가입 신청" activeTab="my" bottomNav={false} backHref="/my">
+      <div className="tm-my-shell">
+        {/* Desktop page head */}
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <ChevronLeftIcon size={22} strokeWidth={2.5} />
+          </Link>
+          <h1 className="tm-text-heading">보낸 가입 신청</h1>
+        </div>
+        {model.error ? (
+          <EmptyState
+            title="가입 신청 목록을 불러오지 못했어요"
+            sub="잠시 후 다시 시도해 주세요."
+            cta="다시 시도"
+            onCta={model.onRetry}
+          />
+        ) : model.loading ? (
+          <PageSkeleton />
+        ) : model.applications.length === 0 ? (
+          <EmptyState title="보낸 가입 신청이 없어요" sub="팀에 가입 신청하면 진행 상태를 여기에서 확인할 수 있어요." />
+        ) : (
+          <div className="tm-my-list-stack">
+            {model.applications.map((application) => (
+              <div key={application.applicationId} className="tm-invitation-card tm-join-application-card">
+                <div className="tm-invitation-card-head">
+                  <TeamAvatar seed={application.teamId} name={application.teamName} logoUrl={application.logoUrl} size="lg" />
+                  <div className="tm-invitation-meta">
+                    <Link className="tm-invitation-meta-name tm-join-application-team-link" href={`/teams/${application.teamId}`}>
+                      {application.teamName}
+                    </Link>
+                    <div className="tm-invitation-meta-date">{application.dateLabel} 신청</div>
+                  </div>
+                  <span className={`tm-badge ${JOIN_APPLICATION_BADGE_CLASS[application.statusTone]}`}>
+                    {application.statusLabel}
+                  </span>
+                </div>
+                <p className="tm-join-application-hint">{application.statusHint}</p>
+                {application.message ? (
+                  <div className="tm-invitation-message">{application.message}</div>
+                ) : null}
+                {application.status === 'requested' ? (
+                  <div className="tm-invitation-actions">
+                    <button
+                      className="tm-btn tm-btn-sm tm-btn-ghost"
+                      type="button"
+                      disabled={application.actionPending}
+                      onClick={() => model.onWithdraw(application.applicationId)}
+                      aria-label={`${application.teamName} 가입 신청 취소`}
+                    >
+                      신청 취소
+                    </button>
+                  </div>
+                ) : null}
+                {application.actionPending ? (
+                  <div className="tm-text-caption" role="status" aria-live="polite">
+                    처리 중…
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -262,7 +370,7 @@ export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }
           {/* LEFT: hero + info + recent matches */}
           <div className="tm-my-team-detail-left">
             <section className="tm-my-team-hero">
-              <MyTeamLogo team={model.team} large />
+              <TeamAvatar seed={model.team.id} name={model.team.name} logoUrl={model.team.logoUrl} size="xl" />
               <div>
                 <h2 className="tm-text-heading">{model.team.name}</h2>
                 <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
@@ -351,7 +459,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
               <Card pad={16}>
                 <InfoRow label="로그인 방식" value={model.account.loginMethod} />
                 <InfoRow label="이메일" value={model.account.email} />
-                <InfoRow label="휴대폰" value={model.account.phone} />
+                <PhoneInfoRow value={model.account.phone} verified={model.account.phoneVerified} />
                 {model.account.canRequestPasswordChange ? (
                   <InfoRow
                     label="비밀번호"
@@ -367,7 +475,9 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
           {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
           {/* 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 — 마이홈과 동일 패턴 */}
           <div className="tm-my-logout-row">
-            <LogoutButton variant="ghost" />
+            <Card pad={16} className="tm-my-logout-card">
+              <LogoutButton variant="ghost" />
+            </Card>
           </div>
         </div>
       </div>
@@ -456,7 +566,7 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
     <Link className="tm-my-team-card tm-pressable" href={`/teams/${team.id}`}>
-      <MyTeamLogo team={team} />
+      <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">
           <div className="tm-text-body-lg">{team.name}</div>
@@ -477,18 +587,6 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   );
 }
 
-function MyTeamLogo({ team, large }: { team: Pick<MyTeam, 'logo' | 'logoUrl'>; large?: boolean }) {
-  return (
-    <div className={`tm-team-logo ${large ? 'tm-team-logo-large' : ''}`} style={{ overflow: 'hidden' }}>
-      {team.logoUrl ? (
-        <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        team.logo
-      )}
-    </div>
-  );
-}
-
 function MemberGroup({ title, members }: { title: string; members: MyMember[] }) {
   return (
     <section>
@@ -502,6 +600,71 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
           </div>
         )}
     </section>
+  );
+}
+
+/**
+ * 마이페이지의 본인인증 진입점.
+ * 홈 배너 말고도 여기서 항상 인증을 시작할 수 있어야 한다 — 인증 전에는 신청·등록이 전부
+ * 막히는데, 진입점이 홈에만 있으면 사용자는 막힌 화면에서 되돌아갈 곳을 찾지 못한다.
+ */
+function PhoneVerificationCallout() {
+  return (
+    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--orange-soft)',
+          color: 'var(--orange500)',
+        }}
+      >
+        <ShieldAlert size={18} strokeWidth={2} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label">휴대폰 본인인증이 필요해요</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>인증해야 대회 신청·팀 활동을 할 수 있어요.</div>
+      </div>
+      <Link
+        className="tm-btn tm-btn-sm tm-btn-primary"
+        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        href={buildPhoneVerifyHref('/my')}
+      >
+        인증하기
+      </Link>
+    </Card>
+  );
+}
+
+/**
+ * 계정 설정의 휴대폰 행. 번호만 보여주면 미인증 계정도 정상으로 보이는데, 실제로는 그 상태에서
+ * 신청·등록이 전부 막힌다. 상태와 인증 진입점을 같은 자리에 둔다.
+ */
+function PhoneInfoRow({ value, verified }: { value: string; verified?: boolean }) {
+  return (
+    <div className="tm-info-row">
+      <div className="tm-text-caption">휴대폰</div>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+        <span className="tm-text-label" style={{ textAlign: 'right' }}>{value}</span>
+        {verified === true ? (
+          <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+            인증 완료
+          </span>
+        ) : null}
+        {verified === false ? (
+          <Link className="tm-btn tm-btn-sm tm-btn-primary" href={buildPhoneVerifyHref('/my/settings')}>
+            인증하기
+          </Link>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

@@ -46,7 +46,7 @@ export class TournamentListQueryDto {
 
 /**
  * 어드민 공지 생성 DTO.
- * audience는 현재 메타 저장 용도(실제 발송 로직은 후속 task).
+ * audience는 공개 시 tournament_announcement_published 알림 수신 대상(신청 팀) 필터로 사용된다.
  * publish=true이면 publishedAt=now()로 즉시 공개 처리.
  */
 export const ANNOUNCEMENT_AUDIENCES = [
@@ -56,6 +56,16 @@ export const ANNOUNCEMENT_AUDIENCES = [
   'waitlist',
 ] as const;
 export type AnnouncementAudience = (typeof ANNOUNCEMENT_AUDIENCES)[number];
+
+export const ANNOUNCEMENT_CATEGORIES = [
+  'general',
+  'venue',
+  'sponsor',
+  'media',
+  'results',
+  'review',
+] as const;
+export type AnnouncementCategory = (typeof ANNOUNCEMENT_CATEGORIES)[number];
 
 export class CreateAnnouncementDto {
   @IsString()
@@ -69,6 +79,10 @@ export class CreateAnnouncementDto {
   @IsOptional()
   @IsIn(ANNOUNCEMENT_AUDIENCES)
   audience?: AnnouncementAudience;
+
+  @IsOptional()
+  @IsIn(ANNOUNCEMENT_CATEGORIES)
+  category?: AnnouncementCategory;
 
   @IsOptional()
   @IsBoolean()

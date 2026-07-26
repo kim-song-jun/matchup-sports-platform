@@ -20,7 +20,6 @@ test.describe('[host] 팀매치 목록 플로우', () => {
     await expect(main).toBeVisible();
     // 팀매치 목록 — 종목 칩 또는 summary row 렌더
     await expect(main).toContainText(/팀매치|팀 매치/);
-    // 모바일 FAB (href="/team-matches/new/team", aria-label="팀매치 만들기")
     const fab = page.locator('.tm-floating-fab[href="/team-matches/new/team"]');
     // DOM에는 존재하지만 desktop에서는 CSS로 숨겨짐 — DOM presence만 확인
     await expect(fab).toHaveCount(1);

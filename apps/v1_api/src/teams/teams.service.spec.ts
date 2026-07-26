@@ -42,6 +42,7 @@ const suspended = {
 function teamRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'team-1',
+    name: '테스트팀',
     status: 'active',
     joinPolicy: 'approval_required',
     memberCount: 5,
@@ -114,11 +115,11 @@ function invitationRow(overrides: Record<string, unknown> = {}) {
 describe('TeamsService', () => {
   let service: TeamsService;
   let prisma: {
-    v1Team: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1Team: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
-    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock };
-    v1TeamJoinApplication: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
-    v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; updateMany: jest.Mock; count: jest.Mock };
+    v1TeamJoinApplication: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1User: { findUnique: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
@@ -126,13 +127,15 @@ describe('TeamsService', () => {
     v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatMessage: { create: jest.Mock };
+    v1PostEventReview: { findMany: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
-      v1Team: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
+      v1Team: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
       v1TeamProfile: { upsert: jest.fn() },
       v1TeamMembership: {
         findFirst: jest.fn(),
@@ -141,9 +144,13 @@ describe('TeamsService', () => {
         create: jest.fn(),
         upsert: jest.fn(),
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+        updateMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
       },
       v1TeamJoinApplication: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
       },
@@ -153,6 +160,8 @@ describe('TeamsService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
       },
       v1User: { findUnique: jest.fn() },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
@@ -161,13 +170,16 @@ describe('TeamsService', () => {
       v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatMessage: { create: jest.fn() },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn(),
     };
 
     // Default: $transaction executes the callback with prisma itself as tx
     (prisma.$transaction as jest.Mock).mockImplementation(
       (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma),
     );
+    prisma.$queryRaw.mockResolvedValue(undefined);
     prisma.v1ChatRoom.upsert.mockResolvedValue({ id: 'room-1' });
     prisma.v1ChatRoomParticipant.upsert.mockResolvedValue({ id: 'participant-1' });
     prisma.v1ChatRoomParticipant.updateMany.mockResolvedValue({ count: 1 });
@@ -231,6 +243,7 @@ describe('TeamsService', () => {
           sportId: 'sport-1',
           regionId: 'region-seoul',
           name: '서울 전체 팀',
+          logoUrl: '/images/team-logos/team-logo-04.jpg',
           joinPolicy: 'approval_required',
         }),
       ).resolves.toMatchObject({
@@ -247,6 +260,11 @@ describe('TeamsService', () => {
           data: expect.objectContaining({
             membersVisible: true,
             regionId: 'region-seoul',
+            profile: {
+              create: expect.objectContaining({
+                logoUrl: '/images/team-logos/team-logo-04.jpg',
+              }),
+            },
           }),
         }),
       );
@@ -272,7 +290,7 @@ describe('TeamsService', () => {
           sportId: 'sport-1',
           regionId: 'region-seoul',
           name: '서울 전체 팀',
-          logoUrl: null,
+          logoUrl: '/images/team-logos/team-logo-07.jpg',
           coverImageUrl: null,
           introduction: null,
           activityAreaText: null,
@@ -306,6 +324,192 @@ describe('TeamsService', () => {
           }),
         }),
       );
+      expect(prisma.v1TeamProfile.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { teamId: 'team-1' },
+          update: expect.objectContaining({
+            logoUrl: '/images/team-logos/team-logo-07.jpg',
+          }),
+          create: expect.objectContaining({
+            logoUrl: '/images/team-logos/team-logo-07.jpg',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('list', () => {
+    it('includes owner and active manager in each list item', async () => {
+      prisma.v1Team.findMany.mockResolvedValueOnce([
+        {
+          ...teamRow(),
+          name: '테스트팀',
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [
+            {
+              ...membershipRow({ id: 'owner-membership', role: 'owner', userId: owner.id }),
+              user: { profile: { nickname: 'owner-nick', displayName: '오너', profileImageUrl: null } },
+            },
+            {
+              ...membershipRow({ id: 'manager-membership', role: 'manager', userId: manager.id }),
+              user: { profile: { nickname: 'manager-nick', displayName: '감독님', profileImageUrl: null } },
+            },
+          ],
+          joinApplications: [],
+          trustScore: null,
+          ownerUser: {
+            id: owner.id,
+            profile: { nickname: 'owner-nick', displayName: '오너', profileImageUrl: 'https://example.com/owner.png' },
+          },
+        },
+      ]);
+
+      const result = await service.list(null, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].owner).toEqual({
+        userId: owner.id,
+        displayName: 'owner-nick',
+        profileImageUrl: 'https://example.com/owner.png',
+      });
+      expect(result.items[0].manager).toEqual({
+        userId: manager.id,
+        displayName: 'manager-nick',
+      });
+    });
+
+    it('returns manager=null when the team has no active manager', async () => {
+      prisma.v1Team.findMany.mockResolvedValueOnce([
+        {
+          ...teamRow(),
+          name: '테스트팀',
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [
+            {
+              ...membershipRow({ id: 'owner-membership', role: 'owner', userId: owner.id }),
+              user: { profile: { nickname: 'owner-nick', displayName: null, profileImageUrl: null } },
+            },
+            {
+              ...membershipRow({ id: 'member-membership', role: 'member', userId: member.id }),
+              user: { profile: { nickname: 'member-nick', displayName: null, profileImageUrl: null } },
+            },
+          ],
+          joinApplications: [],
+          trustScore: null,
+          ownerUser: { id: owner.id, profile: null },
+        },
+      ]);
+
+      const result = await service.list(null, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].owner).toEqual({
+        userId: owner.id,
+        displayName: '팀장',
+        profileImageUrl: null,
+      });
+      expect(result.items[0].manager).toBeNull();
+    });
+
+    it('returns live-recalculated trustState instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1Team.findMany.mockResolvedValueOnce([
+        {
+          ...teamRow({ id: 'team-live' }),
+          name: '실시간팀',
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [],
+          joinApplications: [],
+          // 캐시는 예전 verified 상태를 그대로 들고 있지만(72시간 경과 직후 cron이 없어 갱신 누락),
+          // 아직 상대팀이 리뷰를 제출하지 않았고 72시간도 지나지 않아 실제로는 공개된 리뷰가 0건이다.
+          trustScore: { trustState: 'verified', mannerScore: null, matchCount: 3 },
+          ownerUser: { id: owner.id, profile: null },
+        },
+      ]);
+      // candidates: 팀이 받은 리뷰 1건, 방금 제출되어 아직 reveal 조건(상호제출 또는 72시간 경과) 미충족.
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      // reverse: 상대팀은 아직 리뷰를 제출하지 않았다.
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.list(null, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].trustState).toBe('none');
+    });
+  });
+
+  describe('myTeams', () => {
+    it('returns live-recalculated trust instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
+        {
+          ...membershipRow({ id: 'mem-live', teamId: 'team-live', userId: owner.id, role: 'owner' }),
+          team: {
+            ...teamRow({ id: 'team-live' }),
+            sport: { id: 'sport-1', name: 'Soccer' },
+            region: null,
+            profile: null,
+            // 캐시는 예전 verified/4.8점을 들고 있지만 아직 상호제출/72시간 reveal 조건을 만족하지 못한다.
+            trustScore: { trustState: 'verified', mannerScore: 4.8 },
+          },
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.myTeams(owner, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].trust).toEqual({ trustState: 'none', score: null });
+    });
+  });
+
+  describe('detail (getPublicTeam)', () => {
+    it('returns live-recalculated trustState instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ id: 'team-live' }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [],
+        joinApplications: [],
+        trustScore: { trustState: 'verified', mannerScore: null, matchCount: 3 },
+        ownerUser: { id: owner.id, profile: null },
+      });
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.detail(null, 'team-live');
+
+      expect(result.trustState).toBe('none');
     });
   });
 
@@ -342,7 +546,7 @@ describe('TeamsService', () => {
       expect(result.membersPreview).toHaveLength(2);
     });
 
-    it('members allows active members to list members even when public visibility is disabled', async () => {
+    it('members exposes private profile fields only for the ordinary member viewer own row', async () => {
       prisma.v1Team.findFirst.mockResolvedValueOnce({
         ...teamRow({ membersVisible: false }),
         sport: { id: 'sport-1', name: 'Soccer' },
@@ -357,13 +561,28 @@ describe('TeamsService', () => {
         {
           ...membershipRow({ id: 'member-viewer', role: 'member', userId: member.id }),
           user: {
-            phone: null,
+            phone: '010-1111-2222',
             profile: {
               nickname: 'viewer',
-              displayName: null,
+              displayName: 'Viewer Real Name',
+              realName: 'Viewer Real Name',
               profileImageUrl: null,
-              birthDate: null,
+              birthDate: new Date('1995-04-03'),
               gender: 'female',
+            },
+          },
+        },
+        {
+          ...membershipRow({ id: 'other-member', role: 'member', userId: 'other-user' }),
+          user: {
+            phone: '010-9999-8888',
+            profile: {
+              nickname: 'other',
+              displayName: 'Other Real Name',
+              realName: 'Other Real Name',
+              profileImageUrl: null,
+              birthDate: new Date('1990-01-02'),
+              gender: 'male',
             },
           },
         },
@@ -373,10 +592,145 @@ describe('TeamsService', () => {
 
       expect(result.membersVisibilityEnabled).toBe(false);
       expect(result.viewerRole).toBe('member');
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0].gender).toBe('female');
-      expect(prisma.v1TeamMembership.findMany).toHaveBeenCalled();
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0]).toMatchObject({
+        userId: member.id,
+        realName: 'Viewer Real Name',
+        phone: '010-1111-2222',
+        birthDate: new Date('1995-04-03'),
+        gender: 'female',
+      });
+      expect(result.items[1]).toMatchObject({
+        userId: 'other-user',
+        realName: null,
+        phone: null,
+        birthDate: null,
+        gender: null,
+      });
     });
+
+    it('members reports all active owners independently of roster filters and pagination', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ membersVisible: true }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: { id: owner.id, profile: null },
+      });
+      prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
+        {
+          ...membershipRow({ id: 'removed-manager', role: 'manager', status: 'removed', userId: manager.id }),
+          user: { phone: null, profile: null },
+        },
+        {
+          ...membershipRow({ id: 'next-removed-manager', role: 'manager', status: 'removed', userId: 'next-manager' }),
+          user: { phone: null, profile: null },
+        },
+      ]);
+      prisma.v1TeamMembership.count.mockResolvedValueOnce(2);
+
+      const result = await service.members(null, 'team-1', {
+        cursor: 'previous-membership',
+        limit: 1,
+        role: 'manager',
+        status: 'removed',
+      });
+
+      expect(result.summary.ownerCount).toBe(2);
+      expect(result.items).toHaveLength(1);
+      expect(result.pageInfo).toEqual({ nextCursor: 'removed-manager', hasNext: true });
+      expect(prisma.v1TeamMembership.count).toHaveBeenCalledWith({
+        where: { teamId: 'team-1', role: 'owner', status: 'active' },
+      });
+    });
+
+    it.each([
+      { viewer: owner, role: 'owner' as const },
+      { viewer: manager, role: 'manager' as const },
+    ])('members exposes roster-required profile fields to an active $role', async ({ viewer, role }) => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ membersVisible: false }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [membershipRow({ role, userId: viewer.id })],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: { id: owner.id, profile: null },
+      });
+      prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
+        {
+          ...membershipRow({ id: 'roster-member', role: 'member', userId: 'roster-user' }),
+          user: {
+            phone: '010-2222-3333',
+            profile: {
+              nickname: 'roster',
+              displayName: 'Roster Real Name',
+              realName: 'Roster Real Name',
+              profileImageUrl: null,
+              birthDate: new Date('1993-07-08'),
+              gender: 'male',
+            },
+          },
+        },
+      ]);
+
+      const result = await service.members(viewer, 'team-1', {});
+
+      expect(result.viewerRole).toBe(role);
+      expect(result.items[0]).toMatchObject({
+        userId: 'roster-user',
+        realName: 'Roster Real Name',
+        phone: '010-2222-3333',
+        birthDate: new Date('1993-07-08'),
+        gender: 'male',
+      });
+    });
+
+    it.each(['left', 'removed'] as const)(
+      'members hides private profile fields from the former member own $status row',
+      async (status) => {
+        prisma.v1Team.findFirst.mockResolvedValueOnce({
+          ...teamRow({ membersVisible: true }),
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [membershipRow({ role: 'member', status, userId: member.id })],
+          joinApplications: [],
+          trustScore: null,
+          ownerUser: { id: owner.id, profile: null },
+        });
+        prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
+          {
+            ...membershipRow({ id: `former-member-${status}`, role: 'member', status, userId: member.id }),
+            user: {
+              phone: '010-3333-4444',
+              profile: {
+                nickname: 'former',
+                displayName: 'Former Real Name',
+                profileImageUrl: null,
+                birthDate: new Date('1991-02-03'),
+                gender: 'female',
+              },
+            },
+          },
+        ]);
+
+        const result = await service.members(member, 'team-1', { status });
+
+        expect(result.viewerRole).toBe('none');
+        expect(result.items[0]).toMatchObject({
+          userId: member.id,
+          realName: null,
+          phone: null,
+          birthDate: null,
+          gender: null,
+        });
+      },
+    );
 
     it('detail allows non-members to preview members when public visibility is enabled', async () => {
       prisma.v1Team.findFirst.mockResolvedValueOnce({
@@ -494,6 +848,157 @@ describe('TeamsService', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  // ─── leaveTeam: 본인 self-leave ────────────────────────────────────────────
+
+  it('leaveTeam: 마지막 active owner는 나갈 수 없다 → 409 LAST_OWNER_CANNOT_LEAVE', async () => {
+    const ownerMembership = membershipRow({ role: 'owner', userId: owner.id, status: 'active' });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [ownerMembership],
+    });
+    prisma.v1TeamMembership.count.mockResolvedValueOnce(0); // no other active owner
+
+    await expect(
+      service.leaveTeam(owner, 'team-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LAST_OWNER_CANNOT_LEAVE' }),
+    });
+    // R15-005: last-owner 체크는 $transaction 내부(row lock 하에서) 실행되어야 하며,
+    // 실패 시 트랜잭션이 롤백되어 membership 업데이트는 발생하지 않는다.
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.v1TeamMembership.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('leaveTeam: 다른 active owner가 있으면 owner도 나갈 수 있다', async () => {
+    const ownerMembership = membershipRow({ id: 'mem-owner', role: 'owner', userId: owner.id, status: 'active' });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [ownerMembership],
+    });
+    prisma.v1TeamMembership.count.mockResolvedValueOnce(1); // another active owner exists
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null); // no chat room
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.v1TeamMembership.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'mem-owner',
+      teamId: 'team-1',
+      status: 'left',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 1 });
+
+    const result = await service.leaveTeam(owner, 'team-1', {});
+
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+    expect(prisma.v1TeamMembership.updateMany).toHaveBeenCalledWith({
+      where: { id: 'mem-owner', teamId: 'team-1', status: 'active' },
+      data: { status: 'left', leftAt: expect.any(Date) },
+    });
+    expect(result).toMatchObject({ membershipId: 'mem-owner', status: 'left', memberCount: 4 });
+  });
+
+  it('leaveTeam: 일반 멤버는 나가면 status=left + memberCount decrement + 채팅 참가자 정리', async () => {
+    const memberMembership = membershipRow({
+      id: 'mem-member',
+      role: 'member',
+      userId: member.id,
+      status: 'active',
+    });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [memberMembership],
+    });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce({ id: 'room-1' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce({ id: 'participant-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.update.mockResolvedValueOnce({ id: 'participant-1' });
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.v1TeamMembership.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'mem-member',
+      teamId: 'team-1',
+      status: 'left',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 1 });
+
+    const result = await service.leaveTeam(member, 'team-1', {});
+
+    // owner-only 확인 경로(count/row lock)는 member에게는 호출되지 않는다
+    expect(prisma.v1TeamMembership.count).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(prisma.v1Team.update).toHaveBeenCalledWith({
+      where: { id: 'team-1' },
+      data: { memberCount: { decrement: 1 } },
+    });
+    expect(prisma.v1ChatRoomParticipant.update).toHaveBeenCalledWith({
+      where: { id: 'participant-1' },
+      data: { status: 'left', leftAt: expect.any(Date) },
+      select: { id: true },
+    });
+    expect(result).toMatchObject({ membershipId: 'mem-member', status: 'left', memberCount: 4 });
+  });
+
+  it('leaveTeam: manager가 나가면 tx 내부에서 재조회한 role로 managerCount를 decrement한다(바깥에서 읽은 stale role 무시)', async () => {
+    // 바깥(tx 밖)에서 읽은 membership은 role='member'였지만, tx 내부 재조회(findUniqueOrThrow)는
+    // role='manager'를 반환하도록 해 "바깥 role 대신 tx 내부 재조회 결과를 쓴다"를 직접 증명한다.
+    const memberMembership = membershipRow({
+      id: 'mem-manager',
+      role: 'member',
+      userId: member.id,
+      status: 'active',
+    });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [memberMembership],
+    });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.v1TeamMembership.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'mem-manager',
+      teamId: 'team-1',
+      status: 'left',
+      role: 'manager',
+    });
+    prisma.v1Team.update.mockResolvedValueOnce({ memberCount: 4, managerCount: 0 });
+
+    await service.leaveTeam(member, 'team-1', {});
+
+    expect(prisma.v1Team.update).toHaveBeenCalledWith({
+      where: { id: 'team-1' },
+      data: { memberCount: { decrement: 1 }, managerCount: { decrement: 1 } },
+    });
+  });
+
+  it('leaveTeam: membership이 트랜잭션 중 이미 처리되면 409 CONCURRENT_UPDATE', async () => {
+    const memberMembership = membershipRow({
+      id: 'mem-member',
+      role: 'member',
+      userId: member.id,
+      status: 'active',
+    });
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [memberMembership],
+    });
+    // updateMany의 조건부 guard(where: status='active')가 0건을 매칭한 상황을 시뮬레이션
+    // (동시 요청이 먼저 이 membership을 'left'로 바꿔버린 경우)
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.leaveTeam(member, 'team-1', {}),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CONCURRENT_UPDATE' }),
+    });
+    expect(prisma.v1Team.update).not.toHaveBeenCalled();
+  });
+
+  it('leaveTeam: 팀에 소속되지 않은 사용자는 403', async () => {
+    prisma.v1Team.findFirst.mockResolvedValueOnce({
+      ...teamRow(),
+      memberships: [],
+    });
+
+    await expect(
+      service.leaveTeam(member, 'team-1', {}),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   // ─── changeMembershipRole: owner 역할을 일반 API로 변경 불가 ────────────────
 
   it('changeMembershipRole: 대상이 owner인 경우 역할 변경 불가 → 409 STATE_CONFLICT', async () => {
@@ -530,6 +1035,29 @@ describe('TeamsService', () => {
     });
   });
 
+  it('changeMembershipRole: R15-004 — concurrent promotions bypass outer cap check → 409 MANAGER_LIMIT_EXCEEDED inside tx', async () => {
+    // Outer check passes (managerCount=4), but by the time the transaction runs the
+    // count is already at 5; the atomic updateMany returns count=0 → 409.
+    const memberTarget = membershipRow({
+      role: 'member',
+      userId: 'target-user',
+      status: 'active',
+      team: teamRow({ managerCount: 4 }), // outer pre-check passes
+    });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(memberTarget)
+      .mockResolvedValueOnce({ role: 'owner' });
+    // Inside the transaction: conditional updateMany finds managerCount >= 5 → returns 0
+    prisma.v1Team.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.changeMembershipRole(owner, 'mem-target', { role: 'manager' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'MANAGER_LIMIT_EXCEEDED' }),
+    });
+    expect(prisma.v1TeamMembership.update).not.toHaveBeenCalled();
+  });
+
   // ─── changeMembershipRole: 이미 같은 역할이면 no-op ──────────────────────────
 
   it('changeMembershipRole: 이미 manager인 멤버를 manager로 변경하면 DB 업데이트 없이 현재 상태 반환', async () => {
@@ -553,6 +1081,33 @@ describe('TeamsService', () => {
       membershipId: 'mem-1',
       role: 'manager',
     });
+  });
+
+  // ─── changeMembershipRole: R15-003 — concurrent ownership delegation ──────
+
+  it('changeMembershipRole: R15-003 — concurrent ownership delegation → 409 CONCURRENT_UPDATE', async () => {
+    // Target is a manager; caller claims to be owner. But inside the transaction,
+    // updateMany finds the caller is no longer owner (already demoted) → 409.
+    const managerTarget = membershipRow({
+      id: 'mem-target',
+      role: 'manager',
+      userId: 'target-user',
+      status: 'active',
+      teamId: 'team-1',
+    });
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce(managerTarget) // getMembershipWithTeam
+      .mockResolvedValueOnce({ role: 'owner' }) // getManagementActor
+      .mockResolvedValueOnce({ id: 'owner-mem', userId: owner.id, teamId: 'team-1' }); // findFirst(currentOwner)
+    // Inside the transaction: owner was already demoted concurrently
+    prisma.v1TeamMembership.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.changeMembershipRole(owner, 'mem-target', { role: 'owner' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'CONCURRENT_UPDATE' }),
+    });
+    expect(prisma.v1Team.update).not.toHaveBeenCalled();
   });
 
   // ─── approveJoinApplication: 닫힌 팀에는 승인 불가 → 409 STATE_CONFLICT ──────
@@ -685,6 +1240,7 @@ describe('TeamsService', () => {
       application.applicantUserId,
       'team_join_application_accepted',
       application.teamId,
+      '"테스트팀" 팀 가입이 승인됐어요.',
     );
   });
 
@@ -833,6 +1389,7 @@ describe('TeamsService', () => {
       expect.any(Function),
       'team_join_application_received',
       'team-1',
+      '"테스트팀" 팀 가입 신청을 확인해 주세요.',
     );
 
     prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
@@ -931,12 +1488,14 @@ describe('TeamsService', () => {
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce(memberTarget) // getMembershipWithTeam (target)
       .mockResolvedValueOnce({ role: 'manager' }); // getManagementActor (caller is manager)
+    // R15-004: atomic cap check via updateMany (count < 5)
+    prisma.v1Team.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.v1Team.findUniqueOrThrow.mockResolvedValueOnce({ id: 'team-1', managerCount: 2 });
     prisma.v1TeamMembership.update.mockResolvedValue({
       id: 'mem-1',
       teamId: 'team-1',
       role: 'manager',
     });
-    prisma.v1Team.update.mockResolvedValue({ managerCount: 2 });
 
     const result = await service.changeMembershipRole(manager, 'mem-1', { role: 'manager' });
 
@@ -1232,8 +1791,10 @@ describe('TeamsService', () => {
       prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
 
       // 트랜잭션 내부
-      // v1TeamInvitation.update (accepted)
-      prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'accepted' });
+      // R15-002: updateMany with conditional status check
+      prisma.v1TeamInvitation.updateMany.mockResolvedValueOnce({ count: 1 });
+      // findUniqueOrThrow returns the accepted invitation
+      prisma.v1TeamInvitation.findUniqueOrThrow.mockResolvedValueOnce({ id: 'inv-1', status: 'accepted' });
       // v1TeamMembership.findUnique (wasActive 체크) → 기존 멤버십 없음
       prisma.v1TeamMembership.findUnique.mockResolvedValueOnce(null);
       // upsert → 새 멤버십 생성
@@ -1309,7 +1870,8 @@ describe('TeamsService', () => {
       const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
       prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
 
-      prisma.v1TeamInvitation.update.mockResolvedValueOnce({ id: 'inv-1', status: 'accepted' });
+      prisma.v1TeamInvitation.updateMany.mockResolvedValueOnce({ count: 1 });
+      prisma.v1TeamInvitation.findUniqueOrThrow.mockResolvedValueOnce({ id: 'inv-1', status: 'accepted' });
       // wasActive = true: 기존 active 멤버십 존재
       prisma.v1TeamMembership.findUnique.mockResolvedValueOnce({
         id: 'mem-already',
@@ -1334,6 +1896,19 @@ describe('TeamsService', () => {
       expect(prisma.v1Team.update).not.toHaveBeenCalled();
       expect(prisma.v1ChatRoomParticipant.updateMany).toHaveBeenCalled();
       expect(prisma.v1ChatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('R15-002: invitation cancelled between outer read and transaction → 409 STATE_CONFLICT', async () => {
+      // Outer read sees pending invitation; inside the transaction updateMany matches 0
+      // rows (another actor cancelled it), so acceptance is rejected.
+      const inv = invitationRow({ invitedUserId: invitee.id, status: 'pending' });
+      prisma.v1TeamInvitation.findUnique.mockResolvedValueOnce(inv);
+      prisma.v1TeamInvitation.updateMany.mockResolvedValueOnce({ count: 0 }); // concurrent cancel
+
+      await expect(service.acceptInvitation(invitee, 'inv-1')).rejects.toMatchObject({
+        response: expect.objectContaining({ code: 'STATE_CONFLICT' }),
+      });
+      expect(prisma.v1TeamMembership.upsert).not.toHaveBeenCalled();
     });
   });
 
@@ -1512,6 +2087,70 @@ describe('TeamsService', () => {
       expect(result.items[0].team).toMatchObject({ teamId: 'team-1', name: '테스트팀', sportId: 'sport-1' });
       expect(result.items[0].team.introductionPreview).toHaveLength(120); // 200자 → 120 컷
       expect(result.items[0].invitedBy.displayName).toBe('매니저'); // displayName null → nickname fallback
+    });
+  });
+
+  describe('myJoinApplications', () => {
+    it('승인 대기 건이 처리 완료 건보다 항상 앞에 오고, 두 그룹을 따로 조회한다', async () => {
+      prisma.v1TeamJoinApplication.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'app-pending',
+            teamId: 'team-1',
+            status: 'requested',
+            message: '가입하고 싶어요',
+            createdAt: new Date('2026-06-01'),
+            reviewedAt: null,
+            withdrawnAt: null,
+            team: { id: 'team-1', name: '대기팀', sportId: 'sport-1', profile: { logoUrl: null, description: null } },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'app-rejected',
+            teamId: 'team-2',
+            status: 'rejected',
+            message: null,
+            createdAt: new Date('2026-06-20'), // 대기 건보다 최신이지만 뒤에 와야 한다
+            reviewedAt: new Date('2026-06-21'),
+            withdrawnAt: null,
+            team: { id: 'team-2', name: '거절팀', sportId: 'sport-1', profile: { logoUrl: null, description: null } },
+          },
+        ]);
+
+      const result = await service.myJoinApplications(invitee);
+
+      // 본인 신청만 조회 — requested / not requested 두 그룹
+      expect(prisma.v1TeamJoinApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { applicantUserId: invitee.id, status: 'requested' } }),
+      );
+      expect(prisma.v1TeamJoinApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { applicantUserId: invitee.id, status: { not: 'requested' } } }),
+      );
+      expect(result.items.map((item) => item.applicationId)).toEqual(['app-pending', 'app-rejected']);
+      expect(result.items[0].team).toMatchObject({ teamId: 'team-1', name: '대기팀' });
+      expect(result.items[1].status).toBe('rejected');
+    });
+
+    it('팀 소개는 120자로 자른다', async () => {
+      prisma.v1TeamJoinApplication.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'app-1',
+            teamId: 'team-1',
+            status: 'requested',
+            message: null,
+            createdAt: new Date('2026-06-01'),
+            reviewedAt: null,
+            withdrawnAt: null,
+            team: { id: 'team-1', name: '팀', sportId: 'sport-1', profile: { logoUrl: null, description: 'a'.repeat(200) } },
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.myJoinApplications(invitee);
+
+      expect(result.items[0].team.introductionPreview).toHaveLength(120);
     });
   });
 

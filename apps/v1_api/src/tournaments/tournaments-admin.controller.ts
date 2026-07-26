@@ -6,6 +6,7 @@ import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
   CreateTournamentDto,
+  PublishBracketDto,
   UpdateTournamentDto,
 } from './dto/admin-tournament.dto';
 import { TournamentsAdminService } from './tournaments-admin.service';
@@ -46,5 +47,25 @@ export class TournamentsAdminController {
     @Body() dto: ChangeTournamentStatusDto,
   ) {
     return this.tournamentsAdminService.changeStatus(user, tournamentId, dto);
+  }
+
+  /** body 없이 호출하면 즉시 공개, `scheduledAt` 을 주면 그 시각에 공개되도록 예약한다. */
+  @Post(':tournamentId/publish-bracket')
+  publishBracket(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Body() dto: PublishBracketDto,
+  ) {
+    return this.tournamentsAdminService.publishBracket(
+      user,
+      tournamentId,
+      dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
+    );
+  }
+
+  /** 공개·예약을 모두 되돌린다(비공개 전환). */
+  @Post(':tournamentId/unpublish-bracket')
+  unpublishBracket(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {
+    return this.tournamentsAdminService.unpublishBracket(user, tournamentId);
   }
 }

@@ -29,12 +29,13 @@ test.describe('[applicant] 대회 탐색 및 신청 플로우', () => {
     // 상세 링크(목록 카드 → /tournaments/<uuid>)만 선택. seed 대회는 항상 존재하므로
     // 못 찾으면 회귀로 실패해야 한다(빈 상태로 조용히 통과 금지).
     const tournamentLink = page
-      .locator('a[href*="/tournaments/"]:not([href$="/tournaments"]):not([href*="/apply"]):not([href*="/my"]):not([href*="/roster"])')
+      .locator('.tm-card.tm-pressable[href*="/tournaments/"]:not([href*="/apply"]):not([href*="/my"]):not([href*="/roster"])')
       .first();
     await expect(tournamentLink).toBeVisible();
-    await tournamentLink.click();
-
-    await expect(page).toHaveURL(/\/tournaments\/[a-f0-9-]{8,}/);
+    await Promise.all([
+      page.waitForURL(/\/tournaments\/[a-f0-9-]{8,}/),
+      tournamentLink.click(),
+    ]);
     const detail = page.getByRole('main');
     await expect(detail).toBeVisible();
 

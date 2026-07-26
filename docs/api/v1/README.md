@@ -30,6 +30,7 @@ Canonical sources:
 - [Tournaments](./domains/tournaments.md)
 - [Chat And Notifications](./domains/chat-notifications.md)
 - [Profile And Settings](./domains/profile-settings.md)
+- [Uploads And Media](./domains/uploads.md)
 - [Admin And Audit](./domains/admin-audit.md)
 - [Deferred Boundaries](./domains/deferred-boundaries.md)
 
@@ -38,4 +39,4 @@ Canonical sources:
 - These docs describe the v1 implementation contract as of 2026-05-18.
 - The frozen reference checklist used `/api/v1/sm-new` while the implemented Nest app uses `/api/v1`. The implementation prefix wins for runtime and frontend hook work.
 - Terms, OAuth callback, email login, signup, and global search remain frozen in the reference contract but are not yet implemented in `apps/v1_api`; they are marked as pending implementation where relevant.
-- Payment, refund, support/dispute, marketplace, lessons, venue owner/operator, DM, file attachment, and admin task queue success flows are not v1 APIs.
+- Payment, refund, support/dispute, marketplace, lessons, venue owner/operator, chat file attachment, and admin task queue success flows are not v1 APIs. Authenticated image/video media upload is implemented separately from chat attachments.

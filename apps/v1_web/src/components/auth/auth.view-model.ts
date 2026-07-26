@@ -44,6 +44,12 @@ function buildKakaoAuthUrl() {
     response_type: 'code',
   });
 
+  // 이름/전화번호/성별 자동 채움용 추가 동의항목. 카카오는 콘솔에서 승인되지 않은 scope 를
+  // 요청하면 authorize 단계에서 실패시키므로 기본값을 두지 않는다 — 검수 승인 후
+  // NEXT_PUBLIC_KAKAO_SCOPE='name,phone_number,gender' 로 켜면 코드 변경 없이 동작한다.
+  const scope = process.env.NEXT_PUBLIC_KAKAO_SCOPE?.trim();
+  if (scope) params.set('scope', scope);
+
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
 
@@ -144,14 +150,6 @@ export function getTermsViewModel(): TermsViewModel {
         required: true,
         checked: true,
         detail: '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
-      },
-      {
-        title: '위치기반서비스 이용 동의',
-        meta: '선택 · 주변 매치 추천에 사용',
-        required: false,
-        checked: false,
-        locationBased: true,
-        detail: '',
       },
     ],
     primary: { label: '동의하고 회원가입하기', href: '/signup' },

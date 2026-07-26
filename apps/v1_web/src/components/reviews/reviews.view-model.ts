@@ -32,8 +32,8 @@ export function toReviewsPageModel(data: V1ReviewListResponse | undefined, tab: 
     cards: items.map((item) => ({
       ...item,
       href: `/my/reviews/${item.sourceType}/${item.sourceId}`,
-      badgeLabel: item.state === 'done' ? '완료' : item.sourceType === 'team_match' ? '상대팀' : '작성 전',
-      kindLabel: item.sourceType === 'team_match' ? '팀매치' : '개인 매치',
+      badgeLabel: item.state === 'done' ? '완료' : isTeamReviewSource(item.sourceType) ? '상대팀' : '작성 전',
+      kindLabel: sourceTypeLabel(item.sourceType),
       meta: buildListMeta(item.completedAt, item.reviewedCount, item.targetCount, item.remainingCount),
       ctaLabel: item.state === 'done' ? '보기' : item.reviewedCount > 0 ? '이어서 작성' : '리뷰',
     })),
@@ -85,7 +85,14 @@ export function toReviewsReceivedPageModel(data: V1ReviewReceivedResponse | unde
 }
 
 export function sourceTypeLabel(sourceType: V1ReviewSourceType) {
-  return sourceType === 'team_match' ? '팀매치' : '개인 매치';
+  switch (sourceType) {
+    case 'match':
+      return '개인 매치';
+    case 'team_match':
+      return '팀매치';
+    case 'tournament_fixture':
+      return '대회 경기';
+  }
 }
 
 export function formatDateTime(value: string | null) {
@@ -136,4 +143,8 @@ function averageRating(reviews: V1ReviewDetail[]) {
 
 function initials(name: string) {
   return name.trim().slice(0, 2) || '리뷰';
+}
+
+function isTeamReviewSource(sourceType: V1ReviewSourceType) {
+  return sourceType === 'team_match' || sourceType === 'tournament_fixture';
 }

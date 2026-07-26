@@ -12,19 +12,21 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { AdminRegistrationsService } from './admin-registrations.service';
 
 const opsAuth = { id: 'ops-user-id', email: 'ops@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const supportAuth = { id: 'support-user-id', email: 'support@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const nonAdminAuth = { id: 'plain-user-id', email: 'user@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
-const opsAdminRecord = { id: 'ops-admin-id', userId: 'ops-user-id', adminRole: 'ops' as const, status: 'active' as const };
-const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', adminRole: 'support' as const, status: 'active' as const };
+const opsAdminRecord = { id: 'ops-admin-id', userId: 'ops-user-id', adminRole: 'ops' as const, status: 'active' as const, user: { accountStatus: 'active' as const } };
+const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', adminRole: 'support' as const, status: 'active' as const, user: { accountStatus: 'active' as const } };
 
 function registrationRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'reg-1',
     tournamentId: 'tournament-1',
+    tournament: { title: '테스트대회' },
     teamId: 'team-1',
     appliedByUserId: 'manager-user',
     status: 'awaiting_payment',
@@ -36,10 +38,11 @@ function registrationRow(overrides: Record<string, unknown> = {}) {
     confirmedByAdminUserId: null,
     confirmedAt: null,
     rosterLockedAt: null,
+    rosterDeadlineOverrideAt: null,
     cancelRequestedAt: null,
     cancelReason: null,
-    createdAt: new Date('2026-06-14T00:00:00.000Z'),
-    updatedAt: new Date('2026-06-14T00:00:00.000Z'),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   };
 }
@@ -58,8 +61,8 @@ function paymentRow(overrides: Record<string, unknown> = {}) {
     refundedAt: null,
     confirmedByAdminUserId: null,
     rawWebhookRef: null,
-    createdAt: new Date('2026-06-14T00:00:00.000Z'),
-    updatedAt: new Date('2026-06-14T00:00:00.000Z'),
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   };
 }
@@ -71,11 +74,12 @@ describe('AdminRegistrationsService', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
-    v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock };
-    v1TournamentPlayer: { count: jest.Mock };
+    v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
+    v1TournamentPlayer: { count: jest.Mock; findMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -83,11 +87,15 @@ describe('AdminRegistrationsService', () => {
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
-      v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn() },
-      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+      v1TournamentPlayer: {
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
@@ -100,6 +108,7 @@ describe('AdminRegistrationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminRegistrationsService,
+        TournamentPaymentExpiryService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
@@ -163,6 +172,38 @@ describe('AdminRegistrationsService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'registration.confirm_payment' }) }),
     );
+  });
+
+  it('confirmPayment: overdue awaiting-payment is auto-cancelled and cannot be confirmed', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-14T02:01:00.000Z'));
+    const createdAt = new Date('2026-06-14T00:00:00.000Z');
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'ready', createdAt }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({
+        status: 'cancelled',
+        cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
+      }),
+    );
+    prisma.v1TournamentPayment.update.mockResolvedValue(
+      paymentRow({ status: 'cancelled', createdAt, cancelledAt: new Date('2026-06-14T02:01:00.000Z') }),
+    );
+
+    await expect(service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' })).rejects.toMatchObject({
+      response: {
+        code: 'PAYMENT_DEADLINE_EXPIRED',
+        message: '입금 안내 후 2시간이 지나 신청이 자동 취소됐어요.',
+      },
+    });
+
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+    );
+    expect(prisma.v1TournamentPayment.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+    );
+    jest.useRealTimers();
   });
 
   // ─── confirm ────────────────────────────────────────────────────────────────
@@ -302,6 +343,69 @@ describe('AdminRegistrationsService', () => {
     );
   });
 
+  it('rosterLock: mixed quota failure returns counts and does not lock', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed' }),
+    );
+    prisma.v1Tournament.findUnique.mockResolvedValue({
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 4,
+      genderMinFemale: 2,
+      genderMaxFemale: 4,
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+    ]);
+
+    await expect(service.rosterLock(opsAuth, 'reg-1', {})).rejects.toMatchObject({
+      response: {
+        code: 'TOURNAMENT_GENDER_QUOTA_NOT_MET',
+        details: {
+          male: { count: 5, min: 2, max: 4, ok: false },
+          female: { count: 1, min: 2, max: 4, ok: false },
+        },
+      },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('rosterLock: mixed quota success locks inside the serialized transaction', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed' }),
+    );
+    prisma.v1Tournament.findUnique.mockResolvedValue({
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 4,
+      genderMinFemale: 2,
+      genderMaxFemale: 4,
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+      { genderSnapshot: 'female' },
+    ]);
+    const lockedAt = new Date();
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterLockedAt: lockedAt }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    await expect(service.rosterLock(opsAuth, 'reg-1', {})).resolves.toMatchObject({
+      rosterLockedAt: lockedAt.toISOString(),
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+  });
+
   it('rosterUnlock: removes rosterLockedAt', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed', rosterLockedAt: new Date() }));
@@ -310,6 +414,67 @@ describe('AdminRegistrationsService', () => {
 
     const result = await service.rosterUnlock(opsAuth, 'reg-1');
     expect(result.rosterLockedAt).toBeNull();
+  });
+
+  // ─── roster deadline override (grant / revoke) ─────────────────────────────
+
+  it('grantRosterDeadlineOverride: sets rosterDeadlineOverrideAt + audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+    const overrideAt = new Date();
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterDeadlineOverrideAt: overrideAt }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    const result = await service.grantRosterDeadlineOverride(opsAuth, 'reg-1');
+
+    expect(result.rosterDeadlineOverrideAt).toBe(overrideAt.toISOString());
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'registration.roster_deadline_override_grant' }),
+      }),
+    );
+  });
+
+  it('grantRosterDeadlineOverride: unknown registration → 404 REGISTRATION_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+
+    await expect(service.grantRosterDeadlineOverride(opsAuth, 'ghost-reg')).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('revokeRosterDeadlineOverride: clears rosterDeadlineOverrideAt + audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterDeadlineOverrideAt: new Date() }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(
+      registrationRow({ status: 'confirmed', rosterDeadlineOverrideAt: null }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(null);
+
+    const result = await service.revokeRosterDeadlineOverride(opsAuth, 'reg-1');
+
+    expect(result.rosterDeadlineOverrideAt).toBeNull();
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'registration.roster_deadline_override_revoke' }),
+      }),
+    );
+  });
+
+  it('revokeRosterDeadlineOverride: unknown registration → 404 REGISTRATION_NOT_FOUND', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+
+    await expect(service.revokeRosterDeadlineOverride(opsAuth, 'ghost-reg')).rejects.toMatchObject({
+      response: { code: 'REGISTRATION_NOT_FOUND' },
+    });
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
   });
 
   // ─── list ───────────────────────────────────────────────────────────────────
@@ -342,6 +507,25 @@ describe('AdminRegistrationsService', () => {
 
   // ─── notification emissions ──────────────────────────────────────────────────
 
+  it('confirmPayment: emits tournament_payment_confirmed to registrant', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({ status: 'awaiting_payment', appliedByUserId: 'manager-user', tournamentId: 'tournament-1' }),
+    );
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'ready' }));
+    prisma.v1TournamentPayment.update.mockResolvedValue(paymentRow({ status: 'paid', paidAt: new Date() }));
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
+
+    await service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'manager-user',
+      'tournament_payment_confirmed',
+      'tournament-1',
+      expect.any(String),
+    );
+  });
+
   it('confirm: decision=confirm emits tournament_registration_confirmed to registrant', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
@@ -358,6 +542,7 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_confirmed',
       'tournament-1',
+      expect.any(String),
     );
   });
 
@@ -377,6 +562,7 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_waitlisted',
       'tournament-1',
+      expect.any(String),
     );
   });
 
@@ -395,6 +581,7 @@ describe('AdminRegistrationsService', () => {
       'manager-user',
       'tournament_registration_cancelled',
       'tournament-1',
+      expect.any(String),
     );
   });
 

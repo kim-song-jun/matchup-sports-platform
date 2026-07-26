@@ -95,7 +95,8 @@ describe('ProfileController', () => {
 
   it('logs out', async () => {
     profileService.logout.mockReturnValue({ ok: true });
-    expect(controller.logout(user)).toEqual({ ok: true });
+    expect(controller.logout()).toEqual({ ok: true });
+    expect(profileService.logout).toHaveBeenCalledWith();
   });
 
   it('requests withdrawal', async () => {

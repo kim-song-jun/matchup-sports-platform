@@ -43,4 +43,24 @@ describe('TournamentHeroCard', () => {
       expect.stringContaining('홈 third'),
     ]);
   });
+
+  it('links a promoted tournament to its published campaign when a campaign slug exists', () => {
+    render(
+      <TournamentHeroCard
+        items={[
+          { ...promo('campaign-tournament', 0), campaignSlug: 'summer-futsal-cup' },
+          promo('detail-tournament', 1),
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: /홈 campaign-tournament/ })).toHaveAttribute(
+      'href',
+      '/tournaments/campaigns/summer-futsal-cup',
+    );
+    expect(screen.getByRole('link', { name: /홈 detail-tournament/ })).toHaveAttribute(
+      'href',
+      '/tournaments/detail-tournament',
+    );
+  });
 });

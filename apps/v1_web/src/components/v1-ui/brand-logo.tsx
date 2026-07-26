@@ -2,41 +2,36 @@ import type { CSSProperties } from 'react';
 import { publicAssetPath } from '@/lib/assets';
 
 /**
- * Teameet 로고 마크.
- * - variant 'mark' (기본): 투명 배경 파란 마크 — 밝은 배경(nav·footer·랜딩)용
- * - variant 'tile': 흰 앱아이콘 타일 — 어두운/컬러 배경(인증 패널)용
- * 워드마크 텍스트는 호출부가 기존 클래스로 함께 렌더(로고 락업).
+ * Teameet 로고 마크 — 실제 브랜드 자산(두 사람이 함께 뛰는 모양, favicon·PWA 아이콘과
+ * 동일한 원본 `/brand/icon-512.png`)을 그대로 렌더링한다. 예전엔 이 실제 마크와 다른
+ * 임의의 손그림 SVG 경로(T자+아령 모양)를 썼는데, 실제 브랜드 자산과 전혀 달라 보였다
+ * (사용자 피드백: "우리 teameet 아이콘이 아닌데"). `/brand/icon-512.png` 자체에 파란
+ * 둥근모서리 타일 배경이 이미 구워져 있으므로 별도 CSS 배경·border-radius가 필요 없다
+ * — favicon(`/favicon.png`)도 동일 원본에서 생성돼 탭 아이콘까지 일관된 모양을 보장한다.
+ *
+ * 모든 호출부가 22~42px 사이의 작은 크기로만 렌더링하므로(nav/footer/auth 패널),
+ * 512px 원본을 매번 그대로 내려받는 건 낭비 — `srcSet`으로 192px 변형도 함께 제공해
+ * 저해상도/저DPR 화면에서는 브라우저가 더 작은 파일을 고르게 한다.
  */
 export function BrandMark({
   size = 24,
-  variant = 'mark',
-  rounded,
   alt = '',
   style,
 }: {
   size?: number;
-  variant?: 'mark' | 'tile';
-  rounded?: number;
   alt?: string;
   style?: CSSProperties;
 }) {
-  const src = publicAssetPath(variant === 'tile' ? '/brand/teameet-logo.png' : '/brand/teameet-mark.png');
   return (
     <img
-      src={src}
+      src={publicAssetPath('/brand/icon-192.png')}
+      srcSet={`${publicAssetPath('/brand/icon-192.png')} 192w, ${publicAssetPath('/brand/icon-512.png')} 512w`}
+      sizes={`${size}px`}
       alt={alt}
       aria-hidden={alt === '' ? true : undefined}
       width={size}
       height={size}
-      style={{
-        width: size,
-        height: size,
-        display: 'block',
-        flexShrink: 0,
-        objectFit: 'contain',
-        ...(rounded != null ? { borderRadius: rounded } : {}),
-        ...style,
-      }}
+      style={{ display: 'block', flexShrink: 0, ...style }}
     />
   );
 }

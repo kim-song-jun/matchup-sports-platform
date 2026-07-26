@@ -30,11 +30,12 @@ test.describe('[applicant] 팀 탐색 및 가입 플로우', () => {
     await expect(main).toBeVisible();
 
     // 첫 번째 팀 카드로 이동 (seed id 패턴 /teams/0000…)
-    const teamLink = page.locator('a[href*="/teams/0000"]').first();
+    const teamLink = page.locator('.tm-team-card[href*="/teams/"]').first();
     await expect(teamLink).toBeVisible();
-    await teamLink.click();
-
-    await expect(page).toHaveURL(/\/teams\/[a-f0-9-]{8,}/);
+    await Promise.all([
+      page.waitForURL(/\/teams\/[a-f0-9-]{8,}/),
+      teamLink.click(),
+    ]);
     const detail = page.getByRole('main');
     await expect(detail).toBeVisible();
     // 팀 상세에는 팀 이름/정보가 있어야

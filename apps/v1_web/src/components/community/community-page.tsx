@@ -7,9 +7,11 @@ import { Check, Pin, Send } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { BellIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
+import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
+import { NotificationDetailSheet } from './notification-detail-sheet';
+import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
@@ -151,6 +153,10 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
             />
           ) : null}
           {model.messages.map((message, index) => {
+            const prev = model.messages[index - 1];
+            const next = model.messages[index + 1];
+            const isFirstInGroup = !prev || prev.who !== message.who || prev.senderId !== message.senderId;
+            const isLastInGroup = !next || next.who !== message.who || next.senderId !== message.senderId;
             const showDate = shouldShowChatDate(message.sentAt, model.messages[index - 1]?.sentAt);
             const dateLabel = showDate ? formatChatDate(message.sentAt) : '';
             const timeLabel = formatChatTime(message.sentAt);
@@ -167,18 +173,20 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                     <span>{message.body}</span>
                   </div>
                 ) : (
-                  <div className={`tm-chat-message-row tm-chat-message-row-${message.who}`}>
-                    {message.who === 'me' ? (
-                      <div className="tm-chat-message-meta">
-                        {message.unreadCount ? <span className="tm-chat-read-count">{message.unreadCount}</span> : null}
-                        {timeLabel ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
+                  <div className={`tm-chat-message-group ${isLastInGroup ? 'tm-chat-message-group-end' : 'tm-chat-message-group-mid'}`}>
+                    {message.who === 'other' && isFirstInGroup ? <div className="tm-text-micro tm-chat-sender-label">{message.label}</div> : null}
+                    <div className={`tm-chat-message-row tm-chat-message-row-${message.who} tm-chat-message-line tm-chat-message-line-${message.who}`}>
+                      {message.who === 'me' && isLastInGroup ? (
+                        <div className="tm-chat-message-meta">
+                          {message.unreadCount ? <span className="tm-chat-read-count">{message.unreadCount}</span> : null}
+                          {timeLabel ? <time dateTime={message.sentAt}>{timeLabel}</time> : null}
+                        </div>
+                      ) : null}
+                      <div className={`tm-chat-bubble tm-chat-bubble-${message.who} ${isFirstInGroup ? 'tm-chat-bubble-head' : 'tm-chat-bubble-grouped'}`}>
+                        <div className="tm-text-body">{message.body}</div>
                       </div>
-                    ) : null}
-                    <div className={`tm-chat-bubble tm-chat-bubble-${message.who}`}>
-                      <div className="tm-text-micro">{message.label}</div>
-                      <div className="tm-text-body">{message.body}</div>
+                      {message.who === 'other' && isLastInGroup && timeLabel ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
                     </div>
-                    {message.who === 'other' && timeLabel ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
                   </div>
                 )}
               </Fragment>
@@ -236,6 +244,9 @@ function ChatDesktopWorkspace({ listModel }: { listModel: ChatListViewModel }) {
 export function NotificationsPageView({ model }: { model: NotificationsViewModel }) {
   const groups = Array.from(new Set(model.notifications.map((notification) => notification.group)));
   const allRead = model.unreadCount === 0;
+  // 카드 탭 → 상세 시트. 시트에는 탭한 시점의 모델을 그대로 담아두므로,
+  // 읽음 처리로 목록이 갱신돼도 시트 내용이 흔들리지 않는다.
+  const [detail, setDetail] = useState<NotificationModel | null>(null);
   return (
     <AppChrome
       title={<span>알림 <span className={`tm-notification-count ${allRead ? 'tm-notification-count-muted' : ''}`}>{model.unreadCount}</span></span>}
@@ -305,7 +316,16 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
                 <section key={group} className="tm-notification-section" aria-labelledby={headingId}>
                   <div id={headingId} className="tm-text-label">{group}</div>
                   <div className="tm-notification-stack">
-                    {items.map((notification) => <NotificationCard key={notification.id} notification={notification} onOpen={model.onOpen} />)}
+                    {items.map((notification) => (
+                      <NotificationCard
+                        key={notification.id}
+                        notification={notification}
+                        onOpen={(opened) => {
+                          model.onOpen?.(opened);
+                          setDetail(opened);
+                        }}
+                      />
+                    ))}
                   </div>
                 </section>
               );
@@ -313,6 +333,14 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
           )}
         </div>
       </div>
+      <NotificationDetailSheet
+        notification={detail}
+        onClose={() => setDetail(null)}
+        onNavigate={(notification) => {
+          setDetail(null);
+          model.onNavigate?.(notification);
+        }}
+      />
       {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽었어요</div> : null}
     </AppChrome>
   );
@@ -448,25 +476,35 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
   );
 }
 
-function NotificationCard({ notification, onOpen }: { notification: NotificationModel; onOpen?: (notification: NotificationModel) => void }) {
+/**
+ * 알림 카드. 탭하면 곧바로 이동하지 않고 상세 시트를 연다(본문이 2줄로 잘리므로
+ * 전문·수신 시각·이동 CTA를 시트에서 제공). 이동 자체는 시트의 CTA가 담당하므로
+ * 링크가 아니라 다이얼로그를 여는 버튼이 정확한 시맨틱이다.
+ */
+function NotificationCard({ notification, onOpen }: { notification: NotificationModel; onOpen: (notification: NotificationModel) => void }) {
   return (
-    <Link
+    <button
+      type="button"
       className={`tm-notification-card ${notification.unread ? 'tm-notification-card-unread' : ''}`}
-      href={notification.href}
-      onClick={(event) => {
-        if (!onOpen) return;
-        event.preventDefault();
-        onOpen(notification);
-      }}
+      aria-haspopup="dialog"
+      onClick={() => onOpen(notification)}
     >
-      <div className="tm-notification-icon" aria-hidden="true"><BellIcon size={18} /></div>
+      <div className="tm-notification-icon" aria-hidden="true">
+        <NotificationTypeIcon type={notification.type} size={18} />
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* 읽지 않음 상태를 컬러 외에 텍스트로도 전달 — 컬러만 의존 금지 */}
-        {notification.unread ? <span className="sr-only">읽지 않음</span> : null}
-        <div className="tm-text-body-lg">{notification.title}</div>
+        {/* 종류와 읽음 상태를 아이콘·컬러 외에 텍스트로도 전달 — 컬러만 의존 금지 */}
+        <span className="sr-only">
+          {notificationTypeLabel(notification.type)}
+          {notification.unread ? ', 읽지 않음' : ''}
+        </span>
+        <div className="tm-notification-card-title">
+          <span className="tm-text-body-lg">{notification.title}</span>
+          {notification.unread ? <span className="tm-notification-dot" aria-hidden="true" /> : null}
+        </div>
         <div className="tm-text-caption line-clamp-2" style={{ marginTop: 3 }}>{notification.body}</div>
         <div className="tm-notification-meta">{notification.time}</div>
       </div>
-    </Link>
+    </button>
   );
 }

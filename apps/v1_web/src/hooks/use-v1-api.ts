@@ -1,7 +1,8 @@
 'use client';
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { v1Api, v1Delete, v1Get, v1Patch, v1Post, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { v1Api, v1Delete, v1Get, v1Patch, v1Post, v1Put, getV1ApiBaseUrl, getV1DevAuthHeaders, V1ApiError } from '@/lib/api-client';
+import { trackEvent } from '@/lib/analytics';
 import { v1Keys } from '@/lib/query-keys';
 import type {
   ApiEnvelope,
@@ -11,6 +12,7 @@ import type {
   CursorPage,
   V1AdminGrantResult,
   V1AdminInquiryDetail,
+  V1AdminInquiryPendingCount,
   V1AdminInquiryReplyPayload,
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
@@ -31,7 +33,22 @@ import type {
   V1AdminNoticeRow,
   V1AdminNoticeUpdatePayload,
   V1AdminNoticeUpdateResult,
+  V1AdminTermsListResult,
+  V1AdminTermsPolicy,
+  V1AdminTermsPolicyCreatePayload,
+  V1AdminTermsPolicyUpdatePayload,
+  V1AdminTermsStatusPayload,
+  V1AdminTermsVersionPayload,
   V1AdminRow,
+  V1PushFailureSummary,
+  V1FoundAccount,
+  V1SmsFailureSummary,
+  V1AdminOpsSummary,
+  V1AdminErrorLogsPage,
+  V1AdminErrorLogDetail,
+  V1AdminErrorLogFilters,
+  V1AdminPushSendPayload,
+  V1AdminPushSendResult,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -46,6 +63,8 @@ import type {
   V1AdminUserRow,
   V1AuthMe,
   V1AuthSessionResponse,
+  V1CurrentSignupTerms,
+  V1CurrentTerms,
   V1ChatMessage,
   V1ChatMessageSendResult,
   V1ChatRoom,
@@ -68,6 +87,7 @@ import type {
   V1MatchMutationResult,
   V1MatchUpdatePayload,
   V1MyActivitySummary,
+  V1MyJoinApplicationsPage,
   V1MyRegionUpdateResult,
   V1MyTeamsResponse,
   V1MyTeamMatch,
@@ -89,6 +109,7 @@ import type {
   V1RecentSearchesResponse,
   V1ReviewListResponse,
   V1ReviewReceivedResponse,
+  V1ReviewReceivedSummaryResponse,
   V1ReviewSourceResponse,
   V1ReviewSourceType,
   V1ReviewSubmitPayload,
@@ -116,14 +137,19 @@ import type {
   V1UploadImagesResult,
   V1TournamentListPage,
   V1TournamentDetail,
+  V1PendingTournamentReview,
+  V1TournamentReview,
+  V1TournamentReviewsPage,
+  V1AdminTournamentReviewsPage,
+  V1TournamentAward,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
+  V1AdminTournamentRosterResponse,
   V1TournamentPlayer,
   V1AdminTournamentListPage,
   V1AdminRegistrationListPage,
   V1AdminTournamentRegistration,
   V1AdminTournamentRegistrationWithIdempotent,
-  V1AdminTournamentRosterResponse,
   V1AdminTournamentBracket,
   V1AdminBracketGroup,
   V1AdminBracketGroupTeam,
@@ -131,7 +157,16 @@ import type {
   V1AdminBracketResult,
   V1AdminTournamentAnnouncement,
   V1AdminTournamentAnnouncementWithIdempotent,
+  V1AdminTournamentSponsor,
+  V1AdminTournamentSponsorListResult,
+  V1AdminTournamentPopup,
+  V1AdminTournamentPopupListResult,
+  V1CreateTournamentPopupPayload,
+  V1UpdateTournamentPopupPayload,
+  V1DeleteTournamentPopupResult,
   V1AdminTournamentStatusChangeResult,
+  V1PublishBracketResult,
+  V1UnpublishBracketResult,
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
   V1Tournament,
@@ -150,8 +185,11 @@ import type {
   V1CreateGroupPayload,
   V1CreateGroupTeamPayload,
   V1CreateFixturePayload,
+  V1UpdateFixturePayload,
   V1RecordResultPayload,
   V1CreateAnnouncementPayload,
+  V1CreateTournamentSponsorPayload,
+  V1UpdateTournamentSponsorPayload,
   V1DeleteAnnouncementResult,
   V1AdminAnnouncementListResult,
   V1UpdateAnnouncementPayload,
@@ -161,12 +199,20 @@ import type {
   V1ReceivedInvitationsPage,
   V1SendInvitationResult,
   V1InvitationActionResult,
+  V1IntegrationSettings,
+  V1UpdateIntegrationSettingsPayload,
+  V1PublicKakaoMapsKeyResponse,
 } from '@/types/api';
 
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
 type QueryOptions = { enabled?: boolean };
 
-export function useV1AuthMe(options?: { enabled?: boolean; retry?: boolean | number }) {
+export function useV1AuthMe(options?: {
+  enabled?: boolean;
+  // 함수형 retry를 허용한다 — 세션 확인은 4xx면 즉시 포기하고 5xx는 재시도해야 해서
+  // boolean 하나로는 두 정책을 같이 표현할 수 없다(retryTransientFailure 참고).
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+}) {
   return useQuery({
     queryKey: v1Keys.authMe(),
     queryFn: () => v1Get<V1AuthMe>('/auth/me'),
@@ -201,10 +247,13 @@ export function useV1Register() {
       password: string;
       gender: 'male' | 'female';
       realName?: string;
-      phone?: string;
-      birthDate?: string;
+      displayName?: string;
+      phone: string;
+      birthDate: string;
       profileImageUrl?: string;
       requiredTermsAccepted: boolean;
+      acceptedTermsDocumentIds: string[];
+      phoneProofToken?: string;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
     onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
@@ -218,26 +267,104 @@ export function useV1CompleteSocialProfile() {
       nickname: string;
       gender: 'male' | 'female';
       realName?: string;
-      phone?: string;
-      birthDate?: string;
+      displayName?: string;
+      phone: string;
+      birthDate: string;
       profileImageUrl?: string;
     }) =>
-      v1Post<V1AuthSessionResponse>('/auth/social-profile', body),
-    onSuccess: (result) => {
-      queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result);
-      return queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
-    },
+      v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-profile', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
 
 export function useV1CompleteSocialTerms() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { requiredTermsAccepted: boolean }) => v1Post<V1AuthSessionResponse>('/auth/social-terms', body),
-    onSuccess: (result) => {
-      queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result);
-      return queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
-    },
+    mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[] }) =>
+      v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-terms', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1PhoneIssue() {
+  return useMutation({
+    mutationFn: (body: { phone: string }) =>
+      v1Post<{ expiresAt: string; devCode?: string }>('/auth/phone/issue', body),
+  });
+}
+
+export function useV1PhoneVerify() {
+  return useMutation({
+    // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
+    // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
+      v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+  });
+}
+
+export function useV1FindAccountByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
+  });
+}
+
+export function useV1ResetPasswordByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string; newPassword: string }) =>
+      v1Post<{ ok: true }>('/auth/recovery/reset-password', body),
+  });
+}
+
+/**
+ * 비로그인 이메일 OTP — 비밀번호 재설정 전용. 로그인 후 이메일 인증(/verification/email/*)은
+ * 인증 가드 뒤라 여기 쓸 수 없어 공개 엔드포인트가 따로 있다.
+ *
+ * 응답은 가입 여부를 드러내지 않는다(계정 열거 방어) — 화면도 "가입된 주소면 보냈다"는 식으로만
+ * 안내하고, 없는 계정을 드러내는 문구를 쓰지 않는다. devCode 는 실발송 수단이 하나도 없는
+ * 개발/CI 환경(dev-echo)에서만, 그것도 메일을 실제로 보낸 경우에만 붙는다.
+ */
+export function useV1RecoveryEmailIssue() {
+  return useMutation({
+    mutationFn: (body: { email: string }) =>
+      v1Post<{ sent: true; expiresAt: string; devCode?: string }>('/auth/recovery/email/request', body),
+  });
+}
+
+export function useV1RecoveryEmailVerify() {
+  return useMutation({
+    // 용도(purpose)를 보내지 않는다 — 이 경로가 발급하는 증명은 서버가 재설정용으로 고정한다.
+    mutationFn: (body: { email: string; code: string }) =>
+      v1Post<{ verified: boolean; proofToken?: string }>('/auth/recovery/email/confirm', body),
+  });
+}
+
+export function useV1ResetPasswordByEmail() {
+  return useMutation({
+    mutationFn: (body: { email: string; proofToken: string; newPassword: string }) =>
+      v1Post<{ ok: true }>('/auth/recovery/email/reset-password', body),
+  });
+}
+
+export function useV1AuthedPhoneRequest() {
+  return useMutation({
+    mutationFn: (body: { phone: string }) =>
+      v1Post<{ sent: boolean; channel: 'phone'; target?: string; alreadyVerified?: boolean; expiresAt?: string; devCode?: string }>(
+        '/verification/phone/request',
+        body,
+      ),
+  });
+}
+
+export function useV1AuthedPhoneConfirm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { code: string }) =>
+      v1Post<{ verified: boolean; verification: { emailVerified: boolean; phoneVerified: boolean } }>(
+        '/verification/phone/confirm',
+        body,
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
 
@@ -317,7 +444,11 @@ export function useV1MasterRegions() {
 
 export function useV1ResolveLocation() {
   return useMutation({
-    mutationFn: (body: { latitude: number; longitude: number }) =>
+    mutationFn: (body: {
+      latitude: number;
+      longitude: number;
+      locationConsentAccepted: true;
+    }) =>
       v1Post<V1ResolveLocationResponse>('/master/regions/resolve-location', body),
   });
 }
@@ -518,6 +649,21 @@ export function useV1MatchApplications(matchId: string, filters?: ListFilters, o
   });
 }
 
+/**
+ * queryFn 응답 shape을 검증한다. 서버가 malformed/undefined 페이지를 반환하면(네트워크 파싱
+ * 실패 등) "신청자 0명"으로 조용히 뭉개지 않고 에러를 던져 react-query의 isError 경로로
+ * 넘긴다 — 목록 화면(client.tsx)이 이미 `applicationsQuery.isError`에서 "신청 목록을
+ * 불러오지 못했어요" 에러 상태를 렌더링하므로, 실패를 빈 상태로 위장하지 않고 그대로 노출한다.
+ */
+function assertValidMatchApplicationsPage(
+  page: V1MatchApplicationsPage | undefined | null,
+): V1MatchApplicationsPage {
+  if (!page || !Array.isArray(page.items) || !page.pageInfo) {
+    throw new Error('Malformed match applications page response');
+  }
+  return page;
+}
+
 // Cursor-paginated applicant list for the host management screen. A match can hold
 // up to 100 participants while the server caps each page at 50, so a single page can
 // hide applicants the host must act on. useInfiniteQuery accumulates pages and, on
@@ -534,9 +680,10 @@ export function useV1MatchApplicationsInfinite(
       v1Get<V1MatchApplicationsPage>(`/matches/${matchId}/applications`, {
         ...filters,
         ...(pageParam ? { cursor: pageParam } : {}),
-      }),
+      }).then(assertValidMatchApplicationsPage),
     initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => (lastPage.pageInfo.hasNext ? lastPage.pageInfo.nextCursor : undefined),
+    getNextPageParam: (lastPage) =>
+      lastPage?.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor : undefined,
     enabled: Boolean(matchId) && (options?.enabled ?? true),
     retry: false,
   });
@@ -724,16 +871,54 @@ export function useV1TeamJoinEligibility(teamId: string, options?: { enabled?: b
   });
 }
 
+/**
+ * 가입 신청/철회 후 다시 읽어야 하는 쿼리들.
+ *
+ * `invalidateQueries`의 프라미스를 **await**하는 것이 핵심이다. React Query는
+ * onSuccess가 resolve될 때까지 `isPending`을 유지하므로, 버튼이 "처리 중"에서
+ * 풀리는 시점엔 이미 새 상태가 캐시에 들어와 있다. await하지 않으면 버튼만 먼저
+ * 활성화되고 라벨·배지는 한 박자 뒤에 바뀌어 "상태가 안 바뀐다"로 보인다.
+ */
+async function refetchTeamJoinState(queryClient: QueryClient, teamId: string) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.teams() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.myJoinApplications() }),
+  ]);
+}
+
 export function useV1CreateTeamJoinApplication(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body?: { message?: string | null }) =>
       v1Post<V1TeamJoinApplicationResult>(`/teams/${teamId}/join-applications`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
-    },
+    onSuccess: () => refetchTeamJoinState(queryClient, teamId),
+  });
+}
+
+/** GET /me/join-applications — 내가 보낸 가입 신청 목록(승인 대기 + 최근 처리 결과) */
+export function useV1MyJoinApplications() {
+  return useQuery({
+    queryKey: v1Keys.myJoinApplications(),
+    queryFn: () => v1Get<V1MyJoinApplicationsPage>('/me/join-applications'),
+  });
+}
+
+/**
+ * 신청 현황 목록에서의 신청 취소.
+ *
+ * 팀 상세용 `useV1WithdrawTeamJoinApplication`은 teamId·applicationId를 훅 인자로 받아
+ * 한 팀에 고정된다. 목록은 여러 팀의 신청을 한 화면에서 다루므로 대상 식별자를
+ * mutate 인자로 받는 훅이 따로 필요하다.
+ */
+export function useV1WithdrawMyJoinApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, reason }: { applicationId: string; teamId: string; reason?: string | null }) =>
+      v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/withdraw`, {
+        reason: reason ?? null,
+      }),
+    onSuccess: (_result, variables) => refetchTeamJoinState(queryClient, variables.teamId),
   });
 }
 
@@ -751,11 +936,7 @@ export function useV1WithdrawTeamJoinApplication(teamId: string, applicationId?:
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/withdraw`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
-    },
+    onSuccess: () => refetchTeamJoinState(queryClient, teamId),
   });
 }
 
@@ -804,6 +985,22 @@ export function useV1RemoveTeamMembership(teamId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
+    },
+  });
+}
+
+// 본인이 스스로 팀을 나가는 self-service 경로. removeMembership(관리자가 타인을 강제 추방)과
+// 별도 엔드포인트 — /teams/:teamId/leave (V1AuthGuard만, membershipId 불필요).
+export function useV1LeaveTeam(teamId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<V1TeamMembershipMutationResult>(`/teams/${teamId}/leave`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'teams'] });
     },
   });
 }
@@ -994,6 +1191,14 @@ export function useV1ReceivedReviews(filters?: ListFilters, options?: QueryOptio
   });
 }
 
+export function useV1ReceivedReviewSummary(targetType: 'user' | 'team', period?: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.reviewsReceivedSummary(targetType, period),
+    queryFn: () => v1Get<V1ReviewReceivedSummaryResponse>('/reviews/received/summary', { targetType, period }),
+    enabled: options?.enabled,
+  });
+}
+
 export function useV1ReviewSource(sourceType: V1ReviewSourceType, sourceId: string, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.reviewSource(sourceType, sourceId),
@@ -1007,21 +1212,26 @@ export function useV1SubmitReview() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1ReviewSubmitPayload) => v1Post<V1ReviewSubmitResponse>('/reviews', body),
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.reviews() });
       queryClient.invalidateQueries({ queryKey: v1Keys.reviewsReceived() });
       queryClient.invalidateQueries({ queryKey: v1Keys.reviewSource(variables.sourceType, variables.sourceId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
       if (variables.targetTeamId) queryClient.invalidateQueries({ queryKey: v1Keys.team(variables.targetTeamId) });
+      // 멱등 재제출(alreadySubmitted)은 실제 신규 제출이 아니므로 이벤트에서 제외
+      if (!data.alreadySubmitted) {
+        trackEvent('review_submit', { targetType: variables.targetType });
+      }
     },
   });
 }
 
-export function useV1ChatRooms() {
+export function useV1ChatRooms(options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.chatRooms(),
     queryFn: () => v1Get<CursorPage<V1ChatRoom>>('/chat/rooms'),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -1046,8 +1256,12 @@ export function useV1ResolveChatRoom() {
   return useMutation({
     mutationFn: (body: { targetType: 'match' | 'team' | 'team_match'; targetId: string }) =>
       v1Post<V1ChatRoomResolveResult>('/chat/rooms/resolve', body),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.chatRooms() });
+      // 신규 채팅방이 실제로 시작될 때만 기록 (기존 방을 다시 여는 경우는 "시작"이 아님)
+      if (data.created) {
+        trackEvent('chat_room_start', { type: data.roomType });
+      }
     },
   });
 }
@@ -1180,12 +1394,19 @@ export function useV1UpdateProfile() {
       email?: string | null;
       profileImageUrl?: string | null;
       phone?: string | null;
+      /** 번호를 바꿀 때만 필요 — 서버가 register 와 동일하게 본인인증 증명을 요구한다. */
+      phoneProofToken?: string | null;
       birthDate?: string | null;
       gender: 'male' | 'female';
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
+    // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에
+    // 호출부가 다음 화면으로 이동해 버려 마이페이지 등에서 방금 저장한 값 대신
+    // 이전 캐시 값이 잠깐(또는 리페치 실패 시 계속) 보였다. setQueryData로 즉시 반영.
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1Profile>(v1Keys.profile(), (current) =>
+        current ? { ...current, profile: result.profile } : current,
+      );
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
@@ -1307,6 +1528,59 @@ export function useV1UploadImages() {
   });
 }
 
+/**
+ * 진행률 콜백이 필요한 대용량 업로드용 XHR 멀티파트 (fetch는 업로드 진행 이벤트가 없다).
+ * 응답 파싱·에러 규약은 v1MultipartPost와 동일하게 맞춘다.
+ */
+function v1MultipartUploadWithProgress<T>(
+  path: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${getV1ApiBaseUrl()}${path}`);
+    xhr.withCredentials = true;
+    for (const [k, v] of Object.entries(getV1DevAuthHeaders())) xhr.setRequestHeader(k, v);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onerror = () =>
+      reject(new V1ApiError({ status: 'error', statusCode: 0, code: 'NETWORK_OR_PARSE_ERROR', message: '업로드에 실패했어요.', timestamp: new Date().toISOString() }));
+    xhr.onload = () => {
+      let body: ApiEnvelope<T> | ApiErrorBody | null = null;
+      try { body = JSON.parse(xhr.responseText); } catch { body = null; }
+      const isError =
+        xhr.status < 200 || xhr.status >= 300 ||
+        (typeof body === 'object' && body !== null && 'status' in body && body.status === 'error');
+      if (isError) {
+        reject(new V1ApiError(
+          (body as ApiErrorBody) ?? { status: 'error', statusCode: xhr.status, code: 'NETWORK_OR_PARSE_ERROR', message: xhr.statusText || '업로드에 실패했어요.', timestamp: new Date().toISOString() },
+        ));
+        return;
+      }
+      resolve((body as ApiEnvelope<T>).data);
+    };
+    xhr.send(formData);
+  });
+}
+
+/**
+ * 경기 영상 파일 업로드 mutation (1개, 최대 200MB, mp4/webm/mov).
+ * BE 계약: POST /api/v1/uploads/videos — field 'files', 응답 { urls: string[] }.
+ * 응답 url(/uploads/*.mp4)은 정적 서빙이 Range 요청을 지원해 <video>에서 바로 스트리밍된다.
+ * 200MB 대용량이라 onProgress로 업로드 진행률(%)을 노출한다.
+ */
+export function useV1UploadVideo() {
+  return useMutation({
+    mutationFn: ({ file, onProgress }: { file: File; onProgress?: (percent: number) => void }) => {
+      const formData = new FormData();
+      formData.append('files', file);
+      return v1MultipartUploadWithProgress<V1UploadImagesResult>('/uploads/videos', formData, onProgress);
+    },
+  });
+}
+
 export function useV1AdminOverview() {
   return useQuery({
     queryKey: v1Keys.adminOverview(),
@@ -1318,6 +1592,9 @@ export function useV1AdminActionLogs(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.adminActionLogs(), filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1AdminLog>>('/admin/action-logs', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1336,6 +1613,9 @@ export function useV1AdminUsers(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminUsers(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminUserRow>>('/admin/users', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1351,6 +1631,9 @@ export function useV1AdminMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminMatches(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminMatchRow>>('/admin/matches', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1366,6 +1649,9 @@ export function useV1AdminTeams(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeams(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminTeamRow>>('/admin/teams', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1395,6 +1681,9 @@ export function useV1AdminNotices(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1406,10 +1695,59 @@ export function useV1AdminNoticeDetail(noticeId: string) {
   });
 }
 
+export function useV1CurrentSignupTerms(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.currentSignupTerms(),
+    queryFn: () => v1Get<V1CurrentSignupTerms>('/terms/current', { context: 'signup' }),
+    enabled: options?.enabled,
+  });
+}
+
+export function useV1CurrentTerms(
+  context: 'signup' | 'tournament_application' | 'footer',
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: v1Keys.currentTerms(context),
+    queryFn: () => v1Get<V1CurrentTerms>('/terms/current', { context }),
+    enabled: options?.enabled,
+  });
+}
+
+export function useV1AcceptSignupTerms() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { documentIds: string[] }) =>
+      v1Post<V1CurrentSignupTerms>('/terms/consents', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData(v1Keys.currentSignupTerms(), result);
+      queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
+  });
+}
+
+export function useV1AdminTerms(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminTerms(filters),
+    queryFn: () => v1Get<V1AdminTermsListResult>('/admin/terms', filters),
+  });
+}
+
+export function useV1AdminTermsPolicy(policyId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTermsPolicy(policyId),
+    queryFn: () => v1Get<V1AdminTermsPolicy>(`/admin/terms/${policyId}`),
+    enabled: !!policyId,
+  });
+}
+
 export function useV1AdminInquiries(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminInquiryRow>>('/admin/inquiries', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1421,11 +1759,35 @@ export function useV1AdminInquiry(inquiryId: string) {
   });
 }
 
+/** 어드민 사이드바 "문의" 배지용 — received/reviewing(미답변) 건수만 가볍게 조회 */
+export function useV1AdminInquiriesPendingCount() {
+  return useQuery({
+    queryKey: v1Keys.adminInquiriesPendingCount(),
+    queryFn: () => v1Get<V1AdminInquiryPendingCount>('/admin/inquiries/pending-count'),
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    retry: false, // refetchInterval과 겹쳐 일시 실패 시 중복 요청 방지 (Copilot 리뷰 지적, PR #63)
+  });
+}
+
 export function useV1ReplyAdminInquiry(inquiryId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1AdminInquiryReplyPayload) =>
       v1Post<V1AdminInquiryDetail>(`/admin/inquiries/${inquiryId}/replies`, body),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminInquiry(inquiryId), data);
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'inquiries'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.inquiry(inquiryId) });
+    },
+  });
+}
+
+export function useV1UpdateAdminInquiryReply(inquiryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ replyId, body }: { replyId: string } & V1AdminInquiryReplyPayload) =>
+      v1Patch<V1AdminInquiryDetail>(`/admin/inquiries/${inquiryId}/replies/${replyId}`, { body }),
     onSuccess: (data) => {
       queryClient.setQueryData(v1Keys.adminInquiry(inquiryId), data);
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'inquiries'] });
@@ -1451,6 +1813,9 @@ export function useV1AdminTeamMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1458,6 +1823,9 @@ export function useV1AdminStatusChangeLogs(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminStatusChangeLogs(filters as Record<string, unknown>),
     queryFn: () => v1Get<CursorPage<V1AdminStatusChangeLog>>('/admin/status-change-logs', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1573,7 +1941,7 @@ export function useV1CreateAdminNotice() {
     mutationFn: (body: V1AdminNoticeCreatePayload) =>
       v1Post<V1AdminNoticeCreateResult>('/admin/notices', body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
@@ -1585,9 +1953,8 @@ export function useV1UpdateAdminNotice() {
   return useMutation({
     mutationFn: ({ noticeId, body }: { noticeId: string; body: V1AdminNoticeUpdatePayload }) =>
       v1Patch<V1AdminNoticeUpdateResult>(`/admin/notices/${noticeId}`, body),
-    onSuccess: (data, { noticeId }) => {
-      queryClient.setQueryData(v1Keys.adminNotice(noticeId), data);
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
+    onSuccess: (_data, { noticeId }) => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
@@ -1601,11 +1968,79 @@ export function useV1DeleteAdminNotice() {
     mutationFn: (noticeId: string) => v1Delete<V1AdminNoticeDeleteResult>(`/admin/notices/${noticeId}`),
     onSuccess: (_data, noticeId) => {
       queryClient.removeQueries({ queryKey: v1Keys.adminNotice(noticeId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'notices'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminNotices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notices() });
       queryClient.invalidateQueries({ queryKey: v1Keys.notice(noticeId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
     },
+  });
+}
+
+function invalidateAdminTerms(queryClient: QueryClient, policyId?: string) {
+  queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'terms'] });
+  if (policyId) queryClient.invalidateQueries({ queryKey: v1Keys.adminTermsPolicy(policyId) });
+}
+
+export function useV1CreateAdminTermsPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminTermsPolicyCreatePayload) =>
+      v1Post<V1AdminTermsPolicy>('/admin/terms', body),
+    onSuccess: () => invalidateAdminTerms(queryClient),
+  });
+}
+
+export function useV1UpdateAdminTermsPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ policyId, body }: { policyId: string; body: V1AdminTermsPolicyUpdatePayload }) =>
+      v1Patch<V1AdminTermsPolicy>(`/admin/terms/${policyId}`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1CreateAdminTermsVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ policyId, body }: { policyId: string; body: V1AdminTermsVersionPayload }) =>
+      v1Post<V1AdminTermsPolicy>(`/admin/terms/${policyId}/documents`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1UpdateAdminTermsDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      policyId,
+      documentId,
+      body,
+    }: {
+      policyId: string;
+      documentId: string;
+      body: V1AdminTermsVersionPayload;
+    }) => v1Patch<V1AdminTermsPolicy>(`/admin/terms/${policyId}/documents/${documentId}`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1ChangeAdminTermsStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      policyId,
+      documentId,
+      body,
+    }: {
+      policyId: string;
+      documentId: string;
+      body: V1AdminTermsStatusPayload;
+    }) =>
+      v1Post<V1AdminTermsPolicy>(
+        `/admin/terms/${policyId}/documents/${documentId}/status`,
+        body,
+      ),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
   });
 }
 
@@ -1617,6 +2052,9 @@ export function useV1AdminAdmins(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminAdmins(filters as Record<string, unknown>),
     queryFn: () => v1Get<AdminCursorPage<V1AdminRow>>('/admin/admins', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1645,6 +2083,100 @@ export function useV1UpdateAdminRole() {
 }
 
 // ---------------------------------------------------------------------------
+// Admin — ops (web push failure log)
+// ---------------------------------------------------------------------------
+
+export function useV1RecentPushFailures(limit = 20) {
+  return useQuery({
+    queryKey: v1Keys.adminPushFailures({ limit }),
+    queryFn: () => v1Get<V1PushFailureSummary[]>('/admin/ops/recent-push-failures', { limit }),
+  });
+}
+
+export function useV1AckPushFailures() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => v1Post('/admin/ops/push-failures/ack', { ids }),
+    onSuccess: () => {
+      // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+    },
+  });
+}
+
+/**
+ * 어드민 수동 웹 푸시 발송 — 특정 유저 또는 전체 구독자 브로드캐스트.
+ * 성공 시 push-failures 목록(새 실패가 즉시 생겼을 수 있음)을 무효화한다.
+ */
+export function useV1AdminSendPush() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1AdminPushSendPayload) =>
+      v1Post<V1AdminPushSendResult>('/admin/ops/push-send', payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — ops (SMS / 인증 실패 로그 + 운영 KPI 요약)
+// ---------------------------------------------------------------------------
+
+export function useV1RecentSmsFailures(limit = 20) {
+  return useQuery({
+    queryKey: v1Keys.adminSmsFailures({ limit }),
+    queryFn: () => v1Get<V1SmsFailureSummary[]>('/admin/ops/recent-sms-failures', { limit }),
+  });
+}
+
+export function useV1AckSmsFailures() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => v1Post('/admin/ops/sms-failures/ack', { ids }),
+    onSuccess: () => {
+      // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminSmsFailures() });
+    },
+  });
+}
+
+/**
+ * 운영 대시보드 KPI(최근 5분 웹 푸시 / SMS·인증 실패 건수).
+ * ack 는 "최근 5분 발생 건수"를 바꾸지 않으므로(집계 기준이 createdAt) 무효화 대상이 아니다.
+ */
+export function useV1AdminOpsSummary() {
+  return useQuery({
+    queryKey: v1Keys.adminOpsSummary(),
+    queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — 에러 로그 뷰어
+// ---------------------------------------------------------------------------
+
+/** 에러 로그 목록 (cursor 페이지네이션, source/statusCode/level/기간/검색어 필터) */
+export function useAdminErrorLogs(filters?: V1AdminErrorLogFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'admin', 'error-logs', filters ?? {}] as const,
+    queryFn: () => v1Get<V1AdminErrorLogsPage>('/admin/ops/errors', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** 에러 로그 상세 — traceback/request/response/context 포함 */
+export function useAdminErrorLog(id: string) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'admin', 'error-log', id] as const,
+    queryFn: () => v1Get<V1AdminErrorLogDetail>(`/admin/ops/errors/${id}`),
+    enabled: !!id,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Tournament — consumer/team hooks
 // ---------------------------------------------------------------------------
 
@@ -1655,8 +2187,17 @@ type TournamentListFilters = {
   limit?: number;
 };
 
+export function useV1Tournaments(params?: TournamentListFilters) {
+  return useQuery({
+    queryKey: v1Keys.tournaments(params as Record<string, unknown>),
+    queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
+  });
+}
+
 type AllTournamentListFilters = Pick<TournamentListFilters, 'status' | 'sportId'>;
 
+/** 홈/목록 프로모 캐러셀은 전체 대회를 훑어 promoHome/promoListEnabled 필터링이 필요 —
+ * cursor 페이지를 전부 순회해 누적한다. 무한 루프 방지로 cursor 재등장을 감지한다. */
 export async function fetchAllV1Tournaments(
   params?: AllTournamentListFilters,
 ): Promise<V1TournamentListPage['items']> {
@@ -1664,37 +2205,25 @@ export async function fetchAllV1Tournaments(
   const seenItemIds = new Set<string>();
   const seenCursors = new Set<string>();
   let cursor: string | undefined;
-
   while (true) {
     const page = await v1Get<V1TournamentListPage>('/tournaments', {
       ...params,
       cursor,
       limit: 50,
     });
-
     for (const item of page.items) {
       if (seenItemIds.has(item.id)) continue;
       seenItemIds.add(item.id);
       items.push(item);
     }
-
     if (!page.pageInfo.hasNext) return items;
-
     const nextCursor = page.pageInfo.nextCursor;
     if (!nextCursor || seenCursors.has(nextCursor)) {
       throw new Error('대회 목록 cursor가 유효하게 진행되지 않아 전체 대회를 불러오지 못했어요.');
     }
-
     seenCursors.add(nextCursor);
     cursor = nextCursor;
   }
-}
-
-export function useV1Tournaments(params?: TournamentListFilters) {
-  return useQuery({
-    queryKey: v1Keys.tournaments(params as Record<string, unknown>),
-    queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
-  });
 }
 
 export function useV1AllTournaments(params?: AllTournamentListFilters) {
@@ -1709,6 +2238,134 @@ export function useV1Tournament(id: string) {
     queryKey: v1Keys.tournament(id),
     queryFn: () => v1Get<V1TournamentDetail>(`/tournaments/${id}`),
     enabled: !!id,
+  });
+}
+
+/** 대회 리뷰 목록 (tournaments/:id에 이미 포함되지만 독립 조회용) */
+export function useV1TournamentReviews(
+  tournamentId: string,
+  params?: { page?: number; pageSize?: number; search?: string },
+) {
+  const page = params?.page ?? 1;
+  const pageSize = params?.pageSize ?? 10;
+  const search = params?.search?.trim() || undefined;
+  return useQuery({
+    queryKey: ['tournament-reviews', tournamentId, page, pageSize, search ?? ''],
+    queryFn: () =>
+      v1Get<V1TournamentReviewsPage>(`/tournaments/${tournamentId}/reviews`, {
+        page,
+        pageSize,
+        ...(search ? { search } : {}),
+      }),
+    enabled: !!tournamentId,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** 내 리뷰 조회 (이미 작성했는지 확인) */
+export function useV1MyTournamentReview(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-reviews-me', tournamentId],
+    queryFn: () => v1Get<V1TournamentReview | null>(`/tournaments/${tournamentId}/reviews/me`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 참가 확정했지만 아직 리뷰를 작성하지 않은 종료 대회 목록 (최근 종료순) */
+export function useV1PendingTournamentReviews(enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-reviews-pending'],
+    queryFn: () => v1Get<V1PendingTournamentReview[]>('/tournaments/me/pending-reviews'),
+    enabled,
+  });
+}
+
+/** 참가팀 여부 확인 */
+export function useV1TournamentParticipantCheck(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['tournament-participant-check', tournamentId],
+    queryFn: () => v1Get<{ isParticipant: boolean }>(`/tournaments/${tournamentId}/participant-check`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 리뷰 제출 */
+export function useV1SubmitTournamentReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { rating: number; comment?: string; photoUrls?: string[] }) =>
+      v1Post<V1TournamentReview>(`/tournaments/${tournamentId}/reviews`, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews', tournamentId] });
+      void queryClient.invalidateQueries({ queryKey: ['tournament-reviews-me', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 어워드 조회 — 어드민 대회 상세 응답에는 awards가 포함되지 않아 별도 조회가 필요하다 */
+export function useV1AdminTournamentAwards(tournamentId: string) {
+  return useQuery({
+    queryKey: ['admin-tournament-awards', tournamentId],
+    queryFn: () => v1Get<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`),
+    enabled: !!tournamentId,
+  });
+}
+
+/** 어드민: 어워드 설정 */
+export function useV1SetTournamentAwards(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (awards: {
+      awardType: string; awardLabel: string; recipientName: string;
+      teamName?: string; note?: string; sortOrder?: number;
+    }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-awards', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 리뷰 모더레이션 목록 조회 */
+export function useV1AdminTournamentReviews(
+  tournamentId: string,
+  params?: { page?: number; pageSize?: number; search?: string },
+) {
+  return useQuery({
+    queryKey: ['admin-tournament-reviews', tournamentId, params ?? {}],
+    queryFn: () =>
+      v1Get<V1AdminTournamentReviewsPage>(`/admin/tournaments/${tournamentId}/reviews`, params),
+    enabled: !!tournamentId,
+  });
+}
+
+/** 어드민: 리뷰 숨기기 */
+export function useV1HideReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId, reason }: { reviewId: string; reason?: string }) =>
+      v1Patch<{ alreadyHidden: boolean }>(
+        `/admin/tournaments/${tournamentId}/reviews/${reviewId}/hide`,
+        { reason },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-reviews', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 리뷰 다시 공개하기 */
+export function useV1UnhideReview(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId }: { reviewId: string }) =>
+      v1Patch<{ alreadyVisible: boolean }>(
+        `/admin/tournaments/${tournamentId}/reviews/${reviewId}/unhide`,
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-reviews', tournamentId] });
+    },
   });
 }
 
@@ -1737,14 +2394,14 @@ export function useV1Registration(tournamentId: string, registrationId: string) 
 }
 
 /** 로그인 유저 본인의 신청을 registrationId 없이 조회한다. 없으면 404 (data=undefined). */
-export function useV1MyRegistration(tournamentId: string) {
+export function useV1MyRegistration(tournamentId: string, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.myTournamentRegistration(tournamentId),
     queryFn: () =>
       v1Get<V1TournamentRegistration>(
         `/tournaments/${tournamentId}/registrations/my-registration`,
       ),
-    enabled: !!tournamentId,
+    enabled: (options?.enabled ?? true) && !!tournamentId,
     retry: (failureCount, error) => {
       // 404 (no registration yet) is expected — do not retry
       if (error instanceof V1ApiError && error.statusCode === 404) return false;
@@ -1862,6 +2519,17 @@ export function useV1TournamentPlayers(tournamentId: string, registrationId: str
   });
 }
 
+/** 어드민 전용 로스터 조회 — 팀 비멤버 어드민도 403 없이 조회 가능 (Task 110) */
+export function useV1AdminTournamentPlayers(registrationId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentRoster(registrationId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`),
+    enabled: !!registrationId,
+    retry: false,
+  });
+}
+
 export function useV1AddPlayer(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -1944,6 +2612,9 @@ export function useV1AdminTournaments(params?: AdminTournamentListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1AdminTournamentListPage>('/admin/tournaments', params),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1983,6 +2654,40 @@ export function useV1ChangeTournamentStatus(id: string) {
   return useMutation({
     mutationFn: (body: V1ChangeTournamentStatusPayload) =>
       v1Post<V1AdminTournamentStatusChangeResult>(`/admin/tournaments/${id}/status`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
+/**
+ * Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개. 성공 시 어드민 상세 + 공개 상세를 모두 invalidate.
+ * `scheduledAt`(ISO)을 넘기면 즉시 공개하지 않고 그 시각에 공개되도록 예약한다.
+ * 과거 시각은 서버가 400 `TOURNAMENT_BRACKET_PUBLISH_SCHEDULE_PAST` 로 거부한다.
+ */
+export function useV1PublishTournamentBracket(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars?: { scheduledAt?: string }) =>
+      v1Post<V1PublishBracketResult>(
+        `/admin/tournaments/${id}/publish-bracket`,
+        vars?.scheduledAt ? { scheduledAt: vars.scheduledAt } : {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
+/** 대진표 공개 취소 — 즉시 공개분과 예약분을 모두 되돌린다(비공개 전환). */
+export function useV1UnpublishTournamentBracket(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<V1UnpublishBracketResult>(`/admin/tournaments/${id}/unpublish-bracket`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
@@ -2072,6 +2777,23 @@ export function useV1CancelRegistrationAdmin() {
   });
 }
 
+/** 취소 요청 거부(잔류) — cancel_requested 상태만 허용, cancelPreviousStatus(없으면 confirmed)로 복원 */
+export function useV1RejectCancelRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ registrationId }: { registrationId: string }) =>
+      v1Patch<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/reject-cancel`,
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
 export function useV1RosterLock() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2092,22 +2814,47 @@ export function useV1RosterLock() {
   });
 }
 
-export function useV1AdminTournamentPlayers(registrationId: string) {
-  return useQuery({
-    queryKey: v1Keys.adminTournamentRoster(registrationId),
-    queryFn: () =>
-      v1Get<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`),
-    enabled: !!registrationId,
-    retry: false,
-  });
-}
-
 export function useV1RosterUnlock() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (registrationId: string) =>
       v1Api<V1AdminTournamentRegistration>(
         `/admin/registrations/${registrationId}/roster-lock`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
+/** 명단 제출 마감 예외 부여 — 마감이 지나도 해당 신청 팀은 명단을 계속 수정할 수 있게 한다 */
+export function useV1RosterDeadlineOverrideGrant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationId: string) =>
+      v1Post<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/roster-deadline-override`,
+      ),
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: [...v1Keys.all, 'admin', 'tournaments'],
+      });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+    },
+  });
+}
+
+/** 명단 제출 마감 예외 해제 */
+export function useV1RosterDeadlineOverrideRevoke() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationId: string) =>
+      v1Api<V1AdminTournamentRegistration>(
+        `/admin/registrations/${registrationId}/roster-deadline-override`,
         { method: 'DELETE' },
       ),
     onSuccess: (_data) => {
@@ -2142,9 +2889,6 @@ export function useV1UpdatePlayerEligibility() {
     }: { playerId: string } & V1UpdatePlayerEligibilityPayload) =>
       v1Patch<V1TournamentPlayer>(`/admin/players/${playerId}/eligibility`, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [...v1Keys.all, 'admin', 'registrations'],
-      });
       queryClient.invalidateQueries({
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
@@ -2192,6 +2936,74 @@ export function useV1CreateFixture(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+    },
+  });
+}
+
+/** 경기 일정·장소·대진 수정 (`PATCH /admin/fixtures/:id`) — 결과 있는 경기의 팀 변경은 409 FIXTURE_HAS_RESULT */
+export function useV1UpdateFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fixtureId, ...body }: { fixtureId: string } & V1UpdateFixturePayload) =>
+      v1Patch<V1AdminBracketFixture>(`/admin/fixtures/${fixtureId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 경기 삭제 (`DELETE /admin/fixtures/:id`) — 결과 있으면 409 */
+export function useV1DeleteFixture(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 결과 삭제(오입력 복구, `DELETE /admin/fixtures/:id/result`) — 경기 상태 scheduled 복귀 */
+export function useV1DeleteFixtureResult(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fixtureId: string) => v1Delete<{ deleted: boolean }>(`/admin/fixtures/${fixtureId}/result`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 이름·진출 팀 수 수정 (`PATCH /admin/groups/:id`) */
+export function useV1UpdateGroup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, ...body }: { groupId: string; name?: string; advanceCount?: number }) =>
+      v1Patch<V1AdminBracketGroup>(`/admin/groups/${groupId}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 삭제 (`DELETE /admin/groups/:id`) — 팀 배정·경기 있으면 409 */
+export function useV1DeleteGroup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (groupId: string) => v1Delete<{ deleted: boolean }>(`/admin/groups/${groupId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
+    },
+  });
+}
+
+/** 조 팀 배정 해제 (`DELETE /admin/group-teams/:id`) — 해당 순위 행도 정리 */
+export function useV1RemoveGroupTeam(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (groupTeamId: string) => v1Delete<{ deleted: boolean }>(`/admin/group-teams/${groupTeamId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
     },
   });
 }
@@ -2307,6 +3119,116 @@ export function useV1PublishAnnouncement(tournamentId?: string) {
   });
 }
 
+export function useV1AdminTournamentSponsors(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentSponsors(tournamentId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentSponsorListResult>(
+        `/admin/tournaments/${tournamentId}/sponsors`,
+      ),
+    enabled: !!tournamentId,
+  });
+}
+
+export function useV1CreateTournamentSponsor(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateTournamentSponsorPayload) =>
+      v1Post<V1AdminTournamentSponsor>(
+        `/admin/tournaments/${tournamentId}/sponsors`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentSponsors(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1UpdateTournamentSponsor(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { sponsorId: string; body: V1UpdateTournamentSponsorPayload }) =>
+      v1Patch<V1AdminTournamentSponsor>(
+        `/admin/tournaments/${tournamentId}/sponsors/${input.sponsorId}`,
+        input.body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentSponsors(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1DeactivateTournamentSponsor(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sponsorId: string) =>
+      v1Post<V1AdminTournamentSponsor>(
+        `/admin/tournaments/${tournamentId}/sponsors/${sponsorId}/deactivate`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentSponsors(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+// ── Tournament popups (Task 109 Track 8) ────────────────────────────────────
+
+export function useV1AdminTournamentPopups(tournamentId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTournamentPopups(tournamentId),
+    queryFn: () =>
+      v1Get<V1AdminTournamentPopupListResult>(`/admin/tournaments/${tournamentId}/popups`),
+    enabled: !!tournamentId,
+  });
+}
+
+export function useV1CreateTournamentPopup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CreateTournamentPopupPayload) =>
+      v1Post<V1AdminTournamentPopup>(`/admin/tournaments/${tournamentId}/popups`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentPopups(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1UpdateTournamentPopup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { popupId: string; body: V1UpdateTournamentPopupPayload }) =>
+      v1Patch<V1AdminTournamentPopup>(
+        `/admin/tournaments/${tournamentId}/popups/${input.popupId}`,
+        input.body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentPopups(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
+export function useV1DeleteTournamentPopup(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (popupId: string) =>
+      v1Delete<V1DeleteTournamentPopupResult>(
+        `/admin/tournaments/${tournamentId}/popups/${popupId}`,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentPopups(tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    },
+  });
+}
+
 // ── Team Invitations ──────────────────────────────────────────────────────────
 
 /** POST /teams/:teamId/invitations — 이메일로 팀원 초대 발송 */
@@ -2390,6 +3312,43 @@ export function useV1DeclineTeamInvitation() {
     },
   });
 }
+
+// ─── 어드민: 외부 연동 키 설정(카카오맵 REST/JS 키) ────────────────────────────
+
+/** GET /admin/settings/integrations — 마스킹된 현재 값 + 출처(admin/env/none) 조회 */
+export function useV1AdminIntegrationSettings() {
+  return useQuery({
+    queryKey: v1Keys.adminIntegrationSettings(),
+    queryFn: () => v1Get<V1IntegrationSettings>('/admin/settings/integrations'),
+  });
+}
+
+/** PATCH /admin/settings/integrations — 값 저장(빈 문자열 전달 시 해당 키 삭제 → env 폴백 복귀) */
+export function useV1UpdateIntegrationSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1UpdateIntegrationSettingsPayload) =>
+      v1Patch<V1IntegrationSettings>('/admin/settings/integrations', payload),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminIntegrationSettings(), data);
+    },
+  });
+}
+
+/**
+ * GET /public/integrations/kakao-maps-key — 인증 불필요. 카카오맵 JS SDK는 도메인 제한으로
+ * 보호되므로 공개돼도 안전 — 지도 임베드 컴포넌트가 SDK 스크립트 로드 직전에 호출한다.
+ */
+export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.publicKakaoMapsKey(),
+    queryFn: () => v1Get<V1PublicKakaoMapsKeyResponse>('/public/integrations/kakao-maps-key'),
+    staleTime: 5 * 60 * 1000,
+    enabled: options?.enabled,
+  });
+}
+
+// ─── 어드민: 콘텐츠(공지/팝업) 본문 이미지 업로드 ────────────────────────────
 
 export function useV1UploadAdminContentAsset() {
   return useMutation({

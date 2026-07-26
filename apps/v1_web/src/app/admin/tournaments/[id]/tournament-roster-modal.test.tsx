@@ -27,6 +27,7 @@ const registration: V1AdminTournamentRegistration = {
   agreedMediaConsent: true,
   confirmedAt: '2026-07-14T00:00:00.000Z',
   rosterLockedAt: null,
+  rosterDeadlineOverrideAt: null,
   cancelRequestedAt: null,
   cancelReason: null,
   playerCount: 1,

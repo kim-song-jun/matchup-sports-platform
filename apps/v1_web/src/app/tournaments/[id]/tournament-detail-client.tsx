@@ -1,25 +1,41 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { TrophyIcon, ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
+import { FormattedText } from '@/components/v1-ui/formatted-text';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
+import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
 import {
+  TournamentApplicationGuideSection,
+  TournamentParticipantSection,
+} from '@/components/tournaments/tournament-event-hub-sections';
+import {
+  TournamentPostEventHubSection,
+  TournamentVenuePrepSection,
+} from '@/components/tournaments/tournament-venue-retention-sections';
+import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
+import { TournamentPopupDialog } from '@/components/tournaments/tournament-popup-dialog';
+import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
+import {
   formatTournamentDateShort,
-  formatTournamentDateRangeShort,
+  formatTournamentDateRangeWithTime,
   formatTournamentDateLong,
   formatEntryFee,
 } from '@/lib/date-utils';
 import type {
   V1TournamentDetail,
   V1TournamentFormat,
-  V1TournamentStatus,
   V1TournamentGroup,
   V1TournamentFixture,
   V1TournamentAnnouncement,
@@ -27,26 +43,7 @@ import type {
   V1TournamentRegistration,
 } from '@/types/api';
 
-/* ── Status helpers ── */
-
-type StatusConfig = { badgeClass: string; label: string };
-
-function getTournamentStatusConfig(status: V1TournamentStatus): StatusConfig {
-  switch (status) {
-    case 'open':
-      return { badgeClass: 'tm-badge-blue', label: '모집 중' };
-    case 'in_progress':
-      return { badgeClass: 'tm-badge-green', label: '진행 중' };
-    case 'completed':
-      return { badgeClass: 'tm-badge-grey', label: '종료' };
-    case 'closed':
-      return { badgeClass: 'tm-badge-grey', label: '마감' };
-    case 'cancelled':
-      return { badgeClass: 'tm-badge-red', label: '취소' };
-    default:
-      return { badgeClass: 'tm-badge-grey', label: status };
-  }
-}
+export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-event-hub-sections';
 
 /* ── Format helpers ── */
 
@@ -56,6 +53,76 @@ function getFormatLabel(format: V1TournamentFormat): string {
     case 'knockout': return '토너먼트';
     case 'group_knockout': return '조별리그 후 토너먼트';
   }
+}
+
+function getGenderCategoryLabel(category: V1TournamentDetail['genderCategory']) {
+  if (category === 'mixed') return '혼성';
+  if (category === 'male') return '남성부';
+  if (category === 'female') return '여성부';
+  return null;
+}
+
+function getGenderQuotaLabel(
+  tournament: Pick<
+    V1TournamentDetail,
+    | 'genderCategory'
+    | 'genderMinMale'
+    | 'genderMaxMale'
+    | 'genderMinFemale'
+    | 'genderMaxFemale'
+  >,
+) {
+  if (tournament.genderCategory !== 'mixed') return null;
+  const formatRange = (label: string, min: number | null, max: number | null) => {
+    if (min === null && max === null) return null;
+    if (min !== null && max !== null) return `${label} ${min}~${max}명`;
+    if (min !== null) return `${label} 최소 ${min}명`;
+    return `${label} 최대 ${max}명`;
+  };
+  return [
+    formatRange('남성', tournament.genderMinMale, tournament.genderMaxMale),
+    formatRange('여성', tournament.genderMinFemale, tournament.genderMaxFemale),
+  ]
+    .filter((value): value is string => value !== null)
+    .join(' · ');
+}
+
+/**
+ * 완료 대회 결과 히어로용 우승팀명 — 결선(final) 픽스처 승자(knockout·group_knockout) 또는
+ * 단일 그룹 1위 팀(league)만 계산한다. 결선 미기록 등으로 간단히 확정되지 않으면 null을 반환해
+ * 히어로가 기존 "대회가 끝났어요" 문구로 안전하게 폴백하도록 한다(과설계 방지).
+ */
+export function getCompletedChampionName(tournament: V1TournamentDetail): string | null {
+  if (tournament.format === 'league') {
+    const leagueGroup = tournament.groups.find((g) => g.phase === 'group');
+    if (!leagueGroup) return null;
+    const top = [...leagueGroup.standings].sort((a, b) => a.position - b.position)[0];
+    return top?.teamName ?? null;
+  }
+
+  const finalFixture = tournament.fixtures.find((f) => f.round === 'final' || f.round === '결승');
+  if (!finalFixture?.result) return null;
+
+  const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = finalFixture.result;
+  let winnerSide: 'home' | 'away' | null = null;
+  if (hasPenalty && homePenaltyScore !== null && awayPenaltyScore !== null) {
+    if (homePenaltyScore !== awayPenaltyScore) winnerSide = homePenaltyScore > awayPenaltyScore ? 'home' : 'away';
+  } else if (homeScore !== awayScore) {
+    winnerSide = homeScore > awayScore ? 'home' : 'away';
+  }
+  if (winnerSide === 'home') return finalFixture.homeTeamName || null;
+  if (winnerSide === 'away') return finalFixture.awayTeamName || null;
+  return null;
+}
+
+/**
+ * 상금 칩 분리 — lib/prize-breakdown의 공용 스플리터(splitPrizeSegments)를 그대로 소비한다.
+ * 구분자 규칙("/"·줄바꿈·비-천단위 콤마, "·"는 물품 나열용으로 보존)이 시상 페이지·어드민
+ * 미리보기(parsePrizeRows)와 단일 소스로 통일되어 화면 간 항목 수가 어긋나지 않는다.
+ */
+export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
+  if (!prizeBreakdown) return [];
+  return splitPrizeSegments(prizeBreakdown);
 }
 
 function formatPublishedAt(dateStr: string): string {
@@ -115,7 +182,7 @@ function CapacityProgressBar({
   );
 }
 
-const COLLAPSED_POLICY_LINES = 4;
+const COLLAPSED_POLICY_MAX_HEIGHT = 96; // 대략 4줄 분량
 const POLICY_TOGGLE_THRESHOLD = 160;
 
 function CollapsiblePolicyText({
@@ -133,50 +200,53 @@ function CollapsiblePolicyText({
 }) {
   const [expanded, setExpanded] = useState(false);
   const shouldCollapse = text.length > POLICY_TOGGLE_THRESHOLD || text.includes('\n');
+  const collapsed = shouldCollapse && !expanded;
+  const fadeMask = 'linear-gradient(180deg, #000 55%, transparent 100%)';
 
   return (
     <>
-      <p
+      <div
         id={id}
-        className={className}
-        style={{
-          color,
-          lineHeight,
-          margin: 0,
-          whiteSpace: 'pre-wrap',
-          ...(shouldCollapse && !expanded
+        style={
+          collapsed
             ? {
-                display: '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: COLLAPSED_POLICY_LINES,
+                maxHeight: COLLAPSED_POLICY_MAX_HEIGHT,
                 overflow: 'hidden',
+                maskImage: fadeMask,
+                WebkitMaskImage: fadeMask,
               }
-            : {}),
-        }}
+            : undefined
+        }
       >
-        {text}
-      </p>
+        <FormattedText text={text} className={className} style={{ color, lineHeight }} />
+      </div>
       {shouldCollapse ? (
-        <button
-          type="button"
-          className="tm-btn tm-btn-sm tm-btn-ghost"
-          aria-controls={id}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((prev) => !prev)}
-          style={{ marginTop: 10, paddingInline: 0, minHeight: 36 }}
-        >
-          {expanded ? '접기' : '전체 보기'}
-          <ChevronRightIcon
-            size={14}
-            strokeWidth={2.2}
-            aria-hidden="true"
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <button
+            type="button"
+            className="tm-btn tm-btn-sm tm-btn-ghost"
+            aria-controls={id}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((prev) => !prev)}
             style={{
-              marginLeft: 2,
-              transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)',
-              transition: 'transform 0.16s ease',
+              fontSize: 'var(--font-size-caption)',
+              fontWeight: 500,
+              color: 'var(--text-muted)',
             }}
-          />
-        </button>
+          >
+            {expanded ? '접기' : '전체 보기'}
+            <ChevronRight
+              size={12}
+              strokeWidth={2.2}
+              aria-hidden="true"
+              style={{
+                marginLeft: 2,
+                transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)',
+                transition: 'transform 0.16s ease',
+              }}
+            />
+          </button>
+        </div>
       ) : null}
     </>
   );
@@ -273,10 +343,17 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
     myRegistrations.find((registration) => registration.status !== 'cancelled') ??
     myRegistrations[0] ??
     null;
+  const trackedViewRef = useRef<string | null>(null);
 
   useEffect(() => {
     setHasSessionHint(hasStoredV1Session());
   }, []);
+
+  useEffect(() => {
+    if (!data || trackedViewRef.current === tournamentId) return;
+    trackedViewRef.current = tournamentId;
+    trackEvent('tournament_view', { tournamentId });
+  }, [data, tournamentId]);
 
   if (isLoading) {
     return (
@@ -301,21 +378,27 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   }
 
   return (
-    <AppChrome
-      title={data.title}
-      backHref="/tournaments"
-      bottomNav={false}
-      activeTab="tournaments"
-      floatingSlot={<ApplyCTA tournament={data} myRegistration={myRegistration} />}
-    >
-      <TournamentDetailView tournament={data} myRegistration={myRegistration} />
-    </AppChrome>
+    <>
+      <TournamentPopupDialog popup={data.popup} />
+      <AppChrome
+        title={data.title}
+        backHref="/tournaments"
+        bottomNav={false}
+        activeTab="tournaments"
+        floatingSlot={<ApplyCTA tournament={data} myRegistration={myRegistration} />}
+      >
+        <TournamentDetailView tournament={data} myRegistration={myRegistration} />
+      </AppChrome>
+    </>
   );
 }
 
-/* ── Full detail view ── */
-
-function TournamentDetailView({
+/* ── Full detail view ──
+ * Exported (in addition to the data-fetching TournamentDetailPageClient wrapper above) so unit
+ * tests can render the completed vs non-completed section-rendering contract directly with a
+ * plain V1TournamentDetail fixture, without needing to mock the data hooks — same pattern as
+ * teams-page.tsx's exported *PageView components. */
+export function TournamentDetailView({
   tournament,
   myRegistration,
 }: {
@@ -326,10 +409,13 @@ function TournamentDetailView({
   const sportAccent = getSportAccent(tournament.sport.code);
   const hasAnnouncements = tournament.announcements.length > 0;
   const isOpen = tournament.status === 'open';
+  const isCompleted = tournament.status === 'completed';
   const pendingPaymentCount = getPendingPaymentCount(tournament);
   const reservedTeamCount = getReservedTeamCount(tournament);
   const isFull = reservedTeamCount >= tournament.teamCount;
   const prizeText = tournament.prizeSummary?.trim() ?? '';
+  const genderCategoryLabel = getGenderCategoryLabel(tournament.genderCategory);
+  const genderQuotaLabel = getGenderQuotaLabel(tournament);
   const hasPrize = prizeText.length > 0;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
@@ -338,9 +424,9 @@ function TournamentDetailView({
   const bottomPad = isOpen ? 96 : 48;
 
   /* ── Prize card — rendered in left column just after metric strip ── */
-  const prizeChips = tournament.prizeBreakdown
-    ? tournament.prizeBreakdown.split(/[/·,\n]+/).map((s) => s.trim()).filter(Boolean)
-    : [];
+  // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
+  // 분리하지 않는다 — dev의 콤마 구분 요구를 더 견고한 getPrizeBreakdownChips 헬퍼(테스트 보유)로 충족.
+  const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
   const prizeCard = hasPrize ? (
     <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
       <Card pad={18} style={{ background: 'var(--orange50)' }}>
@@ -349,7 +435,7 @@ function TournamentDetailView({
             aria-hidden="true"
             style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--orange500)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
           >
-            <TrophyIcon size={24} color="var(--static-white)" />
+            <Trophy size={24} color="var(--static-white)" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 700 }}>상품 및 상금</div>
@@ -360,82 +446,106 @@ function TournamentDetailView({
         </div>
         {prizeChips.length > 0 ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
-            {prizeChips.map((seg, i) => (
-              <span
-                key={i}
-                className="tm-text-micro"
-                style={{ background: 'var(--surface)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
-              >
-                {seg}
-              </span>
-            ))}
+            {prizeChips.map((seg, i) => {
+              const m = seg.match(/^(우승|준우승|공동 ?[1-9]위|[1-9]위|MVP|득점왕|도움왕|(?:참가(?:팀|자) )?전원)\s+(.+)$/);
+              return (
+                <span
+                  key={i}
+                  className="tm-text-micro"
+                  style={{ background: 'var(--surface)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 10px', borderRadius: 999 }}
+                >
+                  {m ? (
+                    <>
+                      <strong style={{ color: 'var(--text-strong)', fontWeight: 800, marginRight: 4 }}>{m[1]}</strong>
+                      {isPrizeAmountValue(m[2]) ? (
+                        formatPrizeRowValue(m[2])
+                      ) : (
+                        <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>{m[2].trim()}</span>
+                      )}
+                    </>
+                  ) : (
+                    seg
+                  )}
+                </span>
+              );
+            })}
           </div>
         ) : null}
       </Card>
     </section>
   ) : null;
 
-  /* ── Left column body content ── */
+  /* ── Header identity block (icon + title + badges) — shared by open/scheduled/in_progress
+     layout and the completed layout, which relocates it above the result hero (TARGET §1). ── */
+  const headerIdentitySection = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+      <div
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 56,
+          height: 56,
+          borderRadius: 16,
+          background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--static-white)',
+        }}
+      >
+        <Trophy size={28} strokeWidth={1.6} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
+          {tournament.title}
+        </h1>
+        <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span className={`tm-badge ${status.badgeClass}`}>
+            {status.label}
+          </span>
+          <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
+            {getFormatLabel(tournament.format)}
+          </span>
+          {genderCategoryLabel ? (
+            <span className="tm-badge tm-badge-grey" aria-label={`성별 카테고리: ${genderCategoryLabel}`}>
+              {genderCategoryLabel}
+            </span>
+          ) : null}
+          {/* Sport identity chip — color dot + Korean label (color + text, not color-only) */}
+          <span
+            className="tm-badge"
+            aria-label={`종목: ${sportAccent.label}`}
+            style={{
+              background: sportAccent.badgeBg,
+              color: sportAccent.badgeText,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                background: sportAccent.dot,
+                flexShrink: 0,
+                display: 'inline-block',
+              }}
+            />
+            {sportAccent.label}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── Left column body content (open / scheduled / in_progress — unchanged behavior) ── */
   const leftContent = (
     <>
       {/* ── Section 1: Header ── */}
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
-        {/* Hero icon + title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-          <div
-            aria-hidden="true"
-            style={{
-              flexShrink: 0,
-              width: 56,
-              height: 56,
-              borderRadius: 16,
-              background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
-              display: 'grid',
-              placeItems: 'center',
-              color: 'var(--static-white)',
-            }}
-          >
-            <TrophyIcon size={28} strokeWidth={1.6} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
-              {tournament.title}
-            </h1>
-            <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span className={`tm-badge ${status.badgeClass}`}>
-                {status.label}
-              </span>
-              <span className="tm-badge tm-badge-grey" aria-label={`대회 형식: ${getFormatLabel(tournament.format)}`}>
-                {getFormatLabel(tournament.format)}
-              </span>
-              {/* Sport identity chip — color dot + Korean label (color + text, not color-only) */}
-              <span
-                className="tm-badge"
-                aria-label={`종목: ${sportAccent.label}`}
-                style={{
-                  background: sportAccent.badgeBg,
-                  color: sportAccent.badgeText,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    background: sportAccent.dot,
-                    flexShrink: 0,
-                    display: 'inline-block',
-                  }}
-                />
-                {sportAccent.label}
-              </span>
-            </div>
-          </div>
-        </div>
+        {headerIdentitySection}
 
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
@@ -480,7 +590,8 @@ function TournamentDetailView({
           </div>
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
-            <InfoRow label="일정" value={formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+            <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+            <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
             <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
           {/* 항상 표시 */}
@@ -493,13 +604,35 @@ function TournamentDetailView({
           <InfoRow
             label="선수단 규모"
             value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
-            isLast
+            isLast={!genderQuotaLabel}
           />
+          {genderQuotaLabel ? (
+            <InfoRow label="혼성 명단 조건" value={genderQuotaLabel} isLast />
+          ) : null}
         </Card>
       </section>
 
       {/* ── Prize card — shown HIGH in left column, right after metric strip ── */}
       {prizeCard}
+
+      <TournamentApplicationGuideSection
+        minPlayers={tournament.minPlayers}
+        maxPlayers={tournament.maxPlayers}
+      />
+
+      <TournamentParticipantSection
+        teams={tournament.participantTeams}
+        teamCount={tournament.teamCount}
+        status={tournament.status}
+        confirmedCount={tournament.confirmedCount}
+      />
+
+      <TournamentVenuePrepSection
+        venue={tournament.venue}
+        announcements={tournament.announcements}
+        latitude={tournament.latitude}
+        longitude={tournament.longitude}
+      />
 
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
       <TournamentFlowSection tournament={tournament} />
@@ -520,9 +653,128 @@ function TournamentDetailView({
         </section>
       ) : null}
 
-      {/* ── Section 3 + 4: Format-aware fixtures / standings (non-bracket portions) ── */}
-      <FormatLeftSections tournament={tournament} />
+      <TournamentSponsorSection sponsors={tournament.sponsors} />
 
+      <TournamentPostEventHubSection
+        tournamentId={tournament.id}
+        status={tournament.status}
+        fixtures={tournament.fixtures}
+        hasAnnouncements={hasAnnouncements}
+        sponsorCount={tournament.sponsors.length}
+        announcements={tournament.announcements}
+      />
+
+      {/* ── Section 3 + 4: Format-aware fixtures / standings (non-bracket portions) ── */}
+      <div id="tournament-results">
+        <FormatLeftSections tournament={tournament} />
+      </div>
+
+      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
+    </>
+  );
+
+  /* ── Left column body content (completed — TARGET §1~6 축약 레이아웃) ──
+     헤더 → 결과 히어로 → 액션 리스트 → 참가팀 → 기본정보·상금 → (협찬) → 아코디언(규정/환불/유의사항).
+     신청 안내·진행 방식·인라인 조별순위/일정·결선 대진표는 완료 상세에서 제거(중복 해소, 스크롤 감소). ── */
+  const completedLeftContent = (
+    <>
+      <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
+        {headerIdentitySection}
+      </section>
+
+      <CompletedResultHero tournament={tournament} />
+
+      <TournamentPostEventHubSection
+        tournamentId={tournament.id}
+        status={tournament.status}
+        fixtures={tournament.fixtures}
+        hasAnnouncements={hasAnnouncements}
+        sponsorCount={tournament.sponsors.length}
+        announcements={tournament.announcements}
+      />
+
+      <TournamentParticipantSection
+        teams={tournament.participantTeams}
+        teamCount={tournament.teamCount}
+        status={tournament.status}
+        confirmedCount={tournament.confirmedCount}
+      />
+
+      <section aria-labelledby="completed-basic-info-heading" style={{ marginTop: 24 }}>
+        <div id="completed-basic-info-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
+          기본 정보
+        </div>
+        <Card pad={0}>
+          <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+          <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
+          <InfoRow label="참가팀" value={`${tournament.confirmedCount}/${tournament.teamCount}팀 확정`} />
+          <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
+          {tournament.venue ? (
+            <InfoRow label="장소" value={tournament.venue} />
+          ) : null}
+          <InfoRow
+            label="선수단 규모"
+            value={`팀당 ${tournament.minPlayers}~${tournament.maxPlayers}명`}
+            isLast={!genderQuotaLabel}
+          />
+          {genderQuotaLabel ? (
+            <InfoRow label="혼성 명단 조건" value={genderQuotaLabel} isLast />
+          ) : null}
+        </Card>
+      </section>
+
+      {prizeCard}
+
+      <TournamentSponsorSection sponsors={tournament.sponsors} />
+
+      {/* ── 아코디언: 대회 규정 / 환불 정책 / 참가 전 유의사항 — 기본 collapsed, 1회만 노출 ── */}
+      <div style={{ marginTop: 24 }}>
+        {tournament.rulesText ? (
+          <AccordionSection id="rules-content" title="대회 규정">
+            <FormattedText
+              text={tournament.rulesText}
+              className="tm-text-body"
+              style={{ color: 'var(--text-body)', lineHeight: 1.7 }}
+            />
+          </AccordionSection>
+        ) : null}
+
+        {tournament.refundPolicyText ? (
+          <AccordionSection id="refund-content" title="환불 정책">
+            <FormattedText
+              text={tournament.refundPolicyText}
+              className="tm-text-caption"
+              style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}
+            />
+          </AccordionSection>
+        ) : null}
+
+        <AccordionSection id="precheck-content" title="참가 전 유의사항">
+          <div style={{ display: 'grid', gap: 0 }}>
+            {PRE_PARTICIPATION_CHECK_ITEMS.map((item, idx, arr) => (
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  padding: idx === 0 ? '0 0 10px' : '10px 0',
+                  borderBottom: idx < arr.length - 1 ? '1px solid var(--grey100)' : 'none',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: 'var(--text-strong)', minWidth: 52, letterSpacing: '-0.01em' }}>
+                  {item.label}
+                </span>
+                <span className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  {item.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </AccordionSection>
+      </div>
+
+      <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
     </>
   );
 
@@ -542,7 +794,8 @@ function TournamentDetailView({
         </section>
       ) : null}
 
-      {tournament.refundPolicyText ? (
+      {/* completed: 환불 정책은 leftContent의 아코디언(규정/환불/유의사항)으로 단일화 — 여기서는 skip */}
+      {!isCompleted && tournament.refundPolicyText ? (
         <section aria-labelledby="refund-heading">
           <div id="refund-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>환불 정책</div>
           <Card pad={16} style={{ background: 'var(--grey50)' }}>
@@ -553,6 +806,45 @@ function TournamentDetailView({
               color="var(--text-muted)"
               lineHeight={1.65}
             />
+          </Card>
+        </section>
+      ) : null}
+
+      {/* 참가 전 확인 사항 — 데스크탑 우측 aside 전용.
+          completed: leftContent 아코디언의 "참가 전 유의사항"으로 단일화되어 중복 렌더를 없앤다. */}
+      {!isCompleted ? (
+        <section aria-label="참가 전 꼭 확인해 주세요" className="tm-show-desktop">
+          <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>참가 전 꼭 확인해 주세요</div>
+          <Card pad={0} style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
+            {([
+              { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정됩니다.' },
+              { label: '자동 취소', text: '신청 후 2시간 내 입금 미확인 시 자동 취소됩니다.' },
+              { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
+              { label: '주최 취소', text: '주최 측 사정 취소 시 참가비 100% 환불됩니다.' },
+              { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않습니다.' },
+              { label: '허위 정보', text: '경력·소속 이력 허위 제출 시 팀 탈락됩니다.' },
+              { label: '본인 확인', text: '당일 신분증 또는 확인 자료 제출을 요청할 수 있습니다.' },
+              { label: '부상 책임', text: '경기 전 본인 건강 상태를 확인 후 참가하세요.' },
+              { label: '현장 촬영', text: '대회 현장에서 사진·영상이 촬영될 수 있습니다.' },
+            ] as { label: string; text: string }[]).map((item, idx, arr) => (
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  padding: '9px 14px',
+                  borderBottom: idx < arr.length - 1 ? '1px solid var(--grey100)' : 'none',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 800, color: 'var(--text-strong)', minWidth: 48, paddingTop: 2, letterSpacing: '-0.01em' }}>
+                  {item.label}
+                </span>
+                <span className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.55, fontSize: 11 }}>
+                  {item.text}
+                </span>
+              </div>
+            ))}
           </Card>
         </section>
       ) : null}
@@ -601,9 +893,10 @@ function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}
+            {formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}
           </span>
         </div>
+        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
@@ -618,7 +911,119 @@ function TournamentDetailView({
         </div>
       </div>
     </aside>
+  ) : tournament.status === 'in_progress' ? (
+    <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 진행 상태">
+      {/* Live CTA */}
+      <Link
+        href={`/tournaments/${tournament.id}/bracket`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 16px',
+          background: 'var(--blue500)', borderRadius: 14,
+          textDecoration: 'none',
+          boxShadow: '0 2px 14px rgba(49,130,246,0.28)',
+          marginBottom: 16,
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', flexShrink: 0, boxShadow: '0 0 0 2px rgba(74,222,128,0.35)' }} aria-hidden="true" />
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
+        </span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>순위표 · 대진표 보기</span>
+        <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
+      </Link>
+      {/* Key facts */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+        </div>
+        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>참가비</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatEntryFee(tournament.entryFee)}</span>
+        </div>
+      </div>
+    </aside>
+  ) : tournament.status === 'completed' ? (
+    <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 결과">
+      <Link
+        href={`/tournaments/${tournament.id}/results`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 16px',
+          background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)', borderRadius: 14,
+          textDecoration: 'none',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+          marginBottom: 16,
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.12)', borderRadius: 20, padding: '3px 9px', flexShrink: 0 }}>
+          <Trophy size={12} className="tm-medal-gold" strokeWidth={2.4} aria-hidden="true" />
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>종료</span>
+        </span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>최종 결과 · 시상 보기</span>
+        <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
+      </Link>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+        </div>
+        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
+        </div>
+      </div>
+    </aside>
   ) : null;
+
+  /* ── 상단 진입 CTA (in_progress / completed 전용, 모바일 히어로 직후) ── */
+  const topCTA =
+    tournament.status === 'in_progress' ? (
+      <div className="tm-tournament-bleed tm-hide-desktop" style={{ padding: '0 20px 14px' }}>
+        <Link
+          href={`/tournaments/${tournament.id}/bracket`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            width: '100%',
+            padding: '14px 16px',
+            background: 'var(--blue500)',
+            borderRadius: 14,
+            textDecoration: 'none',
+            boxShadow: '0 2px 14px rgba(49,130,246,0.3)',
+          }}
+          aria-label="현재 순위·대진표 보기"
+        >
+          {/* 라이브 배지 */}
+          <span style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            background: 'rgba(255,255,255,0.18)', borderRadius: 20,
+            padding: '3px 9px', flexShrink: 0,
+          }}>
+            {/* 펄스 점 */}
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: '#4ADE80', flexShrink: 0,
+              boxShadow: '0 0 0 2px rgba(74,222,128,0.35)',
+            }} aria-hidden="true" />
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
+          </span>
+          {/* 액션 텍스트 */}
+          <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+            순위표 · 대진표 보기
+          </span>
+          <ChevronRight size={18} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
+        </Link>
+      </div>
+    ) : null; // completed: 기존 상단 배너는 CompletedResultHero(헤더 직후, leftContent)로 이전 — 중복 렌더 제거
 
   return (
     <article style={{ paddingBottom: bottomPad }}>
@@ -629,18 +1034,21 @@ function TournamentDetailView({
           href="/tournaments"
           aria-label="대회 목록으로 돌아가기"
         >
-          <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+          <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>
-        <h1 className="tm-text-heading" style={{ margin: 0 }}>대회 상세</h1>
+        <div className="tm-text-heading" style={{ margin: 0 }} aria-hidden="true">대회 상세</div>
       </div>
 
       {/* ── Desktop 2-column layout: left=body, right=sticky CTA rail ──
           .tm-tournament-detail-grid: minmax(0,1fr) 340px (≥1440: 360px), gap 32px.
           Mobile: single-column, no grid applied. */}
+      {/* ── 상단 CTA: 히어로 직후 첫 번째로 보이는 진입점 (모바일) ── */}
+      {topCTA}
+
       <div className="tm-tournament-detail-grid">
         {/* Left column: header + metrics + prize + rules + standings + group fixtures */}
         <div className="tm-match-detail-body">
-          {leftContent}
+          {isCompleted ? completedLeftContent : leftContent}
         </div>
 
         {/* Right column: sticky CTA rail (desktop, open only) + 공지/환불.
@@ -653,44 +1061,249 @@ function TournamentDetailView({
           </div>
         ) : null}
 
-        {/* Bracket: direct grid child spanning both columns via .tm-tournament-bleed
-            (grid-column 1/-1) — full-width below the 2-col on desktop; normal flow on mobile. */}
-        <BracketSection tournament={tournament} />
-        <TournamentPreParticipationNotice />
+        {/* Bracket 진입 카드와 참가 전 확인 사항 — completed는 leftContent(액션 리스트·아코디언)로 이전 */}
+        {!isCompleted && <BracketSection tournament={tournament} />}
+        {!isCompleted && <TournamentPreParticipationNotice />}
+        <TournamentStatusEntryCard tournament={tournament} />
       </div>
     </article>
   );
 }
 
-function TournamentPreParticipationNotice() {
-  const items = [
-    '대회 신청 후 운영진 확인 및 참가비 입금 확인이 완료되어야 참가가 확정됩니다.',
-    '신청 후 2시간 이내 입금 확인이 되지 않으면 신청은 자동 취소됩니다.',
-    '참가비 입금 후 단순 변심, 일정 착오, 팀 사정, 선수 구성 실패로 인한 신청 취소는 원칙적으로 불가합니다.',
-    '팀밋 또는 주최 측 사정으로 대회가 취소되는 경우 참가비는 100% 환불됩니다.',
-    '대회가 연기되는 경우 기존 대회일 기준 2주 전까지 참가 취소 및 환불 요청이 가능합니다.',
-    '노쇼 시 해당 팀 또는 참가자는 실격 처리되며 참가비는 환불되지 않습니다.',
-    '선출·비선출 여부, 이름, 생년월일, 선수 경력, 소속 이력 등을 허위로 제출하거나 숨기는 행위는 팀 탈락 사유가 됩니다.',
-    '대회 당일 본인 확인을 위해 신분증 또는 본인 확인 자료 제출을 요청할 수 있습니다.',
-    '경기 중 부상 위험이 있으므로 참가자는 본인의 건강 상태를 확인한 후 참가해야 합니다.',
-    '대회 현장에서는 사진 및 영상이 촬영될 수 있습니다.',
-  ];
+/**
+ * in_progress 전용 진입 카드 — 순위·대진표 바로 보기(모바일).
+ * completed 전용 진입점은 CompletedResultHero로 분리되어 헤더 직후 상단에 노출된다
+ * (기존엔 이 카드가 completed도 함께 처리해 상단 topCTA와 중복 렌더되던 것을 해소).
+ */
+function TournamentStatusEntryCard({ tournament }: { tournament: V1TournamentDetail }) {
+  if (tournament.status !== 'in_progress') {
+    return null;
+  }
 
   return (
     <div className="tm-tournament-bleed">
+      <div className="tm-match-detail-body">
+        <section style={{ marginTop: 24, paddingBottom: 8 }}>
+          <Link
+            href={`/tournaments/${tournament.id}/bracket`}
+            className="tm-hide-desktop"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '14px 16px',
+              background: 'var(--blue500)',
+              borderRadius: 14,
+              textDecoration: 'none',
+              boxShadow: '0 2px 12px rgba(49,130,246,0.28)',
+              transition: 'opacity 0.12s',
+            }}
+            aria-label="대회 순위·브래킷 보기"
+          >
+            <span
+              style={{
+                fontSize: 24,
+                flexShrink: 0,
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255,255,255,0.15)',
+              }}
+              aria-hidden="true"
+            >
+              <Goal size={22} color="var(--static-white)" strokeWidth={2} aria-hidden="true" />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 2, letterSpacing: '-0.01em' }}>
+                대회가 진행 중이에요
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+                현재 순위표와 대진표를 실시간으로 확인하세요.
+              </div>
+            </div>
+            <ChevronRight size={18} strokeWidth={2.2} style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} aria-hidden="true" />
+          </Link>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * completed 전용 결과 요약 히어로 — 헤더 직후 최상단에 배치해 "대회가 끝났어요" 진입점을
+ * 스크롤 없이 바로 보이게 한다(TARGET §2). 우승팀명을 간단히 계산할 수 있으면 제목에 노출하고,
+ * 아니면 기존 "대회가 끝났어요" 문구로 폴백한다. 모바일·데스크탑 공통(예전 topCTA/railCTA처럼
+ * 브레이크포인트별로 나뉘지 않음 — leftContent는 두 화면 모두에서 렌더되는 영역).
+ */
+function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail }) {
+  const championName = getCompletedChampionName(tournament);
+  const title = championName ? `${championName} 우승!` : '대회가 끝났어요';
+
+  return (
+    <section style={{ marginTop: 16 }}>
+      <Link
+        href={`/tournaments/${tournament.id}/results`}
+        className="tm-pressable"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          padding: '16px 18px',
+          background: 'linear-gradient(135deg, #1A1A2E 0%, #111827 100%)',
+          borderRadius: 16,
+          textDecoration: 'none',
+          boxShadow: '0 2px 14px rgba(0,0,0,0.2)',
+        }}
+        aria-label={championName ? `${championName} 우승. 최종 결과와 시상 내역 보기` : '대회 최종 결과 보기'}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(255,255,255,0.14)',
+          }}
+        >
+          <Trophy size={24} className="tm-medal-gold" strokeWidth={2} aria-hidden="true" />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 800,
+              color: '#fff',
+              marginBottom: 2,
+              letterSpacing: '-0.01em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {title}
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+            최종 순위와 시상 결과를 확인해보세요.
+          </div>
+        </div>
+        <ChevronRight size={18} strokeWidth={2.2} style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} aria-hidden="true" />
+      </Link>
+    </section>
+  );
+}
+
+/**
+ * completed 전용 아코디언 — 기본 collapsed, 헤더 탭으로 토글(WCAG: aria-expanded/aria-controls).
+ * 대회 규정·환불 정책·참가 전 유의사항을 동일한 패턴으로 묶어 스크롤을 줄인다(TARGET §6).
+ */
+function AccordionSection({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Card pad={0} style={{ marginTop: 8, overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-controls={id}
+        className="tm-list-row-interactive tm-pressable"
+        style={{
+          width: '100%',
+          minHeight: 52,
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          background: 'transparent',
+          border: 'none',
+          textAlign: 'left',
+          cursor: 'pointer',
+        }}
+      >
+        <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{title}</span>
+        <ChevronRight
+          size={16}
+          strokeWidth={2.2}
+          aria-hidden="true"
+          style={{
+            color: 'var(--text-caption)',
+            flexShrink: 0,
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+            transition: 'transform 0.16s ease',
+          }}
+        />
+      </button>
+      {open ? (
+        <div id={id} style={{ padding: '14px 16px 16px', borderTop: '1px solid var(--grey100)' }}>
+          {children}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * "참가 전 확인" 체크리스트 — non-completed 하단 카드(TournamentPreParticipationNotice)와
+ * completed 아코디언(completedLeftContent)이 공유하는 단일 소스. 두 곳 모두 렌더링은 별도이지만
+ * 데이터는 이 상수 하나로 통일한다.
+ */
+const PRE_PARTICIPATION_CHECK_ITEMS: { label: string; text: string }[] = [
+  { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 참가가 확정됩니다.' },
+  { label: '자동 취소', text: '신청 후 2시간 내 입금 미확인 시 신청이 자동 취소됩니다.' },
+  { label: '환불 불가', text: '참가비 입금 후 단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
+  { label: '주최 취소', text: '주최 측 사정으로 대회가 취소되는 경우 참가비 100% 환불됩니다.' },
+  { label: '대회 연기', text: '대회 연기 시 기존 대회일 2주 전까지 취소·환불 요청이 가능합니다.' },
+  { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않습니다.' },
+  { label: '허위 정보', text: '선수 경력·소속 이력 등 허위 제출 시 팀 탈락 사유가 됩니다.' },
+  { label: '본인 확인', text: '대회 당일 신분증 또는 본인 확인 자료 제출을 요청할 수 있습니다.' },
+  { label: '부상 책임', text: '경기 중 부상 위험에 대비해 참가 전 본인 건강 상태를 확인하세요.' },
+  { label: '현장 촬영', text: '대회 현장에서 사진 및 영상이 촬영될 수 있습니다.' },
+];
+
+function TournamentPreParticipationNotice() {
+  return (
+    <div className="tm-tournament-bleed tm-hide-desktop">
       <div className="tm-match-detail-body">
         <section aria-labelledby="tournament-precheck-heading" style={{ marginTop: 24 }}>
           <div id="tournament-precheck-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             참가 전 꼭 확인해 주세요
           </div>
-          <Card pad={16} style={{ background: 'var(--grey50)' }}>
-            <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 8 }}>
-              {items.map((item) => (
-                <li key={item} className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                  {item}
-                </li>
-              ))}
-            </ul>
+          <Card pad={0} style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
+            {PRE_PARTICIPATION_CHECK_ITEMS.map((item, idx, arr) => (
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  padding: '10px 16px',
+                  borderBottom: idx < arr.length - 1 ? '1px solid var(--grey100)' : 'none',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: 'var(--text-strong)', minWidth: 52, paddingTop: 1, letterSpacing: '-0.01em' }}>
+                  {item.label}
+                </span>
+                <span className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  {item.text}
+                </span>
+              </div>
+            ))}
           </Card>
         </section>
       </div>
@@ -848,11 +1461,12 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   const { knockoutFixtures, hasKnockoutFixtures, hasAnyFixtures } =
     partitionTournamentSections(format, fixtures, groups);
 
-  /* league: no bracket */
+  /* league: 브래킷 없음 */
   if (format === 'league') return null;
 
-  /* knockout: bracket for all fixtures */
+  /* knockout: 픽스처가 있을 때만 표시 (모집 중/마감 단계엔 미표시) */
   if (format === 'knockout') {
+    if (!hasAnyFixtures) return null;
     return (
       <div className="tm-tournament-bleed">
         <div className="tm-match-detail-body">
@@ -861,11 +1475,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
               대진표
             </div>
             <div style={{ marginTop: 4 }}>
-              {hasAnyFixtures ? (
-                <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
-              ) : (
-                <FixturesPlaceholder />
-              )}
+              <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
             </div>
           </section>
         </div>
@@ -873,7 +1483,11 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
     );
   }
 
-  /* group_knockout: knockout bracket only */
+  /* group_knockout: 결선 픽스처가 확정됐을 때만 표시
+   * - 조별 리그 진행 중(hasKnockoutFixtures=false)이면 노출 안 함
+   * - 결선 대진표 전체 보기는 /bracket 서브페이지에서 제공 */
+  if (!hasKnockoutFixtures) return null;
+
   return (
     <div className="tm-tournament-bleed">
       <div className="tm-match-detail-body">
@@ -882,18 +1496,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
             결선 대진표
           </div>
           <div style={{ marginTop: 4 }}>
-            {hasKnockoutFixtures ? (
-              <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
-            ) : (
-              <Card pad={16} style={{ background: 'var(--grey50)' }}>
-                <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
-                  결선 대진표
-                </div>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                  조별 리그가 끝나면 결선 대진표가 공개돼요.
-                </div>
-              </Card>
-            )}
+            <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
           </div>
         </section>
       </div>
@@ -994,6 +1597,23 @@ function InfoRow({
   );
 }
 
+/**
+ * "일정" 표시 근처에 공통으로 붙는 안내 캡션 — 대회 상태(open/scheduled/in_progress/completed)
+ * 전체에서 공유하는 단일 소스. 일정·경기 방식이 현장 상황에 따라 바뀔 수 있음을 안내한다.
+ * 기본 marginTop=8 은 InfoRow 리스트 밖 등 독립 블록 배치용 — desktop rail 의 flex(gap) 목록
+ * 안에서는 gap 이 간격을 이미 담당하므로 style로 marginTop:0 을 넘겨 이중 여백을 막는다.
+ */
+function ScheduleNoticeCaption({ style }: { style?: React.CSSProperties }) {
+  return (
+    <div
+      className="tm-text-caption"
+      style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 8, ...style }}
+    >
+      대회 일정 및 경기 방식은 현장 상황에 따라 일부 변경될 수 있습니다. 참가 전 꼭 확인해 주세요.
+    </div>
+  );
+}
+
 /* ── Fixture card ── */
 
 function fixtureStatusLabel(status: string): string {
@@ -1042,10 +1662,12 @@ function FixtureStatusBadge({ status }: { status: string }) {
   );
 }
 
-function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
+export function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
   const hasResult = fixture.result !== null;
   const homeScore = hasResult ? fixture.result!.homeScore : null;
   const awayScore = hasResult ? fixture.result!.awayScore : null;
+  const homeGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'home') : [];
+  const awayGoals = hasResult ? fixture.result!.goals.filter((g) => g.team === 'away') : [];
   // 라운드 라벨: tournament-bracket.tsx ROUND_LABELS 맵과 동일하게 '4강' 사용
   const roundLabel = fixture.round
     ? fixture.round.replace('group', '조별').replace('semi', '4강').replace('final', '결승').replace('third_place', '3·4위')
@@ -1141,6 +1763,48 @@ function FixtureCard({ fixture }: { fixture: V1TournamentFixture }) {
         </div>
       </div>
 
+      {/* Goals */}
+      {homeGoals.length > 0 || awayGoals.length > 0 ? (
+        <div
+          role="list"
+          aria-label="득점자"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr auto 1fr',
+            gap: 8,
+            marginTop: 6,
+          }}
+        >
+          <div style={{ textAlign: 'right' }}>
+            {homeGoals.map((g) => (
+              <div
+                key={g.id}
+                role="listitem"
+                className="tm-text-micro"
+                style={{ color: 'var(--text-caption)' }}
+              >
+                {g.playerName}
+                {g.minute != null ? ` ${g.minute}′` : ''}
+              </div>
+            ))}
+          </div>
+          <div aria-hidden="true" />
+          <div style={{ textAlign: 'left' }}>
+            {awayGoals.map((g) => (
+              <div
+                key={g.id}
+                role="listitem"
+                className="tm-text-micro"
+                style={{ color: 'var(--text-caption)' }}
+              >
+                {g.playerName}
+                {g.minute != null ? ` ${g.minute}′` : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {/* Penalty */}
       {hasResult && fixture.result!.hasPenalty ? (
         <div
@@ -1187,7 +1851,12 @@ function StandingRow({
   isQualifying: boolean;
 }) {
   return (
-    <tr style={isQualifying ? { background: 'var(--blue50)' } : undefined}>
+    <tr
+      style={{
+        // zebra: 진출 팀은 파란 강조가 우선, 그 외엔 짝수 행에만 옅은 회색을 줘 가독성을 높인다.
+        background: isQualifying ? 'var(--blue50)' : rank % 2 === 0 ? 'var(--grey50)' : undefined,
+      }}
+    >
       <td
         style={{
           padding: '8px 8px 8px 0',
@@ -1197,32 +1866,38 @@ function StandingRow({
       >
         <span
           className="tm-text-caption tab-num"
-          style={{ color: isQualifying ? 'var(--text-strong)' : 'var(--text-caption)' }}
+          style={{ color: isQualifying ? 'var(--text-strong)' : 'var(--text-caption)', fontWeight: isQualifying ? 700 : 400 }}
         >
           {rank}
         </span>
       </td>
-      <td
-        style={{ padding: '8px 4px', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-      >
-        <span className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-          {standing.teamName}
-        </span>
-        {isQualifying ? (
-          <span className="tm-badge tm-badge-blue" style={{ marginLeft: 6, verticalAlign: 'middle' }}>
-            진출
+      <td style={{ padding: '8px 4px', maxWidth: 160 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <TeamAvatar seed={standing.teamId} name={standing.teamName} size="sm" />
+          <span
+            className="tm-text-label"
+            style={{ color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}
+          >
+            {standing.teamName}
           </span>
-        ) : null}
+          {isQualifying ? (
+            <span className="tm-badge tm-badge-blue tm-badge-sm" style={{ flexShrink: 0 }}>
+              진출
+            </span>
+          ) : null}
+        </div>
       </td>
       <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
+        <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
           {standing.points}
         </span>
       </td>
       <td style={{ padding: '8px 4px', textAlign: 'center' }}>
-        <span className="tm-text-micro tab-num" style={{ color: 'var(--text-muted)' }}>
-          {standing.wins}승{standing.draws}무{standing.losses}패
-        </span>
+        <div style={{ display: 'inline-flex', gap: 3 }}>
+          <span className="tm-badge tm-badge-green tm-badge-sm tab-num">{standing.wins}승</span>
+          <span className="tm-badge tm-badge-grey tm-badge-sm tab-num">{standing.draws}무</span>
+          <span className="tm-badge tm-badge-red tm-badge-sm tab-num">{standing.losses}패</span>
+        </div>
       </td>
       <td style={{ padding: '8px 0 8px 4px', textAlign: 'center' }}>
         <span className="tm-text-micro">
@@ -1248,7 +1923,7 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
         <table
           /* colgroup으로 열 너비를 명시해 카드 끝선까지 순위표가 확장되도록 함.
              maxWidth 캡 제거 — 카드 너비에 맞게 테이블이 늘어남. */
-          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 280 }}
+          style={{ width: '100%', borderCollapse: 'collapse', minWidth: 320 }}
           aria-label={`${group.name} 순위표`}
         >
           <colgroup>
@@ -1258,8 +1933,8 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
             <col />
             {/* 승점 */}
             <col style={{ width: 48 }} />
-            {/* 전적 */}
-            <col style={{ width: 88 }} />
+            {/* 전적 — 승/무/패 개별 배지 3개라 텍스트보다 폭이 더 필요하다 */}
+            <col style={{ width: 128 }} />
             {/* 득실 */}
             <col style={{ width: 48 }} />
           </colgroup>
@@ -1339,22 +2014,26 @@ function GroupStandingsTable({ group }: { group: V1TournamentGroup }) {
 
 function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnouncement }) {
   return (
-    <Card pad={16}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div className="tm-text-label" style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0 }}>
-          {announcement.title}
+    <div id={`announcement-${announcement.id}`} style={{ scrollMarginTop: 96 }}>
+      <Card pad={16}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--text-strong)', flex: 1, minWidth: 0 }}>
+            {announcement.title}
+          </div>
+          <span className="tm-text-micro" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
+            {formatPublishedAt(announcement.publishedAt)}
+          </span>
         </div>
-        <span className="tm-text-micro" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
-          {formatPublishedAt(announcement.publishedAt)}
+        <span className="tm-badge tm-badge-grey" style={{ marginTop: 8 }}>
+          {getTournamentAnnouncementCategoryLabel(announcement.category)}
         </span>
-      </div>
-      <p
-        className="tm-text-caption"
-        style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}
-      >
-        {announcement.body}
-      </p>
-    </Card>
+        <FormattedText
+          text={announcement.body}
+          className="tm-text-caption"
+          style={{ marginTop: 6, color: 'var(--text-body)', lineHeight: 1.65 }}
+        />
+      </Card>
+    </div>
   );
 }
 

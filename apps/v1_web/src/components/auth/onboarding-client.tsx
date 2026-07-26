@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
+import { trackEvent } from '@/lib/analytics';
 import { onboardingStepLabel } from '@/lib/v1-status-labels';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import {
   useV1CompleteOnboarding,
   useV1DeferOnboarding,
@@ -24,16 +26,12 @@ type OnboardingRouteStep = 'resume' | Extract<V1OnboardingStep, 'sport' | 'level
 type OnboardingDraft = {
   sports: Array<{ sportId: string; levelId: string | null }>;
   regions: Array<{ regionId: string; primary: boolean }>;
-  currentLocation?: CurrentLocationDraft | null;
+  detectedRegion?: DetectedRegionDraft | null;
 };
 
-type CurrentLocationDraft = {
-  latitude: number;
-  longitude: number;
-  accuracy?: number | null;
-  capturedAt: string;
-  matchedRegionId?: string | null;
-  matchedRegionName?: string | null;
+type DetectedRegionDraft = {
+  regionId: string;
+  regionName: string;
 };
 
 type LocationStatus = 'idle' | 'requesting' | 'allowed' | 'denied' | 'unsupported' | 'unmatched';
@@ -92,11 +90,13 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const completeOnboarding = useV1CompleteOnboarding();
   const deferOnboarding = useV1DeferOnboarding();
   const resolveLocation = useV1ResolveLocation();
+  const pushRegistration = useV1PushRegistration();
   const [draft, setDraft] = useState<OnboardingDraft>({ sports: [], regions: [] });
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
   const [selectedRegionGroupId, setSelectedRegionGroupId] = useState<string | null>(null);
+  const [pushRequesting, setPushRequesting] = useState(false);
 
   useEffect(() => {
     if (hydrated || !onboarding.data) return;
@@ -104,7 +104,7 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     const initial = stored ?? {
       sports: onboarding.data.sports.map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })),
       regions: onboarding.data.regions.map((region) => ({ regionId: region.regionId, primary: region.primary })),
-      currentLocation: null,
+      detectedRegion: null,
     };
     setDraft(initial);
     setHydrated(true);
@@ -143,6 +143,10 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   const pending = savePreferences.isPending || completeOnboarding.isPending || deferOnboarding.isPending;
 
   const saveAndGo = (currentStep: V1OnboardingPreferencePayload['currentStep'], href: string) => {
+    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+    if (pending) return;
     setError(null);
     const payloadDraft = sanitizeDraft(draft);
 
@@ -166,24 +170,26 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
         })),
         regions: payloadDraft.regions,
         currentStep,
-        currentLocation: payloadDraft.currentLocation
-          ? {
-              latitude: payloadDraft.currentLocation.latitude,
-              longitude: payloadDraft.currentLocation.longitude,
-              accuracy: payloadDraft.currentLocation.accuracy,
-              capturedAt: payloadDraft.currentLocation.capturedAt,
-              matchedRegionId: payloadDraft.currentLocation.matchedRegionId ?? null,
-            }
-          : null,
       },
       {
-        onSuccess: () => router.push(href),
+        onSuccess: () => {
+          // 'sport' 단계에서만 선택한 종목 코드를 함께 남긴다 — 다른 단계는 종목과 무관.
+          const sportType = currentStep === 'sport'
+            ? payloadDraft.sports
+                .map((sport) => sports.find((candidate) => candidate.id === sport.sportId)?.code)
+                .filter((code): code is string => Boolean(code))
+                .join(',')
+            : '';
+          trackEvent('onboarding_step_complete', sportType ? { step: currentStep, sportType } : { step: currentStep });
+          router.push(href);
+        },
         onError: (nextError) => setError(getErrorMessage(nextError)),
       },
     );
   };
 
   const defer = () => {
+    if (pending) return;
     setError(null);
     deferOnboarding.mutate(
       { reason: 'later' },
@@ -195,14 +201,28 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
   };
 
   const complete = () => {
+    if (pending) return;
     setError(null);
     completeOnboarding.mutate(undefined, {
       onSuccess: (result) => {
+        trackEvent('onboarding_complete', {});
         clearDraft();
         router.replace(result.next?.route ?? '/home');
       },
       onError: (nextError) => setError(getErrorMessage(nextError)),
     });
+  };
+
+  // 위치 권한(requestCurrentLocation)과 동일하게, 알림 권한도 사전 안내 카드 + 명시적 버튼 클릭으로만
+  // 요청한다 — user gesture 없이 팝업이 뜨는 것을 방지.
+  const requestPush = async () => {
+    if (pushRequesting || pushRegistration.isSubscribed) return;
+    setPushRequesting(true);
+    try {
+      await pushRegistration.subscribe();
+    } finally {
+      setPushRequesting(false);
+    }
   };
 
   const requestCurrentLocation = () => {
@@ -216,14 +236,12 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
     setLocationStatus('requesting');
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const nextLocation = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
-          capturedAt: new Date().toISOString(),
-        };
         resolveLocation.mutate(
-          { latitude: nextLocation.latitude, longitude: nextLocation.longitude },
+          {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            locationConsentAccepted: true,
+          },
           {
             onSuccess: (result) => {
               const matchedRegionId = result.region?.id ?? null;
@@ -235,24 +253,14 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
 
               setDraft((current) => ({
                 ...upsertPrimaryRegion(current, matchedRegionId),
-                currentLocation: {
-                  ...nextLocation,
-                  matchedRegionId,
-                  matchedRegionName,
-                },
+                detectedRegion: matchedRegionId && matchedRegionName
+                  ? { regionId: matchedRegionId, regionName: matchedRegionName }
+                  : null,
               }));
               setSelectedRegionGroupId(findRegionGroupId(regionGroups, matchedRegionId));
               setLocationStatus(matchedRegionId ? 'allowed' : 'unmatched');
             },
             onError: () => {
-              setDraft((current) => ({
-                ...current,
-                currentLocation: {
-                  ...nextLocation,
-                  matchedRegionId: null,
-                  matchedRegionName: null,
-                },
-              }));
               setLocationStatus('unmatched');
             },
           },
@@ -369,7 +377,11 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
             <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" disabled={locationStatus === 'requesting'} onClick={requestCurrentLocation} type="button">
               {locationStatus === 'requesting' ? '현재 위치 확인 중' : '현재 위치로 찾기'}
             </button>
-            <LocationNotice location={draft.currentLocation ?? null} status={locationStatus} />
+            <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+              버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
+              좌표 자체는 저장하지 않아요.
+            </p>
+            <LocationNotice detectedRegion={draft.detectedRegion ?? null} status={locationStatus} />
             <div className="tm-auth-stack">
               <Card pad={15}>
                 <div className="tm-text-label">시/도</div>
@@ -406,7 +418,26 @@ export function OnboardingClient({ step }: { step: OnboardingRouteStep }) {
             </div>
           </>
         ) : null}
-        {step === 'confirm' ? <ConfirmPanel draft={draft} emptySports={emptySports} regions={regionOptions} sports={sports} /> : null}
+        {step === 'confirm' ? (
+          <>
+            {/* 위치 권한과 동일한 패턴: 사전 안내 후 명시적 버튼 클릭이 실제 user gesture로
+                pushRegistration.subscribe()를 트리거한다 — complete() 성공 시 자동 호출 금지. */}
+            <button
+              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+              disabled={pushRequesting || pushRegistration.isSubscribed}
+              onClick={() => void requestPush()}
+              type="button"
+            >
+              {pushRequesting ? '알림 권한 확인 중' : pushRegistration.isSubscribed ? '알림 받기 완료' : '알림 받기'}
+            </button>
+            <p className="tm-text-caption" style={{ margin: '8px 0 0' }}>
+              매칭 성사, 채팅, 경기 결과 같은 소식을 놓치지 않도록 브라우저 알림을 받을 수 있어요.
+              언제든 설정에서 끌 수 있어요.
+            </p>
+            <PushNotice isSubscribed={pushRegistration.isSubscribed} permission={pushRegistration.permission} requesting={pushRequesting} />
+            <ConfirmPanel draft={draft} emptySports={emptySports} regions={regionOptions} sports={sports} />
+          </>
+        ) : null}
       </div>
     </AuthFrame>
   );
@@ -513,11 +544,11 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
       {/* P1 tabular-nums: 숫자가 포함될 수 있는 요약 텍스트 */}
       <Card pad={16}><div className="tm-text-caption">관심 종목과 실력</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{sportSummary || '미설정'}</div></Card>
       <Card pad={16}><div className="tm-text-caption">활동 지역</div><div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>{regionSummary || '미설정'}</div></Card>
-      {draft.currentLocation ? (
+      {draft.detectedRegion ? (
         <Card pad={16} className="tm-onboarding-confirm-full">
-          <div className="tm-text-caption">현재 위치</div>
+          <div className="tm-text-caption">현재 위치로 찾은 지역</div>
           <div className="tm-text-body" style={{ marginTop: 4, color: 'var(--text-strong)', fontWeight: 600 }}>
-            {formatLocation(draft.currentLocation)}
+            {draft.detectedRegion.regionName}
           </div>
         </Card>
       ) : null}
@@ -527,28 +558,56 @@ function ConfirmPanel({ draft, emptySports, regions, sports }: { draft: Onboardi
   );
 }
 
-function LocationNotice({ location, status }: { location: CurrentLocationDraft | null; status: LocationStatus }) {
+function LocationNotice({ detectedRegion, status }: { detectedRegion: DetectedRegionDraft | null; status: LocationStatus }) {
   if (status === 'requesting') {
-    return <Notice title="현재 위치 확인 중" body="위치 권한을 확인하고 있어요." />;
+    return <Notice title="현재 위치 확인 중" body="브라우저의 위치 권한을 확인하고 있어요." />;
   }
 
   if (status === 'denied') {
-    return <Notice title="위치 권한 거부" body="브라우저에서 위치 권한이 거부됐어요. 지역을 직접 선택해 계속할 수 있어요." tone="orange" />;
+    return <Notice title="위치 권한이 꺼져 있어요" body="브라우저 설정에서 다시 허용하거나 지역을 직접 선택해 계속할 수 있어요." tone="orange" />;
   }
 
   if (status === 'unsupported') {
     return <Notice title="위치 확인 불가" body="이 브라우저에서는 현재 위치 확인을 지원하지 않아요. 지역을 직접 선택해 주세요." tone="orange" />;
   }
 
-  if (status === 'unmatched' && location) {
-    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · 지원 지역과 거리가 멀어 자동 선택하지 않았어요.`} tone="orange" />;
+  if (status === 'unmatched') {
+    return <Notice title="가까운 지역을 찾지 못했어요" body="현재 위치의 좌표는 저장하지 않았어요. 아래에서 활동 지역을 직접 선택해 주세요." tone="orange" />;
   }
 
-  if (location) {
-    return <Notice title="현재 위치 확인 완료" body={`${formatLocation(location)} · ${location.matchedRegionName ?? '가까운 지역'}을 선택했어요.`} tone="green" />;
+  if (detectedRegion) {
+    return <Notice title="현재 위치 확인 완료" body={`${detectedRegion.regionName}을 활동 지역으로 선택했어요. 허용 상태는 브라우저에 유지되지만 좌표는 저장하지 않아요.`} tone="green" />;
   }
 
-  return <Notice title="현재 위치 사용하기" body="현재 위치를 허용하면 가까운 활동 지역을 자동으로 선택해요. 거부해도 직접 선택할 수 있어요." />;
+  return <Notice title="현재 위치로 지역 찾기" body="한 번 허용하면 브라우저가 권한을 기억해요. 좌표는 가까운 지역을 찾을 때만 1회 사용하고 저장하지 않아요." />;
+}
+
+function PushNotice({
+  isSubscribed,
+  permission,
+  requesting,
+}: {
+  isSubscribed: boolean;
+  permission: NotificationPermission | 'unsupported';
+  requesting: boolean;
+}) {
+  if (requesting) {
+    return <Notice title="알림 권한 확인 중" body="브라우저의 알림 권한을 확인하고 있어요." />;
+  }
+
+  if (permission === 'unsupported') {
+    return <Notice title="알림 사용 불가" body="이 브라우저에서는 알림을 지원하지 않아요. 다른 브라우저에서 다시 시도해 주세요." tone="orange" />;
+  }
+
+  if (permission === 'denied') {
+    return <Notice title="알림 권한이 꺼져 있어요" body="브라우저 설정에서 알림을 다시 허용하면 소식을 받을 수 있어요." tone="orange" />;
+  }
+
+  if (isSubscribed) {
+    return <Notice title="알림 받기 완료" body="매칭, 채팅, 경기 결과 소식을 보내드릴게요." tone="green" />;
+  }
+
+  return <Notice title="알림 받기" body="버튼을 누르면 브라우저가 알림 권한을 물어봐요. 언제든 설정에서 끌 수 있어요." />;
 }
 
 function Notice({ body, title, tone = 'blue' }: { body: string; title: string; tone?: 'blue' | 'orange' | 'green' }) {
@@ -605,11 +664,6 @@ function upsertPrimaryRegion(draft: OnboardingDraft, regionId: string | null): O
   };
 }
 
-function formatLocation(location: CurrentLocationDraft) {
-  const accuracy = location.accuracy ? ` · 오차 약 ${Math.round(location.accuracy)}m` : '';
-  return `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}${accuracy}`;
-}
-
 function getBackHref(step: OnboardingRouteStep) {
   if (step === 'sport') return '/signup/complete';
   if (step === 'level') return '/onboarding/sport';
@@ -659,24 +713,15 @@ function sanitizeDraft(raw: Partial<OnboardingDraft> | null | undefined): Onboar
         }))
     : [];
 
-  const location = raw?.currentLocation;
-  const currentLocation =
-    location &&
-    Number.isFinite(location.latitude) &&
-    Number.isFinite(location.longitude) &&
-    typeof location.capturedAt === 'string' &&
-    location.capturedAt.trim()
-      ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: Number.isFinite(location.accuracy) ? location.accuracy : null,
-          capturedAt: location.capturedAt,
-          matchedRegionId: isUuid(location.matchedRegionId) ? location.matchedRegionId : null,
-          matchedRegionName: location.matchedRegionName ?? null,
-        }
-      : null;
+  const detectedRegion = raw?.detectedRegion;
+  const sanitizedDetectedRegion = detectedRegion
+    && isUuid(detectedRegion.regionId)
+    && typeof detectedRegion.regionName === 'string'
+    && detectedRegion.regionName.trim()
+    ? { regionId: detectedRegion.regionId, regionName: detectedRegion.regionName.trim() }
+    : null;
 
-  return { sports, regions, currentLocation };
+  return { sports, regions, detectedRegion: sanitizedDetectedRegion };
 }
 
 function isUuid(value: unknown): value is string {

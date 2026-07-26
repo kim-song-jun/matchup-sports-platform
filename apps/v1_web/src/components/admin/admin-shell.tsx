@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
+import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
 import {
   LayoutDashboard,
   Users,
@@ -13,8 +14,13 @@ import {
   Megaphone,
   PanelsTopLeft,
   MessageSquareText,
+  MessageSquareWarning,
   ClipboardList,
   ShieldCheck,
+  Settings,
+  Send,
+  BellRing,
+  ScrollText,
   ChevronLeft,
   Menu,
   X,
@@ -26,6 +32,10 @@ interface NavItem {
   href: string;
   icon: ReactNode;
   exact?: boolean;
+  /** Numeric pill badge rendered at the end of the link (e.g. pending inquiry count). Hidden when 0/undefined. */
+  badgeCount?: number;
+  /** Accessible description appended to the link's aria-label when badgeCount > 0, e.g. "미확인 문의 3건" */
+  badgeAriaLabel?: string;
 }
 
 const BASE_NAV_ITEMS: NavItem[] = [
@@ -37,8 +47,13 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: '대회', href: '/admin/tournaments', icon: <Medal size={18} /> },
   { label: '공지사항', href: '/admin/notices', icon: <Megaphone size={18} /> },
   { label: '팝업', href: '/admin/popups', icon: <PanelsTopLeft size={18} /> },
+  { label: '약관', href: '/admin/terms', icon: <ScrollText size={18} /> },
   { label: '문의', href: '/admin/inquiries', icon: <MessageSquareText size={18} /> },
   { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
+  { label: '웹 푸시 실패', href: '/admin/ops/push-failures', icon: <BellRing size={18} /> },
+  { label: 'SMS · 인증 실패', href: '/admin/ops/sms-failures', icon: <MessageSquareWarning size={18} /> },
+  { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
+  { label: '웹 푸시 발송', href: '/admin/ops/push-send', icon: <Send size={18} /> },
 ];
 
 const OWNER_NAV_ITEM: NavItem = {
@@ -67,9 +82,17 @@ function useIsActive(pathname: string) {
     item.exact ? pathname === item.href : pathname.startsWith(item.href);
 }
 
-/** Builds the nav list, optionally appending the owner-only item */
-function buildNavItems(canManageAdmins: boolean): NavItem[] {
-  return canManageAdmins ? [...BASE_NAV_ITEMS, OWNER_NAV_ITEM] : BASE_NAV_ITEMS;
+/** Builds the nav list, optionally appending the owner-only item and the "문의" pending-count badge */
+function buildNavItems(canManageAdmins: boolean, pendingInquiryCount?: number): NavItem[] {
+  const items = canManageAdmins ? [...BASE_NAV_ITEMS, OWNER_NAV_ITEM] : [...BASE_NAV_ITEMS];
+  if (typeof pendingInquiryCount === 'number' && pendingInquiryCount > 0) {
+    return items.map((item) =>
+      item.href === '/admin/inquiries'
+        ? { ...item, badgeCount: pendingInquiryCount, badgeAriaLabel: `미확인 문의 ${pendingInquiryCount}건` }
+        : item,
+    );
+  }
+  return items;
 }
 
 /** Current section label derived from pathname (for mobile appbar title) */
@@ -81,12 +104,26 @@ function useSectionLabel(pathname: string, canManageAdmins: boolean): string {
   return match?.label ?? '관리';
 }
 
+/** Numeric pill badge shown at the end of a nav link. Caps the visible number at 99+. */
+function NavBadge({ count }: { count: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-1.5 text-[11px] font-semibold leading-none text-white tabular-nums"
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 // ── Sidebar nav link (desktop) ────────────────────────────────────────────
 function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
+  const hasBadge = typeof item.badgeCount === 'number' && item.badgeCount > 0;
   return (
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
+      aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
       className={[
         'flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm transition-colors border-l-2',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
@@ -99,6 +136,7 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
         {item.icon}
       </span>
       <span>{item.label}</span>
+      {hasBadge && <NavBadge count={item.badgeCount!} />}
     </Link>
   );
 }
@@ -111,13 +149,24 @@ interface DrawerProps {
   adminRoleLabel?: string;
   pathname: string;
   canManageAdmins: boolean;
+  /** Pending (received/reviewing) 문의 count shown as a badge next to the "문의" nav item */
+  pendingInquiryCount?: number;
   /** Ref to the hamburger button — focus is restored here when the drawer closes (WCAG 2.4.3) */
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
-function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageAdmins, triggerRef }: DrawerProps) {
+function Drawer({
+  open,
+  onClose,
+  adminName,
+  adminRoleLabel,
+  pathname,
+  canManageAdmins,
+  pendingInquiryCount,
+  triggerRef,
+}: DrawerProps) {
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(canManageAdmins);
+  const navItems = buildNavItems(canManageAdmins, pendingInquiryCount);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -223,7 +272,7 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageA
           'fixed inset-y-0 left-0 z-50 w-[280px] bg-white flex flex-col',
           'shadow-[4px_0_24px_rgba(20,28,45,0.12)]',
           'transition-transform motion-reduce:transition-none',
-          open ? 'translate-x-0' : '-translate-x-full',
+          open ? 'translate-x-0 visible' : '-translate-x-full invisible',
         ].join(' ')}
       >
         {/* Drawer header */}
@@ -251,11 +300,13 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageA
         <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
+            const hasBadge = typeof item.badgeCount === 'number' && item.badgeCount > 0;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
+                aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
                 onClick={onClose}
                 className={[
                   'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
@@ -269,6 +320,7 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageA
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
+                {hasBadge && <NavBadge count={item.badgeCount!} />}
               </Link>
             );
           })}
@@ -297,7 +349,8 @@ function Drawer({ open, onClose, adminName, adminRoleLabel, pathname, canManageA
 export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmins = false }: AdminShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(canManageAdmins);
+  const { data: pendingInquiries } = useV1AdminInquiriesPendingCount();
+  const navItems = buildNavItems(canManageAdmins, pendingInquiries?.count);
   const sectionLabel = useSectionLabel(pathname, canManageAdmins);
   const [drawerOpen, setDrawerOpen] = useState(false);
   /** Ref for the hamburger button so focus can be restored when the drawer closes (WCAG 2.4.3) */
@@ -362,6 +415,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           adminRoleLabel={adminRoleLabel}
           pathname={pathname}
           canManageAdmins={canManageAdmins}
+          pendingInquiryCount={pendingInquiries?.count}
           triggerRef={hamburgerRef}
         />
       </div>

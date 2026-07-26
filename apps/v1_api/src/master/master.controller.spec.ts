@@ -49,7 +49,11 @@ describe('MasterController', () => {
       distanceMeters: 1200,
     });
 
-    await expect(controller.resolveLocation({ latitude: 37.5172, longitude: 127.0473 })).resolves.toEqual({
+    await expect(controller.resolveLocation({
+      locationConsentAccepted: true,
+      latitude: 37.5172,
+      longitude: 127.0473,
+    })).resolves.toEqual({
       region: { id: 'region-2', code: 'seoul-gangnam', name: '강남구', level: 2 },
       source: 'nearest',
       distanceMeters: 1200,

@@ -2,6 +2,22 @@
 
 풋살/농구/아이스하키/배드민턴 등 생활체육 종목의 개인 및 팀을 AI로 최적 매칭하는 플랫폼.
 
+## Git 브랜치 정책 (Critical — 2026-07-20 갱신, 사용자 재지정)
+
+- **dev → main 승격 절대 금지.** `git push`/`gh pr merge`/`gh pr create --base main` 등 어떤 방식으로든 dev를 main에 승격하지 않는다 — main promotion 자체가 이 프로젝트에서 완전히 폐기된 워크플로다. 사용자 승인 여부와 무관하게 하지 않는다(과거 "사용자 게이트" 조항은 폐기됨).
+- **모든 작업은 `dev`에서만.** 통합 브랜치·배포 트리거 브랜치 모두 `dev` 하나다. 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
+- **`main`은 과거 유산 브랜치일 뿐, 배포와 무관하다.** main에 새 커밋이 생겼다면(다른 세션·실수 등) 그 변경분을 **origin/main → dev로 병합**해 흡수한다(반대 방향 금지). main 자체는 더 이상 갱신·유지하지 않는다.
+- **배포는 dev push가 자동 트리거한다.** `.github/workflows/deploy-alpha.yml`이 `push: branches: [dev]`에 반응해 승인 게이트 없이 자동으로 alpha(alpha.teameet.co.kr)에 배포한다 — dev에 머지하는 즉시 실배포로 이어진다는 뜻이므로, dev 머지 전 검증(테스트·tsc·lint)을 프로덕션 배포 게이트로 취급한다.
+- **`deploy.yml`(main 트리거, `environment: production` 승인 게이트)은 이 정책 하에서 사용하지 않는다.** 존재는 하지만 main에 아무것도 push하지 않으므로 발동하지 않는다.
+- **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다. dev push = 자동 실배포이므로, 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 실제 배포 시점의 코드가 어긋날 위험도 커진다.
+  - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
+
+## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
+
+- **스키마 변경은 반드시 migration 파일 동반.** `prisma db push`로만 dev에 반영하고 migration을 빠뜨리면 prod `migrate deploy`가 깨진다 (실사례: 리뷰 테이블 migration 누락 → 배포 중단·서비스 장애).
+- **CI가 강제한다**: test job의 "V1 migration replay + drift gate"가 ① 빈 DB에 마이그레이션 전체 체인 재생 ② `schema.prisma` 드리프트 0을 검증 — 어느 쪽이 깨져도 CI red.
+- 수동 SQL로 dev에 먼저 적용한 경우: 같은 내용을 **idempotent migration**(IF NOT EXISTS/가드)으로 작성하고 dev에는 `prisma migrate resolve --applied`로 박제한다.
+
 ## Core Engineering Principles
 
 이 프로젝트의 모든 변경에는 아래 7개 원칙이 엄격히 적용됩니다.
@@ -144,6 +160,8 @@ infra/
 | Redis | 6379 | 컨테이너 내부만 |
 
 > **주의**: dev 와 prod 의 API 포트(8111 vs 8100) · Web 포트(3003 vs 3000) 가 다릅니다. 주요 설정 위치: `apps/api/src/config/configuration.ts` (`API_PORT || 8111`), `apps/web/next.config.ts` (`http://localhost:8111` dev / `http://api:8100` prod), `docker-compose.yml` (dev), `deploy/docker-compose.prod.yml` (prod).
+
+> **로컬 dev 서버는 항상 web·api 각 1개 쌍만 유지한다.** 여러 worktree/에이전트가 검증 목적으로 임시 서버(`pnpm --filter v1_web dev`, `pnpm --filter v1_api dev` 등)를 추가로 띄우기 쉬운데, 검증이 끝나면 즉시 종료해야 한다 — 방치하면 포트가 계속 늘어나고(예: 위 포트 맵과 별개인 v1 스택 기준 — web 3013 외 3014/3016/3020/3021, api 8121 외 8122/8123/8221 등) 어떤 프로세스가 실제로 쓰이는지 혼선이 생긴다. 새로 서버를 띄우기 전에 `lsof -nP -iTCP -sTCP:LISTEN | grep -E ':(3003|3013|301[4-9]|302[0-9]|8100|8111|812[0-9]|822[0-9])'`로(단순 `grep node`는 VS Code·다른 프로젝트의 무관한 Node 프로세스까지 잡혀 잘못된 PID를 kill할 위험이 있다 — 이 프로젝트의 기본 포트뿐 아니라 앞서 예시로 든 드리프트 포트 대역까지 포함해 필터링한다) 기존에 이 프로젝트용으로 떠 있는 프로세스(PID 포함)가 있는지 먼저 확인하고, 있으면 그걸 재사용한다. 부득이하게 별도 포트로 임시 서버를 띄웠다면(예: PR 검증용 격리 worktree), 검증이 끝나는 즉시 위 `lsof` 결과의 PID로 `kill <PID>`해서 정리한다.
 
 ## 개발 명령어
 
@@ -511,7 +529,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 1. **커밋은 내 파일만 pathspec** + 직후 `git show --stat HEAD` 검증. 완료 보고 전 게이트 = `tsc 0` + 테스트 + (시각 변경이면) **라이브 스크린샷**.
 2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer` (REST `requested_reviewers`는 422). 도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은 **적대적 검증으로 real만 수정**(Copilot도 틀림, 예: RQ `partialMatchKey` 빈 객체 부분일치). 스레드는 GraphQL `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve. **`generated no new comments`(clean) 나올 때까지 반복.**
 3. **300-파일 한도**: 변경 파일 300개 초과 시 Copilot 리뷰 거부. 커밋된 스크린샷 PNG가 원인이면 **트리에서 `git rm`** — 갤러리 코멘트는 **SHA 고정 raw URL**(`raw.githubusercontent.com/<owner>/<repo>/<SHA>/...`)이라 그대로 렌더된다.
-4. **시각 검증/스크린샷**: v1 스택 기동(DB `teameet_v1_pg`:5432 + `apps/v1_api`:8121 + web:3013) 후 **헤더 dev 인증**(localStorage `teameet.v1.userId`/`userEmail` → `x-v1-user-*` 헤더)으로 Playwright 캡처. **캡처 스크립트는 `scripts/` 내부**(`/tmp`는 모듈 해석 실패). 갤러리는 페이지별 **📱mobile 390 / 📲tablet 768 / 🖥desktop 1440** 3열 + raw URL 200 확인 후 코멘트 게시.
+4. **시각 검증/스크린샷 — UI 변경 PR은 예외 없이 필수**: 화면 마크업·레이아웃·스타일이 조금이라도 바뀐 PR은 **반드시** 📱mobile 390 / 📲tablet 768 / 🖥desktop 1440 3폭 스크린샷 갤러리를 PR 코멘트로 첨부한다 — "커밋만 하고 스크린샷은 생략"은 완료가 아니다(로직/백엔드 전용 PR은 대상 아님). v1 스택 기동(DB `teameet_v1_pg`:5432 + `apps/v1_api`:8121 + web:3013) 후 **헤더 dev 인증**(localStorage `teameet.v1.userId`/`userEmail` → `x-v1-user-*` 헤더)으로 Playwright 캡처. **캡처 스크립트는 `scripts/` 내부**(`/tmp`는 모듈 해석 실패). 갤러리는 페이지별 **📱mobile 390 / 📲tablet 768 / 🖥desktop 1440** 3열 + raw URL 200 확인 후 코멘트 게시. PR을 이미 올린 뒤 UI 변경을 뒤늦게 인지했다면 그 PR에 갤러리 코멘트를 추가로 게시해 채운다.
 5. **전체 검수/피드백**은 built-in `Workflow`(ultracode) 8차원 적대 검증으로(= evidence-producing; `/agent-all`은 본 레포 Phase 0 전제 미충족). 모델 배정은 글로벌 규칙 11(결정=opus/fable, 실행=sonnet).
 6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`. 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
 

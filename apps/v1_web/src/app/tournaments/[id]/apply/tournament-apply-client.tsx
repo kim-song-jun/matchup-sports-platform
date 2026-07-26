@@ -2,21 +2,42 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { UsersRound } from 'lucide-react';
+import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
+import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
+import { SponsorLogoStrip } from '@/components/tournaments/tournament-sponsor-logo-strip';
 import {
   useV1Tournament,
   useV1MyTeams,
   useV1MyRegistrations,
+  useV1Registration,
   useV1CreateRegistration,
   useV1SubmitRegistration,
+  useV1AuthMe,
+  useV1CurrentTerms,
 } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
-import { publicAssetPath } from '@/lib/assets';
 import { appRoute } from '@/lib/app-route';
 import { formatEntryFee } from '@/lib/date-utils';
-import type { V1MyTeam, V1TournamentDetail, V1TournamentPaymentMethod, V1TournamentRegistration } from '@/types/api';
+import {
+  filterTournamentTeamsBySport,
+  getTournamentTeamEmptyState,
+} from '@/lib/tournament-team-eligibility';
+import type {
+  V1MyTeam,
+  V1TournamentDetail,
+  V1TournamentPaymentMethod,
+  V1TournamentRegistration,
+  V1TournamentRegistrationStatus,
+  V1TournamentPaymentInstructions,
+  V1CurrentTermsItem,
+} from '@/types/api';
 
 /* ── Helpers ── */
 
@@ -35,6 +56,24 @@ const STEPS: Array<{ id: ApplyStep; label: string }> = [
   { id: 'payment', label: '결제 안내' },
 ];
 
+/** 위저드로 복원 가능한 단계 (팀 선택은 registration 없이 시작하는 최초 진입점이라 제외). */
+type ResumableApplyStep = Extract<ApplyStep, 'agreements' | 'payment'>;
+
+/**
+ * P1-5: registration.status → 위저드 재진입 시 복원 동작 일반화.
+ * draft → 2단계(동의), awaiting_payment/payment_checking/paid → 3단계(입금 안내) 복원,
+ * confirmed/waitlisted/cancel_requested → 위저드 대신 내 신청 현황으로 리다이렉트,
+ * cancelled → 복원 대상 아님(새로 신청 가능).
+ */
+function resolveRegistrationResumeAction(
+  status: V1TournamentRegistrationStatus,
+): ResumableApplyStep | 'redirect' | null {
+  if (status === 'draft') return 'agreements';
+  if (status === 'awaiting_payment' || status === 'payment_checking' || status === 'paid') return 'payment';
+  if (status === 'confirmed' || status === 'waitlisted' || status === 'cancel_requested') return 'redirect';
+  return null;
+}
+
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
   const currentLabel = STEPS[currentIndex]?.label ?? '';
@@ -48,7 +87,7 @@ function StepIndicator({ current }: { current: ApplyStep }) {
         aria-atomic="true"
         className="sr-only"
       >
-        {`${currentIndex + 1}단계 중 ${STEPS.length}단계: ${currentLabel}`}
+        {`${STEPS.length}단계 중 ${currentIndex + 1}단계: ${currentLabel}`}
       </span>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <span className="tm-badge tm-badge-blue">{`${currentIndex + 1}/${STEPS.length} 단계`}</span>
@@ -211,6 +250,7 @@ function DesktopRailSummary({
 function TeamSelectStep({
   tournament,
   teams,
+  hasAnyTeam,
   registrations,
   isLoadingTeams,
   selectedTeamId,
@@ -221,6 +261,7 @@ function TeamSelectStep({
 }: {
   tournament: V1TournamentDetail;
   teams: V1MyTeam[];
+  hasAnyTeam: boolean;
   registrations: V1TournamentRegistration[];
   isLoadingTeams: boolean;
   selectedTeamId: string;
@@ -231,9 +272,10 @@ function TeamSelectStep({
 }) {
   const managerTeams = teams.filter((t) => t.role === 'owner' || t.role === 'manager');
   const hasManagerTeam = managerTeams.length > 0;
+  const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
 
   return (
-    <div style={{ padding: '0 20px 120px' }}>
+    <div style={{ padding: '0 20px 168px' }}>
       <section aria-labelledby="team-select-heading" style={{ marginTop: 20 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="team-select-heading" title="참가 팀 선택" />
@@ -256,24 +298,15 @@ function TeamSelectStep({
             ))}
           </div>
         ) : teams.length === 0 ? (
-          <Card pad={16} style={{ background: 'var(--grey50)' }}>
-            <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-              소속 팀이 없어요
-            </div>
-            <p
-              className="tm-text-caption"
-              style={{ marginTop: 6, lineHeight: 1.6, color: 'var(--text-muted)' }}
-            >
-              팀을 먼저 만들고 참가 신청을 해주세요.
-            </p>
-            <Link
-              href="/teams/new"
-              className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
-              style={{ marginTop: 14 }}
-            >
-              팀 만들기
-            </Link>
-          </Card>
+          <div className="tm-tournament-registration-empty">
+            <EmptyState
+              title={emptyState.title}
+              sub={emptyState.description}
+              cta="팀 만들기"
+              onCta={() => { window.location.href = '/teams/new'; }}
+              icon={<UsersRound size={36} strokeWidth={1.5} />}
+            />
+          </div>
         ) : (
           <div
             role="radiogroup"
@@ -310,30 +343,7 @@ function TeamSelectStep({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {/* Team logo placeholder */}
-                      <div
-                        aria-hidden="true"
-                        style={{
-                          flexShrink: 0,
-                          width: 40,
-                          height: 40,
-                          borderRadius: 14,
-                          background: 'var(--grey100)',
-                          overflow: 'hidden',
-                          display: 'grid',
-                          placeItems: 'center',
-                          color: 'var(--text-caption)',
-                          fontSize: 'var(--font-size-body-lg)',
-                        }}
-                      >
-                        {team.logoUrl ? (
-                          <img src={publicAssetPath(team.logoUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-caption)' }}>
-                            {team.name?.charAt(0)}
-                          </span>
-                        )}
-                      </div>
+                      <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <span
@@ -557,6 +567,7 @@ function ExpandableCheckRow({
 /* ── Step 2: Agreements + payment method ── */
 
 type AgreementsState = {
+  acceptedTermsDocumentIds: string[];
   agreedRules: boolean;
   agreedPrivacy: boolean;
   agreedRefund: boolean;
@@ -843,6 +854,7 @@ function AgreementsStep({
   onSubmit,
   isSubmitting,
   error,
+  terms,
 }: {
   tournament: V1TournamentDetail;
   selectedTeam: V1MyTeam | undefined;
@@ -852,15 +864,27 @@ function AgreementsStep({
   onSubmit: () => void;
   isSubmitting: boolean;
   error: string | null;
+  terms: V1CurrentTermsItem[];
 }) {
   const [activeConsentDocument, setActiveConsentDocument] = useState<TournamentConsentDocument | null>(null);
-  const allRequired = state.agreedRules && state.agreedPrivacy && state.agreedRefund;
-  const allAgreed = allRequired && state.agreedMediaConsent;
+  const stateKeyByCode = {
+    tournament_rules: 'agreedRules',
+    tournament_privacy: 'agreedPrivacy',
+    tournament_refund: 'agreedRefund',
+    tournament_media: 'agreedMediaConsent',
+  } as const;
+  const visibleTerms = terms;
+  const isChecked = (term: V1CurrentTermsItem) =>
+    (state.acceptedTermsDocumentIds ?? []).includes(term.documentId);
+  const allRequired = visibleTerms.length > 0
+    && visibleTerms.filter((term) => term.requirement === 'required').every(isChecked);
+  const allAgreed = visibleTerms.length > 0 && visibleTerms.every(isChecked);
   const bankTransferValid =
     state.paymentMethod !== 'bank_transfer' || state.depositorName.trim().length > 0;
   const canSubmit = allRequired && bankTransferValid;
   const toggleAllAgreements = (checked: boolean) => {
     onChange({
+      acceptedTermsDocumentIds: checked ? visibleTerms.map((term) => term.documentId) : [],
       agreedRules: checked,
       agreedPrivacy: checked,
       agreedRefund: checked,
@@ -883,50 +907,31 @@ function AgreementsStep({
             checked={allAgreed}
             onChange={toggleAllAgreements}
           />
-          <ExpandableCheckRow
-            id="agree-rules"
-            label="대회 규정 및 안내사항 동의"
-            consentType="required"
-            summary="참가 자격, 경기 운영, 노쇼, 실격, 허위 신분 제출 금지에 대한 동의입니다."
-            checked={state.agreedRules}
-            onChange={(v) => onChange({ agreedRules: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.rules}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
-          <ExpandableCheckRow
-            id="agree-privacy"
-            label="대회 참가 개인정보 수집·이용 동의"
-            consentType="required"
-            summary="대회 참가자 확인 및 참가 자격 검토를 위한 동의입니다."
-            checked={state.agreedPrivacy}
-            onChange={(v) => onChange({ agreedPrivacy: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.privacy}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
-          <ExpandableCheckRow
-            id="agree-refund"
-            label="참가비 입금·취소·환불 정책 동의"
-            consentType="required"
-            summary="입금 기한, 신청 취소, 환불 기준에 대한 동의입니다."
-            checked={state.agreedRefund}
-            onChange={(v) => onChange({ agreedRefund: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.refund}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
-          <ExpandableCheckRow
-            id="agree-media"
-            label="사진·영상 촬영 및 홍보 활용 동의"
-            consentType="optional"
-            summary="대회 기록, 홍보 콘텐츠, 협찬사 결과 보고에 활용될 수 있습니다."
-            checked={state.agreedMediaConsent}
-            onChange={(v) => onChange({ agreedMediaConsent: v })}
-            document={TOURNAMENT_CONSENT_DOCUMENTS.media}
-            onOpenDocument={setActiveConsentDocument}
-            divider
-          />
+          {visibleTerms.map((term) => {
+            const stateKey = stateKeyByCode[term.code as keyof typeof stateKeyByCode];
+            return (
+              <ExpandableCheckRow
+                key={term.documentId}
+                id={`agree-${term.code}`}
+                label={term.title}
+                consentType={term.requirement === 'required' ? 'required' : 'optional'}
+                summary={term.subtitle ?? term.changeSummary ?? `${term.version} 약관`}
+                checked={isChecked(term)}
+                onChange={(value) => {
+                  const acceptedTermsDocumentIds = value
+                    ? [...new Set([...(state.acceptedTermsDocumentIds ?? []), term.documentId])]
+                    : (state.acceptedTermsDocumentIds ?? []).filter((id) => id !== term.documentId);
+                  onChange({
+                    acceptedTermsDocumentIds,
+                    ...(stateKey ? { [stateKey]: value } : {}),
+                  });
+                }}
+                document={{ title: term.title, body: term.content }}
+                onOpenDocument={setActiveConsentDocument}
+                divider
+              />
+            );
+          })}
         </Card>
       </section>
 
@@ -1236,21 +1241,34 @@ function TournamentSubmitConfirmDialog({
 function PaymentGuideStep({
   tournament,
   registrationId,
+  paymentDueAt,
+  initialPaymentInstructions,
+  onBack,
 }: {
   tournament: V1TournamentDetail;
   registrationId: string;
+  paymentDueAt: string | null;
+  initialPaymentInstructions: V1TournamentPaymentInstructions | null;
+  onBack: () => void;
 }) {
-  const hasBankInfo =
-    Boolean(tournament.bankName) &&
-    Boolean(tournament.bankAccount) &&
-    Boolean(tournament.bankHolder);
+  // P0: 방금 제출한 입금자명을 모바일에서도 재확인할 수 있게 배선 (입금자명 불일치 = 자동취소 정책)
+  const { data: registration } = useV1Registration(tournament.id, registrationId);
+  const paymentInstructions =
+    registration?.paymentInstructions ?? initialPaymentInstructions;
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
+  const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
+  const rosterNextStep = getTournamentRosterNextStep({
+    tournamentId: tournament.id,
+    registrationId,
+    minPlayers: tournament.minPlayers,
+    maxPlayers: tournament.maxPlayers,
+  });
 
   function handleCopyAccount() {
-    if (!tournament.bankAccount) return;
-    navigator.clipboard.writeText(tournament.bankAccount).then(() => {
+    if (!paymentInstructions?.bankAccount) return;
+    navigator.clipboard.writeText(paymentInstructions.bankAccount).then(() => {
       if (copyLiveRef.current) {
         copyLiveRef.current.textContent = '계좌번호를 복사했어요.';
         setTimeout(() => {
@@ -1308,9 +1326,9 @@ function PaymentGuideStep({
           <SectionTitle id="bank-guide-heading" title="입금 안내" />
         </div>
         <Card pad={0} style={{ marginTop: 8 }}>
-          {hasBankInfo ? (
+          {paymentInstructions ? (
             <div style={{ padding: '0 16px' }}>
-              <InfoRow label="은행" value={tournament.bankName!} />
+              <InfoRow label="은행" value={paymentInstructions.bankName} />
               {/* Account number row with copy button */}
               <div
                 className="tm-info-row"
@@ -1324,61 +1342,82 @@ function PaymentGuideStep({
                     className="tm-text-label"
                     style={{ color: 'var(--text-strong)', textAlign: 'right' }}
                   >
-                    {tournament.bankAccount}
+                    {paymentInstructions.bankAccount}
                   </span>
                   <button
                     type="button"
                     className="tm-btn tm-btn-sm tm-btn-outline"
                     onClick={handleCopyAccount}
-                    aria-label={`계좌번호 ${tournament.bankAccount} 복사`}
+                    aria-label={`계좌번호 ${paymentInstructions.bankAccount} 복사`}
                     style={{ flexShrink: 0 }}
                   >
                     복사
                   </button>
                 </div>
               </div>
-              <InfoRow label="예금주" value={tournament.bankHolder!} />
+              <InfoRow label="예금주" value={paymentInstructions.bankHolder} />
+              <InfoRow label="입금액" value={formatEntryFee(tournament.entryFee)} />
               <InfoRow
-                label="입금액"
-                value={formatEntryFee(tournament.entryFee)}
-                isLast
+                label="입금자명"
+                value={registration?.depositorName ?? '—'}
+                isLast={!paymentDeadline}
               />
+              {paymentDeadline ? (
+                <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
+              ) : null}
             </div>
           ) : (
             <div style={{ padding: '0 16px 14px' }}>
               <AlertBanner
-                tone="info"
-                message="신청했어요. 계좌 정보는 확인 후 알림으로 안내드릴게요."
+                tone="error"
+                message="입금 계좌가 준비되지 않았어요. 자동 취소 전에 운영팀에 문의해 주세요."
               />
               <div style={{ marginTop: 10 }}>
                 <InfoRow
                   label="입금액"
                   value={formatEntryFee(tournament.entryFee)}
-                  isLast
+                  isLast={!paymentDeadline}
                 />
+                {paymentDeadline ? (
+                  <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
+                ) : null}
               </div>
             </div>
           )}
         </Card>
 
         <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <h2 className="tm-text-label" style={{ margin: 0, color: 'var(--text-strong)', fontWeight: 700 }}>
-              대회 신청이 접수되었습니다.
-            </h2>
-            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-              <p style={{ margin: 0 }}>아직 참가가 확정된 상태는 아닙니다.</p>
-              <p style={{ margin: '8px 0 0' }}>
-                안내된 계좌로 참가비를 입금해 주세요.
-                <br />
-                입금 확인이 완료되면 참가가 최종 확정됩니다.
-              </p>
-              <p style={{ margin: '8px 0 0' }}>
-                신청 후 2시간 이내에 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
-              </p>
-            </div>
-          </div>
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+            {paymentDeadline
+              ? `${paymentDeadline.message} 입금자명이 다르면 확인이 늦어질 수 있어요.`
+              : '입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.'}
+          </p>
         </Card>
+
+        <section aria-labelledby="roster-next-step-heading" style={{ marginTop: 12, scrollMarginBottom: 144 }}>
+          <Card pad={14}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div id="roster-next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+                  {rosterNextStep.title}
+                </div>
+                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, margin: '4px 0 0' }}>
+                  {rosterNextStep.body}
+                </p>
+              </div>
+              <span className="tm-badge tm-badge-grey" style={{ whiteSpace: 'nowrap' }}>
+                {rosterNextStep.rosterRangeLabel}
+              </span>
+            </div>
+            <Link
+              href={rosterNextStep.href}
+              className="tm-btn tm-btn-md tm-btn-neutral"
+              style={{ marginTop: 12 }}
+            >
+              {rosterNextStep.ctaLabel}
+            </Link>
+          </Card>
+        </section>
       </section>
 
       {/* Fixed CTA — hidden on desktop (rail takes over) */}
@@ -1414,7 +1453,6 @@ function LoadingSkeleton() {
 
 export function TournamentApplyPageClient({ tournamentId }: { tournamentId: string }) {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedTeamId = searchParams.get('team') ?? '';
   const hubHref = `/tournaments/${tournamentId}/my`;
@@ -1423,14 +1461,23 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
+  const tournamentTerms = useV1CurrentTerms('tournament_application');
+  const authMe = useV1AuthMe();
+  // undefined = 아직 모름(로딩 중이라 막지 않는다), false = 미인증으로 확인됨.
+  const phoneVerified = authMe.data?.verification?.phoneVerified;
 
   const myTeams = normalizeMyTeams(myTeamsData) ?? [];
-  const managerTeams = myTeams.filter((team) => team.role === 'owner' || team.role === 'manager');
+  const eligibleTeams = tournament
+    ? filterTournamentTeamsBySport(myTeams, tournament.sportId)
+    : [];
+  const managerTeams = eligibleTeams.filter((team) => team.role === 'owner' || team.role === 'manager');
 
   const [step, setStep] = useState<ApplyStep>('team');
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const [paymentDueAt, setPaymentDueAt] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<AgreementsState>({
+    acceptedTermsDocumentIds: [],
     agreedRules: false,
     agreedPrivacy: false,
     agreedRefund: false,
@@ -1440,9 +1487,52 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [submittedPaymentInstructions, setSubmittedPaymentInstructions] =
+    useState<V1TournamentPaymentInstructions | null>(null);
+  // P1-5: 위저드로 되돌릴 수 없는 상태(confirmed 등)를 감지해 /my 로 리다이렉트하는 동안 1단계가 잠깐 보이는 깜빡임 방지
+  const [isRedirectingAway, setIsRedirectingAway] = useState(false);
+
+  // P0: 동의·입금자명 입력을 registration 단위로 보존 — 새로고침/이탈 후 재진입 시 복원
+  const agreementsDraftKey = registrationId ? `teameet.v1.applyDraft.${registrationId}` : null;
+  useEffect(() => {
+    if (!agreementsDraftKey) return;
+    try {
+      const raw = window.sessionStorage.getItem(agreementsDraftKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Partial<AgreementsState>;
+      setAgreements((prev) => ({ ...prev, ...saved }));
+    } catch {
+      // 저장값 손상 시 조용히 무시 — 새 입력으로 진행
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agreementsDraftKey]);
+  useEffect(() => {
+    if (!agreementsDraftKey) return;
+    const timer = setTimeout(() => {
+      try {
+        window.sessionStorage.setItem(agreementsDraftKey, JSON.stringify(agreements));
+      } catch {
+        // 스토리지 실패는 UX에 치명적이지 않음
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [agreements, agreementsDraftKey]);
 
   const createRegistration = useV1CreateRegistration(tournamentId);
   const submitRegistration = useV1SubmitRegistration(tournamentId, registrationId ?? '');
+  const createBusyRef = useRef(false);
+  const submitBusyRef = useRef(false);
+
+  // P0: 입금자명 prefill — 정책상 팀명/신청자명 일치 요구. 비어 있을 때만 선택 팀명으로 채움
+  useEffect(() => {
+    if (step !== 'agreements') return;
+    if (agreements.depositorName.trim()) return;
+    const team = managerTeams.find((t) => t.teamId === selectedTeamId);
+    if (team?.name) {
+      setAgreements((prev) => (prev.depositorName.trim() ? prev : { ...prev, depositorName: team.name.slice(0, 20) }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, selectedTeamId]);
 
   // Auto-select first manager team
   useEffect(() => {
@@ -1452,31 +1542,50 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     if (first) setSelectedTeamId(first.teamId);
   }, [managerTeams, requestedTeamId, selectedTeamId]);
 
+  // P1-5: 위저드 재진입 자동 스킵 일반화 — 매니저 팀이 여럿이어도 진행 중 registration을 우선 복원한다.
+  // 여러 팀에 진행 중 registration이 있으면 가장 최근에 갱신된 것을 복원 대상으로 삼는다.
   useEffect(() => {
     if (requestedTeamId) return;
-    if (registrationId || myRegistrations.length !== 1) return;
-    if (managerTeams.length !== 1) return;
+    if (registrationId) return;
+    if (loadingTeams || loadingMyRegistrations) return;
 
-    const registration = myRegistrations[0];
-    if (registration.status === 'draft') {
-      setRegistrationId(registration.id);
-      setSelectedTeamId(registration.teamId);
-      setStep('agreements');
+    const managerTeamIds = new Set(managerTeams.map((team) => team.teamId));
+    const myManagedRegistrations = myRegistrations
+      .filter((reg) => managerTeamIds.has(reg.teamId))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+    const inProgress = myManagedRegistrations.find((reg) => {
+      const action = resolveRegistrationResumeAction(reg.status);
+      return action === 'agreements' || action === 'payment';
+    });
+
+    if (inProgress) {
+      const action = resolveRegistrationResumeAction(inProgress.status) as ResumableApplyStep;
+      setSelectedTeamId(inProgress.teamId);
+      setRegistrationId(inProgress.id);
+      setStep(action);
       setSubmitError(null);
       return;
     }
 
-    if (
-      registration.status === 'awaiting_payment' &&
-      registration.payment?.method === 'bank_transfer' &&
-      registration.payment.status === 'ready'
-    ) {
-      setRegistrationId(registration.id);
-      setSelectedTeamId(registration.teamId);
-      setStep('payment');
-      setSubmitError(null);
+    const needsRedirect = myManagedRegistrations.find(
+      (reg) => resolveRegistrationResumeAction(reg.status) === 'redirect',
+    );
+
+    if (needsRedirect) {
+      setIsRedirectingAway(true);
+      router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${needsRedirect.id}`));
     }
-  }, [managerTeams.length, myRegistrations, registrationId, requestedTeamId]);
+  }, [
+    loadingMyRegistrations,
+    loadingTeams,
+    managerTeams,
+    myRegistrations,
+    registrationId,
+    requestedTeamId,
+    router,
+    tournamentId,
+  ]);
 
   useEffect(() => {
     if (!requestedTeamId || loadingTeams || loadingMyRegistrations) return;
@@ -1495,25 +1604,19 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     setSubmitError(null);
 
     if (registration) {
-      if (registration.status === 'draft') {
+      const action = resolveRegistrationResumeAction(registration.status);
+      if (action === 'agreements' || action === 'payment') {
         setRegistrationId(registration.id);
-        setStep('agreements');
+        setStep(action);
         return;
       }
-      if (
-        registration.status === 'awaiting_payment' &&
-        registration.payment?.method === 'bank_transfer' &&
-        registration.payment.status === 'ready'
-      ) {
+      if (action === 'redirect') {
         setRegistrationId(registration.id);
-        setStep('payment');
+        setIsRedirectingAway(true);
+        router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`));
         return;
       }
-      if (registration.status !== 'cancelled') {
-        setRegistrationId(registration.id);
-        window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`, pathname));
-        return;
-      }
+      // action === null (cancelled) → 새 신청으로 진행
     }
 
     setRegistrationId(null);
@@ -1523,12 +1626,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     loadingTeams,
     managerTeams,
     myRegistrations,
-    pathname,
     requestedTeamId,
+    router,
     tournamentId,
   ]);
 
-  const selectedTeam = myTeams.find((t) => t.teamId === selectedTeamId);
+  const selectedTeam = eligibleTeams.find((t) => t.teamId === selectedTeamId);
   const selectedRegistration = myRegistrations.find((item) => item.teamId === selectedTeamId);
 
   function handleSelectTeam(teamId: string) {
@@ -1538,15 +1641,23 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     setSubmitError(null);
   }
 
-  const allRequiredAgreed = agreements.agreedRules && agreements.agreedPrivacy && agreements.agreedRefund;
+  const allRequiredAgreed = (tournamentTerms.data?.items ?? [])
+    .filter((term) => term.requirement === 'required')
+    .every((term) => (agreements.acceptedTermsDocumentIds ?? []).includes(term.documentId));
   const bankTransferValid =
     agreements.paymentMethod !== 'bank_transfer' || agreements.depositorName.trim().length > 0;
-  const canSubmitAgreements = allRequiredAgreed && bankTransferValid;
+  const requiredTournamentTerms = tournamentTerms.data?.items.filter(
+    (term) => term.requirement === 'required',
+  ) ?? [];
+  const canSubmitAgreements = allRequiredAgreed
+    && bankTransferValid
+    && tournamentTerms.data?.ready === true
+    && requiredTournamentTerms.length > 0;
 
   const isCreating = createRegistration.isPending;
   const isSubmittingApplication = createRegistration.isPending || submitRegistration.isPending;
 
-  if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams)) {
+  if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams) || isRedirectingAway) {
     return (
       <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
         <LoadingSkeleton />
@@ -1564,6 +1675,36 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 14 }}
+          >
+            대회 상세로 돌아가기
+          </Link>
+        </div>
+      </AppChrome>
+    );
+  }
+
+  // 대회 신청은 본인확인이 전제다(서버도 submit에서 403 PHONE_NOT_VERIFIED로 막는다).
+  // 이미 인증한 사용자는 이 화면을 보지 않고 그대로 통과하고, 미인증이면 인증 화면으로 보낸 뒤
+  // 인증이 끝나면 이 신청 화면으로 정확히 되돌아오게 한다.
+  if (phoneVerified === false) {
+    return (
+      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments">
+        <div style={{ padding: '0 20px', marginTop: 24 }}>
+          <AlertBanner
+            message="대회 신청은 휴대폰 본인인증을 마친 계정만 할 수 있어요. 인증 후 이 화면으로 돌아옵니다."
+            tone="info"
+          />
+          <Link
+            href={buildPhoneVerifyHref(`/tournaments/${tournamentId}/apply`)}
+            className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+            style={{ marginTop: 14 }}
+          >
+            본인인증 하러 가기
+          </Link>
+          <Link
+            href={`/tournaments/${tournamentId}`}
+            className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 10 }}
           >
             대회 상세로 돌아가기
           </Link>
@@ -1594,54 +1735,62 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   }
 
   async function handleTeamNext() {
+    if (createBusyRef.current || isCreating) return;
     if (!selectedTeamId) return;
-    if (selectedRegistration?.status === 'awaiting_payment' &&
-      selectedRegistration.payment?.method === 'bank_transfer' &&
-      selectedRegistration.payment.status === 'ready') {
-      setRegistrationId(selectedRegistration.id);
-      setStep('payment');
-      setSubmitError(null);
-      return;
-    }
-    if (selectedRegistration && selectedRegistration.status !== 'draft' && selectedRegistration.status !== 'cancelled') {
-      window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${selectedRegistration.id}`, pathname));
-      return;
+    if (selectedRegistration) {
+      const action = resolveRegistrationResumeAction(selectedRegistration.status);
+      if (action === 'agreements' || action === 'payment') {
+        setRegistrationId(selectedRegistration.id);
+        setStep(action);
+        setSubmitError(null);
+        return;
+      }
+      if (action === 'redirect') {
+        setRegistrationId(selectedRegistration.id);
+        setIsRedirectingAway(true);
+        router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${selectedRegistration.id}`));
+        return;
+      }
+      // action === null (cancelled) → 새 신청으로 진행
     }
     if (registrationId && selectedRegistration?.id === registrationId) {
       setStep('agreements');
       return;
     }
     setSubmitError(null);
+    createBusyRef.current = true;
     try {
       const reg = await createRegistration.mutateAsync({ teamId: selectedTeamId });
       setRegistrationId(reg.id);
-      if (reg.status === 'draft') {
-        setStep('agreements');
+      const action = resolveRegistrationResumeAction(reg.status);
+      if (action === 'agreements' || action === 'payment') {
+        setStep(action);
         return;
       }
-      if (
-        reg.status === 'awaiting_payment' &&
-        reg.payment?.method === 'bank_transfer' &&
-        reg.payment.status === 'ready'
-      ) {
-        setStep('payment');
+      if (action === 'redirect') {
+        setIsRedirectingAway(true);
+        router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${reg.id}`));
         return;
       }
-      window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${reg.id}`, pathname));
+      window.location.assign(appRoute(`/tournaments/${tournamentId}/my?reg=${reg.id}`));
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '신청을 시작하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+    } finally {
+      createBusyRef.current = false;
     }
   }
 
   async function handleAgreementsSubmit() {
-    if (!selectedTeamId) return;
+    if (submitBusyRef.current || !selectedTeamId) return;
+    submitBusyRef.current = true;
     setSubmitError(null);
     try {
       const targetRegistrationId = registrationId
         ?? (await createRegistration.mutateAsync({ teamId: selectedTeamId })).id;
       setRegistrationId(targetRegistrationId);
-      await submitRegistration.mutateAsync({
+      const submittedRegistration = await submitRegistration.mutateAsync({
         registrationIdOverride: targetRegistrationId,
+        termsDocumentIds: agreements.acceptedTermsDocumentIds ?? [],
         paymentMethod: agreements.paymentMethod,
         depositorName: agreements.paymentMethod === 'bank_transfer' ? agreements.depositorName : undefined,
         agreedRules: agreements.agreedRules,
@@ -1649,9 +1798,14 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         agreedRefund: agreements.agreedRefund,
         agreedMediaConsent: agreements.agreedMediaConsent,
       });
+      setPaymentDueAt(submittedRegistration.payment?.paymentDueAt ?? null);
+      setSubmittedPaymentInstructions(submittedRegistration.paymentInstructions);
+      trackEvent('tournament_apply_complete', { tournamentId });
       setStep('payment');
     } catch (err) {
       setSubmitError(extractErrorMessage(err, '신청 제출 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요.'));
+    } finally {
+      submitBusyRef.current = false;
     }
   }
 
@@ -1661,13 +1815,13 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   }
 
   function confirmAgreementsSubmit() {
-    if (isSubmittingApplication) return;
+    if (submitBusyRef.current || isSubmittingApplication) return;
     void handleAgreementsSubmit().finally(() => setSubmitConfirmOpen(false));
   }
 
   function handleAgreementsBack() {
     if (requestedTeamId) {
-      router.push(appRoute(hubHref, pathname));
+      router.push(appRoute(hubHref));
       return;
     }
     setStep('team');
@@ -1694,7 +1848,8 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 ) : null}
                 <TeamSelectStep
                   tournament={tournament}
-                  teams={myTeams}
+                  teams={eligibleTeams}
+                  hasAnyTeam={myTeams.length > 0}
                   registrations={myRegistrations}
                   isLoadingTeams={loadingTeams}
                   selectedTeamId={selectedTeamId}
@@ -1713,12 +1868,27 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 onBack={handleAgreementsBack}
                 onSubmit={requestAgreementsSubmit}
                 isSubmitting={isSubmittingApplication}
-                error={submitError}
+                error={
+                  submitError
+                  ?? (tournamentTerms.isError
+                    ? '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+                    : tournamentTerms.data && !tournamentTerms.data.ready
+                      ? '현재 대회 필수 약관이 준비되지 않아 신청할 수 없어요.'
+                      : null)
+                }
+                terms={tournamentTerms.data?.items ?? []}
               />
             ) : registrationId ? (
               <PaymentGuideStep
                 tournament={tournament}
                 registrationId={registrationId}
+                paymentDueAt={paymentDueAt}
+                initialPaymentInstructions={
+                  submittedPaymentInstructions ??
+                  selectedRegistration?.paymentInstructions ??
+                  null
+                }
+                onBack={() => setStep('agreements')}
               />
             ) : null}
           </div>
@@ -1738,12 +1908,14 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               isSubmitting={isSubmittingApplication}
               onSubmitFromRail={requestAgreementsSubmit}
               selectedTeamId={selectedTeamId}
-              hasManagerTeam={myTeams.some((t) => t.role === 'owner' || t.role === 'manager')}
+              hasManagerTeam={managerTeams.length > 0}
               isCreating={isCreating}
               onNext={handleTeamNext}
             />
           </aside>
         </div>
+
+        <SponsorLogoStrip sponsors={tournament.sponsors} />
 
         {/* Full-screen creating overlay */}
         {isCreating ? (

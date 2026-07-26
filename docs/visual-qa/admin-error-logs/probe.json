@@ -1,0 +1,35 @@
+[
+  {
+    "name": "mobile",
+    "width": 390,
+    "list": "errors-list-mobile-390.png",
+    "detail": "errors-detail-mobile-390.png",
+    "rows": 3,
+    "dialog": 1,
+    "hasRedacted": true,
+    "hasTraceback": false,
+    "text": "관리 운영 도구 에러 로그 서버·클라이언트 에러를 모아 원인 파악에 필요한 정보를 한 화면에서 확인해요. 에러 검색 전체 서버 클라이언트 전체 error warn 상태코드 시작일 종료일 마지막 발생 방금 전 source 서버 status 401 route /api/v1/auth/login message Email or password is incorrect 발생 횟수 1 버전 0.1.0-local.… 보기 마지막 발생 방금 전 source 클라이언트 status"
+  },
+  {
+    "name": "tablet",
+    "width": 768,
+    "list": "errors-list-tablet-768.png",
+    "detail": "errors-detail-tablet-768.png",
+    "rows": 3,
+    "dialog": 1,
+    "hasRedacted": true,
+    "hasTraceback": false,
+    "text": "관리 운영 도구 에러 로그 서버·클라이언트 에러를 모아 원인 파악에 필요한 정보를 한 화면에서 확인해요. 에러 검색 전체 서버 클라이언트 전체 error warn 상태코드 시작일 종료일 마지막 발생 방금 전 source 서버 status 401 route /api/v1/auth/login message Email or password is incorrect 발생 횟수 1 버전 0.1.0-local.… 보기 마지막 발생 방금 전 source 클라이언트 status"
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "list": "errors-list-desktop-1440.png",
+    "detail": "errors-detail-desktop-1440.png",
+    "rows": 3,
+    "dialog": 2,
+    "hasRedacted": true,
+    "hasTraceback": true,
+    "text": "Teameet 운영 최고운영자 개요 회원 매치 팀 팀매치 대회 공지사항 팝업 약관 문의 감사 로그 웹 푸시 실패 SMS · 인증 실패 연동 설정 웹 푸시 발송 관리자 최고운영자 (adma0000) 서비스로 돌아가기 운영 도구 에러 로그 서버·클라이언트 에러를 모아 원인 파악에 필요한 정보를 한 화면에서 확인해요. 에러 검색 전체 서버 클라이언트 전체 error warn 상태코드 시작일 종료일 마지막 발생 source status route message 발생 횟"
+  }
+]

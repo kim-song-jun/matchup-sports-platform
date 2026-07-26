@@ -1,16 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import type { ChangeEvent, KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
-import { cssUrl, publicAssetPath } from '@/lib/assets';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { CreateField, DraggableFilterSheet, GenderRuleSelector } from '@/components/v1-ui/create-form-fields';
+import { cssUrl } from '@/lib/assets';
 import type {
   TeamMatchCreateViewModel,
   TeamMatchDetailViewModel,
@@ -115,9 +116,17 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
 
+  const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string) => {
-    if (!action) return;
-    void Promise.resolve(action())
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
+    // 동기적인 ref 락으로 한 번 더 막는다.
+    if (!action || heroActionBusyRef.current) return;
+    heroActionBusyRef.current = true;
+    // action()을 .then() 콜백 안에서 호출 — 동기 throw도 promise rejection으로 변환되어
+    // .catch/.finally가 항상 실행되고 락이 풀린다(Promise.resolve(action())은 인자 평가가
+    // Promise.resolve 호출보다 먼저라 동기 throw 시 .finally를 건너뛰어 락이 영구 고정됨).
+    void Promise.resolve()
+      .then(() => action())
       .then(() => {
         setHeroMessage(successMessage);
         window.setTimeout(() => setHeroMessage(''), 2000);
@@ -125,6 +134,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       .catch(() => {
         setHeroMessage('처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 2000);
+      })
+      .finally(() => {
+        heroActionBusyRef.current = false;
       });
   };
 
@@ -145,15 +157,8 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
    * Desktop 우측 컬럼에 이동해 40% 보이드를 채움(T1). 모바일은 기존 위치 유지. */
   const hostTeamCard = (
     <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
-      {/* 팀 로고 아바타 */}
-      <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, overflow: 'hidden', background: 'var(--grey100)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {match.hostTeamLogoUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={publicAssetPath(match.hostTeamLogoUrl)} alt={match.hostTeam} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <span className="tm-text-subhead" style={{ color: 'var(--text-caption)' }}>{match.hostTeam.slice(0, 1)}</span>
-        )}
-      </div>
+      {/* 팀 로고 아바타 — 원본은 48px였으나 TeamAvatar 표준 사이즈 중 가장 근접한 md(40px)로 통일 */}
+      <TeamAvatar seed={match.hostTeamId ?? match.hostTeam} name={match.hostTeam} logoUrl={match.hostTeamLogoUrl} size="md" />
       {/* 팀 정보 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>홈팀 정보</div>
@@ -208,6 +213,9 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                   <ChevronLeftIcon size={22} strokeWidth={2.2} />
                 </Link>
                 <div style={{ display: 'flex', gap: 4 }}>
+                  {/* 이 화면은 topBar·bottomNav 를 모두 끄고 히어로를 쓰므로 AppChrome 의
+                      홈 단축 버튼이 렌더되지 않는다. 히어로 액션에 직접 홈 경로를 둔다. */}
+                  <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/home" aria-label="홈으로"><HomeIcon size={20} strokeWidth={2} /></Link>
                   <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
                   <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림" onClick={model.onNotify} />
                 </div>
@@ -533,74 +541,6 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
   );
 }
 
-function DraggableFilterSheet({
-  closeHref,
-  ariaLabel,
-  children,
-}: {
-  closeHref: string;
-  ariaLabel: string;
-  children: ReactNode;
-}) {
-  const router = useRouter();
-  const startYRef = useRef(0);
-  const draggingRef = useRef(false);
-  const [offsetY, setOffsetY] = useState(0);
-
-  const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
-    startYRef.current = event.clientY;
-    draggingRef.current = true;
-    setOffsetY(0);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
-    if (!draggingRef.current) return;
-    setOffsetY(Math.max(0, event.clientY - startYRef.current));
-  };
-
-  const handlePointerEnd = (event: PointerEvent<HTMLElement>) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    if (offsetY > 72) {
-      router.push(closeHref);
-      return;
-    }
-    setOffsetY(0);
-  };
-
-  // a11y: ESC 키로 필터 시트 닫기 (드래그 동작과 독립적으로 동작)
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      router.push(closeHref);
-    }
-  };
-
-  return (
-    <div className="tm-filter-layer">
-      {/* role="dialog" + aria-modal="true": 스크린리더가 시트를 대화상자로 인식하고
-          배경 콘텐츠를 읽지 않도록 함. focus-trap은 드래그 인터랙션 충돌 위험으로 생략. */}
-      <section
-        className="tm-filter-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        onKeyDown={handleKeyDown}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        style={{ transform: `translateY(${offsetY}px)` }}
-      >
-        {children}
-      </section>
-    </div>
-  );
-}
-
 function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
@@ -917,14 +857,6 @@ function CreateProgress({ step, edit }: { step: number; edit: boolean }) {
       ) : null}
     </div>
   );
-}
-
-function CreateField({ label, value, placeholder, suffix, multiline, type = 'text', onChange }: { label: string; value?: string; placeholder?: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
-  return <label className="tm-create-field"><div className="tm-text-label">{label}</div><div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>{onChange ? (multiline ? <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} /> : <input className="tm-create-native-input" type={type} value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />) : <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder || '입력'}</span>}{suffix ? <span className="tm-text-caption">{suffix}</span> : null}</div></label>;
-}
-
-function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (value: string) => void }) {
-  return <div className="tm-create-field"><div className="tm-text-label">성별 조건</div><div className="tm-team-form-chip-row">{['성별 무관', '남', '여'].map((option) => <button key={option} className={`tm-chip ${value === option ? 'tm-chip-active' : ''}`} type="button" aria-pressed={value === option} onClick={() => onChange?.(option)}>{option}</button>)}</div></div>;
 }
 
 function stepToNumber(step: TeamMatchCreateViewModel['step']) {

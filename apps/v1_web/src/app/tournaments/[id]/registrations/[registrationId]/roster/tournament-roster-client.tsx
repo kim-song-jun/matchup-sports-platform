@@ -15,10 +15,39 @@ import {
   useV1RemovePlayer,
 } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
+import { josa } from '@/lib/korean';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
+
+/* ── Roster deadline helper ── */
+
+export type RosterDeadlineState = {
+  /** 명단 제출 마감이 지나 예외 없이는 편집이 막힌 상태 */
+  blocked: boolean;
+  /** 마감은 지났지만 어드민이 예외를 허용해 편집 가능한 상태 */
+  overridden: boolean;
+};
+
+/**
+ * 명단 제출 마감 상태를 판정한다.
+ * - 마감일이 없으면 항상 편집 가능.
+ * - 마감일이 지났고 어드민 예외(override)가 없으면 편집 차단.
+ * - 마감일이 지났어도 어드민 예외가 있으면 편집 가능(overridden=true로 안내만 표시).
+ */
+export function getRosterDeadlineState(
+  rosterDeadlineAt: string | null | undefined,
+  overrideAt: string | null | undefined,
+  now: Date = new Date(),
+): RosterDeadlineState {
+  if (!rosterDeadlineAt) return { blocked: false, overridden: false };
+  const deadline = new Date(rosterDeadlineAt);
+  if (Number.isNaN(deadline.getTime())) return { blocked: false, overridden: false };
+  const isPast = now.getTime() > deadline.getTime();
+  if (!isPast) return { blocked: false, overridden: false };
+  return overrideAt ? { blocked: false, overridden: true } : { blocked: true, overridden: false };
+}
 
 /* ── Helpers ── */
 
@@ -83,11 +112,13 @@ export function TournamentRosterDeadlineCard({
   deadlineAt,
   isRosterLocked,
   isRosterEditBlockedByStatus,
+  isRosterDeadlineBlocked,
   nowMs,
 }: {
   deadlineAt: string | null;
   isRosterLocked: boolean;
   isRosterEditBlockedByStatus: boolean;
+  isRosterDeadlineBlocked: boolean;
   nowMs?: number;
 }) {
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
@@ -96,17 +127,21 @@ export function TournamentRosterDeadlineCard({
     : deadlineState === 'closed'
       ? { label: '신청 마감', className: 'tm-badge-grey' }
       : { label: '일정 미정', className: 'tm-badge-grey' };
-  const canEditRoster = !isRosterLocked && !isRosterEditBlockedByStatus;
+  const canEditRoster = !isRosterLocked && !isRosterEditBlockedByStatus && !isRosterDeadlineBlocked;
   const rosterEditBadge = isRosterLocked
     ? '명단 마감'
     : isRosterEditBlockedByStatus
       ? '수정 불가'
-      : '수정 가능';
+      : isRosterDeadlineBlocked
+        ? '제출 마감'
+        : '수정 가능';
   const rosterEditMessage = isRosterLocked
     ? '선수 명단이 운영진에 의해 마감됐어요.'
     : isRosterEditBlockedByStatus
       ? '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.'
-      : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
+      : isRosterDeadlineBlocked
+        ? '선수 명단 제출 기간이 종료됐어요.'
+        : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
 
   return (
     <Card pad={16} style={{ marginBottom: 14 }}>
@@ -188,7 +223,7 @@ type DraftPlayerForm = {
 
 function createDraftPlayerForm(): DraftPlayerForm {
   return {
-    id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: `draft-${crypto.randomUUID()}`,
     userId: '',
   };
 }
@@ -252,6 +287,7 @@ function AddPlayerForm({
 }) {
   const [form, setForm] = useState<AddPlayerFormState>(EMPTY_FORM);
   const [birthDateError, setBirthDateError] = useState<string | null>(null);
+  const [memberQuery, setMemberQuery] = useState('');
 
   // ROSTER-004: cursor-paginated team member fetch so 50+ member teams work.
   // useInfiniteQuery accumulates all loaded pages; "더 보기" fetches the next page.
@@ -283,6 +319,13 @@ function AddPlayerForm({
     () => members.filter((member) => !isRegisterableMember(member)),
     [members],
   );
+  // ROSTER P2-8: 팀원이 많은 팀(8명 이상)에서만 검색으로 select 옵션을 좁힌다.
+  const showMemberSearch = members.length >= 8;
+  const filteredMembers = useMemo(() => {
+    const q = memberQuery.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) => m.displayName.toLowerCase().includes(q));
+  }, [members, memberQuery]);
 
   function patch(partial: Partial<AddPlayerFormState>) {
     setForm((prev) => ({ ...prev, ...partial }));
@@ -363,6 +406,22 @@ function AddPlayerForm({
             </div>
           ) : (
             <>
+              {showMemberSearch ? (
+                <input
+                  type="text"
+                  value={memberQuery}
+                  onChange={(e) => setMemberQuery(e.target.value)}
+                  placeholder="이름으로 검색"
+                  aria-label="팀원 이름 검색"
+                  className="tm-input"
+                  style={{ minHeight: 44, marginBottom: 8 }}
+                />
+              ) : null}
+              {unavailableMembers.length > 0 ? (
+                <p className="tm-text-micro" style={{ color: 'var(--text-muted)', margin: '0 0 8px' }}>
+                  프로필(생년월일·휴대폰)이 완성된 팀원만 명단에 올릴 수 있어요. 팀원에게 프로필 완성을 요청해 주세요.
+                </p>
+              ) : null}
               <select
                 id={memberFieldId}
                 value={form.userId}
@@ -372,7 +431,7 @@ function AddPlayerForm({
                 aria-required="true"
               >
                 <option value="">팀원을 선택해 주세요</option>
-                {members.map((m) => {
+                {filteredMembers.map((m) => {
                   const registerable = isRegisterableMember(m);
                   const alreadyRegistered = registeredUserIds.has(m.userId);
                   const alreadyPending = pendingUserIds.has(m.userId);
@@ -406,7 +465,7 @@ function AddPlayerForm({
                 <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
                   {unavailableMembers.map((m) => (
                     <div key={m.userId} className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>
-                      {m.displayName}은 {memberMissingReason(m)}으로 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
+                      {josa(m.displayName, ['은', '는'])} {josa(memberMissingReason(m), ['으로', '로'])} 표시돼요. 제출하면 서버가 최신 프로필 기준으로 다시 확인해요.
                     </div>
                   ))}
                 </div>
@@ -639,6 +698,10 @@ function PlayerRow({
   const [editError, setEditError] = useState<string | null>(null);
 
   async function handleSave() {
+    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+    if (isUpdating) return;
     setEditError(null);
     try {
       await onUpdate(player.id, draftEligibility);
@@ -844,9 +907,22 @@ export function TournamentRosterPageClient({
   const isRosterLocked = Boolean(registration?.rosterLockedAt);
   const isRosterEditBlockedByStatus =
     registration?.status === 'cancel_requested' || registration?.status === 'cancelled';
-  const canEditRoster = Boolean(registration) && !isRosterLocked && !isRosterEditBlockedByStatus;
+  const rosterDeadlineAt = tournament?.rosterDeadlineAt ?? null;
+  const rosterDeadlineFormatted = rosterDeadlineAt
+    ? formatTournamentDateTimeLong(rosterDeadlineAt)
+    : null;
+  const rosterDeadlineState = getRosterDeadlineState(
+    rosterDeadlineAt,
+    registration?.rosterDeadlineOverrideAt,
+  );
+  const canEditRoster =
+    Boolean(registration) &&
+    !isRosterLocked &&
+    !isRosterEditBlockedByStatus &&
+    !rosterDeadlineState.blocked;
   const minPlayers = tournament?.minPlayers ?? 0;
   const maxPlayers = tournament?.maxPlayers ?? 999;
+  const shortfall = Math.max(0, minPlayers - players.length);
   const registeredUserIds = useMemo(
     () => new Set(players.map((player) => player.userId)),
     [players],
@@ -857,7 +933,7 @@ export function TournamentRosterPageClient({
 
   if (isLoading) {
     return (
-      <AppChrome title="선수 명단" backHref={backHref} bottomNav={false}>
+      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments">
         <div
           aria-busy="true"
           aria-label="명단 불러오는 중"
@@ -878,7 +954,7 @@ export function TournamentRosterPageClient({
   if (isError) {
     const msg = extractErrorMessage(rosterErr, '명단을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="선수 명단" backHref={backHref} bottomNav={false}>
+      <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments">
         <div style={{ padding: '0 20px', marginTop: 40 }}>
           <ErrorState
             message={msg}
@@ -920,7 +996,10 @@ export function TournamentRosterPageClient({
     birthDate: string;
     eligibilityStatus: V1PlayerEligibilityStatus;
   }) {
-    if (!canEditRoster) return;
+    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+    if (!canEditRoster || addPlayer.isPending) return;
     const usedByAnotherDraft = draftForms.some((form) => form.id !== formId && form.userId === formData.userId);
     if (registeredUserIds.has(formData.userId) || usedByAnotherDraft) {
       setDraftErrors((prev) => ({
@@ -958,9 +1037,11 @@ export function TournamentRosterPageClient({
     if (!canEditRoster) return;
     const player = players.find((p) => p.id === playerId);
     const nameLabel = player?.realName ? `"${player.realName}"` : '이 선수';
+    // 조사는 따옴표가 아니라 이름의 받침 기준으로 고른다 ("김민준"을 / "이수아"를)
+    const nameJosa = josa(player?.realName ?? '이 선수', ['을', '를']).slice((player?.realName ?? '이 선수').length);
     const ok = await confirmRemove({
       title: '선수 삭제',
-      message: `${nameLabel}를 명단에서 삭제할까요?`,
+      message: `${nameLabel}${nameJosa} 명단에서 삭제할까요?`,
       confirmLabel: '삭제',
       tone: 'danger',
     });
@@ -986,7 +1067,7 @@ export function TournamentRosterPageClient({
   }
 
   return (
-    <AppChrome title="선수 명단" backHref={backHref} bottomNav={false} activeTab="tournaments">
+    <AppChrome title="선수 명단" backHref={backHref} activeTab="tournaments">
       <div className="tm-tournament-roster-body" style={{ padding: '0 20px 48px', marginTop: 12 }}>
 
         {tournament && registration ? (
@@ -994,7 +1075,38 @@ export function TournamentRosterPageClient({
             deadlineAt={tournament.registrationDeadlineAt}
             isRosterLocked={isRosterLocked}
             isRosterEditBlockedByStatus={isRosterEditBlockedByStatus}
+            isRosterDeadlineBlocked={rosterDeadlineState.blocked}
           />
+        ) : null}
+
+        {/* Roster deadline info row */}
+        {rosterDeadlineFormatted ? (
+          <p
+            className="tm-text-caption"
+            style={{ color: 'var(--text-muted)', marginBottom: 10 }}
+          >
+            {`명단 제출 마감: ${rosterDeadlineFormatted}까지`}
+          </p>
+        ) : null}
+
+        {/* Roster deadline passed banner (blocks edit unless admin granted an override) */}
+        {rosterDeadlineState.blocked ? (
+          <div style={{ marginBottom: 14 }}>
+            <AlertBanner
+              message="명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요."
+              tone="info"
+            />
+          </div>
+        ) : null}
+
+        {/* Deadline passed but admin granted an override — editing stays open */}
+        {rosterDeadlineState.overridden ? (
+          <div style={{ marginBottom: 14 }}>
+            <AlertBanner
+              message="운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요."
+              tone="info"
+            />
+          </div>
         ) : null}
 
         {/* Locked banner */}
@@ -1016,13 +1128,28 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
-        {/* Below minimum warning */}
-        {canEditRoster && belowMinimum ? (
+        {/* Below minimum warning — 잠금/상태와 무관하게 미달 사실은 계속 노출 (P0: 조건 버그 수정) */}
+        {belowMinimum ? (
           <div style={{ marginBottom: 14 }}>
-            <AlertBanner
-              message={`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.`}
-              tone="warning"
-            />
+            {/* P1-3a: 델타(K명 더 필요해요)를 굵게 병기 — AlertBanner는 string만 받으므로 동일 스타일을 직접 구성 */}
+            <div
+              role="status"
+              aria-live="polite"
+              className="tm-text-label"
+              style={{
+                padding: '10px 14px',
+                borderRadius: 12,
+                background: 'var(--orange50)',
+                color: 'var(--orange500)',
+                lineHeight: 1.55,
+              }}
+            >
+              {`최소 ${minPlayers}명 이상 등록해야 해요. 현재 ${players.length}명 등록됐어요.`}
+              {shortfall > 0 ? <strong> → {shortfall}명 더 필요해요</strong> : null}
+              {isRosterLocked || rosterDeadlineState.blocked
+                ? ' (명단이 마감된 상태예요 — 운영팀에 문의해 주세요)'
+                : null}
+            </div>
           </div>
         ) : null}
 

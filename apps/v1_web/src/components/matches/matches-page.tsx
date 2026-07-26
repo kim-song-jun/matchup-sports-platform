@@ -1,16 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import type { ChangeEvent, KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import type { ChangeEvent } from 'react';
 import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
-import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, HomeIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { NotificationBellButton } from '@/components/v1-ui/notification-bell';
 import { cssUrl } from '@/lib/assets';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { CreateField, DraggableFilterSheet, GenderRuleSelector } from '@/components/v1-ui/create-form-fields';
 import type {
   MatchCardModel,
   MatchCreateViewModel,
@@ -71,12 +71,20 @@ function CompletionCheckIcon() {
 /**
  * [P0/P1 아이콘+컬러] 상태 아이콘 — 색상만으로 상태를 구분하지 않도록 아이콘+텍스트 병행 (WCAG 1.4.1).
  */
-function StatusIcon({ tone }: { tone: 'orange' | 'green' }) {
+function StatusIcon({ tone }: { tone: 'orange' | 'green' | 'grey' }) {
   if (tone === 'green') {
     return (
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
         <circle cx="7.5" cy="7.5" r="7.5" fill="var(--tint-green)" />
         <path d="M4 7.5L6.5 10L11 5" stroke="var(--green500)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (tone === 'grey') {
+    return (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+        <circle cx="7.5" cy="7.5" r="7.5" fill="var(--tint-grey)" />
+        <path d="M4.5 7.5H10.5" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     );
   }
@@ -115,13 +123,18 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
           <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>
         </div>
-        <div className="tm-match-card-stack">
-          {model.matches.length ? (
-            model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)
-          ) : (
-            <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
-          )}
-        </div>
+        {model.matches.length ? (
+          <div className="tm-match-card-stack">
+            {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
+          </div>
+        ) : (
+          /* EmptyState must be a sibling of .tm-match-card-stack, not nested inside it —
+             the stack becomes a 2-up/3-up CSS grid on desktop (matches.css), and a single
+             grid-item child gets confined to the first grid cell (~50%/33% width), reading
+             as flush-left instead of centered across the full content column. Matches the
+             pattern already used by teams-page.tsx / team-matches-page.tsx / tournaments page.tsx. */
+          <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
+        )}
       </div>
       {model.filterSheet?.open ? <MatchFilterSheet model={model} /> : null}
     </AppChrome>
@@ -151,7 +164,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
         ) : null}
         {model.state === 'joined' ? (
           <div className="tm-match-card-stack" style={{ marginTop: 18 }}>
-            {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
+            {model.matches.map((match) => <MatchCardItem key={match.id} match={match} />)}
           </div>
         ) : null}
       </div>
@@ -172,7 +185,7 @@ function matchStatusBadgeClass(mode: MatchDetailViewModel['mode'], status: Match
   if (mode === 'pending') return 'tm-badge-orange';
   if (mode === 'approved') return 'tm-badge-green';
   if (mode === 'mine') return 'tm-badge-blue';
-  if (status === 'full') return 'tm-badge-grey';
+  if (mode === 'closed' || status === 'full') return 'tm-badge-grey';
   return 'tm-badge-grey';
 }
 
@@ -180,22 +193,30 @@ function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: Match
   if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') return '승인 완료';
   if (mode === 'mine') return '내 매치';
-  if (status === 'full') return '모집 완료';
+  if (mode === 'closed' || status === 'full') return '모집 완료';
   return '모집 중';
 }
 
 export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
   const { match, mode } = model;
   const [heroMessage, setHeroMessage] = useState('');
-  const locked = mode === 'pending' || mode === 'approved' || match.status === 'full';
+  const locked = mode === 'pending' || mode === 'approved' || mode === 'closed' || match.status === 'full';
   const canRunAction = Boolean(model.onApply);
-  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : match.status === 'full' ? '신청 마감' : '참가 신청');
+  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const showChat = mode === 'approved' && Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
+  const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
-    if (!action) return;
-    void Promise.resolve(action())
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
+    // 동기적인 ref 락으로 한 번 더 막는다.
+    if (!action || heroActionBusyRef.current) return;
+    heroActionBusyRef.current = true;
+    // action()을 .then() 콜백 안에서 호출 — 동기 throw도 promise rejection으로 변환되어
+    // .catch/.finally가 항상 실행되고 락이 풀린다(Promise.resolve(action())은 인자 평가가
+    // Promise.resolve 호출보다 먼저라 동기 throw 시 .finally를 건너뛰어 락이 영구 고정됨).
+    void Promise.resolve()
+      .then(() => action())
       .then((result) => {
         // null = 액션이 UX를 직접 처리(네이티브 공유/취소/prompt 폴백) → 토스트 미표시.
         if (result === null) return;
@@ -206,6 +227,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       .catch(() => {
         setHeroMessage('잠깐 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 1800);
+      })
+      .finally(() => {
+        heroActionBusyRef.current = false;
       });
   };
 
@@ -228,6 +252,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
               <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+                {/* 이 화면은 topBar·bottomNav 를 모두 끄고 히어로를 쓰므로 AppChrome 의
+                    홈 단축 버튼이 렌더되지 않는다. 히어로 액션에 직접 홈 경로를 둔다. */}
+                <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button tm-hide-desktop" href="/home" aria-label="홈으로"><HomeIcon size={20} strokeWidth={2} /></Link>
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
                 <NotificationBellButton className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" ariaLabel="알림 목록" onClick={model.onNotify} />
               </div>
@@ -277,6 +304,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </>
             ) : null}
             {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+            {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 10 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -346,6 +374,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </>
           ) : null}
           {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+          {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 10 }}>
             <div className="tm-text-body-lg">참가자</div>
@@ -553,74 +582,6 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
   );
 }
 
-function DraggableFilterSheet({
-  closeHref,
-  ariaLabel,
-  children,
-}: {
-  closeHref: string;
-  ariaLabel: string;
-  children: ReactNode;
-}) {
-  const router = useRouter();
-  const startYRef = useRef(0);
-  const draggingRef = useRef(false);
-  const [offsetY, setOffsetY] = useState(0);
-
-  const handlePointerDown = (event: PointerEvent<HTMLElement>) => {
-    startYRef.current = event.clientY;
-    draggingRef.current = true;
-    setOffsetY(0);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePointerMove = (event: PointerEvent<HTMLElement>) => {
-    if (!draggingRef.current) return;
-    setOffsetY(Math.max(0, event.clientY - startYRef.current));
-  };
-
-  const handlePointerEnd = (event: PointerEvent<HTMLElement>) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    if (offsetY > 72) {
-      router.push(closeHref);
-      return;
-    }
-    setOffsetY(0);
-  };
-
-  // a11y: ESC 키로 필터 시트 닫기 (드래그 동작과 독립적으로 동작)
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape') {
-      router.push(closeHref);
-    }
-  };
-
-  return (
-    <div className="tm-filter-layer">
-      {/* role="dialog" + aria-modal="true": 스크린리더가 시트를 대화상자로 인식하고
-          배경 콘텐츠를 읽지 않도록 함. focus-trap은 드래그 인터랙션 충돌 위험으로 생략. */}
-      <section
-        className="tm-filter-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        onKeyDown={handleKeyDown}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerEnd}
-        onPointerCancel={handlePointerEnd}
-        style={{ transform: `translateY(${offsetY}px)` }}
-      >
-        {children}
-      </section>
-    </div>
-  );
-}
-
 function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
   return (
     <div className="tm-sport-chip-row">
@@ -642,11 +603,11 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
   );
 }
 
-function MatchCardItem({ match, index }: { match: MatchCardModel; index: number }) {
+function MatchCardItem({ match }: { match: MatchCardModel }) {
   return (
     <Link className="tm-match-list-card tm-pressable" href={`/matches/${match.id}`}>
       <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
-        <span className="tm-badge tm-badge-blue">{index === 0 ? '추천' : match.sport}</span>
+        <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
         <span className="tm-match-count-badge" style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
           <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: 'var(--font-size-body-lg)' }}>{match.current}</span>
@@ -711,13 +672,15 @@ function CapacityRow({ current, capacity }: { current: number; capacity: number 
   );
 }
 
-function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
+function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; title: string; body: string }) {
+  const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
+  const accent = tone === 'green' ? 'var(--green500)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange600)';
   return (
-    <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}>
+    <Card pad={14} style={{ marginTop: 14, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <StatusIcon tone={tone} />
-        <div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange600)' }}>{title}</div>
+        <div className="tm-text-label" style={{ color: accent }}>{title}</div>
       </div>
       <div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div>
     </Card>
@@ -1002,53 +965,6 @@ function MatchComplete({ model }: { model: MatchCreateViewModel }) {
         </div>
       </div>
     </AppChrome>
-  );
-}
-
-function CreateField({ label, value, placeholder, suffix, multiline, type = 'text', onChange }: { label: string; value?: string; placeholder?: string; suffix?: string; multiline?: boolean; type?: string; onChange?: (value: string) => void }) {
-  // date/time 인풋은 lang="ko"를 부여해 OS locale에 상관없이
-  // 가능한 경우 한국어 포맷(yyyy.mm.dd 또는 HH:MM)으로 표시를 유도한다.
-  // CSS(.tm-create-native-input[type="date" i] 등)에서 appearance:none +
-  // ::-webkit-calendar-picker-indicator 처리로 OS 스피너/아이콘을 제거한다.
-  const isDateLike = type === 'date' || type === 'time';
-  return (
-    <label className="tm-create-field">
-      <div className="tm-text-label">{label}</div>
-      <div className={`tm-create-input ${multiline ? 'tm-create-input-multiline' : ''}`}>
-        {onChange ? (
-          multiline ? (
-            <textarea className="tm-create-native-input" value={value ?? ''} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
-          ) : (
-            <input
-              className="tm-create-native-input"
-              type={type}
-              lang={isDateLike ? 'ko' : undefined}
-              value={value ?? ''}
-              placeholder={placeholder}
-              onChange={(event) => onChange(event.target.value)}
-            />
-          )
-        ) : (
-          <span className="tm-text-body" style={{ color: value ? 'var(--text-strong)' : 'var(--text-caption)' }}>{value || placeholder}</span>
-        )}
-        {suffix ? <span className="tm-text-caption">{suffix}</span> : null}
-      </div>
-    </label>
-  );
-}
-
-function GenderRuleSelector({ value, onChange }: { value: string; onChange?: (value: string) => void }) {
-  return (
-    <div className="tm-create-field">
-      <div className="tm-text-label">성별 조건</div>
-      <div className="tm-team-form-chip-row">
-        {['성별 무관', '남', '여'].map((option) => (
-          <button key={option} className={`tm-chip ${value === option ? 'tm-chip-active' : ''}`} type="button" aria-pressed={value === option} onClick={() => onChange?.(option)}>
-            {option}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 

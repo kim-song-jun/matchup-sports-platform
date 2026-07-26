@@ -25,13 +25,11 @@ import {
   useV1UpdateAdminPopup,
 } from '@/hooks/use-v1-api';
 import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
-import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isSafePopupLink, POPUP_TARGET_LABELS, POPUP_TARGET_OPTIONS } from '@/lib/popup-targets';
 import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
   AdminListFilters,
-  CursorPage,
   V1AdminPopupCreatePayload,
   V1AdminPopupRow,
   V1AdminPopupStatus,
@@ -99,13 +97,14 @@ function formatTargetScreens(targetScreens: V1PopupTargetScreen[]) {
   return targetScreens.map((screen) => POPUP_TARGET_LABELS[screen]).join(', ');
 }
 
+const PAGE_SIZE = 20;
+
 export default function AdminPopupsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
-  const [extraRows, setExtraRows] = useState<V1AdminPopupRow[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState('');
   const [mode, setMode] = useState<EditorMode>('view');
   const [title, setTitle] = useState('');
@@ -126,15 +125,16 @@ export default function AdminPopupsPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  // 필터를 좁히면 보던 페이지에 결과가 없을 수 있어 첫 페이지로 되돌린다.
   useEffect(() => {
-    setExtraRows([]);
-    setNextCursor(null);
+    setPage(1);
   }, [activeStatus, debouncedSearch]);
 
   const filters: AdminListFilters = {
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
   const listQuery = useV1AdminPopups(filters);
   const statusOptions = STATUS_OPTIONS.map((option) => ({
@@ -155,28 +155,9 @@ export default function AdminPopupsPage() {
     contentAssets.clearCleanupError();
   }, [contentAssets.cleanupError]);
 
-  useEffect(() => {
-    if (listQuery.data) {
-      setNextCursor(listQuery.data.nextCursor ?? listQuery.data.pageInfo?.nextCursor ?? null);
-    }
-  }, [listQuery.data]);
-
-  const rows = [...(listQuery.data?.items ?? []), ...extraRows];
+  const rows = listQuery.data?.items ?? [];
+  const pageInfo = listQuery.data?.pageInfo;
   const selectedPopup = detailQuery.data?.popup ?? rows.find((row) => row.popupId === selectedId) ?? null;
-
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await v1Get<CursorPage<V1AdminPopupRow>>('/admin/popups', { ...filters, cursor: nextCursor });
-      setExtraRows((previous) => [...previous, ...page.items]);
-      setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
-    } catch (error) {
-      showToast(extractErrorMessage(error, '추가 팝업을 불러오지 못했어요.'), 'error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   function openView(row: V1AdminPopupRow) {
     void contentAssets.discard();
@@ -261,7 +242,8 @@ export default function AdminPopupsPage() {
           void contentAssets.commit(content);
           setMode('view');
           setSelectedId(popup.popupId);
-          setExtraRows([]);
+          // 방금 바꾼 팝업이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
+          setPage(1);
           showToast('팝업을 수정했어요.', 'success');
         },
         onError: (error) => showToast(extractErrorMessage(error, '팝업 수정에 실패했어요.'), 'error'),
@@ -274,7 +256,8 @@ export default function AdminPopupsPage() {
         void contentAssets.commit(content);
         setMode('view');
         setSelectedId(popup.popupId);
-        setExtraRows([]);
+        // 방금 바꾼 팝업이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
+        setPage(1);
         showToast(status === 'published' ? '팝업을 공개했어요.' : status === 'archived' ? '팝업을 비공개로 저장했어요.' : '팝업 초안을 저장했어요.', 'success');
       },
       onError: (error) => showToast(extractErrorMessage(error, '팝업 생성에 실패했어요.'), 'error'),
@@ -287,7 +270,8 @@ export default function AdminPopupsPage() {
       onSuccess: () => {
         if (selectedId === row.popupId) setSelectedId('');
         setMode('view');
-        setExtraRows([]);
+        // 방금 바꾼 팝업이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
+        setPage(1);
         showToast('팝업을 삭제했어요.', 'success');
       },
       onError: (error) => showToast(extractErrorMessage(error, '팝업 삭제에 실패했어요.'), 'error'),
@@ -329,6 +313,9 @@ export default function AdminPopupsPage() {
             onStatusChange={setActiveStatus}
           />
 
+          {/* 본문 전문을 카드에 넣어 한 항목이 세로로 길게 늘어나 있었다. 목록은 어떤 팝업이
+              어디에 언제 걸려 있는지 훑는 자리이고 본문은 우측 상세에서 본다 — 표로 옮기고
+              본문은 제목 아래 한 줄 요약만 남긴다. */}
           <AdminCardList<V1AdminPopupRow>
             rows={rows}
             keyExtractor={(row) => row.popupId}
@@ -337,6 +324,20 @@ export default function AdminPopupsPage() {
             onRetry={() => void listQuery.refetch()}
             empty={<AdminEmpty title="팝업이 없어요" description="새 팝업을 만들어 필요한 화면에 안내해 보세요." />}
             skeletonCards={6}
+            actionLayout="compact"
+            pagination={
+              pageInfo?.totalPages
+                ? {
+                    page: pageInfo.page ?? page,
+                    totalPages: pageInfo.totalPages,
+                    total: pageInfo.total ?? 0,
+                    limit: pageInfo.limit ?? PAGE_SIZE,
+                    onPageChange: setPage,
+                    loading: listQuery.isFetching,
+                  }
+                : undefined
+            }
+            minCardWidth="100%"
             renderActions={(row) => (
               <>
                 <button type="button" onClick={() => openView(row)} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
@@ -352,24 +353,23 @@ export default function AdminPopupsPage() {
             )}
             card={(row) => ({
               title: row.title,
-              subtitle: `${formatTargetScreens(row.targetScreens)} · ${formatDisplayWindow(row.displayStartAt, row.displayEndAt)}`,
+              subtitle: formatDisplayWindow(row.displayStartAt, row.displayEndAt),
               statusNode: <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
               meta: [
-                { icon: <MonitorUp size={14} aria-hidden="true" />, label: row.status === 'published' ? `${row.targetScreens.length}개 화면 노출` : '미노출' },
+                {
+                  icon: <MonitorUp size={14} aria-hidden="true" />,
+                  label: row.status === 'published' ? formatTargetScreens(row.targetScreens) : '미노출',
+                  wrap: true,
+                },
                 { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.updatedAt) },
               ],
-              description: noticeSummary(row.body),
+              // 본문 미리보기는 목록에서 어떤 팝업인지 가려내는 데 쓰이므로 남긴다. 다만
+              // 전문이 그대로 흐르면 한 항목이 세로로 길게 늘어나 목록을 훑을 수 없다 —
+              // 두 줄로 잘라 카드 높이를 일정하게 유지한다.
+              description: <span className="line-clamp-2">{noticeSummary(row.body)}</span>,
             })}
           />
 
-          {nextCursor ? (
-            <div className="flex justify-center">
-              <button type="button" onClick={loadMore} disabled={loadingMore} className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-6 text-sm font-medium text-gray-700 hover:border-blue-300 hover:text-blue-600 disabled:opacity-50">
-                {loadingMore ? '불러오는 중...' : '더 보기'}
-              </button>
-            </div>
-          ) : null}
-          {loadingMore ? <AdminTableSkeleton rows={3} /> : null}
         </section>
 
         <aside className="h-fit rounded-2xl border border-gray-100 bg-white p-4 xl:sticky xl:top-6" aria-label={mode === 'view' ? '팝업 상세 조회' : mode === 'edit' ? '팝업 수정' : '팝업 생성'}>

@@ -93,10 +93,28 @@ Current commands:
 - `pnpm v1:db:seed`: base seed only. It inserts runtime check, sports, sport levels, regions, and published terms.
 - `pnpm v1:db:seed:demo`: demo personas and representative user-owned flows.
 - `pnpm v1:db:seed:all`: demo plus coverage permutations.
+- `V1_ALLOW_LOCAL_EVENT_SEED=true pnpm v1:db:seed:event-campaigns`: local-only event hub campaigns for up to six existing tournaments plus the fixed `event.qa@teameet.local` QA persona/team. It only manages `dev-event-*` slugs and deterministic local QA IDs, preserves other campaigns and production users, rejects production mode, and rejects non-loopback database hosts.
 
 Demo and coverage modes are blocked when `NODE_ENV=production` unless `V1_ALLOW_DEMO_SEED=true` is explicitly set for a reviewed non-production/demo import. Do not set that flag for ordinary production operation.
 
 `demo`/`coverage`/`all` seed modes also require `V1_HOST_ADMIN_PASSWORD` (8+ chars) set in `apps/v1_api/.env` — it becomes the `host@teameet.v1` account password. Missing or too-short values fail the seed run immediately (fail-closed).
+
+## Production Snapshot To Existing Local Dev DB
+
+Production-to-local refresh is an operator workflow, not an application deploy step.
+
+1. Run a host load, memory, swap, Node/browser process, Docker, and target-service preflight.
+2. Keep production read-only. Stream `pg_dump --format=custom --no-owner --no-acl` from `teameet_v1_postgres`; do not create a persistent dump file on the production host.
+3. Store temporary local dumps outside the repository with directory mode `0700` and file mode `0600`.
+4. Back up the current local dev DB before replacement.
+5. Stop only the local v1 API process that owns connections to the target DB. The Web server may stay up.
+6. Drop and recreate the existing local dev database, then restore with `pg_restore --no-owner --no-acl --exit-on-error`.
+7. Run canonical `prisma migrate deploy` against the restored local database. Never run a migration or seed against production during this workflow.
+8. Add local QA/demo records only through production-guarded, idempotent seed commands.
+9. Verify migration status, schema drift, API health, affected row counts, and browser scenarios.
+10. Remove temporary dump files after restore and rollback verification. Do not commit dumps, copied uploads, or production-derived PII.
+
+Screenshots and planning reports created from a production clone must stay on public product surfaces or use clearly marked local QA personas. Do not capture or publish private user data from the clone.
 
 ## Migration Policy
 

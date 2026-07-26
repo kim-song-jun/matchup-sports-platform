@@ -10,13 +10,24 @@ type ReviewSourceRouteProps = {
 export default async function ReviewSourceRoute({ params, searchParams }: ReviewSourceRouteProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
-  const sourceType = resolvedParams.sourceType === 'team_match' ? 'team_match' : 'match';
+  const sourceType = parseReviewSourceType(resolvedParams.sourceType);
 
   return (
     <ReviewSourcePageClient
       complete={resolvedSearchParams?.complete === '1'}
       sourceId={resolvedParams.sourceId}
-      sourceType={sourceType as V1ReviewSourceType}
+      sourceType={sourceType}
     />
   );
+}
+
+function parseReviewSourceType(sourceType: string): V1ReviewSourceType {
+  switch (sourceType) {
+    case 'team_match':
+      return 'team_match';
+    case 'tournament_fixture':
+      return 'tournament_fixture';
+    default:
+      return 'match';
+  }
 }

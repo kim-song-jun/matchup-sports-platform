@@ -50,12 +50,14 @@ const ownerAdmin = {
   userId: 'owner-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 const supportAdmin = {
   id: 'support-admin-id',
   userId: 'support-user-id',
   adminRole: 'support' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function tournamentRow(overrides: Record<string, unknown> = {}) {
@@ -114,6 +116,7 @@ function fixtureRow(overrides: Record<string, unknown> = {}) {
     parentFixtureId: null,
     homeRegistrationId: 'reg-1',
     awayRegistrationId: 'reg-2',
+    videos: [],
     scheduledAt: null,
     venue: null,
     status: 'scheduled',
@@ -158,6 +161,9 @@ describe('TournamentBracketService', () => {
       update: jest.Mock;
     };
     v1TournamentFixtureResult: { upsert: jest.Mock };
+    v1TournamentFixtureVideo: { findMany: jest.Mock; deleteMany: jest.Mock; createMany: jest.Mock };
+    v1TournamentFixtureGoal: { findMany: jest.Mock; deleteMany: jest.Mock; createMany: jest.Mock };
+    v1TournamentPlayer: { findMany: jest.Mock };
     v1TournamentStanding: { upsert: jest.Mock; findMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
@@ -178,6 +184,17 @@ describe('TournamentBracketService', () => {
         update: jest.fn(),
       },
       v1TournamentFixtureResult: { upsert: jest.fn() },
+      v1TournamentFixtureVideo: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      v1TournamentFixtureGoal: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { upsert: jest.fn(), findMany: jest.fn() },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
@@ -499,6 +516,104 @@ describe('TournamentBracketService', () => {
     expect(result).toMatchObject({ hasPenalty: true, homePenaltyScore: 5, awayPenaltyScore: 4 });
   });
 
+  // Track 5: 득점자 등록
+  it('recordResult: whitespace-only goal name is rejected before stored goals are replaced', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());
+
+    await expect(
+      service.recordResult(ownerUser, 'fixture-1', {
+        homeScore: 1,
+        awayScore: 0,
+        goals: [{ team: 'home', playerName: '   ' }],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'GOAL_PLAYER_NAME_REQUIRED' } });
+
+    expect(prisma.v1TournamentFixtureResult.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentFixtureGoal.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('recordResult: goals with playerId in home team roster → persists goal rows', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());
+    prisma.v1TournamentFixtureResult.upsert.mockResolvedValue(resultRow());
+    prisma.v1TournamentFixture.update.mockResolvedValue(fixtureRow({ status: 'completed' }));
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { id: 'player-1', registrationId: 'reg-1' },
+    ]);
+    prisma.v1TournamentFixtureGoal.findMany.mockResolvedValue([
+      { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 12 },
+    ]);
+
+    const result = await service.recordResult(ownerUser, 'fixture-1', {
+      homeScore: 2,
+      awayScore: 1,
+      goals: [{ team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 12 }],
+    });
+
+    expect(prisma.v1TournamentFixtureGoal.deleteMany).toHaveBeenCalledWith({
+      where: { fixtureResultId: 'result-1' },
+    });
+    expect(prisma.v1TournamentFixtureGoal.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          fixtureResultId: 'result-1',
+          team: 'home',
+          playerId: 'player-1',
+          playerName: '홍길동',
+          minute: 12,
+        },
+      ],
+    });
+    expect(result.goals).toEqual([
+      { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 12 },
+    ]);
+  });
+
+  it('recordResult: goal playerId belongs to opposing team → 400 GOAL_PLAYER_NOT_IN_TEAM', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());
+    // player-2 소속은 reg-2(away)인데 team='home'으로 등록 시도
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { id: 'player-2', registrationId: 'reg-2' },
+    ]);
+
+    await expect(
+      service.recordResult(ownerUser, 'fixture-1', {
+        homeScore: 1,
+        awayScore: 0,
+        goals: [{ team: 'home', playerId: 'player-2', playerName: '김철수' }],
+      }),
+    ).rejects.toMatchObject({ response: { code: 'GOAL_PLAYER_NOT_IN_TEAM' } });
+    expect(prisma.v1TournamentFixtureResult.upsert).not.toHaveBeenCalled();
+  });
+
+  it('recordResult: goal without playerId (비회원 대타) → persists playerName only', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentFixture.findUnique.mockResolvedValue(fixtureRow());
+    prisma.v1TournamentFixtureResult.upsert.mockResolvedValue(resultRow());
+    prisma.v1TournamentFixture.update.mockResolvedValue(fixtureRow({ status: 'completed' }));
+
+    await service.recordResult(ownerUser, 'fixture-1', {
+      homeScore: 1,
+      awayScore: 0,
+      goals: [{ team: 'away', playerName: '대타 선수' }],
+    });
+
+    expect(prisma.v1TournamentPlayer.findMany).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentFixtureGoal.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          fixtureResultId: 'result-1',
+          team: 'away',
+          playerId: null,
+          playerName: '대타 선수',
+          minute: null,
+        },
+      ],
+    });
+  });
+
   // AGF-1: 미배정 픽스처 결과 입력 차단
   it('recordResult: fixture without homeRegistrationId → 400 FIXTURE_TEAMS_UNASSIGNED', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
@@ -748,7 +863,7 @@ describe('TournamentBracketService', () => {
     prisma.v1TournamentFixture.findMany.mockResolvedValue([
       {
         ...fixtureRow(),
-        result: resultRow(),
+        result: { ...resultRow(), goals: [] },
         homeRegistration: { team: { name: '서울 FC' } },
         awayRegistration: { team: { name: '부산 SC' } },
       },

@@ -4,13 +4,14 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   getPendingSocialSignupRoute,
   isPendingSocialSignupRequestAllowed,
 } from './social-signup-access';
-import { V1AuthUser } from './v1-auth-user';
+import type { V1AuthUser } from './v1-auth-user';
+import { currentRuntimeConfiguration, resolveV1RequestIdentity, type V1RequestIdentity } from './v1-session';
 
 type V1Request = Request & { v1User?: V1AuthUser };
 
@@ -20,15 +21,17 @@ export class OptionalV1AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<V1Request>();
-    const userId = getHeader(request, 'x-v1-user-id');
-    const email = getHeader(request, 'x-v1-user-email');
+    const identity = resolveV1RequestIdentity(
+      request,
+      currentRuntimeConfiguration(),
+    );
 
-    if (!userId && !email) {
+    if (!identity) {
       return true;
     }
 
     const user = await this.prisma.v1User.findFirst({
-      where: userId ? { id: userId } : { email: email ?? undefined },
+      where: identityWhere(identity),
       select: {
         id: true,
         email: true,
@@ -41,7 +44,7 @@ export class OptionalV1AuthGuard implements CanActivate {
       return true;
     }
 
-    if (['suspended', 'blocked', 'deleted'].includes(user.accountStatus)) {
+    if (['suspended', 'blocked', 'deleted', 'withdrawal_pending'].includes(user.accountStatus)) {
       return true;
     }
 
@@ -62,7 +65,17 @@ export class OptionalV1AuthGuard implements CanActivate {
   }
 }
 
-function getHeader(request: Request, name: string): string | null {
-  const value = request.header(name);
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+function identityWhere(identity: V1RequestIdentity) {
+  switch (identity.kind) {
+    case 'user_id':
+      return { id: identity.userId };
+    case 'email':
+      return { email: identity.email };
+    default:
+      return assertNever(identity);
+  }
+}
+
+function assertNever(value: never): never {
+  return value;
 }

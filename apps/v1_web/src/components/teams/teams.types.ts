@@ -15,6 +15,10 @@ export type TeamModel = {
   statusLabel: string;
   tags: string[];
   genderRule: string;
+  /** 팀장 표시명 — 목록 카드용, V1Team.owner가 아직 없는 폴백/시드 데이터에는 없을 수 있어 optional */
+  ownerName?: string;
+  /** 감독 표시명 — 감독이 없는 팀은 null */
+  managerName?: string | null;
   intro: string;
   next: string;
 };
@@ -85,6 +89,11 @@ export type TeamDetailViewModel = {
   onShare?: () => void | Promise<void>;
   ctaSuccessMessage?: string;
   ctaFailureMessage?: string;
+  /**
+   * 승인 대기 중일 때만 채워진다(mode === 'pending'). 토스트는 2초 뒤 사라지므로
+   * "무엇을 기다리는 중인지"는 화면에 계속 남아 있어야 한다.
+   */
+  joinRequest?: { requestedAtLabel?: string };
   operations?: Array<{ label: string; sub: string; href: string }>;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
@@ -147,6 +156,14 @@ export type TeamMembersViewModel = {
     locked?: boolean;
     actions: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
     actionPending?: boolean;
+    /** 본인 행에만 노출되는 "팀 나가기" 버튼. owner는 소유권 이전 전까지 disabled + 툴팁. */
+    selfLeave?: {
+      disabled: boolean;
+      disabledReason?: string;
+      pending?: boolean;
+      error?: string | null;
+      onSelect: () => void;
+    };
   }>;
   requests: Array<{
     name: string;
@@ -179,5 +196,8 @@ export type TeamMembersViewModel = {
       onCancel: () => void;
     }>;
     listLoading: boolean;
+    /** 목록 조회 실패 여부 — true면 EmptyState 대신 에러+재시도 UI로 분기 */
+    listError: boolean;
+    onRetry: () => void;
   };
 };

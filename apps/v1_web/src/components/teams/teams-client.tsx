@@ -8,6 +8,7 @@ import {
   useV1CancelTeamInvitation,
   useV1ChangeTeamMembershipRole,
   useV1CreateTeamJoinApplication,
+  useV1LeaveTeam,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
@@ -24,7 +25,9 @@ import {
   useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
+import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
+import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
@@ -234,7 +237,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             message: '',
           },
         },
-        mode: toDetailMode(query.data),
+        mode: toDetailMode(query.data, eligibility.data),
         ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
         ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
         onCta: teamDetailCtaAction({
@@ -244,15 +247,20 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
             router.push(chatRoomHref(result.roomId, result.route));
           },
-          join: () => join.mutateAsync({ message: null }),
+          join: () => join.mutateAsync({ message: null }).then((result) => {
+            trackEvent('team_apply_complete', { teamId });
+            return result;
+          }),
           withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
-        ctaSuccessMessage: query.data.viewer.role === 'none'
-          ? undefined
-          : '팀 채팅으로 이동해요.',
-        ctaFailureMessage: query.data.viewer.role === 'none'
-          ? undefined
-          : '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.',
+        // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
+        // 특히 신청 성공은 "승인이 남았다"는 사실을 반드시 알려야 사용자가 기다릴 대상을 안다.
+        ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data),
+        ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data),
+        joinRequest:
+          toDetailMode(query.data, eligibility.data) === 'pending'
+            ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
+            : undefined,
         operations: buildTeamOperations(query.data),
         onShare: () => shareTeam(query.data),
         openMatches,
@@ -264,11 +272,13 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
 }
 
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
   const viewerRole = team.data?.viewer.role;
+  const viewerMembershipId = team.data?.viewer.membershipId ?? null;
   const canManageMembers = isTeamOperatorRole(viewerRole);
   const canDelegateOwner = viewerRole === 'owner';
   const canManageInvitations = canManageMembers;
@@ -281,6 +291,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const sendInvitation = useV1SendTeamInvitation(teamId);
   const cancelInvitation = useV1CancelTeamInvitation(teamId);
   const invitationsQuery = useV1TeamInvitations(teamId, { enabled: canManageInvitations });
+  const leaveTeam = useV1LeaveTeam(teamId);
   const { confirm, ConfirmModal } = useConfirm();
   const fallback = getTeamMembersViewModel();
 
@@ -289,11 +300,32 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [inviteMessage, setInviteMessage] = useState('');
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
+  const cancellingInvitations = usePendingIds();
 
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
   const invitationItems = invitationsQuery.data?.items ?? [];
   const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
+
+  function handleLeaveTeam() {
+    setLeaveError(null);
+    leaveTeam.mutate(
+      { reason: 'left_from_v1_web_member_page' },
+      {
+        onSuccess: () => router.push('/teams'),
+        onError: (err) => {
+          const responseCode = err instanceof V1ApiError ? err.code : undefined;
+          if (responseCode === 'CONCURRENT_UPDATE') {
+            setLeaveError('처리 중 팀 상태가 바뀌었어요. 다시 시도해 주세요.');
+          } else {
+            setLeaveError(extractErrorMessage(err, '팀을 나가지 못했어요. 다시 시도해 주세요.'));
+          }
+        },
+      },
+    );
+  }
 
   function handleSendInvitation() {
     const email = inviteEmail.trim();
@@ -365,14 +397,34 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
               tone: 'danger',
               confirmationPhrase: '확인했습니다',
             }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
+            selfLeave:
+              viewerMembershipId && member.membershipId === viewerMembershipId
+                ? {
+                    pending: leaveTeam.isPending,
+                    error: leaveError,
+                    activeOwnerCount: members.data?.summary.ownerCount,
+                    onSelect: () =>
+                      confirmAction(
+                        confirm,
+                        { title: '팀 나가기', message: '정말 이 팀을 나가시겠어요? 다시 가입하려면 새로 신청해야 해요.', confirmLabel: '나가기', tone: 'danger' },
+                        handleLeaveTeam,
+                      ),
+                  }
+                : undefined,
           }),
         )
       : fallback.members,
     requests: requestItems.map((application) =>
       toRequestModel(application, {
         actionPending,
-        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
-        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' })),
+        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate(
+          { applicationId: application.applicationId, note: null },
+          { onSuccess: () => trackEvent('team_application_accept', { teamId }) },
+        )),
+        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate(
+          { applicationId: application.applicationId, reason: 'rejected_from_v1_web_member_page' },
+          { onSuccess: () => trackEvent('team_application_reject', { teamId }) },
+        )),
       }),
     ),
     invitations: canManageInvitations
@@ -396,15 +448,23 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             displayName: inv.invitedUser.displayName,
             createdAt: inv.createdAt,
             message: inv.message,
-            cancelPending: cancelInvitation.isPending,
+            cancelPending: cancellingInvitations.has(inv.invitationId),
             onCancel: () =>
               confirmAction(
                 confirm,
-                { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '취소', tone: 'danger' },
-                () => cancelInvitation.mutate({ invitationId: inv.invitationId }),
+                { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '초대 취소', tone: 'danger' },
+                () => {
+                  cancellingInvitations.start(inv.invitationId);
+                  cancelInvitation.mutate(
+                    { invitationId: inv.invitationId },
+                    { onSettled: () => cancellingInvitations.finish(inv.invitationId) },
+                  );
+                },
               ),
           })),
           listLoading: invitationsQuery.isLoading,
+          listError: invitationsQuery.isError,
+          onRetry: () => void invitationsQuery.refetch(),
         }
       : undefined,
   };
@@ -459,6 +519,8 @@ function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
     tags: [levelTag, genderRule].filter(Boolean),
     genderRule,
+    ownerName: team.owner?.displayName,
+    managerName: team.manager?.displayName ?? null,
     intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
     next: team.activitySummary ?? team.activityAreaText ?? '',
   };
@@ -620,18 +682,68 @@ function splitTeamRegion(region?: { name: string; parentName?: string | null } |
   return { city, county: countyParts.join(' ') };
 }
 
-function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {
+/**
+ * 화면 전체가 참조하는 가입 상태 단일 소스.
+ *
+ * 팀 상세(`viewer.joinState`)와 join-eligibility는 별개 쿼리라 갱신 시점이 어긋난다.
+ * 예전에는 배지가 상세를, CTA 라벨이 eligibility를 각각 보고 있어서 신청 직후
+ * 둘이 다른 상태를 표시했다. 가입 가능 여부의 기준은 eligibility이므로 그 값을
+ * 우선하고, 아직 도착 전일 때만 상세로 폴백한다.
+ */
+function resolveJoinState(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string },
+): string {
+  return eligibility?.joinState ?? team.viewer.joinState;
+}
+
+function toDetailMode(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string },
+): TeamDetailViewModel['mode'] {
   if (isTeamMemberRole(team.viewer.role)) return 'mine';
-  if (team.viewer.joinState === 'requested') return 'pending';
+  if (resolveJoinState(team, eligibility) === 'requested') return 'pending';
   if (team.profile.joinPolicy === 'closed') return 'closed';
   return 'default';
 }
 
 function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
-  if (eligibility?.joinState === 'requested') return '신청 취소';
+  if (resolveJoinState(team, eligibility) === 'requested') return '신청 취소';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
+}
+
+/**
+ * CTA 성공 안내. 신청 성공 문구가 승인 대기를 명시하지 않으면 사용자는
+ * "신청이 곧 가입"이라 오해하고, 왜 팀에 못 들어가는지 알 수 없게 된다.
+ */
+function teamDetailCtaSuccessMessage(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string; eligible: boolean },
+): string | undefined {
+  if (isTeamMemberRole(team.viewer.role)) return '팀 채팅으로 이동해요.';
+  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소했어요.';
+  if (eligibility?.eligible) return '가입 신청을 보냈어요. 관리자가 승인하면 알림으로 알려드려요.';
+  return undefined;
+}
+
+function teamDetailCtaFailureMessage(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string; eligible: boolean },
+): string | undefined {
+  if (isTeamMemberRole(team.viewer.role)) return '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (eligibility?.eligible) return '가입 신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.';
+  return undefined;
+}
+
+function formatJoinRequestedAt(requestedAt?: string | null): string | undefined {
+  if (!requestedAt) return undefined;
+  // formatDate는 파싱 실패 시 '날짜 미정'을 돌려주므로 그대로 쓰면 "날짜 미정 신청"이 된다.
+  // 신청일은 부가 정보라 알 수 없으면 줄 자체를 감춘다.
+  if (Number.isNaN(new Date(requestedAt).getTime())) return undefined;
+  return `${formatDate(requestedAt)} 신청`;
 }
 
 function teamDetailCtaAction({
@@ -648,7 +760,7 @@ function teamDetailCtaAction({
   withdraw: () => Promise<unknown>;
 }): (() => void | Promise<unknown>) | undefined {
   if (isTeamMemberRole(team.viewer.role)) return chat;
-  if (eligibility?.joinState === 'requested') return withdraw;
+  if (resolveJoinState(team, eligibility) === 'requested') return withdraw;
   if (eligibility?.eligible) return join;
   return undefined;
 }
@@ -698,6 +810,8 @@ function toMemberModel(
     delegateOwner: () => void;
     demote: () => void;
     remove: () => void;
+    /** 본인 행에만 설정 — 나머지 멤버 행은 undefined */
+    selfLeave?: { pending: boolean; error?: string | null; activeOwnerCount: number | undefined; onSelect: () => void };
   },
 ): TeamMembersViewModel['members'][number] {
   const itemActions: TeamMembersViewModel['members'][number]['actions'] = [];
@@ -711,6 +825,7 @@ function toMemberModel(
   if (actions.canManageMembers && member.canRemove && member.role !== 'owner') {
     itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
   }
+  const ownerCanLeave = member.role !== 'owner' || (actions.selfLeave?.activeOwnerCount ?? 0) > 1;
 
   return {
     name: member.displayName,
@@ -720,6 +835,15 @@ function toMemberModel(
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions.actionPending,
+    selfLeave: actions.selfLeave
+      ? {
+          disabled: !ownerCanLeave,
+          disabledReason: ownerCanLeave ? undefined : '마지막 소유자는 소유권을 먼저 이전해주세요',
+          pending: actions.selfLeave.pending,
+          error: actions.selfLeave.error,
+          onSelect: actions.selfLeave.onSelect,
+        }
+      : undefined,
   };
 }
 

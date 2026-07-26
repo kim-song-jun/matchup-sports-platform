@@ -4,10 +4,11 @@
 
 This document covers VAPID key generation, loading, rotation, and rollback for the Teameet web-push notification system.
 
-- Backend: `apps/api/src/notifications/web-push.service.ts` (`WebPushService`)
-- Config: `apps/api/src/config/configuration.ts` (`vapid.*`)
+- Backend (v1, 현재 운영 대상): `apps/v1_api/src/notifications/web-push.service.ts` (`WebPushService`) — 세 환경변수를 `onModuleInit`에서 `process.env`로 직접 읽는다(별도 config 계층 없음)
+- Backend (legacy): `apps/api/src/notifications/web-push.service.ts` + `apps/api/src/config/configuration.ts` (`vapid.*`)
 - Public key endpoint: `GET /api/v1/notifications/vapid-public-key`
 - Push subscription endpoint: `POST /api/v1/notifications/push-subscribe`
+- 주입 경로: GitHub Actions secrets → `.github/workflows/deploy.yml` → `deploy/docker-compose.prod.yml` (`VAPID_*`)
 
 All three env vars (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) must be set for push to be active. Missing any one causes graceful disable (`WebPushService.enabled = false`) — the rest of the API continues to function normally.
 

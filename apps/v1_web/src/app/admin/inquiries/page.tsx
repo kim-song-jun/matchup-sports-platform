@@ -2,13 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Clock, Mail, MessageSquareText, Tag, UserRound } from 'lucide-react';
 import {
-  AdminCardList,
+  AdminDataTable,
   AdminEmpty,
   AdminFilterBar,
   AdminPageHeader,
-  AdminTableSkeleton,
+  AdminStatusPill,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
@@ -73,17 +72,26 @@ function formatDateTime(value: string | null | undefined) {
 }
 
 function requesterLabel(row: V1AdminInquiryRow) {
-  return row.requesterName ?? row.requesterEmail ?? row.userId.slice(0, 8);
+  if (row.isGuest) return '비회원';
+  return row.requesterName ?? row.requesterEmail ?? row.userId?.slice(0, 8) ?? '알 수 없음';
 }
+
+function requesterContact(row: V1AdminInquiryRow) {
+  const email = row.isGuest ? row.guestEmail : row.requesterEmail;
+  const phone = row.isGuest ? row.guestPhone : null;
+  if (email && phone) return `${email} · ${phone}`;
+  return email ?? phone ?? '-';
+}
+
+const PAGE_SIZE = 20;
 
 export default function AdminInquiriesPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
-  const [extraRows, setExtraRows] = useState<V1AdminInquiryRow[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
   const { toasts, showToast } = useAdminToast();
 
   useEffect(() => {
@@ -92,26 +100,22 @@ export default function AdminInquiriesPage() {
   }, [search]);
 
   useEffect(() => {
-    setExtraRows([]);
-    setNextCursor(null);
+    setPage(1);
   }, [debouncedSearch, activeStatus, activeCategory]);
 
   const filters: AdminListFilters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(activeCategory ? { category: activeCategory } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
-  const { data: firstPage, isPending, isError, error, refetch } = useV1AdminInquiries(filters);
+  const { data: firstPage, isPending, isFetching, isError, error, refetch } =
+    useV1AdminInquiries(filters);
 
-  useEffect(() => {
-    if (firstPage) {
-      setNextCursor(firstPage.nextCursor ?? firstPage.pageInfo?.nextCursor ?? null);
-    }
-  }, [firstPage]);
-
-  const rows = [...(firstPage?.items ?? []), ...extraRows];
+  const rows = firstPage?.items ?? [];
+  const pageInfo = firstPage?.pageInfo;
   const errorMessage = isError ? extractErrorMessage(error, '문의 목록을 불러오지 못했어요.') : undefined;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
     ...option,
@@ -125,23 +129,6 @@ export default function AdminInquiriesPage() {
     ...option,
     count: option.value ? categoryCounts?.[option.value] : categoryTotal,
   }));
-
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await v1Get<CursorPage<V1AdminInquiryRow>>('/admin/inquiries', {
-        ...filters,
-        cursor: nextCursor,
-      });
-      setExtraRows((prev) => [...prev, ...page.items]);
-      setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
-    } catch (err) {
-      showToast(extractErrorMessage(err, '추가 문의를 불러오지 못했어요.'), 'error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   return (
     <>
@@ -175,28 +162,82 @@ export default function AdminInquiriesPage() {
           }
         />
 
-        <AdminCardList<V1AdminInquiryRow>
+        {/* 문의는 제목·분류·상태를 한눈에 훑고 처리 대상을 고르는 목록이다. 카드 그리드로는
+            항목이 한둘일 때 화면 대부분이 비고, 제목이 카드 폭에 맞춰 잘렸다. */}
+        <AdminDataTable<V1AdminInquiryRow>
           rows={rows}
           keyExtractor={(row) => row.inquiryId}
           loading={isPending && rows.length === 0}
           error={errorMessage}
           onRetry={() => void refetch()}
           empty={<AdminEmpty title="문의가 없어요" description="검색어나 필터를 바꿔서 확인해 보세요." />}
-          skeletonCards={8}
-          card={(row) => ({
-            title: row.title,
-            subtitle: requesterLabel(row),
-            status: row.status,
-            statusLabel: STATUS_LABEL[row.status],
-            meta: [
-              { icon: <Tag size={14} aria-hidden="true" />, label: CATEGORY_LABEL[row.category] },
-              { icon: <UserRound size={14} aria-hidden="true" />, label: requesterLabel(row) },
-              { icon: <Mail size={14} aria-hidden="true" />, label: row.requesterEmail ?? '-' },
-              { icon: <MessageSquareText size={14} aria-hidden="true" />, label: `답변 ${row.replyCount}` },
-              { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
-            ],
-            tone: row.status === 'received' ? 'warning' : undefined,
-          })}
+          skeletonRows={8}
+          pagination={
+            pageInfo?.totalPages
+              ? {
+                  page: pageInfo.page ?? page,
+                  totalPages: pageInfo.totalPages,
+                  total: pageInfo.total ?? 0,
+                  limit: pageInfo.limit ?? PAGE_SIZE,
+                  onPageChange: setPage,
+                  loading: isFetching,
+                }
+              : undefined
+          }
+          tableMaxWidth="max-w-none"
+          rowTone={(row) => (row.status === 'received' ? 'warning' : undefined)}
+          columns={[
+            {
+              key: 'createdAt',
+              header: '접수',
+              width: 'w-[132px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+              ),
+            },
+            {
+              key: 'status',
+              header: '상태',
+              width: 'w-[104px]',
+              render: (row) => <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
+            },
+            {
+              key: 'category',
+              header: '분류',
+              width: 'w-[96px]',
+              render: (row) => <span className="text-gray-600">{CATEGORY_LABEL[row.category]}</span>,
+            },
+            {
+              key: 'title',
+              header: '제목',
+              render: (row) => (
+                <Link
+                  href={`/admin/inquiries/${row.inquiryId}`}
+                  className="block max-w-[420px] truncate font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                  title={row.title}
+                >
+                  {row.title}
+                </Link>
+              ),
+            },
+            {
+              key: 'requester',
+              header: '문의자',
+              width: 'w-[160px]',
+              render: (row) => (
+                <span className="block truncate text-gray-600" title={requesterContact(row)}>
+                  {requesterLabel(row)}
+                </span>
+              ),
+            },
+            {
+              key: 'replyCount',
+              header: '답변',
+              align: 'center',
+              width: 'w-[64px]',
+              render: (row) => <span className="tabular-nums text-gray-600">{row.replyCount}</span>,
+            },
+          ]}
           renderActions={(row) => (
             <Link
               href={`/admin/inquiries/${row.inquiryId}`}
@@ -206,20 +247,6 @@ export default function AdminInquiriesPage() {
             </Link>
           )}
         />
-
-        {nextCursor && !isPending && !isError ? (
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              onClick={() => void loadMore()}
-              disabled={loadingMore}
-              className="h-[44px] rounded-xl border border-gray-200 bg-white px-6 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-            >
-              {loadingMore ? '불러오는 중...' : '더 보기'}
-            </button>
-          </div>
-        ) : null}
-        {loadingMore ? <AdminTableSkeleton rows={4} /> : null}
       </div>
 
       <AdminToasts toasts={toasts} />

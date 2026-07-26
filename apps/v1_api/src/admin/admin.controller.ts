@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_HARD_CAP_BYTES } from '../uploads/uploads.controller';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -43,9 +44,13 @@ export class AdminController {
   }
 
   @Post('content-assets')
+  // UploadsService.storeFiles() is the single content validator (mimetype + precise
+  // 5MB) and returns clear 400s — see uploads.controller.ts's uploadFiles() for the
+  // full rationale. The multer fileSize limit here is only a hard DoS backstop
+  // (above the 5MB service limit), matching that same endpoint's cap.
   @UseInterceptors(FilesInterceptor('files', 1, {
     dest: UploadsService.UPLOAD_BASE,
-    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    limits: { fileSize: UPLOAD_HARD_CAP_BYTES, files: 1 },
   }))
   createContentAsset(
     @CurrentUser() user: V1AuthUser,
@@ -223,6 +228,12 @@ export class AdminController {
     return this.adminService.listInquiries(user, query);
   }
 
+  /** 사이드바 배지용 — received/reviewing(미답변) 문의 건수만 가볍게 반환 */
+  @Get('inquiries/pending-count')
+  getPendingInquiryCount(@CurrentUser() user: V1AuthUser) {
+    return this.adminService.getPendingInquiryCount(user);
+  }
+
   @Get('inquiries/:inquiryId')
   getInquiry(@CurrentUser() user: V1AuthUser, @Param('inquiryId') inquiryId: string) {
     return this.adminService.getInquiry(user, inquiryId);
@@ -235,6 +246,16 @@ export class AdminController {
     @Body() dto: ReplyInquiryDto,
   ) {
     return this.adminService.replyInquiry(user, inquiryId, dto);
+  }
+
+  @Patch('inquiries/:inquiryId/replies/:replyId')
+  updateInquiryReply(
+    @CurrentUser() user: V1AuthUser,
+    @Param('inquiryId') inquiryId: string,
+    @Param('replyId') replyId: string,
+    @Body() dto: ReplyInquiryDto,
+  ) {
+    return this.adminService.updateInquiryReply(user, inquiryId, replyId, dto);
   }
 
   @Post('inquiries/:inquiryId/status')

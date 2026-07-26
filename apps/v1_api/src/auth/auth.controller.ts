@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
@@ -6,10 +14,12 @@ import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
-import { V1AuthUser } from './v1-auth-user';
+import type { V1AuthUser } from './v1-auth-user';
 import { V1AuthGuard } from './v1-auth.guard';
+import { V1SessionCookieInterceptor } from './v1-session.interceptor';
 
 @Controller('auth')
+@UseInterceptors(V1SessionCookieInterceptor)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

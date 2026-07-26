@@ -15,7 +15,7 @@ import type { V1TournamentListItem } from '@/types/api';
 export function TournamentHeroCard({ items, loading = false }: { items: V1TournamentListItem[]; loading?: boolean }) {
   if (loading) {
     return (
-      <Card pad={0} style={{ overflow: 'hidden' }} aria-busy="true">
+      <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }} aria-busy="true">
         <div
           className="tm-featured-media"
           style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
@@ -28,7 +28,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             </div>
           </div>
         </div>
-        <div style={{ padding: 16 }}>
+        <div className="tm-featured-content">
           <div className="tm-review-skeleton" style={{ height: 20, borderRadius: 6, width: '72%' }} aria-hidden="true" />
           <div className="tm-review-skeleton" style={{ height: 14, borderRadius: 6, width: '54%', marginTop: 8 }} aria-hidden="true" />
         </div>
@@ -48,26 +48,27 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
         const badgeText = featured.promoHomeBadgeText?.trim() || '추천 대회';
         const imageUrl = featured.promoHomeImageUrl?.trim();
         const facts = [
-          featured.promoHomeDateText?.trim(),
-          featured.promoHomeTeamsText?.trim(),
-          featured.promoHomeLocationText?.trim(),
-          featured.promoHomePrizeText?.trim(),
-        ]
-          .filter(Boolean)
-          .join(' · ');
+          { kind: 'date', value: featured.promoHomeDateText?.trim() },
+          { kind: 'teams', value: featured.promoHomeTeamsText?.trim() },
+          { kind: 'location', value: featured.promoHomeLocationText?.trim() },
+          { kind: 'prize', value: featured.promoHomePrizeText?.trim() },
+        ].filter((fact): fact is { kind: string; value: string } => Boolean(fact.value));
 
         return (
           <Link
             key={featured.id}
             className="tm-featured-link tm-pressable"
-            href={`/tournaments/${featured.id}`}
+            href={featured.campaignSlug
+              ? `/tournaments/campaigns/${featured.campaignSlug}`
+              : `/tournaments/${featured.id}`}
             aria-label={`대회 상세 — ${cardTitle}`}
           >
-            <Card pad={0} style={{ overflow: 'hidden' }}>
+            <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
               <div
                 className="tm-featured-media"
                 style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
               >
+                {/* 은은한 트로피 워터마크 (장식) — 세로 중앙·우측 살짝 블리드(상단 잘림 방지) */}
                 {!imageUrl ? (
                   <div
                     aria-hidden="true"
@@ -89,13 +90,33 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
                   </div>
                 </div>
               </div>
-              <div style={{ padding: 16 }}>
-                <div className="tm-text-body-lg">{cardBody}</div>
-                {facts ? (
-                  <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                    {facts}
-                  </div>
-                ) : null}
+              <div className="tm-featured-content tm-featured-content-with-cta">
+                <div className="tm-featured-copy">
+                  <div className="tm-text-body-lg">{cardBody}</div>
+                  {facts.length > 0 ? (
+                    <div
+                      className="tm-text-caption tm-featured-meta"
+                      style={{ marginTop: 6, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
+                    >
+                      {facts.map((fact) => (
+                        <span
+                          key={`${featured.id}-${fact.kind}`}
+                          style={fact.kind === 'date'
+                            ? { color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }
+                            : undefined}
+                        >
+                          {fact.value}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <span
+                  className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
+                  aria-hidden="true"
+                >
+                  참가 신청하기
+                </span>
               </div>
             </Card>
           </Link>

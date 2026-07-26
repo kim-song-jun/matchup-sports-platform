@@ -2,25 +2,21 @@ name: CI / Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
-    inputs:
-      reset_db:
-        description: 'DANGER: Drop all tables, re-run migrations, re-seed'
-        required: false
-        default: false
-        type: boolean
-      run_seed:
-        description: 'DANGER: Run destructive full seed data refresh'
-        required: false
-        default: false
-        type: boolean
 
+permissions:
+  contents: read
+
+# PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
+# - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
+# - main push · workflow_dispatch: 취소 없이 직렬 큐
+# 프로덕션 배포 직렬화는 deploy job의 job-level concurrency가 담당
 concurrency:
-  group: deploy-production
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # ── Test job: runs on every push and PR ─────────────────────────────────────
@@ -53,6 +49,42 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify release changeset
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            BASE_SHA="$(git merge-base origin/main "${HEAD_SHA}")"
+          fi
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > /tmp/teameet-changed-files.txt
+          node scripts/release/check-changeset-policy.mjs \
+            --repo . \
+            --changed-files-file /tmp/teameet-changed-files.txt
+
+      - name: Validate planned SemVer
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        env:
+          RELEASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          if find .changeset -maxdepth 1 -type f -name '*.md' ! -name README.md -print -quit | grep -q .; then
+            release_date="$(git show -s --format=%cs "${RELEASE_SHA}")"
+            node scripts/release/resolve-changeset-version.mjs \
+              --repo . \
+              --sha "${RELEASE_SHA}" \
+              --date "${release_date}" |
+              jq -e '.stableVersion and .prereleaseVersion'
+          else
+            echo "No unreleased Changesets; planned release validation skipped"
+          fi
+
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
@@ -60,66 +92,57 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Get pnpm store path
-        id: pnpm-cache
-        run: echo "store=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.store }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-${{ runner.os }}-
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: V1 DB guardrails
         run: pnpm qa:v1-db-guardrails
 
-      - name: Generate Prisma client
-        run: cd apps/api && pnpm prisma generate
-
-      - name: Lint (all packages)
-        run: pnpm lint
-
-      - name: Type-check (parallel)
-        run: |
-          (cd apps/api && npx tsc --noEmit) & pid1=$!
-          (cd apps/web && npx tsc --noEmit) & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
-
-      - name: Unit tests (parallel)
-        run: |
-          pnpm --filter api test & pid1=$!
-          pnpm --filter web test & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
-
-      - name: Prisma DB push (integration test schema)
-        run: cd apps/api && pnpm prisma db push
-
-      - name: Integration tests
-        run: pnpm --filter api test:integration
+      - name: Production deploy security guardrails
+        run: pnpm qa:production-deploy-security
 
       - name: Generate V1 Prisma client
         run: cd apps/v1_api && pnpm prisma generate
 
-      - name: V1 unit tests (parallel)
+      - name: V1 lint and type-check (sequential)
         run: |
-          pnpm --filter v1_api test & pid1=$!
-          pnpm --filter v1_web test & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
+          pnpm --filter v1_api exec tsc --noEmit
+          pnpm --filter v1_web lint
 
-      - name: V1 build checks (parallel)
+      # 마이그레이션 게이트: 빈 DB에 전체 체인 재생 + schema.prisma 드리프트 0 검증.
+      # db push로만 스키마를 바꾸면 여기서 CI가 깨진다 — 반드시 migration 파일 동반.
+      # (2026-07-12 프로덕션 장애 재발 방지: 리뷰 테이블 migration 누락 → deploy 중단)
+      - name: V1 migration replay + drift gate
+        env:
+          PGPASSWORD: teameet_test
+          MIGRATE_URL: postgresql://teameet_test:teameet_test@localhost:5432/v1_migrate_check
         run: |
-          pnpm --filter v1_api build & pid1=$!
-          pnpm --filter v1_web build & pid2=$!
-          wait $pid1 || exit 1
-          wait $pid2 || exit 1
+          psql -h localhost -U teameet_test -d teameet_test -c "CREATE DATABASE v1_migrate_check;"
+          cd apps/v1_api
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/prisma migrate deploy
+          ./node_modules/.bin/prisma migrate diff \
+            --from-url "$MIGRATE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+          DATABASE_URL="$MIGRATE_URL" pnpm test:integration
+          echo "migration chain OK — empty-DB replay clean, zero schema drift"
+
+      - name: V1 unit tests (sequential)
+        run: |
+          pnpm --filter v1_api test
+          pnpm --filter v1_web test
+
+      # Next.js 빌드 캐시 — build check를 가볍게 (incremental compile 재사용)
+      - name: Cache Next.js build cache (v1_web)
+        uses: actions/cache@v4
+        with:
+          path: apps/v1_web/.next/cache
+          key: nextjs-v1web-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            nextjs-v1web-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: V1 build checks (sequential)
+        run: |
+          pnpm --filter v1_api build
+          pnpm --filter v1_web build
 
   # ── Deploy job: runs on push to main or manual dispatch, after tests pass ──
   deploy:
@@ -127,67 +150,95 @@ jobs:
     needs: test
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    # 수동 승인 게이트: production environment의 required reviewer가
+    # GitHub UI에서 승인해야 배포가 시작된다 (main push 자동 배포 제거)
+    environment: production
+    # 프로덕션 배포 직렬화: 진행 중 배포는 취소하지 않고 뒤에 큐잉
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
+          set -Eeuo pipefail
+          if [[ -z "${EC2_HOST}" || -z "${EC2_KNOWN_HOSTS}" || -z "${EC2_SSH_KEY}" ]]; then
+            echo "EC2_HOST, EC2_KNOWN_HOSTS, and EC2_SSH_KEY are required" >&2
+            exit 1
+          fi
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${EC2_SSH_KEY}" > ~/.ssh/deploy_key
+          printf '%s\n' "${EC2_KNOWN_HOSTS}" > ~/.ssh/known_hosts
           chmod 400 ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/known_hosts
+          if ! ssh-keygen -F "${EC2_HOST}" -f ~/.ssh/known_hosts >/dev/null; then
+            echo "EC2_KNOWN_HOSTS does not contain the configured EC2_HOST" >&2
+            exit 1
+          fi
           cat >> ~/.ssh/config << EOF
           Host ec2
-            HostName ${{ secrets.EC2_HOST }}
+            HostName ${EC2_HOST}
             User ec2-user
             IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
           EOF
 
       - name: Sync code
         run: |
           rsync -avz --delete \
-            --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
+            --exclude node_modules --exclude .next --exclude dist --exclude .git \
+            --exclude backups --exclude 'deploy/certbot' \
+            --filter 'protect backups/***' \
             --filter 'protect deploy/.env' \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            ./ ec2-user@${{ secrets.EC2_HOST }}:~/teameet/
+            -e "ssh" \
+            ./ ec2:~/teameet/
 
       - name: Build and deploy
         timeout-minutes: 35
         env:
-          RESET_DB: ${{ inputs.reset_db }}
-          RUN_SEED: ${{ inputs.run_seed }}
-          TOSS_CLIENT_KEY_SECRET: ${{ secrets.TOSS_CLIENT_KEY }}
-          TOSS_SECRET_KEY_SECRET: ${{ secrets.TOSS_SECRET_KEY }}
-          TOSS_WEBHOOK_SECRET_SECRET: ${{ secrets.TOSS_WEBHOOK_SECRET }}
-          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
-          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
-          OPS_ALERT_WEBHOOK_URL_SECRET: ${{ secrets.OPS_ALERT_WEBHOOK_URL }}
           KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
+          # 공개 동의항목 목록이라 시크릿이 아닌 repository variable.
+          KAKAO_SCOPE_SECRET: ${{ vars.KAKAO_SCOPE }}
           V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
+          GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
+          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
         run: |
-          TOSS_CLIENT_KEY_B64="$(printf '%s' "${TOSS_CLIENT_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          TOSS_SECRET_KEY_B64="$(printf '%s' "${TOSS_SECRET_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          TOSS_WEBHOOK_SECRET_B64="$(printf '%s' "${TOSS_WEBHOOK_SECRET_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
-          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
-          OPS_ALERT_WEBHOOK_URL_B64="$(printf '%s' "${OPS_ALERT_WEBHOOK_URL_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
+          KAKAO_SCOPE_B64="$(printf '%s' "${KAKAO_SCOPE_SECRET:-}" | base64 | tr -d '\n')"
           V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
+          GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
 
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "RESET_DB='${RESET_DB:-}' RUN_SEED='${RUN_SEED:-}' TOSS_CLIENT_KEY_B64='${TOSS_CLIENT_KEY_B64}' TOSS_SECRET_KEY_B64='${TOSS_SECRET_KEY_B64}' TOSS_WEBHOOK_SECRET_B64='${TOSS_WEBHOOK_SECRET_B64}' VAPID_PUBLIC_KEY_B64='${VAPID_PUBLIC_KEY_B64}' VAPID_PRIVATE_KEY_B64='${VAPID_PRIVATE_KEY_B64}' VAPID_SUBJECT_B64='${VAPID_SUBJECT_B64}' OPS_ALERT_WEBHOOK_URL_B64='${OPS_ALERT_WEBHOOK_URL_B64}' KAKAO_CLIENT_ID_B64='${KAKAO_CLIENT_ID_B64}' KAKAO_CLIENT_SECRET_B64='${KAKAO_CLIENT_SECRET_B64}' KAKAO_REDIRECT_URI_B64='${KAKAO_REDIRECT_URI_B64}' V1_HOST_ADMIN_PASSWORD_B64='${V1_HOST_ADMIN_PASSWORD_B64}' bash -se" <<'EOF'
+          {
+            printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
+            printf 'KAKAO_CLIENT_SECRET_B64=%s\n' "${KAKAO_CLIENT_SECRET_B64}"
+            printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
+            printf 'KAKAO_SCOPE_B64=%s\n' "${KAKAO_SCOPE_B64}"
+            printf 'V1_HOST_ADMIN_PASSWORD_B64=%s\n' "${V1_HOST_ADMIN_PASSWORD_B64}"
+            printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
+            printf 'VAPID_PUBLIC_KEY_B64=%s\n' "${VAPID_PUBLIC_KEY_B64}"
+            printf 'VAPID_PRIVATE_KEY_B64=%s\n' "${VAPID_PRIVATE_KEY_B64}"
+            printf 'VAPID_SUBJECT_B64=%s\n' "${VAPID_SUBJECT_B64}"
+            cat <<'REMOTE_SCRIPT'
           set -euo pipefail
-
-          RESET_DB="${RESET_DB:-false}"
-          RUN_SEED="${RUN_SEED:-false}"
 
           cd ~/teameet
 
@@ -231,32 +282,18 @@ jobs:
             exit 1
           fi
 
-          sync_env_from_github_secret "TOSS_CLIENT_KEY" "${TOSS_CLIENT_KEY_B64:-}"
-          sync_env_from_github_secret "TOSS_SECRET_KEY" "${TOSS_SECRET_KEY_B64:-}"
-          sync_env_from_github_secret "TOSS_WEBHOOK_SECRET" "${TOSS_WEBHOOK_SECRET_B64:-}"
-          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
-          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
-          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
-          sync_env_from_github_secret "OPS_ALERT_WEBHOOK_URL" "${OPS_ALERT_WEBHOOK_URL_B64:-}"
           sync_env_from_github_secret "KAKAO_CLIENT_ID" "${KAKAO_CLIENT_ID_B64:-}"
           sync_env_from_github_secret "KAKAO_CLIENT_SECRET" "${KAKAO_CLIENT_SECRET_B64:-}"
           sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
+          sync_env_from_github_secret "KAKAO_SCOPE" "${KAKAO_SCOPE_B64:-}"
           sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
+          sync_env_from_github_secret "GA_MEASUREMENT_ID" "${GA_MEASUREMENT_ID_B64:-}"
+          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
 
-          # Harden deploy/.env perms against EC2 umask 022 — contains VAPID_PRIVATE_KEY and other secrets
+          # Harden deploy/.env perms against EC2 umask 022 — contains DB_PASSWORD/JWT_SECRET and other secrets
           chmod 600 deploy/.env
-
-          # Auto-set REALTIME_ALLOWED_ORIGINS if not already configured
-          if ! grep -q '^REALTIME_ALLOWED_ORIGINS=.' deploy/.env 2>/dev/null; then
-            _DEPLOY_PUBLIC_IP=$(curl -s --connect-timeout 3 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "")
-            if [ -n "$_DEPLOY_PUBLIC_IP" ]; then
-              tmp_env=$(mktemp)
-              awk 'index($0, "REALTIME_ALLOWED_ORIGINS=") != 1' deploy/.env > "$tmp_env"
-              printf 'REALTIME_ALLOWED_ORIGINS=http://%s,https://%s\n' "$_DEPLOY_PUBLIC_IP" "$_DEPLOY_PUBLIC_IP" >> "$tmp_env"
-              mv "$tmp_env" deploy/.env
-              echo "[INFO] Auto-set REALTIME_ALLOWED_ORIGINS for $_DEPLOY_PUBLIC_IP"
-            fi
-          fi
 
           set -a
           . deploy/.env
@@ -270,13 +307,17 @@ jobs:
             fi
           done
 
-          WEB_INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}"
           V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}"
+
+          if ! sudo docker buildx version >/dev/null 2>&1; then
+            echo "[ERROR] Docker BuildKit/buildx is required for production image builds"
+            exit 1
+          fi
 
           # ── Pre-build disk cleanup ────────────────────────────────────────
           # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
           # dangling images, stopped containers, and unused build cache.
-          # Volumes are NOT touched (postgres/redis data must persist).
+          # Volumes are NOT touched (v1_postgres data must persist).
           echo "[cleanup] Disk usage before prune:"
           df -h / | tail -1
           # Use `docker image prune -f` (without -a) to remove only dangling images.
@@ -284,57 +325,38 @@ jobs:
           # postgres:16-alpine, etc.) forcing a full re-pull on every deploy.
           sudo docker image prune -f || true
           sudo docker container prune -f || true
-          sudo docker builder prune -a -f || true
+          BUILDX_PRUNE_HELP="$(sudo docker buildx prune --help)"
+          for required_flag in --max-used-space --min-free-space; do
+            if ! grep -q -- "${required_flag}" <<<"${BUILDX_PRUNE_HELP}"; then
+              echo "[ERROR] Docker Buildx must support ${required_flag} for bounded production cache cleanup"
+              exit 1
+            fi
+          done
+          sudo docker buildx prune -f --filter 'until=168h'
+          sudo docker buildx prune -f --max-used-space 10GB --min-free-space 20GB
           sudo docker network prune -f || true
           echo "[cleanup] Disk usage after prune:"
           df -h / | tail -1
 
-          sudo docker build --no-cache -f deploy/Dockerfile.api -t teameet-api .
-          sudo docker build --no-cache \
-            -f deploy/Dockerfile.web \
-            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-            --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
-            --build-arg INTERNAL_API_ORIGIN="${WEB_INTERNAL_API_ORIGIN}" \
-            -t teameet-web .
-          sudo docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
-          sudo docker build --no-cache \
+          sudo env DOCKER_BUILDKIT=1 docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
+          sudo env DOCKER_BUILDKIT=1 docker build --no-cache \
             -f deploy/Dockerfile.v1-web \
-            --build-arg NEXT_PUBLIC_API_URL=/v1/api/v1 \
+            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
             --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \
-            --build-arg NEXT_PUBLIC_BASE_PATH=/v1 \
             --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
             --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
+            --build-arg NEXT_PUBLIC_KAKAO_SCOPE="${KAKAO_SCOPE:-}" \
+            --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${GA_MEASUREMENT_ID:-}" \
             -t teameet-v1-web .
 
           cd deploy
 
-          # ── Ensure postgres and redis are running before migrations ───────
+          # ── Ensure v1_postgres is running before migrations ────────────────
           # network prune above may have removed the deploy_default network.
-          # Start DB services first so the migration container can reach them.
+          # Start the DB service first so the migration container can reach it.
           echo "[INFO] Starting database services..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis v1_postgres
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
 
-          echo "[INFO] Waiting for postgres to be healthy..."
-          for i in $(seq 1 30); do
-            if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T postgres \
-                pg_isready >/dev/null 2>&1; then
-              echo "[INFO] postgres is ready (attempt $i)"
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "[ERROR] postgres did not become healthy in time"
-              exit 1
-            fi
-            sleep 2
-          done
-
-          # ── Bootstrap or apply database migrations before new containers ──
-          # Empty databases cannot replay the current migration chain from
-          # scratch because the repo lacks an old baseline migration. In that
-          # case we bootstrap the current schema with prisma db push and mark
-          # the existing migrations as applied. Non-empty databases still use
-          # migrate deploy, and a non-empty DB without migration history fails
-          # closed instead of auto-resolving unknown drift.
           echo "[INFO] Waiting for v1_postgres to be healthy..."
           for i in $(seq 1 30); do
             if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T v1_postgres \
@@ -349,34 +371,29 @@ jobs:
             sleep 2
           done
 
-          echo "[INFO] Bootstrapping deploy database..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/bootstrap-deploy-db.ts"
           echo "[INFO] Syncing v1 deploy database schema..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
           echo "[INFO] Build phase complete."
-          EOF
+          REMOTE_SCRIPT
+          } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
 
       - name: Restart containers
         timeout-minutes: 15
         run: |
           ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 \
-            "RESET_DB='${{ inputs.reset_db }}' RUN_SEED='${{ inputs.run_seed }}' bash ~/teameet/deploy/restart-containers.sh"
+            "bash ~/teameet/deploy/restart-containers.sh"
 
       - name: Health check
         run: |
           for i in $(seq 1 12); do
-            if ssh ec2 'curl -fsS http://localhost:8100/api/v1/health | \
-                        jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null 2>&1 && \
-                        curl -fsS http://localhost:8121/api/v1/health | \
+            if ssh ec2 'curl -fsS --connect-timeout 5 --max-time 15 http://localhost:8121/api/v1/health | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        curl -fsS http://localhost/landing > /dev/null 2>&1 && \
-                        curl -fsS http://localhost/v1/landing > /dev/null 2>&1 && \
-                        curl -fsSI http://localhost/v1/api/v1/health | \
-                        grep -qE "^HTTP/[0-9.]+ 301" && \
-                        curl -fsSI http://localhost/api/v1/health | \
-                        grep -qE "^HTTP/[0-9.]+ 301"'; then
+                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w "%{http_code}" https://teameet.co.kr/landing 2>/dev/null | \
+                        grep -qx 200 && \
+                        curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/api/v1/health 2>/dev/null | \
+                        jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
+                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "404"'; then
               echo "Deploy OK"
               exit 0
             fi

@@ -1,11 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1OnboardingStatus } from '@prisma/client';
-import { getPendingSocialSignupRoute } from '../auth/social-signup-access';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateOnboardingPreferencesDto } from './dto/update-onboarding-preferences.dto';
 import { V1OnboardingStep, derivePreferenceStatus, getMissing, getOnboardingDetail, hasAcceptedRequiredTerms } from './onboarding-summary';
@@ -245,13 +245,24 @@ export class OnboardingService {
       });
     }
 
-    const pendingSignupRoute = getPendingSocialSignupRoute(user.onboardingStatus);
-    if (pendingSignupRoute) {
-      throw new ForbiddenException({
-        code: 'SIGNUP_INCOMPLETE',
-        message: 'Social signup must be completed before onboarding can be changed',
-        details: { next: { route: pendingSignupRoute } },
-      });
+    switch (user.onboardingStatus) {
+      case 'social_terms_required':
+        throw onboardingStepRequired('/terms?mode=social');
+      case 'social_profile_required':
+        throw onboardingStepRequired('/signup/social');
+      case 'not_started':
+      case 'terms_done':
+      case 'signup_done':
+      case 'sport_done':
+      case 'level_done':
+      case 'region_done':
+      case 'completed':
+      case 'deferred':
+        return;
+      default: {
+        const exhaustiveStatus: never = user.onboardingStatus;
+        return exhaustiveStatus;
+      }
     }
   }
 
@@ -356,5 +367,13 @@ function validationError(message: string, field: string) {
     code: 'VALIDATION_FAILED',
     message,
     details: { field },
+  });
+}
+
+function onboardingStepRequired(requiredRoute: '/terms?mode=social' | '/signup/social') {
+  return new ConflictException({
+    code: 'ONBOARDING_STEP_REQUIRED',
+    message: 'Complete the required signup step before continuing onboarding',
+    details: { requiredRoute },
   });
 }

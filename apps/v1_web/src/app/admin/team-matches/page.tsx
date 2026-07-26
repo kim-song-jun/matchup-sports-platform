@@ -12,7 +12,8 @@ import { Activity, Clock, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminReasonModal,
   AdminEmpty,
   STATUS_META,
@@ -56,6 +57,8 @@ const REASON_MODAL_STATUS_OPTIONS = [
   { value: 'archived', label: STATUS_META['archived']?.label ?? '보관' },
 ];
 
+const PAGE_SIZE = 20;
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamMatchesPage() {
@@ -75,49 +78,25 @@ export default function AdminTeamMatchesPage() {
 
   const handleStatusChange = (value: string) => {
     setActiveStatus(value);
-    setAccumulatedRows([]);
-    setCursor(null);
-    setNextCursor(null);
+    setPage(1);
   };
 
-  // ── Cursor pagination ──────────────────────────────────────────────
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [accumulatedRows, setAccumulatedRows] = useState<V1AdminTeamMatchRow[]>([]);
-  // Persisted so the "더 보기" button survives the next-page fetch (data is
-  // briefly undefined) and a failed fetch (data stays undefined) — otherwise
-  // the button would vanish mid-load and permanently on error, blocking retry.
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
 
   const filters = {
     ...(activeStatus ? { status: activeStatus } : {}),
-    ...(cursor ? { cursor } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
   const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeamMatches(filters);
+  const rows = data?.items ?? [];
+  const pageInfo = data?.pageInfo;
   const statusOptions = STATUS_OPTIONS.map((option) => ({
     ...option,
     count: option.value ? data?.summary.byStatus[option.value] : data?.summary.total,
   }));
-
-  // Accumulate rows as pages load
-  useEffect(() => {
-    if (!data?.items) return;
-    if (!cursor) {
-      setAccumulatedRows(data.items);
-    } else {
-      setAccumulatedRows((prev) => [...prev, ...data.items]);
-    }
-    setNextCursor(data.nextCursor ?? data.pageInfo?.nextCursor ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
-  const hasMore = !!nextCursor;
-  const loadMoreFailed = isError && accumulatedRows.length > 0;
-
-  const handleLoadMore = () => {
-    if (nextCursor) setCursor(nextCursor);
-  };
 
   // ── Moderation modal ───────────────────────────────────────────────
   const [modalRow, setModalRow] = useState<V1AdminTeamMatchRow | null>(null);
@@ -134,9 +113,8 @@ export default function AdminTeamMatchesPage() {
         onSuccess: () => {
           setModalRow(null);
           showToast('팀매치 상태를 변경했어요.', 'success');
-          setAccumulatedRows([]);
-          setCursor(null);
-          setNextCursor(null);
+          // 방금 바꾼 행이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
+          setPage(1);
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
@@ -146,7 +124,7 @@ export default function AdminTeamMatchesPage() {
   };
 
   // ── Loading / error for initial load ───────────────────────────────
-  const isInitialLoad = isPending && accumulatedRows.length === 0;
+  const isInitialLoad = isPending && rows.length === 0;
 
   return (
     <>
@@ -170,25 +148,57 @@ export default function AdminTeamMatchesPage() {
       </div>
 
       {/* Card list */}
-      <AdminCardList<V1AdminTeamMatchRow>
-        rows={accumulatedRows}
+      <AdminDataTable<V1AdminTeamMatchRow>
+        rows={rows}
         keyExtractor={(r) => r.teamMatchId}
-        card={(row) => ({
-          title: row.title,
-          subtitle: row.hostTeamName,
-          status: row.status,
-          meta: [
-            { icon: <Activity size={14} aria-hidden="true" />, label: row.sportName },
-            { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.startAt) },
-            { icon: <Calendar size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
-          ],
-          tone:
-            row.status === 'cancelled'
-              ? 'danger'
-              : row.status === 'archived'
-                ? 'warning'
-                : undefined,
-        })}
+        tableMaxWidth="max-w-none"
+        rowTone={(row) =>
+          row.status === 'cancelled' ? 'danger' : row.status === 'archived' ? 'warning' : undefined
+        }
+        columns={[
+          {
+            key: 'startAt',
+            header: '시작',
+            width: 'w-[132px]',
+            render: (row) => (
+              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.startAt)}</span>
+            ),
+          },
+          {
+            key: 'status',
+            header: '상태',
+            width: 'w-[104px]',
+            render: (row) => <AdminStatusPill status={row.status} />,
+          },
+          {
+            key: 'title',
+            header: '팀매칭',
+            render: (row) => (
+              <div className="min-w-0">
+                <span className="block truncate font-medium text-gray-900" title={row.title}>
+                  {row.title}
+                </span>
+                <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                  {row.hostTeamName}
+                </span>
+              </div>
+            ),
+          },
+          {
+            key: 'sportName',
+            header: '종목',
+            width: 'w-[96px]',
+            render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+          },
+          {
+            key: 'createdAt',
+            header: '생성',
+            width: 'w-[132px]',
+            render: (row) => (
+              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+            ),
+          },
+        ]}
         renderActions={
           canWrite
             ? (row) => (
@@ -208,6 +218,18 @@ export default function AdminTeamMatchesPage() {
             : undefined
         }
         loading={isInitialLoad}
+        pagination={
+          pageInfo?.totalPages
+            ? {
+                page: pageInfo.page ?? page,
+                totalPages: pageInfo.totalPages,
+                total: pageInfo.total ?? 0,
+                limit: pageInfo.limit ?? PAGE_SIZE,
+                onPageChange: setPage,
+                loading: isFetching,
+              }
+            : undefined
+        }
         empty={
           <AdminEmpty
             title="검색 결과가 없어요"
@@ -215,29 +237,27 @@ export default function AdminTeamMatchesPage() {
           />
         }
         error={
-          isError && accumulatedRows.length === 0
+          isError && rows.length === 0
             ? extractErrorMessage(error, '팀매치 목록을 불러오지 못했어요.')
             : undefined
         }
         onRetry={() => void refetch()}
-        skeletonCards={8}
+        skeletonRows={8}
       />
 
-      {/* Load more */}
-      {hasMore && !isInitialLoad && (
+      {/* 페이지 이동 실패는 목록이 비어 보이지 않으므로 따로 알린다. */}
+      {isError && rows.length > 0 && (
         <div className="mt-4 flex flex-col items-center gap-1.5">
-          {loadMoreFailed && (
-            <p className="text-[var(--font-size-label)] text-red-500" role="alert">
-              {extractErrorMessage(error, '다음 목록을 불러오지 못했어요.')}
-            </p>
-          )}
+          <p className="text-[var(--font-size-label)] text-red-500" role="alert">
+            {extractErrorMessage(error, '목록을 불러오지 못했어요.')}
+          </p>
           <button
             type="button"
-            onClick={loadMoreFailed ? () => void refetch() : handleLoadMore}
+            onClick={() => void refetch()}
             disabled={isFetching}
             className="inline-flex items-center h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
-            {isFetching ? '불러오는 중…' : loadMoreFailed ? '다시 시도' : '더 보기'}
+            {isFetching ? '불러오는 중…' : '다시 시도'}
           </button>
         </div>
       )}

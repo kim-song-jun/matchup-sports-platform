@@ -1,6 +1,7 @@
-import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { RequiredSignupProfileDto } from './required-signup-profile.dto';
 
-export class RegisterDto {
+export class RegisterDto extends RequiredSignupProfileDto {
   @IsString()
   @MinLength(2)
   nickname!: string;
@@ -13,34 +14,17 @@ export class RegisterDto {
   @MinLength(8)
   password!: string;
 
-  @IsIn(['male', 'female'])
-  gender!: 'male' | 'female';
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  realName?: string;
-
-  /** @deprecated Rolling-deploy compatibility for clients that predate realName. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  displayName?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d{11}$/)
-  phone?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d{8}$/)
-  birthDate?: string;
-
-  @IsOptional()
-  @IsString()
-  profileImageUrl?: string;
-
   @IsBoolean()
   requiredTermsAccepted!: boolean;
+
+  @IsArray()
+  @IsDefined()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  acceptedTermsDocumentIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  phoneProofToken?: string;
 }

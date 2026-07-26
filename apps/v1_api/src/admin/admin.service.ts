@@ -3,16 +3,20 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
   Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { isSafePopupLink } from '../popups/popup-screen';
+import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
 import {
@@ -79,13 +83,25 @@ const ADMIN_LIST_STATUSES = ['active', 'suspended', 'revoked'] as const;
 
 @Injectable()
 export class AdminService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(AdminService.name);
   private staleAssetCleanupTimer?: ReturnType<typeof setInterval>;
   private staleAssetCleanupRun?: Promise<void>;
 
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly uploadsService?: UploadsService,
+    // Optional: AdminModule always wires RealtimeModule in production (see
+    // admin.module.ts), so these resolve normally there. They're marked
+    // optional purely so unit-test modules for other AdminService methods
+    // (which have no reason to know about realtime disconnection) don't have
+    // to provide unrelated mocks just to compile — changeUserStatus() itself
+    // treats a missing/failing gateway as non-fatal via optional chaining +
+    // try/catch below, consistent with "realtime failures must never block a
+    // status change."
+    @Optional() private readonly realtimeGateway?: RealtimeGateway,
+    @Optional() @InjectPinoLogger(AdminService.name) private readonly logger?: PinoLogger,
+    // Optional for the same reason as realtimeGateway: AdminModule imports
+    // NotificationsModule in production, so this always resolves there.
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   onModuleInit() {
@@ -116,7 +132,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const admin = await this.getMutationAdmin(user.id);
     if (!this.uploadsService) throw new ConflictException({ code: 'UPLOADS_UNAVAILABLE', message: '콘텐츠 이미지 저장소를 사용할 수 없어요.' });
     await this.runStaleTemporaryAssetCleanup();
-    const stored = await this.uploadsService.storeFiles(files);
+    const stored = await this.uploadsService.storeFiles(files, user.id);
     const url = stored.urls[0];
     if (!url) throw new BadRequestException({ code: 'CONTENT_ASSET_REQUIRED', message: '이미지 파일을 선택해 주세요.' });
     try {
@@ -196,19 +212,36 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   }
 
   async changeUserStatus(user: V1AuthUser, userId: string, dto: ChangeUserStatusDto) {
-    const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+    const result = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const admin = await this.getTransactionMutationAdmin(tx, user.id);
+      await this.lockUserRow(tx, userId);
 
-    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
-    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
-      throw new ForbiddenException({
-        code: 'PERMISSION_DENIED',
-        message: '운영자 계정의 상태는 owner만 변경할 수 있어요.',
-      });
-    }
+      const target = await tx.v1User.findUnique({ where: { id: userId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
 
-    return this.prisma.$transaction(async (tx) => {
+      const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
+      if (targetAdminRecord?.status === 'active') {
+        if (admin.userId === userId && dto.status !== 'active') {
+          throw new ConflictException({
+            code: 'SELF_LOCKOUT',
+            message: 'Active admins cannot disable their own user account',
+          });
+        }
+        if (admin.adminRole !== 'owner') {
+          throw new ForbiddenException({
+            code: 'PERMISSION_DENIED',
+            message: '운영자 계정의 상태는 owner만 변경할 수 있어요.',
+          });
+        }
+        if (dto.status !== 'active') {
+          throw new ConflictException({
+            code: 'ADMIN_ACCESS_ACTIVE',
+            message: 'Revoke admin access before disabling the user account',
+          });
+        }
+      }
+
       const updated = await tx.v1User.update({ where: { id: userId }, data: { accountStatus: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -226,23 +259,54 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         tx,
       );
     });
+
+    // Disable-class statuses must cut off any realtime channel the user already
+    // holds — otherwise a socket connected before this change keeps receiving
+    // notifications/chat until it happens to reconnect. This runs after the
+    // transaction commits and must never roll back the status change itself if
+    // the gateway throws, so it's isolated in its own try/catch (same
+    // fire-and-forget isolation pattern as NotificationsService.emitToUser).
+    if (dto.status === 'suspended' || dto.status === 'blocked' || dto.status === 'deleted') {
+      try {
+        this.realtimeGateway?.forceDisconnectUser(userId);
+      } catch (err) {
+        this.logger?.warn({ userId, status: dto.status, err }, '상태 변경 후 실시간 소켓 강제 종료 실패');
+      }
+    }
+
+    return result;
   }
 
   async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {
-    const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1User.findUnique({ where: { id: userId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-
-    const targetAdminRecord = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
-    if (targetAdminRecord && targetAdminRecord.status === 'active' && admin.adminRole !== 'owner') {
-      throw new ForbiddenException({
-        code: 'PERMISSION_DENIED',
-        message: '운영자 계정은 owner만 삭제할 수 있어요.',
-      });
-    }
-
     const deletedAt = new Date();
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const admin = await this.getTransactionMutationAdmin(tx, user.id);
+      await this.lockUserRow(tx, userId);
+
+      const target = await tx.v1User.findUnique({ where: { id: userId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+      const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
+      if (targetAdminRecord?.status === 'active') {
+        if (admin.userId === userId) {
+          throw new ConflictException({
+            code: 'SELF_LOCKOUT',
+            message: 'Active admins cannot delete their own user account',
+          });
+        }
+        if (admin.adminRole !== 'owner') {
+          throw new ForbiddenException({
+            code: 'PERMISSION_DENIED',
+            message: '운영자 계정은 owner만 삭제할 수 있어요.',
+          });
+        }
+        throw new ConflictException({
+          code: 'ADMIN_ACCESS_ACTIVE',
+          message: 'Revoke admin access before deleting the user account',
+        });
+      }
+
       const updated = await tx.v1User.update({
         where: { id: userId },
         data: {
@@ -310,6 +374,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
       return { ...result, deletedAt };
     });
+
+    // Same isolation as changeUserStatus(): deletion also lands on the
+    // disable-class accountStatus, so an already-connected socket must be
+    // cut off here too — otherwise a deleted account keeps receiving
+    // notifications/chat until it happens to reconnect.
+    try {
+      this.realtimeGateway?.forceDisconnectUser(userId);
+    } catch (err) {
+      this.logger?.warn({ userId, err }, '탈퇴 처리 후 실시간 소켓 강제 종료 실패');
+    }
+
+    return result;
   }
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {
@@ -387,17 +463,22 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   async actionLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const logs = await this.prisma.v1AdminActionLog.findMany({
-      where: {
-        ...(query.adminUserId ? { adminUserId: query.adminUserId } : {}),
-        ...(query.targetType ? { targetType: query.targetType } : {}),
-        ...(query.targetId ? { targetId: query.targetId } : {}),
-        ...(query.actionType ? { action: query.actionType } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const where = {
+      ...(query.adminUserId ? { adminUserId: query.adminUserId } : {}),
+      ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.actionType ? { action: query.actionType } : {}),
+    };
+    // 페이지 버튼을 그리려면 총 건수가 필요하다 — 목록과 함께 한 번에 집계한다.
+    const [logs, total] = await Promise.all([
+      this.prisma.v1AdminActionLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+      }),
+      this.prisma.v1AdminActionLog.count({ where }),
+    ]);
     const pageItems = logs.slice(0, limit);
     const hasNext = logs.length > limit;
     return {
@@ -412,23 +493,33 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         afterState: log.afterJson,
         createdAt: log.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
     };
   }
 
   async statusChangeLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const logs = await this.prisma.v1StatusChangeLog.findMany({
-      where: {
-        ...(query.targetType ? { targetType: query.targetType } : {}),
-        ...(query.targetId ? { targetId: query.targetId } : {}),
-        ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const where = {
+      ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
+    };
+    const [logs, total] = await Promise.all([
+      this.prisma.v1StatusChangeLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+      }),
+      this.prisma.v1StatusChangeLog.count({ where }),
+    ]);
     const pageItems = logs.slice(0, limit);
     const hasNext = logs.length > limit;
     return {
@@ -443,7 +534,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         reason: log.reason,
         createdAt: log.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
     };
   }
 
@@ -471,7 +568,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         email: true,
@@ -507,6 +604,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      USER_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.accountStatus, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         userId: row.id,
@@ -529,11 +631,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         adminRole: row.adminUser?.adminRole ?? null,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        USER_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.accountStatus, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -694,7 +799,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         title: true,
@@ -717,6 +822,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      MATCH_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         matchId: row.id,
@@ -732,11 +842,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         maxParticipants: row.maxParticipants,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        MATCH_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -801,7 +914,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         name: true,
@@ -822,6 +935,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      TEAM_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         teamId: row.id,
@@ -834,11 +952,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: row.status,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        TEAM_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -859,7 +980,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         region: { select: { name: true } },
         ownerUser: { select: { profile: { select: { nickname: true } } } },
         trustScore: {
-          select: { trustState: true, mannerScore: true, matchCount: true, calculatedAt: true },
+          select: { matchCount: true, calculatedAt: true },
         },
         hostedTeamMatches: {
           take: 5,
@@ -870,6 +991,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     });
 
     if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
+
+    const revealedTrust = (await computeRevealedTeamTrustBatch(this.prisma, [row.id])).get(row.id) ?? null;
 
     return {
       teamId: row.id,
@@ -884,8 +1007,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       createdAt: row.createdAt,
       trustScore: row.trustScore
         ? {
-            trustState: row.trustScore.trustState,
-            mannerScore: row.trustScore.mannerScore,
+            trustState: revealedTrust?.trustState ?? 'sample',
+            mannerScore: revealedTrust?.mannerScore ?? null,
             matchCount: row.trustScore.matchCount,
             calculatedAt: row.trustScore.calculatedAt,
           }
@@ -920,7 +1043,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
     }), this.prisma.v1Popup.groupBy({
       by: ['status'],
       where: searchWhere,
@@ -929,13 +1052,21 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+    const summary = buildListSummary(
+      POPUP_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => this.toAdminPopupRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        POPUP_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -1030,7 +1161,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           title: dto.title.trim(),
           body: content.plainText,
           contentJson: content.document as Prisma.InputJsonValue,
-          contentVersion: 1,
+          contentVersion: { increment: 1 },
           targetScreens,
           linkUrl,
           linkLabel,
@@ -1147,7 +1278,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
     }), this.prisma.v1Notice.groupBy({
       by: ['status'],
       where: statusFacetWhere,
@@ -1164,9 +1295,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       NOTICE_LIST_STATUSES,
       statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
     );
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status ? summary.byStatus[query.status] ?? 0 : summary.total;
     return {
       items: pageItems.map((row) => this.toAdminNoticeRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
       summary: {
         ...summary,
         byAudience: buildCountMap(
@@ -1257,7 +1397,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           title: dto.title.trim(),
           body: content.plainText,
           contentJson: content.document as Prisma.InputJsonValue,
-          contentVersion: 1,
+          contentVersion: { increment: 1 },
           status: dto.status,
           publishedAt,
           archivedAt,
@@ -1342,6 +1482,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
             { body: { contains: query.q, mode: 'insensitive' as const } },
             { user: { email: { contains: query.q, mode: 'insensitive' as const } } },
             { user: { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } } },
+            { guestEmail: { contains: query.q, mode: 'insensitive' as const } },
+            { guestPhone: { contains: query.q, mode: 'insensitive' as const } },
           ],
         }
       : {};
@@ -1361,7 +1503,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         category: true,
@@ -1373,6 +1515,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         updatedAt: true,
         closedAt: true,
         userId: true,
+        guestEmail: true,
+        guestPhone: true,
         user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
         _count: { select: { replies: true } },
       },
@@ -1393,9 +1537,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       INQUIRY_LIST_STATUSES,
       statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
     );
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status ? summary.byStatus[query.status] ?? 0 : summary.total;
     return {
       items: pageItems.map((row) => this.toAdminInquiryRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
       summary: {
         ...summary,
         byCategory: buildCountMap(
@@ -1406,6 +1559,15 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /** 사이드바 배지용 — 전체 목록을 가져오지 않고 미답변(received/reviewing) 건수만 count */
+  async getPendingInquiryCount(user: V1AuthUser) {
+    await this.getActiveAdmin(user.id);
+    const count = await this.prisma.v1Inquiry.count({
+      where: { status: { in: ['received', 'reviewing'] } },
+    });
+    return { count };
+  }
+
   async getInquiry(user: V1AuthUser, inquiryId: string) {
     await this.getActiveAdmin(user.id);
     const row = await this.prisma.v1Inquiry.findUnique({
@@ -1413,6 +1575,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       select: {
         id: true,
         userId: true,
+        guestEmail: true,
+        guestPhone: true,
         category: true,
         title: true,
         body: true,
@@ -1453,7 +1617,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    const asked = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.v1Inquiry.findUnique({ where: { id: inquiryId } });
       if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
 
@@ -1481,6 +1645,50 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         tx,
       );
+
+      return { userId: existing.userId, title: existing.title };
+    });
+
+    // 커밋 이후에만 알림을 보낸다 — 롤백된 답변으로 "답변 등록" 알림만 남는 상황을 막는다.
+    // 게스트 문의(userId=null)는 계정이 없어 인앱/푸시 알림 대상이 아니다(연락처로만 회신).
+    if (asked.userId) {
+      void this.notifications?.emitNotification(
+        asked.userId,
+        'inquiry_answered',
+        inquiryId,
+        `"${asked.title}" 문의 답변: ${previewInquiryReply(body)}`,
+      );
+    }
+
+    return this.getInquiry(user, inquiryId);
+  }
+
+  async updateInquiryReply(user: V1AuthUser, inquiryId: string, replyId: string, dto: ReplyInquiryDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const body = dto.body.trim();
+    if (!body) {
+      throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1InquiryReply.findUnique({ where: { id: replyId } });
+      if (!existing || existing.inquiryId !== inquiryId) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: 'Reply was not found' });
+      }
+
+      await tx.v1InquiryReply.update({ where: { id: replyId }, data: { body } });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'inquiry.reply.update',
+          targetType: 'inquiry_reply',
+          targetId: replyId,
+          reason: '문의 답변 수정',
+          beforeJson: { inquiryId, replyId, bodyPreview: existing.body.slice(0, 60) } as Prisma.InputJsonValue,
+          afterJson: { inquiryId, replyId, bodyPreview: body.slice(0, 60) } as Prisma.InputJsonValue,
+        },
+      });
     });
 
     return this.getInquiry(user, inquiryId);
@@ -1537,7 +1745,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         title: true,
@@ -1556,6 +1764,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      TEAM_MATCH_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         teamMatchId: row.id,
@@ -1567,11 +1780,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: row.status,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        TEAM_MATCH_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -1587,7 +1803,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
       orderBy: { grantedAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       include: {
         user: {
           select: {
@@ -1604,6 +1820,11 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      ADMIN_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => ({
         adminUserId: row.id,
@@ -1617,55 +1838,67 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         grantedAt: row.grantedAt,
         revokedAt: row.revokedAt ?? null,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
-      summary: buildListSummary(
-        ADMIN_LIST_STATUSES,
-        statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
-      ),
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
   async grantAdmin(user: V1AuthUser, dto: GrantAdminDto) {
-    const actor = await this.getOwnerAdmin(user.id);
-
-    const targetUser = await this.prisma.v1User.findUnique({ where: { id: dto.userId } });
-    if (!targetUser) {
-      throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
-    }
-
     const now = new Date();
 
-    const adminRow = await this.prisma.$transaction(async (tx) => {
+    const withUser = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const actor = await this.getTransactionOwnerAdmin(tx, user.id);
+      await this.lockUserRow(tx, dto.userId);
+
+      const targetUser = await tx.v1User.findUnique({ where: { id: dto.userId } });
+      if (!targetUser) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+      }
+      if (targetUser.accountStatus !== 'active') {
+        throw new ConflictException({
+          code: 'ADMIN_ACCOUNT_INACTIVE',
+          message: 'Admin access can only be granted to an active user account',
+        });
+      }
+
       const existing = await tx.v1AdminUser.findUnique({ where: { userId: dto.userId } });
       if (existing && existing.status === 'active') {
         throw new ConflictException({ code: 'ALREADY_ADMIN', message: 'User is already an active admin' });
       }
 
-      let row: { id: string; userId: string; adminRole: string; status: string; grantedByAdminUserId: string | null; grantedAt: Date; revokedAt: Date | null };
-
-      if (existing) {
-        // revoked/suspended → reactivate
-        row = await tx.v1AdminUser.update({
-          where: { userId: dto.userId },
-          data: {
-            adminRole: dto.adminRole,
-            status: 'active',
-            revokedAt: null,
-            grantedByAdminUserId: actor.userId,
-            grantedAt: now,
-          },
-        });
-      } else {
-        row = await tx.v1AdminUser.create({
-          data: {
-            userId: dto.userId,
-            adminRole: dto.adminRole,
-            status: 'active',
-            grantedByAdminUserId: actor.userId,
-            grantedAt: now,
-          },
-        });
-      }
+      const row = existing
+        ? await tx.v1AdminUser.update({
+            where: { userId: dto.userId },
+            data: {
+              adminRole: dto.adminRole,
+              status: 'active',
+              revokedAt: null,
+              grantedByAdminUserId: actor.userId,
+              grantedAt: now,
+            },
+            include: {
+              user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+            },
+          })
+        : await tx.v1AdminUser.create({
+            data: {
+              userId: dto.userId,
+              adminRole: dto.adminRole,
+              status: 'active',
+              grantedByAdminUserId: actor.userId,
+              grantedAt: now,
+            },
+            include: {
+              user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
+            },
+          });
 
       await tx.v1AdminActionLog.create({
         data: {
@@ -1684,13 +1917,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       return row;
     });
 
-    const withUser = await this.prisma.v1AdminUser.findUniqueOrThrow({
-      where: { userId: dto.userId },
-      include: {
-        user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
-      },
-    });
-
     return {
       adminUserId: withUser.id,
       userId: withUser.userId,
@@ -1706,33 +1932,40 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   }
 
   async updateAdmin(user: V1AuthUser, targetUserId: string, dto: UpdateAdminDto) {
-    const actor = await this.getOwnerAdmin(user.id);
-
-    // Guard: cannot modify self (check before entering transaction — self-id is immutable)
-    if (actor.userId === targetUserId) {
-      throw new ConflictException({ code: 'SELF_MODIFICATION', message: 'Cannot modify your own admin record' });
-    }
-
     const now = new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const actor = await this.getTransactionOwnerAdmin(tx, user.id);
+      await this.lockUserRow(tx, targetUserId);
+
+      if (actor.userId === targetUserId) {
+        throw new ConflictException({ code: 'SELF_MODIFICATION', message: 'Cannot modify your own admin record' });
+      }
+
       const existing = await tx.v1AdminUser.findUnique({ where: { userId: targetUserId } });
       if (!existing) {
         throw new NotFoundException({ code: 'NOT_FOUND', message: 'Admin was not found' });
       }
 
-      // Guard: cannot demote or revoke the last active owner (atomic count inside tx)
+      // The row lock above serializes every path that can remove owner access.
       const wouldLoseOwnerStatus =
         existing.adminRole === 'owner' &&
+        existing.status === 'active' &&
         (dto.status === 'revoked' || (dto.adminRole !== undefined && dto.adminRole !== 'owner'));
       if (wouldLoseOwnerStatus) {
-        const activeOwnerCount = await tx.v1AdminUser.count({
-          where: { adminRole: 'owner', status: 'active' },
+        await this.assertAnotherActiveOwner(tx, targetUserId);
+      }
+
+      if (dto.status === 'active') {
+        const targetUser = await tx.v1User.findUnique({
+          where: { id: targetUserId },
+          select: { accountStatus: true },
         });
-        if (activeOwnerCount <= 1) {
+        if (!targetUser || targetUser.accountStatus !== 'active') {
           throw new ConflictException({
-            code: 'LAST_OWNER',
-            message: 'Cannot demote or revoke the last active owner',
+            code: 'ADMIN_ACCOUNT_INACTIVE',
+            message: 'Admin access can only be activated for an active user account',
           });
         }
       }
@@ -1791,11 +2024,20 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async getActiveAdmin(userId: string): Promise<ActiveAdmin> {
-    const admin = await this.prisma.v1AdminUser.findUnique({ where: { userId } });
-    if (!admin || admin.status !== 'active') {
+    const admin = await this.prisma.v1AdminUser.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        adminRole: true,
+        status: true,
+        user: { select: { accountStatus: true } },
+      },
+    });
+    if (!admin || admin.status !== 'active' || admin.user.accountStatus !== 'active') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Active admin access is required' });
     }
-    return admin as ActiveAdmin;
+    return { id: admin.id, userId: admin.userId, adminRole: admin.adminRole, status: 'active' };
   }
 
   private async getMutationAdmin(userId: string) {
@@ -1804,6 +2046,77 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Support admins cannot mutate status' });
     }
     return admin;
+  }
+
+  private async getTransactionMutationAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
+    const admin = await this.getTransactionActiveAdmin(tx, userId);
+    if (admin.adminRole === 'support') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Support admins cannot mutate status' });
+    }
+    return admin;
+  }
+
+  private async getTransactionOwnerAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
+    const admin = await this.getTransactionActiveAdmin(tx, userId);
+    if (admin.adminRole !== 'owner') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Owner access is required' });
+    }
+    return admin;
+  }
+
+  private async getTransactionActiveAdmin(tx: Prisma.TransactionClient, userId: string): Promise<ActiveAdmin> {
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "v1_admin_users" WHERE "user_id" = ${userId} FOR UPDATE
+    `;
+    await this.lockUserRow(tx, userId);
+
+    const admin = await tx.v1AdminUser.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        adminRole: true,
+        status: true,
+        user: { select: { accountStatus: true } },
+      },
+    });
+    if (!admin || admin.status !== 'active' || admin.user.accountStatus !== 'active') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Active admin access is required' });
+    }
+    return { id: admin.id, userId: admin.userId, adminRole: admin.adminRole, status: 'active' };
+  }
+
+  private async lockActiveOwnerRows(tx: Prisma.TransactionClient) {
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "v1_admin_users"
+      WHERE "admin_role" = 'owner' AND "status" = 'active'
+      ORDER BY id
+      FOR UPDATE
+    `;
+  }
+
+  private async lockUserRow(tx: Prisma.TransactionClient, userId: string) {
+    await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM "v1_users" WHERE id = ${userId} FOR UPDATE
+    `;
+  }
+
+  private async assertAnotherActiveOwner(tx: Prisma.TransactionClient, targetUserId: string) {
+    const remainingOwnerCount = await tx.v1AdminUser.count({
+      where: {
+        userId: { not: targetUserId },
+        adminRole: 'owner',
+        status: 'active',
+        user: { accountStatus: 'active' },
+      },
+    });
+    if (remainingOwnerCount === 0) {
+      throw new ConflictException({
+        code: 'LAST_OWNER',
+        message: 'Cannot remove access from the last active owner',
+      });
+    }
   }
 
   private async writeAdminStatusLogs(
@@ -1911,9 +2224,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     if (this.staleAssetCleanupRun) return this.staleAssetCleanupRun;
     this.staleAssetCleanupRun = this.cleanupStaleTemporaryAssets()
       .catch((error) => {
-        this.logger.error(
-          `임시 콘텐츠 이미지 정리 실패: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger?.error({ err: error }, '임시 콘텐츠 이미지 정리 실패');
       })
       .finally(() => {
         this.staleAssetCleanupRun = undefined;
@@ -1952,7 +2263,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const results = await Promise.allSettled(urls.map((url) => this.uploadsService!.removeStoredUrl(url)));
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        this.logger.error(`콘텐츠 이미지 파일 정리 실패 (${urls[index]}): ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
+        this.logger?.error({ url: urls[index], err: result.reason }, '콘텐츠 이미지 파일 정리 실패');
       }
     });
   }
@@ -2065,7 +2376,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
   }
   private toAdminInquiryRow(row: {
     id: string;
-    userId: string;
+    userId: string | null;
+    guestEmail: string | null;
+    guestPhone: string | null;
     category: string;
     title: string;
     status: string;
@@ -2074,14 +2387,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     createdAt: Date;
     updatedAt: Date;
     closedAt: Date | null;
-    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null } | null;
     _count: { replies: number };
   }) {
     return {
       inquiryId: row.id,
       userId: row.userId,
-      requesterName: row.user.profile?.nickname ?? row.user.profile?.displayName ?? null,
-      requesterEmail: row.user.email ?? null,
+      isGuest: !row.userId,
+      requesterName: row.user?.profile?.nickname ?? row.user?.profile?.displayName ?? null,
+      requesterEmail: row.user?.email ?? row.guestEmail ?? null,
+      guestEmail: row.guestEmail,
+      guestPhone: row.guestPhone,
       category: row.category,
       title: row.title,
       status: row.status,
@@ -2096,7 +2412,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   private toAdminInquiryDetail(row: {
     id: string;
-    userId: string;
+    userId: string | null;
+    guestEmail: string | null;
+    guestPhone: string | null;
     category: string;
     title: string;
     body: string;
@@ -2107,7 +2425,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     closedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
-    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null } | null;
     replies: Array<{
       id: string;
       body: string;
@@ -2124,6 +2442,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       ...this.toAdminInquiryRow({
         id: row.id,
         userId: row.userId,
+        guestEmail: row.guestEmail,
+        guestPhone: row.guestPhone,
         category: row.category,
         title: row.title,
         status: row.status,
@@ -2178,4 +2498,16 @@ function buildDeletedProviderUserKey(userId: string, identityId: string) {
 
 function buildDeletedNickname(userId: string) {
   return `deleted_${userId.slice(0, 8)}`;
+}
+
+/**
+ * 문의 답변 알림 본문에 넣을 답변 미리보기. 알림 본문은 인앱 목록·상세 시트와
+ * 웹 푸시 payload에 그대로 실리므로, 줄바꿈을 공백으로 접고 길이를 제한한다.
+ */
+const INQUIRY_REPLY_PREVIEW_LIMIT = 160;
+
+function previewInquiryReply(body: string): string {
+  const flattened = body.replace(/\s+/g, ' ').trim();
+  if (flattened.length <= INQUIRY_REPLY_PREVIEW_LIMIT) return flattened;
+  return `${flattened.slice(0, INQUIRY_REPLY_PREVIEW_LIMIT)}…`;
 }

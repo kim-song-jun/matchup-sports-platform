@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { ShieldAlert, X } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import {
+  BellIcon,
   ChatIcon,
   ChevronRightIcon,
   MatchIcon,
@@ -14,7 +16,6 @@ import { Card, EmptyState, KPIStat, ListItem, NumberDisplay, SectionTitle, Weath
 import { cssUrl } from '@/lib/assets';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { useV1AllTournaments } from '@/hooks/use-v1-api';
-import { getSortedTournamentPromos } from '@/lib/tournament-promo';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentHeroCard } from './tournament-hero-card';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
@@ -23,9 +24,13 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
   const tournaments = useV1AllTournaments({ status: 'open' });
   const tournamentItems = tournaments.data ?? [];
-  const homePromoItems = getSortedTournamentPromos(tournamentItems, 'home');
-  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || homePromoItems.length > 0;
+  // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
+  // to know whether *any* eligible item exists, to decide the section's visibility.
+  const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
+  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || hasHomePromo;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
+  const weatherPermission = model.weatherPermission ?? 'prompt';
+  const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
 
   return (
     <>
@@ -36,6 +41,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
         hasNewNotification={model.hasNewNotification && !model.network}
         floatingSlot={<HomeChatFloatingButton model={model} />}
       >
+      <h1 className="sr-only">Teameet 홈</h1>
       {/*
        * .tm-home-desktop: display:contents on mobile → transparent to layout.
        * display:grid on desktop → 2-column dashboard (main | sidebar).
@@ -47,6 +53,9 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
 
         {/* ── LEFT: main content column ─────────────────────────────────── */}
         <div className="tm-home-main">
+
+          {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
+          {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
 
           {/* Greeting + activity stats */}
           <div className="tm-home-greeting-block">
@@ -113,7 +122,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   </Card>
                 </div>
               ) : (
-                <TournamentHeroCard items={homePromoItems} loading={tournaments.isLoading} />
+                <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
               )}
             </div>
           </div>
@@ -126,7 +135,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           <div className="tm-home-matches-block">
             <SectionTitle title="추천 매치" sub={model.network ? '다시 불러올게요' : '내 실력에 맞는 매치 추천'} action="전체보기" actionHref="/matches" />
             {model.network ? (
-              <div style={{ padding: '0 20px 8px' }}>
+              <div className="tm-home-matches-error-wrap" role="alert">
                 {/* [P2 UX 라이팅] 능동형 + 해요체 */}
                 <EmptyState title="목록을 불러오지 못했어요" sub="아래 버튼으로 다시 불러올 수 있어요." cta="다시 불러오기" onCta={model.retry} />
               </div>
@@ -154,14 +163,19 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           <div className="tm-home-sidebar-weather-wrap">
             {/* 인라인 style 제거 → home.css .tm-home-weather-head 규칙으로 이전 */}
             <div className="tm-home-weather-head">
-              <div className="tm-text-label">현재 위치 날씨</div>
+              <div>
+                <div className="tm-text-label">내 위치 날씨</div>
+                <div className="tm-text-caption" style={{ marginTop: 2 }}>
+                  {weatherPermissionCopy}
+                </div>
+              </div>
               <button
                 className="tm-btn tm-btn-icon tm-btn-neutral"
                 type="button"
                 onClick={model.refreshWeather}
-                disabled={!model.refreshWeather || model.weatherRefreshing}
-                aria-label={model.weatherRefreshing ? '날씨 확인 중' : '현재 위치 날씨 새로고침'}
-                title={model.weatherRefreshing ? '확인 중' : '새로고침'}
+                disabled={!model.refreshWeather || model.weatherRefreshing || weatherPermission === 'unsupported'}
+                aria-label={model.weatherRefreshing ? '날씨 확인 중' : weatherPermission === 'granted' ? '현재 위치 날씨 다시 확인' : '위치 권한을 확인하고 날씨 보기'}
+                title={model.weatherRefreshing ? '확인 중' : weatherPermission === 'granted' ? '날씨 다시 확인' : '위치로 날씨 보기'}
               >
                 <RefreshIcon size={18} strokeWidth={2.1} />
               </button>
@@ -203,6 +217,14 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
       </AppChrome>
     </>
   );
+}
+
+function getWeatherPermissionCopy(permission: NonNullable<HomeViewModel['weatherPermission']>) {
+  if (permission === 'checking') return '브라우저의 위치 허용 상태를 확인하고 있어요.';
+  if (permission === 'granted') return '권한은 허용되어 있어요. 버튼을 누를 때만 Teameet와 날씨·지역 확인 제공처에 좌표를 1회 전송해요.';
+  if (permission === 'denied') return '브라우저 설정에서 위치를 허용한 뒤 다시 확인해 주세요.';
+  if (permission === 'unsupported') return '이 브라우저에서는 위치 기반 날씨를 사용할 수 없어요.';
+  return '버튼을 누르면 권한을 요청하고 Teameet와 날씨·지역 확인 제공처에 좌표를 1회 전송해요.';
 }
 
 function HomeChatSummary({ model }: { model: HomeViewModel }) {
@@ -307,6 +329,86 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   );
 }
 
+function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['pushNudge']> }) {
+  return (
+    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--blue-soft)',
+          color: 'var(--blue500)',
+        }}
+      >
+        <BellIcon size={18} strokeWidth={2} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label">알림을 받아보세요</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>매칭, 채팅, 경기 결과 소식을 놓치지 않아요.</div>
+      </div>
+      <button
+        type="button"
+        className="tm-btn tm-btn-sm tm-btn-primary"
+        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        disabled={pushNudge.subscribing}
+        onClick={pushNudge.onSubscribe}
+      >
+        {pushNudge.subscribing ? '확인 중' : '알림 받기'}
+      </button>
+      <button
+        type="button"
+        aria-label="알림 받기 안내 닫기"
+        className="tm-pressable"
+        style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onClick={pushNudge.onDismiss}
+      >
+        <X size={18} aria-hidden="true" />
+      </button>
+    </Card>
+  );
+}
+
+function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable<HomeViewModel['phoneVerifyNudge']> }) {
+  return (
+    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--orange-soft)',
+          color: 'var(--orange500)',
+        }}
+      >
+        <ShieldAlert size={18} strokeWidth={2} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label">휴대폰 본인인증이 필요해요</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>인증해야 대회 신청·팀 활동을 할 수 있어요.</div>
+      </div>
+      <button
+        type="button"
+        className="tm-btn tm-btn-sm tm-btn-primary"
+        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        onClick={phoneVerifyNudge.onVerify}
+      >
+        인증하기
+      </button>
+    </Card>
+  );
+}
+
 /** 진입점별 SVG 아이콘 — label 첫 글자 텍스트 대체 금지(a11y: 컬러만으로 정보 전달 방지). */
 function QuickActionIcon({ item }: { item: HomeQuickAction }) {
   const iconProps = { size: 20, strokeWidth: 2, 'aria-hidden': true } as const;
@@ -375,7 +477,7 @@ function FeaturedMatchCard({
   onRetry?: () => void;
 }) {
   const card = (
-    <Card pad={0} style={{ overflow: 'hidden' }}>
+    <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
       <div
         className="tm-featured-media"
         style={{ background: network ? 'var(--grey100)' : `${cssUrl(match.imageUrl)} center/cover` }}
@@ -393,7 +495,7 @@ function FeaturedMatchCard({
           </div>
         ) : null}
       </div>
-      <div style={{ padding: 16 }}>
+      <div className={network ? 'tm-featured-content' : 'tm-featured-content tm-featured-content-with-cta'}>
         {network ? (
           <>
             {/* [P2 UX 라이팅] 에러 상황: 수동형 유지(실패 사실 전달) + CTA 능동형 */}
@@ -404,35 +506,30 @@ function FeaturedMatchCard({
           </>
         ) : (
           <>
-            <div className="tm-text-body-lg">{match.venue}</div>
-            <div className="tm-text-caption" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {match.date} {match.time} ·{' '}
-              {/* [P1 숫자:단위 2:1 + tabular-nums] 참가 인원 조판 */}
-              <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
-                <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{match.currentParticipants}/{match.maxParticipants}</span>
-                <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>명</span>
-              </span>
-              {/* #8: 잔여 자리 ≤3일 때 orange 배지로 희소성 강조 */}
-              {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants
-                ? <span className="tm-badge tm-badge-orange">마감 임박</span>
-                : null}
+            <div className="tm-featured-copy">
+              <div className="tm-text-body-lg">{match.venue}</div>
+              <div
+                className="tm-text-caption tm-featured-meta"
+                style={{ marginTop: 6, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
+              >
+                <span style={{ color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                  {match.date} {match.time}
+                </span>
+                <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{match.currentParticipants}/{match.maxParticipants}</span>
+                  <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>명</span>
+                </span>
+                {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants
+                  ? <span className="tm-badge tm-badge-orange">마감 임박</span>
+                  : null}
+              </div>
             </div>
-            {/*
-             * [taste-A] 히어로 카드 주요 CTA — solid blue primary 버튼 1개.
-             * 기존에는 카드 자체(Link)가 CTA 역할을 암묵적으로 맡고 있었으나,
-             * 시각적 종착점(explicit CTA)이 없어 행동 유도력이 약했다.
-             * 카드 전체 Link를 유지하되, 카드 내부 CTA 버튼을 추가해
-             * 명시적 행동 신호를 제공한다. (R-K5: CTA 화면당 최대 1개)
-             */}
-            <button
-              className="tm-btn tm-btn-primary tm-btn-sm"
-              type="button"
-              style={{ marginTop: 12, width: '100%', pointerEvents: 'none' }}
+            <span
+              className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
               aria-hidden="true"
-              tabIndex={-1}
             >
               {match.actionLabel ?? '신청하기'}
-            </button>
+            </span>
           </>
         )}
       </div>

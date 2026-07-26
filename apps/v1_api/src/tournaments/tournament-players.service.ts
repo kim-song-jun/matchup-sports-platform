@@ -5,9 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { V1TournamentPlayer, V1TournamentRegistration } from '@prisma/client';
+import { Prisma, V1TournamentPlayer, V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AddPlayerDto, UpdatePlayerEligibilityDto } from './dto/tournament-player.dto';
 
@@ -74,7 +75,10 @@ export class TournamentPlayersService {
     }
   }
 
-  private assertRosterMutable(registration: V1TournamentRegistration) {
+  private assertRosterMutable(
+    registration: V1TournamentRegistration,
+    tournament: { rosterDeadlineAt: Date | null },
+  ) {
     if (registration.rosterLockedAt) {
       throw new ConflictException({ code: 'ROSTER_LOCKED', message: '명단이 잠겼어요. 운영진에게 문의해 주세요.' });
     }
@@ -82,6 +86,17 @@ export class TournamentPlayersService {
       throw new ConflictException({
         code: 'REGISTRATION_ROSTER_NOT_MUTABLE',
         message: '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.',
+      });
+    }
+    // 명단 제출 마감 하드 차단 — 어드민이 해당 팀에 개별 예외(rosterDeadlineOverrideAt)를 부여한 경우만 예외.
+    if (
+      tournament.rosterDeadlineAt &&
+      new Date() > tournament.rosterDeadlineAt &&
+      !registration.rosterDeadlineOverrideAt
+    ) {
+      throw new ConflictException({
+        code: 'ROSTER_DEADLINE_PASSED',
+        message: '명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.',
       });
     }
   }
@@ -122,93 +137,107 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    this.assertRosterMutable(registration);
-
     const tournament = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      select: { maxPlayers: true, minPlayers: true },
+      select: {
+        maxPlayers: true,
+        minPlayers: true,
+        rosterDeadlineAt: true,
+        genderCategory: true,
+      },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
-    // 활성 선수 수 < maxPlayers 가드
-    const activeCount = await this.prisma.v1TournamentPlayer.count({
-      where: { registrationId, removedAt: null },
-    });
-    if (activeCount >= tournament.maxPlayers) {
-      throw new ConflictException({
-        code: 'ROSTER_FULL',
-        message: `최대 인원(${tournament.maxPlayers}명)을 초과할 수 없어요.`,
-      });
-    }
+    this.assertRosterMutable(registration, tournament);
 
-    // userId가 해당 팀(registration.teamId)의 active 멤버 가드
-    const teamMembership = await this.prisma.v1TeamMembership.findFirst({
-      where: {
-        teamId: registration.teamId,
-        userId: dto.userId,
-        status: 'active',
-        team: { status: 'active', deletedAt: null },
-      },
-      include: {
-        user: {
-          select: {
-            phone: true,
-            profile: { select: { realName: true, birthDate: true, gender: true } },
+    const player = await this.prisma.$transaction(async (tx) => {
+      const current = await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
+      const activeCount = await tx.v1TournamentPlayer.count({
+        where: { registrationId, removedAt: null },
+      });
+      if (activeCount >= current.tournament.maxPlayers) {
+        throw new ConflictException({
+          code: 'ROSTER_FULL',
+          message: `최대 인원(${current.tournament.maxPlayers}명)을 초과할 수 없어요.`,
+        });
+      }
+
+      const teamMembership = await tx.v1TeamMembership.findFirst({
+        where: {
+          teamId: current.registration.teamId,
+          userId: dto.userId,
+          status: 'active',
+          team: { status: 'active', deletedAt: null },
+        },
+        include: {
+          user: {
+            select: {
+              phone: true,
+              phoneVerifiedAt: true,
+              profile: { select: { realName: true, birthDate: true, gender: true } },
+            },
           },
         },
-      },
-    });
-    if (!teamMembership) {
-      throw new BadRequestException({
-        code: 'USER_NOT_TEAM_MEMBER',
-        message: '해당 팀의 활성 멤버가 아니에요.',
       });
-    }
-    const memberRealName = teamMembership.user.profile?.realName?.trim();
-    const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
-    const memberGender = normalizeGender(teamMembership.user.profile?.gender);
-    const memberPhone = teamMembership.user.phone?.trim();
-    if (!memberRealName || !memberBirthDate || !memberPhone) {
-      throw new BadRequestException({
-        code: 'PLAYER_REQUIRED_PROFILE_MISSING',
-        message: '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+      if (!teamMembership) {
+        throw new BadRequestException({
+          code: 'USER_NOT_TEAM_MEMBER',
+          message: '해당 팀의 활성 멤버가 아니에요.',
+        });
+      }
+      const memberRealName = teamMembership.user.profile?.realName?.trim();
+      const memberBirthDate = teamMembership.user.profile?.birthDate?.trim();
+      const memberGender = normalizeGender(teamMembership.user.profile?.gender);
+      const memberPhone = teamMembership.user.phone?.trim();
+      const requiresGender = current.tournament.genderCategory === 'mixed';
+      if (!memberRealName || !memberBirthDate || !memberPhone || (requiresGender && !memberGender)) {
+        throw new BadRequestException({
+          code: 'PLAYER_REQUIRED_PROFILE_MISSING',
+          message: requiresGender
+            ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
+            : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+        });
+      }
+      // 번호가 "적혀 있는지"만 보면 대회 명단이 약속하는 본인확인이 성립하지 않는다 —
+      // 실제로 그 번호의 소유자임을 확인한(phoneVerifiedAt) 팀원만 출전 명단에 올린다.
+      if (isPhoneVerificationEnforced() && !teamMembership.user.phoneVerifiedAt) {
+        throw new BadRequestException({
+          code: 'PLAYER_PHONE_NOT_VERIFIED',
+          message: '휴대폰 본인인증을 마친 팀원만 선수로 등록할 수 있어요.',
+        });
+      }
+      const existingActive = await tx.v1TournamentPlayer.findFirst({
+        where: { registrationId, userId: dto.userId, removedAt: null },
       });
-    }
+      if (existingActive) {
+        throw new ConflictException({
+          code: 'PLAYER_ALREADY_REGISTERED',
+          message: '이미 명단에 등록된 선수예요.',
+        });
+      }
 
-    // 동일 registration에 동일 userId 미등록(removedAt=null) 가드 — 활성 중복 체크
-    const existingActive = await this.prisma.v1TournamentPlayer.findFirst({
-      where: { registrationId, userId: dto.userId, removedAt: null },
-    });
-    if (existingActive) {
-      throw new ConflictException({
-        code: 'PLAYER_ALREADY_REGISTERED',
-        message: '이미 명단에 등록된 선수예요.',
+      return tx.v1TournamentPlayer.upsert({
+        where: { registrationId_userId: { registrationId, userId: dto.userId } },
+        create: {
+          registrationId,
+          userId: dto.userId,
+          realName: memberRealName,
+          birthDateSnapshot: memberBirthDate,
+          genderSnapshot: memberGender,
+          eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
+        },
+        update: {
+          realName: memberRealName,
+          birthDateSnapshot: memberBirthDate,
+          genderSnapshot: memberGender,
+          eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
+          eligibilityNote: null,
+          removedAt: null,
+          addedAt: new Date(),
+        },
       });
-    }
-
-    // @@unique([registrationId, userId]) 제약 때문에 soft-deleted 레코드가 있으면
-    // create 가 유니크 위반을 일으킨다. upsert 로 재활성화(realName/birth 최신 업데이트).
-    const player = await this.prisma.v1TournamentPlayer.upsert({
-      where: { registrationId_userId: { registrationId, userId: dto.userId } },
-      create: {
-        registrationId,
-        userId: dto.userId,
-        realName: memberRealName,
-        birthDateSnapshot: memberBirthDate,
-        genderSnapshot: memberGender,
-        eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
-      },
-      update: {
-        realName: memberRealName,
-        birthDateSnapshot: memberBirthDate,
-        genderSnapshot: memberGender,
-        eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
-        eligibilityNote: null,
-        removedAt: null,
-        addedAt: new Date(),
-      },
     });
 
     return this.serializePlayer(player);
@@ -225,18 +254,27 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    this.assertRosterMutable(registration);
-
-    const player = await this.prisma.v1TournamentPlayer.findFirst({
-      where: { id: playerId, registrationId, removedAt: null },
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: { rosterDeadlineAt: true },
     });
-    if (!player) {
-      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
+    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
 
-    const removed = await this.prisma.v1TournamentPlayer.update({
-      where: { id: playerId },
-      data: { removedAt: new Date() },
+    const removed = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
+      const player = await tx.v1TournamentPlayer.findFirst({
+        where: { id: playerId, registrationId, removedAt: null },
+      });
+      if (!player) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      return tx.v1TournamentPlayer.update({
+        where: { id: playerId },
+        data: { removedAt: new Date() },
+      });
     });
 
     return this.serializePlayer(removed);
@@ -254,21 +292,30 @@ export class TournamentPlayersService {
     const registration = await this.loadRegistration(tournamentId, registrationId);
     await this.assertTeamManager(registration.teamId, user.id);
 
-    this.assertRosterMutable(registration);
-
-    const player = await this.prisma.v1TournamentPlayer.findFirst({
-      where: { id: playerId, registrationId, removedAt: null },
+    const tournament = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: { rosterDeadlineAt: true },
     });
-    if (!player) {
-      throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
+    this.assertRosterMutable(registration, { rosterDeadlineAt: tournament.rosterDeadlineAt });
 
-    const updated = await this.prisma.v1TournamentPlayer.update({
-      where: { id: playerId },
-      data: {
-        eligibilityStatus: dto.eligibilityStatus,
-        eligibilityNote: null,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
+      const player = await tx.v1TournamentPlayer.findFirst({
+        where: { id: playerId, registrationId, removedAt: null },
+      });
+      if (!player) {
+        throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      }
+      return tx.v1TournamentPlayer.update({
+        where: { id: playerId },
+        data: {
+          eligibilityStatus: dto.eligibilityStatus,
+          eligibilityNote: null,
+        },
+      });
     });
 
     return this.serializePlayer(updated);
@@ -354,7 +401,7 @@ export class TournamentPlayersService {
     });
     const csv = [header, ...rows].join('\n');
 
-    const teamName = (registration as any).team?.name ?? registrationId;
+    const teamName = registration.team.name;
     const filename = `players_${teamName.replace(/\s+/g, '_')}_${registrationId.slice(0, 8)}.csv`;
 
     return { filename, csv };
@@ -413,6 +460,37 @@ export class TournamentPlayersService {
       addedAt: row.addedAt.toISOString(),
       removedAt: row.removedAt?.toISOString() ?? null,
     };
+  }
+
+  private async lockAndLoadMutableRegistration(
+    tx: Prisma.TransactionClient,
+    tournamentId: string,
+    registrationId: string,
+  ) {
+    await tx.$queryRaw`SELECT id FROM "v1_tournament_registrations" WHERE id = ${registrationId} FOR UPDATE`;
+    const registration = await tx.v1TournamentRegistration.findFirst({
+      where: { id: registrationId, tournamentId },
+    });
+    if (!registration) {
+      throw new NotFoundException({
+        code: 'REGISTRATION_NOT_FOUND',
+        message: '신청 내역을 찾을 수 없어요.',
+      });
+    }
+    const tournament = await tx.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: {
+        maxPlayers: true,
+        minPlayers: true,
+        rosterDeadlineAt: true,
+        genderCategory: true,
+      },
+    });
+    if (!tournament) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    this.assertRosterMutable(registration, tournament);
+    return { registration, tournament };
   }
 
   private escapeCsvField(value: string): string {

@@ -17,6 +17,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListReviewsQueryDto } from './dto/list-reviews.dto';
 import { ReviewSourceParamsDto } from './dto/review-source.dto';
 import { SubmitReviewDto } from './dto/submit-review.dto';
+import { isReviewRevealed } from './review-visibility';
+import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 
 const REVIEW_TAGS = {
   punctual: '시간 약속을 잘 지켜요',
@@ -34,7 +36,7 @@ type ReviewTagCode = keyof typeof REVIEW_TAGS;
 const ELIGIBLE_PARTICIPANT_STATUSES: V1MatchParticipantStatus[] = ['active', 'completed'];
 const TEAM_REVIEW_ROLES: V1TeamMembershipRole[] = ['owner', 'manager'];
 
-type SourceType = 'match' | 'team_match';
+type SourceType = 'match' | 'team_match' | 'tournament_fixture';
 type TargetType = 'user' | 'team';
 type PrismaTx = Omit<
   PrismaService,
@@ -43,18 +45,22 @@ type PrismaTx = Omit<
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tournamentFixtureReviews: TournamentFixtureReviewsService,
+  ) {}
 
   async list(user: V1AuthUser, query: ListReviewsQueryDto) {
     const tab = query.tab ?? 'pending';
     if (tab === 'written') return this.written(user, query);
 
     const limit = normalizeLimit(query.limit);
-    const [personalItems, teamItems] = await Promise.all([
+    const [personalItems, teamItems, tournamentFixtureItems] = await Promise.all([
       this.pendingPersonalReviews(user, limit),
       this.pendingTeamReviews(user, limit),
+      this.tournamentFixtureReviews.pending(user, limit),
     ]);
-    const items = [...personalItems, ...teamItems]
+    const items = [...personalItems, ...teamItems, ...tournamentFixtureItems]
       .sort((a, b) => b.completedAtSort - a.completedAtSort)
       .slice(0, limit)
       .map(({ completedAtSort: _completedAtSort, ...item }) => item);
@@ -70,6 +76,7 @@ export class ReviewsService {
     const reviews = await this.prisma.v1PostEventReview.findMany({
       where: {
         status: 'submitted',
+        sportId: null, // 레거시(이 기능 출시 이전) 리뷰만 — 개별 노출은 소급 마스킹하지 않는다는 스펙에 따름
         OR: receivedFilters,
       },
       orderBy: [{ submittedAt: 'desc' }, { id: 'desc' }],
@@ -85,9 +92,68 @@ export class ReviewsService {
     };
   }
 
+  async receivedSummary(user: V1AuthUser, query: { targetType: 'user' | 'team'; period?: string }) {
+    const now = new Date();
+    const targetFilter = query.targetType === 'team'
+      ? { targetTeamId: { in: await this.managedTeamIds(user.id) }, targetType: 'team' as const }
+      : { targetUserId: user.id, targetType: 'user' as const };
+
+    const candidates = await this.prisma.v1PostEventReview.findMany({
+      where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
+      select: { sourceId: true, reviewerUserId: true, reviewerTeamId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
+    });
+
+    const reverseReviews = query.targetType === 'team'
+      ? await this.reverseTeamReviews(candidates)
+      : await this.reverseUserReviews(user.id, candidates);
+
+    const revealed = candidates.filter((review) =>
+      isReviewRevealed(
+        {
+          sourceId: review.sourceId,
+          reviewerUserId: query.targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
+          targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId,
+          submittedAt: review.submittedAt,
+        },
+        reverseReviews,
+        now,
+      ),
+    );
+
+    const availableMonths = [...new Set(revealed.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
+    const filtered = query.period
+      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
+      : revealed;
+
+    return { bySport: summarizeBySport(filtered), availableMonths };
+  }
+
+  private async reverseUserReviews(targetUserId: string, candidates: Array<{ sourceId: string }>) {
+    if (!candidates.length) return [];
+    const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+    const reverse = await this.prisma.v1PostEventReview.findMany({
+      where: { reviewerUserId: targetUserId, sourceId: { in: sourceIds }, status: 'submitted' },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+    });
+    return reverse;
+  }
+
+  private async reverseTeamReviews(candidates: Array<{ sourceId: string; targetTeamId: string | null }>) {
+    if (!candidates.length) return [];
+    const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
+    const teamIds = [...new Set(candidates.map((review) => review.targetTeamId).filter((id): id is string => Boolean(id)))];
+    if (!teamIds.length) return [];
+    const reverse = await this.prisma.v1PostEventReview.findMany({
+      where: { reviewerTeamId: { in: teamIds }, sourceId: { in: sourceIds }, status: 'submitted' },
+      select: { sourceId: true, reviewerTeamId: true, targetTeamId: true },
+    });
+    return reverse.map((review) => ({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId }));
+  }
+
   async source(user: V1AuthUser, params: ReviewSourceParamsDto) {
     if (params.sourceType === 'match') return this.matchSource(user, params.sourceId);
-    return this.teamMatchSource(user, params.sourceId);
+    if (params.sourceType === 'team_match') return this.teamMatchSource(user, params.sourceId);
+    return this.tournamentFixtureReviews.source(user, params.sourceId);
   }
 
   async submit(user: V1AuthUser, dto: SubmitReviewDto) {
@@ -97,7 +163,10 @@ export class ReviewsService {
     if (dto.sourceType === 'match') {
       return this.submitPersonalReview(user, dto, tagCodes);
     }
-    return this.submitTeamReview(user, dto, tagCodes);
+    if (dto.sourceType === 'team_match') {
+      return this.submitTeamReview(user, dto, tagCodes);
+    }
+    return this.tournamentFixtureReviews.submit(user, dto, tagCodes);
   }
 
   private async written(user: V1AuthUser, query: ListReviewsQueryDto) {
@@ -242,6 +311,7 @@ export class ReviewsService {
         status: true,
         completedAt: true,
         startAt: true,
+        sportId: true,
         participants: {
           where: { status: { in: ELIGIBLE_PARTICIPANT_STATUSES } },
           select: {
@@ -270,6 +340,7 @@ export class ReviewsService {
 
     return {
       source: sourceSummary('match', match.id, match.title, match.completedAt ?? match.startAt),
+      sportId: match.sportId,
       reviewerTeam: null,
       targets: match.participants
         .filter((participant) => participant.userId !== user.id)
@@ -300,6 +371,7 @@ export class ReviewsService {
         status: true,
         completedAt: true,
         startAt: true,
+        sportId: true,
         hostTeamId: true,
         approvedApplicantTeamId: true,
         hostTeam: { select: teamSelect() },
@@ -326,6 +398,7 @@ export class ReviewsService {
 
     return {
       source: sourceSummary('team_match', teamMatch.id, teamMatch.title, teamMatch.completedAt ?? teamMatch.startAt),
+      sportId: teamMatch.sportId,
       reviewerTeam,
       targets: [{
         targetType: 'team' as const,
@@ -360,6 +433,7 @@ export class ReviewsService {
           targetType: 'user',
           targetUserId,
           rating: dto.rating,
+          sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
         },
         include: reviewInclude(),
@@ -394,6 +468,7 @@ export class ReviewsService {
           targetType: 'team',
           targetTeamId,
           rating: dto.rating,
+          sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
         },
         include: reviewInclude(),
@@ -429,7 +504,8 @@ export class ReviewsService {
   private async reviewSourceSummaries(reviews: ReviewWithIncludes[]) {
     const matchIds = reviews.filter((review) => review.sourceType === 'match').map((review) => review.sourceId);
     const teamMatchIds = reviews.filter((review) => review.sourceType === 'team_match').map((review) => review.sourceId);
-    const [matches, teamMatches] = await Promise.all([
+    const tournamentFixtureIds = reviews.filter((review) => review.sourceType === 'tournament_fixture').map((review) => review.sourceId);
+    const [matches, teamMatches, tournamentFixtures] = await Promise.all([
       matchIds.length
         ? this.prisma.v1Match.findMany({
             where: { id: { in: matchIds } },
@@ -442,11 +518,13 @@ export class ReviewsService {
             select: { id: true, title: true, completedAt: true, startAt: true },
           })
         : [],
+      this.tournamentFixtureReviews.sourceSummaries(tournamentFixtureIds),
     ]);
 
     return new Map([
       ...matches.map((match) => [`match:${match.id}`, sourceSummary('match', match.id, match.title, match.completedAt ?? match.startAt)] as const),
       ...teamMatches.map((match) => [`team_match:${match.id}`, sourceSummary('team_match', match.id, match.title, match.completedAt ?? match.startAt)] as const),
+      ...tournamentFixtures,
     ]);
   }
 
@@ -492,25 +570,35 @@ export class ReviewsService {
   }
 
   private async recalculateUserReputation(tx: PrismaTx, targetUserId: string) {
-    const aggregate = await tx.v1PostEventReview.aggregate({
+    const now = new Date();
+    const candidates = await tx.v1PostEventReview.findMany({
       where: { targetUserId, targetType: 'user', status: 'submitted' },
-      _avg: { rating: true },
-      _count: { _all: true },
+      select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
-    const reviewCount = aggregate._count._all;
+    const reverseReviews = candidates.length
+      ? await tx.v1PostEventReview.findMany({
+          where: { reviewerUserId: targetUserId, sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, status: 'submitted' },
+          select: { sourceId: true, reviewerUserId: true, targetUserId: true },
+        })
+      : [];
+    const revealed = candidates.filter((review) => isReviewRevealed(review, reverseReviews, now));
+    const reviewCount = revealed.length;
+    const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
+
     await tx.v1UserReputationSummary.upsert({
       where: { userId: targetUserId },
-      update: reputationData(reviewCount, aggregate._avg.rating, '완료 경기 리뷰 기반'),
-      create: { userId: targetUserId, ...reputationData(reviewCount, aggregate._avg.rating, '완료 경기 리뷰 기반') },
+      update: reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'),
+      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반') },
     });
   }
 
   private async recalculateTeamTrust(tx: PrismaTx, targetTeamId: string) {
-    const [aggregate, completedMatchCount] = await Promise.all([
-      tx.v1PostEventReview.aggregate({
-        where: { targetTeamId, targetType: 'team', status: 'submitted' },
-        _avg: { rating: true },
-        _count: { _all: true },
+    const now = new Date();
+    const [candidates, completedMatchCount] = await Promise.all([
+      tx.v1PostEventReview.findMany({
+        // sourceType 필터 추가 — team_match 리뷰만 팀신뢰점수에 반영(대회후기는 별도 경로에서 집계)
+        where: { targetTeamId, targetType: 'team', status: 'submitted', sourceType: 'team_match' },
+        select: { sourceId: true, reviewerTeamId: true, targetTeamId: true, rating: true, submittedAt: true },
       }),
       tx.v1TeamMatch.count({
         where: {
@@ -519,12 +607,29 @@ export class ReviewsService {
         },
       }),
     ]);
-    const reviewCount = aggregate._count._all;
+    // reverse-lookup 대상은 상대팀(review.reviewerTeamId)이 아니라 targetTeamId 자기 자신 —
+    // candidates는 이미 targetTeamId로 필터링되어 있으므로, "targetTeamId가 상대에게 보낸 리뷰"를 찾으려면
+    // reviewerTeamId=targetTeamId로 조회해야 한다 (reverseTeamReviews()의 review.targetTeamId 패턴과 동일)
+    const teamIds = [...new Set(candidates.map((review) => review.targetTeamId).filter((id): id is string => Boolean(id)))];
+    const reverseReviews = teamIds.length
+      ? (
+          await tx.v1PostEventReview.findMany({
+            where: { reviewerTeamId: { in: teamIds }, sourceId: { in: [...new Set(candidates.map((review) => review.sourceId))] }, sourceType: 'team_match', status: 'submitted' },
+            select: { sourceId: true, reviewerTeamId: true, targetTeamId: true },
+          })
+        ).map((review) => ({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId }))
+      : [];
+    const revealed = candidates.filter((review) =>
+      isReviewRevealed({ sourceId: review.sourceId, reviewerUserId: review.reviewerTeamId ?? '', targetUserId: review.targetTeamId, submittedAt: review.submittedAt }, reverseReviews, now),
+    );
+    const reviewCount = revealed.length;
+    const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
+
     await tx.v1TeamTrustScore.upsert({
       where: { teamId: targetTeamId },
       update: {
         trustState: trustStateForReviewCount(reviewCount),
-        mannerScore: decimalScore(aggregate._avg.rating),
+        mannerScore: decimalScore(avgRating),
         matchCount: completedMatchCount,
         sourceLabel: '완료 팀매치 리뷰 기반',
         calculatedAt: new Date(),
@@ -532,7 +637,7 @@ export class ReviewsService {
       create: {
         teamId: targetTeamId,
         trustState: trustStateForReviewCount(reviewCount),
-        mannerScore: decimalScore(aggregate._avg.rating),
+        mannerScore: decimalScore(avgRating),
         matchCount: completedMatchCount,
         sourceLabel: '완료 팀매치 리뷰 기반',
         calculatedAt: new Date(),
@@ -546,6 +651,9 @@ export class ReviewsService {
     }
     if (dto.sourceType === 'team_match' && (dto.targetType !== 'team' || !dto.targetTeamId || dto.targetUserId)) {
       throw badRequest('INVALID_TEAM_MATCH_REVIEW_TARGET', 'Team match reviews require targetType=team and targetTeamId only');
+    }
+    if (dto.sourceType === 'tournament_fixture' && (dto.targetType !== 'team' || !dto.targetTeamId || dto.targetUserId)) {
+      throw badRequest('INVALID_TOURNAMENT_FIXTURE_REVIEW_TARGET', 'Tournament fixture reviews require targetType=team and targetTeamId only');
     }
   }
 
@@ -713,4 +821,34 @@ function notFound(code: string, message: string) {
 
 function conflict(code: string, message: string) {
   return new ConflictException({ code, message });
+}
+
+function summarizeBySport(
+  reviews: Array<{ sportId: string | null; rating: number; tags: Array<{ tagCode: string; labelSnapshot: string }> }>,
+) {
+  type SportBucket = { ratings: number[]; tagCounts: Map<string, { label: string; count: number }> };
+  const bySport = new Map<string, SportBucket>();
+  for (const review of reviews) {
+    if (!review.sportId) continue;
+    const bucket: SportBucket = bySport.get(review.sportId) ?? { ratings: [], tagCounts: new Map() };
+    bucket.ratings.push(review.rating);
+    for (const tag of review.tags) {
+      const current = bucket.tagCounts.get(tag.tagCode) ?? { label: tag.labelSnapshot, count: 0 };
+      current.count += 1;
+      bucket.tagCounts.set(tag.tagCode, current);
+    }
+    bySport.set(review.sportId, bucket);
+  }
+
+  return [...bySport.entries()].map(([sportId, bucket]) => ({
+    sportId,
+    ratingAvg: bucket.ratings.length ? Number((bucket.ratings.reduce((sum, value) => sum + value, 0) / bucket.ratings.length).toFixed(2)) : null,
+    ratingCount: bucket.ratings.length,
+    tagRates: [...bucket.tagCounts.entries()].map(([tagCode, { label, count }]) => ({
+      tagCode,
+      label,
+      rate: Number((count / bucket.ratings.length).toFixed(2)),
+      count,
+    })),
+  }));
 }

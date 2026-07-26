@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { AlertBanner, Card, EmptyState, ErrorState, ListItem, TextField } from '@/components/v1-ui/primitives';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { useV1CreateInquiry, useV1Inquiries, useV1Inquiry } from '@/hooks/use-v1-api';
@@ -120,7 +120,6 @@ export function MyInquiriesListClient() {
 
 export function MyInquiryCreateClient() {
   const router = useRouter();
-  const pathname = usePathname();
   const createInquiry = useV1CreateInquiry();
   const [category, setCategory] = useState<V1InquiryCategory>('account');
   const [title, setTitle] = useState('');
@@ -129,6 +128,10 @@ export function MyInquiryCreateClient() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+    if (createInquiry.isPending) return;
     const nextErrors: InquiryFormErrors = {};
     if (!title.trim()) nextErrors.title = '\ubb38\uc758 \uc81c\ubaa9\uc744 \uc785\ub825\ud574 \uc8fc\uc138\uc694.';
     if (!body.trim()) nextErrors.body = '\ubb38\uc758 \ub0b4\uc6a9\uc744 \uc785\ub825\ud574 \uc8fc\uc138\uc694.';
@@ -146,7 +149,7 @@ export function MyInquiryCreateClient() {
 
     createInquiry.mutate(payload, {
       onSuccess: (inquiry) => {
-        router.replace(appRoute(`/my/inquiries/${inquiry.inquiryId}`, pathname));
+        router.replace(appRoute(`/my/inquiries/${inquiry.inquiryId}`));
       },
       onError: (error) => {
         setErrors({ form: errorMessage(error) });

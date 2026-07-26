@@ -12,6 +12,7 @@ import {
   useV1UpdateMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
@@ -26,6 +27,7 @@ const selectionKey = 'teameet:v1:match-selection';
 const defaultGenderRule = '성별 무관';
 
 type MatchDraft = MatchCreateViewModel['draft'];
+type MatchSelection = { sportId: string; regionId: string };
 
 export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep, 'edit'> }) {
   const router = useRouter();
@@ -38,7 +40,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // 위저드 step이 각각 별도 라우트라 step 이동 시 이 컴포넌트가 재마운트된다. 종목/지역 선택을
   // 로컬 useState에만 두면 매 step 첫 항목으로 리셋돼(풋살 선택→다음 step에서 축구로 소실)
   // 잘못된 종목/지역으로 매치가 생성된다. draft와 동일하게 localStorage에 영속한다.
-  const [selection, setSelection] = useState<{ sportId: string; regionId: string }>({ sportId: '', regionId: '' });
+  const [selection, setSelection] = useState<MatchSelection>({ sportId: '', regionId: '' });
   const [selectionHydrated, setSelectionHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +76,13 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 
   const selectedSportId = selection.sportId;
   const regionId = selection.regionId;
+  const updateSelection = (updater: (current: MatchSelection) => MatchSelection) => {
+    setSelection((current) => {
+      const next = updater(current);
+      window.localStorage.setItem(selectionKey, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const model = buildCreateModel({
     step,
@@ -86,10 +95,10 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     submitting: createMatch.isPending,
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
-      if (sport) setSelection((current) => ({ ...current, sportId: sport.id }));
+      if (sport) updateSelection((current) => ({ ...current, sportId: sport.id }));
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: (value) => setSelection((current) => ({ ...current, regionId: value })),
+    onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
     onBack: () => router.push(previousCreateHref(step)),
     onNext: () => router.push(nextCreateHref(step)),
     uploadImage: async (file: File) => {
@@ -99,6 +108,10 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
       return url;
     },
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+      if (createMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
       if (!payload) {
@@ -110,6 +123,9 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
           window.localStorage.setItem('teameet:v1:last-match-id', result.matchId);
           window.localStorage.removeItem(storageKey);
           window.localStorage.removeItem(selectionKey);
+          trackEvent('match_create_complete', {
+            sportType: sports.data?.find((sport) => sport.id === selectedSportId)?.name ?? '',
+          });
           router.push(result.detailRoute || `/matches/${result.matchId}`);
         },
         onError: (err) => {
@@ -183,6 +199,10 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       return url;
     },
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+      if (updateMatch.isPending || cancelMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedSportId, regionId);
       if (!payload || !version) {
@@ -198,6 +218,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       );
     },
     onCancel: () => {
+      if (updateMatch.isPending || cancelMatch.isPending) return;
       setError(null);
       cancelMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },

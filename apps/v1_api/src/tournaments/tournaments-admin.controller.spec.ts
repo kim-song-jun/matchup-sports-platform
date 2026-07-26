@@ -17,6 +17,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
+import { KakaoGeocodingService } from './kakao-geocoding.service';
 import { TournamentsAdminController } from './tournaments-admin.controller';
 import { TournamentsAdminService } from './tournaments-admin.service';
 
@@ -34,6 +35,7 @@ const ownerAdminRecord = {
   userId: 'owner-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function tournamentSummary(overrides: Record<string, unknown> = {}) {
@@ -72,6 +74,8 @@ describe('TournamentsAdminController (service stub)', () => {
     create: jest.fn(),
     update: jest.fn(),
     changeStatus: jest.fn(),
+    publishBracket: jest.fn(),
+    unpublishBracket: jest.fn(),
   };
 
   let controller: TournamentsAdminController;
@@ -127,6 +131,47 @@ describe('TournamentsAdminController (service stub)', () => {
     await expect(controller.changeStatus(ownerAuthUser, 'tournament-1', dto)).resolves.toEqual(payload);
     expect(tournamentsAdminService.changeStatus).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1', dto);
   });
+
+  it('publishBracket: body 없이 호출하면 즉시 공개(예약 시각 미전달)', async () => {
+    const payload = {
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: '2026-07-18T00:00:00.000Z',
+      bracketPublishScheduledAt: null,
+      alreadyPublished: false,
+    };
+    tournamentsAdminService.publishBracket.mockResolvedValue(payload);
+    await expect(controller.publishBracket(ownerAuthUser, 'tournament-1', {})).resolves.toEqual(payload);
+    expect(tournamentsAdminService.publishBracket).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1', undefined);
+  });
+
+  it('publishBracket: scheduledAt 을 주면 Date 로 변환해 서비스에 넘긴다', async () => {
+    const scheduledAt = '2026-08-01T09:00:00.000Z';
+    const payload = {
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: null,
+      bracketPublishScheduledAt: scheduledAt,
+      alreadyPublished: false,
+    };
+    tournamentsAdminService.publishBracket.mockResolvedValue(payload);
+    await expect(controller.publishBracket(ownerAuthUser, 'tournament-1', { scheduledAt })).resolves.toEqual(payload);
+    expect(tournamentsAdminService.publishBracket).toHaveBeenCalledWith(
+      ownerAuthUser,
+      'tournament-1',
+      new Date(scheduledAt),
+    );
+  });
+
+  it('unpublishBracket: delegates to service and returns result', async () => {
+    const payload = {
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: null,
+      bracketPublishScheduledAt: null,
+      alreadyUnpublished: false,
+    };
+    tournamentsAdminService.unpublishBracket.mockResolvedValue(payload);
+    await expect(controller.unpublishBracket(ownerAuthUser, 'tournament-1')).resolves.toEqual(payload);
+    expect(tournamentsAdminService.unpublishBracket).toHaveBeenCalledWith(ownerAuthUser, 'tournament-1');
+  });
 });
 
 // ─── Suite B: real guard + real admin gate (no service mock for guard path) ──
@@ -158,6 +203,7 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
         TournamentsAdminService,
         AdminContextService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: KakaoGeocodingService, useValue: { geocode: jest.fn().mockResolvedValue(null) } },
       ],
     }).compile();
 
@@ -186,7 +232,9 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
     // method directly after extracting it to simulate the guard rejecting.
     // A cleaner way: wire the actual guard and trigger canActivate with a
     // stub execution context that has no headers.
-    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService);
+    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService, {
+      signupCompliance: jest.fn(),
+    } as never);
     const ctx = {
       switchToHttp: () => ({
         getRequest: () => ({
@@ -199,7 +247,9 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
 
   it('V1AuthGuard is applied: headers present but user not found → UnauthorizedException', async () => {
     prismaMock.v1User.findFirst.mockResolvedValue(null);
-    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService);
+    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService, {
+      signupCompliance: jest.fn(),
+    } as never);
     const ctx = {
       switchToHttp: () => ({
         getRequest: () => ({
@@ -217,7 +267,9 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
       accountStatus: 'suspended',
       onboardingStatus: 'completed',
     });
-    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService);
+    const guard = new V1AuthGuard(prismaMock as unknown as PrismaService, {
+      signupCompliance: jest.fn(),
+    } as never);
     const ctx = {
       switchToHttp: () => ({
         getRequest: () => ({

@@ -22,6 +22,25 @@
   margin: 0 20px 28px;
 }
 
+.tm-home-matches-error-wrap {
+  padding: 0 20px 8px;
+}
+
+/*
+ * Bug fix: .tm-section-title carries its own `padding: 0 20px 12px` (globals.css)
+ * so that sections using it standalone (e.g. .tm-home-matches-block, which has no
+ * horizontal margin of its own) get correct left/right inset from the title alone.
+ * .tm-home-chat-block already supplies that 20px inset via its own margin above,
+ * so without this override the "최근 채팅" title doubled up to 40px — misaligned
+ * with both its own chat rows below (20px) and sibling section titles (20px).
+ * Zeroing it here (unconditionally, not just at the desktop breakpoint) makes the
+ * title rely solely on the block's own margin, matching every other home section.
+ */
+.tm-home-chat-block .tm-section-title {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .tm-home-chat-list {
   display: grid;
   gap: 8px;
@@ -211,12 +230,11 @@
 /* ─── Featured hero card (desktop) ────────────────────────────────────────── */
 @media (min-width: 1024px) {
   /*
-   * On mobile the featured card media is 146px tall.
-   * On desktop it sits in a wider column, so we give it a proper hero height.
+   * .tm-featured-media now uses a fixed aspect-ratio (--tm-featured-media-ratio,
+   * globals.css) instead of a per-breakpoint height, so it grows taller in step
+   * with the wider desktop card automatically — same crop as mobile, no override
+   * needed here.
    */
-  .tm-featured-media {
-    height: 220px;
-  }
 
   /* The featured wrapper removes its inline margin — grid gap handles spacing */
   .tm-home-featured-block {
@@ -366,15 +384,25 @@
 
 /* ─── Desktop EmptyState / error fills the column gracefully ──────────────── */
 @media (min-width: 1024px) {
+  .tm-home-matches-error-wrap {
+    padding: 0;
+  }
+
   .tm-home-matches-block .tm-empty-state,
   .tm-home-matches-block .tm-error-state {
-    /* Don't let the empty state be a tiny centered card in a huge column */
-    min-height: 200px;
+    min-height: 176px;
+    padding: 28px 24px;
     border: 1px solid var(--border);
     border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .tm-home-matches-block .tm-empty-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
   }
 }
 
@@ -385,15 +413,18 @@
 @media (min-width: 1024px) {
   .tm-home-featured-carousel {
     overflow-x: visible;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+    flex-wrap: wrap;
+    /* 16px → 24px — 두 히어로 카드가 붙어 보인다는 피드백. 1440+ 사이드바 컬럼 gap(24px,
+       하단 min-width:1440px 블록)과 동일 리듬으로 맞춰 카드 사이 여백을 확실히 벌렸다. */
+    gap: 24px;
   }
 
   .tm-home-featured-carousel > * {
-    /* 캐러셀 고정폭(min(88%, 400px)) 해제 — 2열 그리드 셀 채움 */
+    flex: 0 1 calc((100% - 24px) / 2);
+    max-width: calc((100% - 24px) / 2);
     min-width: 0;
   }
+
 }
 
 /* ─── Wide (≥1440): expand sidebar slightly ───────────────────────────────── */
@@ -408,10 +439,8 @@
     min-width: 0;
   }
 
-  /* Larger featured hero on wide screens */
-  .tm-featured-media {
-    height: 260px;
-  }
+  /* Featured hero grows automatically at 1440+ via aspect-ratio (see 1024px
+     block above) — no height override needed here anymore. */
 
   /* [clear-win] 1440+ 추천 매치 카드 2x2 그리드 — ragged 정렬 해소.
    * 기존 3-up(repeat(3,1fr))을 2-up(repeat(2,1fr))으로 낮춰 4개 카드가

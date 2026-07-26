@@ -1,0 +1,281 @@
+.page {
+  width: min(100%, 1180px);
+  margin: 0 auto;
+  padding: 32px 28px 64px;
+}
+
+.intro {
+  max-width: 680px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--blue600);
+}
+
+.titleRow h1 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: var(--font-size-heading);
+  letter-spacing: -0.03em;
+}
+
+.intro p {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.filter {
+  flex-shrink: 0;
+}
+
+.listSection {
+  margin-top: 24px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grid > li {
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--card-radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--grey100);
+}
+
+.image,
+.fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fallback {
+  display: grid;
+  place-items: center;
+  color: var(--static-white);
+}
+
+.status {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.cardBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 18px;
+}
+
+.heading {
+  min-width: 0;
+}
+
+.sportBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: var(--font-size-micro);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sportBadge > span {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.heading h2 {
+  display: -webkit-box;
+  min-height: 52px;
+  margin: 12px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--font-size-subhead);
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  word-break: keep-all;
+}
+
+.summary {
+  display: -webkit-box;
+  min-height: 42px;
+  margin: 8px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--text-muted);
+  font-size: var(--font-size-label);
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.metadata {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  color: var(--text-muted);
+  font-size: var(--font-size-label);
+}
+
+.metadata > span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.metadata svg,
+.promotion svg,
+.detailCta svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.metadata span span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--grey100);
+}
+
+.promotion {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.prize,
+.deadline {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.prize {
+  color: var(--text-strong);
+}
+
+.deadline {
+  color: var(--blue600);
+}
+
+.detailCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  color: var(--blue600);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+}
+
+.paginationError,
+.moreButton {
+  margin-top: 20px;
+}
+
+.skeleton {
+  aspect-ratio: 3 / 4;
+  border-radius: var(--card-radius);
+}
+
+@media (max-width: 1023px) {
+  .page {
+    padding-inline: 24px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 639px) {
+  .page {
+    padding: 24px 20px 48px;
+  }
+
+  .titleRow h1 {
+    font-size: var(--font-size-heading);
+  }
+
+  .filters {
+    margin-inline: -20px;
+    padding-inline: 20px;
+  }
+
+  .listSection {
+    margin-top: 20px;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .heading h2,
+  .summary {
+    min-height: auto;
+  }
+}

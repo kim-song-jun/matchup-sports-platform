@@ -1,9 +1,14 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { type ReactNode, useState } from 'react';
+import { Suspense, type ReactNode, useState } from 'react';
 import { PendingSocialSignupGate } from '@/components/auth/pending-social-signup-gate';
+import { PhoneVerificationRequiredModal } from '@/components/auth/phone-verification/phone-verification-required-modal';
+import { ClientErrorListener } from '@/components/providers/client-error-listener';
+import { GoogleAnalytics } from '@/components/providers/google-analytics';
+import { getGaMeasurementId } from '@/lib/analytics';
 import { GlobalPopup } from '@/components/popups/global-popup';
+import { NotificationSocketBridge } from '@/components/providers/notification-socket-bridge';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -24,8 +29,18 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <PendingSocialSignupGate>{children}</PendingSocialSignupGate>
-      <GlobalPopup />
+      <ClientErrorListener />
+      <NotificationSocketBridge />
+      {getGaMeasurementId() && (
+        <Suspense fallback={null}>
+          <GoogleAnalytics />
+        </Suspense>
+      )}
+      <PendingSocialSignupGate>
+        {children}
+        <GlobalPopup />
+        <PhoneVerificationRequiredModal />
+      </PendingSocialSignupGate>
     </QueryClientProvider>
   );
 }

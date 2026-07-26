@@ -10,6 +10,18 @@ Do not add useless fallback paths that turn broken runtime behavior into fake su
 
 Tests must fail for the real user-visible contract or regression they claim to protect. Do not write tests that only assert a mock was called, a selector exists, or a hard-coded sample renders while the actual route/API/action can still be broken. Prefer RED -> GREEN: capture a failing run first, then change code or rules, then capture the passing run.
 
+## Minimal validation load (Minimal Validation Load)
+
+This gate does not pause code analysis, implementation, or refactoring. Continue the code work, then run the narrowest test that proves the changed contract once. Do not repeat a full suite, full build, typecheck, lint, or high-parallel validation to obtain the same evidence. Heavy validation is limited to one pre-commit run over the changed scope; CI owns repeated repository-wide validation unless the user explicitly requests it or a high-risk change cannot be proven safely with narrower evidence.
+
+## Host load preflight (Host Load Preflight)
+
+Before any automated test, typecheck, build, or lint command, inspect CPU/load, memory and swap pressure, Node/browser process counts, Docker status, and the target service health. If load materially exceeds available cores, swap is pressured, or process counts are growing unexpectedly, do not start another workload; report the state first. When safe, run validation serially with the minimum worker count. Never terminate another session's processes, and clean up only processes created by the current task.
+
+## Headed Playwright MCP only (Headed Playwright MCP Only)
+
+Manual UI and click QA driven through Playwright MCP must use a visible headed browser session. Do not start Playwright MCP with `--headless`, and do not leave its server or browser tree running in the background after the QA scope ends. Record the MCP/browser PID and parent relationship at startup, then terminate only that owned tree during cleanup. Non-interactive browser validation owned by CI is governed separately and must not be used as a substitute for the required headed manual QA.
+
 ## Visual verification before completion (Visual Verification Before Completion)
 
 For UI, layout, responsive, design-system, or route-shell changes, tests pass is not completion. Completion requires browser-based manual QA with Playwright screenshot evidence, console/network inspection, and a written verdict for the changed route or component. Docs-only policy updates can skip screenshots, but must still prove the policy is searchable and enforced by a contract test.

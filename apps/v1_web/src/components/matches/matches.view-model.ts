@@ -132,6 +132,7 @@ const matchDetailByMode: Record<MatchDetailViewModel['mode'], (typeof matches)[n
   default: matches[0],
   pending: matches[1],
   approved: matches[2],
+  closed: matches[3],
   mine: matches[4],
 };
 
@@ -172,6 +173,14 @@ const detailCopy: Record<MatchDetailViewModel['mode'], Pick<MatchDetailViewModel
       { name: '정하늘', meta: '신청 메시지 · 2명 동반 가능', status: '승인 대기' },
       { name: '문태오', meta: '최근 농구 5경기 · 매너 4.7', status: '승인 대기' },
       { name: '최유진', meta: '참가 확정', status: '승인완료' },
+    ],
+  },
+  closed: {
+    description: '신청이 마감된 축구 친선경기예요. 참가 신청을 한 적이 없는 매치이며, 정원이 모두 찼어요.',
+    address: '전남 영암군 삼호읍 대불로 100',
+    rules: [],
+    participants: [
+      { name: '윤현우', meta: '호스트 · 매너 4.7', status: '승인완료' },
     ],
   },
 };

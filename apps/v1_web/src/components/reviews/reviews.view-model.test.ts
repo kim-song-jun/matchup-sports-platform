@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { REVIEW_TAG_OPTIONS } from './reviews.view-model';
+import { REVIEW_TAG_OPTIONS, sourceTypeLabel, toReviewsPageModel } from './reviews.view-model';
 
 /**
  * v1 API(reviews.service.ts의 REVIEW_TAGS)가 수용하는 리뷰 태그 코드의 정본.
@@ -38,5 +38,39 @@ describe('reviews view model — 태그 옵션 계약', () => {
     for (const option of REVIEW_TAG_OPTIONS) {
       expect(option.label.trim().length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('reviews view model — 대회 경기 리뷰 계약', () => {
+  it('대회 경기 source를 사용자에게 별도 경기 유형으로 표시한다', () => {
+    expect(sourceTypeLabel('tournament_fixture')).toBe('대회 경기');
+  });
+
+  it('대회 fixture 상대팀 리뷰는 리뷰 목록에서 상대팀 CTA로 보인다', () => {
+    const model = toReviewsPageModel({
+      items: [
+        {
+          sourceType: 'tournament_fixture',
+          sourceId: '00000000-0000-4000-8000-000000000101',
+          title: 'TeamMeet Cup · 결승 7경기',
+          completedAt: '2026-06-20T12:00:00.000Z',
+          targetType: 'team',
+          targetCount: 1,
+          reviewedCount: 0,
+          remainingCount: 1,
+          state: 'ready',
+          reviewerTeam: { teamId: 'team-1', name: '성수 FC' },
+          targetTeam: { teamId: 'team-2', name: '마포 러너스' },
+        },
+      ],
+      pageInfo: { nextCursor: null, hasNext: false },
+    }, 'pending');
+
+    expect(model.cards[0]).toMatchObject({
+      href: '/my/reviews/tournament_fixture/00000000-0000-4000-8000-000000000101',
+      badgeLabel: '상대팀',
+      kindLabel: '대회 경기',
+      ctaLabel: '리뷰',
+    });
   });
 });

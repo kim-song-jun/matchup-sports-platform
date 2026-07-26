@@ -141,3 +141,10 @@ export class RemoveTeamMembershipDto {
   @MaxLength(500)
   reason?: string | null;
 }
+
+export class LeaveTeamDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string | null;
+}

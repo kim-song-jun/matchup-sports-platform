@@ -81,7 +81,7 @@ export type MatchDetailViewModel = {
       actionPending?: boolean;
     }>;
   };
-  mode: 'default' | 'pending' | 'approved' | 'mine';
+  mode: 'default' | 'pending' | 'approved' | 'closed' | 'mine';
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;

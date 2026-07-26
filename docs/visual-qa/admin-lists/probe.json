@@ -1,0 +1,80 @@
+[
+  {
+    "name": "audit",
+    "label": "desktop",
+    "width": 1440,
+    "file": "audit-desktop-1440.png",
+    "rows": 6,
+    "headers": [
+      "시각",
+      "대상",
+      "액션",
+      "대상 ID",
+      "실행자",
+      "사유",
+      "시각",
+      "대상",
+      "변경",
+      "대상 ID",
+      "실행자",
+      "사유"
+    ]
+  },
+  {
+    "name": "users",
+    "label": "desktop",
+    "width": 1440,
+    "file": "users-desktop-1440.png",
+    "rows": 3,
+    "headers": [
+      "회원",
+      "상태",
+      "성별",
+      "로그인",
+      "매치 / 소유팀",
+      "소속 (팀장/운영진/멤버)",
+      "가입",
+      "최근 로그인",
+      "작업"
+    ]
+  },
+  {
+    "name": "audit",
+    "label": "mobile",
+    "width": 390,
+    "file": "audit-mobile-390.png",
+    "rows": 6,
+    "headers": [
+      "시각",
+      "대상",
+      "액션",
+      "대상 ID",
+      "실행자",
+      "사유",
+      "시각",
+      "대상",
+      "변경",
+      "대상 ID",
+      "실행자",
+      "사유"
+    ]
+  },
+  {
+    "name": "users",
+    "label": "mobile",
+    "width": 390,
+    "file": "users-mobile-390.png",
+    "rows": 3,
+    "headers": [
+      "회원",
+      "상태",
+      "성별",
+      "로그인",
+      "매치 / 소유팀",
+      "소속 (팀장/운영진/멤버)",
+      "가입",
+      "최근 로그인",
+      "작업"
+    ]
+  }
+]

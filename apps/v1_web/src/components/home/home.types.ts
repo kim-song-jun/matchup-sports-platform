@@ -83,8 +83,22 @@ export type HomeViewModel = {
     status?: string;
     icon?: 'sun' | 'cloud-sun' | 'cloud' | 'fog' | 'drizzle' | 'rain' | 'snow' | 'thunderstorm';
   };
+  weatherPermission?: 'checking' | 'prompt' | 'granted' | 'denied' | 'unsupported';
   weatherRefreshing?: boolean;
   refreshWeather?: () => void;
   popup: HomePopup | null;
   notices: HomeNotice[];
+  /** 온보딩에서 알림을 거부/미응답한 기존 유저에게 로그인마다 1번 다시 유도하는 닫을 수 있는 배너. undefined면 렌더하지 않는다. */
+  pushNudge?: {
+    subscribing: boolean;
+    onSubscribe: () => void;
+    onDismiss: () => void;
+  };
+  /**
+   * 휴대폰 본인인증을 아직 완료하지 않은 계정에게 상시 노출하는 배너. undefined면 렌더하지 않는다.
+   * 인증 전에는 쓰기가 전부 막히므로 닫기(dismiss)를 제공하지 않는다.
+   */
+  phoneVerifyNudge?: {
+    onVerify: () => void;
+  };
 };

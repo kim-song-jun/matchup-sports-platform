@@ -1,22 +1,14 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { cssUrl, publicAssetPath } from './assets';
 
 describe('publicAssetPath', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.resetModules();
+  it('keeps public assets at the web root', () => {
+    expect(publicAssetPath('/brand/teameet-mark.png')).toBe('/brand/teameet-mark.png');
   });
+});
 
-  it('prefixes root-relative upload URLs with the configured basePath', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/v1');
-    const { publicAssetPath } = await import('./assets');
-
-    expect(publicAssetPath('/uploads/2026/07/image.webp')).toBe('/v1/uploads/2026/07/image.webp');
-  });
-
-  it('does not double-prefix an already-prefixed asset URL', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_PATH', '/v1');
-    const { publicAssetPath } = await import('./assets');
-
-    expect(publicAssetPath('/v1/uploads/2026/07/image.webp')).toBe('/v1/uploads/2026/07/image.webp');
+describe('cssUrl', () => {
+  it('escapes CSS string control characters, quotes, and backslashes', () => {
+    expect(cssUrl('/mock/a\\b"c\n.png')).toBe('url("/mock/a\\\\b\\"c\\a .png")');
   });
 });

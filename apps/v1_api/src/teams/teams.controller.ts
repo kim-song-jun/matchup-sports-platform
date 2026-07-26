@@ -7,6 +7,7 @@ import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { CreateTeamInvitationDto } from './dto/create-team-invitation.dto';
 import {
   ChangeTeamMembershipRoleDto,
+  LeaveTeamDto,
   MutateTeamDto,
   RemoveTeamMembershipDto,
   TeamMembersQueryDto,
@@ -70,6 +71,16 @@ export class TeamsController {
     return this.teamsService.members(user ?? null, teamId, query);
   }
 
+  @Post('teams/:teamId/leave')
+  @UseGuards(V1AuthGuard)
+  leaveTeam(
+    @CurrentUser() user: V1AuthUser,
+    @Param('teamId') teamId: string,
+    @Body() dto: LeaveTeamDto,
+  ) {
+    return this.teamsService.leaveTeam(user, teamId, dto);
+  }
+
   @Post('teams/:teamId/join-applications')
   @UseGuards(V1AuthGuard)
   createJoinApplication(
@@ -88,6 +99,12 @@ export class TeamsController {
     @Query() query: ListTeamJoinApplicationsQueryDto,
   ) {
     return this.teamsService.joinApplications(user, teamId, query);
+  }
+
+  @Get('me/join-applications')
+  @UseGuards(V1AuthGuard)
+  myJoinApplications(@CurrentUser() user: V1AuthUser) {
+    return this.teamsService.myJoinApplications(user);
   }
 
   @Get('me/teams')

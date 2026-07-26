@@ -16,6 +16,10 @@ import {
   AdminRegistrationListQueryDto,
   AdminRosterLockDto,
 } from './dto/admin-registration.dto';
+import {
+  getTournamentPaymentDueAt,
+  TournamentPaymentExpiryService,
+} from './tournament-payment-expiry.service';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -39,6 +43,7 @@ export class AdminRegistrationsService {
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
     private readonly notifications: NotificationsService,
+    private readonly paymentExpiry: TournamentPaymentExpiryService,
   ) {}
 
   async list(user: V1AuthUser, tournamentId: string, query: AdminRegistrationListQueryDto) {
@@ -70,10 +75,16 @@ export class AdminRegistrationsService {
 
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
+    const resolvedItems = await Promise.all(
+      pageItems.map(async (row) => ({
+        row,
+        expiry: await this.paymentExpiry.expireIfOverdue(row, row.payment ?? null),
+      })),
+    );
 
     return {
-      items: pageItems.map((row) => ({
-        ...this.serialize(row, row.payment ?? null, row._count.players),
+      items: resolvedItems.map(({ row, expiry }) => ({
+        ...this.serialize(expiry.registration, expiry.payment, row._count.players),
         teamName: row.team?.name ?? null,
       })),
       pageInfo: {
@@ -86,22 +97,29 @@ export class AdminRegistrationsService {
   async confirmPayment(user: V1AuthUser, registrationId: string, dto: AdminConfirmPaymentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const registration = await this.loadRegistration(registrationId);
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const expiry = await this.paymentExpiry.expireIfOverdue(registration, payment ?? null);
+    if (expiry.expired) {
+      throw new ConflictException({
+        code: 'PAYMENT_DEADLINE_EXPIRED',
+        message: '입금 안내 후 2시간이 지나 신청이 자동 취소됐어요.',
+      });
+    }
 
-    if (registration.status !== 'awaiting_payment') {
+    if (expiry.registration.status !== 'awaiting_payment') {
       throw new ConflictException({
         code: 'REGISTRATION_STATUS_INVALID',
         message: '현재 상태에서는 입금 확인을 할 수 없어요.',
       });
     }
 
-    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
     if (!payment) {
       throw new ConflictException({
         code: 'PAYMENT_NOT_FOUND',
         message: '결제 정보를 찾을 수 없어요.',
       });
     }
-    if (payment.status !== 'ready') {
+    if (expiry.payment?.status !== 'ready') {
       throw new ConflictException({
         code: 'PAYMENT_STATUS_INVALID',
         message: '이미 처리된 결제예요.',
@@ -128,15 +146,23 @@ export class AdminRegistrationsService {
           targetType: 'tournament_registration',
           targetId: registrationId,
           reason: dto.note ?? null,
-          beforeJson: { registrationStatus: registration.status, paymentStatus: payment.status },
+          beforeJson: { registrationStatus: expiry.registration.status, paymentStatus: payment.status },
           afterJson: { registrationStatus: 'payment_checking', paymentStatus: 'paid' },
-          fromStatus: registration.status,
+          fromStatus: expiry.registration.status,
           toStatus: 'payment_checking',
         },
         tx,
       );
       return { updatedRegistration, updatedPayment };
     });
+
+    // 알림: 신청자에게 입금 확인 안내 (fire-and-forget — 트랜잭션 실패와 무관)
+    void this.notifications.emitNotification(
+      registration.appliedByUserId,
+      'tournament_payment_confirmed',
+      registration.tournamentId,
+      `"${registration.tournament.title}" 대회 운영진 확정을 기다려 주세요.`,
+    );
 
     const playerCount = await this.countPlayers(registrationId);
     return this.serialize(result.updatedRegistration, result.updatedPayment, playerCount);
@@ -211,6 +237,9 @@ export class AdminRegistrationsService {
         ? 'tournament_registration_confirmed'
         : 'tournament_registration_waitlisted',
       registration.tournamentId,
+      dto.decision === 'confirm'
+        ? `"${registration.tournament.title}" 대회 참가가 확정됐어요.`
+        : `"${registration.tournament.title}" 대회 대기자 명단에 등록됐어요.`,
     );
 
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
@@ -232,7 +261,8 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
-        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? null },
+        // 팀이 남긴 취소 요청 사유는 어드민이 별도 사유를 주지 않는 한 보존한다 (감사 추적)
+        data: { status: 'cancelled', cancelPreviousStatus: null, cancelReason: dto.reason ?? registration.cancelReason ?? null },
       });
 
       // 결제가 있고 아직 cancelled 아니면 payment도 cancelled로 변경.
@@ -270,26 +300,130 @@ export class AdminRegistrationsService {
       registration.appliedByUserId,
       'tournament_registration_cancelled',
       registration.tournamentId,
+      `"${registration.tournament.title}" 대회 참가 신청이 취소됐어요.`,
     );
 
     const playerCount = await this.countPlayers(registrationId);
     return this.serialize(result.updated, result.updatedPayment ?? null, playerCount);
   }
 
-  async rosterLock(user: V1AuthUser, registrationId: string, dto: AdminRosterLockDto) {
+  /**
+   * 취소 요청 거부(잔류) — cancel_requested 상태의 신청을 이전 상태로 되돌린다.
+   * cancelReason은 감사 추적을 위해 유지한다(팀이 왜 취소하려 했는지 보존).
+   * cancelRequestedAt은 초기화한다 — 남겨두면 목록 UI가 되돌린 이후에도 "취소 요청" 배지를 계속 표시함.
+   */
+  async rejectCancelRequest(user: V1AuthUser, registrationId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const registration = await this.loadRegistration(registrationId);
 
-    if (registration.status !== 'confirmed') {
-      // 경고: confirmed 아닌 상태에서도 잠금을 기술적으로 막지는 않으나 권장하지 않음.
-      // 여기서는 confirmed 상태에서만 허용하는 엄격 정책 적용.
+    if (registration.status !== 'cancel_requested') {
       throw new ConflictException({
-        code: 'REGISTRATION_NOT_CONFIRMED',
-        message: '확정된 신청만 명단을 잠글 수 있어요.',
+        code: 'NOT_CANCEL_REQUESTED',
+        message: '취소 요청 상태가 아니에요.',
       });
     }
 
+    const restoredStatus = registration.cancelPreviousStatus ?? 'confirmed';
+
     const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TournamentRegistration.update({
+        where: { id: registrationId },
+        data: {
+          status: restoredStatus,
+          cancelPreviousStatus: null,
+          cancelRequestedAt: null,
+        },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.registration.cancel_reject',
+          targetType: 'tournament_registration',
+          targetId: registrationId,
+          beforeJson: { status: registration.status },
+          afterJson: { status: restoredStatus },
+          fromStatus: registration.status,
+          toStatus: restoredStatus,
+        },
+        tx,
+      );
+      return updated;
+    });
+
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const playerCount = await this.countPlayers(registrationId);
+    return this.serialize(result, payment ?? null, playerCount);
+  }
+
+  async rosterLock(user: V1AuthUser, registrationId: string, dto: AdminRosterLockDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT id
+        FROM "v1_tournament_registrations"
+        WHERE id = ${registrationId}
+        FOR UPDATE
+      `;
+      const registration = await tx.v1TournamentRegistration.findUnique({
+        where: { id: registrationId },
+      });
+      if (!registration) {
+        throw new NotFoundException({
+          code: 'REGISTRATION_NOT_FOUND',
+          message: '신청 내역을 찾을 수 없어요.',
+        });
+      }
+      if (registration.status !== 'confirmed') {
+        throw new ConflictException({
+          code: 'REGISTRATION_NOT_CONFIRMED',
+          message: '확정된 신청만 명단을 잠글 수 있어요.',
+        });
+      }
+
+      const tournament = await tx.v1Tournament.findUnique({
+        where: { id: registration.tournamentId },
+        select: {
+          genderCategory: true,
+          genderMinMale: true,
+          genderMaxMale: true,
+          genderMinFemale: true,
+          genderMaxFemale: true,
+        },
+      });
+      if (!tournament) {
+        throw new NotFoundException({
+          code: 'TOURNAMENT_NOT_FOUND',
+          message: '대회를 찾을 수 없어요.',
+        });
+      }
+
+      if (tournament.genderCategory === 'mixed') {
+        const roster = await tx.v1TournamentPlayer.findMany({
+          where: { registrationId, removedAt: null },
+          select: { genderSnapshot: true },
+        });
+        const maleCount = roster.filter((player) => player.genderSnapshot === 'male').length;
+        const femaleCount = roster.filter((player) => player.genderSnapshot === 'female').length;
+        const male = this.genderQuotaVerdict(
+          maleCount,
+          tournament.genderMinMale,
+          tournament.genderMaxMale,
+        );
+        const female = this.genderQuotaVerdict(
+          femaleCount,
+          tournament.genderMinFemale,
+          tournament.genderMaxFemale,
+        );
+
+        if (!male.ok || !female.ok) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_GENDER_QUOTA_NOT_MET',
+            message: '성별 인원 조건을 충족하지 않아 명단을 확정할 수 없어요.',
+            details: { male, female },
+          });
+        }
+      }
+
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: { rosterLockedAt: new Date() },
@@ -306,11 +440,20 @@ export class AdminRegistrationsService {
         tx,
       );
       return updated;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
     const playerCount = await this.countPlayers(registrationId);
     return this.serialize(result, payment ?? null, playerCount);
+  }
+
+  private genderQuotaVerdict(count: number, min: number | null, max: number | null) {
+    return {
+      count,
+      min,
+      max,
+      ok: (min === null || count >= min) && (max === null || count <= max),
+    };
   }
 
   async rosterUnlock(user: V1AuthUser, registrationId: string) {
@@ -340,9 +483,71 @@ export class AdminRegistrationsService {
     return this.serialize(result, payment ?? null, playerCount);
   }
 
-  private async loadRegistration(registrationId: string): Promise<V1TournamentRegistration> {
+  /**
+   * 명단 제출 마감 예외 부여 — 대회 rosterDeadlineAt이 지나도 이 팀(신청건)은 명단을 계속 수정할 수 있게 한다.
+   * status 제약 없음(취소된 신청에도 기술적으로 부여 가능하나 실무상 무해).
+   */
+  async grantRosterDeadlineOverride(user: V1AuthUser, registrationId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.loadRegistration(registrationId);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TournamentRegistration.update({
+        where: { id: registrationId },
+        data: { rosterDeadlineOverrideAt: new Date() },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'registration.roster_deadline_override_grant',
+          targetType: 'tournament_registration',
+          targetId: registrationId,
+          afterJson: { rosterDeadlineOverrideAt: updated.rosterDeadlineOverrideAt?.toISOString() },
+        },
+        tx,
+      );
+      return updated;
+    });
+
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const playerCount = await this.countPlayers(registrationId);
+    return this.serialize(result, payment ?? null, playerCount);
+  }
+
+  /** 명단 제출 마감 예외 취소(rosterDeadlineOverrideAt = null). */
+  async revokeRosterDeadlineOverride(user: V1AuthUser, registrationId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.loadRegistration(registrationId);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.v1TournamentRegistration.update({
+        where: { id: registrationId },
+        data: { rosterDeadlineOverrideAt: null },
+      });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'registration.roster_deadline_override_revoke',
+          targetType: 'tournament_registration',
+          targetId: registrationId,
+          afterJson: { rosterDeadlineOverrideAt: null },
+        },
+        tx,
+      );
+      return updated;
+    });
+
+    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
+    const playerCount = await this.countPlayers(registrationId);
+    return this.serialize(result, payment ?? null, playerCount);
+  }
+
+  private async loadRegistration(
+    registrationId: string,
+  ): Promise<V1TournamentRegistration & { tournament: { title: string } }> {
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
+      include: { tournament: { select: { title: true } } },
     });
     if (!registration) {
       throw new NotFoundException({
@@ -376,6 +581,7 @@ export class AdminRegistrationsService {
       confirmedByAdminUserId: row.confirmedByAdminUserId,
       confirmedAt: row.confirmedAt?.toISOString() ?? null,
       rosterLockedAt: row.rosterLockedAt?.toISOString() ?? null,
+      rosterDeadlineOverrideAt: row.rosterDeadlineOverrideAt?.toISOString() ?? null,
       cancelRequestedAt: row.cancelRequestedAt?.toISOString() ?? null,
       cancelReason: row.cancelReason,
       playerCount,
@@ -385,6 +591,7 @@ export class AdminRegistrationsService {
             status: payment.status,
             amount: payment.amount,
             paidAt: payment.paidAt?.toISOString() ?? null,
+            paymentDueAt: getTournamentPaymentDueAt(payment).toISOString(),
             confirmedByAdminUserId: payment.confirmedByAdminUserId,
           }
         : null,

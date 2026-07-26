@@ -15,6 +15,11 @@ describe('resolvePopupTargetScreen', () => {
     expect(resolvePopupTargetScreen('/admin/popups')).toBeNull();
   });
 
+  it('stays null instead of throwing when usePathname has not resolved yet', () => {
+    expect(resolvePopupTargetScreen(null)).toBeNull();
+    expect(resolvePopupTargetScreen(undefined)).toBeNull();
+  });
+
   it('accepts internal and HTTPS links while rejecting unsafe schemes', () => {
     expect(isSafePopupLink('/matches?tab=open')).toBe(true);
     expect(isSafePopupLink('https://teameet.co.kr/v1/matches')).toBe(true);

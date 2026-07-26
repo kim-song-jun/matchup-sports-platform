@@ -436,6 +436,7 @@ export class MatchesService {
       result.notifyUserIds,
       'match_cancelled',
       match.id,
+      `"${match.title}" 매치가 취소됐어요.`,
     );
 
     return {
@@ -509,6 +510,7 @@ export class MatchesService {
       match.hostUserId,
       'match_application_received',
       match.id,
+      `"${match.title}" 매치 신청을 확인해 주세요.`,
     );
 
     return {
@@ -590,13 +592,16 @@ export class MatchesService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const nextApplication = await tx.v1MatchApplication.update({
-        where: { id: application.id },
+      const transition = await tx.v1MatchApplication.updateMany({
+        where: { id: application.id, applicantUserId: user.id, status: 'requested' },
         data: {
           status: 'withdrawn',
           withdrawnAt: new Date(),
         },
       });
+      if (transition.count !== 1) {
+        throw stateConflict('Only requested applications can be withdrawn');
+      }
 
       await tx.v1StatusChangeLog.create({
         data: {
@@ -610,7 +615,7 @@ export class MatchesService {
         },
       });
 
-      return nextApplication;
+      return { id: application.id, matchId: application.matchId, status: 'withdrawn' as const };
     });
 
     return {
@@ -645,19 +650,36 @@ export class MatchesService {
       // 동시 승인 레이스 방지: match 행을 잠가 정원 체크~참가자 upsert 를 직렬화한다.
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${application.matchId} FOR UPDATE`;
 
+      const currentMatch = await tx.v1Match.findFirst({
+        where: { id: application.matchId, deletedAt: null },
+        select: { status: true, startAt: true, deadlineAt: true, maxParticipants: true },
+      });
+      const now = new Date();
+      if (
+        !currentMatch ||
+        currentMatch.status !== 'recruiting' ||
+        currentMatch.startAt < now ||
+        (currentMatch.deadlineAt && currentMatch.deadlineAt < now)
+      ) {
+        throw stateConflict('Match is not recruiting');
+      }
+
       const activeParticipantCount = await this.getActiveParticipantCount(application.matchId, tx);
-      if (activeParticipantCount >= application.match.maxParticipants) {
+      if (activeParticipantCount >= currentMatch.maxParticipants) {
         throw stateConflict('Match is full', 'FULL');
       }
 
-      const updated = await tx.v1MatchApplication.update({
-        where: { id: application.id },
+      const transition = await tx.v1MatchApplication.updateMany({
+        where: { id: application.id, status: 'requested' },
         data: {
           status: 'approved',
           reviewedByUserId: user.id,
           reviewedAt: new Date(),
         },
       });
+      if (transition.count !== 1) {
+        throw stateConflict('Only requested applications can be approved');
+      }
 
       const participant = await tx.v1MatchParticipant.upsert({
         where: {
@@ -695,7 +717,10 @@ export class MatchesService {
         },
       });
 
-      return { updated, participant };
+      return {
+        updated: { id: application.id, matchId: application.matchId, status: 'approved' as const },
+        participant,
+      };
     });
 
     // 알림: 신청자에게 승인 안내 (fire-and-forget)
@@ -703,6 +728,7 @@ export class MatchesService {
       application.applicantUserId,
       'match_application_approved',
       application.matchId,
+      `"${application.match.title}" 매치 참가가 확정됐어요.`,
     );
 
     return {
@@ -753,6 +779,7 @@ export class MatchesService {
       application.applicantUserId,
       'match_application_rejected',
       application.matchId,
+      `"${application.match.title}" 매치 신청이 거절됐어요.`,
     );
 
     return {

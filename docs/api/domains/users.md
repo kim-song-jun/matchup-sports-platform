@@ -1,199 +1,136 @@
 # Domain Contract — Users
 
-## Source Of Truth Priority
+## 범위와 Source of Truth
 
-1. `apps/api/src/users/users.controller.ts`
-2. `apps/api/src/users/dto/update-profile.dto.ts`
-3. `apps/api/src/users/users.service.ts`
-4. `apps/web/src/hooks/use-api.ts`
-5. `apps/web/src/types/api.ts`
+이 문서는 v1 `ProfileController`가 실제로 노출하는 프로필·설정·탈퇴 계약을 다룬다.
+
+1. `apps/v1_api/src/profile/profile.controller.ts`
+2. `apps/v1_api/src/profile/dto/profile.dto.ts`
+3. `apps/v1_api/src/profile/profile.service.ts`
+4. `apps/v1_web/src/hooks/use-v1-api.ts`
+5. `apps/v1_web/src/types/api.ts`
 
 ## Endpoint Matrix
 
-| Method | Path | Auth | 설명 |
+| Method | Path | Auth | DTO | 설명 |
+|---|---|---|---|---|
+| `GET` | `/api/v1/me/profile` | Required | - | 내 전체 프로필 |
+| `GET` | `/api/v1/me/activity-summary` | Required | - | 내 활동 요약 |
+| `PATCH` | `/api/v1/me/profile` | Required | `UpdateProfileDto` | 내 프로필 수정 |
+| `GET` | `/api/v1/users/:userId/public-profile` | Optional | - | 공개 프로필 |
+| `GET` | `/api/v1/me/settings` | Required | - | 계정·알림 설정 |
+| `PATCH` | `/api/v1/me/settings` | Required | `UpdateSettingsDto` | 알림 설정 수정 |
+| `PATCH` | `/api/v1/me/regions` | Required | `UpdateMyRegionsDto` | 대표 활동 지역 수정 |
+| `PATCH` | `/api/v1/me/preferences` | Required | `UpdateMyPreferencesDto` | 종목·지역 선호 전체 동기화 |
+| `POST` | `/api/v1/auth/logout` | Controller guard 없음 | - | 세션 로그아웃 응답 |
+| `POST` | `/api/v1/me/withdrawal-request` | Required | `WithdrawalRequestDto` | 탈퇴 대기 요청 |
+
+## 프로필 조회·수정
+
+### `GET /me/profile`
+
+현재 사용자의 계정, 프로필, 종목 선호, 지역, 평판 snapshot을 반환한다. deleted 계정은 조회 대상이 아니며, mutable profile API는 active 계정만 허용한다.
+
+### `PATCH /me/profile`
+
+`UpdateProfileDto`:
+
+| 필드 | 타입 | 필수 | 규칙 |
 |---|---|---|---|
-| GET | `/users/me` | Yes | 내 프로필 |
-| PATCH | `/users/me` | Yes | 내 프로필 수정 |
-| PATCH | `/users/me/sport-profiles` | Yes | 내 운동정보 수정 |
-| GET | `/users/me/matches` | Yes | 내 매치 히스토리 |
-| GET | `/users/me/invitations` | Yes | 내 팀 초대 목록 |
-| GET | `/users/search?q=` | Yes | 닉네임 검색 |
-| GET | `/users/:userId/public-profile` | Optional | 공개 프로필 |
+| `realName` | string or null | No | 최대 40자 |
+| `displayName` | string or null | No | rolling-deploy 호환용 deprecated 입력, 최대 40자 |
+| `nickname` | string | Yes | 2~40자 |
+| `email` | string or null | No | 3~320자; password 계정은 최종 email 필수 |
+| `profileImageUrl` | string or null | No | 문자열 |
+| `phone` | string or null | No | 숫자 11자리 |
+| `birthDate` | string or null | No | 유효한 `YYYYMMDD` 숫자 8자리 |
+| `gender` | `male | female` | Yes | 필수 |
 
-## GET /users/me
+- `realName`이 없으면 호환 입력 `displayName`을 사용한다.
+- email/phone 변경 시 해당 verified 시각을 비운다.
+- 중복 값은 각각 `409 EMAIL_CONFLICT`, `PHONE_CONFLICT`, `NICKNAME_CONFLICT`다.
+- 성공 응답은 `{ profile, updatedAt }`이다.
 
-- Header: `Authorization: Bearer <token>`
-- 성공 시 현재 로그인 사용자의 프로필을 반환한다.
-- 주요 필드:
-  - `id`, `email`, `nickname`
-  - `profileImageUrl`
-  - `phone`
-  - `gender`, `birthYear`
-  - `locationCity`, `locationDistrict`
-  - 서비스에 따라 manner/reputation 요약 필드가 포함될 수 있음
-- 실패:
-  - 토큰 누락/만료: `401`
-  - soft-deleted 계정: `404` 가능
+## 활동·공개 프로필
 
-성공 예시:
+- `GET /me/activity-summary`는 `totals: { activityCount, teamCount, mannerScore }`와 `monthly: { matchCount, mannerScore, winRate }`를 반환한다.
+- `GET /users/:userId/public-profile`은 optional auth이며 active/non-deleted 사용자만 반환한다.
+- 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`만 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다.
+- 공개 `activitySummary`는 누적 match/team/review 수와 이번 달 match/team join/review 수를 구분한다.
+
+## 설정·선호
+
+### `GET/PATCH /me/settings`
+
+- 조회 응답은 `account`, `profile`, `notifications`를 반환한다.
+- `UpdateSettingsDto.notifications`의 선택 boolean 필드: `matchEnabled`, `teamEnabled`, `teamMatchEnabled`, `chatEnabled`, `noticeEnabled`, `marketingEnabled`.
+- 수정 응답은 `{ profile, notifications, updatedAt }`이다.
+
+### `PATCH /me/regions`
 
 ```json
 {
-  "status": "success",
-  "data": {
-    "id": "user-id",
-    "nickname": "teameet-player",
-    "profileImageUrl": "/uploads/profile.jpg",
-    "locationCity": "Seoul"
-  },
-  "timestamp": "2026-04-11T12:00:00.000Z"
+  "regionId": "uuid"
 }
 ```
 
-## PATCH /users/me
+- active 2단계 지역만 허용한다.
+- 기존 대표 지역을 해제한 뒤 요청 지역을 대표로 upsert한다.
+- 성공 응답은 `{ region: { regionId, name }, updatedAt }`이다.
 
-- Body (`UpdateProfileDto`)
-
-| 필드 | 타입 | 필수 | nullable |
-|---|---|---|---|
-| `nickname` | string | No | No |
-| `profileImageUrl` | string | No | No |
-| `phone` | string | No | No |
-| `gender` | `male` or `female` | Yes for v1 profile save | DB remains nullable for legacy rows |
-| `birthYear` | int(1950~2015) | No | No |
-| `locationCity` | string | No | No |
-| `locationDistrict` | string | No | No |
-
-CAUTION:
-
-- DTO에 없는 필드 전송 시 `400`
-- `birthYear`를 문자열로 보내면 transform 후 숫자 검증 실패 가능
-- `null`로 값을 지우는 계약이 DTO에서 보장되지 않는 필드는 빈 문자열/`null` clearing을 추측하지 말고 현재 service 동작을 확인해야 한다.
-
-## PATCH /users/me/sport-profiles
-
-- Body (`UpdateSportProfilesDto`)
+### `PATCH /me/preferences`
 
 ```json
 {
-  "profiles": [
-    {
-      "sportType": "futsal",
-      "level": 3,
-      "preferredPositions": ["FW", "MF"]
-    }
+  "sports": [
+    { "sportId": "uuid", "levelId": "uuid" }
+  ],
+  "regions": [
+    { "regionId": "uuid", "primary": true }
   ]
 }
 ```
 
-동작:
+- `sports[].sportId`, `regions[].regionId` 중복은 허용하지 않는다.
+- `regions[].primary=true`는 최대 1개다. 하나도 없으면 첫 지역이 대표가 된다.
+- 요청 배열은 기존 선호를 대체하는 전체 동기화 계약이다.
+- 성공 응답은 정규화된 `sports`, `regions`, `updatedAt`이다.
 
-- 현재 사용자의 `sportTypes`를 요청의 `profiles[].sportType` 목록으로 동기화한다.
-- 요청에 없는 기존 `UserSportProfile`은 삭제한다.
-- 기존 종목은 `level`, `preferredPositions`만 갱신하고, `eloRating`, `matchCount`, `winCount`, `mvpCount`는 경기 결과 기반 값으로 보존한다.
-- 새 종목은 기본 ELO/전적 값으로 생성한다.
-- 성공 응답은 `GET /users/me`와 동일한 full profile shape다.
+## 탈퇴 요청과 운영자 불변식
 
-CAUTION:
-
-- `profiles` 안의 `sportType`은 중복될 수 없다.
-- `level`은 1~5 정수다.
-- 프론트는 운동정보가 없으면 `운동정보 설정`, 하나 이상 있으면 `운동정보 수정/관리`로 표시해야 한다. 설정 완료 상태에서 계속 `설정` CTA를 보여주면 안 된다.
-
-## GET /users/me/matches
-
-- Query
-
-| 필드 | 타입 | 필수 | 기본값 |
-|---|---|---|---|
-| `status` | string | No | 전체 |
-| `cursor` | string | No | 첫 페이지 |
-| `limit` | number | No | 20 |
-
-- Response data shape
+`POST /api/v1/me/withdrawal-request` body:
 
 ```json
 {
-  "items": [],
-  "nextCursor": null
+  "reason": "서비스를 더 이상 이용하지 않음"
 }
 ```
 
-CAUTION:
+- `reason`은 선택 문자열 또는 null, 최대 500자다.
+- 현재 `accountStatus=active`인 사용자만 `withdrawal_pending`으로 전이할 수 있다.
+- 서비스는 사용자 행을 `FOR UPDATE`로 잠근 뒤 최신 계정 상태와 운영자 상태를 다시 확인하고, 상태 변경과 `V1StatusChangeLog` 기록을 같은 트랜잭션에서 처리한다.
+- active 운영자는 이 self-service 경로로 사용자 계정을 비활성화할 수 없다. owner가 먼저 운영자 접근을 revoke해야 하며, 위반하면 `403 ADMIN_WITHDRAWAL_FORBIDDEN`이다.
+- 성공 응답은 `{ userId, accountStatus: "withdrawal_pending", requestedAt }`이다.
 
-- service 구현에서 `nextCursor`는 participant id가 아니라 `items[last].id` 기반
+## Permission / Error Rules
 
-## GET /users/me/invitations
-
-- Auth required
-- body 없음
-- 현재 사용자에게 온 pending 초대만 반환한다.
-- UI는 이 endpoint를 "내가 보낸 초대"로 해석하면 안 된다.
-
-응답 예시:
-
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "id": "invitation-id",
-      "teamId": "team-id",
-      "role": "member",
-      "status": "pending"
-    }
-  ],
-  "timestamp": "2026-04-11T12:00:00.000Z"
-}
-```
-
-## GET /users/search
-
-- Query: `q` 필수
-- 빈 문자열/공백만 전달 시 `400` (`USER_SEARCH_QUERY_REQUIRED`)
-- 최대 10명, 본인 제외
-- 프론트 구현 규칙:
-  - 공백 trim 후 요청
-  - debounce는 프론트에서 처리하고, 빈 문자열이면 호출 자체를 막는다.
-
-대표 실패 예시:
-
-```json
-{
-  "status": "error",
-  "statusCode": 400,
-  "message": "검색어를 입력해주세요.",
-  "timestamp": "2026-04-11T12:00:00.000Z"
-}
-```
-
-## GET /users/:userId/public-profile
-
-- 공개 프로필용이며 일부 private field는 제외
-- `GET /users/me`와 동일 shape를 보장하지 않는다.
-- 프론트는 public profile page에서 `email`, `phone` 같은 private 필드를 기대하지 않는다.
-- 공개 프로필은 `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`를 반환한다.
-- 공개 프로필은 `email`, `phone`, `birthDate`, `gender`, `bio`를 반환하지 않는다.
-- `activitySummary`는 누적 경기 수, 활동 팀 수, 받은 후기 수와 이번 달 경기/팀 가입/후기 수를 포함한다.
-- 사용자 공개/비공개 선택 상태는 v1 공개 프로필 계약에 포함하지 않는다.
-
-## Permission / Ownership Rules
-
-- `/users/me*`는 본인 토큰 필수
-- `/users/:userId/public-profile`은 선택 인증으로 공개 조회
+- `/me/*` 프로필·설정·탈퇴 경로는 `V1AuthGuard` 인증이 필요하다.
+- public profile은 `OptionalV1AuthGuard`를 사용한다.
+- active가 아닌 계정의 mutable 작업은 `403 PERMISSION_DENIED`다.
+- active admin 탈퇴 요청은 `403 ADMIN_WITHDRAWAL_FORBIDDEN`이다.
+- 없는/비활성/삭제 사용자의 공개 프로필은 `404 NOT_FOUND`다.
+- DTO에 없는 필드는 전역 `whitelist + forbidNonWhitelisted` 정책에 따라 거부된다.
 
 ## Frontend Mapping Notes
 
-- `useMyMatches`는 `/users/me/matches`를 `PaginatedResponse<Match>`로 사용
-- `useUpdateMySportProfiles`는 `/users/me/sport-profiles` 성공 응답으로 auth store와 `queryKeys.me`를 갱신
-- `useUserSearch`는 `/users/search` 결과를 사용자 선택 UI에 바로 사용
-- `useV1PublicProfile(id)`는 `/users/:userId/public-profile`을 public profile로 소비
-- `useMe`와 `useV1PublicProfile`의 응답 shape를 하나의 완전 동일 타입으로 가정하면 private/public 필드 드리프트가 생길 수 있다.
-
-## Edge Cases
-
-- soft-deleted user id는 `404`
-- 검색 q 없이 호출하면 백엔드가 명시적 `BadRequestException` 반환
-- `/users/me/matches`의 `status` 값은 화면 display label이 아니라 backend filter literal 기준으로 전달해야 한다.
+- 프론트의 profile/settings/preferences/withdrawal 호출은 `apps/v1_web/src/hooks/use-v1-api.ts`의 실제 `/me/*` 경로를 기준으로 한다.
+- 내 프로필과 공개 프로필은 응답 shape가 다르므로 동일한 완전 타입으로 가정하지 않는다.
+- `PATCH /me/preferences`는 partial patch가 아니라 전체 배열 교체이므로 현재 선택 전체를 전송한다.
 
 ## Source References
+
+- `apps/v1_api/src/profile/profile.controller.ts`
+- `apps/v1_api/src/profile/profile.service.ts`
+- `apps/v1_api/src/profile/dto/profile.dto.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`
+- `apps/v1_web/src/types/api.ts`

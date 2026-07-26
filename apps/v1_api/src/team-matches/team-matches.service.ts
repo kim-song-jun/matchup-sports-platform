@@ -10,6 +10,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
+import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   CancelTeamMatchDto,
@@ -85,6 +86,15 @@ export class TeamMatchesService {
     const pageItems = teamMatches.slice(0, limit);
     const hasNext = teamMatches.length > limit;
 
+    // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
+    // hostTeam들의 신뢰점수를 배치 1회 호출로 live 재계산해 덮어쓴다 (N+1 방지, computeRevealedTeamTrustBatch 참조).
+    const hostTeamIds = [...new Set(pageItems.map((teamMatch) => teamMatch.hostTeamId))];
+    const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, hostTeamIds);
+    for (const teamMatch of pageItems) {
+      const trust = trustByHostTeam.get(teamMatch.hostTeamId);
+      teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+    }
+
     return {
       items: pageItems.map((teamMatch) => this.toListItem(teamMatch, user)),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
@@ -92,7 +102,7 @@ export class TeamMatchesService {
   }
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
-    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user);
+    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
     const viewer = await this.getViewer(teamMatch, user);
     const approvedApplication = teamMatch.applications.find((item) => item.status === 'approved');
 
@@ -395,6 +405,7 @@ export class TeamMatchesService {
           ).map((m) => m.userId),
         'team_match_cancelled',
         teamMatch.id,
+        `"${teamMatch.title}" 팀매치가 취소됐어요.`,
       );
     }
 
@@ -442,7 +453,7 @@ export class TeamMatchesService {
     this.emitTeamMatchNotificationToApplicantManagers(
       teamMatch.id,
       'team_match_closed',
-      '모집이 마감되어 대기 중인 신청이 종료됐어요.',
+      `"${teamMatch.title}" 팀매치 모집이 마감되어 대기 중인 신청이 종료됐어요.`,
     );
 
     return {
@@ -521,7 +532,12 @@ export class TeamMatchesService {
       return nextTeamMatch;
     });
 
-    this.emitNotificationToTeamManagers([teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId], 'team_match_completed', teamMatch.id);
+    this.emitNotificationToTeamManagers(
+      [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId],
+      'team_match_completed',
+      teamMatch.id,
+      `"${teamMatch.title}" 팀매치 리뷰를 남겨보세요.`,
+    );
 
     return {
       teamMatchId: updated.id,
@@ -594,6 +610,7 @@ export class TeamMatchesService {
         ).map((m) => m.userId),
       'team_match_application_received',
       teamMatch.id,
+      `"${teamMatch.title}" 팀매치 신청을 확인해 주세요.`,
     );
 
     return {
@@ -624,7 +641,7 @@ export class TeamMatchesService {
             id: true,
             name: true,
             profile: { select: { logoUrl: true } },
-            trustScore: { select: { trustState: true, mannerScore: true, matchCount: true } },
+            trustScore: { select: { matchCount: true } },
           },
         },
         appliedByUser: {
@@ -642,34 +659,41 @@ export class TeamMatchesService {
     const pageItems = applications.slice(0, limit);
     const hasNext = applications.length > limit;
 
+    // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지의 applicantTeam들의
+    // 신뢰점수를 배치 1회 호출로 live 재계산한다. matchCount는 이번 스코프 밖(리뷰 reveal과 무관한 별개
+    // 집계)이라 기존 캐시값을 그대로 쓴다.
+    const applicantTeamIds = [...new Set(pageItems.map((application) => application.applicantTeamId))];
+    const trustByApplicantTeam = await computeRevealedTeamTrustBatch(this.prisma, applicantTeamIds);
+
     return {
       teamMatchId: teamMatch.id,
-      items: pageItems.map((application) => ({
-        applicationId: application.id,
-        status: application.status,
-        message: application.message,
-        createdAt: application.createdAt,
-        reviewedAt: application.reviewedAt,
-        applicantTeam: {
-          teamId: application.applicantTeam.id,
-          name: application.applicantTeam.name,
-          logoUrl: application.applicantTeam.profile?.logoUrl ?? null,
-          trustState: application.applicantTeam.trustScore?.trustState ?? 'none',
-          score: application.applicantTeam.trustScore?.mannerScore
-            ? Number(application.applicantTeam.trustScore.mannerScore)
-            : null,
-          matchCount: application.applicantTeam.trustScore?.matchCount ?? 0,
-        },
-        appliedBy: {
-          userId: application.appliedByUser.id,
-          displayName:
-            application.appliedByUser.profile?.nickname ?? application.appliedByUser.profile?.displayName ??
-            '신청자',
-          profileImageUrl: application.appliedByUser.profile?.profileImageUrl ?? null,
-        },
-        canApprove: application.status === 'requested' && teamMatch.status === 'recruiting',
-        canReject: application.status === 'requested',
-      })),
+      items: pageItems.map((application) => {
+        const trust = trustByApplicantTeam.get(application.applicantTeamId);
+        return {
+          applicationId: application.id,
+          status: application.status,
+          message: application.message,
+          createdAt: application.createdAt,
+          reviewedAt: application.reviewedAt,
+          applicantTeam: {
+            teamId: application.applicantTeam.id,
+            name: application.applicantTeam.name,
+            logoUrl: application.applicantTeam.profile?.logoUrl ?? null,
+            trustState: trust?.trustState ?? 'none',
+            score: trust?.mannerScore ?? null,
+            matchCount: application.applicantTeam.trustScore?.matchCount ?? 0,
+          },
+          appliedBy: {
+            userId: application.appliedByUser.id,
+            displayName:
+              application.appliedByUser.profile?.nickname ?? application.appliedByUser.profile?.displayName ??
+              '신청자',
+            profileImageUrl: application.appliedByUser.profile?.profileImageUrl ?? null,
+          },
+          canApprove: application.status === 'requested' && teamMatch.status === 'recruiting',
+          canReject: application.status === 'requested',
+        };
+      }),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
   }
@@ -713,7 +737,7 @@ export class TeamMatchesService {
       [application.teamMatch.hostTeamId],
       'team_match_application_withdrawn',
       application.teamMatchId,
-      '상대팀 신청이 취소됐어요.',
+      `"${application.teamMatch.title}" 팀매치 상대팀 신청이 취소됐어요.`,
     );
 
     return {
@@ -741,10 +765,27 @@ export class TeamMatchesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const updatedApplication = await tx.v1TeamMatchApplication.update({
-        where: { id: application.id },
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${application.teamMatchId} FOR UPDATE`;
+      const currentTeamMatch = await tx.v1TeamMatch.findFirst({
+        where: { id: application.teamMatchId, deletedAt: null },
+        select: { status: true, startAt: true, approvedApplicantTeamId: true },
+      });
+      if (
+        !currentTeamMatch ||
+        currentTeamMatch.status !== 'recruiting' ||
+        currentTeamMatch.startAt < new Date() ||
+        currentTeamMatch.approvedApplicantTeamId
+      ) {
+        throw stateConflict('Team match is not recruiting');
+      }
+
+      const transition = await tx.v1TeamMatchApplication.updateMany({
+        where: { id: application.id, status: 'requested' },
         data: { status: 'approved', reviewedByUserId: user.id, reviewedAt: new Date() },
       });
+      if (transition.count !== 1) {
+        throw stateConflict('Only requested team match applications can be approved');
+      }
       const updatedTeamMatch = await tx.v1TeamMatch.update({
         where: { id: application.teamMatchId },
         data: {
@@ -782,7 +823,15 @@ export class TeamMatchesService {
           },
         ],
       });
-      return { updatedApplication, updatedTeamMatch };
+      return {
+        updatedApplication: {
+          id: application.id,
+          teamMatchId: application.teamMatchId,
+          applicantTeamId: application.applicantTeamId,
+          status: 'approved' as const,
+        },
+        updatedTeamMatch,
+      };
     });
 
     // 알림: 신청팀 owner/manager에게 승인 안내 (fire-and-forget)
@@ -790,6 +839,7 @@ export class TeamMatchesService {
       [application.applicantTeamId],
       'team_match_application_approved',
       application.teamMatchId,
+      `"${application.teamMatch.title}" 팀매치 신청이 승인됐어요.`,
     );
 
     return {
@@ -839,6 +889,7 @@ export class TeamMatchesService {
       [application.applicantTeamId],
       'team_match_application_rejected',
       application.teamMatchId,
+      `"${application.teamMatch.title}" 팀매치 신청이 거절됐어요.`,
     );
 
     return {
@@ -969,12 +1020,27 @@ export class TeamMatchesService {
     };
   }
 
-  private async getPublicTeamMatch(teamMatchId: string, user: V1AuthUser | null) {
+  private async getPublicTeamMatch(
+    teamMatchId: string,
+    user: V1AuthUser | null,
+    options: { includeTrust?: boolean } = {},
+  ) {
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
       where: { id: teamMatchId, deletedAt: null, hostTeam: { status: 'active', deletedAt: null } },
       include: this.teamMatchInclude(user),
     });
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+
+    // hostTeam 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
+    // hostTeam.trustScore를 전혀 참조하지 않으므로 불필요한 live 재계산(추가 쿼리)을 건너뛴다.
+    if (options.includeTrust) {
+      const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, [teamMatch.hostTeamId]);
+      const trust = trustByHostTeam.get(teamMatch.hostTeamId);
+      teamMatch.hostTeam.trustScore = trust ? { trustState: trust.trustState } : null;
+    } else {
+      teamMatch.hostTeam.trustScore = null;
+    }
+
     return teamMatch;
   }
 

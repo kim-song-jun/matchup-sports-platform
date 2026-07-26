@@ -30,6 +30,7 @@ export async function logout(page: Page): Promise<void> {
       if (window.sessionStorage.getItem('__e2e_logged_out__')) return;
       window.localStorage.removeItem('teameet.v1.userEmail');
       window.localStorage.removeItem('teameet.v1.userId');
+      window.sessionStorage.removeItem('teameet.v1.signupTermsAccepted');
       window.sessionStorage.setItem('__e2e_logged_out__', '1');
     } catch {
       /* noop */

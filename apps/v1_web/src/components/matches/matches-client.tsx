@@ -13,9 +13,11 @@ import {
   useV1ResolveChatRoom,
   useV1WithdrawMatchApplication,
 } from '@/hooks/use-v1-api';
+import { trackEvent } from '@/lib/analytics';
 import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
+import { toDetailMode } from './matches.mode';
 import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
 import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
@@ -111,7 +113,14 @@ export function MatchListPageClient() {
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
         filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        matches: [],
         sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
+        summary: {
+          ...base.summary,
+          count: 0,
+          today: 0,
+          urgent: 0,
+        },
       };
 
   return <MatchListPageView model={model} />;
@@ -148,13 +157,21 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
   const withdrawMatch = useV1WithdrawMatchApplication(matchId, eligibility.data?.applicationId ?? query.data?.viewer?.applicationId);
   const resolveChatRoom = useV1ResolveChatRoom();
   const autoResolvedChatRef = useRef<string | null>(null);
+  const matchViewTrackedRef = useRef<string | null>(null);
   const fallback = getMatchDetailViewModel();
+  const matchSportType = query.data ? query.data.sport?.name ?? query.data.sportName : undefined;
 
   useEffect(() => {
     if (!query.data || !canOpenMatchChat(viewerState) || autoResolvedChatRef.current === matchId) return;
     autoResolvedChatRef.current = matchId;
     resolveChatRoom.mutate({ targetType: 'match', targetId: matchId });
   }, [matchId, query.data, resolveChatRoom, viewerState]);
+
+  useEffect(() => {
+    if (!query.data || matchViewTrackedRef.current === matchId) return;
+    matchViewTrackedRef.current = matchId;
+    trackEvent('match_view', { matchId, sportType: matchSportType ?? '' });
+  }, [matchId, query.data, matchSportType]);
 
   if (query.isError) {
     return <MatchStatePageView model={getMatchStateViewModel('error')} />;
@@ -194,8 +211,16 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
           viewerState,
           eligible: eligibility.data?.eligible,
           applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
-          apply: () => applyMatch.mutateAsync({ message: null }),
-          withdraw: () => withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }),
+          apply: () =>
+            applyMatch.mutateAsync({ message: null }).then((result) => {
+              trackEvent('match_join_complete', { matchId, sportType: matchSportType ?? '' });
+              return result;
+            }),
+          withdraw: () =>
+            withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }).then((result) => {
+              trackEvent('match_leave', { matchId });
+              return result;
+            }),
         }),
       }
     : fallback;
@@ -396,14 +421,6 @@ function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1ViewerState
   if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
   if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'full';
   return 'open';
-}
-
-function toDetailMode(viewerState: V1ViewerState, status: V1MatchApiStatus): MatchDetailViewModel['mode'] {
-  if (viewerState === 'host') return 'mine';
-  if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'approved';
-  return 'default';
 }
 
 function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {

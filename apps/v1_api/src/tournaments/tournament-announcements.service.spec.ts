@@ -11,6 +11,7 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
 
 const ownerAuthUser = {
@@ -37,12 +38,14 @@ const ownerAdminRecord = {
   userId: 'owner-user-id',
   adminRole: 'owner' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 const supportAdminRecord = {
   id: 'support-admin-id',
   userId: 'support-user-id',
   adminRole: 'support' as const,
   status: 'active' as const,
+  user: { accountStatus: 'active' as const },
 };
 
 function announcementRow(overrides: Record<string, unknown> = {}) {
@@ -51,6 +54,7 @@ function announcementRow(overrides: Record<string, unknown> = {}) {
     tournamentId: 'tournament-1',
     title: '경기 일정 공지',
     body: '7월 1일 오전 10시 시작합니다.',
+    category: 'general',
     audience: 'all_registered',
     publishedAt: null,
     createdAt: new Date('2026-06-14T00:00:00.000Z'),
@@ -73,8 +77,10 @@ describe('TournamentAnnouncementsService', () => {
     };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
+    v1TournamentRegistration: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
+  let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -93,6 +99,7 @@ describe('TournamentAnnouncementsService', () => {
       v1StatusChangeLog: {
         create: jest.fn().mockResolvedValue({ id: 'status-log-1' }),
       },
+      v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
     };
     const p = prisma;
@@ -100,11 +107,17 @@ describe('TournamentAnnouncementsService', () => {
       (cb: (tx: typeof p) => Promise<unknown>) => cb(p),
     );
 
+    notifications = {
+      emitNotification: jest.fn().mockResolvedValue(undefined),
+      emitToManyDeferred: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TournamentAnnouncementsService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -184,10 +197,11 @@ describe('TournamentAnnouncementsService', () => {
     );
   });
 
-  it('listByTournament: serializes all required fields (id/title/body/audience/publishedAt/createdAt)', async () => {
+  it('listByTournament: serializes all required fields including category', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1' });
     const row = announcementRow({
+      category: 'venue',
       publishedAt: new Date('2026-06-14T12:00:00.000Z'),
     });
     prisma.v1TournamentAnnouncement.findMany.mockResolvedValue([row]);
@@ -199,6 +213,7 @@ describe('TournamentAnnouncementsService', () => {
       id: 'ann-1',
       title: '경기 일정 공지',
       body: '7월 1일 오전 10시 시작합니다.',
+      category: 'venue',
       audience: 'all_registered',
       publishedAt: '2026-06-14T12:00:00.000Z',
       createdAt: '2026-06-14T00:00:00.000Z',
@@ -275,6 +290,44 @@ describe('TournamentAnnouncementsService', () => {
     expect(createArgs.data.publishedAt).toBeInstanceOf(Date);
   });
 
+  it('create: publish=true emits tournament_announcement_published to matching registrants', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentAnnouncement.create.mockResolvedValue(
+      announcementRow({ publishedAt: new Date(), audience: 'confirmed_only' }),
+    );
+
+    await service.create(ownerAuthUser, 'tournament-1', {
+      title: '경기 일정 공지',
+      body: '내용',
+      audience: 'confirmed_only',
+      publish: true,
+    });
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledTimes(1);
+    const [resolveUserIds, type, targetId, body] = notifications.emitToManyDeferred.mock.calls[0];
+    expect(type).toBe('tournament_announcement_published');
+    expect(targetId).toBe('tournament-1');
+    expect(body).toContain('경기 일정 공지');
+
+    await resolveUserIds();
+    expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tournamentId: 'tournament-1', status: { in: ['confirmed'] } }),
+      }),
+    );
+  });
+
+  it('create: publish=false does NOT emit a notification', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentAnnouncement.create.mockResolvedValue(announcementRow({ publishedAt: null }));
+
+    await service.create(ownerAuthUser, 'tournament-1', { title: 'x', body: 'y', publish: false });
+
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+  });
+
   it('create: audience defaults to all_registered when not supplied', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
@@ -287,6 +340,32 @@ describe('TournamentAnnouncementsService', () => {
 
     const createArgs = prisma.v1TournamentAnnouncement.create.mock.calls[0][0];
     expect(createArgs.data.audience).toBe('all_registered');
+  });
+
+  it('create: stores and returns the supplied announcement category', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentAnnouncement.create.mockResolvedValue(
+      announcementRow({ category: 'sponsor' }),
+    );
+    const dto = {
+      title: '협찬 이벤트',
+      body: '현장 이벤트는 이 공지에서만 안내합니다.',
+      category: 'sponsor' as const,
+    };
+
+    const result = await service.create(ownerAuthUser, 'tournament-1', dto);
+
+    expect(result).toMatchObject({ id: 'ann-1', category: 'sponsor' });
+    const createArgs = prisma.v1TournamentAnnouncement.create.mock.calls[0][0];
+    expect(createArgs.data.category).toBe('sponsor');
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          afterJson: expect.objectContaining({ category: 'sponsor' }),
+        }),
+      }),
+    );
   });
 
   it('create: accepts public audience for logged-out tournament detail visibility', async () => {
@@ -364,6 +443,23 @@ describe('TournamentAnnouncementsService', () => {
         }),
       }),
     );
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'tournament_announcement_published',
+      'tournament-1',
+      expect.stringContaining('경기 일정 공지'),
+    );
+  });
+
+  it('publish: already published → no duplicate notification', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(
+      announcementRow({ publishedAt: new Date('2026-06-10T00:00:00Z') }),
+    );
+
+    await service.publish(ownerAuthUser, 'ann-1');
+
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
   });
   it('update: support admin cannot mutate', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
@@ -435,6 +531,48 @@ describe('TournamentAnnouncementsService', () => {
 
     const updateArgs = prisma.v1TournamentAnnouncement.update.mock.calls[0][0];
     expect(updateArgs.data.publishedAt).toBeNull();
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+  });
+
+  it('update: draft → publish=true (newly published) emits notification', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(
+      announcementRow({ publishedAt: null }),
+    );
+    prisma.v1TournamentAnnouncement.update.mockResolvedValue(
+      announcementRow({ publishedAt: new Date() }),
+    );
+
+    await service.update(ownerAuthUser, 'ann-1', {
+      title: '경기 일정 공지',
+      body: '내용',
+      publish: true,
+    });
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'tournament_announcement_published',
+      'tournament-1',
+      expect.any(String),
+    );
+  });
+
+  it('update: already-published announcement re-saved with publish=true does NOT re-notify', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1TournamentAnnouncement.findUnique.mockResolvedValue(
+      announcementRow({ publishedAt: new Date('2026-06-10T00:00:00Z') }),
+    );
+    prisma.v1TournamentAnnouncement.update.mockResolvedValue(
+      announcementRow({ title: 'edited', publishedAt: new Date('2026-06-10T00:00:00Z') }),
+    );
+
+    await service.update(ownerAuthUser, 'ann-1', {
+      title: 'edited',
+      body: 'body',
+      publish: true,
+    });
+
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
   });
 
   it('remove: unknown announcementId returns ANNOUNCEMENT_NOT_FOUND', async () => {

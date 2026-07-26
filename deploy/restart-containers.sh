@@ -21,25 +21,12 @@ if sudo docker ps -a --format '{{.Names}}' | grep -qx 'teameet_v1_api'; then
   }
 fi
 
-echo "[INFO] Stopping api, web, v1_api, v1_web, nginx containers..."
-${COMPOSE} -f docker-compose.prod.yml --env-file .env stop api web v1_api v1_web nginx 2>/dev/null || true
-${COMPOSE} -f docker-compose.prod.yml --env-file .env rm -f api web v1_api v1_web nginx 2>/dev/null || true
+echo "[INFO] Stopping v1_api, v1_web, nginx containers..."
+${COMPOSE} -f docker-compose.prod.yml --env-file .env stop v1_api v1_web nginx 2>/dev/null || true
+${COMPOSE} -f docker-compose.prod.yml --env-file .env rm -f v1_api v1_web nginx 2>/dev/null || true
 
-echo "[INFO] Ensuring postgres, v1_postgres and redis are running..."
-${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis v1_postgres
-
-echo "[INFO] Waiting for postgres healthy..."
-for i in $(seq 1 30); do
-  if sudo docker exec teameet_postgres pg_isready -U "${DB_USER:-teameet}" >/dev/null 2>&1; then
-    echo "[INFO] postgres ready (attempt $i)"
-    break
-  fi
-  if [ "$i" -eq 30 ]; then
-    echo "[ERROR] postgres not ready after 60s"
-    exit 1
-  fi
-  sleep 2
-done
+echo "[INFO] Ensuring v1_postgres is running..."
+${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
 
 echo "[INFO] Waiting for v1_postgres healthy..."
 for i in $(seq 1 30); do
@@ -58,17 +45,16 @@ echo "[INFO] Applying v1 deploy database migrations..."
 echo "[INFO] Recovering known failed v1 tournament registration migration if present..."
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260703000000_v1_tournament_registration_team_unique || true"
-echo "[INFO] Recovering known failed v1 tournament review photos migration if present..."
+echo "[INFO] Recovering known failed v1 review photos migration if present..."
+# 2026-07-12 장애: 리뷰 테이블 생성 마이그레이션 누락으로 20260711180000이 42P01로 실패 기록됨.
+# 누락분은 20260711170000_v1_tournament_reviews_awards로 보충 — 실패 레코드를 롤백 처리해 재적용 가능하게 한다.
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
   run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back 20260711180000_v1_tournament_review_photos || true"
-${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-  run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
-echo "[INFO] Recreating api, v1_api, web, v1_web, nginx only (keeping postgres/redis running)..."
+echo "[INFO] Recreating v1_api, v1_web, nginx only (keeping v1_postgres running)..."
 echo "[INFO] Syncing v1 deploy database schema..."
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
 
-${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps api
 echo "[INFO] Ensuring the v1 uploads volume is writable by UID/GID 1001..."
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env run --rm --no-deps -T v1_uploads_init
 ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps v1_api
@@ -80,29 +66,9 @@ if [ -d "${V1_UPLOADS_BACKUP_DIR}/uploads" ]; then
   ${COMPOSE} -f docker-compose.prod.yml --env-file .env run --rm --no-deps -T v1_uploads_init
 fi
 sudo rm -rf "${V1_UPLOADS_BACKUP_DIR}" 2>/dev/null || true
-echo "[INFO] Waiting for APIs to be ready before starting web..."
+echo "[INFO] Starting v1_web/nginx first, then verifying v1_api health..."
 sleep 5
-${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps web v1_web nginx
-
-echo "[INFO] Waiting for teameet_api health..."
-for i in $(seq 1 45); do
-  if curl -fsS http://localhost:8100/api/v1/health | \
-      jq -e '.data.checks.db == true and .data.checks.redis == true' >/dev/null 2>&1; then
-    echo "[INFO] teameet_api is healthy (attempt $i)"
-    break
-  fi
-  if [ "$i" -eq 45 ]; then
-    echo "[ERROR] teameet_api failed health check after 90s"
-    echo "[DEBUG] API container status:"
-    sudo docker ps -a --filter name=teameet_api --format 'table {{.Status}}\t{{.Ports}}' || true
-    echo "[DEBUG] API logs (last 60 lines):"
-    sudo docker logs teameet_api --tail 60 2>&1 || true
-    echo "[DEBUG] Attempting restart..."
-    sudo docker restart teameet_api || true
-    sleep 15
-  fi
-  sleep 2
-done
+${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d --force-recreate --no-deps v1_web nginx
 
 echo "[INFO] Waiting for teameet_v1_api health..."
 for i in $(seq 1 45); do
@@ -126,23 +92,9 @@ else
   echo "[INFO] Skipping v1 seed data sync because DEPLOY_SYNC_V1_SEED_DATA=false"
 fi
 
-echo "[INFO] Waiting for teameet_web routing..."
-for i in $(seq 1 45); do
-  if curl -fsS http://localhost:3000/api/v1/health >/dev/null 2>&1 && \
-     curl -fsS http://localhost:3000/landing >/dev/null 2>&1; then
-    echo "[INFO] teameet_web routing is healthy (attempt $i)"
-    break
-  fi
-  if [ "$i" -eq 45 ]; then
-    echo "[ERROR] teameet_web failed routing check"
-    sudo docker logs teameet_web --tail 60 2>&1 || true
-  fi
-  sleep 2
-done
-
 echo "[INFO] Waiting for teameet_v1_web routing..."
 for i in $(seq 1 45); do
-  if curl -fsS http://localhost:3013/v1/landing >/dev/null 2>&1; then
+  if curl -fsS http://localhost:3013/landing >/dev/null 2>&1; then
     echo "[INFO] teameet_v1_web routing is healthy (attempt $i)"
     break
   fi
@@ -152,28 +104,6 @@ for i in $(seq 1 45); do
   fi
   sleep 2
 done
-
-RESET_DB="${RESET_DB:-false}"
-RUN_SEED="${RUN_SEED:-false}"
-
-if [ "${RESET_DB}" = "true" ]; then
-  echo "[DANGER] Resetting database..."
-  sudo docker exec teameet_api npx prisma migrate reset --force --skip-seed
-  sudo docker exec teameet_api npx prisma db seed
-elif [ "${RUN_SEED}" = "true" ]; then
-  echo "[DANGER] Running destructive full seed..."
-  sudo docker exec teameet_api npx prisma db seed
-fi
-
-if [ "${DEPLOY_SYNC_MOCK_DATA:-true}" != "false" ]; then
-  echo "[INFO] Syncing canonical mock data..."
-  sudo docker exec teameet_api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/seed-mocks.ts --checksum-gate" || true
-else
-  echo "[INFO] Skipping canonical mock data sync because DEPLOY_SYNC_MOCK_DATA=false"
-fi
-
-echo "[INFO] Syncing DB-backed image data..."
-sudo docker exec teameet_api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/seed-images.ts" || echo "::warning::seed-images sync failed"
 
 sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
 sudo docker exec teameet_nginx nginx -t

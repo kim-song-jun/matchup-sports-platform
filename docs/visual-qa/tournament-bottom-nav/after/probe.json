@@ -1,0 +1,89 @@
+{
+  "my-registration-mobile": {
+    "navInDom": true,
+    "navVisible": true,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
+  "tournament-detail-mobile": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": true,
+    "homeShortcutVisible": true,
+    "visibleHomeLinks": 1
+  },
+  "notices-mobile": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": true,
+    "homeShortcutVisible": true,
+    "visibleHomeLinks": 2
+  },
+  "roster-mobile": {
+    "navInDom": true,
+    "navVisible": true,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
+  "_console_mobile": [],
+  "my-registration-tablet": {
+    "navInDom": true,
+    "navVisible": true,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
+  "tournament-detail-tablet": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": true,
+    "homeShortcutVisible": true,
+    "visibleHomeLinks": 1
+  },
+  "notices-tablet": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": true,
+    "homeShortcutVisible": true,
+    "visibleHomeLinks": 2
+  },
+  "roster-tablet": {
+    "navInDom": true,
+    "navVisible": true,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
+  "_console_tablet": [],
+  "my-registration-desktop": {
+    "navInDom": true,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 2
+  },
+  "tournament-detail-desktop": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": true,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 2
+  },
+  "notices-desktop": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": true,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 3
+  },
+  "roster-desktop": {
+    "navInDom": true,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 2
+  },
+  "_console_desktop": []
+}

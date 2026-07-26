@@ -3,18 +3,18 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Calendar, Clock, Eye, LogIn, Shield, UserRound } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import {
   useV1AdminMe,
   useV1AdminUsers,
   useV1ChangeUserStatus,
 } from '@/hooks/use-v1-api';
-import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
   AdminFilterBar,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -22,7 +22,7 @@ import {
   useAdminToast,
   AdminToasts,
 } from '@/components/admin';
-import type { V1AdminUserRow, CursorPage } from '@/types/api';
+import type { V1AdminUserRow } from '@/types/api';
 
 // ── Date formatter ────────────────────────────────────────────────────────────
 function formatDateCompact(dateStr: string | null | undefined): string {
@@ -83,6 +83,8 @@ const USER_STATUS_FILTER_OPTIONS = [
   { value: 'deleted', label: '삭제' },
 ];
 
+const PAGE_SIZE = 20;
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AdminUsersPage() {
   return (
@@ -100,10 +102,9 @@ function AdminUsersPageContent() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState(initialStatus);
 
-  // Accumulated rows across cursor pages
-  const [extraRows, setExtraRows] = useState<V1AdminUserRow[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // 커서 누적 대신 페이지 단위 교체다. 회원 목록은 "몇 명 중 어디쯤"이 보여야 하는데
+  // 누적 목록으로는 그 감각이 생기지 않는다.
+  const [page, setPage] = useState(1);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -119,10 +120,9 @@ function AdminUsersPageContent() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reset extra pages when filters change
+  // 필터가 바뀌면 첫 페이지로 돌아간다 — 3페이지를 보던 중 조건을 좁히면 결과가 없을 수 있다.
   useEffect(() => {
-    setExtraRows([]);
-    setNextCursor(null);
+    setPage(1);
   }, [debouncedSearch, activeStatus]);
 
   // Capability check
@@ -133,55 +133,28 @@ function AdminUsersPageContent() {
   const filters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
-  // First page via React Query
   const {
     data: firstPage,
     isPending,
+    isFetching,
     isError,
     error,
     refetch,
   } = useV1AdminUsers(filters);
 
-  // Sync cursor from first page
-  useEffect(() => {
-    if (firstPage) {
-      setNextCursor(
-        firstPage.nextCursor ?? firstPage.pageInfo?.nextCursor ?? null,
-      );
-    }
-  }, [firstPage]);
-
   // Mutation
   const changeStatusMutation = useV1ChangeUserStatus();
 
-  // Combined rows: first page + loaded extras
-  const firstRows = firstPage?.items ?? [];
-  const rows = [...firstRows, ...extraRows];
+  const rows = firstPage?.items ?? [];
+  const pageInfo = firstPage?.pageInfo;
   const statusOptions = USER_STATUS_FILTER_OPTIONS.map((option) => ({
     ...option,
     count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
   }));
-
-  // Load more handler
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await v1Get<CursorPage<V1AdminUserRow>>('/admin/users', {
-        ...filters,
-        cursor: nextCursor,
-      });
-      setExtraRows((prev) => [...prev, ...page.items]);
-      setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
-    } catch (err) {
-      showToast(extractErrorMessage(err, '추가 데이터를 불러오지 못했어요.'), 'error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   // Submit moderation modal
   function handleModalSubmit(status: string, reason: string) {
@@ -192,10 +165,8 @@ function AdminUsersPageContent() {
         onSuccess: () => {
           setModalOpen(false);
           setSelectedRow(null);
-          // Reset to first page so the updated row (incl. page2+ extras) is
-          // re-fetched fresh instead of left stale in extraRows.
-          setExtraRows([]);
-          setNextCursor(null);
+          // 방금 바꾼 행이 최신 상태로 다시 그려지도록 첫 페이지부터 받아온다.
+          setPage(1);
           showToast('회원 상태를 변경했어요.', 'success');
         },
         onError: (err) => {
@@ -229,56 +200,109 @@ function AdminUsersPageContent() {
         />
 
         {/* Card list */}
-        <AdminCardList<V1AdminUserRow>
+        {/* 회원 한 명에 8개 지표가 붙는데 카드 2열로는 값이 서로 붙어 읽히지 않았다.
+            숫자는 컬럼으로 세워야 회원 간 비교가 된다. */}
+        <AdminDataTable<V1AdminUserRow>
           rows={rows}
           keyExtractor={(row) => row.userId}
-          card={(row) => {
-            const teamRoles = getTeamRoleCounts(row);
-            return {
-              title: formatUserTitle(row),
-              subtitle: row.email ?? undefined,
-              status: row.accountStatus,
-              meta: [
-                {
-                  icon: <UserRound size={14} aria-hidden="true" />,
-                  label: formatGender(row.gender),
-                },
-                ...(row.adminRole
-                  ? [{ icon: <Shield size={14} aria-hidden="true" />, label: '운영자' }]
-                  : []),
-                {
-                  icon: <LogIn size={14} aria-hidden="true" />,
-                  label: formatAuthProviders(row.authProviders),
-                },
-                {
-                  icon: <Activity size={14} aria-hidden="true" />,
-                  label: `매치 ${row.hostedMatchCount} · 생성/소유 ${row.ownedTeamCount}`,
-                },
-                {
-                  icon: <Shield size={14} aria-hidden="true" />,
-                  label: `소속 ${row.membershipCount} · 팀장 ${teamRoles.owner}`,
-                },
-                {
-                  icon: <Shield size={14} aria-hidden="true" />,
-                  label: `운영진 ${teamRoles.manager} · 멤버 ${teamRoles.member}`,
-                },
-                {
-                  icon: <Calendar size={14} aria-hidden="true" />,
-                  label: formatDateCompact(row.createdAt),
-                },
-                {
-                  icon: <Clock size={14} aria-hidden="true" />,
-                  label: formatDateCompact(row.lastLoginAt),
-                },
-              ],
-              tone:
-              row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
-                ? 'danger'
-                : row.accountStatus === 'suspended' || row.accountStatus === 'withdrawal_pending'
-                  ? 'warning'
-                  : undefined,
-            };
-          }}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) =>
+            row.accountStatus === 'blocked' || row.accountStatus === 'deleted'
+              ? 'danger'
+              : row.accountStatus === 'suspended' || row.accountStatus === 'withdrawal_pending'
+                ? 'warning'
+                : undefined
+          }
+          columns={[
+            {
+              key: 'user',
+              header: '회원',
+              render: (row) => (
+                <div className="min-w-0">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-medium text-gray-900">{formatUserTitle(row)}</span>
+                    {row.adminRole ? (
+                      <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[var(--font-size-micro)] font-semibold text-blue-700">
+                        운영자
+                      </span>
+                    ) : null}
+                  </span>
+                  {row.email ? (
+                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500" title={row.email}>
+                      {row.email}
+                    </span>
+                  ) : null}
+                </div>
+              ),
+            },
+            {
+              key: 'accountStatus',
+              header: '상태',
+              width: 'w-[104px]',
+              render: (row) => <AdminStatusPill status={row.accountStatus} />,
+            },
+            {
+              key: 'gender',
+              header: '성별',
+              width: 'w-[72px]',
+              render: (row) => <span className="text-gray-600">{formatGender(row.gender)}</span>,
+            },
+            {
+              key: 'authProviders',
+              header: '로그인',
+              width: 'w-[124px]',
+              render: (row) => (
+                <span className="block truncate text-gray-600" title={formatAuthProviders(row.authProviders)}>
+                  {formatAuthProviders(row.authProviders)}
+                </span>
+              ),
+            },
+            {
+              key: 'activity',
+              header: '매치 / 소유팀',
+              align: 'center',
+              width: 'w-[110px]',
+              render: (row) => (
+                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                  {row.hostedMatchCount} / {row.ownedTeamCount}
+                </span>
+              ),
+            },
+            {
+              key: 'membership',
+              header: '소속 (팀장/운영진/멤버)',
+              align: 'center',
+              width: 'w-[168px]',
+              render: (row) => {
+                const teamRoles = getTeamRoleCounts(row);
+                return (
+                  <span className="tabular-nums whitespace-nowrap text-gray-600">
+                    {row.membershipCount}
+                    <span className="text-gray-400">
+                      {' '}
+                      ({teamRoles.owner}/{teamRoles.manager}/{teamRoles.member})
+                    </span>
+                  </span>
+                );
+              },
+            },
+            {
+              key: 'createdAt',
+              header: '가입',
+              width: 'w-[104px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDateCompact(row.createdAt)}</span>
+              ),
+            },
+            {
+              key: 'lastLoginAt',
+              header: '최근 로그인',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDateCompact(row.lastLoginAt)}</span>
+              ),
+            },
+          ]}
           renderActions={(row) => (
             <>
               <Link
@@ -312,7 +336,7 @@ function AdminUsersPageContent() {
               ) : null}
             </>
           )}
-          loading={isPending}
+          loading={isPending && rows.length === 0}
           empty={
             <AdminEmpty
               title="조건에 맞는 회원이 없어요"
@@ -321,28 +345,20 @@ function AdminUsersPageContent() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonCards={8}
+          skeletonRows={8}
+          pagination={
+            pageInfo?.totalPages
+              ? {
+                  page: pageInfo.page ?? page,
+                  totalPages: pageInfo.totalPages,
+                  total: pageInfo.total ?? 0,
+                  limit: pageInfo.limit ?? PAGE_SIZE,
+                  onPageChange: setPage,
+                  loading: isFetching,
+                }
+              : undefined
+          }
         />
-
-        {/* Load more trigger */}
-        {nextCursor && !isPending && !isError && !loadingMore && (
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              onClick={() => void loadMore()}
-              className={[
-                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
-                'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-              ].join(' ')}
-            >
-              더 보기
-            </button>
-          </div>
-        )}
-
-        {/* Loading more skeleton */}
-        {loadingMore && <AdminTableSkeleton rows={4} />}
       </div>
 
       {/* Reason modal */}

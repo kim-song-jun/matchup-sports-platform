@@ -10,14 +10,15 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { KakaoGeocodingService } from './kakao-geocoding.service';
 import { TournamentsAdminService } from './tournaments-admin.service';
 
 const ownerAuthUser = { id: 'owner-user-id', email: 'admin@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const supportAuthUser = { id: 'support-user-id', email: 'support@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const nonAdminAuthUser = { id: 'plain-user-id', email: 'user@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
-const ownerAdminRecord = { id: 'owner-admin-id', userId: 'owner-user-id', adminRole: 'owner' as const, status: 'active' as const };
-const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', adminRole: 'support' as const, status: 'active' as const };
+const ownerAdminRecord = { id: 'owner-admin-id', userId: 'owner-user-id', adminRole: 'owner' as const, status: 'active' as const, user: { accountStatus: 'active' as const } };
+const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', adminRole: 'support' as const, status: 'active' as const, user: { accountStatus: 'active' as const } };
 
 function tournamentRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -32,6 +33,11 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    genderCategory: null,
+    genderMinMale: null,
+    genderMaxMale: null,
+    genderMinFemale: null,
+    genderMaxFemale: null,
     entryFee: 120000,
     bankName: null,
     bankAccount: null,
@@ -71,10 +77,19 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
 
 describe('TournamentsAdminService', () => {
   let service: TournamentsAdminService;
+  let kakaoGeocoding: { geocode: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
     v1Sport: { findUnique: jest.Mock };
-    v1Tournament: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock; groupBy: jest.Mock };
+    v1Tournament: {
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      groupBy: jest.Mock;
+    };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -84,7 +99,15 @@ describe('TournamentsAdminService', () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
       v1Sport: { findUnique: jest.fn() },
-      v1Tournament: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1Tournament: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),
@@ -92,11 +115,15 @@ describe('TournamentsAdminService', () => {
     const p = prisma;
     (prisma.$transaction as jest.Mock).mockImplementation((cb: (tx: typeof p) => Promise<unknown>) => cb(p));
 
+    // 기본값: 키 미설정 상태와 동일하게 항상 null 반환(geocoding disabled). 개별 테스트에서 override.
+    kakaoGeocoding = { geocode: jest.fn().mockResolvedValue(null) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TournamentsAdminService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
+        { provide: KakaoGeocodingService, useValue: kakaoGeocoding },
       ],
     }).compile();
 
@@ -166,6 +193,23 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
   });
 
+  it('create: paid tournament without complete bank details is rejected', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: '유료 대회',
+        teamCount: 8,
+        entryFee: 50000,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED' },
+    });
+    expect(prisma.v1Sport.findUnique).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
   it('create: owner with valid input → returns draft tournament + writes audit log', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
@@ -176,6 +220,9 @@ describe('TournamentsAdminService', () => {
       title: '테스트 대회',
       teamCount: 12,
       entryFee: 120000,
+      bankName: '국민은행',
+      bankAccount: '123-456',
+      bankHolder: '팀밋',
       scheduledAt: '2026-08-15T09:00:00.000Z',
       scheduledEndAt: '2026-08-16T18:00:00.000Z',
     });
@@ -201,11 +248,59 @@ describe('TournamentsAdminService', () => {
     );
   });
 
+  // ─── venue geocoding wiring (KakaoGeocodingService) ────────────────────────────
+
+  it('create: venue provided + geocoding succeeds → coordinates saved with the tournament', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ venue: '잠실종합운동장', latitude: 37.5, longitude: 127.07 }));
+    kakaoGeocoding.geocode.mockResolvedValue({ latitude: 37.5, longitude: 127.07 });
+
+    await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 8, venue: '잠실종합운동장' });
+
+    expect(kakaoGeocoding.geocode).toHaveBeenCalledWith('잠실종합운동장');
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ latitude: 37.5, longitude: 127.07 }) }),
+    );
+  });
+
+  it('create: no venue → geocoding is never called and coordinates are null', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow());
+
+    await service.create(ownerAuthUser, { sportId: 'sport-1', title: '테스트 대회', teamCount: 8 });
+
+    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
+    );
+  });
+
+  it('create: geocoding disabled/failed (returns null) → venue still saves, coordinates stay null', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ venue: '알 수 없는 장소' }));
+    kakaoGeocoding.geocode.mockResolvedValue(null);
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '테스트 대회',
+      teamCount: 8,
+      venue: '알 수 없는 장소',
+    });
+
+    expect(result).toMatchObject({ venue: '알 수 없는 장소' });
+    expect(prisma.v1Tournament.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
+    );
+  });
+
   // ─── status transitions ───────────────────────────────────────────────────────
 
   it('changeStatus: draft → open succeeds and records previous/next', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
-    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft' }));
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', entryFee: 0 }));
     prisma.v1Tournament.update.mockResolvedValue(tournamentRow({ status: 'open' }));
 
     const result = await service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' });
@@ -214,6 +309,18 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ fromStatus: 'draft', toStatus: 'open' }) }),
     );
+  });
+
+  it('changeStatus: paid tournament without bank details cannot be opened', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft' }));
+
+    await expect(
+      service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'open' }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
   });
 
   it('changeStatus: open → completed (skipping in_progress) → 409 TRANSITION_INVALID', async () => {
@@ -237,6 +344,145 @@ describe('TournamentsAdminService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'completed' }));
     await expect(service.changeStatus(ownerAuthUser, 'tournament-1', { status: 'in_progress' })).rejects.toThrow(ConflictException);
+  });
+
+  // ─── bracket publish (Task 109 Track 6) ────────────────────────────────────────
+
+  it('publishBracket: not-yet-published tournament → sets bracketPublishedAt + writes audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: null }));
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.publishBracket(ownerAuthUser, 'tournament-1');
+
+    expect(result.alreadyPublished).toBe(false);
+    expect(result.bracketPublishedAt).toEqual(expect.any(String));
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith({
+      where: { id: 'tournament-1', deletedAt: null, bracketPublishedAt: null },
+      // 즉시 공개는 남아 있던 예약을 함께 비운다(공개된 뒤의 예약은 의미가 없다).
+      data: { bracketPublishedAt: expect.any(Date), bracketPublishScheduledAt: null },
+    });
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.bracket_publish' }) }),
+    );
+    // 대진표 공개는 대회 status와 무관한 이벤트라 status-change 로그는 남기지 않는다.
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: concurrent requests produce one transition and one audit log', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: null }));
+    let winnerPublishedAt: Date | null = null;
+    prisma.v1Tournament.updateMany.mockImplementation(
+      ({ data }: { data: { bracketPublishedAt: Date } }) => {
+        if (winnerPublishedAt) return Promise.resolve({ count: 0 });
+        winnerPublishedAt = data.bracketPublishedAt;
+        return Promise.resolve({ count: 1 });
+      },
+    );
+    prisma.v1Tournament.findUnique.mockImplementation(() =>
+      Promise.resolve({ bracketPublishedAt: winnerPublishedAt, deletedAt: null }),
+    );
+
+    const results = await Promise.all([
+      service.publishBracket(ownerAuthUser, 'tournament-1'),
+      service.publishBracket(ownerAuthUser, 'tournament-1'),
+    ]);
+
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ alreadyPublished: false }),
+        expect.objectContaining({ alreadyPublished: true }),
+      ]),
+    );
+    expect(new Set(results.map((result) => result.bracketPublishedAt)).size).toBe(1);
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledTimes(2);
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('publishBracket: 예약 시각이 지나 이미 공개 중이면 재예약을 받지 않는다(재비공개 방지)', async () => {
+    // 예약 공개는 조회 시점 판정이라 시각이 지나도 bracketPublishedAt 은 null 이다.
+    // 여기서 미래 예약을 그대로 받으면 이미 공개된 대진표가 다시 감춰진다.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        bracketPublishedAt: null,
+        bracketPublishScheduledAt: new Date(Date.now() - 60_000),
+      }),
+    );
+
+    const result = await service.publishBracket(
+      ownerAuthUser,
+      'tournament-1',
+      new Date(Date.now() + 86_400_000),
+    );
+
+    expect(result.alreadyPublished).toBe(true);
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: 아직 오지 않은 예약이 있으면 재예약은 미래 조건 가드와 함께 기록된다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        bracketPublishedAt: null,
+        bracketPublishScheduledAt: new Date(Date.now() + 3_600_000),
+      }),
+    );
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+
+    const next = new Date(Date.now() + 7_200_000);
+    const result = await service.publishBracket(ownerAuthUser, 'tournament-1', next);
+
+    expect(result.bracketPublishScheduledAt).toBe(next.toISOString());
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          bracketPublishedAt: null,
+          // 이미 지난 예약(=공개 상태)에는 덮어쓰지 않도록 하는 레이스 가드
+          OR: [{ bracketPublishScheduledAt: null }, { bracketPublishScheduledAt: { gt: expect.any(Date) } }],
+        }),
+        data: { bracketPublishScheduledAt: next },
+      }),
+    );
+  });
+
+  it('publishBracket: already published → idempotent no-op (no write)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const publishedAt = new Date('2026-07-01T00:00:00.000Z');
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ bracketPublishedAt: publishedAt }));
+
+    const result = await service.publishBracket(ownerAuthUser, 'tournament-1');
+
+    expect(result).toEqual({
+      tournamentId: 'tournament-1',
+      bracketPublishedAt: publishedAt.toISOString(),
+      bracketPublishScheduledAt: null,
+      alreadyPublished: true,
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: non-admin → 403', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(service.publishBracket(nonAdminAuthUser, 'tournament-1')).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1Tournament.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('publishBracket: support admin cannot mutate → 403', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
+    await expect(service.publishBracket(supportAuthUser, 'tournament-1')).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
+
+  it('publishBracket: unknown tournament → 404', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(null);
+    await expect(service.publishBracket(ownerAuthUser, 'ghost')).rejects.toThrow(NotFoundException);
   });
 
   // ─── not found ────────────────────────────────────────────────────────────────
@@ -299,6 +545,116 @@ describe('TournamentsAdminService', () => {
     // Only `title` was in the dto — verify update was called with exactly that field.
     expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ title: '새 제목' }) }),
+    );
+  });
+
+  it('update: venue changed → re-geocodes and persists new coordinates', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ venue: '기존 장소', latitude: 1, longitude: 1 });
+    const updated = tournamentRow({ venue: '새 장소', latitude: 37.4, longitude: 127.1 });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(updated);
+    kakaoGeocoding.geocode.mockResolvedValue({ latitude: 37.4, longitude: 127.1 });
+
+    await service.update(ownerAuthUser, 'tournament-1', { venue: '새 장소' });
+
+    expect(kakaoGeocoding.geocode).toHaveBeenCalledWith('새 장소');
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ venue: '새 장소', latitude: 37.4, longitude: 127.1 }) }),
+    );
+  });
+
+  it('update: venue unchanged (same value resent) → does not re-geocode or touch coordinates', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ venue: '동일 장소', latitude: 5, longitude: 5 });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(existing);
+
+    await service.update(ownerAuthUser, 'tournament-1', { venue: '동일 장소' });
+
+    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
+    const updateCallData = prisma.v1Tournament.update.mock.calls[0][0].data;
+    expect(updateCallData).not.toHaveProperty('latitude');
+    expect(updateCallData).not.toHaveProperty('longitude');
+  });
+
+  it('update: clearing venue and editable text fields persists null without geocoding', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({
+      venue: '기존 장소',
+      latitude: 5,
+      longitude: 5,
+      entryFee: 0,
+      bankName: '기존 은행',
+      rulesText: '기존 규정',
+    });
+    const updated = tournamentRow({
+      venue: null,
+      latitude: null,
+      longitude: null,
+      bankName: null,
+      rulesText: null,
+    });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(updated);
+
+    await service.update(ownerAuthUser, 'tournament-1', {
+      venue: null,
+      bankName: null,
+      rulesText: null,
+    });
+
+    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          venue: null,
+          latitude: null,
+          longitude: null,
+          bankName: null,
+          rulesText: null,
+        }),
+      }),
+    );
+  });
+
+  it('update: venue not included in dto → does not re-geocode or touch coordinates', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ venue: '기존 장소', latitude: 5, longitude: 5 });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(existing);
+
+    await service.update(ownerAuthUser, 'tournament-1', { title: '제목만 변경' });
+
+    expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
+    const updateCallData = prisma.v1Tournament.update.mock.calls[0][0].data;
+    expect(updateCallData).not.toHaveProperty('latitude');
+    expect(updateCallData).not.toHaveProperty('longitude');
+  });
+
+  it('update: geocoding disabled/failed on venue change → clears coordinates to null (never blocks venue save)', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    const existing = tournamentRow({ venue: '기존 장소', latitude: 5, longitude: 5 });
+    const updated = tournamentRow({ venue: '지오코딩 실패 장소', latitude: null, longitude: null });
+    prisma.v1Tournament.findFirst
+      .mockResolvedValueOnce(existing)
+      .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
+    prisma.v1Tournament.update.mockResolvedValue(updated);
+    kakaoGeocoding.geocode.mockResolvedValue(null);
+
+    const result = await service.update(ownerAuthUser, 'tournament-1', { venue: '지오코딩 실패 장소' });
+
+    expect(result).toMatchObject({ venue: '지오코딩 실패 장소' });
+    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
     );
   });
 
@@ -371,5 +727,94 @@ describe('TournamentsAdminService', () => {
         }),
       }),
     );
+  });
+
+  it('create: rejects an impossible mixed gender quota', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: '혼성 대회',
+        teamCount: 8,
+        maxPlayers: 10,
+        genderCategory: 'mixed',
+        genderMinMale: 6,
+        genderMinFemale: 5,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
+    });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+  });
+
+  it('create: persists a valid mixed gender quota', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 2,
+        genderMaxMale: 6,
+        genderMinFemale: 2,
+        genderMaxFemale: 6,
+      }),
+    );
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '혼성 대회',
+      teamCount: 8,
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 6,
+      genderMinFemale: 2,
+      genderMaxFemale: 6,
+    });
+
+    expect(result).toMatchObject({
+      genderCategory: 'mixed',
+      genderMinMale: 2,
+      genderMaxMale: 6,
+      genderMinFemale: 2,
+      genderMaxFemale: 6,
+    });
+  });
+
+  it('update: changing maxPlayers revalidates the retained mixed quota', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        maxPlayers: 10,
+        genderCategory: 'mixed',
+        genderMinMale: 5,
+        genderMinFemale: 4,
+      }),
+    );
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', { maxPlayers: 8 }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
+    });
+    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+  });
+
+  it('create: rejects a gender maximum above the roster capacity', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+
+    await expect(
+      service.create(ownerAuthUser, {
+        sportId: 'sport-1',
+        title: '혼성 대회',
+        teamCount: 8,
+        maxPlayers: 10,
+        genderCategory: 'mixed',
+        genderMaxFemale: 11,
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
+    });
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
   });
 });

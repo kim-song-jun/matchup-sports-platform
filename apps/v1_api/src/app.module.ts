@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
+import { buildPinoHttpOptions } from './common/logging/pino-http.config';
 import { V1ThrottlerGuard } from './common/guards/v1-throttler.guard';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { HomeModule } from './home/home.module';
@@ -16,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { TeamsModule } from './teams/teams.module';
 import { TeamMatchesModule } from './team-matches/team-matches.module';
 import { ChatModule } from './chat/chat.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ProfileModule } from './profile/profile.module';
 import { AdminModule } from './admin/admin.module';
@@ -24,14 +28,21 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { VerificationModule } from './verification/verification.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { LogsModule } from './logs/logs.module';
+import { ErrorLogsModule } from './error-logs/error-logs.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: buildPinoHttpOptions(),
+    }),
     ThrottlerModule.forRoot({
       throttlers: [{ limit: 1000, ttl: 60_000 }],
     }),
     PrismaModule,
+    ErrorLogsModule,
     HealthModule,
     AuthModule,
     PopupsModule,
@@ -44,6 +55,7 @@ import { VerificationModule } from './verification/verification.module';
     TeamsModule,
     TeamMatchesModule,
     ChatModule,
+    RealtimeModule,
     NotificationsModule,
     ProfileModule,
     AdminModule,
@@ -52,7 +64,12 @@ import { VerificationModule } from './verification/verification.module';
     UploadsModule,
     TournamentsModule,
     VerificationModule,
+    IntegrationsModule,
+    LogsModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: V1ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: V1ThrottlerGuard },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+  ],
 })
 export class AppModule {}

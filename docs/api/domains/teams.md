@@ -11,7 +11,7 @@
 | POST | `/teams` | Yes | 팀 생성 |
 | PATCH | `/teams/:id` | Yes | 팀 수정 (manager+) |
 | DELETE | `/teams/:id` | Yes | 팀 삭제 (owner) |
-| GET | `/teams/:id/members` | Yes | 멤버 목록 (member+) |
+| GET | `/teams/:id/members` | Optional | 멤버 목록 (공개 설정 또는 active member) |
 | POST | `/teams/:id/members` | Yes | 멤버 추가 (manager+) |
 | PATCH | `/teams/:id/members/:userId` | Yes | 역할 변경 (owner) |
 | DELETE | `/teams/:id/members/:userId` | Yes | 멤버 제거 (owner) |
@@ -33,6 +33,8 @@
 - 멤버 항목은 `displayName`, `realName`, `birthDate`, `phone`을 포함한다.
 - `realName`, `birthDate`, `phone`은 nullable이다.
 - 대회 로스터 등록 화면은 세 값 중 하나라도 없으면 해당 팀원을 목록에는 유지하되 선택 불가로 표시한다.
+- 응답의 `summary.ownerCount`는 요청한 `role`, `status`, `cursor`, `limit`과 무관하게 팀 전체의 `role=owner`, `status=active` 멤버십을 별도 count한 값이다. 따라서 owner가 현재 페이지에 없거나 inactive 멤버 목록을 조회해도 active owner 총수를 반환한다.
+- `summary.managerCount`, `summary.memberCount`는 팀 aggregate이며, `ownerCount`를 포함한 summary는 현재 page의 `items.length` 집계가 아니다.
 
 ## GET /teams
 
@@ -110,8 +112,11 @@ CAUTION:
 
 ### POST /teams/:id/leave
 
-- owner는 탈퇴 불가
-- active 멤버만 가능
+- active 멤버가 자신의 멤버십을 `left`로 전환하는 self-service 경로다. manager/member는 탈퇴할 수 있다.
+- owner도 다른 active owner가 한 명 이상 있으면 탈퇴할 수 있다. 팀 row lock 아래에서 현재 membership을 제외한 active owner를 다시 count하므로 공동 owner의 동시 탈퇴가 팀을 owner 0명으로 만들지 않는다.
+- 마지막 active owner는 `409 LAST_OWNER_CANNOT_LEAVE`다. 먼저 다른 active manager에게 소유권을 이전하거나 공동 owner를 확보해야 한다.
+- 동일 membership이 동시 요청으로 먼저 변경되면 조건부 update가 `409 CONCURRENT_UPDATE`를 반환한다.
+- 성공 시 membership `status=left`, `memberCount` 감소, manager라면 `managerCount`도 감소하며 팀 채팅 참가 상태와 status log를 같은 transaction에서 정리한다.
 
 ### POST /teams/:id/transfer-ownership
 

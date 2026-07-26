@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { trackEvent } from '@/lib/analytics';
+import { normalizeNotificationHref } from '@/lib/notification-route';
 import {
   useV1ChatMessages,
   useV1ChatRoom,
@@ -86,17 +88,21 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   const fallback = getChatRoomViewModel();
   const isError = room.isError || messages.isError;
   const isLoading = room.isPending || messages.isPending;
-  const messageItems = messages.data ? items.map(toChatMessageModel) : fallback.messages;
+  // fallback은 로딩 중 스켈레톤 배경용 placeholder일 뿐이다 — 조회 실패(isError) 시에도
+  // 노출되면 알림으로 들어온 실제 채팅방 대신 엉뚱한 채팅방이 보이는 것처럼 보인다.
+  const messageItems = messages.data ? items.map(toChatMessageModel) : isLoading ? fallback.messages : [];
   const model: ChatRoomViewModel = {
-    title: room.data?.title ?? fallback.title,
+    title: room.data?.title ?? (isLoading ? fallback.title : '채팅'),
     context: room.data
       ? {
           title: room.data.linkedTarget.title,
           sub: room.data.roomType === 'match' ? '개인매치 채팅' : room.data.roomType === 'team' ? '팀 채팅' : '팀매치 채팅',
           href: room.data.linkedTarget.route ?? '/chat',
         }
-      : fallback.context,
-    messages: messages.data ? messageItems : isLoading ? [] : fallback.messages,
+      : isLoading
+        ? fallback.context
+        : { title: '', sub: '', href: '/chat' },
+    messages: messageItems,
     status: isLoading ? 'loading' : isError ? 'error' : 'ready',
     emptyTitle: isError ? '채팅방을 불러오지 못했어요' : messages.data && items.length === 0 ? '아직 메시지가 없어요' : undefined,
     emptyBody: isError ? '네트워크 상태를 확인하고 다시 시도해 주세요.' : messages.data && items.length === 0 ? '먼저 말을 걸어 대화를 시작해 보세요' : undefined,
@@ -106,7 +112,10 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     onDraftChange: setDraft,
     onSend: () => {
       const content = draft.trim();
-      if (!content) return;
+      // 로딩 중 재클릭/재입력 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
+      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
+      // 재클릭/재입력은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
+      if (!content || send.isPending) return;
       send.mutate(
         { content },
         {
@@ -161,15 +170,12 @@ export function NotificationsPageClient() {
           },
         },
       ),
+    // 카드 탭은 상세 시트를 여는 동작 — 읽음 처리만 하고 이동은 시트 CTA(onNavigate)가 맡는다.
     onOpen: (notification) => {
-      if (!notification.unread) {
-        router.push(notification.href);
-        return;
-      }
-      read.mutate(notification.id, {
-        onSettled: () => router.push(notification.href),
-      });
+      trackEvent('notification_click', { type: notification.type });
+      if (notification.unread) read.mutate(notification.id);
     },
+    onNavigate: (notification) => router.push(notification.href),
   };
 
   return <NotificationsPageView model={model} />;
@@ -203,6 +209,7 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
     return {
       id: message.messageId,
       who: 'system',
+      senderId: 'system',
       label: '',
       body: message.content ?? '',
       sentAt: message.sentAt,
@@ -212,6 +219,7 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
   return {
     id: message.messageId,
     who: message.mine ? 'me' : 'other',
+    senderId: message.sender.userId,
     unreadCount: message.mine && message.unreadCount ? message.unreadCount : undefined,
     label: message.mine ? '나' : message.sender.displayName,
     body: message.content ?? '삭제된 메시지예요.',
@@ -223,6 +231,7 @@ function toNotificationModel(notification: V1Notification): NotificationModel {
   const href = normalizeNotificationHref(notification.target?.route, notification.type);
   return {
     id: notification.notificationId,
+    type: notification.type,
     group: formatNotificationGroup(notification.createdAt),
     title: notification.title,
     body: notification.body ?? '',
@@ -231,23 +240,6 @@ function toNotificationModel(notification: V1Notification): NotificationModel {
     href,
     actionLabel: notification.type === 'chat' ? '채팅 열기' : '보기',
   };
-}
-
-function normalizeNotificationHref(route?: string | null, type?: string | null) {
-  const normalized = (() => {
-    if (!route) return type?.includes('review') ? '/my/reviews' : '/notifications';
-    if (route.startsWith('/chat/rooms/')) return route.replace('/chat/rooms/', '/chat/');
-    if (route === '/reviews' || route.startsWith('/reviews?')) return route.replace('/reviews', '/my/reviews');
-    if (route.startsWith('/reviews/')) return `/my${route}`;
-    if (type?.includes('review') && route === '/my') return '/my/reviews';
-    return route;
-  })();
-
-  if (normalized === '/notifications' || normalized.includes('from=notifications')) {
-    return normalized;
-  }
-
-  return `${normalized}${normalized.includes('?') ? '&' : '?'}from=notifications`;
 }
 
 function formatNotificationGroup(value: string) {

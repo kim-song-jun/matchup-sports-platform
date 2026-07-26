@@ -1,40 +1,21 @@
-import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsString, IsUUID, MinLength } from 'class-validator';
+import { RequiredSignupProfileDto } from './required-signup-profile.dto';
 
 export class SocialTermsDto {
   @IsBoolean()
   requiredTermsAccepted!: boolean;
+
+  @IsArray()
+  @IsDefined()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  acceptedTermsDocumentIds?: string[];
 }
 
-export class SocialProfileDto {
+export class SocialProfileDto extends RequiredSignupProfileDto {
   @IsString()
   @MinLength(2)
   nickname!: string;
 
-  @IsIn(['male', 'female'])
-  gender!: 'male' | 'female';
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  realName?: string;
-
-  /** @deprecated Rolling-deploy compatibility for clients that predate realName. */
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  displayName?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d{11}$/)
-  phone?: string;
-
-  @IsOptional()
-  @IsString()
-  @Matches(/^\d{8}$/)
-  birthDate?: string;
-
-  @IsOptional()
-  @IsString()
-  profileImageUrl?: string;
 }

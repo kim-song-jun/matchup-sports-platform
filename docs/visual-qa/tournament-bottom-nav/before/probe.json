@@ -1,0 +1,68 @@
+{
+  "my-registration-mobile": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 0
+  },
+  "tournament-detail-mobile": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 0
+  },
+  "notices-mobile": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
+  "_console_mobile": [],
+  "my-registration-tablet": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 0
+  },
+  "tournament-detail-tablet": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 0
+  },
+  "notices-tablet": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 1
+  },
+  "_console_tablet": [],
+  "my-registration-desktop": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 2
+  },
+  "tournament-detail-desktop": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 2
+  },
+  "notices-desktop": {
+    "navInDom": false,
+    "navVisible": false,
+    "homeShortcutInDom": false,
+    "homeShortcutVisible": false,
+    "visibleHomeLinks": 3
+  },
+  "_console_desktop": []
+}

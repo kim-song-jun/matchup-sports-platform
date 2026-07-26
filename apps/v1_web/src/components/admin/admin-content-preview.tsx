@@ -1,7 +1,6 @@
 'use client';
 
 import { Monitor, Smartphone } from 'lucide-react';
-import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { browserAppRoute } from '@/lib/app-route';
 import type { V1RichContentDocument } from '@/types/api';
@@ -26,8 +25,7 @@ export type AdminContentPreviewPayload =
 export function AdminContentPreview({ payload }: { payload: AdminContentPreviewPayload }) {
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const pathname = usePathname();
-  const previewSrc = browserAppRoute('/admin-content-preview', pathname);
+  const previewSrc = browserAppRoute('/admin-content-preview');
 
   const sendPreview = () => {
     iframeRef.current?.contentWindow?.postMessage(

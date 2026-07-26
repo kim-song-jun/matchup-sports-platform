@@ -10,16 +10,28 @@ export type ApiErrorBody = {
   code: string;
   message: unknown;
   details?: unknown;
+  requestId?: string;
   timestamp: string;
+};
+
+// 서버 buildPageInfo 응답과 1:1 대응한다. 커서 전용 목록과 페이지 번호 목록이
+// 같은 타입을 쓰도록 이름을 붙였다 — 목록마다 인라인으로 복사하면 확장이 어긋난다.
+export type PageInfo = {
+  nextCursor: string | null;
+  hasNext: boolean;
+  // 페이지 번호 페이지네이션. 서버가 buildPageInfo 로 내려주는 목록에만 존재하며,
+  // 아직 커서만 지원하는 목록에서는 undefined 다 — 화면은 있을 때만 페이지 UI 를 그린다.
+  page?: number;
+  limit?: number;
+  total?: number;
+  totalPages?: number;
+  hasPrev?: boolean;
 };
 
 export type CursorPage<T> = {
   items: T[];
   nextCursor: string | null;
-  pageInfo?: {
-    nextCursor: string | null;
-    hasNext: boolean;
-  };
+  pageInfo?: PageInfo;
 };
 
 export type AdminListSummary = {
@@ -47,7 +59,27 @@ export type V1User = {
   onboardingStatus: string;
 };
 
+/** 휴대폰 본인인증으로 찾은 계정. 이메일은 마스킹된 값만 내려온다. */
+export type V1FoundAccount = {
+  maskedEmail: string | null;
+  providers: string[];
+  hasPassword: boolean;
+};
+
 export type V1AuthMe = {
+  /**
+   * 카카오 가입 진행 중에만 채워진다 — 카카오 동의항목이 승인된 앱에서만 값이 오고,
+   * 미승인이면 null 이라 화면은 기존처럼 직접 입력을 받는다.
+   *
+   * 서버는 항상 이 키를 내려주지만(해당 없으면 null) 타입은 optional 로 둔다 — 배포 직후
+   * 브라우저에 남아 있는 이전 /auth/me 캐시 응답에는 키 자체가 없어서, required 로 두면
+   * 실제로 들어올 수 있는 값을 타입이 부정하게 된다.
+   */
+  socialSignupPrefill?: {
+    name: string | null;
+    phone: string | null;
+    gender: 'male' | 'female' | null;
+  } | null;
   user: {
     id: string;
     email: string | null;
@@ -67,7 +99,16 @@ export type V1AuthMe = {
     regionSummary?: string | null;
   };
   onboarding?: unknown;
+  termsCompliance?: {
+    compliant: boolean;
+    pendingRequiredDocumentIds: string[];
+    nextRoute: string | null;
+  };
   reputation?: unknown;
+  verification?: {
+    emailVerified: boolean;
+    phoneVerified: boolean;
+  };
 };
 
 export type V1AuthSessionResponse = V1AuthMe & {
@@ -146,13 +187,6 @@ export type V1OnboardingPreferencePayload = {
   sports?: Array<{ sportId: string; levelId?: string | null }>;
   regions?: Array<{ regionId: string; primary: boolean }>;
   currentStep: Extract<V1OnboardingStep, 'sport' | 'level' | 'region' | 'confirm'>;
-  currentLocation?: {
-    latitude: number;
-    longitude: number;
-    accuracy?: number | null;
-    capturedAt: string;
-    matchedRegionId?: string | null;
-  } | null;
 };
 
 export type V1OnboardingMutationResult = {
@@ -176,8 +210,14 @@ export type V1RichContentNode = {
     src?: string;
     alt?: string;
     title?: string | null;
-    assetId?: string;
-    textAlign?: 'left' | 'center' | 'right';
+    // Tiptap's Image/TextAlign extensions default unset attrs to `null` (not
+    // `undefined`) in the JSON they emit via getJSON() — apps/v1_api's
+    // rich-content.ts normalizer explicitly strips these null defaults, so the
+    // type must allow them to match what the editor actually sends.
+    width?: number | null;
+    height?: number | null;
+    assetId?: string | null;
+    textAlign?: 'left' | 'center' | 'right' | null;
   };
   content?: V1RichContentNode[];
   marks?: V1RichContentMark[];
@@ -312,6 +352,10 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
+  /** 비로그인(게스트) 문의자의 이메일 — 로그인 상태가 아니면 guestPhone과 함께 최소 1개 필수 */
+  guestEmail?: string;
+  /** 비로그인(게스트) 문의자의 전화번호 — 로그인 상태가 아니면 guestEmail과 함께 최소 1개 필수 */
+  guestPhone?: string;
 };
 
 export type V1Match = {
@@ -496,6 +540,21 @@ export type V1Team = {
   minLevel?: { code: string; name: string } | null;
   maxLevel?: { code: string; name: string } | null;
   genderRule?: string | null;
+  /**
+   * 팀장 — nickname/displayName 미설정 시 백엔드에서 '팀장'으로 폴백(항상 non-empty).
+   * optional인 이유: 이 필드를 아직 채우지 않는 기존 fixture/mock과의 하위 호환
+   * (V1Team의 다른 대다수 필드와 동일하게 optional 컨벤션을 따름).
+   */
+  owner?: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+  /** 감독 — manager 역할 멤버가 없으면 null */
+  manager?: {
+    userId: string;
+    displayName: string;
+  } | null;
   viewerRole?: string;
   viewerJoinState?: string;
 };
@@ -641,6 +700,8 @@ export type V1TeamJoinEligibility = {
   viewerRole: string;
   joinState: string;
   applicationId: string | null;
+  /** 승인 대기(joinState === 'requested') 중일 때의 신청 시각. 그 외에는 null. */
+  requestedAt: string | null;
   requiresApproval: boolean;
   immediateJoinSupported: boolean;
 };
@@ -677,6 +738,30 @@ export type V1TeamJoinApplicationsPage = {
     nextCursor: string | null;
     hasNext: boolean;
   };
+};
+
+/** 내가 보낸 가입 신청 1건 (GET /me/join-applications items 요소) */
+export type V1MyJoinApplication = {
+  applicationId: string;
+  teamId: string;
+  /** V1TeamJoinApplicationStatus — requested | approved | rejected | withdrawn | expired */
+  status: string;
+  message: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  withdrawnAt: string | null;
+  team: {
+    teamId: string;
+    name: string;
+    sportId: string;
+    logoUrl: string | null;
+    introductionPreview: string | null;
+  };
+};
+
+/** GET /me/join-applications 응답 */
+export type V1MyJoinApplicationsPage = {
+  items: V1MyJoinApplication[];
 };
 
 export type V1TeamMembershipMutationResult = {
@@ -892,7 +977,7 @@ export type V1MyTeamMatch = {
   detailRoute: string;
 };
 
-export type V1ReviewSourceType = 'match' | 'team_match';
+export type V1ReviewSourceType = 'match' | 'team_match' | 'tournament_fixture';
 export type V1ReviewTargetType = 'user' | 'team';
 
 export type V1ReviewActorUser = {
@@ -999,6 +1084,25 @@ export type V1ReviewSubmitPayload = {
 export type V1ReviewSubmitResponse = {
   review: V1ReviewDetail;
   alreadySubmitted: boolean;
+};
+
+export type V1ReviewTagRate = {
+  tagCode: string;
+  label: string;
+  rate: number;
+  count: number;
+};
+
+export type V1ReviewSportSummary = {
+  sportId: string;
+  ratingAvg: number | null;
+  ratingCount: number;
+  tagRates: V1ReviewTagRate[];
+};
+
+export type V1ReviewReceivedSummaryResponse = {
+  bySport: V1ReviewSportSummary[];
+  availableMonths: string[];
 };
 
 export type V1ChatRoom = {
@@ -1346,6 +1450,112 @@ export type V1AdminNoticeDeleteResult = {
   deleted: true;
 };
 
+export type V1ManagedTermsContext = 'signup' | 'tournament_application' | 'footer';
+export type V1ManagedTermsRequirement = 'required' | 'optional' | 'display_only';
+export type V1ManagedTermsDocumentStatus = 'draft' | 'published' | 'archived';
+
+export type V1AdminTermsPlacement = {
+  placementId: string;
+  context: V1ManagedTermsContext;
+  requirement: V1ManagedTermsRequirement;
+  displayOrder: number;
+  isActive: boolean;
+};
+
+export type V1AdminTermsDocument = {
+  documentId: string;
+  version: string;
+  title: string;
+  subtitle: string | null;
+  content: string;
+  contentHash: string;
+  changeSummary: string | null;
+  requiresReconsent: boolean;
+  enforcementAt: string | null;
+  status: V1ManagedTermsDocumentStatus;
+  effectiveAt: string | null;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  supersedesDocumentId: string | null;
+  consentEventCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminTermsPolicy = {
+  policyId: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+  currentDocumentId: string | null;
+  placements: V1AdminTermsPlacement[];
+  documents: V1AdminTermsDocument[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type V1AdminTermsListResult = {
+  items: V1AdminTermsPolicy[];
+  summary: { total: number; active: number; draftDocuments: number };
+};
+
+export type V1AdminTermsPlacementPayload = Omit<V1AdminTermsPlacement, 'placementId'>;
+export type V1AdminTermsVersionPayload = {
+  version: string;
+  title: string;
+  subtitle?: string;
+  content: string;
+  changeSummary?: string;
+  effectiveAt?: string | null;
+  requiresReconsent?: boolean;
+  enforcementAt?: string | null;
+};
+export type V1AdminTermsPolicyCreatePayload = V1AdminTermsVersionPayload & {
+  code: string;
+  name: string;
+  placements: V1AdminTermsPlacementPayload[];
+};
+export type V1AdminTermsPolicyUpdatePayload = {
+  name: string;
+  isActive: boolean;
+  placements: V1AdminTermsPlacementPayload[];
+};
+export type V1AdminTermsStatusPayload = {
+  status: Extract<V1ManagedTermsDocumentStatus, 'published' | 'archived'>;
+  reason: string;
+};
+
+export type V1CurrentTermsItem = {
+  policyId: string;
+  code: string;
+  documentId: string;
+  version: string;
+  title: string;
+  subtitle: string | null;
+  content: string;
+  changeSummary: string | null;
+  requirement: V1ManagedTermsRequirement;
+  displayOrder: number;
+  requiresReconsent: boolean;
+  enforcementAt: string | null;
+  effectiveAt: string | null;
+  accepted: boolean;
+  requiresAction: boolean;
+};
+
+export type V1CurrentTerms = {
+  context: V1ManagedTermsContext;
+  ready: boolean;
+  items: V1CurrentTermsItem[];
+  compliance: {
+    compliant: boolean;
+    pendingRequiredDocumentIds: string[];
+    nextRoute: string | null;
+  } | null;
+};
+export type V1CurrentSignupTermsItem = V1CurrentTermsItem;
+export type V1CurrentSignupTerms = V1CurrentTerms & { context: 'signup' };
+
 export type V1AdminPopupStatus = 'draft' | 'published' | 'archived';
 
 export type V1AdminPopupRow = {
@@ -1400,9 +1610,13 @@ export type V1AdminPopupDeleteResult = {
 };
 export type V1AdminInquiryRow = {
   inquiryId: string;
-  userId: string;
+  userId: string | null;
+  /** true면 비회원(guest) 문의 — userId가 없고 guestEmail/guestPhone으로만 식별됨 */
+  isGuest: boolean;
   requesterName: string | null;
   requesterEmail: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
   category: V1InquiryCategory;
   title: string;
   status: V1InquiryStatus;
@@ -1431,6 +1645,11 @@ export type V1AdminInquiryReplyPayload = {
 export type V1AdminInquiryStatusPayload = {
   status: V1InquiryStatus;
   reason?: string;
+};
+
+/** GET /admin/inquiries/pending-count — 미답변(received/reviewing) 문의 건수 */
+export type V1AdminInquiryPendingCount = {
+  count: number;
 };
 
 export type V1AdminUserRow = {
@@ -1555,6 +1774,8 @@ export type AdminListFilters = {
   category?: string;
   targetType?: string;
   cursor?: string;
+  /** 페이지 번호(1부터). cursor 와 함께 보내면 서버가 page 를 우선한다. */
+  page?: number;
   limit?: number;
 };
 
@@ -1572,6 +1793,123 @@ export type V1AdminRow = {
 };
 
 export type V1AdminGrantResult = V1AdminRow;
+
+export type V1PushFailureSummary = {
+  id: string;
+  userIdHash: string;
+  endpointSuffix: string;
+  statusCode: number | null;
+  occurredAt: string;
+  acknowledgedAt: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Admin — SMS / 인증 실패 로그
+// ---------------------------------------------------------------------------
+
+/**
+ * eventType 은 서버에서 자유 문자열(String 컬럼)로 내려온다 — 프론트는 알고 있는 값만
+ * 한국어로 치환하고 모르는 값은 원문 그대로 보여준다(새 이벤트 추가 시 UI 배포 없이도 노출).
+ */
+export type V1SmsFailureSummary = {
+  id: string;
+  eventType: string;
+  resultCode: string | null;
+  phoneMasked: string;
+  provider: string | null;
+  detail: string | null;
+  createdAt: string;
+  acknowledgedAt: string | null;
+};
+
+export type V1AdminOpsSummary = {
+  pushFailures5m: number;
+  smsFailures5m: number;
+};
+
+// ---------------------------------------------------------------------------
+// Admin — 에러 로그 뷰어
+// ---------------------------------------------------------------------------
+
+/** source 는 서버(server) / 클라이언트(client) 두 값만 존재한다. */
+export type V1AdminErrorLogSource = 'server' | 'client';
+
+/** level 은 error / warn 두 값만 존재한다. */
+export type V1AdminErrorLogLevel = 'error' | 'warn';
+
+export type V1AdminErrorLogListItem = {
+  id: string;
+  source: V1AdminErrorLogSource;
+  level: V1AdminErrorLogLevel;
+  statusCode: number | null;
+  errorCode: string | null;
+  method: string | null;
+  route: string | null;
+  message: string;
+  occurrenceCount: number;
+  releaseSha: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+};
+
+export type V1AdminErrorLogDetail = V1AdminErrorLogListItem & {
+  stack: string | null;
+  requestBody: unknown;
+  requestHeaders: unknown;
+  responseBody: unknown;
+  context: unknown;
+  userId: string | null;
+  userAgent: string | null;
+};
+
+export type V1AdminErrorLogsPage = {
+  items: V1AdminErrorLogListItem[];
+  pageInfo: PageInfo;
+};
+
+export type V1AdminErrorLogFilters = {
+  source?: V1AdminErrorLogSource;
+  statusCode?: number;
+  level?: V1AdminErrorLogLevel;
+  from?: string;
+  to?: string;
+  q?: string;
+  cursor?: string;
+  page?: number;
+  limit?: number;
+};
+
+// ---------------------------------------------------------------------------
+// Admin — manual web push send
+// ---------------------------------------------------------------------------
+
+export type V1AdminPushSendTarget = 'user' | 'broadcast';
+
+export type V1AdminPushSendPayload = {
+  target: V1AdminPushSendTarget;
+  /** target === 'user'일 때만 필수 */
+  userId?: string;
+  title: string;
+  body?: string;
+  url?: string;
+};
+
+export type V1AdminPushSendResult = {
+  /** 인앱 알림을 만든 수신자 수. 웹 푸시 도달과는 별개다. */
+  sent: number;
+  skipped: number;
+  failed: number;
+  /**
+   * 웹 푸시 결과. 서버 구버전 응답에는 없을 수 있어 optional 로 둔다.
+   * subscriptions 가 0이면 푸시로는 아무 데도 가지 않았다는 뜻이다.
+   */
+  push?: {
+    subscriptions: number;
+    delivered: number;
+    failed: number;
+    disabled: boolean;
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Upload
@@ -1601,6 +1939,7 @@ export type V1TournamentStatus =
   | 'cancelled';
 
 export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout';
+export type V1TournamentGenderCategory = 'mixed' | 'male' | 'female';
 
 export type V1PublicTournamentStatus = Extract<
   V1TournamentStatus,
@@ -1609,6 +1948,7 @@ export type V1PublicTournamentStatus = Extract<
 
 export type V1TournamentRegistrationStatus =
   | 'draft'
+  | 'submitted'
   | 'awaiting_payment'
   | 'payment_checking'
   | 'paid'
@@ -1616,6 +1956,11 @@ export type V1TournamentRegistrationStatus =
   | 'waitlisted'
   | 'cancel_requested'
   | 'cancelled';
+
+export type V1TournamentParticipantStatus = Extract<
+  V1TournamentRegistrationStatus,
+  'confirmed' | 'waitlisted'
+>;
 
 export type V1TournamentPaymentMethod = 'pg' | 'bank_transfer';
 
@@ -1636,6 +1981,14 @@ export type V1AnnouncementAudience =
   | 'confirmed_only'
   | 'waitlist';
 
+export type V1AnnouncementCategory =
+  | 'general'
+  | 'venue'
+  | 'sponsor'
+  | 'media'
+  | 'results'
+  | 'review';
+
 /** Serialized by TournamentsReadService.serializeCard — list view */
 export type V1TournamentListItem = {
   id: string;
@@ -1649,7 +2002,9 @@ export type V1TournamentListItem = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  coverImageUrl: string | null;
   teamCount: number;
+  genderCategory: V1TournamentGenderCategory | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1674,6 +2029,7 @@ export type V1TournamentListItem = {
   promoListLocationText: string | null;
   promoListPrizeText: string | null;
   promoListPriority: number;
+  campaignSlug: string | null;
   confirmedCount: number;
   pendingPaymentCount: number;
   createdAt: string;
@@ -1688,12 +2044,31 @@ export type V1Tournament = {
   status: V1TournamentStatus;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
+  /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
+  rosterDeadlineAt: string | null;
+  /**
+   * 즉시 공개한 시각. **이 값 단독으로 공개 여부를 판단하지 말 것** — 예약 공개는 조회
+   * 시점에 판정하므로 예약 시각이 지나도 여기는 null 로 남는다. 판정은
+   * `lib/bracket-visibility.ts`의 `isBracketPublished()` 를 쓴다.
+   */
+  bracketPublishedAt: string | null;
+  /** 공개 예약 시각. 아직 공개 전일 때만 내려오며(공개 후 null), "N에 공개 예정" 안내에 쓴다. */
+  bracketPublishScheduledAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
+  latitude: number | null;
+  longitude: number | null;
+  coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
+  genderCategory: V1TournamentGenderCategory | null;
+  genderMinMale: number | null;
+  genderMaxMale: number | null;
+  genderMinFemale: number | null;
+  genderMaxFemale: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1765,6 +2140,15 @@ export type V1TournamentGroup = {
   standings: V1TournamentStanding[];
 };
 
+/** 경기 득점자 — 명단에 있으면 playerId, 비회원/대타는 playerId=null + playerName만 */
+export type V1TournamentFixtureGoal = {
+  id: string;
+  team: 'home' | 'away';
+  playerId: string | null;
+  playerName: string;
+  minute: number | null;
+};
+
 export type V1TournamentFixtureResult = {
   homeScore: number;
   awayScore: number;
@@ -1773,6 +2157,14 @@ export type V1TournamentFixtureResult = {
   awayPenaltyScore: number | null;
   note: string | null;
   recordedAt: string;
+  goals: V1TournamentFixtureGoal[];
+};
+
+/** 경기 하이라이트/중계 영상 — 경기당 여러 개 */
+export type V1TournamentFixtureVideo = {
+  id: string;
+  title: string | null;
+  url: string;
 };
 
 export type V1TournamentFixture = {
@@ -1789,15 +2181,42 @@ export type V1TournamentFixture = {
   awayRegistrationId: string | null;
   awayTeamName: string;
   result: V1TournamentFixtureResult | null;
+  videos: V1TournamentFixtureVideo[];
 };
 
 export type V1TournamentAnnouncement = {
   id: string;
   title: string;
   body: string;
+  category: V1AnnouncementCategory;
   audience: string;
   publishedAt: string;
   createdAt: string;
+};
+
+export type V1TournamentSponsor = {
+  id: string;
+  name: string;
+  description: string | null;
+  logoUrl: string | null;
+  websiteUrl: string | null;
+  instagramUrl: string | null;
+  benefitText: string | null;
+  boothText: string | null;
+  eventTitle: string | null;
+  eventDescription: string | null;
+  eventResultText: string | null;
+  sortOrder: number;
+};
+
+export type V1TournamentParticipantTeam = {
+  registrationId: string;
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+  teamRegionName: string | null;
+  status: V1TournamentParticipantStatus;
+  confirmedAt: string | null;
 };
 
 /** Serialized by TournamentsReadService.get — full public detail */
@@ -1810,12 +2229,31 @@ export type V1TournamentDetail = {
   status: V1TournamentStatus;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
+  /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
+  rosterDeadlineAt: string | null;
+  /**
+   * 관리자가 즉시 공개한 시각. **공개 여부 판정은 이 값 단독으로 하지 말 것** —
+   * `bracketPublishScheduledAt` 이 지나도 여기는 null 로 남으므로,
+   * `lib/bracket-visibility.ts`의 `isBracketPublished()` 로 판정한다.
+   */
+  bracketPublishedAt: string | null;
+  /** 공개 예약 시각. 이 시각이 지나면 스케줄러 없이 조회 시점 판정으로 공개된다. */
+  bracketPublishScheduledAt: string | null;
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
+  latitude: number | null;
+  longitude: number | null;
+  coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
+  genderCategory: V1TournamentGenderCategory | null;
+  genderMinMale: number | null;
+  genderMaxMale: number | null;
+  genderMinFemale: number | null;
+  genderMaxFemale: number | null;
   entryFee: number;
   prizePool: number | null;
   prizeSummary: string | null;
@@ -1840,18 +2278,71 @@ export type V1TournamentDetail = {
   promoListLocationText: string | null;
   promoListPrizeText: string | null;
   promoListPriority: number;
-  bankName: string | null;
-  bankAccount: string | null;
-  bankHolder: string | null;
+  campaignSlug: string | null;
   rulesText: string | null;
   refundPolicyText: string | null;
   confirmedCount: number;
+  participantTeams: V1TournamentParticipantTeam[];
   pendingPaymentCount: number;
   groups: V1TournamentGroup[];
   fixtures: V1TournamentFixture[];
   announcements: V1TournamentAnnouncement[];
+  sponsors: V1TournamentSponsor[];
+  /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능) */
+  reviews: V1TournamentReview[];
+  /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
+  awards: V1TournamentAward[];
+  /** 대회 상세 진입 시 노출할 활성 팝업(published + 노출 기간 내) 1건. 없으면 null. */
+  popup: V1TournamentDetailPopup | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type V1TournamentReview = {
+  id: string;
+  authorId: string;
+  authorNickname: string;
+  authorProfileImageUrl: string | null;
+  teamName: string | null;
+  rating: number; // 1~5
+  comment: string | null;
+  photoUrls: string[];
+  createdAt: string;
+};
+
+export type V1TournamentReviewsPage = {
+  items: V1TournamentReview[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+/** 어드민: 리뷰 모더레이션 뷰 — 공개 리뷰 필드 + 숨김 상태 */
+export type V1AdminTournamentReview = V1TournamentReview & {
+  hiddenAt: string | null;
+  hiddenReason: string | null;
+};
+
+export type V1AdminTournamentReviewsPage = {
+  items: V1AdminTournamentReview[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export type V1PendingTournamentReview = {
+  tournamentId: string;
+  tournamentTitle: string;
+  completedAt: string;
+};
+
+export type V1TournamentAward = {
+  id: string;
+  awardType: string;   // 'mvp' | 'top_scorer' | ...
+  awardLabel: string;  // 'MVP' | '득점왕' | ...
+  recipientName: string;
+  teamName: string | null;
+  note: string | null;
 };
 
 /** Shared payment summary embedded in registrations */
@@ -1860,6 +2351,13 @@ export type V1TournamentPaymentSummary = {
   status: V1TournamentPaymentStatus;
   amount: number;
   paidAt: string | null;
+  paymentDueAt: string | null;
+};
+
+export type V1TournamentPaymentInstructions = {
+  bankName: string;
+  bankAccount: string;
+  bankHolder: string;
 };
 
 /** Serialized by TournamentRegistrationsService.serialize (consumer-facing) */
@@ -1877,16 +2375,22 @@ export type V1TournamentRegistration = {
   agreedMediaConsent: boolean;
   confirmedAt: string | null;
   rosterLockedAt: string | null;
+  /** 어드민이 부여한 명단 제출 마감 예외 — 부여된 이후에는 마감이 지나도 명단을 계속 수정할 수 있다 */
+  rosterDeadlineOverrideAt: string | null;
   cancelRequestedAt: string | null;
   cancelReason: string | null;
   playerCount: number;
   payment: V1TournamentPaymentSummary | null;
+  paymentInstructions: V1TournamentPaymentInstructions | null;
   createdAt: string;
   updatedAt: string;
 };
 
 /** Serialized by AdminRegistrationsService.serialize — admin view (extra confirmedByAdminUserId) */
-export type V1AdminTournamentRegistration = V1TournamentRegistration & {
+export type V1AdminTournamentRegistration = Omit<
+  V1TournamentRegistration,
+  'paymentInstructions'
+> & {
   confirmedByAdminUserId: string | null;
   // 목록 응답에만 포함(team join). mutation 응답에는 없음 → optional.
   teamName?: string | null;
@@ -1921,6 +2425,7 @@ export type V1AdminTournamentPlayer = V1TournamentPlayer & {
   isTeamCaptain: boolean;
 };
 
+/** 어드민 전용 로스터 조회 응답 — 팀 비멤버 어드민도 조회 가능 (Task 110) */
 export type V1AdminTournamentRosterResponse = Omit<V1TournamentRosterResponse, 'players'> & {
   players: V1AdminTournamentPlayer[];
   registrationId: string;
@@ -1969,6 +2474,7 @@ export type V1AdminBracketFixture = {
   createdAt: string;
   updatedAt: string;
   result: V1AdminBracketResult | null;
+  videos: V1TournamentFixtureVideo[];
 };
 
 export type V1AdminBracketResult = {
@@ -1983,6 +2489,7 @@ export type V1AdminBracketResult = {
   recordedAt: string;
   createdAt: string;
   updatedAt: string;
+  goals: V1TournamentFixtureGoal[];
 };
 
 export type V1AdminBracketStanding = {
@@ -2013,6 +2520,7 @@ export type V1AdminTournamentAnnouncement = {
   tournamentId: string;
   title: string;
   body: string;
+  category: V1AnnouncementCategory;
   audience: string;
   publishedAt: string | null;
   createdAt: string;
@@ -2023,11 +2531,36 @@ export type V1AdminTournamentAnnouncementWithIdempotent = V1AdminTournamentAnnou
   alreadyPublished: boolean;
 };
 
+export type V1AdminTournamentSponsor = V1TournamentSponsor & {
+  tournamentId: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type V1AdminTournamentStatusChangeResult = {
   tournamentId: string;
   previousStatus: V1TournamentStatus;
   status: V1TournamentStatus;
   alreadyInStatus: boolean;
+};
+
+/** Task 109 Track 6 — 대진표 일괄 공개 응답 */
+export type V1PublishBracketResult = {
+  tournamentId: string;
+  /** 예약만 걸었을 때는 아직 공개 전이므로 null. */
+  bracketPublishedAt: string | null;
+  /** 예약 공개 시각. 즉시 공개했거나 예약이 없으면 null. */
+  bracketPublishScheduledAt: string | null;
+  alreadyPublished: boolean;
+};
+
+export type V1UnpublishBracketResult = {
+  tournamentId: string;
+  bracketPublishedAt: null;
+  bracketPublishScheduledAt: null;
+  /** 이미 비공개였으면 true — 되돌릴 것이 없었다는 뜻. */
+  alreadyUnpublished: boolean;
 };
 
 export type V1StandingsRecalculateResult = {
@@ -2051,10 +2584,7 @@ export type V1TournamentListPage = {
 
 export type V1AdminTournamentListPage = {
   items: V1Tournament[];
-  pageInfo: {
-    nextCursor: string | null;
-    hasNext: boolean;
-  };
+  pageInfo: PageInfo;
   summary: AdminListSummary;
 };
 
@@ -2079,12 +2609,20 @@ export type V1CreateTournamentPayload = {
   title: string;
   format?: V1TournamentFormat;
   registrationDeadlineAt?: string;
+  /** 명단(선수단) 제출 마감일 */
+  rosterDeadlineAt?: string;
   scheduledAt?: string;
   scheduledEndAt?: string | null;
   venue?: string;
+  coverImageUrl?: string | null;
   teamCount?: number;
   minPlayers?: number;
   maxPlayers?: number;
+  genderCategory?: V1TournamentGenderCategory;
+  genderMinMale?: number;
+  genderMaxMale?: number;
+  genderMinFemale?: number;
+  genderMaxFemale?: number;
   entryFee?: number;
   prizePool?: number;
   prizeSummary?: string;
@@ -2116,7 +2654,36 @@ export type V1CreateTournamentPayload = {
   refundPolicyText?: string;
 };
 
-export type V1UpdateTournamentPayload = Partial<Omit<V1CreateTournamentPayload, 'sportId'>>;
+export type V1UpdateTournamentPayload = Omit<
+  Partial<V1CreateTournamentPayload>,
+  | 'genderMinMale'
+  | 'genderMaxMale'
+  | 'genderMinFemale'
+  | 'genderMaxFemale'
+  | 'registrationDeadlineAt'
+  | 'rosterDeadlineAt'
+  | 'scheduledAt'
+  | 'venue'
+  | 'bankName'
+  | 'bankAccount'
+  | 'bankHolder'
+  | 'rulesText'
+  | 'refundPolicyText'
+> & {
+  genderMinMale?: number | null;
+  genderMaxMale?: number | null;
+  genderMinFemale?: number | null;
+  genderMaxFemale?: number | null;
+  registrationDeadlineAt?: string | null;
+  rosterDeadlineAt?: string | null;
+  scheduledAt?: string | null;
+  venue?: string | null;
+  bankName?: string | null;
+  bankAccount?: string | null;
+  bankHolder?: string | null;
+  rulesText?: string | null;
+  refundPolicyText?: string | null;
+};
 
 export type V1ChangeTournamentStatusPayload = {
   status: V1TournamentStatus;
@@ -2128,6 +2695,7 @@ export type V1CreateRegistrationPayload = {
 };
 
 export type V1SubmitRegistrationPayload = {
+  termsDocumentIds: string[];
   paymentMethod: V1TournamentPaymentMethod;
   depositorName?: string;
   agreedRules: boolean;
@@ -2182,6 +2750,13 @@ export type V1CreateGroupTeamPayload = {
   sortOrder?: number;
 };
 
+export type V1UpdateFixturePayload = {
+  scheduledAt?: string;
+  venue?: string;
+  homeRegistrationId?: string;
+  awayRegistrationId?: string;
+};
+
 export type V1CreateFixturePayload = {
   groupId?: string;
   round: string;
@@ -2201,13 +2776,79 @@ export type V1RecordResultPayload = {
   homePenaltyScore?: number;
   awayPenaltyScore?: number;
   note?: string;
+  /** 전달 시 replace-all — 생략하면 기존 영상 목록 유지 */
+  videos?: { title?: string; url: string }[];
+  /** 전달 시 replace-all — 생략하면 기존 득점 기록 유지 */
+  goals?: { team: 'home' | 'away'; playerId?: string; playerName: string; minute?: number }[];
 };
 
 export type V1CreateAnnouncementPayload = {
   title: string;
   body: string;
+  category?: V1AnnouncementCategory;
   audience?: V1AnnouncementAudience;
   publish?: boolean;
+};
+
+export type V1CreateTournamentSponsorPayload = {
+  name: string;
+  description?: string;
+  logoUrl?: string;
+  websiteUrl?: string;
+  instagramUrl?: string;
+  benefitText?: string;
+  boothText?: string;
+  eventTitle?: string;
+  eventDescription?: string;
+  eventResultText?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type V1UpdateTournamentSponsorPayload = Partial<V1CreateTournamentSponsorPayload>;
+
+/** 대회 상세 공개 응답에 포함되는 활성 팝업 1건(published + 노출 기간 내) */
+export type V1TournamentDetailPopup = {
+  popupId: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+};
+
+export type V1AdminTournamentPopup = {
+  id: string;
+  tournamentId: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  status: V1TournamentPopupStatus;
+  displayStartAt: string | null;
+  displayEndAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** V1TournamentPopup 상태 — 기존 V1AdminPopupStatus(홈 팝업)와 동일 값, 별도 타입으로 유지 */
+export type V1TournamentPopupStatus = 'draft' | 'published' | 'archived';
+
+export type V1CreateTournamentPopupPayload = {
+  title: string;
+  body: string;
+  imageUrl?: string;
+  status: V1TournamentPopupStatus;
+  displayStartAt?: string | null;
+  displayEndAt?: string | null;
+};
+
+export type V1UpdateTournamentPopupPayload = V1CreateTournamentPopupPayload;
+
+export type V1AdminTournamentPopupListResult = {
+  items: V1AdminTournamentPopup[];
+};
+
+export type V1DeleteTournamentPopupResult = {
+  popupId: string;
+  deleted: boolean;
 };
 
 export type V1UpdateAnnouncementPayload = V1CreateAnnouncementPayload;
@@ -2220,6 +2861,10 @@ export type V1DeleteAnnouncementResult = {
 
 export type V1AdminAnnouncementListResult = {
   items: V1AdminTournamentAnnouncement[];
+};
+
+export type V1AdminTournamentSponsorListResult = {
+  items: V1AdminTournamentSponsor[];
 };
 
 // ── Team Invitations ──────────────────────────────────────────────────────────
@@ -2292,4 +2937,32 @@ export type V1InvitationActionResult = {
   status: V1InvitationStatus;
   alreadyCancelled?: boolean;
   alreadyProcessed?: boolean;
+};
+
+/** 어드민이 편집하는 외부 연동 키의 출처 — 어떤 값이 실제로 쓰이고 있는지 화면에 안내하기 위함. */
+export type V1IntegrationKeySource = 'admin' | 'env' | 'none';
+
+/**
+ * GET/PATCH /admin/settings/integrations 응답.
+ * 값이 DB(어드민 설정)에 있으면 마스킹(끝 4자리만 노출)해서 반환하지만, source가 'env'
+ * (환경변수 폴백 사용 중)이거나 'none'(둘 다 없음)이면 DB 원문 자체가 없으므로 null을 반환한다
+ * — "값은 항상 마스킹"이 아니라 "DB에 값이 있을 때만 마스킹, 그 외엔 null".
+ */
+export type V1IntegrationSettings = {
+  kakaoRestApiKey: string | null;
+  kakaoRestApiKeySource: V1IntegrationKeySource;
+  kakaoMapsJsKey: string | null;
+  kakaoMapsJsKeySource: V1IntegrationKeySource;
+  updatedAt: string | null;
+};
+
+/** PATCH /admin/settings/integrations 바디 — undefined=미변경, ""=삭제(env 폴백 복귀), 값=설정 */
+export type V1UpdateIntegrationSettingsPayload = {
+  kakaoRestApiKey?: string;
+  kakaoMapsJsKey?: string;
+};
+
+/** GET /public/integrations/kakao-maps-key — 인증 불필요, 카카오맵 JS SDK 로드용 공개 키. */
+export type V1PublicKakaoMapsKeyResponse = {
+  kakaoMapsJsKey: string | null;
 };

@@ -16,9 +16,11 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
+import { RevealedTeamTrust, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
 import { SPORT_LEVEL_CODES, formatLevelRange, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ChangeTeamMembershipRoleDto,
+  LeaveTeamDto,
   MutateTeamDto,
   RemoveTeamMembershipDto,
   TeamMembersQueryDto,
@@ -33,6 +35,23 @@ import {
   WithdrawTeamJoinApplicationDto,
 } from './dto/team-join-application.dto';
 import { MyTeamsQueryDto, TeamsQueryDto } from './dto/teams-query.dto';
+
+/**
+ * 정원 마감 안내 문구.
+ * join-eligibility의 message는 프론트에서 CTA 버튼 라벨로 그대로 렌더되므로
+ * 사용자 노출 문구는 반드시 한국어 해요체를 유지한다.
+ */
+const TEAM_FULL_MESSAGE = '정원이 다 찬 팀이에요.';
+
+/**
+ * 신청자 본인 가입 신청 목록의 **그룹(승인 대기 / 처리 완료)별** 상한.
+ *
+ * 두 그룹을 각각 이 값까지 조회해 합치므로 응답 items는 최대 2배가 될 수 있다.
+ * 합쳐서 한 번 더 자르지 않는 이유: 승인 대기 건은 사용자가 "지금 기다리는 중"인
+ * 항목이라 처리 완료 건에 밀려 잘리면 안 된다. 팀당 신청은 1건으로 유니크하므로
+ * (`@@unique([teamId, applicantUserId])`) 실사용에서 상한에 닿는 경우는 드물다.
+ */
+const MY_JOIN_APPLICATIONS_GROUP_LIMIT = 20;
 
 type TeamWithRelations = V1Team & {
   sport: { id: string; name: string };
@@ -107,8 +126,16 @@ export class TeamsService {
     const pageItems = teams.slice(0, limit);
     const hasNext = teams.length > limit;
 
+    // 캐시(V1TeamTrustScore)는 리뷰 reveal 시점(상호제출 또는 72시간 경과)에 즉시 갱신되지 않을 수 있으므로,
+    // 이 페이지에 담긴 팀들의 trustState/mannerScore만 배치 1회로 live 재계산해 덮어쓴다(N+1 방지).
+    // matchCount는 이번 스코프 밖이라 기존 캐시값을 그대로 둔다.
+    const liveTrustByTeam = await computeRevealedTeamTrustBatch(
+      this.prisma,
+      pageItems.map((team) => team.id),
+    );
+
     return {
-      items: pageItems.map((team) => this.toListItem(team, user)),
+      items: pageItems.map((team) => this.toListItem(team, user, liveTrustByTeam.get(team.id))),
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
         hasNext,
@@ -181,6 +208,8 @@ export class TeamsService {
     const viewer = this.getViewer(team, user);
     const reasonCode = getJoinReason(team, viewer, user);
 
+    const application = team.joinApplications[0] ?? null;
+
     return {
       teamId: team.id,
       eligible: reasonCode === 'OK',
@@ -189,7 +218,10 @@ export class TeamsService {
       joinPolicy: team.joinPolicy,
       viewerRole: viewer.role,
       joinState: viewer.joinState,
-      applicationId: team.joinApplications[0]?.id ?? null,
+      applicationId: application?.id ?? null,
+      // 승인 대기 안내에 "언제 신청했는지"를 표시하기 위한 값.
+      // joinApplications는 상태 무관 최신 1건이므로 실제 대기 중일 때만 내려준다.
+      requestedAt: viewer.joinState === 'requested' ? (application?.createdAt ?? null) : null,
       requiresApproval: true,
       immediateJoinSupported: false,
     };
@@ -389,30 +421,35 @@ export class TeamsService {
 
     const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
     const status = query.status ?? 'active';
-    const memberships = await this.prisma.v1TeamMembership.findMany({
-      where: {
-        teamId: team.id,
-        status,
-        ...(query.role ? { role: query.role } : {}),
-      },
-      orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      include: {
-        user: {
-          select: {
-            phone: true,
-            profile: { select: { nickname: true, displayName: true, realName: true, profileImageUrl: true, birthDate: true, gender: true } },
+    const [memberships, ownerCount] = await Promise.all([
+      this.prisma.v1TeamMembership.findMany({
+        where: {
+          teamId: team.id,
+          status,
+          ...(query.role ? { role: query.role } : {}),
+        },
+        orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+        take: limit + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+        include: {
+          user: {
+            select: {
+              phone: true,
+              profile: { select: { nickname: true, displayName: true, realName: true, profileImageUrl: true, birthDate: true, gender: true } },
+            },
           },
         },
-      },
-    });
+      }),
+      this.prisma.v1TeamMembership.count({
+        where: { teamId: team.id, role: 'owner', status: 'active' },
+      }),
+    ]);
 
     const pageItems = memberships.slice(0, limit);
     const hasNext = memberships.length > limit;
     const viewerIsOwner = viewer.role === 'owner';
     const viewerIsManager = viewer.role === 'manager';
-    const viewerIsTeamMember = viewer.role === 'owner' || viewer.role === 'manager' || viewer.role === 'member';
+    const viewerCanAccessRosterPii = viewerIsOwner || viewerIsManager;
 
     return {
       items: pageItems.map((membership) => {
@@ -421,14 +458,16 @@ export class TeamsService {
           membership.status === 'active' &&
           membership.role !== 'owner' &&
           (viewerIsOwner || (viewerIsManager && membership.role === 'member'));
+        const canAccessPrivateProfile =
+          viewerCanAccessRosterPii || (membership.status === 'active' && membership.userId === user?.id);
         return {
           membershipId: membership.id,
           userId: membership.userId,
           displayName: membership.user.profile?.nickname ?? membership.user.profile?.displayName ?? '멤버',
-          realName: viewerIsTeamMember ? membership.user.profile?.realName ?? null : null,
-          phone: viewerIsTeamMember ? membership.user.phone ?? null : null,
-          birthDate: viewerIsTeamMember ? membership.user.profile?.birthDate ?? null : null,
-          gender: viewerIsTeamMember ? normalizeProfileGender(membership.user.profile?.gender) : null,
+          realName: canAccessPrivateProfile ? membership.user.profile?.realName ?? null : null,
+          phone: canAccessPrivateProfile ? membership.user.phone ?? null : null,
+          birthDate: canAccessPrivateProfile ? membership.user.profile?.birthDate ?? null : null,
+          gender: canAccessPrivateProfile ? normalizeProfileGender(membership.user.profile?.gender) : null,
           profileImageUrl: membership.user.profile?.profileImageUrl ?? null,
           role: membership.role,
           status: membership.status,
@@ -438,7 +477,7 @@ export class TeamsService {
         };
       }),
       summary: {
-        ownerCount: 1,
+        ownerCount,
         managerCount: team.managerCount,
         memberCount: team.memberCount,
       },
@@ -487,9 +526,18 @@ export class TeamsService {
       },
     });
 
+    const activeMemberships = memberships.filter(
+      (membership) => membership.team.status === 'active' && !membership.team.deletedAt,
+    );
+    // list()와 동일한 이유: 이 화면도 여러 팀을 한 번에 렌더링하는 목록형이라 팀 개수만큼 반복 조회하지 않도록
+    // 배치 1회로 live 재계산한다.
+    const liveTrustByTeam = await computeRevealedTeamTrustBatch(
+      this.prisma,
+      activeMemberships.map((membership) => membership.teamId),
+    );
+
     return {
-      items: memberships
-        .filter((membership) => membership.team.status === 'active' && !membership.team.deletedAt)
+      items: activeMemberships
         .map((membership) => ({
           teamId: membership.teamId,
           membershipId: membership.id,
@@ -514,10 +562,16 @@ export class TeamsService {
                 parentName: membership.team.region.parent?.name ?? null,
               }
             : null,
-          trust: {
-            trustState: membership.team.trustScore?.trustState ?? 'none',
-            score: membership.team.trustScore?.mannerScore != null ? Number(membership.team.trustScore.mannerScore) : null,
-          },
+          trust: (() => {
+            const liveTrust = liveTrustByTeam.get(membership.teamId);
+            if (liveTrust) {
+              return { trustState: liveTrust.trustState, score: liveTrust.mannerScore };
+            }
+            return {
+              trustState: membership.team.trustScore?.trustState ?? 'none',
+              score: membership.team.trustScore?.mannerScore != null ? Number(membership.team.trustScore.mannerScore) : null,
+            };
+          })(),
           memberCount: membership.team.memberCount,
           canManage: membership.role === 'owner' || membership.role === 'manager',
           canCreateTeamMatch: membership.role === 'owner' || membership.role === 'manager',
@@ -565,13 +619,18 @@ export class TeamsService {
       }
 
       const result = await this.prisma.$transaction(async (tx) => {
+        // R15-003: re-verify caller is still owner inside the transaction to guard
+        // against concurrent delegations that could otherwise create multiple owners.
+        const ownerCheck = await tx.v1TeamMembership.updateMany({
+          where: { id: currentOwner.id, teamId: target.teamId, role: 'owner', status: 'active' },
+          data: { role: 'manager' },
+        });
+        if (ownerCheck.count !== 1) {
+          throw stateConflict('Ownership has already been transferred', 'CONCURRENT_UPDATE');
+        }
         const delegatedOwner = await tx.v1TeamMembership.update({
           where: { id: target.id },
           data: { role: 'owner' },
-        });
-        await tx.v1TeamMembership.update({
-          where: { id: currentOwner.id },
-          data: { role: 'manager' },
         });
         const team = await tx.v1Team.update({
           where: { id: target.teamId },
@@ -635,15 +694,29 @@ export class TeamsService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // R15-004: atomic cap check — uses conditional increment so concurrent promotions
+      // cannot both pass the cap check and both increment past the limit.
+      if (dto.role === 'manager') {
+        const capGuard = await tx.v1Team.updateMany({
+          where: { id: target.teamId, managerCount: { lt: 5 } },
+          data: { managerCount: { increment: 1 } },
+        });
+        if (capGuard.count !== 1) {
+          throw stateConflict('Manager count cannot exceed 5', 'MANAGER_LIMIT_EXCEEDED');
+        }
+      }
       const updated = await tx.v1TeamMembership.update({
         where: { id: target.id },
         data: { role: dto.role },
       });
-      const managerDelta = dto.role === 'manager' ? 1 : -1;
-      const team = await tx.v1Team.update({
-        where: { id: target.teamId },
-        data: { managerCount: { increment: managerDelta } },
-      });
+      const managerDelta = dto.role === 'manager' ? 0 : -1; // +1 already applied above for 'manager'
+      const team =
+        dto.role === 'manager'
+          ? await tx.v1Team.findUniqueOrThrow({ where: { id: target.teamId } })
+          : await tx.v1Team.update({
+              where: { id: target.teamId },
+              data: { managerCount: { increment: managerDelta } },
+            });
 
       await tx.v1StatusChangeLog.create({
         data: {
@@ -745,6 +818,82 @@ export class TeamsService {
     };
   }
 
+  // 본인이 스스로 팀을 나가는 self-service 경로.
+  // removeMembership(owner/manager가 타인을 강제 추방)과 달리 getManagementActor를 거치지 않고
+  // 호출자 본인의 active membership만 조회한다. 상태는 'removed'가 아닌 'left'로 구분한다.
+  async leaveTeam(user: V1AuthUser, teamId: string, dto: LeaveTeamDto) {
+    this.assertActiveAccount(user);
+    const { membership } = await this.getActiveTeamMembership(user, teamId);
+
+    const leftAt = new Date();
+    const reason = dto.reason ?? 'team_membership_self_leave';
+    const result = await this.prisma.$transaction(async (tx) => {
+      if (membership.role === 'owner') {
+        // R15-005: lock the team row so concurrent leaveTeam calls for owners of the
+        // same team serialize — otherwise two owners leaving at once could each see
+        // the other as "still active" and both pass the last-owner check, leaving
+        // the team with zero owners.
+        await tx.$queryRaw`SELECT id FROM v1_teams WHERE id = ${teamId} FOR UPDATE`;
+        const otherActiveOwnerCount = await tx.v1TeamMembership.count({
+          where: { teamId, role: 'owner', status: 'active', id: { not: membership.id } },
+        });
+        if (otherActiveOwnerCount === 0) {
+          throw stateConflict(
+            '마지막 소유자는 팀을 나갈 수 없어요. 소유권을 먼저 이전해주세요.',
+            'LAST_OWNER_CANNOT_LEAVE',
+          );
+        }
+      }
+
+      const updateGuard = await tx.v1TeamMembership.updateMany({
+        where: { id: membership.id, teamId, status: 'active' },
+        data: { status: 'left', leftAt },
+      });
+      if (updateGuard.count !== 1) {
+        throw stateConflict('Membership has already changed', 'CONCURRENT_UPDATE');
+      }
+      const updated = await tx.v1TeamMembership.findUniqueOrThrow({
+        where: { id: membership.id },
+      });
+      // NOTE: 본인이 팀의 유일한 active 멤버였던 경우에도 팀을 자동 archive/delete 하지 않는다.
+      // memberCount=0 상태로 그대로 남기며, 0명 팀에 대한 정리(archival) 정책은 후속 과제로 남긴다.
+      // managerCount 감소는 tx 밖에서 읽은 membership.role이 아니라 updated.role(같은 tx 내
+      // updateMany 직후 재조회)을 사용한다 — 동시에 역할 위임이 이 사용자를 건드렸다면
+      // 바깥에서 읽은 role이 stale할 수 있어 managerCount가 어긋날 수 있다.
+      const updatedTeam = await tx.v1Team.update({
+        where: { id: teamId },
+        data: {
+          memberCount: { decrement: 1 },
+          ...(updated.role === 'manager' ? { managerCount: { decrement: 1 } } : {}),
+        },
+      });
+
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'team_membership',
+          targetId: membership.id,
+          fromStatus: 'active',
+          toStatus: 'left',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason,
+        },
+      });
+      await this.leaveTeamChatParticipant(tx, teamId, user.id, user.id, leftAt, reason);
+
+      return { updated, team: updatedTeam };
+    });
+
+    return {
+      membershipId: result.updated.id,
+      teamId: result.updated.teamId,
+      status: result.updated.status,
+      leftAt,
+      memberCount: result.team.memberCount,
+      managerCount: result.team.managerCount,
+    };
+  }
+
   async createJoinApplication(
     user: V1AuthUser,
     teamId: string,
@@ -807,6 +956,7 @@ export class TeamsService {
         ).map((m) => m.userId),
       'team_join_application_received',
       team.id,
+      `"${team.name}" 팀 가입 신청을 확인해 주세요.`,
     );
 
     return {
@@ -1030,6 +1180,7 @@ export class TeamsService {
       application.applicantUserId,
       'team_join_application_accepted',
       application.teamId,
+      `"${application.team.name}" 팀 가입이 승인됐어요.`,
     );
 
     return {
@@ -1085,6 +1236,7 @@ export class TeamsService {
       application.applicantUserId,
       'team_join_application_rejected',
       application.teamId,
+      `"${application.team.name}" 팀 가입 신청이 거절됐어요.`,
     );
 
     return {
@@ -1167,7 +1319,12 @@ export class TeamsService {
         });
 
     // 알림: 초대받은 사용자에게 안내 (fire-and-forget)
-    void this.notifications.emitNotification(invitedUser.id, 'team_invitation_received', teamId);
+    void this.notifications.emitNotification(
+      invitedUser.id,
+      'team_invitation_received',
+      teamId,
+      `"${team.name}" 팀의 초대를 확인해 보세요.`,
+    );
 
     return {
       invitationId: invitation.id,
@@ -1297,6 +1454,61 @@ export class TeamsService {
     };
   }
 
+  /**
+   * 신청자 본인이 보낸 가입 신청 목록.
+   * 승인 대기(requested)는 사용자가 가장 먼저 확인해야 할 정보이므로 처리 완료 건보다 항상 앞에 온다.
+   * 두 그룹을 각각 쿼리하는 이유: 단일 쿼리로 take를 걸면 처리 완료 건이 많을 때
+   * 오래된 승인 대기 건이 잘려 나가 "내 신청이 사라진" 것처럼 보인다.
+   */
+  async myJoinApplications(user: V1AuthUser) {
+    const include = {
+      team: {
+        select: {
+          id: true,
+          name: true,
+          sportId: true,
+          profile: { select: { logoUrl: true, description: true } },
+        },
+      },
+    } as const;
+
+    const [pending, processed] = await Promise.all([
+      this.prisma.v1TeamJoinApplication.findMany({
+        where: { applicantUserId: user.id, status: 'requested' },
+        orderBy: [{ createdAt: 'desc' }],
+        take: MY_JOIN_APPLICATIONS_GROUP_LIMIT,
+        include,
+      }),
+      this.prisma.v1TeamJoinApplication.findMany({
+        where: { applicantUserId: user.id, status: { not: 'requested' } },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: MY_JOIN_APPLICATIONS_GROUP_LIMIT,
+        include,
+      }),
+    ]);
+
+    return {
+      items: [...pending, ...processed].map((application) => ({
+        applicationId: application.id,
+        teamId: application.teamId,
+        status: application.status,
+        message: application.message,
+        createdAt: application.createdAt,
+        reviewedAt: application.reviewedAt,
+        withdrawnAt: application.withdrawnAt,
+        team: {
+          teamId: application.team.id,
+          name: application.team.name,
+          sportId: application.team.sportId,
+          logoUrl: application.team.profile?.logoUrl ?? null,
+          introductionPreview: application.team.profile?.description
+            ? application.team.profile.description.slice(0, 120)
+            : null,
+        },
+      })),
+    };
+  }
+
   async acceptInvitation(user: V1AuthUser, invitationId: string) {
     this.assertActiveAccount(user);
     const invitation = await this.prisma.v1TeamInvitation.findUnique({
@@ -1350,9 +1562,20 @@ export class TeamsService {
     this.assertTeamHasCapacity(invitation.team);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const updatedInvitation = await tx.v1TeamInvitation.update({
-        where: { id: invitation.id },
+      // R15-002: conditional update — rejects if another actor cancelled the invitation
+      // between the outer read and transaction start.
+      const acceptCount = await tx.v1TeamInvitation.updateMany({
+        where: { id: invitation.id, status: 'pending' },
         data: { status: 'accepted', respondedAt: new Date() },
+      });
+      if (acceptCount.count !== 1) {
+        throw stateConflict(
+          'Invitation was cancelled or already processed before acceptance could be recorded',
+          'STATE_CONFLICT',
+        );
+      }
+      const updatedInvitation = await tx.v1TeamInvitation.findUniqueOrThrow({
+        where: { id: invitation.id },
       });
 
       const existingMembership = await tx.v1TeamMembership.findUnique({
@@ -1415,6 +1638,7 @@ export class TeamsService {
       invitation.invitedByUserId,
       'team_invitation_accepted',
       invitation.teamId,
+      `"${invitation.team.name}" 팀 초대를 수락했어요.`,
     );
 
     return {
@@ -1471,6 +1695,18 @@ export class TeamsService {
         code: 'NOT_FOUND_OR_ARCHIVED',
         message: 'Team was not found',
       });
+    }
+
+    // 단일 팀 조회라 N+1 걱정은 없지만, list()/myTeams()와 일관되게 trustState/mannerScore를 live로
+    // 덮어쓴다(캐시가 reveal 시점에 즉시 갱신되지 않을 수 있음). matchCount는 기존 캐시값 유지(스코프 밖).
+    const liveTrustByTeam = await computeRevealedTeamTrustBatch(this.prisma, [team.id]);
+    const liveTrust = liveTrustByTeam.get(team.id);
+    if (liveTrust) {
+      team.trustScore = {
+        trustState: liveTrust.trustState,
+        mannerScore: liveTrust.mannerScore !== null ? new Prisma.Decimal(liveTrust.mannerScore) : null,
+        matchCount: team.trustScore?.matchCount ?? 0,
+      };
     }
 
     return team;
@@ -1708,7 +1944,7 @@ export class TeamsService {
 
   private assertTeamHasCapacity(team: TeamCapacityLike) {
     if (isTeamFull(team)) {
-      throw stateConflict('Team member capacity has been reached', 'TEAM_FULL');
+      throw stateConflict(TEAM_FULL_MESSAGE, 'TEAM_FULL');
     }
   }
 
@@ -1781,7 +2017,7 @@ export class TeamsService {
     } satisfies Prisma.V1TeamInclude;
   }
 
-  private toListItem(team: TeamWithRelations, user: V1AuthUser | null) {
+  private toListItem(team: TeamWithRelations, user: V1AuthUser | null, liveTrust?: RevealedTeamTrust) {
     const viewer = this.getViewer(team, user);
     return {
       id: team.id,
@@ -1809,9 +2045,26 @@ export class TeamsService {
       memberGoalCount: team.profile?.memberGoalCount ?? null,
       joinPolicy: team.joinPolicy,
       memberCount: team.memberCount,
-      trustState: team.trustScore?.trustState ?? 'none',
+      trustState: liveTrust?.trustState ?? team.trustScore?.trustState ?? 'none',
       viewerRole: viewer.role,
       viewerJoinState: viewer.joinState,
+      owner: {
+        userId: team.ownerUser.id,
+        displayName: team.ownerUser.profile?.nickname ?? team.ownerUser.profile?.displayName ?? '팀장',
+        profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
+      },
+      manager: this.findManager(team),
+    };
+  }
+
+  private findManager(team: TeamWithRelations) {
+    const manager = team.memberships.find((membership) => membership.role === 'manager' && membership.status === 'active');
+    if (!manager) {
+      return null;
+    }
+    return {
+      userId: manager.userId,
+      displayName: manager.user.profile?.nickname ?? manager.user.profile?.displayName ?? '감독',
     };
   }
 
@@ -2018,12 +2271,12 @@ function isTeamFull(team: TeamCapacityLike) {
 }
 
 function getJoinReasonMessage(reasonCode: string) {
-  if (reasonCode === 'TEAM_FULL') return 'Team member capacity has been reached';
   const messages: Record<string, string> = {
     OK: '가입 신청할 수 있어요.',
     ALREADY_MEMBER: '이미 팀 멤버예요.',
     ALREADY_REQUESTED: '이미 가입 신청해서 승인을 기다리고 있어요.',
     JOIN_CLOSED: '가입 신청이 마감된 팀이에요.',
+    TEAM_FULL: TEAM_FULL_MESSAGE,
     TEAM_NOT_ACTIVE: '지금은 가입할 수 없는 팀이에요.',
     BLOCKED_USER: '신청할 수 없는 계정 상태예요.',
   };

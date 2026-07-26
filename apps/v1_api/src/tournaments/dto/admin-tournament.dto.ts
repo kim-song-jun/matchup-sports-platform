@@ -41,6 +41,14 @@ export class AdminTournamentListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '페이지 번호는 정수여야 해요.' })
+  @Min(1, { message: '페이지 번호는 1 이상이어야 해요.' })
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '페이지 크기는 정수여야 해요.' })
@@ -51,6 +59,8 @@ export class AdminTournamentListQueryDto {
 
 export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout'] as const;
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
+export const TOURNAMENT_GENDER_CATEGORIES = ['mixed', 'male', 'female'] as const;
+export type TournamentGenderCategory = (typeof TOURNAMENT_GENDER_CATEGORIES)[number];
 export const TOURNAMENT_RULES_TEXT_MAX_LENGTH = 10_000;
 
 export class CreateTournamentDto {
@@ -69,6 +79,11 @@ export class CreateTournamentDto {
   @IsDateString()
   registrationDeadlineAt?: string;
 
+  /** 선수(명단) 제출 마감 시각. 폼에서는 필수 입력을 유도하되(대회 시작 D-7 23:59 자동 제안), API/스키마 레벨은 optional 유지. */
+  @IsOptional()
+  @IsDateString()
+  rosterDeadlineAt?: string;
+
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;
@@ -81,6 +96,12 @@ export class CreateTournamentDto {
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string;
+
+  /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  coverImageUrl?: string | null;
 
   @IsDefined({ message: '참가 팀 수를 입력해 주세요.' })
   @Type(() => Number)
@@ -102,6 +123,38 @@ export class CreateTournamentDto {
   @Min(1, { message: '최대 선수 수는 1명 이상이어야 해요.' })
   @Max(50, { message: '최대 선수 수는 50명을 넘을 수 없어요.' })
   maxPlayers?: number;
+
+  @IsOptional()
+  @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
+  genderCategory?: TournamentGenderCategory;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinMale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxMale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinFemale?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxFemale?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -259,6 +312,10 @@ export class CreateTournamentDto {
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
 export class UpdateTournamentDto {
   @IsOptional()
+  @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
+  sportId?: string;
+
+  @IsOptional()
   @IsString({ message: '대회 이름을 입력해 주세요.' })
   @MaxLength(120, { message: '대회 이름은 120자를 넘을 수 없어요.' })
   title?: string;
@@ -269,11 +326,16 @@ export class UpdateTournamentDto {
 
   @IsOptional()
   @IsDateString()
-  registrationDeadlineAt?: string;
+  registrationDeadlineAt?: string | null;
+
+  /** 선수(명단) 제출 마감 시각. 폼에서는 필수 입력을 유도하되(대회 시작 D-7 23:59 자동 제안), API/스키마 레벨은 optional 유지. */
+  @IsOptional()
+  @IsDateString()
+  rosterDeadlineAt?: string | null;
 
   @IsOptional()
   @IsDateString()
-  scheduledAt?: string;
+  scheduledAt?: string | null;
 
   @IsOptional()
   @IsDateString()
@@ -282,7 +344,13 @@ export class UpdateTournamentDto {
   @IsOptional()
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
-  venue?: string;
+  venue?: string | null;
+
+  /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  coverImageUrl?: string | null;
 
   @IsOptional()
   @Type(() => Number)
@@ -306,6 +374,38 @@ export class UpdateTournamentDto {
   maxPlayers?: number;
 
   @IsOptional()
+  @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
+  genderCategory?: TournamentGenderCategory;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinMale?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '남성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '남성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '남성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxMale?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최소 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최소 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최소 인원은 50명을 넘을 수 없어요.' })
+  genderMinFemale?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '여성 최대 인원은 정수여야 해요.' })
+  @Min(0, { message: '여성 최대 인원은 0명 이상이어야 해요.' })
+  @Max(50, { message: '여성 최대 인원은 50명을 넘을 수 없어요.' })
+  genderMaxFemale?: number | null;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '참가비는 정수여야 해요.' })
   @Min(0, { message: '참가비는 0원 이상이어야 해요.' })
@@ -315,29 +415,29 @@ export class UpdateTournamentDto {
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  bankName?: string;
+  bankName?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  bankAccount?: string;
+  bankAccount?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  bankHolder?: string;
+  bankHolder?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(TOURNAMENT_RULES_TEXT_MAX_LENGTH, {
     message: '대회 규정은 10,000자를 넘을 수 없어요.',
   })
-  rulesText?: string;
+  rulesText?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  refundPolicyText?: string;
+  refundPolicyText?: string | null;
 
   @IsOptional()
   @Type(() => Number)
@@ -466,4 +566,14 @@ export class ChangeTournamentStatusDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+}
+
+export class PublishBracketDto {
+  /**
+   * 공개 예약 시각(ISO). 생략하면 즉시 공개한다. 과거 시각은 서비스에서 거부한다
+   * (즉시 공개와 구분되지 않아 운영자가 의도를 확인할 수 없다).
+   */
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
 }

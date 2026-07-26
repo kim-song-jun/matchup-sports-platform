@@ -10,7 +10,7 @@
 | `GET` | `/api/v1/users/:userId/public-profile` | optional | path id | public-safe profile |
 | `GET` | `/api/v1/me/settings` | user | headers only | settings aggregate |
 | `PATCH` | `/api/v1/me/settings` | user | `UpdateSettingsDto` | updated settings |
-| `POST` | `/api/v1/auth/logout` | user | empty body | no-op logout result |
+| `POST` | `/api/v1/auth/logout` | public/idempotent | empty body | signed session cookie removal + `{ ok: true }`; expired or invalid cookies can also be cleared |
 | `POST` | `/api/v1/me/withdrawal-request` | user | `{ reason?: string | null }` | withdrawal pending result |
 | `POST` | `/api/v1/auth/register` | public | `RegisterDto` | email signup session |
 
@@ -18,20 +18,20 @@
 
 `RegisterDto`:
 
-- Required: `nickname`, `email`, `password`, `gender`, `requiredTermsAccepted`
-- Optional: `realName?: string`, `phone?: string`, `birthDate?: string`, `profileImageUrl?: string`
+- Required: `nickname`, `email`, `password`, one of `realName` or deprecated `displayName`, `phone`, `birthDate`, `gender`, `requiredTermsAccepted`
+- Optional: `profileImageUrl?: string`
 - `phone` is stored as 11 digits only. Signup UI may display `010-0000-0000`, but API payload must be digits.
 - `birthDate` is stored as 8 digits `YYYYMMDD`; API rejects invalid calendar dates.
-- `realName` is saved to private `v1_user_profiles.real_name`; blank values remain `null` and never fall back to nickname.
-- During the rolling migration, deprecated `displayName` input is accepted only when `realName` is absent and is persisted as `realName`. New clients must send `realName`.
-- `profileImageUrl` is saved to `v1_user_profiles.profile_image_url`. Current signup uses a single selected image preview value because authenticated upload is not available before account creation.
+- The accepted name is trimmed, must contain a non-whitespace character, and is saved to private `real_name` and legacy `display_name` without a nickname fallback. New clients send `realName`.
+- `profileImageUrl` is saved to `v1_user_profiles.profile_image_url`. Email signup keeps the selected file only as a local preview until the account/session exists, then uploads it through `POST /api/v1/uploads` and persists the returned URL with `PATCH /api/v1/me/profile`. The local `data:` preview is never persisted. Social signup currently omits the optional image field from its UI and therefore stores `null` unless a compatible API client supplies a URL.
 
 `SocialProfileDto`:
 
-- Required: `nickname`, `gender` (`male` or `female`)
-- Optional API fields match `RegisterDto`: `realName`, `phone`, `birthDate`, `profileImageUrl`. The current Kakao signup UI submits only nickname and gender.
+- Required: `nickname`, one of `realName` or deprecated `displayName`, `phone`, `birthDate`, `gender` (`male` or `female`)
+- Optional: `profileImageUrl`
 - `phone` duplicate checks exclude the current pending social user and return `PHONE_CONFLICT` when another account already owns it.
-- `POST /api/v1/auth/social-terms` moves the user to `/signup/social` without creating a profile. `POST /api/v1/auth/social-profile` must save nickname and gender before sport onboarding.
+- `POST /api/v1/auth/social-terms` returns `next.route = /signup/social` and moves the user there without creating a profile. The client follows that returned route rather than hard-coding a completion page.
+- `POST /api/v1/auth/social-profile` saves the nickname and all four required profile fields before sport onboarding.
 - Until social profile completion changes the user to `signup_done`, the session remains authenticated but receives `403 SIGNUP_INCOMPLETE` for unrelated site APIs.
 
 `UpdateProfileDto`:
@@ -40,13 +40,18 @@
 - Deprecated `displayName?: string | null` remains temporarily accepted for rolling-deploy compatibility and is used only when `realName` is absent.
 - `gender: male | female`, required for every profile save
 - `nickname: string`, min 2, max 40
-- `email?: string | null`, max 320. Email/password accounts still require an email. Social-only accounts may edit or clear the contact email without changing the Kakao provider key. Any changed email clears `emailVerifiedAt`.
+- `email?: string | null`, max 320. Email/password accounts still require an email. Social-only accounts may omit email, and clients must not force email/password controls when `hasPassword=false`.
+- Social-only accounts may edit or clear contact email without changing the Kakao provider key. Any changed email clears `emailVerifiedAt`; password identities track the saved email.
 - `profileImageUrl?: string | null`
 - Authenticated profile edit uploads selected image files through `POST /api/v1/uploads` first and saves the returned root-relative URL. The edit screen must not persist a local `data:` preview as if it were an uploaded profile image.
 - `phone?: string | null`; when present, 11 digits only; duplicate phone returns `PHONE_CONFLICT`
+- Changing the phone clears `phoneVerifiedAt`. Phone confirmation binds the verified token target and timestamp together in one transaction.
+- Verification confirmation consumes a still-unused token conditionally in the same transaction as the identity binding. Concurrent reuse returns `ALREADY_PROCESSED` and cannot commit a second binding.
 - `birthDate?: string | null`; when present, 8 digit `YYYYMMDD` and a valid calendar date
 
 Profile edit UI keeps duplicate checks for changed `nickname` and non-empty changed `email`. Kakao-only users may edit or clear email; this does not change the Kakao login identity.
+
+The profile edit route renders a loading skeleton while `GET /me/profile` is pending and a retryable error state when it fails. It must never expose a blank editable-looking form backed by missing profile data.
 
 ## Creator Profile Gate
 
@@ -69,6 +74,7 @@ Application, invitation, chat, review, inquiry, profile update, and existing-ent
 `GET /users/:userId/public-profile` response:
 
 - Optional auth. Public-safe profiles are readable from user-facing surfaces such as team member lists and join request lists.
+- Only `active` accounts are readable. Withdrawal-pending, suspended, blocked, deleted, or soft-deleted users return the same `404 NOT_FOUND` response so account state and profile data are not exposed.
 - Private fields such as real name, email, phone, birth date, gender, and profile bio are never returned.
 - Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`; `displayName` is derived from public nickname and never from `realName`.
 - Returned trust field: `reputation.mannerScore`, `reputation.reviewCount`, `reputation.trustState`.
@@ -83,9 +89,11 @@ Application, invitation, chat, review, inquiry, profile update, and existing-ent
 
 ## State And Copy
 
-- Logout is a server no-op in the current header-auth development model; frontend still clears local v1 session state.
+- Logout clears the signed `/api/v1` HttpOnly session cookie; frontend also clears local persona/display state. Account-status checks remain server-side on every authenticated request.
 - Withdrawal request moves the account toward `withdrawal_pending` and writes status evidence. It is not immediate hard delete.
 - `GET /me/profile` returns nullable `profile.gender` for legacy compatibility, plus `authProvider`, `authProviders`, and `hasPassword`. `GET /me/settings.account` returns `providers` and `hasPassword`. Clients use these fields to separate common profile editing from login-method-specific account controls.
+- Notification preference switches configure the in-app Teameet notification inbox only. Browser/OS push permission and subscriptions are not part of the current v1 contract, so the UI must not present these switches as push-notification controls.
+- Current-location actions disclose that exact coordinates are transmitted once for region/weather resolution and send `locationConsentAccepted: true`; coordinates are not persisted. Permission denied, unavailable position, and timeout states use distinct user-facing messages, and manual region selection remains available.
 - Profile, notification setting, region, and sport/region preference updates write user-actor evidence to `v1_status_change_logs` with target types such as `user_profile`, `user_notification_settings`, `user_region`, and `user_preferences`. The log reason records changed field names, not raw private values.
 - Unsupported email/password change controls must not be shown as active actions. Kakao-only users see provider account status instead of password change.
 

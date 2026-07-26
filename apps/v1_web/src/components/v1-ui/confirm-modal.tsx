@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -75,6 +75,11 @@ interface ConfirmModalProps {
   open: boolean;
   title: string;
   message: string;
+  /**
+   * 확인 버튼 문구. **취소 버튼 문구(기본 '취소')와 같아지지 않게** 실행할 행동을 적는다.
+   * 취소 성격의 작업이면 '취소'가 아니라 '초대 취소' / '신청 취소'처럼 대상을 붙인다
+   * — 같은 문구가 나란히 두 개 있으면 어느 쪽이 실행인지 구분되지 않는다.
+   */
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: ConfirmTone;
@@ -104,6 +109,10 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const idPrefix = useId();
+  const titleId = `${idPrefix}-confirm-title`;
+  const messageId = `${idPrefix}-confirm-message`;
+  const phraseId = `${idPrefix}-confirm-phrase`;
   const dialogRef = useRef<HTMLDivElement>(null);
   // 취소 버튼에 초기 포커스를 줘서 실수로 확인 누르는 것을 방지한다
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
@@ -213,8 +222,8 @@ export function ConfirmModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="v1-confirm-title"
-        aria-describedby="v1-confirm-message"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
         className="w-full max-w-[360px] rounded-2xl overflow-hidden"
         style={{
           background: 'var(--surface, #fff)',
@@ -225,14 +234,14 @@ export function ConfirmModal({
         {/* Body */}
         <div style={{ padding: '28px 24px 20px' }}>
           <p
-            id="v1-confirm-title"
+            id={titleId}
             className="tm-text-body-lg"
             style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 10 }}
           >
             {title}
           </p>
           <p
-            id="v1-confirm-message"
+            id={messageId}
             className="tm-text-label"
             style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}
           >
@@ -241,7 +250,7 @@ export function ConfirmModal({
           {confirmationPhrase ? (
             <div style={{ marginTop: 18 }}>
               <label
-                htmlFor="v1-confirm-phrase"
+                htmlFor={phraseId}
                 className="tm-text-label"
                 style={{ display: 'block', color: 'var(--text-strong)', fontWeight: 600, marginBottom: 8 }}
               >
@@ -249,7 +258,7 @@ export function ConfirmModal({
               </label>
               <input
                 ref={confirmationInputRef}
-                id="v1-confirm-phrase"
+                id={phraseId}
                 type="text"
                 value={confirmationInput}
                 onChange={(event) => setConfirmationInput(event.target.value)}

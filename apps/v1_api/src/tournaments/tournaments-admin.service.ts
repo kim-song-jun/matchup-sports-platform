@@ -2,16 +2,21 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
+import { isBracketPublished } from './tournament-detail.presenter';
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
   CreateTournamentDto,
+  TournamentGenderCategory,
   TournamentStatus,
   UpdateTournamentDto,
 } from './dto/admin-tournament.dto';
@@ -39,9 +44,12 @@ function nullableText(value: string | undefined): string | null | undefined {
 
 @Injectable()
 export class TournamentsAdminService {
+  private readonly logger = new Logger(TournamentsAdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly kakaoGeocoding: KakaoGeocodingService,
   ) {}
 
   async list(user: V1AuthUser, query: AdminTournamentListQueryDto) {
@@ -63,7 +71,7 @@ export class TournamentsAdminService {
       where,
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       include: { _count: { select: { registrations: true } } },
     }), this.prisma.v1Tournament.groupBy({
       by: ['status'],
@@ -80,9 +88,21 @@ export class TournamentsAdminService {
     >;
     for (const group of statusGroups) byStatus[group.status] = group._count._all;
 
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status
+      ? byStatus[query.status] ?? 0
+      : Object.values(byStatus).reduce((sum, count) => sum + count, 0);
+
     return {
       items: pageItems.map((row) => this.serialize(row, row._count.registrations)),
-      pageInfo: { nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
       summary: {
         total: Object.values(byStatus).reduce((sum, count) => sum + count, 0),
         byStatus,
@@ -119,11 +139,29 @@ export class TournamentsAdminService {
       dto.scheduledAt ? new Date(dto.scheduledAt) : null,
       dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
     );
+    this.assertPaidTournamentPaymentInstructions({
+      entryFee: dto.entryFee ?? 0,
+      bankName: dto.bankName,
+      bankAccount: dto.bankAccount,
+      bankHolder: dto.bankHolder,
+    });
+    const genderQuota = this.normalizeGenderQuota({
+      genderCategory: dto.genderCategory,
+      genderMinMale: dto.genderMinMale,
+      genderMaxMale: dto.genderMaxMale,
+      genderMinFemale: dto.genderMinFemale,
+      genderMaxFemale: dto.genderMaxFemale,
+      maxPlayers: dto.maxPlayers ?? 10,
+    });
 
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
     if (!sport) {
       throw new BadRequestException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
     }
+
+    // 지오코딩은 네트워크 호출이라 DB 트랜잭션 밖에서 먼저 수행 — 트랜잭션을 붙잡아두지 않고,
+    // 실패해도(키 미설정 포함) venue 저장 자체는 절대 막지 않는다(좌표만 null).
+    const coordinates = dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
 
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
@@ -132,12 +170,18 @@ export class TournamentsAdminService {
           title: dto.title,
           format: dto.format ?? 'group_knockout',
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
+          rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           venue: dto.venue ?? null,
+          latitude: coordinates?.latitude ?? null,
+          longitude: coordinates?.longitude ?? null,
+          coverImageUrl: dto.coverImageUrl ?? null,
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
+          genderCategory: dto.genderCategory ?? null,
+          ...genderQuota,
           entryFee: dto.entryFee ?? 0,
           bankName: dto.bankName ?? null,
           bankAccount: dto.bankAccount ?? null,
@@ -200,6 +244,31 @@ export class TournamentsAdminService {
     const nextMin = dto.minPlayers ?? existing.minPlayers;
     const nextMax = dto.maxPlayers ?? existing.maxPlayers;
     this.assertPlayerRange(nextMin, nextMax);
+    const nextGenderCategory =
+      dto.genderCategory !== undefined
+        ? dto.genderCategory
+        : (existing.genderCategory as TournamentGenderCategory | null);
+    const genderConfigChanged =
+      dto.maxPlayers !== undefined ||
+      dto.genderCategory !== undefined ||
+      dto.genderMinMale !== undefined ||
+      dto.genderMaxMale !== undefined ||
+      dto.genderMinFemale !== undefined ||
+      dto.genderMaxFemale !== undefined;
+    const genderQuota = genderConfigChanged
+      ? this.normalizeGenderQuota({
+          genderCategory: nextGenderCategory,
+          genderMinMale:
+            dto.genderMinMale !== undefined ? dto.genderMinMale : existing.genderMinMale,
+          genderMaxMale:
+            dto.genderMaxMale !== undefined ? dto.genderMaxMale : existing.genderMaxMale,
+          genderMinFemale:
+            dto.genderMinFemale !== undefined ? dto.genderMinFemale : existing.genderMinFemale,
+          genderMaxFemale:
+            dto.genderMaxFemale !== undefined ? dto.genderMaxFemale : existing.genderMaxFemale,
+          maxPlayers: nextMax,
+        })
+      : null;
     const nextScheduledAt =
       dto.scheduledAt !== undefined
         ? dto.scheduledAt
@@ -213,19 +282,61 @@ export class TournamentsAdminService {
           : null
         : existing.scheduledEndAt;
     this.assertScheduleRange(nextScheduledAt, nextScheduledEndAt);
+    if (
+      dto.entryFee !== undefined ||
+      dto.bankName !== undefined ||
+      dto.bankAccount !== undefined ||
+      dto.bankHolder !== undefined
+    ) {
+      this.assertPaidTournamentPaymentInstructions({
+        entryFee: dto.entryFee ?? existing.entryFee,
+        bankName: dto.bankName !== undefined ? dto.bankName : existing.bankName,
+        bankAccount: dto.bankAccount !== undefined ? dto.bankAccount : existing.bankAccount,
+        bankHolder: dto.bankHolder !== undefined ? dto.bankHolder : existing.bankHolder,
+      });
+    }
+
+    // 종목 변경: 존재하는 종목인지 검증 후 relation 연결
+    if (dto.sportId !== undefined && dto.sportId !== existing.sportId) {
+      const sport = await this.prisma.v1Sport.findUnique({ where: { id: dto.sportId } });
+      if (!sport) {
+        throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
+      }
+    }
+
+    // venue가 새로 설정되거나 기존 값과 달라질 때만 재지오코딩(불필요한 외부 호출 방지).
+    // 트랜잭션 밖에서 먼저 수행 — 네트워크 호출로 트랜잭션을 붙잡아두지 않는다.
+    const venueChanged = dto.venue !== undefined && dto.venue !== existing.venue;
+    const coordinates = venueChanged && dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
 
     const data: Prisma.V1TournamentUpdateInput = {};
+    if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.format !== undefined) data.format = dto.format;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
     }
+    if (dto.rosterDeadlineAt !== undefined) {
+      data.rosterDeadlineAt = dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null;
+    }
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
     if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
     if (dto.venue !== undefined) data.venue = dto.venue;
+    if (venueChanged) {
+      data.latitude = coordinates?.latitude ?? null;
+      data.longitude = coordinates?.longitude ?? null;
+    }
+    if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
     if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
+    if (dto.genderCategory !== undefined) data.genderCategory = dto.genderCategory;
+    if (genderQuota) {
+      data.genderMinMale = genderQuota.genderMinMale;
+      data.genderMaxMale = genderQuota.genderMaxMale;
+      data.genderMinFemale = genderQuota.genderMinFemale;
+      data.genderMaxFemale = genderQuota.genderMaxFemale;
+    }
     if (dto.entryFee !== undefined) data.entryFee = dto.entryFee;
     if (dto.bankName !== undefined) data.bankName = dto.bankName;
     if (dto.bankAccount !== undefined) data.bankAccount = dto.bankAccount;
@@ -296,6 +407,9 @@ export class TournamentsAdminService {
         message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
       });
     }
+    if (to === 'open') {
+      this.assertPaidTournamentPaymentInstructions(existing);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.v1Tournament.update({ where: { id: tournamentId }, data: { status: to } });
@@ -316,6 +430,216 @@ export class TournamentsAdminService {
     return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };
   }
 
+  /**
+   * Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개.
+   * 접수마감(registrationDeadlineAt) 이후에만 강제하지는 않는다(운영자 재량으로 조기 공개 허용) —
+   * 마감 전 공개 여부 경고는 프론트 확인 모달에서 처리한다. idempotent: 이미 공개된 경우
+   * 트랜잭션/로그 없이 alreadyPublished:true 반환.
+   *
+   * scheduledAt 을 주면 즉시 공개하지 않고 예약만 기록한다. 공개 판정은 스케줄러가 아니라
+   * 조회 시점에 `isBracketPublished()` 가 하므로, 예약 시각이 지나는 순간 별도 작업 없이
+   * 공개로 전환된다. 이미 지난 시각은 받지 않는다(즉시 공개와 구분되지 않아 혼란스럽다).
+   */
+  async publishBracket(user: V1AuthUser, tournamentId: string, scheduledAt?: Date) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+    });
+    if (!existing) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    // "이미 공개됨"은 조회 시점 판정과 같은 규칙으로 봐야 한다. bracketPublishedAt 만 보면
+    // 예약 시각이 지나 이미 공개 중인 대진표에 다시 미래 예약을 걸어 재비공개시키거나,
+    // 불필요한 즉시 공개로 공개 시각을 실제보다 늦게 기록하게 된다.
+    if (isBracketPublished(existing.bracketPublishedAt, existing.bracketPublishScheduledAt)) {
+      return {
+        tournamentId,
+        bracketPublishedAt: existing.bracketPublishedAt?.toISOString() ?? null,
+        bracketPublishScheduledAt: existing.bracketPublishScheduledAt?.toISOString() ?? null,
+        alreadyPublished: true,
+      };
+    }
+
+    if (scheduledAt) {
+      return this.scheduleBracketPublish(admin, tournamentId, scheduledAt);
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const publishedAt = new Date();
+      const transition = await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, deletedAt: null, bracketPublishedAt: null },
+        data: { bracketPublishedAt: publishedAt, bracketPublishScheduledAt: null },
+      });
+
+      if (transition.count === 0) {
+        const current = await tx.v1Tournament.findUnique({
+          where: { id: tournamentId },
+          select: { bracketPublishedAt: true, deletedAt: true },
+        });
+        if (!current || current.deletedAt) {
+          throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+        }
+        if (!current.bracketPublishedAt) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_BRACKET_PUBLISH_CONFLICT',
+            message: '대진표 공개 상태가 변경되었어요. 다시 시도해 주세요.',
+          });
+        }
+        return {
+          tournamentId,
+          bracketPublishedAt: current.bracketPublishedAt.toISOString(),
+          bracketPublishScheduledAt: null,
+          alreadyPublished: true,
+        };
+      }
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket_publish',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          afterJson: { bracketPublishedAt: publishedAt.toISOString() },
+        },
+        tx,
+      );
+
+      return {
+        tournamentId,
+        bracketPublishedAt: publishedAt.toISOString(),
+        bracketPublishScheduledAt: null,
+        alreadyPublished: false,
+      };
+    });
+
+    return result;
+  }
+
+  /**
+   * 예약 공개 기록. 공개 여부 판정은 조회 시점(`isBracketPublished`)이 하므로 여기서는
+   * 시각만 저장한다. 같은 엔드포인트를 다시 호출하면 예약 시각이 덮어써진다(변경 = 재예약).
+   */
+  private async scheduleBracketPublish(
+    admin: Awaited<ReturnType<AdminContextService['getMutationAdmin']>>,
+    tournamentId: string,
+    scheduledAt: Date,
+  ) {
+    if (scheduledAt.getTime() <= Date.now()) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_BRACKET_PUBLISH_SCHEDULE_PAST',
+        message: '공개 예약 시각은 현재 시각 이후여야 해요.',
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const transition = await tx.v1Tournament.updateMany({
+        // 아직 공개 전일 때만 예약을 쓴다. bracketPublishedAt 만 검사하면, 예약 시각이
+        // 막 지나 공개로 간주되는 순간에 레이스로 예약을 미래로 덮어써서 공개된 대진표가
+        // 다시 감춰진다. "예약이 없거나 아직 오지 않았을 때"까지 조건에 넣는다.
+        where: {
+          id: tournamentId,
+          deletedAt: null,
+          bracketPublishedAt: null,
+          OR: [{ bracketPublishScheduledAt: null }, { bracketPublishScheduledAt: { gt: now } }],
+        },
+        data: { bracketPublishScheduledAt: scheduledAt },
+      });
+
+      if (transition.count === 0) {
+        // 예약을 거는 사이 다른 관리자가 즉시 공개했거나, 기존 예약 시각이 지나 공개된 상태.
+        const current = await tx.v1Tournament.findUnique({
+          where: { id: tournamentId },
+          select: { bracketPublishedAt: true, deletedAt: true },
+        });
+        if (!current || current.deletedAt) {
+          throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+        }
+        throw new ConflictException({
+          code: 'TOURNAMENT_BRACKET_ALREADY_PUBLISHED',
+          message: '이미 공개된 대진표예요. 예약할 수 없어요.',
+        });
+      }
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket_publish_schedule',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          afterJson: { bracketPublishScheduledAt: scheduledAt.toISOString() },
+        },
+        tx,
+      );
+
+      return {
+        tournamentId,
+        bracketPublishedAt: null,
+        bracketPublishScheduledAt: scheduledAt.toISOString(),
+        alreadyPublished: false,
+      };
+    });
+  }
+
+  /**
+   * 대진표 공개 취소 — 즉시 공개분과 예약분을 모두 되돌린다. 이미 대진표를 본 참가자에게서
+   * 기억을 되돌릴 수는 없으므로, 되돌릴 수 없다는 경고는 프론트 확인 모달이 담당한다.
+   * idempotent: 이미 비공개면 트랜잭션/로그 없이 alreadyUnpublished:true 반환.
+   */
+  async unpublishBracket(user: V1AuthUser, tournamentId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: { bracketPublishedAt: true, bracketPublishScheduledAt: true },
+    });
+    if (!existing) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    if (!existing.bracketPublishedAt && !existing.bracketPublishScheduledAt) {
+      return { tournamentId, bracketPublishedAt: null, bracketPublishScheduledAt: null, alreadyUnpublished: true };
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, deletedAt: null },
+        data: { bracketPublishedAt: null, bracketPublishScheduledAt: null },
+      });
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket_unpublish',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          beforeJson: {
+            bracketPublishedAt: existing.bracketPublishedAt?.toISOString() ?? null,
+            bracketPublishScheduledAt: existing.bracketPublishScheduledAt?.toISOString() ?? null,
+          },
+          afterJson: { bracketPublishedAt: null, bracketPublishScheduledAt: null },
+        },
+        tx,
+      );
+
+      return { tournamentId, bracketPublishedAt: null, bracketPublishScheduledAt: null, alreadyUnpublished: false };
+    });
+  }
+
+  /**
+   * KakaoGeocodingService.geocode()는 이미 내부에서 모든 실패(키 미설정/네트워크
+   * 오류/응답 이상)를 잡아 null을 반환하지만, 여기서도 한 번 더 방어한다 —
+   * 지오코딩 실패가 venue 저장(대회 생성/수정) 자체를 절대 막아서는 안 된다.
+   */
+  private async geocodeVenueSafe(venue: string): Promise<GeocodedCoordinates | null> {
+    try {
+      return await this.kakaoGeocoding.geocode(venue);
+    } catch (err) {
+      this.logger.warn(`Venue geocoding failed for "${venue}" — saving venue without coordinates: ${err}`);
+      return null;
+    }
+  }
+
   private assertPlayerRange(min: number | undefined, max: number | undefined) {
     if (min !== undefined && max !== undefined && min > max) {
       throw new BadRequestException({
@@ -323,6 +647,74 @@ export class TournamentsAdminService {
         message: '최소 선수 수는 최대 선수 수보다 클 수 없어요.',
       });
     }
+  }
+
+  private assertPaidTournamentPaymentInstructions(input: {
+    entryFee: number;
+    bankName?: string | null;
+    bankAccount?: string | null;
+    bankHolder?: string | null;
+  }) {
+    if (input.entryFee <= 0) return;
+    if (
+      !input.bankName?.trim() ||
+      !input.bankAccount?.trim() ||
+      !input.bankHolder?.trim()
+    ) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED',
+        message: '유료 대회는 은행명, 계좌번호, 예금주를 모두 입력해야 해요.',
+      });
+    }
+  }
+
+  private normalizeGenderQuota(input: {
+    genderCategory?: TournamentGenderCategory | null;
+    genderMinMale?: number | null;
+    genderMaxMale?: number | null;
+    genderMinFemale?: number | null;
+    genderMaxFemale?: number | null;
+    maxPlayers: number;
+  }) {
+    if (input.genderCategory !== 'mixed') {
+      return {
+        genderMinMale: null,
+        genderMaxMale: null,
+        genderMinFemale: null,
+        genderMaxFemale: null,
+      };
+    }
+
+    const quota = {
+      genderMinMale: input.genderMinMale ?? null,
+      genderMaxMale: input.genderMaxMale ?? null,
+      genderMinFemale: input.genderMinFemale ?? null,
+      genderMaxFemale: input.genderMaxFemale ?? null,
+    };
+    const invalidRange =
+      (quota.genderMinMale !== null &&
+        quota.genderMaxMale !== null &&
+        quota.genderMinMale > quota.genderMaxMale) ||
+      (quota.genderMinFemale !== null &&
+        quota.genderMaxFemale !== null &&
+        quota.genderMinFemale > quota.genderMaxFemale);
+    const minimumTotal = (quota.genderMinMale ?? 0) + (quota.genderMinFemale ?? 0);
+    const maximumExceedsRoster =
+      (quota.genderMaxMale !== null && quota.genderMaxMale > input.maxPlayers) ||
+      (quota.genderMaxFemale !== null && quota.genderMaxFemale > input.maxPlayers);
+
+    if (invalidRange || minimumTotal > input.maxPlayers || maximumExceedsRoster) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID',
+        message: invalidRange
+          ? '성별 최소 인원은 최대 인원보다 클 수 없어요.'
+          : maximumExceedsRoster
+            ? '성별 최대 인원은 대회 최대 선수 수를 넘을 수 없어요.'
+            : '성별 최소 인원 합이 대회 최대 선수 수를 넘을 수 없어요.',
+      });
+    }
+
+    return quota;
   }
 
   private assertScheduleRange(start: Date | null, end: Date | null) {
@@ -347,12 +739,23 @@ export class TournamentsAdminService {
       status: row.status,
       format: row.format,
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
+      rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
+      bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,
+      bracketPublishScheduledAt: row.bracketPublishScheduledAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      coverImageUrl: row.coverImageUrl,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
+      genderCategory: row.genderCategory,
+      genderMinMale: row.genderMinMale,
+      genderMaxMale: row.genderMaxMale,
+      genderMinFemale: row.genderMinFemale,
+      genderMaxFemale: row.genderMaxFemale,
       entryFee: row.entryFee,
       bankName: row.bankName,
       bankAccount: row.bankAccount,

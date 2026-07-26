@@ -4,14 +4,19 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
-import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
-import { teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
+import { extractErrorMessage } from '@/lib/error-message';
+import { clearStoredV1Session } from '@/lib/session-storage';
+import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
   useV1AcceptTeamInvitation,
   useV1ApproveTeamJoinApplication,
+  useV1AuthMe,
   useV1CheckEmail,
   useV1CheckNickname,
   useV1ChangeTeamMembershipRole,
@@ -21,6 +26,7 @@ import {
   useV1MyTeamMatches,
   useV1MasterRegions,
   useV1MasterSports,
+  useV1MyJoinApplications,
   useV1Notifications,
   useV1Profile,
   useV1ReceivedInvitations,
@@ -38,20 +44,25 @@ import {
   useV1UpdateProfile,
   useV1UpdateSettings,
   useV1WithdrawalRequest,
+  useV1WithdrawMyJoinApplication,
 } from '@/hooks/use-v1-api';
+import { usePendingIds } from '@/hooks/use-pending-ids';
+import { formatMonthDay } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   MyInvitationsPageView,
+  MyJoinApplicationsPageView,
   SettingsPageView,
   MyTeamDetailPageView,
   MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
-import type { MyHomeViewModel, MyInvitationItem, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
@@ -79,6 +90,10 @@ export function MyHomePageClient() {
   const teams = useV1MyTeams();
   const notifications = useV1Notifications({ status: 'unread', limit: 1 });
   const pendingReviews = useV1Reviews({ tab: 'pending', limit: 1 }, { enabled: Boolean(profile.data) });
+  // 인증 여부는 /auth/me 가 단일 출처다(프로필 응답에는 없다). 이미 앱 전역에서 쓰는 쿼리라
+  // 추가 요청이 발생하지 않는다.
+  const authMe = useV1AuthMe();
+  const phoneVerified = authMe.data?.verification?.phoneVerified;
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -106,8 +121,9 @@ export function MyHomePageClient() {
       notificationUnreadCount(notifications.data) > 0,
       activitySummary.data,
       hasPendingReview(pendingReviews.data),
+      phoneVerified,
     );
-  }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data]);
+  }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data, phoneVerified]);
 
   if (profile.isError) {
     return <ErrorState message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void profile.refetch()} />;
@@ -141,9 +157,12 @@ export function MyInvitationsPageClient() {
   const { confirm, ConfirmModal } = useConfirm();
   const router = useRouter();
 
-  const actionPending = accept.isPending || decline.isPending;
+  // 아이템별 pending — 전역 boolean이면 무관한 카드까지 잠기고, 단일 id면 두 건을
+  // 연달아 처리할 때 뒤엣것이 앞엣것의 pending을 덮어쓴다(usePendingIds 주석 참조).
+  const pendingInvitations = usePendingIds();
 
   const onAccept = (invitationId: string) => {
+    pendingInvitations.start(invitationId);
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
@@ -152,6 +171,7 @@ export function MyInvitationsPageClient() {
           void query.refetch();
         }
       },
+      onSettled: () => pendingInvitations.finish(invitationId),
     });
   };
 
@@ -165,15 +185,15 @@ export function MyInvitationsPageClient() {
       tone: 'danger',
     }).then((ok) => {
       if (ok) {
-        decline.mutate({ invitationId });
+        pendingInvitations.start(invitationId);
+        decline.mutate({ invitationId }, { onSettled: () => pendingInvitations.finish(invitationId) });
       }
     });
   };
 
   const model = {
-    invitations: (query.data?.items ?? []).map(toMyInvitationItem),
+    invitations: (query.data?.items ?? []).map((item) => toMyInvitationItem(item, pendingInvitations.has(item.invitationId))),
     error: query.isError,
-    actionPending,
     onAccept,
     onDecline,
     onRetry: () => void query.refetch(),
@@ -183,6 +203,50 @@ export function MyInvitationsPageClient() {
     <>
       {ConfirmModal}
       <MyInvitationsPageView model={model} />
+    </>
+  );
+}
+
+export function MyJoinApplicationsPageClient() {
+  const query = useV1MyJoinApplications();
+  const withdraw = useV1WithdrawMyJoinApplication();
+  const { confirm, ConfirmModal } = useConfirm();
+
+  // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
+  const pendingApplications = usePendingIds();
+
+  const onWithdraw = (applicationId: string) => {
+    const application = (query.data?.items ?? []).find((item) => item.applicationId === applicationId);
+    if (!application) return;
+    void confirm({
+      title: '가입 신청 취소',
+      message: `${application.team.name}에 보낸 가입 신청을 취소할까요?`,
+      confirmLabel: '신청 취소',
+      tone: 'danger',
+    }).then((ok) => {
+      if (!ok) return;
+      pendingApplications.start(applicationId);
+      withdraw.mutate(
+        { applicationId, teamId: application.teamId, reason: 'team_join_withdrawn_from_v1_web_my_page' },
+        { onSettled: () => pendingApplications.finish(applicationId) },
+      );
+    });
+  };
+
+  const model: MyJoinApplicationsViewModel = {
+    applications: (query.data?.items ?? []).map((item) =>
+      toMyJoinApplicationItem(item, pendingApplications.has(item.applicationId)),
+    ),
+    loading: query.isLoading,
+    error: query.isError,
+    onWithdraw,
+    onRetry: () => void query.refetch(),
+  };
+
+  return (
+    <>
+      {ConfirmModal}
+      <MyJoinApplicationsPageView model={model} />
     </>
   );
 }
@@ -309,6 +373,8 @@ export function ProfileEditPageClient() {
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
+  /** 번호를 바꿨을 때만 채워지는 본인인증 증명. 번호를 다시 고치면 무효가 되므로 함께 비운다. */
+  const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile.data) return;
@@ -322,11 +388,35 @@ export function ProfileEditPageClient() {
     setProfileImageName('');
     setNicknameCheck({ status: 'idle', value: '' });
     setEmailCheck({ status: 'idle', value: '' });
+    setPhoneProofToken(null);
   }, [profile.data]);
 
-  const originalNickname = profile.data?.profile.nickname ?? '';
-  const originalEmail = profile.data?.email ?? '';
-  const emailRequired = Boolean(profile.data?.hasPassword);
+  if (profile.isPending) {
+    return (
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+        <PageSkeleton variant="detail" />
+      </AppChrome>
+    );
+  }
+
+  if (profile.isError || !profile.data) {
+    return (
+      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
+        <div className="tm-my-shell">
+          <ErrorState
+            message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            onRetry={() => void profile.refetch()}
+          />
+        </div>
+      </AppChrome>
+    );
+  }
+
+  const originalNickname = profile.data.profile.nickname ?? '';
+  const originalEmail = profile.data.email ?? '';
+  const originalPhone = profile.data.phone ?? '';
+  const phoneChanged = phoneDigits !== originalPhone;
+  const emailRequired = Boolean(profile.data.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
   const nicknameChanged = normalizedNickname !== originalNickname;
@@ -457,6 +547,13 @@ export function ProfileEditPageClient() {
       return;
     }
 
+    // 번호를 바꿨다면 서버가 본인인증 증명을 요구한다(가입과 동일). 저장 버튼을 눌러서야
+    // 알게 되면 입력을 다 마친 뒤 되돌아가야 하므로, 아래 필드에 인증 카드를 함께 띄운다.
+    if (phoneChanged && phoneDigits && !phoneProofToken) {
+      setFieldErrors({ phone: '변경한 번호로 본인인증을 완료해 주세요.' });
+      return;
+    }
+
     if (birthDateDigits && (birthDateDigits.length !== 8 || !isValidBirthDateDigits(birthDateDigits))) {
       setFieldErrors({ birthDate: '올바른 생년월일을 입력해 주세요. (예: 1995-01-15)' });
       return;
@@ -474,6 +571,7 @@ export function ProfileEditPageClient() {
         email: normalizedEmail || null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
+        phoneProofToken: phoneChanged ? phoneProofToken : null,
         birthDate: birthDateDigits || null,
         gender,
       });
@@ -611,13 +709,33 @@ export function ProfileEditPageClient() {
             value={formatPhone(phoneDigits)}
             onChange={(event) => {
               setPhoneDigits(toDigits(event.target.value, 11));
+              // 번호가 바뀌면 직전 번호로 받은 증명은 더 이상 유효하지 않다.
+              setPhoneProofToken(null);
               setFieldErrors((current) => ({ ...current, phone: undefined }));
             }}
             aria-invalid={fieldErrors.phone ? true : undefined}
             aria-describedby={fieldErrors.phone ? 'profile-phone-error' : undefined}
           />
           {fieldErrors.phone ? <span id="profile-phone-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.phone}</span> : null}
+          {phoneChanged && !phoneProofToken ? (
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              번호를 바꾸면 본인인증을 다시 해야 해요.
+            </span>
+          ) : null}
         </label>
+
+        {/* 번호를 바꾼 경우에만 인증을 요구한다 — 저장을 누르기 전에 이 자리에서 끝낼 수 있게 필드 바로 아래 둔다. */}
+        {phoneChanged && phoneDigits.length === 11 ? (
+          <PhoneVerificationCard
+            mode="public"
+            phone={phoneDigits}
+            surface="inset"
+            onVerified={(token) => {
+              setPhoneProofToken(token ?? null);
+              setFieldErrors((current) => ({ ...current, phone: undefined }));
+            }}
+          />
+        ) : null}
         <label className="tm-create-field">
           <span className="tm-text-label">생년월일</span>
           <DatePickerTextInput
@@ -995,6 +1113,8 @@ function formatPasswordAvailability(hasPassword: boolean | undefined, providers:
 
 export function SettingsPageClient() {
   const settings = useV1Settings();
+  // 계정 설정 응답에는 인증 여부가 없다 — 인증 상태의 단일 출처는 /auth/me 다.
+  const authMe = useV1AuthMe();
 
   if (settings.isError) {
     return <ErrorState message="설정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />;
@@ -1005,6 +1125,7 @@ export function SettingsPageClient() {
         loginMethod: formatLoginMethods(settings.data.account.providers),
         email: formatAccountEmail(settings.data.account.email, settings.data.account.providers),
         phone: settings.data.account.phone ?? '등록 안 됨',
+        phoneVerified: authMe.data?.verification?.phoneVerified,
         password: formatPasswordAvailability(settings.data.account.hasPassword, settings.data.account.providers),
         canRequestPasswordChange: Boolean(settings.data.account.hasPassword),
       }
@@ -1041,6 +1162,7 @@ export function LocationSettingsPageClient() {
           {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
+            locationConsentAccepted: true,
           },
           {
             onSuccess: (result) => {
@@ -1063,9 +1185,18 @@ export function LocationSettingsPageClient() {
           },
         );
       },
-      () => {
-        setStatus('denied');
-        setMessage('위치 접근이 거부됐어요. 아래에서 지역을 직접 선택해 주세요.');
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setStatus('denied');
+          setMessage('위치 접근이 거부됐어요. 아래에서 지역을 직접 선택해 주세요.');
+          return;
+        }
+        setStatus('unmatched');
+        setMessage(
+          error.code === error.TIMEOUT
+            ? '위치 확인 시간이 초과됐어요. 다시 시도하거나 아래에서 지역을 직접 선택해 주세요.'
+            : '현재 위치를 확인할 수 없어요. 아래에서 지역을 직접 선택해 주세요.',
+        );
       },
       { enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 },
     );
@@ -1110,7 +1241,8 @@ export function LocationSettingsPageClient() {
           <Card pad={16}>
             <div className="tm-text-body-lg">현재 위치로 찾기</div>
             <div className="tm-text-caption" style={{ marginTop: 5 }}>
-              좌표는 저장하지 않고 지역을 찾을 때만 사용해요.
+              버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
+              좌표 자체는 저장하지 않아요.
             </div>
             <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" onClick={requestCurrentLocation} disabled={status === 'requesting' || resolveLocation.isPending}>
               {status === 'requesting' || resolveLocation.isPending ? '현재 위치 확인 중' : '현재 위치로 지역 찾기'}
@@ -1150,6 +1282,7 @@ export function LocationSettingsPageClient() {
 export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
+  const pushRegistration = useV1PushRegistration();
 
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
@@ -1164,6 +1297,28 @@ export function NotificationSettingsPageClient() {
 
   const notifications = settings.data?.notifications;
   const [toggleError, setToggleError] = useState(false);
+  // 브라우저 알림 켜기 실패(권한 차단·서버 VAPID 미설정·SW 등록 실패)를 사용자에게 알린다.
+  // 이전에는 subscribe()가 false를 반환해도 토글이 OFF로 남기만 해 원인을 알 수 없었다.
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  const togglePush = async () => {
+    setPushError(null);
+    if (pushRegistration.isSubscribed) {
+      await pushRegistration.unsubscribe();
+      return;
+    }
+    const subscribed = await pushRegistration.subscribe();
+    if (!subscribed) {
+      // 권한은 방금 뜬 팝업의 결과라 클릭 시점 렌더의 pushRegistration.permission은 아직 옛 값이다.
+      // 이 블록은 푸시 지원 환경에서만 도달하므로 Notification을 직접 읽는 편이 정확하다.
+      const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
+      setPushError(
+        denied
+          ? '브라우저에서 알림이 차단돼 있어요. 브라우저 설정에서 이 사이트의 알림을 허용한 뒤 다시 시도해 주세요.'
+          : '지금은 브라우저 알림을 켤 수 없어요. 잠시 후 다시 시도해 주세요.',
+      );
+    }
+  };
   const items = [
     { key: 'matchEnabled', label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때' },
     { key: 'teamEnabled', label: '팀 가입 신청', sub: '내가 운영하는 팀에 신청이 들어올 때' },
@@ -1197,6 +1352,79 @@ export function NotificationSettingsPageClient() {
             </Link>
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
+          {pushRegistration.permission !== 'unsupported' ? (
+            <div className="tm-card" style={{ padding: 0, marginBottom: 8 }}>
+              {(() => {
+                const blocked = pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed;
+                // 켜는 중에는 토글을 미리 ON 위치로 옮긴다 — 권한 팝업·서비스워커
+                // 활성화·서버 저장까지 수 초가 걸려서, 그동안 토글이 그대로면 눌리지
+                // 않은 줄 알고 다시 누르게 된다. 다만 '켜짐'이라고 단정하지는 않고
+                // 라벨로 진행 중임을 밝힌다 — 실패하면 되돌아간다.
+                const showAsOn = pushRegistration.isSubscribed || pushRegistration.isPending;
+                return (
+                  <button
+                    className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                    onClick={() => void togglePush()}
+                    type="button"
+                    role="switch"
+                    aria-checked={pushRegistration.isSubscribed}
+                    aria-busy={pushRegistration.isPending}
+                    aria-label="브라우저 알림 받기"
+                    disabled={blocked || pushRegistration.isPending}
+                    style={{
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: blocked ? 'not-allowed' : pushRegistration.isPending ? 'progress' : 'pointer',
+                      opacity: blocked ? 0.5 : 1,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="tm-text-body">브라우저 알림 받기</div>
+                      <div className="tm-text-caption" style={{ marginTop: 3 }} role="status">
+                        {/* 상태별로 다른 문장을 쓴다 — 꺼져 있는데 "받아요"라고 하면 켜진 것으로 읽힌다.
+                            웹 푸시 구독은 브라우저·기기 단위라 그 사실도 켜졌을 때 알려준다. */}
+                        {pushRegistration.isPending
+                          ? pushRegistration.isSubscribed
+                            ? '끄는 중이에요…'
+                            : '켜는 중이에요… 브라우저가 물어보면 허용해 주세요'
+                          : blocked
+                            ? '브라우저 설정에서 이 사이트의 알림을 허용해 주세요'
+                            : pushRegistration.isSubscribed
+                              ? '지금 이 브라우저에서 받고 있어요. 다른 기기에서는 따로 켜야 해요'
+                              : '켜면 앱을 닫아도 새 소식을 받을 수 있어요'}
+                      </div>
+                    </div>
+                    <span
+                      className="tm-text-caption"
+                      style={{ minWidth: 24, textAlign: 'right', color: showAsOn ? 'var(--blue500)' : 'var(--text-caption)' }}
+                      aria-hidden="true"
+                    >
+                      {pushRegistration.isPending ? '···' : pushRegistration.isSubscribed ? 'ON' : 'OFF'}
+                    </span>
+                    <span className={`tm-toggle ${showAsOn ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+                  </button>
+                );
+              })()}
+            </div>
+          ) : null}
+          {pushError ? (
+            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>브라우저 알림을 켜지 못했어요</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
+            </Card>
+          ) : null}
+          <Card pad={14} style={{ marginBottom: 8 }}>
+            <div className="tm-text-label">받을 알림 고르기</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              {/* 위 푸시 토글과의 관계를 명시한다 — 예전에는 두 영역이 무관해 보여서,
+                  푸시를 켜지 않은 사용자가 왜 폰으로 알림이 안 오는지 알 수 없었다. */}
+              {pushRegistration.isSubscribed
+                ? '여기서 끈 종류는 알림함과 브라우저 알림 모두에서 빠져요.'
+                : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 브라우저 알림을 켜면 같은 종류를 폰으로도 받아요.'}
+            </div>
+          </Card>
           {toggleError ? (
             <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
               <div className="tm-text-label" style={{ color: 'var(--orange500)' }}>저장하지 못했어요</div>
@@ -1245,18 +1473,27 @@ export function WithdrawalPageClient() {
   const router = useRouter();
   const withdrawal = useV1WithdrawalRequest();
   const [reason, setReason] = useState('');
+  const [infoOpen, setInfoOpen] = useState(false);
   // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
   const { confirm, ConfirmModal } = useConfirm();
 
   const handleWithdraw = () => {
     confirm({
       title: '탈퇴 요청',
-      message: '정말 탈퇴 요청할까요? 되돌릴 수 없어요.',
+      message: '정말 탈퇴 요청할까요? 신청 후에는 직접 취소할 수 없고, 운영팀 확인을 거쳐 처리돼요.',
       confirmLabel: '탈퇴 요청',
       tone: 'danger',
     }).then((ok) => {
       if (ok) {
-        withdrawal.mutate({ reason: reason || null }, { onSuccess: () => router.replace('/login') });
+        withdrawal.mutate(
+          { reason: reason || null },
+          {
+            onSuccess: () => {
+              clearStoredV1Session();
+              router.replace('/login');
+            },
+          },
+        );
       }
     });
   };
@@ -1273,18 +1510,54 @@ export function WithdrawalPageClient() {
             <h1 className="tm-text-heading">회원 탈퇴</h1>
           </div>
           <section className="tm-danger-panel">
-            <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
-            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치, 팀 운영 권한, 정산 내역이 있으면 탈퇴가 제한될 수 있어요.</p>
+            <div className="tm-danger-panel-head">
+              <span className="tm-danger-panel-icon" aria-hidden="true">
+                <AlertTriangleIcon size={20} strokeWidth={2} />
+              </span>
+              <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
+            </div>
+            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
           </section>
           <Card pad={16}>
-            <ListItem title="요청 상태" sub="탈퇴 신청 후 계정 확인 절차가 진행돼요" trailing="검토" />
-            <ListItem title="보관 데이터" sub="법령에 따른 보관 기간이 지나면 삭제돼요" trailing="필수" />
+            <button
+              type="button"
+              className="tm-withdrawal-info-toggle tm-pressable"
+              aria-expanded={infoOpen}
+              aria-controls="withdrawal-info-detail"
+              onClick={() => setInfoOpen((current) => !current)}
+            >
+              <span className="tm-withdrawal-info-icon" aria-hidden="true">
+                <InfoCircleIcon size={18} strokeWidth={2} />
+              </span>
+              <span className="tm-text-body" style={{ flex: 1, textAlign: 'left' }}>탈퇴 처리 안내</span>
+              <span className="tm-withdrawal-info-arrow" aria-hidden="true">
+                <ChevronRightIcon size={16} strokeWidth={2} />
+              </span>
+            </button>
+            {infoOpen ? (
+              <div className="tm-withdrawal-info-detail" id="withdrawal-info-detail">
+                <div>
+                  <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>요청 상태</div>
+                  <div className="tm-text-caption">탈퇴 신청 후 계정 확인 절차가 진행돼요</div>
+                </div>
+                <div>
+                  <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>보관 데이터</div>
+                  <div className="tm-text-caption">법령에 따른 보관 기간이 지나면 삭제돼요</div>
+                </div>
+              </div>
+            ) : null}
           </Card>
           <label className="tm-create-field">
             <span className="tm-text-label">탈퇴 사유</span>
             <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
           </label>
-          {withdrawal.isError ? <Card pad={14} className="tm-auth-soft-card-error"><div className="tm-text-label">탈퇴 요청에 실패했어요</div></Card> : null}
+          {withdrawal.isError ? (
+            <Card pad={14} className="tm-auth-soft-card-error">
+              <div className="tm-text-label">
+                {extractErrorMessage(withdrawal.error, '탈퇴 요청에 실패했어요')}
+              </div>
+            </Card>
+          ) : null}
         </div>
       </div>
       <div className="tm-fixed-cta tm-my-withdrawal-cta">
@@ -1307,9 +1580,9 @@ function toMyHomeModel(
   hasNewNotification: boolean,
   activitySummary?: V1MyActivitySummary,
   hasPendingReviews?: boolean,
+  phoneVerified?: boolean,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
-  const displayName = profile.profile.realName?.trim() || nickname;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
@@ -1340,14 +1613,15 @@ function toMyHomeModel(
   return {
     ...myHomeModel,
     hasNewNotification,
+    phoneVerified,
     sections,
     user: {
       ...myHomeModel.user,
-      name: displayName,
+      name: nickname,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
       genderLabel: formatGender(profile.profile.gender),
-      initials: initials(displayName || nickname),
+      initials: initials(nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
       loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
       loginMethodProvider: profile.authProvider,
@@ -1490,14 +1764,54 @@ function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatch
   };
 }
 
-function toMyInvitationItem(invitation: V1ReceivedInvitation): MyInvitationItem {
+function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boolean): MyInvitationItem {
   return {
     invitationId: invitation.invitationId,
+    teamId: invitation.team.teamId,
     teamName: invitation.team.name,
-    teamLogo: invitation.team.name.slice(0, 1),
+    logoUrl: invitation.team.logoUrl ?? null,
     invitedByName: invitation.invitedBy.displayName,
     message: invitation.message,
-    dateLabel: new Date(invitation.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }),
+    dateLabel: formatMonthDay(invitation.createdAt) ?? '',
+    actionPending,
+  };
+}
+
+/**
+ * 상태별 "그래서 지금 어떻게 되는 건지"를 한 줄로 알려준다.
+ * 상태 라벨만 있으면 승인됐다는 사실은 알아도 다음에 뭘 해야 할지 모른다.
+ */
+const JOIN_APPLICATION_HINTS: Record<string, string> = {
+  requested: '관리자가 확인하고 있어요. 승인되면 알림으로 알려드릴게요.',
+  approved: '가입이 승인됐어요. 이제 팀 활동에 참여할 수 있어요.',
+  rejected: '이번에는 승인되지 않았어요. 다시 신청할 수 있어요.',
+  withdrawn: '내가 취소한 신청이에요. 다시 신청할 수 있어요.',
+  expired: '신청이 만료됐어요. 다시 신청할 수 있어요.',
+};
+
+function joinApplicationStatusTone(status: string): MyJoinApplicationItem['statusTone'] {
+  if (status === 'requested') return 'pending';
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  return 'neutral';
+}
+
+function toMyJoinApplicationItem(
+  application: V1MyJoinApplication,
+  actionPending: boolean,
+): MyJoinApplicationItem {
+  return {
+    applicationId: application.applicationId,
+    teamId: application.teamId,
+    teamName: application.team.name,
+    logoUrl: application.team.logoUrl ?? null,
+    status: application.status,
+    statusLabel: myJoinApplicationStatusLabel(application.status),
+    statusTone: joinApplicationStatusTone(application.status),
+    statusHint: JOIN_APPLICATION_HINTS[application.status] ?? '신청이 처리됐어요.',
+    message: application.message,
+    dateLabel: formatMonthDay(application.createdAt) ?? '',
+    actionPending,
   };
 }
 

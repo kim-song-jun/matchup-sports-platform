@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getLoggerToken } from 'nestjs-pino';
+import { WebPushService } from '../notifications/web-push.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ChatService } from './chat.service';
 
 const userA = { id: 'user-a', email: 'a@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -43,6 +46,7 @@ describe('ChatService room polish', () => {
   let service: ChatService;
   let prisma: {
     v1ChatRoom: { findFirst: jest.Mock; update: jest.Mock };
+    v1MatchParticipant: { findFirst: jest.Mock };
     v1ChatMessage: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock; count: jest.Mock };
     v1ChatRoomParticipant: { findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1Notification: { createMany: jest.Mock };
@@ -53,6 +57,7 @@ describe('ChatService room polish', () => {
   beforeEach(async () => {
     prisma = {
       v1ChatRoom: { findFirst: jest.fn(), update: jest.fn() },
+      v1MatchParticipant: { findFirst: jest.fn().mockResolvedValue({ id: 'match-participant-a' }) },
       v1ChatMessage: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), count: jest.fn() },
       v1ChatRoomParticipant: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       v1Notification: { createMany: jest.fn() },
@@ -66,6 +71,9 @@ describe('ChatService room polish', () => {
       providers: [
         ChatService,
         { provide: PrismaService, useValue: prisma },
+        { provide: RealtimeGateway, useValue: { emitToUser: jest.fn() } },
+        { provide: WebPushService, useValue: { sendToUser: jest.fn().mockResolvedValue(undefined) } },
+        { provide: getLoggerToken(ChatService.name), useValue: { warn: jest.fn(), error: jest.fn(), info: jest.fn(), debug: jest.fn() } },
       ],
     }).compile();
 

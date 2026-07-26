@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import { useRef } from 'react';
 import { ChevronRightIcon } from './icons';
 import {
   CalendarIcon,
@@ -132,6 +135,18 @@ export function DatePickerTextInput({
   ...inputProps
 }: DatePickerTextInputProps) {
   const normalizedDateValue = /^\d{4}-\d{2}-\d{2}$/.test(dateValue) ? dateValue : '';
+  const nativeRef = useRef<HTMLInputElement>(null);
+
+  function openPicker() {
+    const input = nativeRef.current;
+    if (!input) return;
+    // showPicker()는 Chromium 99+, Safari 16+ 지원. 미지원 브라우저는 fallback으로 focus.
+    if (typeof input.showPicker === 'function') {
+      try { input.showPicker(); } catch { input.focus(); }
+    } else {
+      input.focus();
+    }
+  }
 
   return (
     <span className="tm-date-picker-text-input">
@@ -139,22 +154,28 @@ export function DatePickerTextInput({
         {...inputProps}
         className={`tm-input ${inputClassName}`.trim()}
         inputMode={inputProps.inputMode ?? 'numeric'}
-        maxLength={inputProps.maxLength ?? 10}
         type="text"
         value={value}
         onChange={(event) => onTextChange(event.target.value)}
       />
-      <span className="tm-date-picker-trigger">
+      <button
+        type="button"
+        className="tm-date-picker-trigger"
+        aria-label={pickerLabel}
+        onClick={openPicker}
+      >
         <CalendarIcon size={19} strokeWidth={2} aria-hidden="true" />
         <input
-          aria-label={pickerLabel}
+          ref={nativeRef}
+          aria-hidden="true"
+          tabIndex={-1}
           className="tm-date-picker-native"
           lang="ko"
           type="date"
           value={normalizedDateValue}
           onChange={(event) => onDateChange(event.target.value)}
         />
-      </span>
+      </button>
     </span>
   );
 }

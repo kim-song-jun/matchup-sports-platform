@@ -1,8 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
-import { V1AuthUser } from '../auth/v1-auth-user';
+import type { V1AuthUser } from '../auth/v1-auth-user';
+import { V1SessionLogoutInterceptor } from '../auth/v1-session.interceptor';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRegionsDto,
@@ -65,9 +75,9 @@ export class ProfileController {
   }
 
   @Post('auth/logout')
-  @UseGuards(V1AuthGuard)
-  logout(@CurrentUser() user: V1AuthUser) {
-    return this.profileService.logout(user);
+  @UseInterceptors(V1SessionLogoutInterceptor)
+  logout() {
+    return this.profileService.logout();
   }
 
   @Post('me/withdrawal-request')

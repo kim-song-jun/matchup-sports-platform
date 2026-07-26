@@ -26,7 +26,8 @@ export const POPUP_TARGET_LABELS = Object.fromEntries(
   POPUP_TARGET_OPTIONS.map((option) => [option.value, option.label]),
 ) as Record<V1PopupTargetScreen, string>;
 
-export function resolvePopupTargetScreen(pathname: string): V1PopupTargetScreen | null {
+export function resolvePopupTargetScreen(pathname: string | null | undefined): V1PopupTargetScreen | null {
+  if (typeof pathname !== 'string') return null;
   const match = POPUP_TARGET_OPTIONS.find((option) =>
     option.prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)),
   );

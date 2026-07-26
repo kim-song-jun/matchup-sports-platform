@@ -1357,6 +1357,45 @@ model V1SmsEventLog {
   @@map("v1_sms_event_logs")
 }
 
+/// 서버(AllExceptionsFilter)·클라이언트(POST /logs/client-error) 에러를 어드민에서
+/// 조사할 수 있도록 적재하는 로그. 창(window) 버킷으로 같은 에러를 한 행에 접어
+/// occurrenceCount 로 누적한다 — 정상 흐름 전수 적재라 dedupe 없이는 목록이 즉시 뒤덮인다.
+/// statusCode 401/403 은 24시간 창, 그 외는 1시간 창을 쓴다(ErrorLogService 참조).
+/// 보존 기한 없음(무기한) — 마스킹(mask-sensitive.ts)이 유일한 방어선이므로 신규 필드
+/// 추가 시 반드시 민감정보 목록을 함께 점검한다.
+model V1ErrorLog {
+  id              String   @id @default(uuid())
+  fingerprint     String
+  windowBucket    DateTime @map("window_bucket")
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+
+  source     String
+  level      String
+  statusCode Int?    @map("status_code")
+  errorCode  String? @map("error_code")
+  method     String?
+  route      String?
+  message    String
+  stack      String?
+
+  requestBody    Json? @map("request_body")
+  requestHeaders Json? @map("request_headers")
+  responseBody   Json? @map("response_body")
+  context        Json?
+
+  userId     String? @map("user_id")
+  userAgent  String? @map("user_agent")
+  releaseSha String? @map("release_sha")
+
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([fingerprint, windowBucket])
+  @@index([lastSeenAt])
+  @@index([source, statusCode])
+  @@map("v1_error_logs")
+}
+
 model V1NotificationPreference {
   id               String   @id @default(uuid())
   userId           String   @unique @map("user_id")

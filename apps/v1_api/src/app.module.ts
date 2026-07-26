@@ -30,6 +30,7 @@ import { TournamentsModule } from './tournaments/tournaments.module';
 import { VerificationModule } from './verification/verification.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { LogsModule } from './logs/logs.module';
+import { ErrorLogsModule } from './error-logs/error-logs.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { LogsModule } from './logs/logs.module';
       throttlers: [{ limit: 1000, ttl: 60_000 }],
     }),
     PrismaModule,
+    ErrorLogsModule,
     HealthModule,
     AuthModule,
     PopupsModule,

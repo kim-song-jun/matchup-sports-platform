@@ -44,6 +44,9 @@ import type {
   V1FoundAccount,
   V1SmsFailureSummary,
   V1AdminOpsSummary,
+  V1AdminErrorLogsPage,
+  V1AdminErrorLogDetail,
+  V1AdminErrorLogFilters,
   V1AdminPushSendPayload,
   V1AdminPushSendResult,
   V1AdminMatchDetail,
@@ -2119,6 +2122,27 @@ export function useV1AdminOpsSummary() {
   return useQuery({
     queryKey: v1Keys.adminOpsSummary(),
     queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — 에러 로그 뷰어
+// ---------------------------------------------------------------------------
+
+/** 에러 로그 목록 (cursor 페이지네이션, source/statusCode/level/기간/검색어 필터) */
+export function useAdminErrorLogs(filters?: V1AdminErrorLogFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'admin', 'error-logs', filters ?? {}] as const,
+    queryFn: () => v1Get<V1AdminErrorLogsPage>('/admin/ops/errors', filters),
+  });
+}
+
+/** 에러 로그 상세 — traceback/request/response/context 포함 */
+export function useAdminErrorLog(id: string) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'admin', 'error-log', id] as const,
+    queryFn: () => v1Get<V1AdminErrorLogDetail>(`/admin/ops/errors/${id}`),
+    enabled: !!id,
   });
 }
 

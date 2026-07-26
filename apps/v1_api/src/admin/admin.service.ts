@@ -1295,9 +1295,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       NOTICE_LIST_STATUSES,
       statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
     );
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status ? summary.byStatus[query.status] ?? 0 : summary.total;
     return {
       items: pageItems.map((row) => this.toAdminNoticeRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
       summary: {
         ...summary,
         byAudience: buildCountMap(
@@ -1528,9 +1537,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       INQUIRY_LIST_STATUSES,
       statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
     );
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status ? summary.byStatus[query.status] ?? 0 : summary.total;
     return {
       items: pageItems.map((row) => this.toAdminInquiryRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
       summary: {
         ...summary,
         byCategory: buildCountMap(

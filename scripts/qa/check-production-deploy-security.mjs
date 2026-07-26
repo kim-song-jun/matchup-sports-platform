@@ -35,6 +35,11 @@ const requiredPatterns = [
     pattern: /--filter 'protect backups\/\*\*\*'/,
     message: 'production rsync must protect existing operator backups from --delete',
   },
+  {
+    pattern:
+      /\(github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'\)/,
+    message: 'manual production deploys must be restricted to the main branch',
+  },
 ];
 
 const forbiddenPatterns = [

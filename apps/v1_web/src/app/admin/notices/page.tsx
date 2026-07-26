@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { Clock, Pencil, Tag, Users, X } from 'lucide-react';
 import {
-  AdminCardList,
+  AdminDataTable,
   AdminEmpty,
   AdminFilterBar,
   AdminPageHeader,
@@ -278,14 +278,14 @@ export default function AdminNoticesPage() {
             }
           />
 
-          <AdminCardList<V1AdminNoticeRow>
+          <AdminDataTable<V1AdminNoticeRow>
             rows={rows}
             keyExtractor={(row) => row.noticeId}
             loading={isPending && rows.length === 0}
             error={errorMessage}
             onRetry={() => void refetch()}
             empty={<AdminEmpty title="공지사항이 없어요" description="조건에 맞는 공지가 없어요." />}
-            skeletonCards={8}
+            skeletonRows={8}
             renderActions={(row) => (
               <button
                 type="button"
@@ -297,23 +297,58 @@ export default function AdminNoticesPage() {
                 수정
               </button>
             )}
-            card={(row) => ({
-              title: row.title,
-              subtitle: `${audienceLabel[row.audience]} · ${row.category}`,
-              statusNode: (
-                <span className="flex items-center gap-1.5 flex-wrap justify-end">
-
+            tableMaxWidth="max-w-none"
+            rowTone={(row) => (row.status === 'archived' ? 'warning' : undefined)}
+            columns={[
+              {
+                key: 'publishedAt',
+                header: '게시',
+                width: 'w-[132px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-500">
+                    {formatDateTime(row.publishedAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: '상태',
+                width: 'w-[96px]',
+                render: (row) => (
                   <AdminStatusPill status={row.status} label={statusLabel[row.status]} />
-                </span>
-              ),
-              meta: [
-                { icon: <Users size={14} aria-hidden="true" />, label: audienceLabel[row.audience] },
-                { icon: <Tag size={14} aria-hidden="true" />, label: row.category },
-                { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.publishedAt) },
-              ],
-              description: noticeSummary(row.body, row.content),
-              tone: row.status === 'archived' ? 'warning' : undefined,
-            })}
+                ),
+              },
+              {
+                key: 'title',
+                header: '제목',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium text-gray-900" title={row.title}>
+                      {row.title}
+                    </span>
+                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                      {noticeSummary(row.body, row.content)}
+                    </span>
+                  </div>
+                ),
+              },
+              {
+                key: 'audience',
+                header: '대상',
+                width: 'w-[104px]',
+                render: (row) => (
+                  <span className="text-gray-600">{audienceLabel[row.audience]}</span>
+                ),
+              },
+              {
+                key: 'category',
+                header: '분류',
+                width: 'w-[104px]',
+                render: (row) => (
+                  <span className="block truncate text-gray-600">{row.category}</span>
+                ),
+              },
+            ]}
           />
 
           {nextCursor ? (

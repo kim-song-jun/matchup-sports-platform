@@ -12,7 +12,8 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { User, Users, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminFilterBar,
   AdminReasonModal,
   AdminEmpty,
@@ -173,32 +174,63 @@ export default function AdminTeamsPage() {
         />
 
         {/* Card list */}
-        <AdminCardList<V1AdminTeamRow>
+        <AdminDataTable<V1AdminTeamRow>
           rows={accumulatedRows}
           keyExtractor={(r) => r.teamId}
-          card={(row) => ({
-            title: row.name,
-            subtitle: row.sportName,
-            status: row.status,
-            meta: [
-              {
-                icon: <User size={14} aria-hidden="true" />,
-                label: row.ownerName ?? '—',
-              },
-              {
-                icon: <Users size={14} aria-hidden="true" />,
-                label: `멤버 ${row.memberCount} · 매니저 ${row.managerCount}`,
-              },
-              {
-                icon: <Calendar size={14} aria-hidden="true" />,
-                label: formatDate(row.createdAt),
-              },
-            ],
-            tone:
-              row.status === 'suspended' || row.status === 'archived'
-                ? 'warning'
-                : undefined,
-          })}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) =>
+            row.status === 'suspended' || row.status === 'archived' ? 'warning' : undefined
+          }
+          columns={[
+            {
+              key: 'name',
+              header: '팀',
+              render: (row) => (
+                <span className="block truncate font-medium text-gray-900" title={row.name}>
+                  {row.name}
+                </span>
+              ),
+            },
+            {
+              key: 'status',
+              header: '상태',
+              width: 'w-[104px]',
+              render: (row) => <AdminStatusPill status={row.status} />,
+            },
+            {
+              key: 'sportName',
+              header: '종목',
+              width: 'w-[104px]',
+              render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+            },
+            {
+              key: 'ownerName',
+              header: '팀장',
+              width: 'w-[132px]',
+              render: (row) => (
+                <span className="block truncate text-gray-600">{row.ownerName ?? '—'}</span>
+              ),
+            },
+            {
+              key: 'members',
+              header: '멤버 / 매니저',
+              align: 'center',
+              width: 'w-[116px]',
+              render: (row) => (
+                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                  {row.memberCount} / {row.managerCount}
+                </span>
+              ),
+            },
+            {
+              key: 'createdAt',
+              header: '생성',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDate(row.createdAt)}</span>
+              ),
+            },
+          ]}
           renderActions={(row) => (
             <>
               <Link
@@ -237,7 +269,7 @@ export default function AdminTeamsPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonCards={8}
+          skeletonRows={8}
         />
 
         {/* Load more */}

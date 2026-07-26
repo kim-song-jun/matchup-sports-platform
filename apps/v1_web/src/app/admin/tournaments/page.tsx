@@ -11,7 +11,8 @@ import type { V1Tournament, V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminFilterBar,
   AdminEmpty,
   AdminTableSkeleton,
@@ -163,38 +164,77 @@ export default function AdminTournamentsPage() {
         {isInitialLoad ? (
           <AdminTableSkeleton rows={8} />
         ) : (
-          <AdminCardList<V1Tournament>
+          <AdminDataTable<V1Tournament>
             rows={accumulatedRows}
             keyExtractor={(r) => r.id}
-            card={(row) => ({
-              title: row.title,
-              subtitle: row.venue ?? undefined,
-              status: row.status,
-              meta: [
-                {
-                  icon: <Calendar size={14} aria-hidden="true" />,
-                  label: formatDateRange(row.scheduledAt, row.scheduledEndAt),
-                },
-                {
-                  icon: <Clock size={14} aria-hidden="true" />,
-                  label: `마감 ${formatDate(row.registrationDeadlineAt)}`,
-                },
-                {
-                  icon: <Users size={14} aria-hidden="true" />,
-                  label: `${row.registrationCount}팀`,
-                },
-                {
-                  icon: <Coins size={14} aria-hidden="true" />,
-                  label: formatCurrency(row.entryFee),
-                },
-              ],
-              tone:
-                row.status === 'cancelled'
-                  ? 'danger'
-                  : row.status === 'closed'
-                    ? 'warning'
-                    : undefined,
-            })}
+            tableMaxWidth="max-w-none"
+            rowTone={(row) =>
+              row.status === 'cancelled' ? 'danger' : row.status === 'closed' ? 'warning' : undefined
+            }
+            columns={[
+              {
+                key: 'schedule',
+                header: '일정',
+                width: 'w-[168px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-500">
+                    {formatDateRange(row.scheduledAt, row.scheduledEndAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: '상태',
+                width: 'w-[104px]',
+                render: (row) => <AdminStatusPill status={row.status} />,
+              },
+              {
+                key: 'title',
+                header: '대회',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium text-gray-900" title={row.title}>
+                      {row.title}
+                    </span>
+                    {row.venue ? (
+                      <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                        {row.venue}
+                      </span>
+                    ) : null}
+                  </div>
+                ),
+              },
+              {
+                key: 'deadline',
+                header: '접수 마감',
+                width: 'w-[124px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-500">
+                    {formatDate(row.registrationDeadlineAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'registrationCount',
+                header: '참가팀',
+                align: 'center',
+                width: 'w-[80px]',
+                render: (row) => (
+                  <span className="tabular-nums text-gray-600">{row.registrationCount}</span>
+                ),
+              },
+              {
+                key: 'entryFee',
+                header: '참가비',
+                align: 'right',
+                width: 'w-[112px]',
+                render: (row) => (
+                  <span className="tabular-nums whitespace-nowrap text-gray-600">
+                    {formatCurrency(row.entryFee)}
+                  </span>
+                ),
+              },
+            ]}
             renderActions={(row) => (
               <Link
                 href={`/admin/tournaments/${row.id}`}
@@ -218,7 +258,7 @@ export default function AdminTournamentsPage() {
             }
             error={errorMessage}
             onRetry={() => void refetch()}
-            skeletonCards={8}
+            skeletonRows={8}
           />
         )}
 

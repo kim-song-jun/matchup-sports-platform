@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { Clock, Eye, MonitorUp, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
-  AdminCardList,
+  AdminDataTable,
   AdminEmpty,
   AdminFilterBar,
   AdminPageHeader,
@@ -329,14 +329,18 @@ export default function AdminPopupsPage() {
             onStatusChange={setActiveStatus}
           />
 
-          <AdminCardList<V1AdminPopupRow>
+          {/* 본문 전문을 카드에 넣어 한 항목이 세로로 길게 늘어나 있었다. 목록은 어떤 팝업이
+              어디에 언제 걸려 있는지 훑는 자리이고 본문은 우측 상세에서 본다 — 표로 옮기고
+              본문은 제목 아래 한 줄 요약만 남긴다. */}
+          <AdminDataTable<V1AdminPopupRow>
             rows={rows}
             keyExtractor={(row) => row.popupId}
             loading={listQuery.isPending && rows.length === 0}
             error={errorMessage}
             onRetry={() => void listQuery.refetch()}
             empty={<AdminEmpty title="팝업이 없어요" description="새 팝업을 만들어 필요한 화면에 안내해 보세요." />}
-            skeletonCards={6}
+            skeletonRows={6}
+            tableMaxWidth="max-w-none"
             renderActions={(row) => (
               <>
                 <button type="button" onClick={() => openView(row)} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
@@ -350,16 +354,61 @@ export default function AdminPopupsPage() {
                 </button>
               </>
             )}
-            card={(row) => ({
-              title: row.title,
-              subtitle: `${formatTargetScreens(row.targetScreens)} · ${formatDisplayWindow(row.displayStartAt, row.displayEndAt)}`,
-              statusNode: <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
-              meta: [
-                { icon: <MonitorUp size={14} aria-hidden="true" />, label: row.status === 'published' ? `${row.targetScreens.length}개 화면 노출` : '미노출' },
-                { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.updatedAt) },
-              ],
-              description: noticeSummary(row.body),
-            })}
+            columns={[
+              {
+                key: 'status',
+                header: '상태',
+                width: 'w-[92px]',
+                render: (row) => <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
+              },
+              {
+                key: 'title',
+                header: '제목',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium text-gray-900" title={row.title}>
+                      {row.title}
+                    </span>
+                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                      {noticeSummary(row.body)}
+                    </span>
+                  </div>
+                ),
+              },
+              {
+                key: 'targetScreens',
+                header: '노출 화면',
+                width: 'w-[150px]',
+                render: (row) => (
+                  <span
+                    className="block truncate text-gray-600"
+                    title={formatTargetScreens(row.targetScreens)}
+                  >
+                    {row.status === 'published'
+                      ? formatTargetScreens(row.targetScreens)
+                      : '미노출'}
+                  </span>
+                ),
+              },
+              {
+                key: 'displayWindow',
+                header: '게시 기간',
+                width: 'w-[190px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-600">
+                    {formatDisplayWindow(row.displayStartAt, row.displayEndAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'updatedAt',
+                header: '수정',
+                width: 'w-[124px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.updatedAt)}</span>
+                ),
+              },
+            ]}
           />
 
           {nextCursor ? (

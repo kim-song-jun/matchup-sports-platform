@@ -66,6 +66,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
       unsubscribe: vi.fn(),
       permission: 'default',
       isSubscribed: false,
+      isPending: false,
     });
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
@@ -85,6 +86,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
       unsubscribe: vi.fn(),
       permission: 'default',
       isSubscribed: false,
+      isPending: false,
     });
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
@@ -104,6 +106,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
       unsubscribe: vi.fn(),
       permission: 'default',
       isSubscribed: false,
+      isPending: false,
     });
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
@@ -120,6 +123,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
       unsubscribe,
       permission: 'granted',
       isSubscribed: true,
+      isPending: false,
     });
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
@@ -136,6 +140,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
       unsubscribe: vi.fn(),
       permission: 'denied',
       isSubscribed: false,
+      isPending: false,
     });
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
@@ -157,6 +162,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
       unsubscribe: vi.fn(),
       permission: 'granted',
       isSubscribed: true,
+      isPending: false,
     });
     renderWithClient(<NotificationSettingsPageClient />);
 
@@ -172,6 +178,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
       unsubscribe: vi.fn(),
       permission: 'default',
       isSubscribed: false,
+      isPending: false,
     });
     renderWithClient(<NotificationSettingsPageClient />);
 
@@ -181,12 +188,52 @@ describe('NotificationSettingsPageClient push toggle', () => {
     expect(screen.queryByText(/브라우저 푸시로 받아요/)).not.toBeInTheDocument();
   });
 
+  /**
+   * 구독은 권한 팝업 → 서비스워커 활성화 → 서버 저장까지 수 초가 걸린다. 그동안
+   * 토글이 꿈쩍도 하지 않으면 눌리지 않은 줄 알고 다시 누르게 되므로, 토글은 즉시
+   * ON 위치로 옮기되 '켜짐'이라고 단정하지는 않는다(실패 시 되돌아가야 하므로).
+   */
+  it('켜는 중에는 토글이 미리 ON 위치로 가되, 켜졌다고 단정하지 않는다', () => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+      isPending: true,
+    });
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    const toggle = screen.getByRole('switch', { name: '브라우저 알림 받기' });
+    // 진행 중임을 보조기술에도 알리고, 아직 켜진 상태로 확정하지 않는다.
+    expect(toggle).toHaveAttribute('aria-busy', 'true');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    // 중복 실행을 막는다.
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText(/켜는 중이에요/)).toBeInTheDocument();
+    // 시각적으로는 ON 위치로 이동해 누른 티가 난다.
+    expect(toggle.querySelector('.tm-toggle-on')).not.toBeNull();
+  });
+
+  it('끄는 중에는 끄는 중이라고 알린다', () => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'granted',
+      isSubscribed: true,
+      isPending: true,
+    });
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    expect(screen.getByText(/끄는 중이에요/)).toBeInTheDocument();
+  });
+
   it('hides the toggle entirely when push is unsupported', () => {
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
       permission: 'unsupported',
       isSubscribed: false,
+      isPending: false,
     });
     renderWithClient(<NotificationSettingsPageClient />);
 

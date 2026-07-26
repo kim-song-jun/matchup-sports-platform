@@ -16,10 +16,18 @@ export interface V1PushRegistration {
   unsubscribe: () => Promise<void>;
   permission: NotificationPermission | 'unsupported';
   isSubscribed: boolean;
+  /**
+   * 구독/해지가 진행 중인지. 권한 팝업 → 서비스워커 활성화 → 푸시 서비스 등록 →
+   * 서버 저장까지 수 초가 걸리는데, 그동안 토글이 꿈쩍도 하지 않으면 사용자는
+   * 눌리지 않은 줄 알고 다시 누르거나 떠난다. 화면이 "처리 중"을 표시할 수 있게
+   * 노출한다.
+   */
+  isPending: boolean;
 }
 
 export function useV1PushRegistration(): V1PushRegistration {
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
   // 권한은 state로 들고 requestPermission 결과로 갱신한다. 렌더 중 Notification.permission을
   // 직접 읽으면 사용자가 권한 팝업에서 '차단'을 눌러도 리렌더가 없어 UI가 계속 '허용 가능'으로
@@ -47,6 +55,7 @@ export function useV1PushRegistration(): V1PushRegistration {
   const subscribe = useCallback(async (): Promise<boolean> => {
     if (!supported || Notification.permission === 'denied') return false;
 
+    setIsPending(true);
     try {
       const permissionResult = await Notification.requestPermission();
       setPermission(permissionResult);
@@ -79,12 +88,15 @@ export function useV1PushRegistration(): V1PushRegistration {
         context: { flow: 'push-subscribe' },
       });
       return false;
+    } finally {
+      setIsPending(false);
     }
   }, [supported]);
 
   const unsubscribe = useCallback(async () => {
     if (!supported) return;
 
+    setIsPending(true);
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
@@ -112,8 +124,10 @@ export function useV1PushRegistration(): V1PushRegistration {
         level: 'warn',
         context: { flow: 'push-unsubscribe' },
       });
+    } finally {
+      setIsPending(false);
     }
   }, [supported]);
 
-  return { subscribe, unsubscribe, permission, isSubscribed };
+  return { subscribe, unsubscribe, permission, isSubscribed, isPending };
 }

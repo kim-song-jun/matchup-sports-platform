@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { Clock, Eye, MonitorUp, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
-  AdminDataTable,
+  AdminCardList,
   AdminEmpty,
   AdminFilterBar,
   AdminPageHeader,
@@ -332,15 +332,16 @@ export default function AdminPopupsPage() {
           {/* 본문 전문을 카드에 넣어 한 항목이 세로로 길게 늘어나 있었다. 목록은 어떤 팝업이
               어디에 언제 걸려 있는지 훑는 자리이고 본문은 우측 상세에서 본다 — 표로 옮기고
               본문은 제목 아래 한 줄 요약만 남긴다. */}
-          <AdminDataTable<V1AdminPopupRow>
+          <AdminCardList<V1AdminPopupRow>
             rows={rows}
             keyExtractor={(row) => row.popupId}
             loading={listQuery.isPending && rows.length === 0}
             error={errorMessage}
             onRetry={() => void listQuery.refetch()}
             empty={<AdminEmpty title="팝업이 없어요" description="새 팝업을 만들어 필요한 화면에 안내해 보세요." />}
-            skeletonRows={6}
-            tableMaxWidth="max-w-none"
+            skeletonCards={6}
+            actionLayout="compact"
+            minCardWidth="100%"
             renderActions={(row) => (
               <>
                 <button type="button" onClick={() => openView(row)} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">
@@ -354,46 +355,23 @@ export default function AdminPopupsPage() {
                 </button>
               </>
             )}
-            columns={[
-              {
-                key: 'status',
-                header: '상태',
-                width: 'w-[92px]',
-                render: (row) => <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
-              },
-              {
-                key: 'title',
-                header: '제목',
-                render: (row) => (
-                  <div className="min-w-0">
-                    <span className="block truncate font-medium text-gray-900" title={row.title}>
-                      {row.title}
-                    </span>
-                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
-                      {noticeSummary(row.body)}
-                    </span>
-                  </div>
-                ),
-              },
-              // 이 목록은 우측 400px 상세 패널과 2단으로 나눠 쓰므로 표에 주어진 폭이 좁다.
-              // 컬럼을 더 늘리면 작업 버튼까지 밀려 잘린다 — 노출 화면·수정 시각은 상세
-              // 패널에서 확인하고, 목록에는 언제 걸려 있는지만 남긴다.
-              {
-                key: 'displayWindow',
-                header: '게시 기간',
-                width: 'w-[172px]',
-                render: (row) => (
-                  <span
-                    className="block truncate text-gray-600"
-                    title={`${formatDisplayWindow(row.displayStartAt, row.displayEndAt)} · ${
-                      row.status === 'published' ? formatTargetScreens(row.targetScreens) : '미노출'
-                    }`}
-                  >
-                    {formatDisplayWindow(row.displayStartAt, row.displayEndAt)}
-                  </span>
-                ),
-              },
-            ]}
+            card={(row) => ({
+              title: row.title,
+              subtitle: formatDisplayWindow(row.displayStartAt, row.displayEndAt),
+              statusNode: <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
+              meta: [
+                {
+                  icon: <MonitorUp size={14} aria-hidden="true" />,
+                  label: row.status === 'published' ? formatTargetScreens(row.targetScreens) : '미노출',
+                  wrap: true,
+                },
+                { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.updatedAt) },
+              ],
+              // 본문 미리보기는 목록에서 어떤 팝업인지 가려내는 데 쓰이므로 남긴다. 다만
+              // 전문이 그대로 흐르면 한 항목이 세로로 길게 늘어나 목록을 훑을 수 없다 —
+              // 두 줄로 잘라 카드 높이를 일정하게 유지한다.
+              description: <span className="line-clamp-2">{noticeSummary(row.body)}</span>,
+            })}
           />
 
           {nextCursor ? (

@@ -322,6 +322,8 @@ export function ErrorLogsClient() {
         </div>
       </div>
 
+      {/* tableMaxWidth: 다른 어드민 표와 같이 컨테이너 폭을 다 쓴다. 기본 900px 캡을 두면
+          1440 에서도 발생 횟수·버전·상세 버튼이 가로 스크롤 밖으로 밀려 보이지 않았다. */}
       <AdminDataTable<V1AdminErrorLogListItem>
         columns={columns}
         rows={rows}
@@ -336,6 +338,7 @@ export function ErrorLogsClient() {
           />
         }
         actionsHeader="상세"
+        tableMaxWidth="max-w-none"
         onRowClick={(row) => setSelectedId(row.id)}
         rowClickLabel={(row) => `${row.message} 상세 보기`}
         pagination={

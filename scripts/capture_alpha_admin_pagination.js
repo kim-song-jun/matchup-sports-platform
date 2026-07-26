@@ -23,9 +23,10 @@ const WIDTHS = [
 
 const PAGES = [
   ['users', '/admin/users', '회원'],
-  ['inquiries', '/admin/inquiries', '문의'],
-  ['popups', '/admin/popups', '팝업'],
+  ['teams', '/admin/teams', '팀'],
+  ['audit', '/admin/audit', '감사 로그'],
   ['errors', '/admin/ops/errors', '에러 로그'],
+  ['popups', '/admin/popups', '팝업'],
 ];
 
 async function settle(page) {

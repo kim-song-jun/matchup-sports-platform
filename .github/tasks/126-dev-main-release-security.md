@@ -17,8 +17,8 @@
 - [x] All 38 pending candidate migrations apply to that restored snapshot.
 - [x] Prisma reports zero schema drift after rehearsal.
 - [x] All 51 pre-existing data tables keep identical row counts.
-- [ ] CodeQL reports no new high-severity alert on the candidate.
-- [ ] Candidate CI Test is green after security remediation.
+- [x] CodeQL reports no new high-severity alert on the candidate.
+- [x] Candidate CI Test is green after security remediation.
 - [ ] Final maintenance-window database and upload backups are captured before production approval.
 - [ ] Production migration, health checks, and critical smoke scenarios pass.
 
@@ -31,12 +31,14 @@
 
 ## Progress Snapshot
 
-- Initial candidate SHA: `6169ab6f270387e93531770801c880a8ae422f83`.
+- Initial migration-rehearsal SHA: `6169ab6f270387e93531770801c880a8ae422f83`.
+- Final security-remediated candidate SHA: `a72024731c132fc8cee6f893287b88672f68ffad` (Prisma tree unchanged).
 - Draft PR: `#195`.
 - Restored-production rehearsal: 80 total migrations, 38 pending, 38 applied.
 - Post-rehearsal status: up to date; schema diff exit `0`.
 - Row preservation: 51/51 existing tables, diff exit `0`.
-- Initial PR CodeQL: six high alerts; remediation is implemented locally and awaiting rerun.
+- Initial PR CodeQL: six high alerts.
+- Final candidate CI: Test PASS, CodeQL PASS, language analyses PASS, Deploy SKIPPED.
 
 ## Ambiguity Log
 

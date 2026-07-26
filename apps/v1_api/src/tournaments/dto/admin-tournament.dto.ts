@@ -41,6 +41,14 @@ export class AdminTournamentListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '페이지 번호는 정수여야 해요.' })
+  @Min(1, { message: '페이지 번호는 1 이상이어야 해요.' })
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '페이지 크기는 정수여야 해요.' })

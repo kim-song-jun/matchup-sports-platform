@@ -4,12 +4,16 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 
-const BASE = process.env.CAPTURE_BASE_URL || 'http://localhost:3023';
+const BASE = process.env.CAPTURE_BASE_URL || 'http://localhost:3013';
 const OUT = path.join(__dirname, '..', 'docs', 'visual-qa', 'phone-gate');
 // 세션은 이메일로만 심는다 — 시드가 만드는 userId 는 실행할 때마다 달라져서 UUID 를 박아 두면
 // 다른 환경에서 그 계정으로 인증되지 않는다(백엔드는 x-v1-user-id 를 먼저 해석한다).
 const UNVERIFIED = { email: process.env.CAPTURE_UNVERIFIED_EMAIL || 'member@teameet.v1' };
 const VERIFIED = { email: process.env.CAPTURE_VERIFIED_EMAIL || 'host@teameet.v1' };
+
+// dev 오버레이(Next devtools 버튼·토스트)는 캡처마다 좌하단에 끼어들어 갤러리를 더럽힌다.
+const HIDE =
+  'nextjs-portal,[data-nextjs-dev-tools-button],#__next-dev-tools-indicator,[data-nextjs-toast]{display:none!important}';
 
 const VIEWPORTS = [
   { key: 'mobile', width: 390, height: 844 },
@@ -32,6 +36,9 @@ async function newContext(browser, viewport, user) {
 async function shoot(page, name) {
   fs.mkdirSync(OUT, { recursive: true });
   await page.waitForTimeout(3000);
+  await page.addStyleTag({ content: HIDE }).catch(() => {});
+  // 폰트 로딩 전에 찍으면 같은 화면이 실행마다 다르게 나온다.
+  await page.evaluate(() => document.fonts.ready).catch(() => {});
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
   console.log('captured', name);
 }

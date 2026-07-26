@@ -16,6 +16,7 @@ import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMembe
 import {
   useV1AcceptTeamInvitation,
   useV1ApproveTeamJoinApplication,
+  useV1AuthMe,
   useV1CheckEmail,
   useV1CheckNickname,
   useV1ChangeTeamMembershipRole,
@@ -89,6 +90,10 @@ export function MyHomePageClient() {
   const teams = useV1MyTeams();
   const notifications = useV1Notifications({ status: 'unread', limit: 1 });
   const pendingReviews = useV1Reviews({ tab: 'pending', limit: 1 }, { enabled: Boolean(profile.data) });
+  // 인증 여부는 /auth/me 가 단일 출처다(프로필 응답에는 없다). 이미 앱 전역에서 쓰는 쿼리라
+  // 추가 요청이 발생하지 않는다.
+  const authMe = useV1AuthMe();
+  const phoneVerified = authMe.data?.verification?.phoneVerified;
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -116,8 +121,9 @@ export function MyHomePageClient() {
       notificationUnreadCount(notifications.data) > 0,
       activitySummary.data,
       hasPendingReview(pendingReviews.data),
+      phoneVerified,
     );
-  }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data]);
+  }, [profile.data, teams.data, notifications.data, activitySummary.data, pendingReviews.data, phoneVerified]);
 
   if (profile.isError) {
     return <ErrorState message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void profile.refetch()} />;
@@ -1107,6 +1113,8 @@ function formatPasswordAvailability(hasPassword: boolean | undefined, providers:
 
 export function SettingsPageClient() {
   const settings = useV1Settings();
+  // 계정 설정 응답에는 인증 여부가 없다 — 인증 상태의 단일 출처는 /auth/me 다.
+  const authMe = useV1AuthMe();
 
   if (settings.isError) {
     return <ErrorState message="설정 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />;
@@ -1117,6 +1125,7 @@ export function SettingsPageClient() {
         loginMethod: formatLoginMethods(settings.data.account.providers),
         email: formatAccountEmail(settings.data.account.email, settings.data.account.providers),
         phone: settings.data.account.phone ?? '등록 안 됨',
+        phoneVerified: authMe.data?.verification?.phoneVerified,
         password: formatPasswordAvailability(settings.data.account.hasPassword, settings.data.account.providers),
         canRequestPasswordChange: Boolean(settings.data.account.hasPassword),
       }
@@ -1556,6 +1565,7 @@ function toMyHomeModel(
   hasNewNotification: boolean,
   activitySummary?: V1MyActivitySummary,
   hasPendingReviews?: boolean,
+  phoneVerified?: boolean,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
@@ -1588,6 +1598,7 @@ function toMyHomeModel(
   return {
     ...myHomeModel,
     hasNewNotification,
+    phoneVerified,
     sections,
     user: {
       ...myHomeModel.user,

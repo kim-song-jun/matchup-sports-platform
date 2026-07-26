@@ -1,6 +1,10 @@
 import type { ApiEnvelope, ApiErrorBody } from '@/types/api';
 import { getStoredV1Session } from './session-storage';
 import { reportClientError } from './client-error-reporter';
+import {
+  PHONE_VERIFICATION_REQUIRED_CODE,
+  notifyPhoneVerificationRequired,
+} from './phone-verification-required';
 
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryValue>;
@@ -109,6 +113,9 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
         requestId: errorBody.requestId,
       },
     });
+    // 미인증 계정이 쓰기를 시도한 경우 — 실패 토스트만 남기면 사용자는 이유를 알 수 없다.
+    // 전역 모달이 인증 화면으로 안내하도록 여기서 한 번만 신호를 쏜다.
+    if (error.code === PHONE_VERIFICATION_REQUIRED_CODE) notifyPhoneVerificationRequired();
     throw error;
   }
 

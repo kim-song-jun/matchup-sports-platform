@@ -17,6 +17,11 @@ import type { V1AuthUser } from './v1-auth-user';
 import { currentRuntimeConfiguration, resolveV1RequestIdentity, type V1RequestIdentity } from './v1-session';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { isTermsReconsentRequestAllowed } from '../terms/terms-reconsent-access';
+import {
+  PHONE_VERIFICATION_ROUTE,
+  isPhoneVerificationEnforced,
+  isPhoneVerificationRequestAllowed,
+} from '../verification/phone-verification-access';
 
 type V1Request = Request & { v1User?: V1AuthUser };
 
@@ -66,6 +71,7 @@ export class V1AuthGuard implements CanActivate {
         email: true,
         accountStatus: true,
         onboardingStatus: true,
+        phoneVerifiedAt: true,
       },
     });
 
@@ -108,6 +114,23 @@ export class V1AuthGuard implements CanActivate {
           },
         });
       }
+    }
+
+    // 휴대폰 본인인증 전역 게이트 — 조회는 열어 두고 쓰기만 막는다.
+    // 프론트 리다이렉트는 UX일 뿐 강제력이 없어서(요청을 직접 보내면 그만) 서버가 최종 방어선이다.
+    // 소셜 가입이 아직 안 끝난 계정은 위 signup 게이트가 이미 흐름을 통제하므로 여기서 다시 막지 않는다
+    // — 가입 도중 인증 화면으로 튕겨 나가 가입을 끝낼 수 없게 되는 교착을 만들기 때문이다.
+    if (
+      !pendingSignupRoute &&
+      isPhoneVerificationEnforced() &&
+      !user.phoneVerifiedAt &&
+      !isPhoneVerificationRequestAllowed(request.method, requestUrl)
+    ) {
+      throw new ForbiddenException({
+        code: 'PHONE_VERIFICATION_REQUIRED',
+        message: '휴대폰 본인인증을 완료해야 이용할 수 있어요.',
+        details: { next: { route: PHONE_VERIFICATION_ROUTE } },
+      });
     }
 
     request.v1User = user;

@@ -12,10 +12,13 @@ import {
   Plus,
   Send,
   Settings,
+  ShieldAlert,
+  ShieldCheck,
   Star,
   Users,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
+import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { AppChrome } from '@/components/v1-ui/shell';
@@ -75,16 +78,25 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               <div className="tm-my-profile-copy">
                 <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
                 <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region} · {model.user.genderLabel}</div>
-                {model.user.loginMethod ? (
-                  <div style={{ marginTop: 6 }}>
-                    <span
-                      className="tm-badge tm-badge-grey"
-                      style={model.user.loginMethodProvider === 'kakao'
-                        ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
-                        : undefined}
-                    >
-                      {model.user.loginMethod}
-                    </span>
+                {model.user.loginMethod || model.phoneVerified ? (
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {model.user.loginMethod ? (
+                      <span
+                        className="tm-badge tm-badge-grey"
+                        style={model.user.loginMethodProvider === 'kakao'
+                          ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
+                          : undefined}
+                      >
+                        {model.user.loginMethod}
+                      </span>
+                    ) : null}
+                    {/* 컬러만으로 상태를 전달하지 않도록 아이콘 + 텍스트를 함께 쓴다. */}
+                    {model.phoneVerified ? (
+                      <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+                        본인인증 완료
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
                 <div
@@ -101,6 +113,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
               </div>
               <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
             </section>
+            {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
             {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
             <Card pad={16}>
               <div className="tm-text-body-lg">활동 요약</div>
@@ -446,7 +459,7 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
               <Card pad={16}>
                 <InfoRow label="로그인 방식" value={model.account.loginMethod} />
                 <InfoRow label="이메일" value={model.account.email} />
-                <InfoRow label="휴대폰" value={model.account.phone} />
+                <PhoneInfoRow value={model.account.phone} verified={model.account.phoneVerified} />
                 {model.account.canRequestPasswordChange ? (
                   <InfoRow
                     label="비밀번호"
@@ -587,6 +600,71 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
           </div>
         )}
     </section>
+  );
+}
+
+/**
+ * 마이페이지의 본인인증 진입점.
+ * 홈 배너 말고도 여기서 항상 인증을 시작할 수 있어야 한다 — 인증 전에는 신청·등록이 전부
+ * 막히는데, 진입점이 홈에만 있으면 사용자는 막힌 화면에서 되돌아갈 곳을 찾지 못한다.
+ */
+function PhoneVerificationCallout() {
+  return (
+    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--orange-soft)',
+          color: 'var(--orange500)',
+        }}
+      >
+        <ShieldAlert size={18} strokeWidth={2} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="tm-text-label">휴대폰 본인인증이 필요해요</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>인증해야 대회 신청·팀 활동을 할 수 있어요.</div>
+      </div>
+      <Link
+        className="tm-btn tm-btn-sm tm-btn-primary"
+        style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        href={buildPhoneVerifyHref('/my')}
+      >
+        인증하기
+      </Link>
+    </Card>
+  );
+}
+
+/**
+ * 계정 설정의 휴대폰 행. 번호만 보여주면 미인증 계정도 정상으로 보이는데, 실제로는 그 상태에서
+ * 신청·등록이 전부 막힌다. 상태와 인증 진입점을 같은 자리에 둔다.
+ */
+function PhoneInfoRow({ value, verified }: { value: string; verified?: boolean }) {
+  return (
+    <div className="tm-info-row">
+      <div className="tm-text-caption">휴대폰</div>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+        <span className="tm-text-label" style={{ textAlign: 'right' }}>{value}</span>
+        {verified === true ? (
+          <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+            인증 완료
+          </span>
+        ) : null}
+        {verified === false ? (
+          <Link className="tm-btn tm-btn-sm tm-btn-primary" href={buildPhoneVerifyHref('/my/settings')}>
+            인증하기
+          </Link>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

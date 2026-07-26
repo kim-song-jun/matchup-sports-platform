@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 
 const LOCAL_QA_USER_ID = 'e7e70000-0000-4000-8000-000000000001';
 const LOCAL_QA_USER_EMAIL = 'event.qa@teameet.local';
+const LOCAL_QA_USER_PHONE = '01003000001';
 const LOCAL_QA_TEAM_ID = 'e7e70000-0000-4000-8000-000000000002';
 const LOCAL_QA_TEAM_NAME = '청라 블루웨이브 FC';
 const LOCAL_QA_STARTED_AT = new Date('2026-07-16T09:00:00.000Z');
@@ -27,6 +28,10 @@ export async function upsertLocalEventQaPersona(
       onboardingStatus: 'completed',
       deletedAt: null,
       emailVerifiedAt: LOCAL_QA_STARTED_AT,
+      // 휴대폰 본인인증은 쓰기 전역 게이트(V1AuthGuard)의 조건이다 — 미인증 QA 계정은
+      // 로그인만 되고 아무 동작도 못 해서 시나리오 검증에 쓸 수 없다.
+      phone: LOCAL_QA_USER_PHONE,
+      phoneVerifiedAt: LOCAL_QA_STARTED_AT,
     },
     create: {
       id: LOCAL_QA_USER_ID,
@@ -34,6 +39,8 @@ export async function upsertLocalEventQaPersona(
       accountStatus: 'active',
       onboardingStatus: 'completed',
       emailVerifiedAt: LOCAL_QA_STARTED_AT,
+      phone: LOCAL_QA_USER_PHONE,
+      phoneVerifiedAt: LOCAL_QA_STARTED_AT,
     },
   });
 

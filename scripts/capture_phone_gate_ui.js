@@ -1,0 +1,81 @@
+// 휴대폰 인증 전역 게이트 UI 캡처 — 미인증/인증완료 상태를 3폭(390/768/1440)으로 담는다.
+// 사용: node scripts/capture_phone_gate_ui.js
+const { chromium } = require('playwright');
+const fs = require('fs');
+const path = require('path');
+
+const BASE = process.env.CAPTURE_BASE_URL || 'http://localhost:3023';
+const OUT = path.join(__dirname, '..', 'docs', 'visual-qa', 'phone-gate');
+const UNVERIFIED = { id: '86aced47-8168-443c-822e-a4c284bbda0b', email: 'member@teameet.v1' };
+const VERIFIED = { id: '9f2252f7-86ab-4a1f-827e-065bbc675c9c', email: 'host@teameet.v1' };
+
+const VIEWPORTS = [
+  { key: 'mobile', width: 390, height: 844 },
+  { key: 'tablet', width: 768, height: 1024 },
+  { key: 'desktop', width: 1440, height: 900 },
+];
+
+async function newContext(browser, viewport, user) {
+  const context = await browser.newContext({
+    viewport: { width: viewport.width, height: viewport.height },
+    deviceScaleFactor: 2,
+  });
+  await context.addInitScript((session) => {
+    window.localStorage.setItem('teameet.v1.userId', session.id);
+    window.localStorage.setItem('teameet.v1.userEmail', session.email);
+  }, user);
+  return context;
+}
+
+async function shoot(page, name) {
+  fs.mkdirSync(OUT, { recursive: true });
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: path.join(OUT, `${name}.png`) });
+  console.log('captured', name);
+}
+
+(async () => {
+  const browser = await chromium.launch();
+
+  for (const viewport of VIEWPORTS) {
+    // 미인증 계정: 홈 상시 배너 / 마이페이지 인증 카드 / 계정 설정 휴대폰 행
+    const unverified = await newContext(browser, viewport, UNVERIFIED);
+    const page = await unverified.newPage();
+
+    await page.goto(`${BASE}/home`, { waitUntil: 'domcontentloaded' });
+    await shoot(page, `home-unverified-${viewport.key}`);
+
+    await page.goto(`${BASE}/my`, { waitUntil: 'domcontentloaded' });
+    await shoot(page, `my-unverified-${viewport.key}`);
+
+    await page.goto(`${BASE}/my/settings`, { waitUntil: 'domcontentloaded' });
+    await shoot(page, `settings-unverified-${viewport.key}`);
+
+    // 차단 모달: 알림 설정 토글이 실제 PATCH 를 보내 403 을 받는 경로
+    await page.goto(`${BASE}/my/settings/notifications`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(2500);
+    // 브라우저 알림 토글은 권한이 없으면 disabled 라 클릭해도 요청이 나가지 않는다 —
+    // 실제 PATCH 를 보내는 알림 선호도 토글을 이름으로 집는다.
+    const toggle = page.getByRole('switch', { name: '매치 승인 알림' });
+    await toggle.click().catch(() => {});
+    await page.waitForTimeout(1200);
+    await shoot(page, `blocked-modal-${viewport.key}`);
+    await unverified.close();
+
+    // 인증 완료 계정: 마이페이지 뱃지 / 계정 설정 인증 완료 표시
+    const verified = await newContext(browser, viewport, VERIFIED);
+    const verifiedPage = await verified.newPage();
+
+    await verifiedPage.goto(`${BASE}/my`, { waitUntil: 'domcontentloaded' });
+    await shoot(verifiedPage, `my-verified-${viewport.key}`);
+
+    await verifiedPage.goto(`${BASE}/my/settings`, { waitUntil: 'domcontentloaded' });
+    await shoot(verifiedPage, `settings-verified-${viewport.key}`);
+    await verified.close();
+  }
+
+  await browser.close();
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

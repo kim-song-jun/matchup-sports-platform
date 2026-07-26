@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, type ReactNode, useState } from 'react';
 import { PendingSocialSignupGate } from '@/components/auth/pending-social-signup-gate';
+import { PhoneVerificationRequiredModal } from '@/components/auth/phone-verification/phone-verification-required-modal';
 import { ClientErrorListener } from '@/components/providers/client-error-listener';
 import { GoogleAnalytics } from '@/components/providers/google-analytics';
 import { getGaMeasurementId } from '@/lib/analytics';
@@ -38,6 +39,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <PendingSocialSignupGate>
         {children}
         <GlobalPopup />
+        <PhoneVerificationRequiredModal />
       </PendingSocialSignupGate>
     </QueryClientProvider>
   );

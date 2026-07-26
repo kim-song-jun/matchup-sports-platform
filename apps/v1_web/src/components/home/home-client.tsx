@@ -6,12 +6,8 @@ import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import {
-  dismissPhoneVerifyNudge,
-  dismissPushNudge,
-  shouldShowPhoneVerifyNudge,
-  shouldShowPushNudge,
-} from '@/lib/session-storage';
+import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
+import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
@@ -69,23 +65,12 @@ export function HomePageClient() {
         },
       }
     : undefined;
-  const [phoneNudgeDismissed, setPhoneNudgeDismissed] = useState(true);
-  useEffect(() => {
-    setPhoneNudgeDismissed(!shouldShowPhoneVerifyNudge());
-  }, []);
-  const showPhoneVerifyNudge =
-    isAuthenticated &&
-    authMe.data?.verification?.phoneVerified === false &&
-    !phoneNudgeDismissed;
-  const phoneVerifyNudge = showPhoneVerifyNudge
-    ? {
-        onVerify: () => router.push('/my/phone-verify'),
-        onDismiss: () => {
-          dismissPhoneVerifyNudge();
-          setPhoneNudgeDismissed(true);
-        },
-      }
-    : undefined;
+  // 인증을 마칠 때까지 계속 보이는 상시 배너 — 닫을 수 있게 두면 한 번 닫은 사용자는
+  // 왜 신청·등록이 막히는지 알 방법이 없어진다(조회는 열려 있어 화면상 정상으로 보인다).
+  const phoneVerifyNudge =
+    isAuthenticated && authMe.data?.verification?.phoneVerified === false
+      ? { onVerify: () => router.push(buildPhoneVerifyHref('/home')) }
+      : undefined;
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';

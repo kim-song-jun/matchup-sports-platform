@@ -37,7 +37,6 @@ function authMeResult(phoneVerified: boolean) {
 // useV1AuthMe() unconditionally on every render — default to a fully-shaped,
 // already-verified result so the unrelated push-nudge tests below don't crash it.
 const authMeMock = vi.fn(() => authMeResult(true));
-const phoneNudgeMocks = { shouldShow: vi.fn(), dismiss: vi.fn() };
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/use-v1-api')>();
@@ -56,8 +55,6 @@ vi.mock('@/lib/session-storage', async (importOriginal) => {
     ...actual,
     shouldShowPushNudge: () => true,
     dismissPushNudge: vi.fn(),
-    shouldShowPhoneVerifyNudge: () => phoneNudgeMocks.shouldShow(),
-    dismissPhoneVerifyNudge: () => phoneNudgeMocks.dismiss(),
   };
 });
 
@@ -115,12 +112,10 @@ describe('HomePageClient push nudge banner', () => {
 
 describe('HomePageClient phone verify nudge banner', () => {
   beforeEach(() => {
-    phoneNudgeMocks.shouldShow.mockReset().mockReturnValue(true);
-    phoneNudgeMocks.dismiss.mockReset();
     authMeMock.mockReset().mockReturnValue(authMeResult(false));
   });
 
-  it('shows the banner when the account has not completed phone verification and the nudge was not dismissed', async () => {
+  it('shows the banner when the account has not completed phone verification', async () => {
     render(
       <Providers>
         <HomePageClient />
@@ -143,16 +138,17 @@ describe('HomePageClient phone verify nudge banner', () => {
     expect(screen.queryByText('휴대폰 본인인증이 필요해요')).not.toBeInTheDocument();
   });
 
-  it('hides the banner once the user has dismissed it for the session', async () => {
-    phoneNudgeMocks.shouldShow.mockReturnValue(false);
-
+  // 인증 전에는 쓰기가 전부 막히므로 배너를 닫을 수 있으면 안 된다 — 닫고 나면 사용자는
+  // 신청·등록이 왜 실패하는지 알 방법이 사라진다(조회는 열려 있어 화면상 정상으로 보인다).
+  it('offers no dismiss control so the banner stays until verification is done', async () => {
     render(
       <Providers>
         <HomePageClient />
       </Providers>,
     );
 
-    await screen.findByText('안녕하세요, 테스터님');
-    expect(screen.queryByText('휴대폰 본인인증이 필요해요')).not.toBeInTheDocument();
+    expect(await screen.findByText('휴대폰 본인인증이 필요해요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '휴대폰 본인인증 안내 닫기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '인증하기' })).toBeInTheDocument();
   });
 });

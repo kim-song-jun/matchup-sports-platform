@@ -8,7 +8,7 @@ import {
 import { Prisma, V1TournamentPlayer, V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { isPhoneVerificationEnforced } from '../verification/phone-verification.service';
+import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AddPlayerDto, UpdatePlayerEligibilityDto } from './dto/tournament-player.dto';
 

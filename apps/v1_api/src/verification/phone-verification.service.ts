@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
+import { isPhoneVerificationEnforced } from './phone-verification-access';
 import { issuePhoneProofToken, type PhoneProofPurpose } from './phone-proof-token';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
@@ -10,17 +11,6 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 // 동일 번호로 유료 SMS 를 반복 발송(SMS 폭탄·과금 남용)하지 못하게 막는 재발송 쿨다운.
 const RESEND_COOLDOWN_MS = 30 * 1000;
-
-/**
- * 휴대폰 인증 강제 여부의 단일 판정.
- *
- * register 게이트(PhoneVerificationService.enabled)와 프로필 번호 변경 게이트(ProfileService)가
- * 같은 판정을 써야 한다 — 한쪽만 env 를 다시 읽으면 "가입은 막는데 번호 변경은 통과" 같은
- * 반쪽 강제가 생기고, 그게 실제로 인증 우회 경로였다.
- */
-export function isPhoneVerificationEnforced(): boolean {
-  return process.env.V1_PHONE_VERIFICATION_DISABLED !== 'true';
-}
 
 /**
  * 회원가입 전(pre-account) 공개 휴대폰 인증 — MT SMS OTP.

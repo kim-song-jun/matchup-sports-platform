@@ -395,7 +395,7 @@ function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-label">휴대폰 본인인증이 필요해요</div>
-        <div className="tm-text-caption" style={{ marginTop: 2 }}>안전한 이용을 위해 번호를 인증해 주세요.</div>
+        <div className="tm-text-caption" style={{ marginTop: 2 }}>인증해야 대회 신청·팀 활동을 할 수 있어요.</div>
       </div>
       <button
         type="button"
@@ -404,15 +404,6 @@ function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable
         onClick={phoneVerifyNudge.onVerify}
       >
         인증하기
-      </button>
-      <button
-        type="button"
-        aria-label="휴대폰 본인인증 안내 닫기"
-        className="tm-pressable"
-        style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        onClick={phoneVerifyNudge.onDismiss}
-      >
-        <X size={18} aria-hidden="true" />
       </button>
     </Card>
   );

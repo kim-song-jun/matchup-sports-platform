@@ -30,6 +30,11 @@ export type MyHomeViewModel = {
   user: MyUser;
   sections: MyMenuSection[];
   hasNewNotification?: boolean;
+  /**
+   * 휴대폰 본인인증 완료 여부. 아직 모를 때(로딩)는 undefined 로 두어 경고를 깜빡이지 않게 한다.
+   * false 일 때만 인증 요청 카드를 띄운다.
+   */
+  phoneVerified?: boolean;
 };
 
 export type MyMatchStatus = 'pending' | 'approved' | 'recruiting' | 'ended';
@@ -119,6 +124,8 @@ export type SettingsViewModel = {
     loginMethod: string;
     email: string;
     phone: string;
+    /** 인증 여부를 아직 모를 때(로딩)는 undefined — 미인증으로 단정해 경고를 깜빡이지 않는다. */
+    phoneVerified?: boolean;
     password: string;
     canRequestPasswordChange: boolean;
   };

@@ -9,7 +9,7 @@ import { Prisma, V1Tournament, V1TournamentPayment, V1TournamentRegistration } f
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
-import { isPhoneVerificationEnforced } from '../verification/phone-verification.service';
+import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   CancelRegistrationRequestDto,

@@ -180,14 +180,14 @@ const FEATURED_QA_DEFAULT_MARKETING: TournamentMarketingCopy = {
   },
 };
 
-type PersonaSeed = { readonly id: string; readonly email: string; readonly nickname: string; readonly realName: string; readonly gender: string };
+type PersonaSeed = { readonly id: string; readonly email: string; readonly phone: string; readonly nickname: string; readonly realName: string; readonly gender: string };
 type TeamSeed = { readonly id: string; readonly name: string };
 
 const PERSONAS: readonly PersonaSeed[] = [
-  { id: 'aa200000-0000-4000-8000-000000000001', email: 'alpha.qa.red@teameet.test', nickname: '알파레드', realName: '김알파', gender: 'male' },
-  { id: 'aa200000-0000-4000-8000-000000000002', email: 'alpha.qa.blue@teameet.test', nickname: '알파블루', realName: '이테스트', gender: 'female' },
-  { id: 'aa200000-0000-4000-8000-000000000003', email: 'alpha.qa.green@teameet.test', nickname: '알파그린', realName: '박경기', gender: 'male' },
-  { id: 'aa200000-0000-4000-8000-000000000004', email: 'alpha.qa.gold@teameet.test', nickname: '알파골드', realName: '최완료', gender: 'female' },
+  { id: 'aa200000-0000-4000-8000-000000000001', email: 'alpha.qa.red@teameet.test', phone: '01001000001', nickname: '알파레드', realName: '김알파', gender: 'male' },
+  { id: 'aa200000-0000-4000-8000-000000000002', email: 'alpha.qa.blue@teameet.test', phone: '01001000002', nickname: '알파블루', realName: '이테스트', gender: 'female' },
+  { id: 'aa200000-0000-4000-8000-000000000003', email: 'alpha.qa.green@teameet.test', phone: '01001000003', nickname: '알파그린', realName: '박경기', gender: 'male' },
+  { id: 'aa200000-0000-4000-8000-000000000004', email: 'alpha.qa.gold@teameet.test', phone: '01001000004', nickname: '알파골드', realName: '최완료', gender: 'female' },
 ] as const;
 
 const TEAMS: readonly TeamSeed[] = [
@@ -201,10 +201,10 @@ const TEAMS: readonly TeamSeed[] = [
 // separate from PERSONAS/TEAMS above so the alpha-QA teams never carry a
 // realistic-looking name, and vice versa.
 const FEATURED_PERSONAS: readonly PersonaSeed[] = [
-  { id: 'ab200000-0000-4000-8000-000000000001', email: 'summer.cup.champion@teameet.alpha', nickname: '민준선수', realName: '김민준', gender: 'male' },
-  { id: 'ab200000-0000-4000-8000-000000000002', email: 'summer.cup.runner@teameet.alpha', nickname: '서연선수', realName: '이서연', gender: 'female' },
-  { id: 'ab200000-0000-4000-8000-000000000003', email: 'summer.cup.scorer@teameet.alpha', nickname: '도윤선수', realName: '박도윤', gender: 'male' },
-  { id: 'ab200000-0000-4000-8000-000000000004', email: 'summer.cup.keeper@teameet.alpha', nickname: '유나선수', realName: '최유나', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000001', email: 'summer.cup.champion@teameet.alpha', phone: '01002000001', nickname: '민준선수', realName: '김민준', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000002', email: 'summer.cup.runner@teameet.alpha', phone: '01002000002', nickname: '서연선수', realName: '이서연', gender: 'female' },
+  { id: 'ab200000-0000-4000-8000-000000000003', email: 'summer.cup.scorer@teameet.alpha', phone: '01002000003', nickname: '도윤선수', realName: '박도윤', gender: 'male' },
+  { id: 'ab200000-0000-4000-8000-000000000004', email: 'summer.cup.keeper@teameet.alpha', phone: '01002000004', nickname: '유나선수', realName: '최유나', gender: 'female' },
 ] as const;
 
 const FEATURED_TEAMS: readonly TeamSeed[] = [
@@ -310,7 +310,10 @@ async function ensureTeamRoster(
     const user = await tx.v1User.upsert({
       where: { email: persona.email },
       update: {
-        phone: null,
+        // 휴대폰 본인인증은 쓰기 전역 게이트(V1AuthGuard)의 조건이다 — QA 페르소나를 미인증으로
+        // 두면 알파에서 로그인만 되고 신청·등록 같은 검증 동작을 아무것도 못 한다.
+        phone: persona.phone,
+        phoneVerifiedAt: new Date(),
         accountStatus: 'active',
         onboardingStatus: 'completed',
         deletedAt: null,
@@ -318,6 +321,8 @@ async function ensureTeamRoster(
       create: {
         id: persona.id,
         email: persona.email,
+        phone: persona.phone,
+        phoneVerifiedAt: new Date(),
         accountStatus: 'active',
         onboardingStatus: 'completed',
         emailVerifiedAt: new Date(),

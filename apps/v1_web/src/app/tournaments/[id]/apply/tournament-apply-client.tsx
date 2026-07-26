@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { UsersRound } from 'lucide-react';
+import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -1694,7 +1695,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             tone="info"
           />
           <Link
-            href={`/my/phone-verify?redirect=${encodeURIComponent(`/tournaments/${tournamentId}/apply`)}`}
+            href={buildPhoneVerifyHref(`/tournaments/${tournamentId}/apply`)}
             className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
             style={{ marginTop: 14 }}
           >

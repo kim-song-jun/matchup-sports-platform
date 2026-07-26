@@ -4,7 +4,7 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { isReviewRevealed } from '../reviews/review-visibility';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
-import { isPhoneVerificationEnforced } from '../verification/phone-verification.service';
+import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRegionsDto,

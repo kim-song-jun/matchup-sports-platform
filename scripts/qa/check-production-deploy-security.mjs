@@ -40,6 +40,10 @@ const requiredPatterns = [
       /\(github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'\)/,
     message: 'manual production deploys must be restricted to the main branch',
   },
+  {
+    pattern: /docker buildx prune -f --filter 'until=168h'/,
+    message: 'production cache cleanup must use the host-compatible age filter',
+  },
 ];
 
 const forbiddenPatterns = [
@@ -54,6 +58,10 @@ const forbiddenPatterns = [
   {
     pattern: /secrets\.GA_MEASUREMENT_ID/,
     message: 'GA_MEASUREMENT_ID is not a registered repository secret; use GA_PROD',
+  },
+  {
+    pattern: /--(?:max-used-space|min-free-space)/,
+    message: 'production BuildKit does not support v0.17-only prune filters',
   },
 ];
 

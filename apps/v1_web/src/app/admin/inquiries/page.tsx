@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Clock, Mail, MessageSquareText, Tag, UserRound } from 'lucide-react';
 import {
-  AdminCardList,
+  AdminDataTable,
   AdminEmpty,
   AdminFilterBar,
   AdminPageHeader,
+  AdminStatusPill,
   AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
@@ -183,28 +183,70 @@ export default function AdminInquiriesPage() {
           }
         />
 
-        <AdminCardList<V1AdminInquiryRow>
+        {/* 문의는 제목·분류·상태를 한눈에 훑고 처리 대상을 고르는 목록이다. 카드 그리드로는
+            항목이 한둘일 때 화면 대부분이 비고, 제목이 카드 폭에 맞춰 잘렸다. */}
+        <AdminDataTable<V1AdminInquiryRow>
           rows={rows}
           keyExtractor={(row) => row.inquiryId}
           loading={isPending && rows.length === 0}
           error={errorMessage}
           onRetry={() => void refetch()}
           empty={<AdminEmpty title="문의가 없어요" description="검색어나 필터를 바꿔서 확인해 보세요." />}
-          skeletonCards={8}
-          card={(row) => ({
-            title: row.title,
-            subtitle: requesterLabel(row),
-            status: row.status,
-            statusLabel: STATUS_LABEL[row.status],
-            meta: [
-              { icon: <Tag size={14} aria-hidden="true" />, label: CATEGORY_LABEL[row.category] },
-              { icon: <UserRound size={14} aria-hidden="true" />, label: requesterLabel(row) },
-              { icon: <Mail size={14} aria-hidden="true" />, label: requesterContact(row) },
-              { icon: <MessageSquareText size={14} aria-hidden="true" />, label: `답변 ${row.replyCount}` },
-              { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
-            ],
-            tone: row.status === 'received' ? 'warning' : undefined,
-          })}
+          skeletonRows={8}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) => (row.status === 'received' ? 'warning' : undefined)}
+          columns={[
+            {
+              key: 'createdAt',
+              header: '접수',
+              width: 'w-[132px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+              ),
+            },
+            {
+              key: 'status',
+              header: '상태',
+              width: 'w-[104px]',
+              render: (row) => <AdminStatusPill status={row.status} label={STATUS_LABEL[row.status]} />,
+            },
+            {
+              key: 'category',
+              header: '분류',
+              width: 'w-[96px]',
+              render: (row) => <span className="text-gray-600">{CATEGORY_LABEL[row.category]}</span>,
+            },
+            {
+              key: 'title',
+              header: '제목',
+              render: (row) => (
+                <Link
+                  href={`/admin/inquiries/${row.inquiryId}`}
+                  className="block max-w-[420px] truncate font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                  title={row.title}
+                >
+                  {row.title}
+                </Link>
+              ),
+            },
+            {
+              key: 'requester',
+              header: '문의자',
+              width: 'w-[160px]',
+              render: (row) => (
+                <span className="block truncate text-gray-600" title={requesterContact(row)}>
+                  {requesterLabel(row)}
+                </span>
+              ),
+            },
+            {
+              key: 'replyCount',
+              header: '답변',
+              align: 'center',
+              width: 'w-[64px]',
+              render: (row) => <span className="tabular-nums text-gray-600">{row.replyCount}</span>,
+            },
+          ]}
           renderActions={(row) => (
             <Link
               href={`/admin/inquiries/${row.inquiryId}`}

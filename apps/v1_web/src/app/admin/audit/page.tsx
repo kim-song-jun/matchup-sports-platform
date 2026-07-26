@@ -5,13 +5,12 @@ import { useV1AdminActionLogs, useV1AdminStatusChangeLogs } from '@/hooks/use-v1
 import type { AdminListFilters, V1AdminLog, V1AdminStatusChangeLog } from '@/types/api';
 import { adminActionLabel, adminTargetTypeLabel } from '@/lib/admin-labels';
 import {
-  AdminCardList,
+  AdminDataTable,
   AdminEmpty,
   AdminPageHeader,
   AdminStatusPill,
   AdminTableSkeleton,
 } from '@/components/admin';
-import { Clock, User, Hash, Tag } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 type TargetTypeFilter = '' | 'user' | 'match' | 'team' | 'team_match' | 'tournament';
@@ -59,7 +58,27 @@ function formatDateTime(dateStr: string): string {
 
 function shortId(id: string | null | undefined): string {
   if (!id) return '—';
-  return `…${id.slice(-8)}`;
+  return `${id.slice(0, 8)}…`;
+}
+
+/** ID 는 축약해 보여주되 전문을 title 로 달아 둔다 — 축약본만으로는 대상을 특정할 수 없다. */
+function IdCell({ id }: { id: string | null | undefined }) {
+  if (!id) return <span className="text-gray-400">—</span>;
+  return (
+    <span className="font-mono text-[var(--font-size-micro)] text-gray-600" title={id}>
+      {shortId(id)}
+    </span>
+  );
+}
+
+/** 사유는 길면 잘리되 전문을 title 로 보존한다(카드에서는 한 글자만 남아 의미가 사라졌다). */
+function ReasonCell({ reason }: { reason: string | null | undefined }) {
+  if (!reason) return <span className="text-gray-400">—</span>;
+  return (
+    <span className="block max-w-[220px] truncate text-gray-600" title={reason}>
+      {reason}
+    </span>
+  );
 }
 
 // ── Load-more shared UI ───────────────────────────────────────────────────
@@ -118,25 +137,56 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <AdminCardList<V1AdminLog>
+      {/* 로그는 시간 축을 따라 훑는 데이터다. 카드 그리드로는 같은 항목끼리 세로로
+          정렬되지 않아 비교가 안 되고, 좁은 카드 폭에 맞추느라 시각·ID·사유가 모두
+          잘려 나갔다(사유는 한 글자만 남았다). 데스크톱은 표, 모바일은 카드 스택으로
+          렌더하는 AdminDataTable 로 옮긴다. */}
+      <AdminDataTable<V1AdminLog>
         rows={rows}
         keyExtractor={(r) => r.actionLogId}
-        card={(row) => ({
-          title: adminActionLabel(row.actionType),
-          subtitle: `${adminTargetTypeLabel(row.targetType)} ${shortId(row.targetId)}`,
-          statusNode: (
-            <AdminStatusPill
-              status={row.targetType}
-              label={adminTargetTypeLabel(row.targetType)}
-            />
-          ),
-          meta: [
-            { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.createdAt) },
-            { icon: <User size={14} aria-hidden="true" />, label: shortId(row.adminUserId) },
-            { icon: <Hash size={14} aria-hidden="true" />, label: shortId(row.targetId) },
-            { icon: <Tag size={14} aria-hidden="true" />, label: row.reason ?? '—' },
-          ],
-        })}
+        tableMaxWidth="max-w-none"
+        columns={[
+          {
+            key: 'createdAt',
+            header: '시각',
+            width: 'w-[140px]',
+            render: (row) => (
+              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+            ),
+          },
+          {
+            key: 'targetType',
+            header: '대상',
+            width: 'w-[112px]',
+            render: (row) => (
+              <AdminStatusPill status={row.targetType} label={adminTargetTypeLabel(row.targetType)} />
+            ),
+          },
+          {
+            key: 'action',
+            header: '액션',
+            render: (row) => (
+              <span className="font-medium text-gray-900">{adminActionLabel(row.actionType)}</span>
+            ),
+          },
+          {
+            key: 'targetId',
+            header: '대상 ID',
+            width: 'w-[120px]',
+            render: (row) => <IdCell id={row.targetId} />,
+          },
+          {
+            key: 'adminUserId',
+            header: '실행자',
+            width: 'w-[120px]',
+            render: (row) => <IdCell id={row.adminUserId} />,
+          },
+          {
+            key: 'reason',
+            header: '사유',
+            render: (row) => <ReasonCell reason={row.reason} />,
+          },
+        ]}
         loading={isPending && rows.length === 0}
         empty={
           <AdminEmpty
@@ -146,7 +196,7 @@ function ActionLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
         }
         error={errorMessage}
         onRetry={() => void refetch()}
-        skeletonCards={8}
+        skeletonRows={8}
       />
       {hasMore && <LoadMoreButton onClick={loadMore} loading={isPending} />}
       {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}
@@ -195,39 +245,63 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <AdminCardList<V1AdminStatusChangeLog>
+      <AdminDataTable<V1AdminStatusChangeLog>
         rows={rows}
         keyExtractor={(r) => r.statusChangeLogId}
-        card={(row) => ({
-          title: `${adminTargetTypeLabel(row.targetType)} ${shortId(row.targetId)}`,
-          statusNode: (
-            <span className="flex items-center gap-1 flex-wrap">
-              <AdminStatusPill status={row.fromStatus} />
-              <span className="text-gray-400 text-[var(--font-size-micro)]" aria-hidden="true">→</span>
-              <AdminStatusPill status={row.toStatus} />
-            </span>
-          ),
-          meta: [
-            {
-              icon: <Clock size={14} aria-hidden="true" />,
-              label: formatDateTime(row.createdAt),
-            },
-            {
-              icon: <User size={14} aria-hidden="true" />,
-              label: shortId(row.adminUserId ?? row.actorUserId),
-            },
-            {
-              icon: <Tag size={14} aria-hidden="true" />,
-              label: row.reason ?? '—',
-            },
-          ],
-          tone:
-            row.toStatus === 'cancelled' || row.toStatus === 'blocked' || row.toStatus === 'deleted'
-              ? 'danger'
-              : row.toStatus === 'suspended' || row.toStatus === 'withdrawal_pending'
-                ? 'warning'
-                : undefined,
-        })}
+        tableMaxWidth="max-w-none"
+        rowTone={(row) =>
+          row.toStatus === 'cancelled' || row.toStatus === 'blocked' || row.toStatus === 'deleted'
+            ? 'danger'
+            : row.toStatus === 'suspended' || row.toStatus === 'withdrawal_pending'
+              ? 'warning'
+              : undefined
+        }
+        columns={[
+          {
+            key: 'createdAt',
+            header: '시각',
+            width: 'w-[140px]',
+            render: (row) => (
+              <span className="whitespace-nowrap text-gray-500">{formatDateTime(row.createdAt)}</span>
+            ),
+          },
+          {
+            key: 'targetType',
+            header: '대상',
+            width: 'w-[112px]',
+            render: (row) => (
+              <AdminStatusPill status={row.targetType} label={adminTargetTypeLabel(row.targetType)} />
+            ),
+          },
+          {
+            key: 'transition',
+            header: '변경',
+            render: (row) => (
+              <span className="flex items-center gap-1 flex-wrap">
+                <AdminStatusPill status={row.fromStatus} />
+                <span className="text-gray-400 text-[var(--font-size-micro)]" aria-hidden="true">→</span>
+                <AdminStatusPill status={row.toStatus} />
+              </span>
+            ),
+          },
+          {
+            key: 'targetId',
+            header: '대상 ID',
+            width: 'w-[120px]',
+            render: (row) => <IdCell id={row.targetId} />,
+          },
+          {
+            key: 'actor',
+            header: '실행자',
+            width: 'w-[120px]',
+            render: (row) => <IdCell id={row.adminUserId ?? row.actorUserId} />,
+          },
+          {
+            key: 'reason',
+            header: '사유',
+            render: (row) => <ReasonCell reason={row.reason} />,
+          },
+        ]}
         loading={isPending && rows.length === 0}
         empty={
           <AdminEmpty
@@ -237,7 +311,7 @@ function StatusLogPanel({ targetType }: { targetType: TargetTypeFilter }) {
         }
         error={errorMessage}
         onRetry={() => void refetch()}
-        skeletonCards={8}
+        skeletonRows={8}
       />
       {hasMore && <LoadMoreButton onClick={loadMore} loading={isPending} />}
       {isPending && rows.length > 0 && <AdminTableSkeleton rows={4} />}

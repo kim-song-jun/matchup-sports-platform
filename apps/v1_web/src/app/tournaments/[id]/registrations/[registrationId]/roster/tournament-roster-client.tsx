@@ -223,7 +223,7 @@ type DraftPlayerForm = {
 
 function createDraftPlayerForm(): DraftPlayerForm {
   return {
-    id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    id: `draft-${crypto.randomUUID()}`,
     userId: '',
   };
 }

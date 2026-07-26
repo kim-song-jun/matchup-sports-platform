@@ -35,7 +35,7 @@ import { publicAssetPath } from '@/lib/assets';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
-import { extractYoutubeVideoId, youtubeThumbnailUrl, videoKind } from '@/lib/video-utils';
+import { extractYoutubeVideoId, safeVideoFileUrl, youtubeThumbnailUrl, videoKind } from '@/lib/video-utils';
 import {
   useV1AdminTournament,
   useV1MasterSports,
@@ -2776,7 +2776,7 @@ export function BracketTab({
                   {v.url.trim() && extractYoutubeVideoId(v.url) ? (
                     <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" className="absolute inset-0 w-full h-full object-cover" />
                   ) : v.url.trim() && videoKind(v.url) === 'file' ? (
-                    <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+                    <video src={safeVideoFileUrl(v.url) ?? undefined} preload="metadata" muted playsInline tabIndex={-1} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
                   ) : null}
                 </span>
                 <input

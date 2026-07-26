@@ -71,8 +71,6 @@ const DIGIT_RUN_PATTERN = /(?<=\/)\d+(?=\/|$)/g;
 // 들어가면 쿼리 값이 바뀔 때마다 다른 지문이 나온다. 스캐너가 매번 다른 값으로 없는 경로를
 // 훑기만 해도 행이 무한히 쌓여, 보존이 무기한인 이 테이블에서 dedupe가 통째로 무력해진다.
 // 한국어 문장의 물음표("정말 삭제할까요?")는 '/'로 시작하는 토큰이 아니라 영향받지 않는다.
-const URL_QUERY_PATTERN = /(\/\S*?)\?\S*/g;
-
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
 
@@ -80,8 +78,16 @@ const MAX_MESSAGE_LENGTH = 4000;
 const MAX_STACK_LENGTH = 4000;
 
 export function normalizeForFingerprint(value: string): string {
-  return value
-    .replace(URL_QUERY_PATTERN, '$1')
+  const withoutUrlQueries = value
+    .split(/(\s+)/)
+    .map((token) => {
+      if (!token.startsWith('/')) return token;
+      const queryIndex = token.indexOf('?');
+      return queryIndex === -1 ? token : token.slice(0, queryIndex);
+    })
+    .join('');
+
+  return withoutUrlQueries
     .replace(UUID_PATTERN, ':id')
     .replace(DIGIT_RUN_PATTERN, ':n');
 }

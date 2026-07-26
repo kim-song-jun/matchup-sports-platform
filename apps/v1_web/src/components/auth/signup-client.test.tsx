@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignupClient } from './signup-client';
@@ -66,9 +66,10 @@ async function completePhoneVerification(): Promise<void> {
   fireEvent.click(await screen.findByRole('button', { name: '__stub_verify__' }));
 }
 
-async function advanceToProfile(): Promise<void> {
-  fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '테스트닉' } });
-  fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'signup@example.com' } });
+/** 1단계(계정) 통과 → 2단계(본인인증) 진입. 라벨은 필수 표시(*·(필수))가 붙어 부분 일치로 찾는다. */
+async function advanceToVerify(): Promise<void> {
+  fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '테스트닉' } });
+  fireEvent.change(screen.getByLabelText(/^이메일/), { target: { value: 'signup@example.com' } });
   fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'password123' } });
   fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'password123' } });
 
@@ -76,9 +77,18 @@ async function advanceToProfile(): Promise<void> {
   fireEvent.click(duplicateButtons[0]);
   fireEvent.click(duplicateButtons[1]);
 
-  const nextButton = screen.getByRole('button', { name: '프로필 입력하기' });
+  const nextButton = screen.getByRole('button', { name: '본인인증 하기' });
   await waitFor(() => expect(nextButton).toBeEnabled());
   fireEvent.click(nextButton);
+}
+
+/** 2단계에서 번호 입력 + 인증까지 마치면 3단계(프로필)로 자동 이동한다. */
+async function advanceToProfile(phone = '01012345678'): Promise<void> {
+  await advanceToVerify();
+  fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: phone } });
+  await completePhoneVerification();
+  // 완료 표시를 잠깐 보여준 뒤 넘어가므로(VERIFY_ADVANCE_DELAY_MS) 프로필 필드 등장으로 대기한다.
+  await screen.findByLabelText(/^이름/, {}, { timeout: 3000 });
 }
 
 describe('SignupClient required profile contract', () => {
@@ -121,7 +131,7 @@ describe('SignupClient required profile contract', () => {
     await advanceToProfile();
 
     // Then
-    expect(screen.getByText('본인 확인에 필요해요.')).toHaveStyle({ whiteSpace: 'nowrap' });
+    expect(screen.getByText('본인 확인에 쓰여요.')).toHaveStyle({ whiteSpace: 'nowrap' });
   });
 
   it('does not let confirmation bypass missing display name, phone, or birth date', async () => {
@@ -144,10 +154,8 @@ describe('SignupClient required profile contract', () => {
     render(<SignupClient />);
     await advanceToProfile();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
-    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
-    await completePhoneVerification();
 
     // When
     fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
@@ -172,10 +180,8 @@ describe('SignupClient required profile contract', () => {
     render(<SignupClient />);
     await advanceToProfile();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
-    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
-    await completePhoneVerification();
 
     // When
     fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
@@ -184,26 +190,100 @@ describe('SignupClient required profile contract', () => {
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'email' }));
   });
 
-  it('blocks email signup submission until phone verification is completed', async () => {
+  it('인증을 마치기 전에는 프로필 단계로 넘어갈 수 없다', async () => {
     // Given
     render(<SignupClient />);
-    await advanceToProfile();
-    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    await advanceToVerify();
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
-    fireEvent.click(screen.getByRole('radio', { name: '남' }));
 
-    // When — submitting without completing phone verification
-    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+    // When — 인증하지 않은 채 다음을 누른다
+    const next = screen.getByRole('button', { name: '다음' });
+    expect(next).toBeDisabled();
+    fireEvent.click(next);
 
-    // Then
-    await waitFor(() => expect(screen.getByText('휴대폰 본인인증을 완료해 주세요.')).toBeInTheDocument());
+    // Then — 프로필 필드는 나타나지 않는다(가입 자체가 시작되지 않는다)
+    expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
     expect(hooks.registerMutateAsync).not.toHaveBeenCalled();
   });
 
+  it('인증이 끝나면 버튼을 누르지 않아도 프로필 단계로 넘어간다', async () => {
+    // Given
+    render(<SignupClient />);
+    await advanceToVerify();
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+
+    // When
+    await completePhoneVerification();
+
+    // Then — 자동 이동(완료 표시를 잠깐 보여준 뒤)
+    expect(await screen.findByLabelText(/^이름/, {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+
+  it('필수 항목은 별표만이 아니라 접근성 이름으로도 필수임을 알린다', async () => {
+    // Given
+    render(<SignupClient />);
+
+    // Then — 색(빨간 별)에만 의존하면 색각 이상·스크린리더에서 정보가 사라진다.
+    // 별표는 장식(aria-hidden)이므로 단언하지 않는다 — 의미를 지고 있는 건 "(필수)" 텍스트다.
+    for (const field of [/닉네임/, /이메일/]) {
+      const label = screen.getByLabelText(field).closest('label');
+      expect(label?.textContent).toContain('(필수)');
+    }
+  });
+
+  it('인증 직후 이전을 누르면 예약된 자동 이동이 취소된다', async () => {
+    // Given — 인증 성공 ~ 자동 이동 사이(900ms)에 사용자가 되돌아가는 경우.
+    // 실시간 대기 대신 예약된 타이머만 앞당긴다. shouldAdvanceTime 을 켜서 waitFor 같은
+    // 기존 비동기 유틸이 그대로 동작하게 한다.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<SignupClient />);
+      await advanceToVerify();
+      fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
+      await completePhoneVerification();
+
+      // When — 자동 이동이 발동하기 전에 '이전'
+      fireEvent.click(screen.getByRole('button', { name: '이전 단계' }));
+
+      // Then — 예약이 남아 있으면 잠시 뒤 프로필로 끌려간다. 그러면 안 된다.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/^닉네임/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('성별 라디오그룹도 필수임을 접근성 이름으로 알린다', async () => {
+    // Given — label 로 감싸지지 않는 radiogroup 은 aria-labelledby 로 라벨을 물려야 한다
+    render(<SignupClient />);
+    await advanceToProfile();
+
+    // Then
+    const group = screen.getByRole('radiogroup');
+    expect(group).toHaveAccessibleName(expect.stringContaining('(필수)'));
+    expect(group).toHaveAttribute('aria-required', 'true');
+  });
+
   it.each([
-    ['phone', /^휴대폰 번호/, '010123456789'],
-    ['phone', /^휴대폰 번호/, '0101234abcd'],
+    ['010123456789'],
+    ['0101234abcd'],
+  ] as const)('휴대폰 원시 입력이 %s 이면 인증 카드가 열리지 않는다', async (rawValue) => {
+    // Given
+    render(<SignupClient />);
+    await advanceToVerify();
+
+    // When
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: rawValue } });
+
+    // Then — 11자리 정상 번호가 아니면 인증을 시작할 수 없다
+    expect(screen.queryByRole('button', { name: '__stub_verify__' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+  });
+
+  it.each([
     ['birth date', /^생년월일/, '200002290'],
     ['birth date', /^생년월일/, '2000ab29'],
   ] as const)('blocks email signup when raw %s input is %s', async (_field, label, rawValue) => {
@@ -211,7 +291,6 @@ describe('SignupClient required profile contract', () => {
     render(<SignupClient />);
     await advanceToProfile();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
-    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
     fireEvent.change(screen.getByLabelText(label), { target: { value: rawValue } });
@@ -223,8 +302,24 @@ describe('SignupClient required profile contract', () => {
     expect(hooks.registerMutateAsync).not.toHaveBeenCalled();
   });
 
+  it('휴대폰에 한 자리를 더 치면 값은 남고 인증 카드는 닫힌다', async () => {
+    // Given
+    const user = userEvent.setup();
+    render(<SignupClient />);
+    await advanceToVerify();
+    const input = screen.getByLabelText(/^휴대폰 번호/);
+    fireEvent.change(input, { target: { value: '01012345678' } });
+    expect(await screen.findByRole('button', { name: '__stub_verify__' })).toBeInTheDocument();
+
+    // When
+    await user.type(input, '9');
+
+    // Then
+    expect(input).toHaveValue('010-1234-56789');
+    expect(screen.queryByRole('button', { name: '__stub_verify__' })).not.toBeInTheDocument();
+  });
+
   it.each([
-    ['phone', /^휴대폰 번호/, '01012345678', '9', '010-1234-56789'],
     ['birth date', /^생년월일/, '20000229', '0', '2000-02-290'],
   ] as const)('retains an extra typed %s digit and disables email signup', async (_field, label, validValue, extraDigit, expectedValue) => {
     // Given
@@ -232,7 +327,6 @@ describe('SignupClient required profile contract', () => {
     render(<SignupClient />);
     await advanceToProfile();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
-    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
     const input = screen.getByLabelText(label);

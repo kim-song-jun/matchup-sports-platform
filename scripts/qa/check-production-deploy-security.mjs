@@ -27,6 +27,14 @@ const requiredPatterns = [
     pattern: /cat <<'REMOTE_SCRIPT'/,
     message: 'remote deploy script must be streamed with its secret assignments over stdin',
   },
+  {
+    pattern: /--exclude backups/,
+    message: 'production rsync must exclude the operator backup directory',
+  },
+  {
+    pattern: /--filter 'protect backups\/\*\*\*'/,
+    message: 'production rsync must protect existing operator backups from --delete',
+  },
 ];
 
 const forbiddenPatterns = [

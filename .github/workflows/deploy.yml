@@ -196,7 +196,9 @@ jobs:
       - name: Sync code
         run: |
           rsync -avz --delete \
-            --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
+            --exclude node_modules --exclude .next --exclude dist --exclude .git \
+            --exclude backups --exclude 'deploy/certbot' \
+            --filter 'protect backups/***' \
             --filter 'protect deploy/.env' \
             -e "ssh" \
             ./ ec2:~/teameet/

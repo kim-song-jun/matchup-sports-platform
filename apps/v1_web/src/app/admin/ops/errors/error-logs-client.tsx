@@ -186,7 +186,12 @@ export function ErrorLogsClient() {
       key: 'route',
       header: 'route',
       render: (row) => (
-        <span className="font-mono text-[var(--font-size-label)] text-gray-700 whitespace-nowrap">
+        // route 가 길면(예: /tournaments/campaigns/...) 표 전체를 밀어내 오른쪽 컬럼과
+        // 상세 버튼이 가로 스크롤 밖으로 사라진다. 잘라 보여주고 전문은 title 로 준다.
+        <span
+          className="block truncate font-mono text-[var(--font-size-label)] text-gray-700 lg:max-w-[200px]"
+          title={row.route ?? undefined}
+        >
           {row.route ?? '—'}
         </span>
       ),
@@ -198,7 +203,7 @@ export function ErrorLogsClient() {
         <button
           type="button"
           onClick={() => setSelectedId(row.id)}
-          className="block w-full text-left break-words text-gray-700 lg:max-w-[320px] lg:truncate hover:text-blue-600 hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="block w-full text-left break-words text-gray-700 lg:max-w-[240px] lg:truncate hover:text-blue-600 hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           title={row.message}
         >
           {row.message}
@@ -219,7 +224,7 @@ export function ErrorLogsClient() {
     {
       key: 'releaseSha',
       header: '버전',
-      width: 'w-[120px]',
+      width: 'w-[96px]',
       render: (row) => (
         <span
           className="font-mono text-[var(--font-size-micro)] text-gray-400 whitespace-nowrap"

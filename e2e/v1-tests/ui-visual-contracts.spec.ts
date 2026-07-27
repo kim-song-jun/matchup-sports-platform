@@ -61,12 +61,14 @@ async function measure(locator: Locator): Promise<Rect> {
 }
 
 test.describe('Teameet shared visual contracts', () => {
-  test('browser routes are root-mounted and the legacy /v1 prefix is unavailable', async ({ page }) => {
+  test('browser routes are root-mounted and the legacy /v1 prefix redirects to them', async ({ page }) => {
     const rootResponse = await page.goto('/home');
     expect(rootResponse?.status()).toBe(200);
 
+    // 구 basePath(/v1) 북마크·외부 링크는 404가 아니라 현재 경로로 넘어간다.
     const legacyResponse = await page.goto('/v1/home');
-    expect(legacyResponse?.status()).toBe(404);
+    expect(legacyResponse?.status()).toBe(200);
+    expect(new URL(page.url()).pathname).toBe('/home');
   });
 
   for (const viewport of VIEWPORTS) {

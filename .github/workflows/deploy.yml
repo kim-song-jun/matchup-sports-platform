@@ -150,7 +150,7 @@ jobs:
     needs: test
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     # 수동 승인 게이트: production environment의 required reviewer가
     # GitHub UI에서 승인해야 배포가 시작된다 (main push 자동 배포 제거)
@@ -196,7 +196,9 @@ jobs:
       - name: Sync code
         run: |
           rsync -avz --delete \
-            --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
+            --exclude node_modules --exclude .next --exclude dist --exclude .git \
+            --exclude backups --exclude 'deploy/certbot' \
+            --filter 'protect backups/***' \
             --filter 'protect deploy/.env' \
             -e "ssh" \
             ./ ec2:~/teameet/
@@ -214,6 +216,21 @@ jobs:
           VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
+          # 휴대폰 SMS OTP 발송처. alpha(deploy-alpha.yml)에만 있어서 prod 컨테이너는
+          # GABIA/SOLAPI 값이 전부 빈 문자열이 됐고, 발송이 SMS_NOT_CONFIGURED 로 막혔다.
+          # 솔라피·가비아 양쪽을 모두 주입하고 SMS_PROVIDER 플래그로만 전환한다.
+          SMS_PROVIDER_SECRET: ${{ secrets.SMS_PROVIDER }}
+          SOLAPI_API_KEY_SECRET: ${{ secrets.SOLAPI_API_KEY }}
+          SOLAPI_API_SECRET_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
+          SOLAPI_SENDER_NUMBER_SECRET: ${{ secrets.SOLAPI_SENDER_NUMBER }}
+          GABIA_SMS_ID_SECRET: ${{ secrets.GABIA_SMS_ID }}
+          GABIA_API_KEY_SECRET: ${{ secrets.GABIA_API_KEY }}
+          GABIA_SENDER_NUMBER_SECRET: ${{ secrets.GABIA_SENDER_NUMBER }}
+          # 이메일 OTP 발송처(SesEmailSender). 둘 다 있어야 enabled 이고 하나라도 비면
+          # 이메일 인증이 조용히 비활성화된다 — SMS 와 같은 누락이 여기에도 있었다.
+          # 값이 공개 설정이라 시크릿이 아닌 repository variable 이다(alpha 와 동일 출처).
+          SES_REGION_SECRET: ${{ vars.SES_REGION }}
+          EMAIL_FROM_SECRET: ${{ vars.EMAIL_FROM }}
         run: |
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
@@ -224,6 +241,15 @@ jobs:
           VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
           VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
           VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
+          SMS_PROVIDER_B64="$(printf '%s' "${SMS_PROVIDER_SECRET:-}" | base64 | tr -d '\n')"
+          SOLAPI_API_KEY_B64="$(printf '%s' "${SOLAPI_API_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          SOLAPI_API_SECRET_B64="$(printf '%s' "${SOLAPI_API_SECRET_SECRET:-}" | base64 | tr -d '\n')"
+          SOLAPI_SENDER_NUMBER_B64="$(printf '%s' "${SOLAPI_SENDER_NUMBER_SECRET:-}" | base64 | tr -d '\n')"
+          GABIA_SMS_ID_B64="$(printf '%s' "${GABIA_SMS_ID_SECRET:-}" | base64 | tr -d '\n')"
+          GABIA_API_KEY_B64="$(printf '%s' "${GABIA_API_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          GABIA_SENDER_NUMBER_B64="$(printf '%s' "${GABIA_SENDER_NUMBER_SECRET:-}" | base64 | tr -d '\n')"
+          SES_REGION_B64="$(printf '%s' "${SES_REGION_SECRET:-}" | base64 | tr -d '\n')"
+          EMAIL_FROM_B64="$(printf '%s' "${EMAIL_FROM_SECRET:-}" | base64 | tr -d '\n')"
 
           {
             printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
@@ -235,6 +261,15 @@ jobs:
             printf 'VAPID_PUBLIC_KEY_B64=%s\n' "${VAPID_PUBLIC_KEY_B64}"
             printf 'VAPID_PRIVATE_KEY_B64=%s\n' "${VAPID_PRIVATE_KEY_B64}"
             printf 'VAPID_SUBJECT_B64=%s\n' "${VAPID_SUBJECT_B64}"
+            printf 'SMS_PROVIDER_B64=%s\n' "${SMS_PROVIDER_B64}"
+            printf 'SOLAPI_API_KEY_B64=%s\n' "${SOLAPI_API_KEY_B64}"
+            printf 'SOLAPI_API_SECRET_B64=%s\n' "${SOLAPI_API_SECRET_B64}"
+            printf 'SOLAPI_SENDER_NUMBER_B64=%s\n' "${SOLAPI_SENDER_NUMBER_B64}"
+            printf 'GABIA_SMS_ID_B64=%s\n' "${GABIA_SMS_ID_B64}"
+            printf 'GABIA_API_KEY_B64=%s\n' "${GABIA_API_KEY_B64}"
+            printf 'GABIA_SENDER_NUMBER_B64=%s\n' "${GABIA_SENDER_NUMBER_B64}"
+            printf 'SES_REGION_B64=%s\n' "${SES_REGION_B64}"
+            printf 'EMAIL_FROM_B64=%s\n' "${EMAIL_FROM_B64}"
             cat <<'REMOTE_SCRIPT'
           set -euo pipefail
 
@@ -289,6 +324,15 @@ jobs:
           sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
           sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
           sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
+          sync_env_from_github_secret "SMS_PROVIDER" "${SMS_PROVIDER_B64:-}"
+          sync_env_from_github_secret "SOLAPI_API_KEY" "${SOLAPI_API_KEY_B64:-}"
+          sync_env_from_github_secret "SOLAPI_API_SECRET" "${SOLAPI_API_SECRET_B64:-}"
+          sync_env_from_github_secret "SOLAPI_SENDER_NUMBER" "${SOLAPI_SENDER_NUMBER_B64:-}"
+          sync_env_from_github_secret "GABIA_SMS_ID" "${GABIA_SMS_ID_B64:-}"
+          sync_env_from_github_secret "GABIA_API_KEY" "${GABIA_API_KEY_B64:-}"
+          sync_env_from_github_secret "GABIA_SENDER_NUMBER" "${GABIA_SENDER_NUMBER_B64:-}"
+          sync_env_from_github_secret "SES_REGION" "${SES_REGION_B64:-}"
+          sync_env_from_github_secret "EMAIL_FROM" "${EMAIL_FROM_B64:-}"
 
           # Harden deploy/.env perms against EC2 umask 022 — contains DB_PASSWORD/JWT_SECRET and other secrets
           chmod 600 deploy/.env
@@ -304,6 +348,25 @@ jobs:
               exit 1
             fi
           done
+
+          # ── env 드리프트 경고 ──────────────────────────────────────────────
+          # compose 는 ${VAR:-} 형태라 값이 없어도 빈 문자열로 조용히 치환된다. 앱은 그걸
+          # "설정 없음"으로 보고 기능을 graceful disable 하므로, 배포는 성공한 채 해당 기능만
+          # 죽는다 — 가비아 SMS(SMS_NOT_CONFIGURED)와 SES 이메일이 실제로 이렇게 오래 죽어
+          # 있었다. 위 sync 목록과 compose 참조 목록이 어긋나면 여기서 눈에 띄게 만든다.
+          # 실패시키지 않는 이유: LOG_LEVEL 처럼 compose 기본값에 의존하는 것이 정상인 키가
+          # 섞여 있어, 배포를 막는 대신 로그로 드러내는 편이 안전하다.
+          drift_keys=$(grep -ohE '\$\{[A-Z0-9_]+' deploy/docker-compose.prod.yml | tr -d '${' | sort -u)
+          empty_keys=""
+          for drift_key in ${drift_keys}; do
+            if [ -z "${!drift_key:-}" ]; then
+              empty_keys="${empty_keys} ${drift_key}"
+            fi
+          done
+          if [ -n "${empty_keys}" ]; then
+            echo "[WARN] compose 가 참조하지만 deploy/.env 에 값이 없는 키:${empty_keys}"
+            echo "[WARN] 의도한 기본값이 아니라면 GitHub secret/variable 등록과 이 워크플로의 sync 목록을 함께 확인할 것."
+          fi
 
           V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}"
 
@@ -323,15 +386,10 @@ jobs:
           # postgres:16-alpine, etc.) forcing a full re-pull on every deploy.
           sudo docker image prune -f || true
           sudo docker container prune -f || true
-          BUILDX_PRUNE_HELP="$(sudo docker buildx prune --help)"
-          for required_flag in --max-used-space --min-free-space; do
-            if ! grep -q -- "${required_flag}" <<<"${BUILDX_PRUNE_HELP}"; then
-              echo "[ERROR] Docker Buildx must support ${required_flag} for bounded production cache cleanup"
-              exit 1
-            fi
-          done
+          # The production host's BuildKit daemon predates the v0.17-only
+          # max-used-space/min-free-space filters. Age-bounded pruning works
+          # across the deployed builder versions and avoids blocking deploys.
           sudo docker buildx prune -f --filter 'until=168h'
-          sudo docker buildx prune -f --max-used-space 10GB --min-free-space 20GB
           sudo docker network prune -f || true
           echo "[cleanup] Disk usage after prune:"
           df -h / | tail -1

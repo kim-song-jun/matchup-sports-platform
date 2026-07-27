@@ -41,6 +41,19 @@ export function youtubeEmbedUrl(videoId: string): string {
 
 export type VideoKind = 'youtube' | 'file' | 'external';
 
+export function safeVideoFileUrl(url: string): string | null {
+  const value = url.trim();
+  if (value.startsWith('/uploads/') && !value.includes('\\')) return value;
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+    return /\.(mp4|webm|mov|m4v)$/i.test(parsed.pathname) ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 영상 URL 종류 판별.
  * - youtube: 페이지 내 iframe 재생
@@ -49,12 +62,6 @@ export type VideoKind = 'youtube' | 'file' | 'external';
  */
 export function videoKind(url: string): VideoKind {
   if (extractYoutubeVideoId(url)) return 'youtube';
-  if (url.startsWith('/uploads/')) return 'file';
-  try {
-    const pathname = new URL(url, 'http://placeholder.local').pathname;
-    if (/\.(mp4|webm|mov|m4v)$/i.test(pathname)) return 'file';
-  } catch {
-    // URL 파싱 불가 — external 폴백
-  }
+  if (safeVideoFileUrl(url)) return 'file';
   return 'external';
 }

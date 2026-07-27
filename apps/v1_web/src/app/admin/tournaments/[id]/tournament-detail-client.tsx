@@ -35,7 +35,7 @@ import { publicAssetPath } from '@/lib/assets';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
-import { extractYoutubeVideoId, youtubeThumbnailUrl, videoKind } from '@/lib/video-utils';
+import { extractYoutubeVideoId, youtubeThumbnailUrl } from '@/lib/video-utils';
 import {
   useV1AdminTournament,
   useV1MasterSports,
@@ -2770,13 +2770,12 @@ export function BracketTab({
             <span className="text-[13px] text-gray-900">경기 영상 (선택 · 최대 10개)</span>
             {resultVideos.map((v, i) => (
               <div key={i} className="flex items-center gap-2">
-                {/* URL을 붙여넣는 즉시 어떤 영상인지 시각 확인 — 유튜브는 썸네일, 파일은 첫 프레임 */}
+                {/* 신뢰된 YouTube video ID로 만든 썸네일만 미리 표시한다. 사용자가 입력한
+                    직접 영상 URL은 저장 전 DOM media source로 재해석하지 않는다. */}
                 <span className="relative w-[56px] h-[32px] shrink-0 rounded-md overflow-hidden bg-gray-800 grid place-items-center text-gray-400" aria-hidden="true">
                   <Clapperboard size={13} />
                   {v.url.trim() && extractYoutubeVideoId(v.url) ? (
                     <img src={youtubeThumbnailUrl(extractYoutubeVideoId(v.url)!)} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                  ) : v.url.trim() && videoKind(v.url) === 'file' ? (
-                    <video src={v.url} preload="metadata" muted playsInline tabIndex={-1} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
                   ) : null}
                 </span>
                 <input

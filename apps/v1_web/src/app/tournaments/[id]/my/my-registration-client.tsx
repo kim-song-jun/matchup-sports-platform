@@ -24,6 +24,14 @@ import {
   filterTournamentTeamsBySport,
   getTournamentTeamEmptyState,
 } from '@/lib/tournament-team-eligibility';
+import {
+  describeTournamentCapacity,
+  describeTournamentRegistrationBlock,
+  resolveTournamentCapacity,
+  resolveTournamentRegistrationBlock,
+  type TournamentCapacity,
+  type TournamentRegistrationBlockReason,
+} from '@/lib/tournament-registration-availability';
 import type {
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
@@ -1204,17 +1212,25 @@ function TeamRegistrationHub({
   teams,
   hasAnyTeam,
   registrations,
-  canStartNewRegistration,
+  capacity,
+  blockReason,
 }: {
   tournamentId: string;
   tournamentSportId: string | null;
   teams: V1MyTeam[];
   hasAnyTeam: boolean;
   registrations: V1TournamentRegistration[];
-  canStartNewRegistration: boolean;
+  capacity: TournamentCapacity | null;
+  blockReason: TournamentRegistrationBlockReason | null;
 }) {
   const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
   const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
+  const canStartNewRegistration = blockReason === null;
+  // 정원이 입금대기 팀으로 차 있으면 "확정 5 / 8"만 보고 여유가 있다고 오해하게 된다.
+  // 재신청이 막히는 이유를 이 화면에서 바로 읽을 수 있게 정원 구성을 그대로 노출한다.
+  const blockMessage = blockReason && capacity
+    ? describeTournamentRegistrationBlock(blockReason, capacity)
+    : null;
 
   return (
     <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
@@ -1224,6 +1240,33 @@ function TeamRegistrationHub({
       <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
         팀별로 신청하고 내역을 관리하세요.
       </p>
+
+      {capacity ? (
+        <div
+          style={{
+            marginTop: 10,
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: blockMessage ? 'var(--orange50)' : 'var(--grey50)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+            정원 {describeTournamentCapacity(capacity)}
+          </span>
+          {blockMessage ? (
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {blockMessage}
+            </span>
+          ) : (
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              {capacity.remainingCount}팀 더 신청할 수 있어요.
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {teams.length === 0 ? (
         <div className="tm-tournament-registration-empty">
@@ -1277,11 +1320,14 @@ function TeamRegistrationHub({
               ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`)
               : href;
             const displayActionDisabled = registration ? false : actionDisabled;
+            // 취소된 신청을 다시 넣으려는 팀에게는 "왜 지금 안 되는지"가 가장 필요한 정보다.
+            const reapplyBlockedNote =
+              registration?.status === 'cancelled' && blockMessage ? ` · ${blockMessage}` : '';
             const meta = registration
-              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}`
+              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}${reapplyBlockedNote}`
               : canStartNewRegistration
                 ? '아직 이 팀으로 신청하지 않았어요'
-                : '현재 새 신청을 받을 수 없어요';
+                : blockMessage ?? '현재 새 신청을 받을 수 없어요';
 
             const content = (
               <Card pad={16}>
@@ -1399,7 +1445,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           teams={teams}
           hasAnyTeam={teams.length > 0}
           registrations={registrations}
-          canStartNewRegistration={false}
+          capacity={null}
+          blockReason="not_open"
         />
       </AppChrome>
     );
@@ -1419,10 +1466,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           teams={visibleTeams}
           hasAnyTeam={teams.length > 0}
           registrations={registrations}
-          canStartNewRegistration={
-            tournament.status === 'open' &&
-            tournament.confirmedCount + (tournament.pendingPaymentCount ?? 0) < tournament.teamCount
-          }
+          capacity={resolveTournamentCapacity(tournament)}
+          blockReason={resolveTournamentRegistrationBlock(tournament)}
         />
       </AppChrome>
     );

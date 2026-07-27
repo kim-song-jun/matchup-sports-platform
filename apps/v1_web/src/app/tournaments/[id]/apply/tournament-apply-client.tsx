@@ -29,6 +29,11 @@ import {
   filterTournamentTeamsBySport,
   getTournamentTeamEmptyState,
 } from '@/lib/tournament-team-eligibility';
+import {
+  describeTournamentRegistrationBlock,
+  resolveTournamentCapacity,
+  resolveTournamentRegistrationBlock,
+} from '@/lib/tournament-registration-availability';
 import type {
   V1MyTeam,
   V1TournamentDetail,
@@ -1486,6 +1491,18 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     ? filterTournamentTeamsBySport(myTeams, tournament.sportId)
     : [];
   const managerTeams = eligibleTeams.filter((team) => team.role === 'owner' || team.role === 'manager');
+  // 위저드는 정원·마감을 보지 않아서, 취소된 신청을 다시 넣는 사용자가 약관을 다 채운 뒤
+  // 제출 순간에야 서버 409(TOURNAMENT_CAPACITY_FULL / REGISTRATION_DEADLINE_PASSED)를 만났다.
+  // 입금대기 팀이 정원을 쥐고 있어도 목록엔 "확정 5 / 8"로 보이니 이유를 짐작할 수도 없었다.
+  const newRegistrationBlockReason = tournament
+    ? resolveTournamentRegistrationBlock(tournament)
+    : null;
+  const newRegistrationBlockMessage = tournament && newRegistrationBlockReason
+    ? describeTournamentRegistrationBlock(
+        newRegistrationBlockReason,
+        resolveTournamentCapacity(tournament),
+      )
+    : null;
 
   const [step, setStep] = useState<ApplyStep>('team');
   const [selectedTeamId, setSelectedTeamId] = useState('');
@@ -1635,8 +1652,15 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     }
 
     setRegistrationId(null);
+    // 재신청이 애초에 불가능하면 약관 단계로 보내지 않는다 — 다 채우고 나서 거절되는 게 최악이다.
+    if (newRegistrationBlockMessage) {
+      setStep('team');
+      setSubmitError(newRegistrationBlockMessage);
+      return;
+    }
     setStep('agreements');
   }, [
+    newRegistrationBlockMessage,
     loadingMyRegistrations,
     loadingTeams,
     managerTeams,
@@ -1769,6 +1793,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       // action === null (cancelled) → 이어받지 않고 아래에서 새 신청을 만든다.
       // (서버는 취소된 신청을 draft로 되살리므로 create가 재신청 경로다)
     }
+    if (newRegistrationBlockMessage) {
+      setSubmitError(newRegistrationBlockMessage);
+      return;
+    }
     setSubmitError(null);
     createBusyRef.current = true;
     try {
@@ -1794,6 +1822,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   async function handleAgreementsSubmit() {
     if (submitBusyRef.current || !selectedTeamId) return;
+    // registrationId가 없으면 여기서 새 신청을 만든다 — 그 경로도 같은 기준으로 막는다.
+    if (!registrationId && newRegistrationBlockMessage) {
+      setSubmitError(newRegistrationBlockMessage);
+      setStep('team');
+      return;
+    }
     submitBusyRef.current = true;
     setSubmitError(null);
     try {
@@ -1853,9 +1887,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <div className="tm-tournament-form-main">
             {step === 'team' ? (
               <>
-                {submitError ? (
+                {submitError ?? newRegistrationBlockMessage ? (
                   <div style={{ padding: '12px 20px 0' }}>
-                    <AlertBanner message={submitError} />
+                    <AlertBanner message={submitError ?? newRegistrationBlockMessage!} />
                   </div>
                 ) : null}
                 <TeamSelectStep
@@ -1882,6 +1916,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 isSubmitting={isSubmittingApplication}
                 error={
                   submitError
+                  ?? newRegistrationBlockMessage
                   ?? (tournamentTerms.isError
                     ? '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
                     : tournamentTerms.data && !tournamentTerms.data.ready

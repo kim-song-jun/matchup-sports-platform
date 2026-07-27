@@ -34,6 +34,18 @@ describe('resolveTournamentCapacity', () => {
     expect(capacity.isFull).toBe(false);
   });
 
+  it('treats a zero-slot tournament as full, matching the server inequality', () => {
+    // 서버는 reservedCount >= teamCount 로 검사하므로 teamCount=0 은 항상 거절된다.
+    // 프론트만 "신청 가능"으로 판정하면 사용자가 위저드를 다 채운 뒤 409를 받는다.
+    const capacity = resolveTournamentCapacity(
+      tournament({ teamCount: 0, confirmedCount: 0, pendingPaymentCount: 0 }),
+    );
+    expect(capacity.isFull).toBe(true);
+    expect(resolveTournamentRegistrationBlock(tournament({ teamCount: 0, confirmedCount: 0 }), NOW)).toBe(
+      'capacity_full',
+    );
+  });
+
   it('clamps reserved count so over-booked data cannot exceed the cap', () => {
     const capacity = resolveTournamentCapacity(
       tournament({ confirmedCount: 8, pendingPaymentCount: 4 }),

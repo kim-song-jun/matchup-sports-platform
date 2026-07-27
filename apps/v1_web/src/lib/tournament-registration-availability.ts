@@ -44,7 +44,9 @@ export function resolveTournamentCapacity(tournament: TournamentCapacityInput): 
     pendingPaymentCount,
     reservedCount,
     remainingCount: Math.max(0, teamCount - reservedCount),
-    isFull: teamCount > 0 && confirmedCount + pendingPaymentCount >= teamCount,
+    // 서버와 같은 부등식(reservedCount >= teamCount)을 쓴다 — `teamCount > 0` 가드를 두면
+    // 정원이 0인 대회를 프론트만 "신청 가능"으로 판정해 서버 409와 어긋난다.
+    isFull: confirmedCount + pendingPaymentCount >= teamCount,
   };
 }
 

@@ -357,6 +357,7 @@ export function ProfileEditPageClient() {
     ? requestedReturnTo
     : '/my';
   const profile = useV1Profile();
+  const profileAuthMe = useV1AuthMe();
   const update = useV1UpdateProfile();
   const uploadImages = useV1UploadImages();
   const checkEmail = useV1CheckEmail();
@@ -375,6 +376,13 @@ export function ProfileEditPageClient() {
   const [emailCheck, setEmailCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   /** 번호를 바꿨을 때만 채워지는 본인인증 증명. 번호를 다시 고치면 무효가 되므로 함께 비운다. */
   const [phoneProofToken, setPhoneProofToken] = useState<string | null>(null);
+  /**
+   * 미인증 계정이 이 화면에서 authed 모드로 인증을 끝낸 번호.
+   * 미인증 상태에서는 PATCH /me/profile 자체가 V1AuthGuard 의 전역 쓰기 게이트에 막히므로
+   * (403 PHONE_VERIFICATION_REQUIRED), proofToken 만 받아 두는 public 흐름으로는 저장이 끝나지 않는다.
+   * authed 흐름은 서버가 phone·phoneVerifiedAt 을 직접 갱신하므로 그 뒤 저장이 통과한다.
+   */
+  const [inlineVerifiedPhone, setInlineVerifiedPhone] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile.data) return;
@@ -389,6 +397,9 @@ export function ProfileEditPageClient() {
     setNicknameCheck({ status: 'idle', value: '' });
     setEmailCheck({ status: 'idle', value: '' });
     setPhoneProofToken(null);
+    // 서버에서 다시 읽어온 번호로 폼을 맞추므로, 직전 인라인 인증 표시도 함께 정리한다
+    // (authed 인증이 끝났으면 authMe 의 phoneVerified 가 이미 true 라 카드가 다시 뜨지 않는다).
+    setInlineVerifiedPhone(null);
   }, [profile.data]);
 
   if (profile.isPending) {
@@ -416,6 +427,16 @@ export function ProfileEditPageClient() {
   const originalEmail = profile.data.email ?? '';
   const originalPhone = profile.data.phone ?? '';
   const phoneChanged = phoneDigits !== originalPhone;
+  /**
+   * 계정이 미인증인 게 확인된 경우에만 다르게 취급한다 — authMe 가 아직 안 왔거나 실패했을 때
+   * 미인증으로 단정하면 멀쩡한 사용자의 저장까지 막힌다(서버가 최종 게이트이므로 여기선 안내만).
+   */
+  const accountPhoneUnverified = profileAuthMe.data?.verification?.phoneVerified === false;
+  /** authed 흐름으로 방금 인증한 번호 — 서버가 phone·phoneVerifiedAt 을 이미 갱신했다. */
+  const phoneVerifiedInline = inlineVerifiedPhone !== null && inlineVerifiedPhone === phoneDigits;
+  const phoneNeedsProof = phoneChanged && Boolean(phoneDigits) && !phoneVerifiedInline;
+  const showPhoneVerification =
+    phoneDigits.length === 11 && !phoneVerifiedInline && (phoneChanged || accountPhoneUnverified);
   const emailRequired = Boolean(profile.data.hasPassword);
   const normalizedNickname = nickname.trim();
   const normalizedEmail = email.trim().toLowerCase();
@@ -549,8 +570,15 @@ export function ProfileEditPageClient() {
 
     // 번호를 바꿨다면 서버가 본인인증 증명을 요구한다(가입과 동일). 저장 버튼을 눌러서야
     // 알게 되면 입력을 다 마친 뒤 되돌아가야 하므로, 아래 필드에 인증 카드를 함께 띄운다.
-    if (phoneChanged && phoneDigits && !phoneProofToken) {
+    if (phoneNeedsProof && !phoneProofToken) {
       setFieldErrors({ phone: '변경한 번호로 본인인증을 완료해 주세요.' });
+      return;
+    }
+
+    // 미인증 계정은 저장 요청 자체가 서버 게이트(PHONE_VERIFICATION_REQUIRED)에 막힌다.
+    // 이 화면의 인증 카드로 먼저 끝내게 안내한다 — 저장을 눌러 403 토스트를 보게 두지 않는다.
+    if (accountPhoneUnverified && !phoneVerifiedInline) {
+      setFieldErrors({ phone: '휴대폰 본인인증을 먼저 완료해 주세요.' });
       return;
     }
 
@@ -571,7 +599,8 @@ export function ProfileEditPageClient() {
         email: normalizedEmail || null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
-        phoneProofToken: phoneChanged ? phoneProofToken : null,
+        // authed 인증으로 서버 번호가 이미 바뀐 경우엔 서버 기준 phoneChanged 가 false 라 증명이 필요 없다.
+        phoneProofToken: phoneNeedsProof ? phoneProofToken : null,
         birthDate: birthDateDigits || null,
         gender,
       });
@@ -711,27 +740,41 @@ export function ProfileEditPageClient() {
               setPhoneDigits(toDigits(event.target.value, 11));
               // 번호가 바뀌면 직전 번호로 받은 증명은 더 이상 유효하지 않다.
               setPhoneProofToken(null);
+              setInlineVerifiedPhone(null);
               setFieldErrors((current) => ({ ...current, phone: undefined }));
             }}
             aria-invalid={fieldErrors.phone ? true : undefined}
             aria-describedby={fieldErrors.phone ? 'profile-phone-error' : undefined}
           />
           {fieldErrors.phone ? <span id="profile-phone-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.phone}</span> : null}
-          {phoneChanged && !phoneProofToken ? (
+          {phoneVerifiedInline ? (
+            <span className="tm-text-caption tm-auth-field-helper-success">
+              본인인증이 완료됐어요. 저장을 눌러 프로필을 마저 저장해 주세요.
+            </span>
+          ) : phoneChanged && !phoneProofToken ? (
             <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
               번호를 바꾸면 본인인증을 다시 해야 해요.
+            </span>
+          ) : accountPhoneUnverified ? (
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              아직 본인인증 전이에요. 저장하려면 이 번호로 인증을 먼저 끝내 주세요.
             </span>
           ) : null}
         </label>
 
-        {/* 번호를 바꾼 경우에만 인증을 요구한다 — 저장을 누르기 전에 이 자리에서 끝낼 수 있게 필드 바로 아래 둔다. */}
-        {phoneChanged && phoneDigits.length === 11 ? (
+        {/*
+          번호를 바꿨거나 계정이 아직 미인증이면 이 자리에서 인증을 끝낼 수 있게 카드를 띄운다.
+          미인증 계정은 public(proofToken) 흐름으로는 저장이 끝나지 않는다 — 저장 요청 자체가
+          V1AuthGuard 의 쓰기 게이트에 막히므로, 서버 인증 상태를 직접 바꾸는 authed 흐름을 쓴다.
+        */}
+        {showPhoneVerification ? (
           <PhoneVerificationCard
-            mode="public"
+            mode={accountPhoneUnverified ? 'authed' : 'public'}
             phone={phoneDigits}
             surface="inset"
             onVerified={(token) => {
-              setPhoneProofToken(token ?? null);
+              if (accountPhoneUnverified) setInlineVerifiedPhone(phoneDigits);
+              else setPhoneProofToken(token ?? null);
               setFieldErrors((current) => ({ ...current, phone: undefined }));
             }}
           />

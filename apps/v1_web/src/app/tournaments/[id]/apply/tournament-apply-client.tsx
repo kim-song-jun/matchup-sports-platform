@@ -74,6 +74,21 @@ function resolveRegistrationResumeAction(
   return null;
 }
 
+/**
+ * 위저드 단계(동의/입금 안내)로 이어받을 수 있는 신청 id만 돌려준다.
+ * cancelled(입금 미확인 자동 취소 등)를 이어받으면 submit이 서버에서 409 REGISTRATION_NOT_DRAFT로
+ * 막혀 재신청이 불가능해진다 — 이 경우 id를 버리고 새 신청(create)으로 가야 한다.
+ * redirect 상태(confirmed/waitlisted/cancel_requested)도 위저드에서 이어갈 단계가 없어 제외한다
+ * (이동은 handleTeamNext / 재진입 effect가 selectedRegistration으로 처리한다).
+ */
+function resolveResumableRegistrationId(
+  registration: { id: string; status: V1TournamentRegistrationStatus } | undefined,
+): string | null {
+  if (!registration) return null;
+  const action = resolveRegistrationResumeAction(registration.status);
+  return action === 'agreements' || action === 'payment' ? registration.id : null;
+}
+
 function StepIndicator({ current }: { current: ApplyStep }) {
   const currentIndex = STEPS.findIndex((s) => s.id === current);
   const currentLabel = STEPS[currentIndex]?.label ?? '';
@@ -1637,7 +1652,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   function handleSelectTeam(teamId: string) {
     const registration = myRegistrations.find((item) => item.teamId === teamId);
     setSelectedTeamId(teamId);
-    setRegistrationId(registration?.id ?? null);
+    setRegistrationId(resolveResumableRegistrationId(registration));
     setSubmitError(null);
   }
 
@@ -1751,11 +1766,8 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         router.replace(appRoute(`/tournaments/${tournamentId}/my?reg=${selectedRegistration.id}`));
         return;
       }
-      // action === null (cancelled) → 새 신청으로 진행
-    }
-    if (registrationId && selectedRegistration?.id === registrationId) {
-      setStep('agreements');
-      return;
+      // action === null (cancelled) → 이어받지 않고 아래에서 새 신청을 만든다.
+      // (서버는 취소된 신청을 draft로 되살리므로 create가 재신청 경로다)
     }
     setSubmitError(null);
     createBusyRef.current = true;

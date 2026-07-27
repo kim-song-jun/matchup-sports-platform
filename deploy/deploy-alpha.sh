@@ -122,10 +122,14 @@ if (( memory_available_kib < 262144 || swap_free_kib < 262144 )); then
   exit 1
 fi
 
-echo "[alpha-deploy] Pre-build disk reclaim (unused images + build cache from prior deploys)"
+# dangling 이미지만 정리한다. 예전에는 `-af` 였는데, 그러면 캐시된 베이스 이미지
+# (node:22-alpine 등)까지 지워 매 배포가 전체 재다운로드·재빌드가 됐다. 릴리스 태그가
+# 쌓이는 문제는 아래 "Retain the three most recent" 블록이 이미 담당한다.
+# 빌드 캐시(docker builder prune)는 여기서 지우지 않는다 — Dockerfile 이 pnpm store 와
+# .next/cache 를 BuildKit 캐시 마운트로 잡고 있어서, 빌드 직전에 비우면 그 설계가 무의미해진다.
+echo "[alpha-deploy] Pre-build disk reclaim (dangling images from prior deploys)"
 df -h / | tail -1
-docker image prune -af >/dev/null 2>&1 || true
-docker builder prune -af >/dev/null 2>&1 || true
+docker image prune -f >/dev/null 2>&1 || true
 df -h / | tail -1
 
 if ! command -v rsync >/dev/null 2>&1; then
@@ -239,9 +243,11 @@ for repository in teameet-v1-api teameet-v1-web; do
   done
 done
 
-echo "[alpha-deploy] Post-deploy disk reclaim (dangling images + stale build cache)"
+# 빌드 캐시는 다음 배포가 재사용할 자산이므로 나이로만 묶는다(`-a` 금지, 24h → 168h).
+# 24시간마다 비우면 하루 이상 간격의 배포는 항상 전체 재빌드가 된다.
+echo "[alpha-deploy] Post-deploy disk reclaim (dangling images + build cache older than 7d)"
 docker image prune -f >/dev/null 2>&1 || true
-docker builder prune -af --filter "until=24h" >/dev/null 2>&1 || true
+docker builder prune -f --filter "until=168h" >/dev/null 2>&1 || true
 df -h / | tail -1
 
 echo "[alpha-deploy] ${release_version} is healthy"

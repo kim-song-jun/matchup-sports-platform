@@ -32,8 +32,12 @@ const COPY: Record<OtpEmailPurpose, Copy> = {
   },
 };
 
-/** 프로덕션에 실제로 올라가 있는 브랜드 자산(앱이 /v1 basePath 아래로 서비스된다). */
-const LOGO_URL = 'https://teameet.co.kr/v1/brand/icon-192.png';
+/**
+ * 프로덕션에 실제로 올라가 있는 브랜드 자산(apps/v1_web/public/brand/icon-192.png).
+ * basePath=/v1 제거 이후 루트 경로로 서비스된다 — 구 `/v1/brand/...` URL은 308 redirect가
+ * 걸려 있지만 메일 클라이언트가 리다이렉트를 안 따르는 경우가 있어 최종 URL을 직접 쓴다.
+ */
+const LOGO_URL = 'https://teameet.co.kr/brand/icon-192.png';
 
 /** 6자리 코드를 3자리씩 띄워 읽기 쉽게 — 값 자체는 바꾸지 않는다. */
 function spaced(code: string): string {

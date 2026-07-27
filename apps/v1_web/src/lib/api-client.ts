@@ -167,9 +167,7 @@ function getV1SearchSessionId() {
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
 
-  const next = typeof window.crypto?.randomUUID === 'function'
-    ? window.crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const next = window.crypto.randomUUID();
   window.localStorage.setItem(key, next);
   return next;
 }

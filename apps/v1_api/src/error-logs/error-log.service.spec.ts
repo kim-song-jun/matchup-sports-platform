@@ -43,6 +43,10 @@ describe('normalizeForFingerprint / computeFingerprint', () => {
   it('keeps a question mark that is not a URL query — Korean copy must survive normalization', () => {
     expect(normalizeForFingerprint('정말 삭제할까요?')).toBe('정말 삭제할까요?');
   });
+
+  it('strips queries from multiple URL tokens without scanning across whitespace', () => {
+    expect(normalizeForFingerprint('GET /first?a=1 then /second?b=2')).toBe('GET /first then /second');
+  });
 });
 
 describe('ErrorLogService.record', () => {

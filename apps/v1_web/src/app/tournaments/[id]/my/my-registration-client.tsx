@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronRight, UsersRound } from 'lucide-react';
-import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
 import {
@@ -24,6 +23,14 @@ import {
   filterTournamentTeamsBySport,
   getTournamentTeamEmptyState,
 } from '@/lib/tournament-team-eligibility';
+import {
+  describeTournamentCapacity,
+  describeTournamentRegistrationBlock,
+  resolveTournamentCapacity,
+  resolveTournamentRegistrationBlock,
+  type TournamentCapacity,
+  type TournamentRegistrationBlockReason,
+} from '@/lib/tournament-registration-availability';
 import type {
   V1TournamentRegistration,
   V1TournamentRegistrationStatus,
@@ -202,7 +209,6 @@ function RegistrationPass({
   scheduledEndAt,
   venue,
   paymentSummary,
-  paymentDueAt,
   rosterCount,
   minPlayers,
   isRosterLocked,
@@ -218,13 +224,11 @@ function RegistrationPass({
   scheduledEndAt: string | null;
   venue: string | null;
   paymentSummary: string | null;
-  paymentDueAt: string | null;
   rosterCount: number;
   minPlayers: number;
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
-  const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
   const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`);
 
   /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
@@ -264,11 +268,10 @@ function RegistrationPass({
           <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDayRange(scheduledAt, scheduledEndAt) || '일정 미정'} />
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
-          {paymentDeadline ? <PassFact icon={<ReceiptIcon />} label="기한" value={paymentDeadline.label} /> : null}
         </div>
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--orange500)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
-            {paymentDeadline ? paymentDeadline.message : '신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.'}
+            신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
           </p>
         </div>
       </div>
@@ -657,8 +660,6 @@ function RegistrationDetailView({
   const paymentSummary = registration.payment
     ? `${formatEntryFee(registration.payment.amount)} · ${paymentStatusLabel(registration.payment.status)}`
     : formatEntryFee(tournament.entryFee);
-  const paymentDeadline = getTournamentPaymentDeadlineState(registration.payment?.paymentDueAt ?? null);
-  const showPaymentDeadline = Boolean(paymentDeadline) && registration.payment?.status === 'ready';
 
   /* The pass owns the roster glance+action for active states; the standalone roster
    * card only renders for states without a pass (e.g. awaiting_payment). */
@@ -849,7 +850,6 @@ function RegistrationDetailView({
               scheduledEndAt={tournament.scheduledEndAt}
               venue={tournament.venue}
               paymentSummary={paymentSummary}
-              paymentDueAt={registration.payment?.paymentDueAt ?? null}
               rosterCount={players.length}
               minPlayers={tournament.minPlayers}
               isRosterLocked={isRosterLocked}
@@ -966,15 +966,8 @@ function RegistrationDetailView({
                       <InfoRow
                         label="결제 상태"
                         value={paymentStatusLabel(registration.payment.status)}
-                        isLast={!showPaymentDeadline && !registration.payment.paidAt && !shouldShowBankTransferAccount}
+                        isLast={!registration.payment.paidAt && !shouldShowBankTransferAccount}
                       />
-                      {showPaymentDeadline && paymentDeadline ? (
-                        <InfoRow
-                          label="입금 기한"
-                          value={paymentDeadline.label}
-                          isLast={!registration.payment.paidAt}
-                        />
-                      ) : null}
                       {registration.payment.paidAt ? (
                         <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast={!shouldShowBankTransferAccount} />
                       ) : null}
@@ -1033,9 +1026,6 @@ function RegistrationDetailView({
                     안내된 계좌로 참가비를 입금해 주세요.
                     <br />
                     입금 확인이 완료되면 참가가 최종 확정됩니다.
-                  </p>
-                  <p style={{ margin: '8px 0 0' }}>
-                    신청 후 2시간 이내에 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
                   </p>
                 </div>
               </Card>
@@ -1204,17 +1194,25 @@ function TeamRegistrationHub({
   teams,
   hasAnyTeam,
   registrations,
-  canStartNewRegistration,
+  capacity,
+  blockReason,
 }: {
   tournamentId: string;
   tournamentSportId: string | null;
   teams: V1MyTeam[];
   hasAnyTeam: boolean;
   registrations: V1TournamentRegistration[];
-  canStartNewRegistration: boolean;
+  capacity: TournamentCapacity | null;
+  blockReason: TournamentRegistrationBlockReason | null;
 }) {
   const registrationByTeamId = new Map(registrations.map((registration) => [registration.teamId, registration]));
   const emptyState = getTournamentTeamEmptyState(hasAnyTeam);
+  const canStartNewRegistration = blockReason === null;
+  // 정원이 입금대기 팀으로 차 있으면 "확정 5 / 8"만 보고 여유가 있다고 오해하게 된다.
+  // 재신청이 막히는 이유를 이 화면에서 바로 읽을 수 있게 정원 구성을 그대로 노출한다.
+  const blockMessage = blockReason && capacity
+    ? describeTournamentRegistrationBlock(blockReason, capacity)
+    : null;
 
   return (
     <div style={{ padding: '0 20px 120px', marginTop: 16 }}>
@@ -1224,6 +1222,33 @@ function TeamRegistrationHub({
       <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
         팀별로 신청하고 내역을 관리하세요.
       </p>
+
+      {capacity ? (
+        <div
+          style={{
+            marginTop: 10,
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: blockMessage ? 'var(--orange50)' : 'var(--grey50)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}
+        >
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+            정원 {describeTournamentCapacity(capacity)}
+          </span>
+          {blockMessage ? (
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {blockMessage}
+            </span>
+          ) : (
+            <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              {capacity.remainingCount}팀 더 신청할 수 있어요.
+            </span>
+          )}
+        </div>
+      ) : null}
 
       {teams.length === 0 ? (
         <div className="tm-tournament-registration-empty">
@@ -1277,11 +1302,14 @@ function TeamRegistrationHub({
               ? appRoute(`/tournaments/${tournamentId}/my?reg=${registration.id}`)
               : href;
             const displayActionDisabled = registration ? false : actionDisabled;
+            // 취소된 신청을 다시 넣으려는 팀에게는 "왜 지금 안 되는지"가 가장 필요한 정보다.
+            const reapplyBlockedNote =
+              registration?.status === 'cancelled' && blockMessage ? ` · ${blockMessage}` : '';
             const meta = registration
-              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}`
+              ? `선수 ${registration.playerCount}명${registration.payment ? ` · ${paymentMethodLabel(registration.payment.method)} · ${paymentStatusLabel(registration.payment.status)}` : ''}${reapplyBlockedNote}`
               : canStartNewRegistration
                 ? '아직 이 팀으로 신청하지 않았어요'
-                : '현재 새 신청을 받을 수 없어요';
+                : blockMessage ?? '현재 새 신청을 받을 수 없어요';
 
             const content = (
               <Card pad={16}>
@@ -1399,7 +1427,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           teams={teams}
           hasAnyTeam={teams.length > 0}
           registrations={registrations}
-          canStartNewRegistration={false}
+          capacity={null}
+          blockReason="not_open"
         />
       </AppChrome>
     );
@@ -1419,10 +1448,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           teams={visibleTeams}
           hasAnyTeam={teams.length > 0}
           registrations={registrations}
-          canStartNewRegistration={
-            tournament.status === 'open' &&
-            tournament.confirmedCount + (tournament.pendingPaymentCount ?? 0) < tournament.teamCount
-          }
+          capacity={resolveTournamentCapacity(tournament)}
+          blockReason={resolveTournamentRegistrationBlock(tournament)}
         />
       </AppChrome>
     );

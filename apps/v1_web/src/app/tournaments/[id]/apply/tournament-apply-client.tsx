@@ -8,7 +8,6 @@ import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
-import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
 import { SponsorLogoStrip } from '@/components/tournaments/tournament-sponsor-logo-strip';
 import {
@@ -29,6 +28,11 @@ import {
   filterTournamentTeamsBySport,
   getTournamentTeamEmptyState,
 } from '@/lib/tournament-team-eligibility';
+import {
+  describeTournamentRegistrationBlock,
+  resolveTournamentCapacity,
+  resolveTournamentRegistrationBlock,
+} from '@/lib/tournament-registration-availability';
 import type {
   V1MyTeam,
   V1TournamentDetail,
@@ -740,23 +744,19 @@ const TOURNAMENT_CONSENT_DOCUMENTS = {
 
 대회 신청 후 팀밋이 안내한 계좌로 참가비를 입금해야 합니다.
 
-2. 입금 기한
-
-대회 신청 후 2시간 이내에 참가비 입금이 확인되지 않는 경우 해당 신청은 자동 취소됩니다.
-
-3. 입금자명
+2. 입금자명
 
 입금자명은 신청자명 또는 팀명과 동일하게 입력해야 합니다.
 
 입금자명 불일치로 인해 입금 확인이 지연되는 경우 신청 취소 또는 참가 제한이 발생할 수 있습니다.
 
-4. 신청 취소
+3. 신청 취소
 
 참가비 입금 후 신청자의 단순 변심, 일정 착오, 팀 내부 사정, 선수 구성 실패, 개인 사정 등을 이유로 한 신청 취소는 원칙적으로 불가합니다.
 
 참가자는 신청 전 대회 일정, 장소, 참가비, 경기 방식, 참가 자격, 환불 기준을 충분히 확인해야 합니다.
 
-5. 대회 취소 시 환불
+4. 대회 취소 시 환불
 
 팀밋 또는 주최 측 사정으로 대회가 취소되는 경우 참가비는 100% 환불됩니다.
 
@@ -764,7 +764,7 @@ const TOURNAMENT_CONSENT_DOCUMENTS = {
 
 대회 취소가 결정되는 경우 팀밋은 사전에 서비스 공지, 문자, 알림톡, 이메일, 대표자 연락 등 가능한 방법으로 안내합니다.
 
-6. 대회 연기 시 환불
+5. 대회 연기 시 환불
 
 대회가 연기되는 경우 팀밋은 변경 일정, 장소, 운영 방식을 사전에 안내합니다.
 
@@ -772,11 +772,11 @@ const TOURNAMENT_CONSENT_DOCUMENTS = {
 
 기존 대회일 기준 2주 전이 지난 이후에는 연기된 일정에 참가하지 않더라도 환불이 제한될 수 있습니다.
 
-7. 환불 제한
+6. 환불 제한
 
 노쇼, 허위 신분 제출, 선출·비선출 여부 허위 기재, 대리 참가, 명단 외 선수 출전, 운영 방해 등 참가자 또는 참가팀 귀책 사유로 실격 처리되는 경우 참가비는 환불되지 않습니다.
 
-8. 환불 처리 기간
+7. 환불 처리 기간
 
 환불은 환불 대상 확정 및 환불 계좌 확인 후 영업일 기준 3~7일 이내 처리됩니다.
 
@@ -989,8 +989,6 @@ function AgreementsStep({
                 style={{ color: 'var(--text-caption)', marginTop: 2, lineHeight: 1.6 }}
               >
                 신청 완료 후 안내되는 계좌로 참가비를 입금해 주세요.
-                <br />
-                신청 후 2시간 이내 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
               </div>
             </div>
           </div>
@@ -1223,8 +1221,6 @@ function TournamentSubmitConfirmDialog({
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginTop: 12 }}
         >
-          신청 후 2시간 이내에 입금 확인이 되지 않으면 신청이 자동 취소됩니다.
-          <br />
           참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 불가합니다.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 18 }}>
@@ -1256,24 +1252,21 @@ function TournamentSubmitConfirmDialog({
 function PaymentGuideStep({
   tournament,
   registrationId,
-  paymentDueAt,
   initialPaymentInstructions,
   onBack,
 }: {
   tournament: V1TournamentDetail;
   registrationId: string;
-  paymentDueAt: string | null;
   initialPaymentInstructions: V1TournamentPaymentInstructions | null;
   onBack: () => void;
 }) {
-  // P0: 방금 제출한 입금자명을 모바일에서도 재확인할 수 있게 배선 (입금자명 불일치 = 자동취소 정책)
+  // P0: 방금 제출한 입금자명을 모바일에서도 재확인할 수 있게 배선
   const { data: registration } = useV1Registration(tournament.id, registrationId);
   const paymentInstructions =
     registration?.paymentInstructions ?? initialPaymentInstructions;
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
-  const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
   const rosterNextStep = getTournamentRosterNextStep({
     tournamentId: tournament.id,
     registrationId,
@@ -1375,27 +1368,21 @@ function PaymentGuideStep({
               <InfoRow
                 label="입금자명"
                 value={registration?.depositorName ?? '—'}
-                isLast={!paymentDeadline}
+                isLast
               />
-              {paymentDeadline ? (
-                <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
-              ) : null}
             </div>
           ) : (
             <div style={{ padding: '0 16px 14px' }}>
               <AlertBanner
                 tone="error"
-                message="입금 계좌가 준비되지 않았어요. 자동 취소 전에 운영팀에 문의해 주세요."
+                message="입금 계좌가 준비되지 않았어요. 운영팀에 문의해 주세요."
               />
               <div style={{ marginTop: 10 }}>
                 <InfoRow
                   label="입금액"
                   value={formatEntryFee(tournament.entryFee)}
-                  isLast={!paymentDeadline}
+                  isLast
                 />
-                {paymentDeadline ? (
-                  <InfoRow label="입금 기한" value={paymentDeadline.label} isLast />
-                ) : null}
               </div>
             </div>
           )}
@@ -1403,9 +1390,7 @@ function PaymentGuideStep({
 
         <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-            {paymentDeadline
-              ? `${paymentDeadline.message} 입금자명이 다르면 확인이 늦어질 수 있어요.`
-              : '입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.'}
+            입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
           </p>
         </Card>
 
@@ -1486,11 +1471,22 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     ? filterTournamentTeamsBySport(myTeams, tournament.sportId)
     : [];
   const managerTeams = eligibleTeams.filter((team) => team.role === 'owner' || team.role === 'manager');
+  // 위저드는 정원·마감을 보지 않아서, 취소된 신청을 다시 넣는 사용자가 약관을 다 채운 뒤
+  // 제출 순간에야 서버 409(TOURNAMENT_CAPACITY_FULL / REGISTRATION_DEADLINE_PASSED)를 만났다.
+  // 입금대기 팀이 정원을 쥐고 있어도 목록엔 "확정 5 / 8"로 보이니 이유를 짐작할 수도 없었다.
+  const newRegistrationBlockReason = tournament
+    ? resolveTournamentRegistrationBlock(tournament)
+    : null;
+  const newRegistrationBlockMessage = tournament && newRegistrationBlockReason
+    ? describeTournamentRegistrationBlock(
+        newRegistrationBlockReason,
+        resolveTournamentCapacity(tournament),
+      )
+    : null;
 
   const [step, setStep] = useState<ApplyStep>('team');
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [registrationId, setRegistrationId] = useState<string | null>(null);
-  const [paymentDueAt, setPaymentDueAt] = useState<string | null>(null);
   const [agreements, setAgreements] = useState<AgreementsState>({
     acceptedTermsDocumentIds: [],
     agreedRules: false,
@@ -1538,16 +1534,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const createBusyRef = useRef(false);
   const submitBusyRef = useRef(false);
 
-  // P0: 입금자명 prefill — 정책상 팀명/신청자명 일치 요구. 비어 있을 때만 선택 팀명으로 채움
-  useEffect(() => {
-    if (step !== 'agreements') return;
-    if (agreements.depositorName.trim()) return;
-    const team = managerTeams.find((t) => t.teamId === selectedTeamId);
-    if (team?.name) {
-      setAgreements((prev) => (prev.depositorName.trim() ? prev : { ...prev, depositorName: team.name.slice(0, 20) }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, selectedTeamId]);
+  // 입금자명은 자동으로 채우지 않는다. 예전에는 선택한 팀명을 미리 넣어줬는데(정책상 팀명도
+  // 허용되므로) 사용자가 아무것도 입력하지 않아도 제출 버튼이 활성화됐다 — 신청자는 "입금자명을
+  // 안 넣었는데 신청이 됐다"고 느끼고, 실제 입금은 개인 이름으로 들어와 입금 확인이 지연된다.
+  // 실제로 입금할 이름을 직접 적게 한다.
 
   // Auto-select first manager team
   useEffect(() => {
@@ -1635,8 +1625,15 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     }
 
     setRegistrationId(null);
+    // 재신청이 애초에 불가능하면 약관 단계로 보내지 않는다 — 다 채우고 나서 거절되는 게 최악이다.
+    if (newRegistrationBlockMessage) {
+      setStep('team');
+      setSubmitError(newRegistrationBlockMessage);
+      return;
+    }
     setStep('agreements');
   }, [
+    newRegistrationBlockMessage,
     loadingMyRegistrations,
     loadingTeams,
     managerTeams,
@@ -1769,6 +1766,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       // action === null (cancelled) → 이어받지 않고 아래에서 새 신청을 만든다.
       // (서버는 취소된 신청을 draft로 되살리므로 create가 재신청 경로다)
     }
+    if (newRegistrationBlockMessage) {
+      setSubmitError(newRegistrationBlockMessage);
+      return;
+    }
     setSubmitError(null);
     createBusyRef.current = true;
     try {
@@ -1794,6 +1795,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   async function handleAgreementsSubmit() {
     if (submitBusyRef.current || !selectedTeamId) return;
+    // registrationId가 없으면 여기서 새 신청을 만든다 — 그 경로도 같은 기준으로 막는다.
+    if (!registrationId && newRegistrationBlockMessage) {
+      setSubmitError(newRegistrationBlockMessage);
+      setStep('team');
+      return;
+    }
     submitBusyRef.current = true;
     setSubmitError(null);
     try {
@@ -1810,7 +1817,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         agreedRefund: agreements.agreedRefund,
         agreedMediaConsent: agreements.agreedMediaConsent,
       });
-      setPaymentDueAt(submittedRegistration.payment?.paymentDueAt ?? null);
       setSubmittedPaymentInstructions(submittedRegistration.paymentInstructions);
       trackEvent('tournament_apply_complete', { tournamentId });
       setStep('payment');
@@ -1853,9 +1859,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <div className="tm-tournament-form-main">
             {step === 'team' ? (
               <>
-                {submitError ? (
+                {submitError ?? newRegistrationBlockMessage ? (
                   <div style={{ padding: '12px 20px 0' }}>
-                    <AlertBanner message={submitError} />
+                    <AlertBanner message={submitError ?? newRegistrationBlockMessage!} />
                   </div>
                 ) : null}
                 <TeamSelectStep
@@ -1882,6 +1888,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 isSubmitting={isSubmittingApplication}
                 error={
                   submitError
+                  ?? newRegistrationBlockMessage
                   ?? (tournamentTerms.isError
                     ? '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
                     : tournamentTerms.data && !tournamentTerms.data.ready
@@ -1894,7 +1901,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               <PaymentGuideStep
                 tournament={tournament}
                 registrationId={registrationId}
-                paymentDueAt={paymentDueAt}
                 initialPaymentInstructions={
                   submittedPaymentInstructions ??
                   selectedRegistration?.paymentInstructions ??

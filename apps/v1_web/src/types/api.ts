@@ -2351,7 +2351,6 @@ export type V1TournamentPaymentSummary = {
   status: V1TournamentPaymentStatus;
   amount: number;
   paidAt: string | null;
-  paymentDueAt: string | null;
 };
 
 export type V1TournamentPaymentInstructions = {

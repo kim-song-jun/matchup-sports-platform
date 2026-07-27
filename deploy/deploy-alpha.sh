@@ -200,7 +200,7 @@ for attempt in $(seq 1 36); do
     curl -fsS --connect-timeout 3 --max-time 10 \
       https://alpha.teameet.co.kr/landing >/dev/null 2>&1 &&
     [[ "$(curl -sS --connect-timeout 3 --max-time 10 -o /dev/null -w '%{http_code}' \
-      https://alpha.teameet.co.kr/v1/home)" == "404" ]]; then
+      https://alpha.teameet.co.kr/v1/home)" == "308" ]]; then
     break
   fi
 

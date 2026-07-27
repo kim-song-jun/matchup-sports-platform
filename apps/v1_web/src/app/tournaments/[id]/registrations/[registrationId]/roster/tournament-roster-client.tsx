@@ -18,6 +18,7 @@ import { v1Get } from '@/lib/api-client';
 import { josa } from '@/lib/korean';
 import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
+import { randomUuid } from '@/lib/uuid';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { V1TournamentPlayer, V1PlayerEligibilityStatus, V1TeamMembersPage } from '@/types/api';
 
@@ -223,7 +224,7 @@ type DraftPlayerForm = {
 
 function createDraftPlayerForm(): DraftPlayerForm {
   return {
-    id: `draft-${crypto.randomUUID()}`,
+    id: `draft-${randomUuid()}`,
     userId: '',
   };
 }

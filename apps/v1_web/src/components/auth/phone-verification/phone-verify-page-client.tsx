@@ -23,10 +23,22 @@ export function PhoneVerifyPageClient() {
   // 외부 URL·javascript: 주입을 막기 위해 상대 경로만 통과시킨다(sanitizeRedirectPath).
   const redirectTo = sanitizeRedirectPath(searchParams.get('redirect')) ?? '/home';
   const authMe = useV1AuthMe();
+  /**
+   * authMe 가 오기 전에는 번호 UI 를 렌더하지 않는다. 로딩 중 existingPhone 이 '' 라
+   * "번호 없는 계정" 모양(입력칸)이 잠깐 떴다가, 데이터가 도착하면 카드로 바뀌며
+   * 그 사이 입력한 값이 저장된 번호로 덮인다.
+   */
+  const authLoading = authMe.isPending;
   const existingPhone = authMe.data?.user.phone ?? '';
   const alreadyVerified = authMe.data?.verification?.phoneVerified === true;
   const [phoneDigits, setPhoneDigits] = useState('');
   const [done, setDone] = useState(false);
+  /**
+   * 계정에 번호가 이미 있으면 그 번호로 문자가 나간다. 어떤 번호인지 보여주지 않으면
+   * 잘못 저장된 번호를 확인할 방법이 없고, 고치려면 프로필까지 가야 했다.
+   * 인증 확정 시 서버가 user.phone 을 인증한 번호로 갱신하므로 이 화면에서 바로 고칠 수 있다.
+   */
+  const [editingPhone, setEditingPhone] = useState(false);
 
   useEffect(() => {
     if (existingPhone) setPhoneDigits(existingPhone);
@@ -57,20 +69,61 @@ export function PhoneVerifyPageClient() {
               </p>
             </Card>
 
-            {!existingPhone ? (
-              <label className="tm-auth-field">
-                <span className="tm-text-label">휴대폰 번호</span>
-                <input
-                  className="tm-input tm-auth-input"
-                  inputMode="numeric"
-                  onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
-                  placeholder="010-0000-0000"
-                  value={formatPhone(phoneDigits)}
-                />
-              </label>
-            ) : null}
+            {authLoading ? (
+              <Card pad={16}>
+                <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+                  계정 정보를 불러오는 중이에요.
+                </p>
+              </Card>
+            ) : !existingPhone || editingPhone ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label className="tm-auth-field">
+                  <span className="tm-text-label">휴대폰 번호</span>
+                  <input
+                    className="tm-input tm-auth-input"
+                    inputMode="numeric"
+                    onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
+                    placeholder="010-0000-0000"
+                    value={formatPhone(phoneDigits)}
+                  />
+                </label>
+                {existingPhone ? (
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-ghost"
+                    style={{ alignSelf: 'flex-start', minHeight: 44 }}
+                    onClick={() => {
+                      setPhoneDigits(existingPhone);
+                      setEditingPhone(false);
+                    }}
+                  >
+                    기존 번호로 되돌리기
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+                    인증번호를 받을 번호
+                  </p>
+                  <p className="tm-text-label" style={{ margin: '2px 0 0', color: 'var(--text-strong)' }}>
+                    {formatPhone(phoneDigits)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ flexShrink: 0, minHeight: 44 }}
+                  onClick={() => setEditingPhone(true)}
+                  aria-label="인증받을 휴대폰 번호 수정"
+                >
+                  번호 수정
+                </button>
+              </Card>
+            )}
 
-            {phoneDigits.length === 11 ? (
+            {!authLoading && phoneDigits.length === 11 ? (
               <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} />
             ) : null}
           </>

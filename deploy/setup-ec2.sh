@@ -188,14 +188,14 @@ sleep 3
 if curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true' > /dev/null 2>&1 && \
    curl -fsS http://localhost/landing > /dev/null 2>&1 && \
    curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true' > /dev/null 2>&1 && \
-   [ "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/v1/home)" = "404" ]; then
+   [ "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/v1/home)" = "308" ]; then
   echo "✅ API 서버 정상"
 else
   echo "⚠️ API 서버 응답 대기 중 (1분 후 다시 확인해주세요)"
 fi
 
 if curl -sf http://localhost/landing > /dev/null 2>&1 && \
-   [ "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/v1/home)" = "404" ]; then
+   [ "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/v1/home)" = "308" ]; then
   echo "✅ 웹 서버 정상"
 else
   echo "⚠️ 웹 서버 응답 대기 중"

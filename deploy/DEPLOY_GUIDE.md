@@ -44,7 +44,7 @@ curl -sL https://raw.githubusercontent.com/kim-song-jun/teameet-sports-platform/
 curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true'
 curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true'
 curl -fsS http://localhost/landing > /dev/null
-test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" = "404"
+test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" = "308"
 ```
 
 ## 4. GitHub Actions 배포
@@ -87,7 +87,7 @@ GitHub Actions의 OAuth·관리자·GA 값은 SSH 명령줄 인자가 아니라 
 3. v1 Web 빌드에는 browser API base `/api/v1`과 internal API origin `http://v1_api:8121`을 주입한다.
 4. `v1_postgres`를 먼저 기동하고 `prisma migrate deploy`를 실행한다.
 5. `deploy/restart-containers.sh`로 v1 스택을 재기동한다.
-6. workflow는 internal API, root-origin API, root Web과 legacy browser `/v1/home`의 404 negative contract를 함께 health check한다.
+6. workflow는 internal API, root-origin API, root Web과 legacy browser `/v1/home`이 현재 경로로 308 redirect되는지를 함께 health check한다.
 
 ## 5. 운영 환경 변수
 
@@ -157,7 +157,7 @@ ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d
 curl -fsS http://localhost:8121/api/v1/health | jq -e '.data.checks.db == true'
 curl -fsS http://localhost/api/v1/health | jq -e '.data.checks.db == true'
 curl -fsS http://localhost/landing > /dev/null
-test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" = "404"
+test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" = "308"
 ```
 
 ## 8. 운영 명령
@@ -200,7 +200,7 @@ TLS 적용 후에도 `/`, `/api/v1/*`, `/uploads/*`의 공개 경로 계약은 �
 공개 origin에서도 HTTPS 응답이 legacy path를 되살리지 않는지 확인한다. HTTP 80은 HTTPS redirect가 정상이라 301일 수 있으므로 negative path 판정에는 HTTPS를 사용한다.
 
 ```bash
-test "$(curl -sS --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://teameet.co.kr/v1/home)" = "404"
+test "$(curl -sS --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w '%{http_code}' https://teameet.co.kr/v1/home)" = "308"
 ```
 
 ## 10. 트러블슈팅

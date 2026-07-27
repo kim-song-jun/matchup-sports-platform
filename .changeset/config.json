@@ -4,7 +4,7 @@
   "commit": false,
   "fixed": [["v1_api", "v1_web"]],
   "access": "restricted",
-  "baseBranch": "main",
+  "baseBranch": "dev",
   "updateInternalDependencies": "patch",
   "ignore": [],
   "privatePackages": {

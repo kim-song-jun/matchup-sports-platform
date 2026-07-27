@@ -82,6 +82,13 @@ jobs:
       - name: Production deploy security guardrails
         run: pnpm qa:production-deploy-security
 
+      # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
+      # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
+      # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로
+      # 넘어가므로 파일을 명시한다.
+      - name: Release contract tests
+        run: node --test scripts/release/versioning.contract.test.mjs
+
   # ── API: 타입·마이그레이션·유닛·통합·빌드 ───────────────────────────────────
   api:
     name: API

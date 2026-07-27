@@ -81,19 +81,48 @@ CI를 3 job으로 나누면 러너 시간 총합은 4.6분 → 약 6.5분으로 
 
 ## 4. 이번에 손대지 않은 것
 
-### M3. `release-main.yml`이 한 번도 실행된 적이 없다 — 미해결
+### M3. `release-main.yml`이 한 번도 실행된 적이 없었다 — 원인 규명 후 기계장치는 복구, 실제 릴리스는 대기
 
-`Prepare Main Release PR` 워크플로는 alpha에 배포된 버전·SHA를 검증한 뒤 Changesets `version` PR을 만드는 공식 main 릴리스 경로다. 실행 이력이 **0건**이다(`gh run list --workflow="Prepare Main Release PR"` → `[]`). main PR은 `gh pr create --base main`으로 수동 생성돼 왔다.
+`Prepare Release PR` 워크플로(파일명 `release-main.yml`)는 alpha에 배포된 버전·SHA를 검증한 뒤 Changesets `version` PR을 만드는 공식 릴리스 경로다. 실행 이력이 **0건**이었다(`gh run list --workflow="Prepare Main Release PR"` → `[]`). main PR은 `gh pr create --base main`으로 수동 생성돼 왔고, `.changeset/` 파일 **136개**가 소비되지 않고 누적됐으며 `v1_api`/`v1_web` 버전은 **`0.0.1`** 그대로였다.
 
-그 결과:
+> **정정**: 초기 감사에서 "CHANGELOG 파일 없음"을 결함으로 적었으나, `.changeset/config.json`에 `"changelog": false`가 설정돼 있어 **CHANGELOG 미생성은 의도된 설정**이다. 결함이 아니다.
 
-- `.changeset/` 파일 **136개**가 소비되지 않고 누적
-- `v1_api`/`v1_web` 버전이 **`0.0.1`** 그대로
-- CHANGELOG 파일이 저장소에 **없음**
+#### 실행을 막고 있던 것 (원인)
 
-즉 changeset 게이트는 절반만 구현돼 있다 — CI는 PR마다 changeset 파일을 강제하지만, 그 파일을 소비해 버전을 올리고 CHANGELOG를 만드는 쪽이 작동하지 않는다. alpha가 쓰는 `resolve-changeset-version.mjs`는 파일을 읽기만 하고 소비하지 않으므로 alpha 버전도 계속 `0.1.0-alpha.*`에 머문다.
+**① changeset을 전부 소비하면 다음 alpha 배포가 깨졌다.** `deploy-alpha.yml`의 `Resolve Changesets alpha version` 스텝은 `if:` 가드 없이 `resolve-changeset-version.mjs`를 호출하는데, 이 스크립트가 `assertReleaseChangeset()`을 써서 **changeset 0개면 `exit 1`** 했다. 격리 환경 재현:
 
-**필요한 결정**: 릴리스 경로를 살릴 것인지(그러면 136개를 한 번 소비해 버전·CHANGELOG를 만들어야 한다), 아니면 쓰지 않기로 하고 `release-main.yml`과 changeset 강제 게이트를 함께 재설계할 것인지. 지금 상태는 개발자에게 매 PR 비용만 물리고 산출물은 아무도 못 보는 형태다.
+```
+$ node scripts/release/resolve-changeset-version.mjs --repo . --sha <40자> --date 2026-07-28
+A release changeset is required for behavior-affecting changes
+exit=1
+```
+
+즉 alpha 배포 가능성이 "미소비 changeset이 최소 1개 존재"에 묶여 있었다. **릴리스를 하는 행위 자체가 그 조건을 깨뜨리는** 자기모순이다.
+
+**②** `release-main.yml`이 `ref == refs/heads/main`에서만 돌았다 — "모든 작업은 dev, main은 유산 브랜치" 정책과 충돌.
+
+**③** `changesets/action`이 만드는 PR의 base가 main이었다 — main만 버전이 오르고 dev는 136개를 유지해 두 브랜치의 `package.json`이 갈라진다.
+
+#### 조치 (기계장치 복구)
+
+- `resolve-changeset-version.mjs`가 `assertReleaseChangeset` 대신 `loadReleaseContract`를 쓴다. 0개여도 버전을 계산하고, 그때 bump는 `patch`로 떨어져 갓 릴리스한 `0.1.0` 다음 alpha 빌드는 `0.1.1-alpha.*`가 된다 — `0.1.0 < 0.1.1-alpha.* < 0.1.1`로 SemVer 순서가 유지된다.
+- **"행동 변경에는 changeset 필수" 게이트는 그대로다.** 그 강제는 `check-changeset-policy.mjs`가 담당하며, 0개 상태에서 행동 변경이 오면 여전히 `exit 1`한다(둘의 분리를 테스트로 고정).
+- `release-main.yml`: dispatch 조건을 `refs/heads/dev`로, 워크플로 표시 이름을 `Prepare Release PR`로, concurrency group을 `prepare-release-pr`로. 소비할 changeset이 0개면 **빈 릴리스 PR을 열지 않고 실패**한다.
+- `.changeset/config.json`의 `baseBranch`를 `dev`로.
+- `scripts/release/versioning.contract.test.mjs`에 회귀 테스트 2개 추가 — 0-changeset 리졸버 동작, 워크플로의 dev base + 빈 릴리스 거부.
+
+파일명은 `release-main.yml`로 남겼다. main 승격이 폐기되기 전 이름이지만 참조 문서·메모리가 이 이름을 쓰고 있어 지금 바꾸면 추적만 어려워진다.
+
+#### 남은 일 (사용자 게이트)
+
+136개를 실제로 소비해 `0.1.0`을 확정하는 것은 **복구된 경로로** 해야 한다:
+
+1. 이 변경을 dev에 머지 → alpha 재배포 → `x-teameet-release`로 새 prerelease 확인
+2. dev에서 `Prepare Release PR` 워크플로를 dispatch (`alpha_release`, `alpha_sha`, `confirmation=CREATE_RELEASE_PR`)
+3. 생성된 draft PR 검토 후 머지 → dev의 `v1_api`/`v1_web` 버전이 `0.1.0`, changeset 136개 소비
+4. 다음 alpha 배포가 0-changeset 상태에서도 정상 동작하는지 확인 (①의 실효 검증)
+
+3번은 릴리스 확정이므로 사용자 승인 후에 진행한다.
 
 ### M5. prod는 장기 SSH 사설키, alpha는 OIDC — 미해결
 

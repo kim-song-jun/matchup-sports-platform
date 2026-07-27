@@ -75,15 +75,18 @@ function resolveRegistrationResumeAction(
 }
 
 /**
- * 위저드 상태로 이어받을 수 있는 신청 id만 돌려준다.
+ * 위저드 단계(동의/입금 안내)로 이어받을 수 있는 신청 id만 돌려준다.
  * cancelled(입금 미확인 자동 취소 등)를 이어받으면 submit이 서버에서 409 REGISTRATION_NOT_DRAFT로
  * 막혀 재신청이 불가능해진다 — 이 경우 id를 버리고 새 신청(create)으로 가야 한다.
+ * redirect 상태(confirmed/waitlisted/cancel_requested)도 위저드에서 이어갈 단계가 없어 제외한다
+ * (이동은 handleTeamNext / 재진입 effect가 selectedRegistration으로 처리한다).
  */
 function resolveResumableRegistrationId(
   registration: { id: string; status: V1TournamentRegistrationStatus } | undefined,
 ): string | null {
   if (!registration) return null;
-  return resolveRegistrationResumeAction(registration.status) === null ? null : registration.id;
+  const action = resolveRegistrationResumeAction(registration.status);
+  return action === 'agreements' || action === 'payment' ? registration.id : null;
 }
 
 function StepIndicator({ current }: { current: ApplyStep }) {

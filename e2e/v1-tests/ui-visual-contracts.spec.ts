@@ -65,7 +65,13 @@ test.describe('Teameet shared visual contracts', () => {
     const rootResponse = await page.goto('/home');
     expect(rootResponse?.status()).toBe(200);
 
-    // 구 basePath(/v1) 북마크·외부 링크는 404가 아니라 현재 경로로 넘어간다.
+    // 구 basePath(/v1) 북마크·외부 링크는 404가 아니라 서버 308로 현재 경로로 넘어간다.
+    // maxRedirects: 0 — goto()는 리다이렉트를 따라가 버려서 308 자체를 검증할 수 없다
+    // (배포 헬스 게이트가 308을 요구하므로 그 계약과 같은 것을 본다).
+    const legacyRedirect = await page.request.get('/v1/home', { maxRedirects: 0 });
+    expect(legacyRedirect.status()).toBe(308);
+    expect(legacyRedirect.headers()['location']).toBe('/home');
+
     const legacyResponse = await page.goto('/v1/home');
     expect(legacyResponse?.status()).toBe(200);
     expect(new URL(page.url()).pathname).toBe('/home');

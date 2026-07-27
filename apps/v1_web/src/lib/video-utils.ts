@@ -41,9 +41,26 @@ export function youtubeEmbedUrl(videoId: string): string {
 
 export type VideoKind = 'youtube' | 'file' | 'external';
 
+const UPLOADS_PREFIX = '/uploads/';
+
 export function safeVideoFileUrl(url: string): string | null {
   const value = url.trim();
-  if (value.startsWith('/uploads/') && !value.includes('\\')) return value;
+  if (value.startsWith(UPLOADS_PREFIX)) {
+    if (value.includes('\\')) return null;
+    let normalized: URL;
+    try {
+      // 상대 경로를 정규화하기 위한 더미 origin — 반환값에는 쓰지 않는다.
+      normalized = new URL(value, 'https://uploads.invalid');
+    } catch {
+      return null;
+    }
+    // `/uploads/../admin` 처럼 uploads 밖을 가리키는 경로는 업로드 파일이 아니다.
+    // URL 정규화가 `../` 와 `%2e%2e/` 는 접어주지만 인코딩된 슬래시(`%2f`)는 남으므로,
+    // 프록시 단에서 디코딩돼 prefix를 벗어나는 경우까지 함께 막는다.
+    if (!normalized.pathname.startsWith(UPLOADS_PREFIX)) return null;
+    if (/%2e|%2f|%5c/i.test(normalized.pathname)) return null;
+    return `${normalized.pathname}${normalized.search}`;
+  }
 
   try {
     const parsed = new URL(value);

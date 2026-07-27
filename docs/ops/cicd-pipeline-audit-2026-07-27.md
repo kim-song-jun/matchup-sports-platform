@@ -85,7 +85,7 @@ CI를 3 job으로 나누면 러너 시간 총합은 4.6분 → 약 6.5분으로 
 
 `Prepare Release PR` 워크플로(파일명 `release-main.yml`)는 alpha에 배포된 버전·SHA를 검증한 뒤 Changesets `version` PR을 만드는 공식 릴리스 경로다. 실행 이력이 **0건**이었다(`gh run list --workflow="Prepare Main Release PR"` → `[]`). main PR은 `gh pr create --base main`으로 수동 생성돼 왔고, `.changeset/` 파일 **136개**가 소비되지 않고 누적됐으며 `v1_api`/`v1_web` 버전은 **`0.0.1`** 그대로였다.
 
-> **정정 2회**: 초기 감사에서 "CHANGELOG 파일 없음"을 결함으로 적었고, 그다음 `.changeset/config.json`의 `"changelog": false`를 근거로 "의도된 설정이므로 결함 아님"으로 정정했다. **둘 다 정확하지 않았다** — 설정은 의도적이었지만 `changesets/action`과 **호환되지 않는 조합**이었다(아래 ④). 즉 결함은 "CHANGELOG가 없다"가 아니라 "CHANGELOG 없이 동작할 수 없는 action을 쓰면서 CHANGELOG를 끈 것"이다.
+> **정정 2회**: 초기 감사에서 "CHANGELOG 파일 없음"을 결함으로 적었고, 그다음 `.changeset/config.json`의 `"changelog": false`를 근거로 "의도된 설정이므로 결함 아님"으로 정정했다. **둘 다 정확하지 않았다** — 설정은 의도적이었지만 `changesets/action`과 **호환되지 않는 조합**이었다(아래 ⑤). 즉 결함은 "CHANGELOG가 없다"가 아니라 "CHANGELOG 없이 동작할 수 없는 action을 쓰면서 CHANGELOG를 끈 것"이다.
 
 #### 실행을 막고 있던 것 (원인)
 

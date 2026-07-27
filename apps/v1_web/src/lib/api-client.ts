@@ -1,5 +1,6 @@
 import type { ApiEnvelope, ApiErrorBody } from '@/types/api';
 import { getStoredV1Session } from './session-storage';
+import { randomUuid } from './uuid';
 import { reportClientError } from './client-error-reporter';
 import {
   PHONE_VERIFICATION_REQUIRED_CODE,
@@ -167,7 +168,7 @@ function getV1SearchSessionId() {
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
 
-  const next = window.crypto.randomUUID();
+  const next = randomUuid();
   window.localStorage.setItem(key, next);
   return next;
 }

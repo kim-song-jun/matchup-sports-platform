@@ -20,6 +20,7 @@ function authMe(phone: string | null) {
   return {
     data: { user: { phone }, verification: { phoneVerified: false } },
     isLoading: false,
+    isPending: false,
   } as never;
 }
 
@@ -75,6 +76,18 @@ describe('PhoneVerifyPageClient — 인증 대상 번호 확인·수정', () => 
 
     expect(screen.getByText('010-1234-5678')).toBeInTheDocument();
     expect(screen.queryByLabelText('휴대폰 번호')).not.toBeInTheDocument();
+  });
+
+  it('authMe 로딩 중에는 번호 UI를 렌더하지 않는다 — 빈 입력칸에 친 값이 저장된 번호로 덮이는 것을 막는다', () => {
+    vi.spyOn(api, 'useV1AuthMe').mockReturnValue({ data: undefined, isLoading: true, isPending: true } as never);
+    vi.spyOn(api, 'useV1AuthedPhoneRequest').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.spyOn(api, 'useV1AuthedPhoneConfirm').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+
+    wrap(<PhoneVerifyPageClient />);
+
+    expect(screen.queryByLabelText('휴대폰 번호')).not.toBeInTheDocument();
+    expect(screen.queryByText('인증번호를 받을 번호')).not.toBeInTheDocument();
+    expect(screen.getByText('계정 정보를 불러오는 중이에요.')).toBeInTheDocument();
   });
 
   it('계정에 번호가 없으면 입력칸을 바로 연다', () => {

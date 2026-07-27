@@ -23,6 +23,12 @@ export function PhoneVerifyPageClient() {
   // 외부 URL·javascript: 주입을 막기 위해 상대 경로만 통과시킨다(sanitizeRedirectPath).
   const redirectTo = sanitizeRedirectPath(searchParams.get('redirect')) ?? '/home';
   const authMe = useV1AuthMe();
+  /**
+   * authMe 가 오기 전에는 번호 UI 를 렌더하지 않는다. 로딩 중 existingPhone 이 '' 라
+   * "번호 없는 계정" 모양(입력칸)이 잠깐 떴다가, 데이터가 도착하면 카드로 바뀌며
+   * 그 사이 입력한 값이 저장된 번호로 덮인다.
+   */
+  const authLoading = authMe.isPending;
   const existingPhone = authMe.data?.user.phone ?? '';
   const alreadyVerified = authMe.data?.verification?.phoneVerified === true;
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -63,7 +69,13 @@ export function PhoneVerifyPageClient() {
               </p>
             </Card>
 
-            {!existingPhone || editingPhone ? (
+            {authLoading ? (
+              <Card pad={16}>
+                <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+                  계정 정보를 불러오는 중이에요.
+                </p>
+              </Card>
+            ) : !existingPhone || editingPhone ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <label className="tm-auth-field">
                   <span className="tm-text-label">휴대폰 번호</span>
@@ -111,7 +123,7 @@ export function PhoneVerifyPageClient() {
               </Card>
             )}
 
-            {phoneDigits.length === 11 ? (
+            {!authLoading && phoneDigits.length === 11 ? (
               <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} />
             ) : null}
           </>

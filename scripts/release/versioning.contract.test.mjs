@@ -178,6 +178,48 @@ test('fixed v1 apps resolve the highest grouped bump into one deterministic alph
   }
 });
 
+test('resolver still labels an alpha build after every changeset has been released', () => {
+  // 릴리스 직후 상태: changeset 0개 + 버전이 이미 올라간 package.json.
+  // deploy-alpha.yml 은 이 리졸버를 가드 없이 호출하므로, 여기서 실패하면 릴리스를 한
+  // 순간부터 alpha 배포가 전부 깨진다 — release-main.yml 이 한 번도 실행되지 못한 이유다.
+  const root = createFixture({ apiVersion: '0.1.0', webVersion: '0.1.0' });
+  try {
+    const result = runNode(resolverPath, [
+      '--repo',
+      root,
+      '--sha',
+      'abcdef1234567890abcdef1234567890abcdef12',
+      '--date',
+      '2026-07-28',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), {
+      baseVersion: '0.1.0',
+      bump: 'patch',
+      // 갓 릴리스한 0.1.0 보다 뒤에 오도록 다음 patch 를 기준으로 붙인다
+      // (0.1.0 < 0.1.1-alpha.* < 0.1.1).
+      stableVersion: '0.1.1',
+      prereleaseVersion: '0.1.1-alpha.20260728.gabcdef123456',
+      changesets: [],
+      sha: 'abcdef1234567890abcdef1234567890abcdef12',
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('release PR workflow refuses to run when there is nothing to release', () => {
+  // 리졸버가 0개를 허용하게 됐으므로, 빈 릴리스 PR 이 열리지 않도록 워크플로가 직접 막아야 한다.
+  const releaseWorkflow = readFileSync(join(repoRoot, '.github/workflows/release-main.yml'), 'utf8');
+
+  assert.match(releaseWorkflow, /\.changesets \| length > 0/);
+  assert.match(releaseWorkflow, /nothing to release/i);
+  // 통합·배포 브랜치가 dev 하나이므로 릴리스 PR 도 dev 를 base 로 만든다.
+  assert.match(releaseWorkflow, /github\.ref == 'refs\/heads\/dev'/);
+  assert.doesNotMatch(releaseWorkflow, /github\.ref == 'refs\/heads\/main'/);
+});
+
 test('resolver rejects a release when the fixed app versions have drifted', () => {
   const root = createFixture({
     apiVersion: '0.0.2',

@@ -207,7 +207,7 @@ describe('TournamentApplyPageClient GA events', () => {
     const submitRegistrationMutateAsync = vi.fn().mockResolvedValue({
       id: 'registration-1',
       status: 'awaiting_payment',
-      payment: { paymentDueAt: '2026-07-19T00:00:00.000Z' },
+      payment: null,
       paymentInstructions: {
         bankName: '국민은행',
         bankAccount: '123-456-789',
@@ -272,7 +272,7 @@ describe('TournamentApplyPageClient GA events', () => {
       const submitRegistrationMutateAsync = vi.fn().mockResolvedValue({
         id: 'registration-reactivated',
         status: 'awaiting_payment',
-        payment: { paymentDueAt: '2026-07-19T00:00:00.000Z' },
+        payment: null,
         paymentInstructions: null,
       });
       tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({

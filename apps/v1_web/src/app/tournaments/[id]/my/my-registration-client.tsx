@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronRight, UsersRound } from 'lucide-react';
-import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
 import {
@@ -210,7 +209,6 @@ function RegistrationPass({
   scheduledEndAt,
   venue,
   paymentSummary,
-  paymentDueAt,
   rosterCount,
   minPlayers,
   isRosterLocked,
@@ -226,13 +224,11 @@ function RegistrationPass({
   scheduledEndAt: string | null;
   venue: string | null;
   paymentSummary: string | null;
-  paymentDueAt: string | null;
   rosterCount: number;
   minPlayers: number;
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
-  const paymentDeadline = getTournamentPaymentDeadlineState(paymentDueAt);
   const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`);
 
   /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
@@ -272,11 +268,10 @@ function RegistrationPass({
           <PassFact icon={<CalendarIcon />} label="일정" value={formatMonthDayRange(scheduledAt, scheduledEndAt) || '일정 미정'} />
           <PassFact icon={<MapPinIcon />} label="장소" value={venue || '장소 미정'} />
           {paymentSummary ? <PassFact icon={<ReceiptIcon />} label="참가비" value={paymentSummary} /> : null}
-          {paymentDeadline ? <PassFact icon={<ReceiptIcon />} label="기한" value={paymentDeadline.label} /> : null}
         </div>
         <div style={{ borderTop: '1px solid var(--border)', padding: '12px 18px' }}>
           <p className="tm-text-caption" style={{ color: 'var(--orange500)', lineHeight: 1.6, margin: 0, fontWeight: 600 }}>
-            {paymentDeadline ? paymentDeadline.message : '신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.'}
+            신청 내역에서 계좌 정보를 확인하고 참가비를 입금해 주세요.
           </p>
         </div>
       </div>
@@ -665,8 +660,6 @@ function RegistrationDetailView({
   const paymentSummary = registration.payment
     ? `${formatEntryFee(registration.payment.amount)} · ${paymentStatusLabel(registration.payment.status)}`
     : formatEntryFee(tournament.entryFee);
-  const paymentDeadline = getTournamentPaymentDeadlineState(registration.payment?.paymentDueAt ?? null);
-  const showPaymentDeadline = Boolean(paymentDeadline) && registration.payment?.status === 'ready';
 
   /* The pass owns the roster glance+action for active states; the standalone roster
    * card only renders for states without a pass (e.g. awaiting_payment). */
@@ -857,7 +850,6 @@ function RegistrationDetailView({
               scheduledEndAt={tournament.scheduledEndAt}
               venue={tournament.venue}
               paymentSummary={paymentSummary}
-              paymentDueAt={registration.payment?.paymentDueAt ?? null}
               rosterCount={players.length}
               minPlayers={tournament.minPlayers}
               isRosterLocked={isRosterLocked}
@@ -974,15 +966,8 @@ function RegistrationDetailView({
                       <InfoRow
                         label="결제 상태"
                         value={paymentStatusLabel(registration.payment.status)}
-                        isLast={!showPaymentDeadline && !registration.payment.paidAt && !shouldShowBankTransferAccount}
+                        isLast={!registration.payment.paidAt && !shouldShowBankTransferAccount}
                       />
-                      {showPaymentDeadline && paymentDeadline ? (
-                        <InfoRow
-                          label="입금 기한"
-                          value={paymentDeadline.label}
-                          isLast={!registration.payment.paidAt}
-                        />
-                      ) : null}
                       {registration.payment.paidAt ? (
                         <InfoRow label="결제일" value={formatDateShort(registration.payment.paidAt)} isLast={!shouldShowBankTransferAccount} />
                       ) : null}
@@ -1041,9 +1026,6 @@ function RegistrationDetailView({
                     안내된 계좌로 참가비를 입금해 주세요.
                     <br />
                     입금 확인이 완료되면 참가가 최종 확정됩니다.
-                  </p>
-                  <p style={{ margin: '8px 0 0' }}>
-                    신청 후 2시간 이내에 입금 확인이 되지 않으면 신청은 자동 취소됩니다.
                   </p>
                 </div>
               </Card>

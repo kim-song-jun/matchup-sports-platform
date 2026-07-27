@@ -228,6 +228,27 @@ test('a real behavior change cannot pose as a release commit', () => {
   }
 });
 
+test('a half-bumped release commit does not get the release exemption', () => {
+  // v1_api·v1_web 은 fixed 그룹이라 changesets version 이 항상 둘을 함께 올린다. 한쪽만
+  // 바뀐 diff 를 통과시키면 두 버전이 갈라진 채 머지되고, 그 드리프트는 릴리스 직후
+  // (changeset 0개 → "Validate planned SemVer" skip) CI 를 통과해 alpha 배포에서야 터진다.
+  const root = createFixture({ apiVersion: '0.1.0', webVersion: '0.1.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      ['apps/v1_api/package.json', '.changeset/consumed-one.md'].join('\n'),
+    );
+
+    const result = runNode(policyPath, ['--repo', root, '--changed-files-file', changedFiles]);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /release changeset is required/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('resolver still labels an alpha build after every changeset has been released', () => {
   // 릴리스 직후 상태: changeset 0개 + 버전이 이미 올라간 package.json.
   // deploy-alpha.yml 은 이 리졸버를 가드 없이 호출하므로, 여기서 실패하면 릴리스를 한

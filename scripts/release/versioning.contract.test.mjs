@@ -280,6 +280,21 @@ test('resolver still labels an alpha build after every changeset has been releas
   }
 });
 
+test('Changesets keeps a changelog generator so the release action can build its PR body', () => {
+  // changelog: false 는 changesets/action 과 호환되지 않는다. version 커맨드 자체는 성공하지만
+  // action 이 PR 본문을 만들려고 각 패키지의 CHANGELOG.md 를 읽다가 ENOENT 로 죽는다
+  // (실측: PR #208 이후 첫 dispatch 가 apps/v1_api/CHANGELOG.md 없음으로 실패).
+  // 이걸 다시 false 로 돌리면 릴리스 경로가 또 막히므로 설정을 고정한다.
+  const config = JSON.parse(readFileSync(join(repoRoot, '.changeset/config.json'), 'utf8'));
+
+  assert.notEqual(
+    config.changelog,
+    false,
+    'changelog: false breaks changesets/action — it reads each package CHANGELOG.md to build the PR body',
+  );
+  assert.ok(config.changelog, 'a changelog generator must be configured');
+});
+
 test('release PR workflow refuses to run when there is nothing to release', () => {
   // 리졸버가 0개를 허용하게 됐으므로, 빈 릴리스 PR 이 열리지 않도록 워크플로가 직접 막아야 한다.
   const releaseWorkflow = readFileSync(join(repoRoot, '.github/workflows/release-main.yml'), 'utf8');

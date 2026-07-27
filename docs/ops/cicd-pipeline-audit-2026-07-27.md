@@ -85,7 +85,7 @@ CI를 3 job으로 나누면 러너 시간 총합은 4.6분 → 약 6.5분으로 
 
 `Prepare Release PR` 워크플로(파일명 `release-main.yml`)는 alpha에 배포된 버전·SHA를 검증한 뒤 Changesets `version` PR을 만드는 공식 릴리스 경로다. 실행 이력이 **0건**이었다(`gh run list --workflow="Prepare Main Release PR"` → `[]`). main PR은 `gh pr create --base main`으로 수동 생성돼 왔고, `.changeset/` 파일 **136개**가 소비되지 않고 누적됐으며 `v1_api`/`v1_web` 버전은 **`0.0.1`** 그대로였다.
 
-> **정정**: 초기 감사에서 "CHANGELOG 파일 없음"을 결함으로 적었으나, `.changeset/config.json`에 `"changelog": false`가 설정돼 있어 **CHANGELOG 미생성은 의도된 설정**이다. 결함이 아니다.
+> **정정 2회**: 초기 감사에서 "CHANGELOG 파일 없음"을 결함으로 적었고, 그다음 `.changeset/config.json`의 `"changelog": false`를 근거로 "의도된 설정이므로 결함 아님"으로 정정했다. **둘 다 정확하지 않았다** — 설정은 의도적이었지만 `changesets/action`과 **호환되지 않는 조합**이었다(아래 ⑤). 즉 결함은 "CHANGELOG가 없다"가 아니라 "CHANGELOG 없이 동작할 수 없는 action을 쓰면서 CHANGELOG를 끈 것"이다.
 
 #### 실행을 막고 있던 것 (원인)
 
@@ -103,24 +103,36 @@ exit=1
 
 **③** `changesets/action`이 만드는 PR의 base가 main이었다 — main만 버전이 오르고 dev는 136개를 유지해 두 브랜치의 `package.json`이 갈라진다.
 
+**④ changeset 게이트가 릴리스 커밋 자체를 거부했다.** `changesets version` 커밋은 앱 매니페스트 버전만 올리고 `.changeset/*.md`를 소비하는데, 매니페스트가 `affectsRelease()` 경로라 게이트에 걸리고 소비 직후엔 미소비 changeset이 0개라 `assertReleaseChangeset`이 **항상** 실패했다. 격리 환경 재현: 매니페스트 2개 + changeset 삭제 diff → `exit 1`.
+
+**⑤ `changelog: false`와 `changesets/action`은 호환되지 않는다.** ①~④를 고친 뒤 첫 dispatch에서 실제로 드러났다 — `changesets version`은 성공했지만(`🦋 All files have been updated`) action이 PR 본문을 만들려고 각 패키지의 `CHANGELOG.md`를 읽다가 죽었다:
+
+```
+Error: ENOENT: no such file or directory, open '.../apps/v1_api/CHANGELOG.md'
+    at async file:///.../changesets/action/.../dist/index.js
+```
+
+즉 설정은 의도적이었지만, CHANGELOG 없이 동작할 수 없는 action을 쓰면서 CHANGELOG를 끈 조합이 문제였다.
+
 #### 조치 (기계장치 복구)
 
 - `resolve-changeset-version.mjs`가 `assertReleaseChangeset` 대신 `loadReleaseContract`를 쓴다. 0개여도 버전을 계산하고, 그때 bump는 `patch`로 떨어져 갓 릴리스한 `0.1.0` 다음 alpha 빌드는 `0.1.1-alpha.*`가 된다 — `0.1.0 < 0.1.1-alpha.* < 0.1.1`로 SemVer 순서가 유지된다.
 - **"행동 변경에는 changeset 필수" 게이트는 그대로다.** 그 강제는 `check-changeset-policy.mjs`가 담당하며, 0개 상태에서 행동 변경이 오면 여전히 `exit 1`한다(둘의 분리를 테스트로 고정).
 - `release-main.yml`: dispatch 조건을 `refs/heads/dev`로, 워크플로 표시 이름을 `Prepare Release PR`로, concurrency group을 `prepare-release-pr`로. 소비할 changeset이 0개면 **빈 릴리스 PR을 열지 않고 실패**한다.
 - `.changeset/config.json`의 `baseBranch`를 `dev`로.
-- `scripts/release/versioning.contract.test.mjs`에 회귀 테스트 2개 추가 — 0-changeset 리졸버 동작, 워크플로의 dev base + 빈 릴리스 거부.
+- `check-changeset-policy.mjs`에 **Changesets 릴리스 커밋 예외**를 넣었다. release-affecting 파일이 앱 매니페스트(+`pnpm-lock.yaml`)뿐이고 changeset을 소비한 diff만 통과시키며, **fixed 그룹 양쪽이 모두 올라야** 한다 — 한쪽만 올린 diff를 통과시키면 버전이 갈라진 채 머지되고, 그 드리프트는 릴리스 직후 `Validate planned SemVer`가 skip되어 CI를 통과한 뒤 alpha 배포에서야 터진다.
+- `.changeset/config.json`의 `changelog`를 `@changesets/cli/changelog`로 켰다. `apps/v1_api`/`apps/v1_web`에 `CHANGELOG.md`가 생기고 changeset 사유가 그 안에 보존된다 — 지금까지는 소비 시 전부 버려졌다.
+- `scripts/release/versioning.contract.test.mjs`에 회귀 테스트 6개 추가 — 0-changeset 리졸버, 워크플로 dev base + 빈 릴리스 거부, 릴리스 커밋 예외(통과), 소스 파일 섞인 diff(거부), 반쪽 bump(거부), changelog 생성기 설정 고정.
+- CI `Gates` job이 이 스위트를 **처음으로 실행한다**. 파일은 있었지만 어떤 워크플로도 돌리지 않았고, 그래서 ①이 계속 살아 있었다. `node --test <디렉터리>` 형태는 Node 버전에 따라 모듈 해석으로 넘어가므로 파일 경로를 명시한다.
 
-파일명은 `release-main.yml`로 남겼다. main 승격이 폐기되기 전 이름이지만 참조 문서·메모리가 이 이름을 쓰고 있어 지금 바꾸면 추적만 어려워진다.
+파일명은 `release-main.yml`로 남겼다. main 승격이 폐기되기 전 이름이지만 참조 문서·메모리가 이 이름을 쓰고 있어 지금 바꾸면 추적만 어려워진다. `gh workflow run`은 표시 이름 인덱싱이 늦으므로 **파일명으로 dispatch**할 것.
 
-#### 남은 일 (사용자 게이트)
+#### 릴리스 절차 (복구된 경로)
 
-136개를 실제로 소비해 `0.1.0`을 확정하는 것은 **복구된 경로로** 해야 한다:
-
-1. 이 변경을 dev에 머지 → alpha 재배포 → `x-teameet-release`로 새 prerelease 확인
-2. dev에서 `Prepare Release PR` 워크플로를 dispatch (`alpha_release`, `alpha_sha`, `confirmation=CREATE_RELEASE_PR`)
-3. 생성된 draft PR 검토 후 머지 → dev의 `v1_api`/`v1_web` 버전이 `0.1.0`, changeset 136개 소비
-4. 다음 alpha 배포가 0-changeset 상태에서도 정상 동작하는지 확인 (①의 실효 검증)
+1. dev에 머지 → alpha 재배포 → `x-teameet-release`/`x-teameet-commit`으로 배포본 확인
+2. `gh workflow run release-main.yml --ref dev -f alpha_release=<위 헤더 값> -f alpha_sha=<위 헤더 값> -f confirmation=CREATE_RELEASE_PR`
+3. 생성된 draft PR 검토 후 머지 → dev의 두 앱 버전이 상승, changeset 소비, `CHANGELOG.md` 갱신
+4. 그 머지가 트리거한 alpha 배포가 0-changeset 상태에서 정상 동작하는지 확인 (①의 실효 검증)
 
 3번은 릴리스 확정이므로 사용자 승인 후에 진행한다.
 

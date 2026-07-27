@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
-import type { V1MyTeam, V1TournamentDetail } from '@/types/api';
+import type { V1MyTeam, V1TournamentDetail, V1TournamentRegistration } from '@/types/api';
 import { TournamentApplyPageClient } from './tournament-apply-client';
 
 const tournamentApplyApiMocks = vi.hoisted(() => ({
@@ -134,6 +134,33 @@ function makeTeam(overrides: Partial<V1MyTeam> = {}): V1MyTeam {
   };
 }
 
+function makeRegistration(overrides: Partial<V1TournamentRegistration> = {}): V1TournamentRegistration {
+  return {
+    id: 'registration-cancelled',
+    tournamentId: 'tournament-1',
+    teamId: 'team-1',
+    teamName: '성수 풋살 크루',
+    appliedByUserId: 'user-1',
+    status: 'cancelled',
+    depositorName: null,
+    agreedRules: false,
+    agreedPrivacy: false,
+    agreedRefund: false,
+    agreedMediaConsent: false,
+    confirmedAt: null,
+    rosterLockedAt: null,
+    rosterDeadlineOverrideAt: null,
+    cancelRequestedAt: '2026-07-01T00:00:00.000Z',
+    cancelReason: '입금 미확인 자동 취소',
+    playerCount: 0,
+    payment: null,
+    paymentInstructions: null,
+    createdAt: '2026-06-30T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 describe('TournamentApplyPageClient GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -228,6 +255,57 @@ describe('TournamentApplyPageClient GA events', () => {
         }),
       );
       expect(trackEvent).toHaveBeenCalledWith('tournament_apply_complete', { tournamentId: 'tournament-1' });
+    });
+  });
+
+  describe('취소된 신청의 재신청', () => {
+    it('취소된 신청이 있는 팀을 다시 골라도 새 신청을 생성한다 (취소된 registrationId를 이어받지 않음)', async () => {
+      // 입금 미확인으로 자동 취소된 신청이 남아있는 상태 — 같은 팀으로 재신청이 가능해야 한다.
+      tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({
+        data: [makeRegistration()],
+        isLoading: false,
+      });
+      const createRegistrationMutateAsync = vi.fn().mockResolvedValue({
+        id: 'registration-reactivated',
+        status: 'draft',
+      });
+      const submitRegistrationMutateAsync = vi.fn().mockResolvedValue({
+        id: 'registration-reactivated',
+        status: 'awaiting_payment',
+        payment: { paymentDueAt: '2026-07-19T00:00:00.000Z' },
+        paymentInstructions: null,
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+        mutateAsync: createRegistrationMutateAsync,
+        isPending: false,
+      });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+        mutateAsync: submitRegistrationMutateAsync,
+        isPending: false,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      // 사용자가 팀 카드를 직접 눌러 선택하는 경로 (자동 선택 경로와 별개)
+      fireEvent.click((await screen.findAllByRole('radio'))[0]);
+      const [nextButton] = await screen.findAllByRole('button', { name: /^다음 단계/ });
+      fireEvent.click(nextButton);
+
+      await waitFor(() => {
+        expect(createRegistrationMutateAsync).toHaveBeenCalledWith({ teamId: 'team-1' });
+      });
+
+      fireEvent.click(await screen.findByLabelText('전체 동의'));
+      fireEvent.change(screen.getByLabelText('입금자명 *'), { target: { value: '성수 풋살 크루' } });
+      fireEvent.click(screen.getAllByRole('button', { name: '신청 제출하기' })[0]);
+      fireEvent.click(await screen.findByRole('button', { name: '확인하고 신청하기' }));
+
+      // 취소된 신청 id로 submit하면 서버가 409(REGISTRATION_NOT_DRAFT)로 막는다.
+      await waitFor(() => {
+        expect(submitRegistrationMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({ registrationIdOverride: 'registration-reactivated' }),
+        );
+      });
     });
   });
 

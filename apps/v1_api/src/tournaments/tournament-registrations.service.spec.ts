@@ -11,7 +11,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
-import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
 
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -126,7 +125,6 @@ describe('TournamentRegistrationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TournamentRegistrationsService,
-        TournamentPaymentExpiryService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
         { provide: ManagedTermsRuntimeService, useValue: managedTerms },
@@ -367,7 +365,6 @@ describe('TournamentRegistrationsService', () => {
         method: 'bank_transfer',
         status: 'ready',
         amount: 120000,
-        paymentDueAt: '2026-06-14T02:00:00.000Z',
       },
       paymentInstructions: {
         bankName: '국민은행',
@@ -576,47 +573,23 @@ describe('TournamentRegistrationsService', () => {
     );
   });
 
-  it('getMyRegistration: overdue awaiting-payment is cancelled before serialization', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-06-14T02:01:00.000Z'));
+  it('getMyRegistration: 입금 안내 후 오래 지난 awaiting_payment 신청도 자동 취소되지 않고 그대로 유지된다', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-20T00:00:00.000Z'));
     const createdAt = new Date('2026-06-14T00:00:00.000Z');
-    const overdueRegistration = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
-    const overduePayment = paymentRow({ createdAt, status: 'ready' });
-    const cancelledRegistration = registrationRow({
-      appliedByUserId: manager.id,
-      status: 'cancelled',
-      cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
-    });
-    const cancelledPayment = paymentRow({
-      createdAt,
-      status: 'cancelled',
-      cancelledAt: new Date('2026-06-14T02:01:00.000Z'),
-    });
-    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(overdueRegistration);
-    prisma.v1TournamentPayment.findUnique.mockResolvedValue(overduePayment);
-    prisma.v1TournamentRegistration.update.mockResolvedValue(cancelledRegistration);
-    prisma.v1TournamentPayment.update.mockResolvedValue(cancelledPayment);
+    const longOverdueRegistration = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
+    const longOverduePayment = paymentRow({ createdAt, status: 'ready' });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(longOverdueRegistration);
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(longOverduePayment);
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
 
     const result = await service.getMyRegistration(manager, 'tournament-1');
 
     expect(result).toMatchObject({
-      status: 'cancelled',
-      cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
-      payment: {
-        status: 'cancelled',
-        paymentDueAt: '2026-06-14T02:00:00.000Z',
-      },
+      status: 'awaiting_payment',
+      payment: { status: 'ready' },
     });
-    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'cancelled',
-          cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
-        }),
-      }),
-    );
-    expect(prisma.v1TournamentPayment.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
-    );
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.update).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
 

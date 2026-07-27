@@ -818,7 +818,6 @@ export function TournamentDetailView({
           <Card pad={0} style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
             {([
               { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정됩니다.' },
-              { label: '자동 취소', text: '신청 후 2시간 내 입금 미확인 시 자동 취소됩니다.' },
               { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
               { label: '주최 취소', text: '주최 측 사정 취소 시 참가비 100% 환불됩니다.' },
               { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않습니다.' },
@@ -1265,7 +1264,6 @@ function AccordionSection({
  */
 const PRE_PARTICIPATION_CHECK_ITEMS: { label: string; text: string }[] = [
   { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 참가가 확정됩니다.' },
-  { label: '자동 취소', text: '신청 후 2시간 내 입금 미확인 시 신청이 자동 취소됩니다.' },
   { label: '환불 불가', text: '참가비 입금 후 단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
   { label: '주최 취소', text: '주최 측 사정으로 대회가 취소되는 경우 참가비 100% 환불됩니다.' },
   { label: '대회 연기', text: '대회 연기 시 기존 대회일 2주 전까지 취소·환불 요청이 가능합니다.' },

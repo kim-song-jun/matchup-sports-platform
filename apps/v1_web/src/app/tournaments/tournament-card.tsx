@@ -268,6 +268,13 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
             {item.teamCount > 0 && reservedTeamCount / item.teamCount >= 0.8
               ? <span className="tm-badge tm-badge-orange">{reservedTeamCount >= item.teamCount ? '마감' : '거의 마감'}</span>
               : null}
+            {/* 입금대기 팀도 정원을 점유하므로(서버 CAPACITY_HOLD_STATUSES) "+N 팀 예약"만으론
+                왜 신청을 못 받는지 알 수 없었다 — 대회 상세와 같은 낱말로 명시한다. */}
+            {pendingPaymentCount > 0 ? (
+              <span className="tm-badge tm-badge-grey" style={{ whiteSpace: 'nowrap' }}>
+                입금대기 {pendingPaymentCount}팀
+              </span>
+            ) : null}
             <span className="tab-num">{item.confirmedCount}</span>
             {pendingPaymentCount > 0 ? (
               <>

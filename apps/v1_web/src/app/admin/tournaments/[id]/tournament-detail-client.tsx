@@ -113,7 +113,6 @@ import {
 } from '@/components/admin';
 import type { AdminTableColumn } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { getTournamentPaymentDeadlineState } from '@/components/tournaments/tournament-payment-deadline';
 import { TournamentSponsorsTab } from './tournament-sponsors-tab';
 import { TournamentPopupTab } from './tournament-popup-tab';
 import { TournamentCampaignTab } from './tournament-campaign-tab';
@@ -261,14 +260,6 @@ function formatRegistrationPaymentSubtitle(
   const method = PAYMENT_METHOD_LABEL[payment.method] ?? payment.method;
   const status = PAYMENT_STATUS_LABEL[payment.status] ?? payment.status;
   return `${method} · ${status} · ${formatCurrency(payment.amount)}`;
-}
-
-function getRegistrationPaymentDeadlineLabel(
-  payment: V1AdminTournamentRegistration['payment'],
-): string | null {
-  if (!payment || payment.status !== 'ready') return null;
-  const deadline = getTournamentPaymentDeadlineState(payment.paymentDueAt);
-  return deadline ? `${deadline.label}까지` : null;
 }
 
 function isoToDatetimeLocalValue(dateStr: string | null | undefined): string {
@@ -991,14 +982,6 @@ export function RegistrationsTab({
                   {
                     icon: <User size={14} aria-hidden="true" />,
                     label: `입금자 ${r.depositorName}`,
-                  },
-                ]
-              : []),
-            ...(getRegistrationPaymentDeadlineLabel(r.payment)
-              ? [
-                  {
-                    icon: <Clock size={14} aria-hidden="true" />,
-                    label: getRegistrationPaymentDeadlineLabel(r.payment),
                   },
                 ]
               : []),

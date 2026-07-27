@@ -12,7 +12,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { AdminRegistrationsService } from './admin-registrations.service';
 
 const opsAuth = { id: 'ops-user-id', email: 'ops@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -108,7 +107,6 @@ describe('AdminRegistrationsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminRegistrationsService,
-        TournamentPaymentExpiryService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
@@ -174,34 +172,22 @@ describe('AdminRegistrationsService', () => {
     );
   });
 
-  it('confirmPayment: overdue awaiting-payment is auto-cancelled and cannot be confirmed', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-06-14T02:01:00.000Z'));
+  it('confirmPayment: 입금 안내 후 오래 지난 awaiting_payment 신청도 자동 취소 없이 정상 확인된다', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-20T00:00:00.000Z'));
     const createdAt = new Date('2026-06-14T00:00:00.000Z');
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
     prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'ready', createdAt }));
-    prisma.v1TournamentRegistration.update.mockResolvedValue(
-      registrationRow({
-        status: 'cancelled',
-        cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
-      }),
-    );
     prisma.v1TournamentPayment.update.mockResolvedValue(
-      paymentRow({ status: 'cancelled', createdAt, cancelledAt: new Date('2026-06-14T02:01:00.000Z') }),
+      paymentRow({ status: 'paid', createdAt, paidAt: new Date(), confirmedByAdminUserId: 'ops-admin-id' }),
     );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'payment_checking' }));
 
-    await expect(service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' })).rejects.toMatchObject({
-      response: {
-        code: 'PAYMENT_DEADLINE_EXPIRED',
-        message: '입금 안내 후 2시간이 지나 신청이 자동 취소됐어요.',
-      },
-    });
+    const result = await service.confirmPayment(opsAuth, 'reg-1', { note: '입금 확인' });
 
+    expect(result).toMatchObject({ status: 'payment_checking', payment: { status: 'paid' } });
     expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
-    );
-    expect(prisma.v1TournamentPayment.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' } ) }),
     );
     jest.useRealTimers();
   });

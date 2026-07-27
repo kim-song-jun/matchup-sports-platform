@@ -207,7 +207,7 @@ describe('TournamentApplyPageClient GA events', () => {
     const submitRegistrationMutateAsync = vi.fn().mockResolvedValue({
       id: 'registration-1',
       status: 'awaiting_payment',
-      payment: { paymentDueAt: '2026-07-19T00:00:00.000Z' },
+      payment: null,
       paymentInstructions: {
         bankName: '국민은행',
         bankAccount: '123-456-789',
@@ -272,7 +272,7 @@ describe('TournamentApplyPageClient GA events', () => {
       const submitRegistrationMutateAsync = vi.fn().mockResolvedValue({
         id: 'registration-reactivated',
         status: 'awaiting_payment',
-        payment: { paymentDueAt: '2026-07-19T00:00:00.000Z' },
+        payment: null,
         paymentInstructions: null,
       });
       tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
@@ -305,6 +305,102 @@ describe('TournamentApplyPageClient GA events', () => {
         expect(submitRegistrationMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({ registrationIdOverride: 'registration-reactivated' }),
         );
+      });
+    });
+  });
+
+  describe('정원·마감으로 재신청이 불가능한 경우', () => {
+    function arrangeCancelledReapply() {
+      tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({
+        data: [makeRegistration()],
+        isLoading: false,
+      });
+      const createRegistrationMutateAsync = vi.fn();
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+        mutateAsync: createRegistrationMutateAsync,
+        isPending: false,
+      });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      });
+      return createRegistrationMutateAsync;
+    }
+
+    it('입금대기 팀이 정원을 채운 대회에서는 이유를 알려주고 신청을 만들지 않는다', async () => {
+      // 확정 5 + 입금대기 3 = 정원 8 → 목록엔 "5 / 8"로 보여도 서버는 409로 막는다.
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3 }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      const createRegistrationMutateAsync = arrangeCancelledReapply();
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      expect(await screen.findByText(/입금대기 3팀이 자리를 잡고 있어요/)).toBeInTheDocument();
+
+      fireEvent.click((await screen.findAllByRole('radio'))[0]);
+      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
+
+      // 약관 단계로 넘기지 않고, 서버를 헛되게 호출하지도 않는다.
+      await waitFor(() => {
+        expect(screen.getAllByText(/입금대기 3팀이 자리를 잡고 있어요/).length).toBeGreaterThan(0);
+      });
+      expect(createRegistrationMutateAsync).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText('전체 동의')).not.toBeInTheDocument();
+    });
+
+    it('신청 마감 시각이 지난 대회에서도 같은 기준으로 막는다', async () => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ registrationDeadlineAt: '2020-01-01T00:00:00.000Z' }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      const createRegistrationMutateAsync = arrangeCancelledReapply();
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      expect(await screen.findByText('신청이 마감돼서 새로 신청할 수 없어요.')).toBeInTheDocument();
+      fireEvent.click((await screen.findAllByRole('radio'))[0]);
+      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
+      await waitFor(() => {
+        expect(createRegistrationMutateAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    it('정원에 여유가 있으면 그대로 재신청을 진행한다', async () => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ teamCount: 8, confirmedCount: 5, pendingPaymentCount: 0 }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      tournamentApplyApiMocks.useV1MyRegistrations.mockReturnValue({
+        data: [makeRegistration()],
+        isLoading: false,
+      });
+      const createRegistrationMutateAsync = vi
+        .fn()
+        .mockResolvedValue({ id: 'registration-reactivated', status: 'draft' });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+        mutateAsync: createRegistrationMutateAsync,
+        isPending: false,
+      });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      fireEvent.click((await screen.findAllByRole('radio'))[0]);
+      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
+
+      await waitFor(() => {
+        expect(createRegistrationMutateAsync).toHaveBeenCalledWith({ teamId: 'team-1' });
       });
     });
   });

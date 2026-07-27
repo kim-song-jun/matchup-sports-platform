@@ -27,6 +27,12 @@ export function PhoneVerifyPageClient() {
   const alreadyVerified = authMe.data?.verification?.phoneVerified === true;
   const [phoneDigits, setPhoneDigits] = useState('');
   const [done, setDone] = useState(false);
+  /**
+   * 계정에 번호가 이미 있으면 그 번호로 문자가 나간다. 어떤 번호인지 보여주지 않으면
+   * 잘못 저장된 번호를 확인할 방법이 없고, 고치려면 프로필까지 가야 했다.
+   * 인증 확정 시 서버가 user.phone 을 인증한 번호로 갱신하므로 이 화면에서 바로 고칠 수 있다.
+   */
+  const [editingPhone, setEditingPhone] = useState(false);
 
   useEffect(() => {
     if (existingPhone) setPhoneDigits(existingPhone);
@@ -57,18 +63,53 @@ export function PhoneVerifyPageClient() {
               </p>
             </Card>
 
-            {!existingPhone ? (
-              <label className="tm-auth-field">
-                <span className="tm-text-label">휴대폰 번호</span>
-                <input
-                  className="tm-input tm-auth-input"
-                  inputMode="numeric"
-                  onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
-                  placeholder="010-0000-0000"
-                  value={formatPhone(phoneDigits)}
-                />
-              </label>
-            ) : null}
+            {!existingPhone || editingPhone ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label className="tm-auth-field">
+                  <span className="tm-text-label">휴대폰 번호</span>
+                  <input
+                    className="tm-input tm-auth-input"
+                    inputMode="numeric"
+                    onChange={(event) => setPhoneDigits(normalizeSeparatedDigits(event.target.value))}
+                    placeholder="010-0000-0000"
+                    value={formatPhone(phoneDigits)}
+                  />
+                </label>
+                {existingPhone ? (
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-ghost"
+                    style={{ alignSelf: 'flex-start', minHeight: 44 }}
+                    onClick={() => {
+                      setPhoneDigits(existingPhone);
+                      setEditingPhone(false);
+                    }}
+                  >
+                    기존 번호로 되돌리기
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+                    인증번호를 받을 번호
+                  </p>
+                  <p className="tm-text-label" style={{ margin: '2px 0 0', color: 'var(--text-strong)' }}>
+                    {formatPhone(phoneDigits)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="tm-btn tm-btn-sm tm-btn-neutral"
+                  style={{ flexShrink: 0, minHeight: 44 }}
+                  onClick={() => setEditingPhone(true)}
+                  aria-label="인증받을 휴대폰 번호 수정"
+                >
+                  번호 수정
+                </button>
+              </Card>
+            )}
 
             {phoneDigits.length === 11 ? (
               <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} />

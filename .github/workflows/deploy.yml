@@ -391,7 +391,7 @@ jobs:
                         grep -qx 200 && \
                         curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/api/v1/health 2>/dev/null | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "404"'; then
+                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "308"'; then
               echo "Deploy OK"
               exit 0
             fi

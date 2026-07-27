@@ -258,6 +258,35 @@ describe('TournamentApplyPageClient GA events', () => {
     });
   });
 
+  describe('입금자명 입력', () => {
+    it('입금자명을 비워두면 제출할 수 없고, 팀명이 자동으로 채워지지도 않는다', async () => {
+      // 예전에는 선택한 팀명을 미리 채워서, 아무것도 입력하지 않아도 제출이 가능했다.
+      // 실제 입금은 개인 이름으로 들어오므로 그 자동채움이 입금 확인 지연을 만들었다.
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({
+        mutateAsync: vi.fn().mockResolvedValue({ id: 'registration-1', status: 'draft' }),
+        isPending: false,
+      });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({
+        mutateAsync: vi.fn(),
+        isPending: false,
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+      fireEvent.click((await screen.findAllByRole('button', { name: /^다음 단계/ }))[0]);
+
+      const depositorInput = await screen.findByLabelText('입금자명 *');
+      expect(depositorInput).toHaveValue('');
+
+      fireEvent.click(await screen.findByLabelText('전체 동의'));
+      for (const button of screen.getAllByRole('button', { name: '신청 제출하기' })) {
+        expect(button).toBeDisabled();
+      }
+
+      fireEvent.change(depositorInput, { target: { value: '김성준' } });
+      expect(screen.getAllByRole('button', { name: '신청 제출하기' })[0]).toBeEnabled();
+    });
+  });
+
   describe('취소된 신청의 재신청', () => {
     it('취소된 신청이 있는 팀을 다시 골라도 새 신청을 생성한다 (취소된 registrationId를 이어받지 않음)', async () => {
       // 입금 미확인으로 자동 취소된 신청이 남아있는 상태 — 같은 팀으로 재신청이 가능해야 한다.

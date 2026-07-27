@@ -1534,16 +1534,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const createBusyRef = useRef(false);
   const submitBusyRef = useRef(false);
 
-  // P0: 입금자명 prefill — 정책상 팀명/신청자명 일치 요구. 비어 있을 때만 선택 팀명으로 채움
-  useEffect(() => {
-    if (step !== 'agreements') return;
-    if (agreements.depositorName.trim()) return;
-    const team = managerTeams.find((t) => t.teamId === selectedTeamId);
-    if (team?.name) {
-      setAgreements((prev) => (prev.depositorName.trim() ? prev : { ...prev, depositorName: team.name.slice(0, 20) }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, selectedTeamId]);
+  // 입금자명은 자동으로 채우지 않는다. 예전에는 선택한 팀명을 미리 넣어줬는데(정책상 팀명도
+  // 허용되므로) 사용자가 아무것도 입력하지 않아도 제출 버튼이 활성화됐다 — 신청자는 "입금자명을
+  // 안 넣었는데 신청이 됐다"고 느끼고, 실제 입금은 개인 이름으로 들어와 입금 확인이 지연된다.
+  // 실제로 입금할 이름을 직접 적게 한다.
 
   // Auto-select first manager team
   useEffect(() => {

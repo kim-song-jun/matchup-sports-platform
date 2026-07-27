@@ -178,6 +178,56 @@ test('fixed v1 apps resolve the highest grouped bump into one deterministic alph
   }
 });
 
+test('the Changesets version commit itself is not blocked by the changeset gate', () => {
+  // 릴리스 커밋은 매니페스트 버전만 올리고 changeset 을 소비한다. 행동 변경이 아니므로
+  // changeset 동반 요구가 성립하지 않는데, 소비 직후엔 미소비 changeset 이 0개라
+  // 예전 게이트는 항상 실패했다 — 게이트가 릴리스 자체를 막고 있었다.
+  const root = createFixture({ apiVersion: '0.1.0', webVersion: '0.1.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/package.json',
+        'apps/v1_web/package.json',
+        '.changeset/consumed-one.md',
+        '.changeset/consumed-two.md',
+      ].join('\n'),
+    );
+
+    const result = runNode(policyPath, ['--repo', root, '--changed-files-file', changedFiles]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /release commit detected/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a real behavior change cannot pose as a release commit', () => {
+  // 예외는 "매니페스트(+lockfile)만 바뀐 경우"로 좁혀야 한다. 소스 파일이 섞여 있으면
+  // changeset 을 지웠다는 이유로 게이트를 통과해선 안 된다.
+  const root = createFixture({ apiVersion: '0.1.0', webVersion: '0.1.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/package.json',
+        'apps/v1_web/src/app/tournaments/page.tsx',
+        '.changeset/consumed-one.md',
+      ].join('\n'),
+    );
+
+    const result = runNode(policyPath, ['--repo', root, '--changed-files-file', changedFiles]);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /release changeset is required/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('resolver still labels an alpha build after every changeset has been released', () => {
   // 릴리스 직후 상태: changeset 0개 + 버전이 이미 올라간 package.json.
   // deploy-alpha.yml 은 이 리졸버를 가드 없이 호출하므로, 여기서 실패하면 릴리스를 한

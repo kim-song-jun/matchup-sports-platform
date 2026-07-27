@@ -47,6 +47,32 @@ function affectsRelease(path) {
   );
 }
 
+/**
+ * Changesets `version` 커밋을 알아본다.
+ *
+ * 그 커밋은 앱 매니페스트의 버전만 올리고 `.changeset/*.md` 를 소비(삭제)한다. 행동 변경이
+ * 아니므로 "changeset 을 동반하라"는 요구가 성립하지 않는데, 매니페스트가 release-affecting
+ * 경로라서 게이트에 걸렸다 — 게다가 소비 직후에는 미소비 changeset 이 0개이므로
+ * assertReleaseChangeset 이 항상 실패했다. 즉 게이트가 릴리스 자체를 막고 있었다.
+ */
+const RELEASE_COMMIT_ALLOWED_FILES = [
+  'apps/v1_api/package.json',
+  'apps/v1_web/package.json',
+  // 버전 bump 가 lockfile 을 건드리는 경우까지 허용한다. 여기서 막히면 릴리스가
+  // 또 진행 불가가 되는데, 그건 게이트가 잡으려던 위험보다 훨씬 큰 손해다.
+  'pnpm-lock.yaml',
+];
+
+function isChangesetsReleaseCommit(changedFiles, releaseFiles) {
+  const consumesChangesets = changedFiles.some(
+    (path) => /^\.changeset\/[^/]+\.md$/.test(path) && path !== '.changeset/README.md',
+  );
+  const onlyVersionManifests = releaseFiles.every((path) =>
+    RELEASE_COMMIT_ALLOWED_FILES.includes(path),
+  );
+  return consumesChangesets && onlyVersionManifests;
+}
+
 try {
   const { repo, changedFilesFile } = parseArguments(process.argv.slice(2));
   const changedFiles = readFileSync(changedFilesFile, 'utf8')
@@ -54,7 +80,11 @@ try {
     .map((path) => path.trim())
     .filter(Boolean);
   const releaseFiles = changedFiles.filter(affectsRelease);
-  if (releaseFiles.length > 0) {
+  if (releaseFiles.length > 0 && isChangesetsReleaseCommit(changedFiles, releaseFiles)) {
+    process.stdout.write(
+      'Changesets release commit detected (version bump + consumed Changesets); changeset not required\n',
+    );
+  } else if (releaseFiles.length > 0) {
     const contract = assertReleaseChangeset(repo);
     const changedChangesets = changedFiles.filter(
       (path) => /^\.changeset\/[^/]+\.md$/.test(path) && path !== '.changeset/README.md',

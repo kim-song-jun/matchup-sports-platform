@@ -50,6 +50,9 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
   const reservedTeamCount = getReservedTeamCount(item);
+  // coverImageUrl이 없는 대회도 홈 프로모션용으로 등록된 실사진(promoHomeImageUrl)이 있으면
+  // 아이콘 대신 그 사진을 썸네일로 재사용한다 (둘 다 없으면 종목색 그라디언트+아이콘 폴백).
+  const thumbnailImageUrl = item.coverImageUrl ?? item.promoHomeImageUrl;
 
   return (
     <div role="listitem" style={{ height: '100%' }}>
@@ -67,20 +70,21 @@ export function TournamentCard({ item }: { item: V1TournamentListItem }) {
       >
         {/* Top row: (선택) 커버 이미지 썸네일 + [제목·배지 / 종목·일정·장소] 세로 스택 */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          {item.coverImageUrl ? (
+          {thumbnailImageUrl ? (
             <div
               aria-hidden="true"
               style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'var(--grey100)' }}
             >
               <img
-                src={publicAssetPath(item.coverImageUrl)}
+                src={publicAssetPath(thumbnailImageUrl)}
                 alt=""
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
           ) : (
-            // 커버 이미지가 없는 대회는 종목색 그라디언트 배지로 대체한다 — 대회 상세 헤더의
-            // 트로피 배지(linear-gradient 135deg, 500→600 + 흰 아이콘)와 동일한 시각 언어.
+            // 커버 이미지도 홈 프로모션 사진(promoHomeImageUrl)도 없는 대회는 종목색
+            // 그라디언트 배지로 대체한다 — 대회 상세 헤더의 트로피 배지(linear-gradient
+            // 135deg, 500→600 + 흰 아이콘)와 동일한 시각 언어.
             // 이전의 옅은 pastel bg(badgeBg)+톤온톤 아이콘(badgeText) 조합은 카드 목록에서
             // 밋밋하고 흐릿하게 보였다(사용자 피드백: "아이콘도 촌스러워").
             <div

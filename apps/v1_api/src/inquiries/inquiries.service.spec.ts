@@ -71,6 +71,85 @@ describe('InquiriesService', () => {
     })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('creates a guest inquiry with a guest email and no userId', async () => {
+    prisma.v1Inquiry.create.mockResolvedValue({
+      id: 'inquiry-guest-1',
+      userId: null,
+      guestEmail: 'guest@teameet.test',
+      guestPhone: null,
+      category: 'tournament',
+      title: 'Tournament question',
+      body: 'When is the schedule confirmed?',
+      contact: null,
+      relatedType: 'tournament',
+      relatedId: 'tournament-1',
+      status: 'received',
+      createdAt: now,
+      updatedAt: now,
+      closedAt: null,
+    });
+
+    await expect(service.create(undefined, {
+      category: 'tournament',
+      title: 'Tournament question',
+      body: 'When is the schedule confirmed?',
+      relatedType: 'tournament',
+      relatedId: 'tournament-1',
+      guestEmail: 'guest@teameet.test',
+    })).resolves.toMatchObject({ inquiryId: 'inquiry-guest-1' });
+
+    expect(prisma.v1Inquiry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: null,
+        guestEmail: 'guest@teameet.test',
+        guestPhone: null,
+      }),
+    });
+  });
+
+  it('rejects a guest inquiry with neither guestEmail nor guestPhone', async () => {
+    await expect(service.create(undefined, {
+      category: 'tournament',
+      title: 'Tournament question',
+      body: 'When is the schedule confirmed?',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.v1Inquiry.create).not.toHaveBeenCalled();
+  });
+
+  it('ignores guestEmail/guestPhone when the requester is logged in', async () => {
+    prisma.v1Inquiry.create.mockResolvedValue({
+      id: 'inquiry-2',
+      userId: user.id,
+      guestEmail: null,
+      guestPhone: null,
+      category: 'account',
+      title: 'Login issue',
+      body: 'Body',
+      contact: null,
+      relatedType: null,
+      relatedId: null,
+      status: 'received',
+      createdAt: now,
+      updatedAt: now,
+      closedAt: null,
+    });
+
+    await service.create(user, {
+      category: 'account',
+      title: 'Login issue',
+      body: 'Body',
+      guestEmail: 'should-not-be-stored@teameet.test',
+    });
+
+    expect(prisma.v1Inquiry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: user.id,
+        guestEmail: null,
+        guestPhone: null,
+      }),
+    });
+  });
+
   it('lists only current user inquiries', async () => {
     prisma.v1Inquiry.findMany.mockResolvedValue([
       {

@@ -922,6 +922,8 @@ export class AdminService {
             { body: { contains: query.q, mode: 'insensitive' as const } },
             { user: { email: { contains: query.q, mode: 'insensitive' as const } } },
             { user: { profile: { nickname: { contains: query.q, mode: 'insensitive' as const } } } },
+            { guestEmail: { contains: query.q, mode: 'insensitive' as const } },
+            { guestPhone: { contains: query.q, mode: 'insensitive' as const } },
           ],
         }
       : {};
@@ -946,6 +948,8 @@ export class AdminService {
         updatedAt: true,
         closedAt: true,
         userId: true,
+        guestEmail: true,
+        guestPhone: true,
         user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
         _count: { select: { replies: true } },
       },
@@ -967,6 +971,8 @@ export class AdminService {
       select: {
         id: true,
         userId: true,
+        guestEmail: true,
+        guestPhone: true,
         category: true,
         title: true,
         body: true,
@@ -1035,6 +1041,37 @@ export class AdminService {
         },
         tx,
       );
+    });
+
+    return this.getInquiry(user, inquiryId);
+  }
+
+  async updateInquiryReply(user: V1AuthUser, inquiryId: string, replyId: string, dto: ReplyInquiryDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    const body = dto.body.trim();
+    if (!body) {
+      throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1InquiryReply.findUnique({ where: { id: replyId } });
+      if (!existing || existing.inquiryId !== inquiryId) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: 'Reply was not found' });
+      }
+
+      await tx.v1InquiryReply.update({ where: { id: replyId }, data: { body } });
+
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'inquiry.reply.update',
+          targetType: 'inquiry_reply',
+          targetId: replyId,
+          reason: '문의 답변 수정',
+          beforeJson: { inquiryId, replyId, bodyPreview: existing.body.slice(0, 60) } as Prisma.InputJsonValue,
+          afterJson: { inquiryId, replyId, bodyPreview: body.slice(0, 60) } as Prisma.InputJsonValue,
+        },
+      });
     });
 
     return this.getInquiry(user, inquiryId);
@@ -1423,7 +1460,9 @@ export class AdminService {
 
   private toAdminInquiryRow(row: {
     id: string;
-    userId: string;
+    userId: string | null;
+    guestEmail: string | null;
+    guestPhone: string | null;
     category: string;
     title: string;
     status: string;
@@ -1432,14 +1471,17 @@ export class AdminService {
     createdAt: Date;
     updatedAt: Date;
     closedAt: Date | null;
-    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null } | null;
     _count: { replies: number };
   }) {
     return {
       inquiryId: row.id,
       userId: row.userId,
-      requesterName: row.user.profile?.nickname ?? row.user.profile?.displayName ?? null,
-      requesterEmail: row.user.email ?? null,
+      isGuest: !row.userId,
+      requesterName: row.user?.profile?.nickname ?? row.user?.profile?.displayName ?? null,
+      requesterEmail: row.user?.email ?? row.guestEmail ?? null,
+      guestEmail: row.guestEmail,
+      guestPhone: row.guestPhone,
       category: row.category,
       title: row.title,
       status: row.status,
@@ -1454,7 +1496,9 @@ export class AdminService {
 
   private toAdminInquiryDetail(row: {
     id: string;
-    userId: string;
+    userId: string | null;
+    guestEmail: string | null;
+    guestPhone: string | null;
     category: string;
     title: string;
     body: string;
@@ -1465,7 +1509,7 @@ export class AdminService {
     closedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
-    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
+    user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null } | null;
     replies: Array<{
       id: string;
       body: string;
@@ -1482,6 +1526,8 @@ export class AdminService {
       ...this.toAdminInquiryRow({
         id: row.id,
         userId: row.userId,
+        guestEmail: row.guestEmail,
+        guestPhone: row.guestPhone,
         category: row.category,
         title: row.title,
         status: row.status,

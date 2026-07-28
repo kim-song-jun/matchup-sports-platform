@@ -33,7 +33,12 @@ export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
       block={!isGhost}
       className={isGhost ? 'tm-logout-ghost' : undefined}
       loading={logout.isPending}
-      onClick={() => logout.mutate(undefined, { onSettled: clearAndRedirect })}
+      onClick={() => {
+        // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+        // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+        if (logout.isPending) return;
+        logout.mutate(undefined, { onSettled: clearAndRedirect });
+      }}
       size={isGhost ? 'md' : 'lg'}
       type="button"
       variant={isGhost ? 'ghost' : 'neutral'}

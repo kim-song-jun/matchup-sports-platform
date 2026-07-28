@@ -64,6 +64,9 @@ export function TeamCreatePageClient() {
     setRegionId,
     setJoinPolicy,
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+      // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+      if (createTeam.isPending) return;
       setError(null);
       const payload = buildPayload(draft, sportId, regionId, joinPolicy);
       if (!payload) {
@@ -176,6 +179,9 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     setJoinPolicy,
     setMembersVisibilityEnabled,
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+      // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+      if (updateTeam.isPending) return;
       setError(null);
       const payload = buildPayload(draft, sportId, regionId, joinPolicy);
       if (!payload || !version) {

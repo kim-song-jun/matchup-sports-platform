@@ -231,13 +231,17 @@
 
   /* Two-column layout for the detail body + sticky right card.
      minmax(0,1fr): 좌측이 내용에 따라 수축 가능 (overflow 방지).
-     min(360px,34%): 우측 패널이 초광폭 뷰포트에서 무한 확장되지 않도록 상한 */
+     min(360px,34%): 우측 패널이 초광폭 뷰포트에서 무한 확장되지 않도록 상한.
+     margin-top: 히어로 이미지 바로 아래 두 컬럼이 붙어 보이던 문제 — 좌측은 타이틀이
+     이미지 오버레이 하단에 있어 착시로 여유가 있어 보였지만, 우측 CTA 카드는 그림자/보더가
+     이미지 경계에 바로 맞닿아 시작해 확연히 붙어 보였다. */
   .tm-match-detail-desktop-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) min(360px, 34%);
     gap: 32px;
     align-items: start;
     padding-top: 0;
+    margin-top: 24px;
   }
 
   /* Left column body content inside the matches desktop layout only.

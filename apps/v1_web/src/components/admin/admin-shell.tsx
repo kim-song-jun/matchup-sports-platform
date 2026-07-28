@@ -14,6 +14,7 @@ import {
   MessageSquareText,
   ClipboardList,
   ShieldCheck,
+  Settings,
   ChevronLeft,
   Menu,
   X,
@@ -37,6 +38,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
   { label: '공지사항', href: '/admin/notices', icon: <Megaphone size={18} /> },
   { label: '문의', href: '/admin/inquiries', icon: <MessageSquareText size={18} /> },
   { label: '감사 로그', href: '/admin/audit', icon: <ClipboardList size={18} /> },
+  { label: '연동 설정', href: '/admin/settings/integrations', icon: <Settings size={18} /> },
 ];
 
 const OWNER_NAV_ITEM: NavItem = {

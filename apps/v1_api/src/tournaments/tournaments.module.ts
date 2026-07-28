@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -22,6 +23,7 @@ import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
+import { KakaoGeocodingService } from './kakao-geocoding.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -32,7 +34,7 @@ import { TournamentReviewsService } from './tournament-reviews.service';
  * 컨트롤러를 와일드카드(:tournamentId) 컨트롤러보다 먼저 두어 매칭 모호성을 줄인다.
  */
 @Module({
-  imports: [AdminContextModule, NotificationsModule],
+  imports: [AdminContextModule, NotificationsModule, IntegrationsModule],
   controllers: [
     TournamentsAdminController,
     AdminRegistrationsController,
@@ -56,6 +58,7 @@ import { TournamentReviewsService } from './tournament-reviews.service';
     TournamentSponsorsService,
     TournamentPaymentExpiryService,
     TournamentReviewsService,
+    KakaoGeocodingService,
     OptionalV1AuthGuard,
     V1AuthGuard,
   ],

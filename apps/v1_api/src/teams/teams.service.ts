@@ -1774,6 +1774,23 @@ export class TeamsService {
       trustState: team.trustScore?.trustState ?? 'none',
       viewerRole: viewer.role,
       viewerJoinState: viewer.joinState,
+      owner: {
+        userId: team.ownerUser.id,
+        displayName: team.ownerUser.profile?.displayName ?? team.ownerUser.profile?.nickname ?? '팀장',
+        profileImageUrl: team.ownerUser.profile?.profileImageUrl ?? null,
+      },
+      manager: this.findManager(team),
+    };
+  }
+
+  private findManager(team: TeamWithRelations) {
+    const manager = team.memberships.find((membership) => membership.role === 'manager' && membership.status === 'active');
+    if (!manager) {
+      return null;
+    }
+    return {
+      userId: manager.userId,
+      displayName: manager.user.profile?.displayName ?? manager.user.profile?.nickname ?? '감독',
     };
   }
 

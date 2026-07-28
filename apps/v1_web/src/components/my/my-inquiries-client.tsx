@@ -129,6 +129,9 @@ export function MyInquiryCreateClient() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+    // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+    if (createInquiry.isPending) return;
     const nextErrors: InquiryFormErrors = {};
     if (!title.trim()) nextErrors.title = '\ubb38\uc758 \uc81c\ubaa9\uc744 \uc785\ub825\ud574 \uc8fc\uc138\uc694.';
     if (!body.trim()) nextErrors.body = '\ubb38\uc758 \ub0b4\uc6a9\uc744 \uc785\ub825\ud574 \uc8fc\uc138\uc694.';

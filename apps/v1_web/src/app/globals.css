@@ -85,6 +85,7 @@
   /* 톤 카드 틴트 배경 */
   --tint-green: rgba(3, 178, 108, 0.08);   /* --green500(#03b26c) 8% — 녹색 안내 카드 */
   --tint-orange: rgba(254, 152, 0, 0.10);  /* --orange500(#fe9800) 10% — 주황 안내 카드 */
+  --tint-grey: rgba(107, 118, 132, 0.10);  /* --grey600(#6b7684, --text-muted) 10% — 중립(마감/종료) 안내 카드 */
   --tint-blue-border: rgba(49, 130, 246, 0.24); /* --blue500(#3182f6) 24% — 파란 카드 테두리 */
   /* 어두운 스크림 / 오버레이 (히어로 카드, 서랍, 토스트) */
   --scrim-dark-32: rgba(25, 31, 40, 0.32);  /* 대화상자 스크림 */
@@ -187,6 +188,28 @@
   --v1-shell-scroll-bottom-pad: 12px;
   --v1-shell-cta-bottom-pad: 22px;
   --v1-shell-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* 홈 "오늘의 추천" 히어로(.tm-featured-media) 커버 사진 crop 비율 — 모바일/데스크톱
+     이전엔 height(146px→220px→260px)만 breakpoint별로 늘고 카드 폭은 독립적으로 변해
+     같은 사진이 뷰포트마다 다른 비율로 잘려 보였다. aspect-ratio 단일 토큰으로 통일해
+     폭이 커지면 높이도 비례해서 커지도록(=같은 crop 유지) 고정.
+     2/1(와이드·짧음) → 4/3 로 조정 — 사진이 카드 안에서 텍스트 콘텐츠 영역(~130-140px
+     고정)보다 확실히 우세한 비중(약 62-64%)을 갖도록 세로 비중을 키웠다. 카드 폭 기준
+     308px에서 이전 154px→약 231px, 카드 전체 높이는 296px→약 355px로 커지지만 과도하게
+     세로로 길어지는 지점(1:1 이하)까지는 가지 않았다. */
+  --tm-featured-media-ratio: 4 / 3;
+
+  /* /tournaments 목록 상단 추천 배너(.tm-tournament-featured-banner) 데스크톱 사진 crop
+     비율 — 이전엔 height가 없어 오버레이 텍스트 길이(부제/일정/장소 텍스트 유무)에 따라
+     배너 세로 크기·사진 크롭 영역이 대회마다 들쭉날쭉했다. 데스크톱(≥1024px)에서만
+     aspect-ratio로 고정해 항상 같은 crop으로 보이게 한다(모바일은 기존 컨텐츠 기반
+     높이 유지). 텍스트가 이보다 길어지는 예외 케이스는 aspect-ratio가 min-content를
+     넘지 못하는 대신 박스가 자동으로 늘어나 잘림 없이 안전하게 처리된다(브라우저 확인 완료).
+     이전 6/1은 지나치게 납작해 사진 하단부(약 55~65% 지점)가 크게 잘려나가 — 예:
+     실제 배너 사진 속 펜스 광고판에 박혀 있는 teameet 워터마크가 crop 경계에 걸려
+     거의 안 보였다. 4/1로 완화해 세로 가시 영역을 넓혀 사진 하단부가 안정적으로
+     드러나도록 함(1440px 데스크톱 실측: 라이브 스크린샷으로 확인 완료). */
+  --tm-tournament-banner-ratio: 4 / 1;
 }
 
 * {
@@ -1489,7 +1512,8 @@ button:disabled {
 }
 
 .tm-featured-media {
-  height: 146px;
+  /* 고정 height 대신 비율 고정 — 카드 폭이 breakpoint별로 달라져도 동일한 crop 유지 */
+  aspect-ratio: var(--tm-featured-media-ratio);
   position: relative;
 }
 
@@ -1511,6 +1535,45 @@ button:disabled {
   display: block;
 }
 
+/* 히어로 카드 쌍(FeaturedMatchCard·TournamentHeroCard) 높이 정합.
+ * .tm-home-featured-carousel(flex row)이 두 <Link>를 align-items:stretch 로
+ * 같은 높이로 늘려도, Card 자신은 콘텐츠 길이만큼만 커지므로(예: 대회 facts 텍스트가
+ * 2줄로 랩되면 매치 카드보다 길어짐) 더 짧은 카드의 보더박스가 부모보다 낮게 끝나
+ * 두 카드 하단이 어긋나 보인다. Card를 stretch된 부모 높이(100%)까지 채우고,
+ * 콘텐츠 영역을 flex column으로 만들면(.tm-featured-content) 텍스트 길이 차이와
+ * 무관하게 두 카드의 바닥 테두리(보더박스)가 항상 일치한다. CTA 버튼 자체는
+ * marginTop:auto로 하단 고정하지 않고 고정 간격(.tm-featured-cta, 12px)만 둔다 —
+ * 텍스트가 짧은 카드는 버튼 아래 여백이 카드 padding 안에서 자연스럽게 남고,
+ * 텍스트가 긴 카드는 버튼이 더 아래에 위치하지만 카드 바깥 테두리는 그대로 맞는다. */
+.tm-featured-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* hairline shadow — 사이드 추천 매치 카드(.tm-match-card)가 이미 동일 목적으로 쓰는
+     shadow-2 를 히어로 카드에도 적용해, 이미지 비중이 커진 만큼 media+content 를 한
+     덩어리로 묶어 '붕 떠' 보이지 않게 한다. border만 있던 이전보다 카드가 배경 위에
+     자연스럽게 자리 잡은 느낌을 준다(과한 확산 없는 절제된 값 그대로 재사용). */
+  box-shadow: var(--shadow-2);
+}
+
+.tm-featured-content {
+  padding: 16px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-featured-cta {
+  /* 텍스트→CTA 간격은 이 파일 내 동일 카드군의 다른 버튼(home-page.tsx 로그인/채팅 CTA,
+     marginTop:12)과 통일한 고정값. 이전 marginTop:auto 는 두 히어로 카드 높이를 맞추려는
+     의도였지만, 텍스트가 짧은 카드(대회)에서 텍스트-버튼 사이에 불필요하게 큰 여백을
+     만들었다. 카드 높이 정합은 .tm-featured-card{height:100%} + 부모 flex stretch로 이미
+     보장되므로(칸 하단 여백은 카드 padding 안에서 자연스럽게 흡수됨) 버튼을 고정 간격으로
+     내리는 편이 자연스럽다. */
+  margin-top: 12px;
+  width: 100%;
+}
+
 /* 헤더와 인사 사이 숨 트이게 (헤더에 붙어 겹쳐 보이던 문제) */
 .tm-home-greeting-block {
   padding-top: 16px;
@@ -1529,6 +1592,12 @@ button:disabled {
      wider/tablet widths — keeps it reading as a carousel, not one giant card. */
   flex: 0 0 min(88%, 400px);
   scroll-snap-align: start;
+}
+
+/* 카드가 1개뿐일 때는 "다음 카드 peek" 여지를 남길 이유가 없다 — 88% 고정폭이
+   오른쪽에 의도된 듯한 빈 여백을 남기므로, 유일한 자식일 때는 폭을 꽉 채운다. */
+.tm-home-featured-carousel > *:only-child {
+  flex: 1 1 100%;
 }
 
 .tm-quick-grid {
@@ -3063,7 +3132,6 @@ button:disabled {
 
 .tm-chat-bubble {
   max-width: 286px;
-  margin-bottom: 10px;
   padding: 10px 12px;
   border-radius: 14px;
   background: var(--bg);
@@ -3073,15 +3141,13 @@ button:disabled {
 
 .tm-chat-bubble-me {
   max-width: 250px;
-  margin-left: auto;
   background: var(--blue500);
   color: var(--static-white);
 }
 
 .tm-chat-bubble-system {
   max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0 auto 14px;
   background: transparent;
   box-shadow: none;
   text-align: center;
@@ -3091,6 +3157,56 @@ button:disabled {
 .tm-chat-bubble-me .tm-text-body,
 .tm-chat-bubble-me .tm-text-micro {
   color: inherit;
+}
+
+/* ── 메시지 그룹핑(카카오톡/토스 관례) ──────────────────────────────────────
+ * 같은 발신자가 연달아 보낸 메시지는 좁은 간격(-mid)으로 붙이고, 발신자가
+ * 바뀌거나 그룹이 끝나면 넓은 간격(-end)으로 시각적으로 분리한다. */
+.tm-chat-message-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-chat-message-group-mid {
+  margin-bottom: 3px;
+}
+
+.tm-chat-message-group-end {
+  margin-bottom: 14px;
+}
+
+/* 상대방 그룹의 첫 메시지 위에만 이름 노출 — 내 메시지는 정렬·색상으로 이미 구분되므로 라벨 생략 */
+.tm-chat-sender-label {
+  margin-bottom: 4px;
+  margin-left: 2px;
+  color: var(--text-caption);
+}
+
+.tm-chat-message-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.tm-chat-message-line-me {
+  justify-content: flex-end;
+}
+
+/* 그룹의 마지막 메시지 옆에만 시각 노출 */
+.tm-chat-time {
+  color: var(--text-caption);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-bottom: 2px;
+}
+
+/* 그룹 첫 버블만 이름표/정렬 방향 쪽 모서리를 살짝 좁혀 "말풍선 시작" 느낌을 준다 */
+.tm-chat-bubble-head.tm-chat-bubble-other {
+  border-top-left-radius: 6px;
+}
+
+.tm-chat-bubble-head.tm-chat-bubble-me {
+  border-top-right-radius: 6px;
 }
 
 .tm-chat-inputbar {
@@ -6262,6 +6378,13 @@ button:disabled {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: inherit;
+}
+.tm-fmt-hr {
+  width: 100%;
+  height: 1px;
+  margin: 4px 0;
+  border: none;
+  background: var(--border);
 }
 
 /* 참가팀 후기 전체보기 — 검색 + 목록(모바일 카드 / 데스크탑 테이블) + 페이지네이션 */

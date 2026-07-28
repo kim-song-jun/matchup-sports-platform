@@ -67,4 +67,38 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     // 같은 함수로 기대값을 계산한다(NEXT_PUBLIC_BASE_PATH가 설정된 환경에서도 안전).
     expect(img).toHaveAttribute('src', publicAssetPath('/uploads/cover-real.jpg'));
   });
+
+  it('falls back to promoHomeImageUrl when coverImageUrl is missing but a promo photo exists', () => {
+    const { container } = render(
+      <TournamentCard
+        item={buildItem({ coverImageUrl: null, promoHomeImageUrl: '/uploads/promo-home.jpg' })}
+      />,
+    );
+
+    const img = container.querySelector('img');
+    expect(img).toHaveAttribute('src', publicAssetPath('/uploads/promo-home.jpg'));
+  });
+
+  it('prefers coverImageUrl over promoHomeImageUrl when both are present', () => {
+    const { container } = render(
+      <TournamentCard
+        item={buildItem({
+          coverImageUrl: '/uploads/cover-real.jpg',
+          promoHomeImageUrl: '/uploads/promo-home.jpg',
+        })}
+      />,
+    );
+
+    const img = container.querySelector('img');
+    expect(img).toHaveAttribute('src', publicAssetPath('/uploads/cover-real.jpg'));
+  });
+
+  it('renders the sport-glyph fallback when neither coverImageUrl nor promoHomeImageUrl exist', () => {
+    const { container } = render(
+      <TournamentCard item={buildItem({ coverImageUrl: null, promoHomeImageUrl: null })} />,
+    );
+
+    expect(container.querySelector('img')).not.toBeInTheDocument();
+    expect(container.querySelector('svg')).toBeInTheDocument();
+  });
 });

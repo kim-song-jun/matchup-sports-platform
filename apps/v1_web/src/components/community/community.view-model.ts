@@ -41,10 +41,10 @@ export function getChatRoomViewModel(): ChatRoomViewModel {
       href: '/matches',
     },
     messages: [
-      { id: 'm1', who: 'other', label: '상대', body: '오늘 14:00 경기 인원 확인해 주세요' },
-      { id: 'm2', who: 'me', label: '나', body: '네. 20분 전에 도착하겠습니다.' },
-      { id: 'm3', who: 'other', label: '상대', body: '참가가 승인됐어요. 현장 준비 내용도 확인해 주세요.' },
-      { id: 'm4', who: 'system', label: '시스템', body: '수아님이 참가 승인됐어요' },
+      { id: 'm1', who: 'other', senderId: 'user-opponent', label: '상대', body: '오늘 14:00 경기 인원 확인해 주세요', time: '13:42' },
+      { id: 'm2', who: 'me', senderId: 'user-me', label: '나', body: '네. 20분 전에 도착하겠습니다.', time: '13:45' },
+      { id: 'm3', who: 'other', senderId: 'user-opponent', label: '상대', body: '참가가 승인됐어요. 현장 준비 내용도 확인해 주세요.', time: '13:47' },
+      { id: 'm4', who: 'system', senderId: 'system', label: '시스템', body: '수아님이 참가 승인됐어요', time: '13:47' },
     ],
   };
 }

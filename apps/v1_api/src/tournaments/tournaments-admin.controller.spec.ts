@@ -17,6 +17,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
+import { KakaoGeocodingService } from './kakao-geocoding.service';
 import { TournamentsAdminController } from './tournaments-admin.controller';
 import { TournamentsAdminService } from './tournaments-admin.service';
 
@@ -158,6 +159,7 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
         TournamentsAdminService,
         AdminContextService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: KakaoGeocodingService, useValue: { geocode: jest.fn().mockResolvedValue(null) } },
       ],
     }).compile();
 

@@ -23,6 +23,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { VerificationModule } from './verification/verification.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { VerificationModule } from './verification/verification.module';
     UploadsModule,
     TournamentsModule,
     VerificationModule,
+    IntegrationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: V1ThrottlerGuard }],
 })

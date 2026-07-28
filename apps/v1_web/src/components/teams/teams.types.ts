@@ -15,6 +15,10 @@ export type TeamModel = {
   statusLabel: string;
   tags: string[];
   genderRule: string;
+  /** 팀장 표시명 — 목록 카드용, V1Team.owner가 아직 없는 폴백/시드 데이터에는 없을 수 있어 optional */
+  ownerName?: string;
+  /** 감독 표시명 — 감독이 없는 팀은 null */
+  managerName?: string | null;
   intro: string;
   next: string;
 };

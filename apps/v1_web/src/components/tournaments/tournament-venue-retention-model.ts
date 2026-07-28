@@ -15,6 +15,10 @@ export type TournamentVenuePrepItem = {
   status: HubState;
   actionLabel: string | null;
   href: string | null;
+  /** true면 href가 외부 링크(지도 검색 등) — target="_blank" + rel="noopener noreferrer"로 열어야 함. */
+  hrefExternal: boolean;
+  /** 장소 정보에 보조적으로 덧붙는 운영진 공지 요약. 장소 정보 자체를 대체하지 않는다. */
+  notice: { summary: string; actionLabel: string; href: string } | null;
 };
 
 export type TournamentPostEventCard = {
@@ -27,18 +31,55 @@ export type TournamentPostEventCard = {
 };
 
 /**
- * 장소·규정·선수단은 대회 상세 페이지 상단 "대회 정보" 섹션에 이미 나오는 값을
- * 그대로 반복 표시하면서 "확정" 배지까지 붙어 오히려 혼란을 줬다(사용자 피드백).
- * 이 섹션이 실제로 새 정보를 주는 건 "주차"(현장 공지 전까지는 알 수 없는 정보)
- * 뿐이라 그 항목만 남긴다.
+ * 규정·선수단은 대회 상세 페이지 상단 "대회 정보" 섹션에 이미 나오는 값을 그대로
+ * 반복 표시하면서 "확정" 배지까지 붙어 오히려 혼란을 줬다(사용자 피드백) — 그래서
+ * 제거됐다. 하지만 "현장 안내"라는 섹션명 자체가 위치·동선 정보를 기대하게 만드는데,
+ * venue(장소명)는 대회 생성 시 항상 입력되는 값인데도 이 섹션이 전혀 활용하지 않아
+ * "관리자 공지가 없으면 아무 정보도 없다"는 인상을 줬다(재차 지적된 문제). venue가
+ * 있으면 장소명 + 지도 링크를 항상 보여주고, 관리자가 venue 카테고리 공지를 추가로
+ * 올렸다면 그 내용은 장소 정보에 보조적으로 덧붙인다 — 공지 유무가 장소 정보 노출
+ * 자체를 좌우하지 않는다. venue가 없는 극히 드문 edge case에서만 기존 공지-only
+ * 폴백을 유지한다.
+ *
+ * 좌표(latitude/longitude, 카카오 지오코딩 결과)가 있으면 이 row의 "지도에서 보기"
+ * 네이버 검색 링크는 렌더하지 않는다 — TournamentVenuePrepSection이 대신 실제 지도
+ * 임베드 + 내비게이션 앱 딥링크 버튼을 별도로 렌더하기 때문(더 정확한 정보이므로
+ * 텍스트 검색 링크와 중복 노출하지 않음). 좌표가 없으면(키 미설정/지오코딩 실패 포함)
+ * 기존 네이버 지도 검색 링크 폴백을 그대로 유지 — 회귀 없음.
  */
 export function getTournamentVenuePrepItems({
+  venue = null,
   announcements = [],
+  latitude = null,
+  longitude = null,
 }: {
+  venue?: string | null;
   announcements?: TournamentAnnouncementSummary[];
+  latitude?: number | null;
+  longitude?: number | null;
 }): TournamentVenuePrepItem[] {
   const venueNotice = findAnnouncementByCategory(announcements, 'venue');
   const venueNoticeLink = venueNotice ? announcementHref(venueNotice.id) : null;
+  const hasCoordinates = latitude !== null && longitude !== null;
+
+  if (venue) {
+    return [
+      {
+        key: 'parking',
+        label: '장소',
+        value: venue,
+        detail: '주차와 입장 동선은 지도에서 확인해요.',
+        status: 'available',
+        actionLabel: hasCoordinates ? null : '지도에서 보기',
+        href: hasCoordinates ? null : naverMapSearchUrl(venue),
+        hrefExternal: !hasCoordinates,
+        notice:
+          venueNotice && venueNoticeLink
+            ? { summary: `공지: ${venueNotice.title}`, actionLabel: '공지 보기', href: venueNoticeLink }
+            : null,
+      },
+    ];
+  }
 
   return [
     {
@@ -51,6 +92,67 @@ export function getTournamentVenuePrepItems({
       status: venueNotice ? 'available' : 'operator_update',
       actionLabel: venueNoticeLink ? '공지 보기' : null,
       href: venueNoticeLink,
+      hrefExternal: false,
+      notice: null,
+    },
+  ];
+}
+
+function naverMapSearchUrl(venue: string): string {
+  return `https://map.naver.com/v5/search/${encodeURIComponent(venue)}`;
+}
+
+// ── 내비게이션 앱 딥링크 (좌표 있을 때만 사용) ──────────────────────────────────
+
+export type VenueNavPlatform = 'ios' | 'android' | 'unknown';
+
+export type VenueNavigationLink = {
+  key: 'kakao' | 'naver' | 'tmap';
+  label: string;
+  /** 앱 커스텀 URL 스킴 딥링크. 앱 미설치 시 브라우저가 처리(무반응 포함) — 의도된 동작. */
+  appHref: string;
+  fallbackLabel: string;
+  fallbackHref: string;
+};
+
+const NAVER_MAP_APP_NAME = 'teameet.kr';
+const TMAP_IOS_STORE_URL = 'https://apps.apple.com/kr/app/tmap/id431589174';
+const TMAP_ANDROID_STORE_URL = 'https://play.google.com/store/apps/details?id=com.skt.tmap.ku';
+
+/**
+ * 장소명+좌표로 카카오맵/네이버맵/티맵 길찾기 딥링크 3종을 만든다. 순수 함수 —
+ * 플랫폼 감지(UA sniffing)는 호출부(클라이언트 컴포넌트)에서 한 줄로 하고 결과만
+ * platform 인자로 전달한다(모델 자체는 브라우저 API에 의존하지 않아 테스트하기 쉽다).
+ */
+export function getVenueNavigationLinks(
+  venue: string,
+  latitude: number,
+  longitude: number,
+  platform: VenueNavPlatform = 'unknown',
+): VenueNavigationLink[] {
+  const encodedVenue = encodeURIComponent(venue);
+
+  return [
+    {
+      key: 'kakao',
+      label: '카카오맵',
+      appHref: `kakaomap://route?ep=${latitude},${longitude}&by=CAR`,
+      fallbackLabel: '웹으로 보기',
+      fallbackHref: `https://map.kakao.com/link/to/${encodedVenue},${latitude},${longitude}`,
+    },
+    {
+      key: 'naver',
+      label: '네이버지도',
+      appHref: `nmap://route/car?dlat=${latitude}&dlng=${longitude}&dname=${encodedVenue}&appname=${encodeURIComponent(NAVER_MAP_APP_NAME)}`,
+      fallbackLabel: '웹으로 보기',
+      fallbackHref: `https://map.naver.com/v5/directions/-/-/-/car?destination=${longitude},${latitude}`,
+    },
+    {
+      key: 'tmap',
+      label: '티맵',
+      appHref: `tmap://route?goalx=${longitude}&goaly=${latitude}&goalname=${encodedVenue}`,
+      fallbackLabel: '설치하기',
+      fallbackHref: platform === 'ios' ? TMAP_IOS_STORE_URL : TMAP_ANDROID_STORE_URL,
     },
   ];
 }

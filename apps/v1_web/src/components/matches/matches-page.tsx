@@ -71,12 +71,20 @@ function CompletionCheckIcon() {
 /**
  * [P0/P1 아이콘+컬러] 상태 아이콘 — 색상만으로 상태를 구분하지 않도록 아이콘+텍스트 병행 (WCAG 1.4.1).
  */
-function StatusIcon({ tone }: { tone: 'orange' | 'green' }) {
+function StatusIcon({ tone }: { tone: 'orange' | 'green' | 'grey' }) {
   if (tone === 'green') {
     return (
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
         <circle cx="7.5" cy="7.5" r="7.5" fill="var(--tint-green)" />
         <path d="M4 7.5L6.5 10L11 5" stroke="var(--green500)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (tone === 'grey') {
+    return (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+        <circle cx="7.5" cy="7.5" r="7.5" fill="var(--tint-grey)" />
+        <path d="M4.5 7.5H10.5" stroke="var(--text-muted)" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     );
   }
@@ -115,13 +123,18 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
           <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>
         </div>
-        <div className="tm-match-card-stack">
-          {model.matches.length ? (
-            model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)
-          ) : (
-            <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
-          )}
-        </div>
+        {model.matches.length ? (
+          <div className="tm-match-card-stack">
+            {model.matches.map((match, index) => <MatchCardItem key={match.id} match={match} index={index} />)}
+          </div>
+        ) : (
+          /* EmptyState must be a sibling of .tm-match-card-stack, not nested inside it —
+             the stack becomes a 2-up/3-up CSS grid on desktop (matches.css), and a single
+             grid-item child gets confined to the first grid cell (~50%/33% width), reading
+             as flush-left instead of centered across the full content column. Matches the
+             pattern already used by teams-page.tsx / team-matches-page.tsx / tournaments page.tsx. */
+          <EmptyState title="조건에 맞는 매치가 없어요" sub="다른 종목을 선택하거나 전체 매치로 돌아가면 모집 중인 매치를 볼 수 있어요." />
+        )}
       </div>
       {model.filterSheet?.open ? <MatchFilterSheet model={model} /> : null}
     </AppChrome>
@@ -172,7 +185,7 @@ function matchStatusBadgeClass(mode: MatchDetailViewModel['mode'], status: Match
   if (mode === 'pending') return 'tm-badge-orange';
   if (mode === 'approved') return 'tm-badge-green';
   if (mode === 'mine') return 'tm-badge-blue';
-  if (status === 'full') return 'tm-badge-grey';
+  if (mode === 'closed' || status === 'full') return 'tm-badge-grey';
   return 'tm-badge-grey';
 }
 
@@ -180,21 +193,25 @@ function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: Match
   if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') return '승인 완료';
   if (mode === 'mine') return '내 매치';
-  if (status === 'full') return '모집 완료';
+  if (mode === 'closed' || status === 'full') return '모집 완료';
   return '모집 중';
 }
 
 export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) {
   const { match, mode } = model;
   const [heroMessage, setHeroMessage] = useState('');
-  const locked = mode === 'pending' || mode === 'approved' || match.status === 'full';
+  const locked = mode === 'pending' || mode === 'approved' || mode === 'closed' || match.status === 'full';
   const canRunAction = Boolean(model.onApply);
-  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : match.status === 'full' ? '신청 마감' : '참가 신청');
+  const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
   const showChat = mode === 'approved' && Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
+  const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | string | null | Promise<void | string | null>) | undefined, fallbackMessage: string) => {
-    if (!action) return;
+    // 로딩 중 재클릭 시 중복 제출 방지 — disabled/loading prop은 리렌더 이후에나 반영되므로
+    // 동기적인 ref 락으로 한 번 더 막는다.
+    if (!action || heroActionBusyRef.current) return;
+    heroActionBusyRef.current = true;
     void Promise.resolve(action())
       .then((result) => {
         // null = 액션이 UX를 직접 처리(네이티브 공유/취소/prompt 폴백) → 토스트 미표시.
@@ -206,6 +223,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       .catch(() => {
         setHeroMessage('잠깐 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
         window.setTimeout(() => setHeroMessage(''), 1800);
+      })
+      .finally(() => {
+        heroActionBusyRef.current = false;
       });
   };
 
@@ -277,6 +297,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </>
             ) : null}
             {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+            {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 10 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -346,6 +367,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </>
           ) : null}
           {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+          {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 10 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 6, marginTop: 10 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 10 }}>
             <div className="tm-text-body-lg">참가자</div>
@@ -711,13 +733,15 @@ function CapacityRow({ current, capacity }: { current: number; capacity: number 
   );
 }
 
-function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
+function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; title: string; body: string }) {
+  const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
+  const accent = tone === 'green' ? 'var(--green500)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange600)';
   return (
-    <Card pad={14} style={{ marginTop: 14, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}>
+    <Card pad={14} style={{ marginTop: 14, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <StatusIcon tone={tone} />
-        <div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green500)' : 'var(--orange600)' }}>{title}</div>
+        <div className="tm-text-label" style={{ color: accent }}>{title}</div>
       </div>
       <div className="tm-text-caption" style={{ marginTop: 5 }}>{body}</div>
     </Card>

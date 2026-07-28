@@ -245,6 +245,10 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
+  /** 비로그인(게스트) 문의자의 이메일 — 로그인 상태가 아니면 guestPhone과 함께 최소 1개 필수 */
+  guestEmail?: string;
+  /** 비로그인(게스트) 문의자의 전화번호 — 로그인 상태가 아니면 guestEmail과 함께 최소 1개 필수 */
+  guestPhone?: string;
 };
 
 export type V1Match = {
@@ -429,6 +433,21 @@ export type V1Team = {
   minLevel?: { code: string; name: string } | null;
   maxLevel?: { code: string; name: string } | null;
   genderRule?: string | null;
+  /**
+   * 팀장 — nickname/displayName 미설정 시 백엔드에서 '팀장'으로 폴백(항상 non-empty).
+   * optional인 이유: 이 필드를 아직 채우지 않는 기존 fixture/mock과의 하위 호환
+   * (V1Team의 다른 대다수 필드와 동일하게 optional 컨벤션을 따름).
+   */
+  owner?: {
+    userId: string;
+    displayName: string;
+    profileImageUrl: string | null;
+  };
+  /** 감독 — manager 역할 멤버가 없으면 null */
+  manager?: {
+    userId: string;
+    displayName: string;
+  } | null;
   viewerRole?: string;
   viewerJoinState?: string;
 };
@@ -1264,9 +1283,13 @@ export type V1AdminNoticeUpdateResult = {
 
 export type V1AdminInquiryRow = {
   inquiryId: string;
-  userId: string;
+  userId: string | null;
+  /** true면 비회원(guest) 문의 — userId가 없고 guestEmail/guestPhone으로만 식별됨 */
+  isGuest: boolean;
   requesterName: string | null;
   requesterEmail: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
   category: V1InquiryCategory;
   title: string;
   status: V1InquiryStatus;
@@ -1570,6 +1593,9 @@ export type V1Tournament = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
+  latitude: number | null;
+  longitude: number | null;
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
@@ -1724,6 +1750,9 @@ export type V1TournamentDetail = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
+  latitude: number | null;
+  longitude: number | null;
   teamCount: number;
   minPlayers: number;
   maxPlayers: number;
@@ -2281,4 +2310,27 @@ export type V1InvitationActionResult = {
   status: V1InvitationStatus;
   alreadyCancelled?: boolean;
   alreadyProcessed?: boolean;
+};
+
+/** 어드민이 편집하는 외부 연동 키의 출처 — 어떤 값이 실제로 쓰이고 있는지 화면에 안내하기 위함. */
+export type V1IntegrationKeySource = 'admin' | 'env' | 'none';
+
+/** GET/PATCH /admin/settings/integrations 응답 — 값은 항상 마스킹(끝 4자리만 노출). */
+export type V1IntegrationSettings = {
+  kakaoRestApiKey: string | null;
+  kakaoRestApiKeySource: V1IntegrationKeySource;
+  kakaoMapsJsKey: string | null;
+  kakaoMapsJsKeySource: V1IntegrationKeySource;
+  updatedAt: string | null;
+};
+
+/** PATCH /admin/settings/integrations 바디 — undefined=미변경, ""=삭제(env 폴백 복귀), 값=설정 */
+export type V1UpdateIntegrationSettingsPayload = {
+  kakaoRestApiKey?: string;
+  kakaoMapsJsKey?: string;
+};
+
+/** GET /public/integrations/kakao-maps-key — 인증 불필요, 카카오맵 JS SDK 로드용 공개 키. */
+export type V1PublicKakaoMapsKeyResponse = {
+  kakaoMapsJsKey: string | null;
 };

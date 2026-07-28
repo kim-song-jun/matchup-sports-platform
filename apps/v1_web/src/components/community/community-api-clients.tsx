@@ -99,7 +99,9 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
     onDraftChange: setDraft,
     onSend: () => {
       const content = draft.trim();
-      if (!content) return;
+      // 로딩 중 재클릭/재입력 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+      // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+      if (!content || send.isPending) return;
       send.mutate(
         { content },
         {
@@ -195,9 +197,18 @@ function toChatMessageModel(message: V1ChatMessage): ChatRoomViewModel['messages
   return {
     id: message.messageId,
     who: message.mine ? 'me' : 'other',
+    senderId: message.sender.userId,
     label: message.mine ? '나' : message.sender.displayName,
     body: message.content ?? '삭제된 메시지예요.',
+    time: formatMessageTime(message.sentAt),
   };
+}
+
+// 채팅 버블 옆에 표시하는 짧은 시각 — 'HH:mm' (v1_web 로컬 포맷터 관례: home-client.tsx/matches-client.tsx 동일 패턴)
+function formatMessageTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function toNotificationModel(notification: V1Notification): NotificationModel {

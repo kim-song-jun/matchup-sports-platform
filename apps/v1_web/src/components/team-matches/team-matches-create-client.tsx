@@ -140,6 +140,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     onBack: () => router.push(previousHref(step)),
     onNext: () => router.push(nextHref(step)),
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+      // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+      if (createTeamMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload) {
@@ -209,6 +212,9 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     onBack: () => router.push(`/team-matches/${teamMatchId}`),
     onNext: () => undefined,
     onSubmit: () => {
+      // 로딩 중 재클릭 시 중복 제출 방지 — disabled 속성은 리렌더 이후에나 반영되므로
+      // 핸들러 최상단에서 동기적으로 한 번 더 막는다.
+      if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
       setError(null);
       const payload = buildPayload(draft, selectedTeamId, selectedSportId, regionId);
       if (!payload || !version) {
@@ -224,6 +230,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       );
     },
     onCancel: () => {
+      if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
       cancelTeamMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
         {

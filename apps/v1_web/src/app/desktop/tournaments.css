@@ -771,6 +771,10 @@
   .tm-tournament-featured-banner {
     margin-left: 0;
     margin-right: 0;
+    /* 사진 crop이 오버레이 텍스트 길이에 좌우되지 않도록 데스크톱에서만 고정 비율 적용.
+       min-content가 이 높이를 넘는 예외적으로 긴 텍스트는 aspect-ratio를 깨지 않고
+       박스가 자동으로 늘어나 텍스트가 잘리지 않는다(globals.css 토큰 주석 참고). */
+    aspect-ratio: var(--tm-tournament-banner-ratio);
   }
 
   /* Prize cards: stay 3-col on desktop (already set) */

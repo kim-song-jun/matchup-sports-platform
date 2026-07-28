@@ -400,7 +400,15 @@
 
   .tm-desktop-footer-brand {
     display: flex;
-    align-items: baseline;
+    /* align-items:center (not baseline) — the first child is a nested
+     * inline-flex wrapper (icon <img> + wordmark <span>), and a flex item's
+     * baseline is derived from its own first baseline-participating
+     * descendant. An <img> has no text baseline, so the nested inline-flex's
+     * synthesized baseline (its margin-bottom edge) does not line up with
+     * the plain-text tagline span's baseline next to it — classic nested
+     * flex-baseline mismatch. Center avoids the whole computation and reads
+     * correctly for an icon+wordmark+tagline row. */
+    align-items: center;
     gap: 10px;
     min-width: 0;
   }
@@ -448,6 +456,7 @@
   }
 
   .tm-desktop-footer-copy {
+    margin: 0; /* <p> 기본 마진(1em 0)이 flex align-items:center 행에서 불필요한 여백을 만듦 */
     font-size: 12px;
     color: var(--grey400);
     white-space: nowrap;

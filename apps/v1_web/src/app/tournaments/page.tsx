@@ -118,11 +118,17 @@ function TournamentsListContent() {
           aria-label={`${featuredTitle} 자세히 보기`}
           className="tm-tournament-featured-banner"
           style={{
-            display: 'block',
+            display: 'flex',
+            flexDirection: 'column',
             marginTop: 12,
-            padding: '16px 18px',
+            padding: '18px 20px',
             borderRadius: 16,
-            background: featuredImageUrl ? `${cssUrl(featuredImageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+            // vertical-position 62% (기본 50% center 대비 살짝 아래) — 대회 배너 사진은
+            // 보통 하단부(경기장 펜스·바닥)에 스폰서 로고/워터마크가 있는 경우가 많아
+            // 사진 중앙보다 살짝 아래를 보여주는 쪽이 일반적으로 더 안전한 기본값
+            // (globals.css --tm-tournament-banner-ratio 4/1과 함께 실측 조정, 특정 사진
+            // 좌표에 하드코딩한 crop이 아니라 photo-agnostic 기본값).
+            background: featuredImageUrl ? `${cssUrl(featuredImageUrl)} center 62%/cover` : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
             color: 'var(--static-white)',
             textDecoration: 'none',
             position: 'relative',
@@ -130,24 +136,32 @@ function TournamentsListContent() {
           }}
         >
           {featuredImageUrl ? <span aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'var(--scrim-dark-32)' }} /> : null}
+          {/* 콘텐츠는 상단에 한 덩어리로 모아 두고, 박스 높이 전체로 늘리지 않는다 — 상금 문구가
+             없는 대회는 하단 행이 CTA 버튼 하나만 남아 justify-content:space-between으로
+             바닥까지 늘리면 좌측 하단만 텅 비어 보이는 비대칭이 생겼다(실측 확인). 이미지가
+             커진 만큼의 여유는 텍스트 아래로 사진이 넉넉히 보이는 것으로 대신한다. */}
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
-              <Trophy size={12} strokeWidth={2} aria-hidden="true" />
-              {featuredBadge}
-            </span>
-            <div className="tm-text-body-lg" style={{ color: 'var(--static-white)', marginTop: 10 }}>{featuredTitle}</div>
-            {featuredSubtitle ? (
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-                {featuredSubtitle}
-              </div>
-            ) : null}
-            {featuredFacts ? (
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
-                {featuredFacts}
-              </div>
-            ) : null}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12 }}>
-              <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
+            <div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'var(--overlay-white-18)', fontSize: 'var(--font-size-caption)', fontWeight: 700 }}>
+                <Trophy size={12} strokeWidth={2} aria-hidden="true" />
+                {featuredBadge}
+              </span>
+              <div className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 12 }}>{featuredTitle}</div>
+              {featuredSubtitle ? (
+                <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 6 }}>
+                  {featuredSubtitle}
+                </div>
+              ) : null}
+              {featuredFacts ? (
+                <div className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', marginTop: 4 }}>
+                  {featuredFacts}
+                </div>
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: featuredPrizeText ? 'space-between' : 'flex-end', gap: 12, marginTop: 16 }}>
+              {featuredPrizeText ? (
+                <span className="tm-text-caption" style={{ color: 'var(--overlay-white-85)', fontWeight: 700, minWidth: 0, whiteSpace: 'pre-wrap' }}>{featuredPrizeText}</span>
+              ) : null}
               <span style={{ background: 'var(--static-white)', color: 'var(--blue700)', fontWeight: 700, fontSize: 'var(--font-size-label)', borderRadius: 999, padding: '6px 14px', lineHeight: 1, display: 'inline-block', flexShrink: 0 }}>자세히 보기 →</span>
             </div>
           </div>

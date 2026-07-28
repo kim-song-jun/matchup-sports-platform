@@ -111,9 +111,13 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
             <div className="tm-my-desktop-menu-grid">
               {model.sections.map((section) => <MenuSection key={section.title} section={section} />)}
             </div>
-            {/* 로그아웃: 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 (계정 설정 페이지에도 동일하게 있어 발견성 유지) */}
+            {/* 로그아웃: 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소.
+                메뉴 그리드 바로 아래 맨몸으로 떠 있으면 "깜빡 잊고 남은 링크"처럼 보여서
+                Card로 감싸 우측 정렬한다(계정 설정 페이지에도 동일하게 있어 발견성 유지). */}
             <div className="tm-my-logout-row">
-              <LogoutButton variant="ghost" />
+              <Card pad={16} className="tm-my-logout-card">
+                <LogoutButton variant="ghost" />
+              </Card>
             </div>
           </div>
         </div>
@@ -370,7 +374,9 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
           {model.groups.map((section) => <MenuSection key={section.title} section={section} />)}
           {/* 파괴 액션이 최강 CTA가 되지 않도록 ghost 텍스트 링크 수준으로 축소 — 마이홈과 동일 패턴 */}
           <div className="tm-my-logout-row">
-            <LogoutButton variant="ghost" />
+            <Card pad={16} className="tm-my-logout-card">
+              <LogoutButton variant="ghost" />
+            </Card>
           </div>
         </div>
       </div>

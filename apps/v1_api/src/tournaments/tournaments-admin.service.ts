@@ -2,12 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
@@ -37,9 +39,12 @@ function nullableText(value: string | undefined): string | null | undefined {
 
 @Injectable()
 export class TournamentsAdminService {
+  private readonly logger = new Logger(TournamentsAdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly kakaoGeocoding: KakaoGeocodingService,
   ) {}
 
   async list(user: V1AuthUser, query: AdminTournamentListQueryDto) {
@@ -101,6 +106,10 @@ export class TournamentsAdminService {
       throw new BadRequestException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
     }
 
+    // 지오코딩은 네트워크 호출이라 DB 트랜잭션 밖에서 먼저 수행 — 트랜잭션을 붙잡아두지 않고,
+    // 실패해도(키 미설정 포함) venue 저장 자체는 절대 막지 않는다(좌표만 null).
+    const coordinates = dto.venue ? await this.geocodeVenueSafe(dto.venue) : null;
+
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
         data: {
@@ -112,6 +121,8 @@ export class TournamentsAdminService {
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
           scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           venue: dto.venue ?? null,
+          latitude: coordinates?.latitude ?? null,
+          longitude: coordinates?.longitude ?? null,
           coverImageUrl: dto.coverImageUrl ?? null,
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
@@ -200,6 +211,11 @@ export class TournamentsAdminService {
       }
     }
 
+    // venue가 새로 설정되거나 기존 값과 달라질 때만 재지오코딩(불필요한 외부 호출 방지).
+    // 트랜잭션 밖에서 먼저 수행 — 네트워크 호출로 트랜잭션을 붙잡아두지 않는다.
+    const venueChanged = dto.venue !== undefined && dto.venue !== existing.venue;
+    const coordinates = venueChanged ? await this.geocodeVenueSafe(dto.venue!) : null;
+
     const data: Prisma.V1TournamentUpdateInput = {};
     if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
     if (dto.title !== undefined) data.title = dto.title;
@@ -213,6 +229,10 @@ export class TournamentsAdminService {
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
     if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
     if (dto.venue !== undefined) data.venue = dto.venue;
+    if (venueChanged) {
+      data.latitude = coordinates?.latitude ?? null;
+      data.longitude = coordinates?.longitude ?? null;
+    }
     if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
@@ -307,6 +327,20 @@ export class TournamentsAdminService {
     return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };
   }
 
+  /**
+   * KakaoGeocodingService.geocode()는 이미 내부에서 모든 실패(키 미설정/네트워크
+   * 오류/응답 이상)를 잡아 null을 반환하지만, 여기서도 한 번 더 방어한다 —
+   * 지오코딩 실패가 venue 저장(대회 생성/수정) 자체를 절대 막아서는 안 된다.
+   */
+  private async geocodeVenueSafe(venue: string): Promise<GeocodedCoordinates | null> {
+    try {
+      return await this.kakaoGeocoding.geocode(venue);
+    } catch (err) {
+      this.logger.warn(`Venue geocoding failed for "${venue}" — saving venue without coordinates: ${err}`);
+      return null;
+    }
+  }
+
   private assertPlayerRange(min: number | undefined, max: number | undefined) {
     if (min !== undefined && max !== undefined && min > max) {
       throw new BadRequestException({
@@ -338,6 +372,8 @@ export class TournamentsAdminService {
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      latitude: row.latitude,
+      longitude: row.longitude,
       coverImageUrl: row.coverImageUrl,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,

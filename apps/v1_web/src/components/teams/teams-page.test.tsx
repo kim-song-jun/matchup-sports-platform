@@ -72,6 +72,8 @@ describe('TeamListPageView', () => {
           statusLabel: '가입 신청 가능',
           tags: ['레벨 미설정'],
           genderRule: '성별 무관',
+          ownerName: '김도윤',
+          managerName: '박서준',
           intro: '짧은 소개',
           next: '수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ',
         },
@@ -84,12 +86,51 @@ describe('TeamListPageView', () => {
     expect(screen.getByText('가입 신청 가능')).toBeInTheDocument();
     expect(screen.getByText('레벨 미설정')).toBeInTheDocument();
     expect(screen.getByText('짧은 소개')).toBeInTheDocument();
+    expect(screen.getByText('팀장 김도윤 · 감독 박서준')).toBeInTheDocument();
     expect(screen.queryByText('가입 신청은 운영진 승인 후 확정돼요.')).not.toBeInTheDocument();
     expect(screen.getByText('수 · 주 1회 · 자유 참여/정기 모임 · ㅇㅇ')).toBeInTheDocument();
     expect(screen.queryByText('자세히 보기 ›')).not.toBeInTheDocument();
     expect(screen.queryByText('팀 보기 ›')).not.toBeInTheDocument();
     expect(screen.queryByText('알림받기')).not.toBeInTheDocument();
     expect(screen.queryByText('오늘 21:00 정기전')).not.toBeInTheDocument();
+  });
+
+  it('shows only the owner line and no manager text when the team has no manager', () => {
+    const base = getTeamListViewModel();
+    const model: TeamListViewModel = {
+      ...base,
+      summary: {
+        ...base.summary,
+        total: 1,
+        recruiting: 1,
+        nearby: undefined,
+      },
+      teams: [
+        {
+          id: 'team-live-2',
+          name: '마포 농구 클럽',
+          logo: '마',
+          sport: '농구',
+          sports: ['농구'],
+          region: '서울 마포구',
+          members: 5,
+          capacity: 10,
+          status: 'open',
+          statusLabel: '가입 신청 가능',
+          tags: ['레벨 미설정'],
+          genderRule: '성별 무관',
+          ownerName: '이하나',
+          managerName: null,
+          intro: '',
+          next: '',
+        },
+      ],
+    };
+
+    render(<TeamListPageView model={model} />);
+
+    expect(screen.getByText('팀장 이하나')).toBeInTheDocument();
+    expect(screen.queryByText(/감독/)).not.toBeInTheDocument();
   });
 });
 

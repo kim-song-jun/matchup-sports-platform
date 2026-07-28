@@ -23,10 +23,11 @@ import {
   TournamentVenuePrepSection,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
 import {
   formatTournamentDateShort,
-  formatTournamentDateRangeShort,
+  formatTournamentDateRangeWithTime,
   formatTournamentDateLong,
   formatEntryFee,
 } from '@/lib/date-utils';
@@ -186,26 +187,32 @@ function CollapsiblePolicyText({
         <FormattedText text={text} className={className} style={{ color, lineHeight }} />
       </div>
       {shouldCollapse ? (
-        <button
-          type="button"
-          className="tm-btn tm-btn-sm tm-btn-ghost"
-          aria-controls={id}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((prev) => !prev)}
-          style={{ marginTop: 10, paddingInline: 0, minHeight: 36 }}
-        >
-          {expanded ? '접기' : '전체 보기'}
-          <ChevronRight
-            size={14}
-            strokeWidth={2.2}
-            aria-hidden="true"
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <button
+            type="button"
+            className="tm-btn tm-btn-sm tm-btn-ghost"
+            aria-controls={id}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((prev) => !prev)}
             style={{
-              marginLeft: 2,
-              transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)',
-              transition: 'transform 0.16s ease',
+              fontSize: 'var(--font-size-caption)',
+              fontWeight: 500,
+              color: 'var(--text-muted)',
             }}
-          />
-        </button>
+          >
+            {expanded ? '접기' : '전체 보기'}
+            <ChevronRight
+              size={12}
+              strokeWidth={2.2}
+              aria-hidden="true"
+              style={{
+                marginLeft: 2,
+                transform: expanded ? 'rotate(-90deg)' : 'rotate(90deg)',
+                transition: 'transform 0.16s ease',
+              }}
+            />
+          </button>
+        </div>
       ) : null}
     </>
   );
@@ -532,7 +539,8 @@ export function TournamentDetailView({
           </div>
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
-            <InfoRow label="일정" value={formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+            <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+            <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
             <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           </div>
           {/* 항상 표시 */}
@@ -563,7 +571,12 @@ export function TournamentDetailView({
         teamCount={tournament.teamCount}
       />
 
-      <TournamentVenuePrepSection announcements={tournament.announcements} />
+      <TournamentVenuePrepSection
+        venue={tournament.venue}
+        announcements={tournament.announcements}
+        latitude={tournament.latitude}
+        longitude={tournament.longitude}
+      />
 
       {/* ── 대회 진행 방식 — format-aware step-by-step flow explanation ── */}
       <TournamentFlowSection tournament={tournament} />
@@ -600,6 +613,7 @@ export function TournamentDetailView({
         <FormatLeftSections tournament={tournament} />
       </div>
 
+      <TournamentInquirySection tournamentId={tournament.id} />
     </>
   );
 
@@ -633,7 +647,8 @@ export function TournamentDetailView({
           기본 정보
         </div>
         <Card pad={0}>
-          <InfoRow label="일정" value={formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+          <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+          <ScheduleNoticeCaption style={{ padding: '10px 16px 14px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
           <InfoRow label="참가팀" value={`${tournament.confirmedCount}/${tournament.teamCount}팀 확정`} />
           <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} />
           {tournament.venue ? (
@@ -697,6 +712,8 @@ export function TournamentDetailView({
           </div>
         </AccordionSection>
       </div>
+
+      <TournamentInquirySection tournamentId={tournament.id} />
     </>
   );
 
@@ -815,9 +832,10 @@ export function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}
+            {formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}
           </span>
         </div>
+        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
@@ -857,8 +875,9 @@ export function TournamentDetailView({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
         </div>
+        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
@@ -892,8 +911,9 @@ export function TournamentDetailView({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
         </div>
+        <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
@@ -1512,6 +1532,23 @@ function InfoRow({
       >
         {value}
       </div>
+    </div>
+  );
+}
+
+/**
+ * "일정" 표시 근처에 공통으로 붙는 안내 캡션 — 대회 상태(open/scheduled/in_progress/completed)
+ * 전체에서 공유하는 단일 소스. 일정·경기 방식이 현장 상황에 따라 바뀔 수 있음을 안내한다.
+ * 기본 marginTop=8 은 InfoRow 리스트 밖 등 독립 블록 배치용 — desktop rail 의 flex(gap) 목록
+ * 안에서는 gap 이 간격을 이미 담당하므로 style로 marginTop:0 을 넘겨 이중 여백을 막는다.
+ */
+function ScheduleNoticeCaption({ style }: { style?: React.CSSProperties }) {
+  return (
+    <div
+      className="tm-text-caption"
+      style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 8, ...style }}
+    >
+      대회 일정 및 경기 방식은 현장 상황에 따라 일부 변경될 수 있습니다. 참가 전 꼭 확인해 주세요.
     </div>
   );
 }

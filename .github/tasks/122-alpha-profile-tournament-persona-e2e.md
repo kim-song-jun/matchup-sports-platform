@@ -162,8 +162,9 @@ Personas: ordinary user, support/read-only admin, ops/owner admin
   - Profile image selection must reject unsupported MIME types locally using the exact JPEG/PNG/WebP allowlist. The profile-specific 2 MiB cap remains intentional even though the generic upload API permits 5 MiB.
   - The scenario/design requirement for `bio` is not implemented end-to-end despite the Prisma column. It is a separate API/type/UI slice, not part of the safety-only patch.
 - [ ] Reconnect the Lazyweb connector and run `lazyweb-update`; this session exposes neither the Lazyweb MCP nor its required image-upload tools, so the mandatory profile UI report cannot be generated or replaced manually.
-- [ ] Host gate before focused RED: latest check was 12 cores, load `7.52/11.70/11.02`, memory free `36%`, swap `17.2/18GB`. Do not start Jest/typecheck/build until swap pressure clears; then run only the upload controller regression and profile component regression serially.
-- [ ] Add the narrow automated regression cases proven by the live run.
+- [ ] Host gate before focused RED: 2026-07-19 13:10 KST check was 12 cores, load `8.32/9.58/9.83`, swap `17.81/18GB`, Node-like 163, browser-like 67. Do not start Jest/typecheck/build until swap pressure clears; then run only the upload controller regression and profile component regression serially.
+- [ ] Focused upload-controller RED is authored at `apps/v1_api/src/uploads/uploads.controller.spec.ts` but intentionally unrun while the host gate fails. It covers withdrawal-pending image/video rejection before storage and active image/video controls. Production code must remain unchanged until this test fails for the missing guard.
+- [ ] Add the remaining narrow profile component regression cases proven by the live run.
 - [ ] Update `docs/scenarios/index.md` with final evidence and cleanup receipt.
 
 ### Current browser evidence

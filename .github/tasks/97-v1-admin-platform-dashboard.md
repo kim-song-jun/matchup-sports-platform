@@ -134,3 +134,18 @@
 - [x] 연결된 인증 수단이 여러 개인 회원은 모두 함께 표시하고, 활성 인증 수단이 없으면 `로그인 수단 없음`으로 표시한다.
 - [x] 관리자 서비스 테스트와 API 계약 문서를 동기화했다.
 - [ ] Playwright 시각 증거는 실행 환경에 Chromium 바이너리가 없어 캡처하지 못했다. API 실데이터와 관리자 웹 라우트는 별도로 확인했다.
+
+## Follow-up - 2026-07-18 - Admin filter and tab counts
+
+- Scope: excluding `/admin/audit`, add exact server totals to nine admin list status filters, inquiry/notice secondary facets, and three tournament detail collection tabs.
+- Contract: list responses expose cursor-independent `summary.total` and `summary.byStatus`; inquiry/notice responses also expose cross-facet counts.
+- [x] Implement and test backend summary contracts.
+- [x] Connect shared frontend UI, nine list routes, and tournament detail tabs.
+- [x] Sync API docs/MSW and complete responsive browser QA.
+
+### Follow-up validation
+
+- Backend: admin-focused 4 suites / 87 tests passed; `v1_api` TypeScript passed. The repository-wide API run had 520/525 passing and five unrelated failures from the concurrently edited terms-management contract.
+- Frontend: 32 suites / 122 tests passed, `v1_web` TypeScript passed, and the production build generated all 76 routes.
+- Browser QA: processed 20/20 surfaces at 1440x1000 and 390x844 (nine list routes plus tournament detail at each viewport). Status counts, inquiry/notice secondary counts, three tournament tab counts, accessible names, console, and horizontal overflow passed. Screenshots are under `output/playwright/visual-audit/admin-filter-counts/`.
+- Runtime note: the already-running API process predated the summary implementation. Browser QA therefore injected deterministic summary values into its real list responses to isolate UI/responsive verification; exact server aggregation is covered by the backend service tests above.

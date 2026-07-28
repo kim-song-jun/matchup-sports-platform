@@ -1,5 +1,6 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, V1NotificationTargetType } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -8,6 +9,7 @@ import {
   ReadAllNotificationsDto,
   UpdateNotificationPreferencesDto,
 } from './dto/notifications.dto';
+import { WebPushService } from './web-push.service';
 
 /** Notification event types emitted by domain services. */
 export type NotificationEventType =
@@ -33,12 +35,11 @@ export type NotificationEventType =
   | 'tournament_payment_confirmed'
   | 'tournament_announcement_published'
   | 'team_invitation_received'
-  | 'team_invitation_accepted';
+  | 'team_invitation_accepted'
+  | 'inquiry_answered';
 
-/** Preference field in V1NotificationPreference that gates the event type. */
-function preferenceFieldForEvent(
-  type: NotificationEventType,
-): keyof Pick<
+/** V1NotificationPreference 컬럼 중 이벤트 발송을 게이트하는 필드들. */
+type NotificationPrefField = keyof Pick<
   {
     matchEnabled: boolean;
     teamEnabled: boolean;
@@ -49,8 +50,16 @@ function preferenceFieldForEvent(
     noticeEnabled: boolean;
     marketingEnabled: boolean;
   },
-  'matchEnabled' | 'teamEnabled' | 'teamMatchEnabled' | 'activityEnabled'
-> {
+  'matchEnabled' | 'teamEnabled' | 'teamMatchEnabled' | 'activityEnabled' | 'importantEnabled'
+>;
+
+/** Preference field in V1NotificationPreference that gates the event type. */
+function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
+  // 사용자가 직접 접수한 1:1 문의의 답변은 놓치면 안 되는 알림이므로
+  // 활동 알림(activityEnabled)이 아니라 중요 알림(importantEnabled)으로 게이트한다.
+  if (type === 'inquiry_answered') {
+    return 'importantEnabled';
+  }
   if (
     type === 'match_application_received' ||
     type === 'match_application_approved' ||
@@ -94,6 +103,9 @@ function preferenceFieldForEvent(
 }
 
 function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetType {
+  if (type === 'inquiry_answered') {
+    return 'inquiry';
+  }
   if (
     type === 'match_application_received' ||
     type === 'match_application_approved' ||
@@ -135,6 +147,7 @@ const ROUTE_BASE_BY_TARGET_TYPE: Partial<Record<V1NotificationTargetType, string
   team: '/teams',
   team_match: '/team-matches',
   tournament: '/tournaments',
+  inquiry: '/my/inquiries',
 };
 
 function deepLinkForTarget(
@@ -181,6 +194,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   tournament_announcement_published: '대회 공지가 올라왔어요',
   team_invitation_received: '팀 초대가 도착했어요',
   team_invitation_accepted: '팀 초대를 수락했어요',
+  inquiry_answered: '문의에 답변이 등록됐어요',
 };
 
 /**
@@ -214,15 +228,16 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   tournament_announcement_published: '공지를 확인해 보세요.',
   team_invitation_received: '팀 초대를 확인해 보세요.',
   team_invitation_accepted: '팀 초대를 수락했어요.',
+  inquiry_answered: '답변 내용을 확인해 주세요.',
 };
 
 @Injectable()
 export class NotificationsService {
-  private readonly logger = new Logger(NotificationsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly webPushService: WebPushService,
+    @InjectPinoLogger(NotificationsService.name) private readonly logger: PinoLogger,
   ) {}
 
   /**
@@ -289,11 +304,7 @@ export class NotificationsService {
     void (async () => {
       const userIds = await resolveUserIds();
       await this.emitNotificationToMany(userIds, type, targetId, body);
-    })().catch((e) =>
-      this.logger.warn(
-        `알림 발송 실패(${type}): ${e instanceof Error ? e.message : String(e)}`,
-      ),
-    );
+    })().catch((e: unknown) => this.logger.warn({ type, err: e }, '알림 발송 실패'));
   }
 
   private emitNotificationFireAndForget(
@@ -303,13 +314,11 @@ export class NotificationsService {
     title: string,
     body: string | null,
     deepLink: string | null,
-    prefField: keyof { matchEnabled: boolean; teamEnabled: boolean; teamMatchEnabled: boolean; activityEnabled: boolean },
+    prefField: NotificationPrefField,
   ): void {
     this.createNotificationWithPrefCheck(userId, targetType, targetId, title, body, deepLink, prefField).catch(
       (err: unknown) => {
-        this.logger.warn(
-          `알림 생성 실패 [userId=${userId} targetType=${targetType} targetId=${targetId}]: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
       },
     );
   }
@@ -321,7 +330,7 @@ export class NotificationsService {
     title: string,
     body: string | null,
     deepLink: string | null,
-    prefField: keyof { matchEnabled: boolean; teamEnabled: boolean; teamMatchEnabled: boolean; activityEnabled: boolean },
+    prefField: NotificationPrefField,
   ): Promise<void> {
     const pref = await this.prisma.v1NotificationPreference.findUnique({
       where: { userId },
@@ -342,7 +351,19 @@ export class NotificationsService {
       },
     });
 
-    this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
+    // emitToUser와 sendToUser는 서로 독립적인 채널이다 — 하나가 던져도 다른 하나의
+    // 시도는 계속되어야 한다(ChatService.sendMessage의 개별 try/catch 격리 패턴과 동일).
+    try {
+      this.realtimeGateway.emitToUser(userId, 'notification:new', notification);
+    } catch (err) {
+      this.logger.warn({ userId, targetType, targetId, err }, '실시간 알림 전송 실패');
+    }
+
+    void this.webPushService
+      .sendToUser(userId, { title, body: body ?? undefined, url: deepLink ?? undefined })
+      .catch((err: unknown) => {
+        this.logger.warn({ userId, targetType, targetId, err }, '웹 푸시 발송 실패');
+      });
   }
 
   async list(user: V1AuthUser, query: NotificationsQueryDto) {

@@ -13,36 +13,17 @@ permissions:
 # PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
 # - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
 # - main push · workflow_dispatch: 취소 없이 직렬 큐
-# 프로덕션 배포 직렬화는 deploy job의 job-level concurrency가 담당
+# 프로덕션 배포 직렬화는 build-images/deploy job의 job-level concurrency가 담당
 concurrency:
   group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # ── Test job: runs on every push and PR ─────────────────────────────────────
-  test:
-    name: Test
+  # ── Gates: 릴리스 계약 검사 ─────────────────────────────────────────────────
+  # DB도 앱 빌드도 필요 없는 초 단위 검사라 api/web 과 병렬로 돌린다.
+  gates:
+    name: Gates
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: teameet_test
-          POSTGRES_PASSWORD: teameet_test
-          POSTGRES_DB: teameet_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U teameet_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      DATABASE_URL: postgresql://teameet_test:teameet_test@localhost:5432/teameet_test
-      JWT_SECRET: ci-test-secret
-      NODE_ENV: test
 
     steps:
       - uses: actions/checkout@v4
@@ -101,20 +82,56 @@ jobs:
       - name: Production deploy security guardrails
         run: pnpm qa:production-deploy-security
 
-      - name: Alpha immutable deployment guardrails
-        run: |
-          node scripts/qa/check-alpha-immutable-deploy.mjs --self-test
-          bash scripts/qa/test-alpha-release-state.sh
-          bash scripts/release/create-alpha-release-manifest.sh --self-test
-          bash scripts/qa/check-expand-contract-migrations.sh --self-test
+      # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
+      # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
+      # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로
+      # 넘어가므로 파일을 명시한다.
+      - name: Release contract tests
+        run: node --test scripts/release/versioning.contract.test.mjs
+
+  # ── API: 타입·마이그레이션·유닛·통합·빌드 ───────────────────────────────────
+  api:
+    name: API
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: teameet_test
+          POSTGRES_PASSWORD: teameet_test
+          POSTGRES_DB: teameet_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U teameet_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://teameet_test:teameet_test@localhost:5432/teameet_test
+      JWT_SECRET: ci-test-secret
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Generate V1 Prisma client
         run: cd apps/v1_api && pnpm prisma generate
 
-      - name: V1 lint and type-check (sequential)
-        run: |
-          pnpm --filter v1_api exec tsc --noEmit
-          pnpm --filter v1_web lint
+      - name: V1 API type-check
+        run: pnpm --filter v1_api exec tsc --noEmit
 
       # 마이그레이션 게이트: 빈 DB에 전체 체인 재생 + schema.prisma 드리프트 0 검증.
       # db push로만 스키마를 바꾸면 여기서 CI가 깨진다 — 반드시 migration 파일 동반.
@@ -132,37 +149,61 @@ jobs:
           DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
-      - name: V1 unit tests (sequential)
-        run: |
-          pnpm --filter v1_api test
-          pnpm --filter v1_web test
+      - name: V1 API unit tests
+        run: pnpm --filter v1_api test
 
-      # Next.js 빌드 캐시 — build check를 가볍게 (incremental compile 재사용)
-      - name: Cache Next.js build cache (v1_web)
-        uses: actions/cache@v4
+      - name: V1 API build check
+        run: pnpm --filter v1_api build
+
+  # ── Web: 린트·타입·유닛·빌드 ────────────────────────────────────────────────
+  # v1_web 은 Prisma 클라이언트도 Postgres도 쓰지 않으므로 DB 서비스를 붙이지 않는다.
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+
+    env:
+      JWT_SECRET: ci-test-secret
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
-          path: apps/v1_web/.next/cache
-          key: nextjs-v1web-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            nextjs-v1web-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+          node-version: 22
+          cache: pnpm
 
-      - name: V1 build checks (sequential)
-        run: |
-          pnpm --filter v1_api build
-          pnpm --filter v1_web build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-  # ── Deploy job: runs on push to main or manual dispatch, after tests pass ──
-  deploy:
-    name: Deploy
-    needs: test
+      - name: V1 web lint and type-check
+        run: pnpm --filter v1_web lint
+
+      - name: V1 web unit tests
+        run: pnpm --filter v1_web test
+
+      # Next.js 빌드 캐시(actions/cache)는 두지 않는다. Next 16 의 next build 는
+      # apps/v1_web/.next/cache 를 거의 채우지 않아(측정값 95,532B) 복원해도 이득이 없는데,
+      # 캐시 키에 커밋 SHA 가 들어가 커밋마다 빈 엔트리를 만들었다(233개 누적).
+      - name: V1 web build check
+        run: pnpm --filter v1_web build
+
+  # ── Build images: 승인 게이트 앞에서 프로덕션 이미지를 만들어 둔다 ──────────
+  # 승인 대기가 배포 시간의 대부분이었다(실측 29분). 빌드를 게이트 앞으로 옮기면
+  # 승인 직후 남는 일은 마이그레이션·컨테이너 교체뿐이다.
+  # 이 job 은 DB 와 실행 중인 컨테이너를 건드리지 않는다 — 호스트의 소스 트리와
+  # 이미지 태그(:<sha>)만 갱신하므로, 승인이 거부돼도 서비스는 그대로 돌아간다.
+  build-images:
+    name: Build images
+    needs: [gates, api, web]
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'workflow_dispatch'
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    # 수동 승인 게이트: production environment의 required reviewer가
-    # GitHub UI에서 승인해야 배포가 시작된다 (main push 자동 배포 제거)
-    environment: production
-    # 프로덕션 배포 직렬화: 진행 중 배포는 취소하지 않고 뒤에 큐잉
+    # 프로덕션 파이프라인 직렬화: 승인 대기 중인 릴리스가 있으면 다음 릴리스의 빌드도
+    # 뒤에 큐잉된다 — 두 릴리스가 같은 호스트를 동시에 건드리는 상황을 막는다.
     concurrency:
       group: deploy-production
       cancel-in-progress: false
@@ -203,32 +244,293 @@ jobs:
       - name: Sync code
         run: |
           rsync -avz --delete \
-            --exclude node_modules --exclude .next --exclude dist --exclude .git --exclude 'deploy/certbot' \
+            --exclude node_modules --exclude .next --exclude dist --exclude .git \
+            --exclude backups --exclude 'deploy/certbot' \
+            --filter 'protect backups/***' \
             --filter 'protect deploy/.env' \
             -e "ssh" \
             ./ ec2:~/teameet/
 
-      - name: Build and deploy
+      - name: Build release images
         timeout-minutes: 35
+        # 웹 이미지 빌드 인자로 들어가는 값만 전달한다. 런타임 전용 시크릿(VAPID·SMS·SES·
+        # 관리자 비밀번호 등)은 승인 후 deploy job 이 .env 로 동기화하므로 여기 필요 없다.
         env:
+          RELEASE_SHA: ${{ github.sha }}
+          KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
+          KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
+          # 공개 동의항목 목록이라 시크릿이 아닌 repository variable.
+          KAKAO_SCOPE_SECRET: ${{ vars.KAKAO_SCOPE }}
+          GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
+        run: |
+          KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
+          KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
+          KAKAO_SCOPE_B64="$(printf '%s' "${KAKAO_SCOPE_SECRET:-}" | base64 | tr -d '\n')"
+          GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
+
+          {
+            printf 'RELEASE_SHA=%s\n' "${RELEASE_SHA}"
+            printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
+            printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
+            printf 'KAKAO_SCOPE_B64=%s\n' "${KAKAO_SCOPE_B64}"
+            printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
+            cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          cd ~/teameet
+
+          # 이 job 은 deploy/.env 를 쓰지 않는다 — 승인 전에 프로덕션 런타임 설정을 바꾸면
+          # 그 사이 재부팅·수동 compose 실행이 '새 env + 옛 이미지' 혼합 상태를 만든다.
+          # 런타임 env 동기화는 승인 뒤 deploy job 이 담당하고, 여기서는 웹 빌드 인자로
+          # 들어갈 값만 시크릿에서 직접 디코드해 셸 변수로 쓴다.
+          decode_secret() {
+            local b64_value="$1"
+            if [ -n "$b64_value" ]; then
+              printf '%s' "$b64_value" | base64 -d
+            fi
+          }
+
+          # 릴리스 태그를 5개까지만 남긴다. 예전에는 dangling 이미지만 정리해도 됐지만
+          # 이제 커밋 SHA 로 태그를 붙이므로 정리하지 않으면 디스크가 찬다.
+          # :latest 는 마지막 '승인된' 배포를 가리키므로 절대 지우지 않는다.
+          prune_stale_release_tags() {
+            local repo="$1"
+            local keep="$2"
+
+            sudo docker images --filter "reference=${repo}:*" \
+                --format '{{.CreatedAt}}|{{.Repository}}:{{.Tag}}' \
+              | grep -v "|${repo}:latest$" \
+              | sort -r \
+              | awk -F'|' -v keep="${keep}" 'NR > keep { print $2 }' \
+              | while IFS= read -r stale_image; do
+                  echo "[cleanup] dropping stale release tag ${stale_image}"
+                  sudo docker rmi "${stale_image}" >/dev/null 2>&1 || true
+                done
+          }
+
+          if sudo docker compose version >/dev/null 2>&1; then
+            COMPOSE="sudo docker compose"
+          elif sudo docker-compose version >/dev/null 2>&1; then
+            COMPOSE="sudo docker-compose"
+          else
+            echo "Docker Compose is not installed on the EC2 host"
+            exit 1
+          fi
+
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo yum install -y jq 2>/dev/null || sudo apt-get install -y jq 2>/dev/null || {
+              echo "[ERROR] jq is required for deploy health checks"
+              exit 1
+            }
+          fi
+
+          if [ ! -f deploy/.env ]; then
+            echo "[ERROR] Missing deploy/.env on the EC2 host"
+            exit 1
+          fi
+
+          # .env 는 읽기만 한다(서브셸에서 읽어 이 스크립트가 파일을 수정하지 않음을 분명히 한다).
+          # DB_PASSWORD/JWT_SECRET 은 시크릿 sync 대상이 아니라 호스트 .env 에 상주하는 값이라,
+          # 여기서 미리 확인해 두면 승인까지 기다린 뒤 실패하는 일을 막을 수 있다.
+          for required_env in DB_PASSWORD JWT_SECRET; do
+            if ! grep -qE "^${required_env}=.+" deploy/.env; then
+              echo "[ERROR] Missing required deploy env: ${required_env}"
+              exit 1
+            fi
+          done
+
+          V1_INTERNAL_API_ORIGIN_VALUE="$(
+            awk -F= '/^V1_INTERNAL_API_ORIGIN=/ { sub(/^V1_INTERNAL_API_ORIGIN=/, ""); print; exit }' deploy/.env
+          )"
+          V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN_VALUE:-http://v1_api:8121}"
+
+          # 웹 빌드 인자는 GitHub 시크릿 값을 그대로 쓴다(예전에도 .env 에 sync 한 직후
+          # 그 값을 읽었으므로 결과는 같다). .env 를 거치지 않으므로 승인 전 부작용이 없다.
+          KAKAO_CLIENT_ID="$(decode_secret "${KAKAO_CLIENT_ID_B64:-}")"
+          KAKAO_REDIRECT_URI="$(decode_secret "${KAKAO_REDIRECT_URI_B64:-}")"
+          KAKAO_SCOPE="$(decode_secret "${KAKAO_SCOPE_B64:-}")"
+          GA_MEASUREMENT_ID="$(decode_secret "${GA_MEASUREMENT_ID_B64:-}")"
+
+          if ! sudo docker buildx version >/dev/null 2>&1; then
+            echo "[ERROR] Docker BuildKit/buildx is required for production image builds"
+            exit 1
+          fi
+
+          # ── Pre-build disk cleanup ────────────────────────────────────────
+          # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
+          # dangling images, stopped containers, and unused build cache.
+          # Volumes are NOT touched (v1_postgres data must persist).
+          echo "[cleanup] Disk usage before prune:"
+          df -h / | tail -1
+          # Use `docker image prune -f` (without -a) to remove only dangling images.
+          # `-a` would delete ALL unused images including cached base layers (node:22-alpine,
+          # postgres:16-alpine, etc.) forcing a full re-pull on every deploy.
+          sudo docker image prune -f || true
+          sudo docker container prune -f || true
+          # 빌드 전에는 여유 공간 확보가 목적이라 '이번 릴리스를 뺀' 5개를 남긴다.
+          # 정확히 5개로 맞추는 정리는 빌드 뒤에 한 번 더 한다 — 여기서만 하면 새 태그가
+          # 추가되면서 결과적으로 6개가 남는다.
+          prune_stale_release_tags teameet-v1-api 5
+          prune_stale_release_tags teameet-v1-web 5
+          # The production host's BuildKit daemon predates the v0.17-only
+          # max-used-space/min-free-space filters. Age-bounded pruning works
+          # across the deployed builder versions and avoids blocking deploys.
+          # 168h 로 묶어 두는 이유: 이 캐시가 아래 빌드의 pnpm store·Next 캐시 마운트와
+          # 레이어 재사용을 담당한다 — 통째로 지우면 매 배포가 전체 재빌드가 된다.
+          sudo docker buildx prune -f --filter 'until=168h'
+          sudo docker network prune -f || true
+          echo "[cleanup] Disk usage after prune:"
+          df -h / | tail -1
+
+          # 레이어 캐시를 쓴다. Dockerfile 이 lockfile → pnpm install → 소스 순서로 짜여
+          # 있고 pnpm store 와 .next/cache 를 BuildKit 캐시 마운트로 잡고 있어서, 캐시를
+          # 켜면 lockfile 이 그대로인 배포는 install 단계를 그대로 재사용한다.
+          # (예전 --no-cache 는 2026-04 "배포해도 옛 자산이 보인다" 이슈에 같이 들어갔는데,
+          #  실제 원인은 nginx 디스크 캐시였고 그 정리는 restart-containers.sh 에 남아 있다.)
+          # --pull 로 베이스 이미지만 매번 최신으로 당겨 온다.
+          sudo env DOCKER_BUILDKIT=1 docker build --pull \
+            -f deploy/Dockerfile.v1-api \
+            -t "teameet-v1-api:${RELEASE_SHA}" .
+          sudo env DOCKER_BUILDKIT=1 docker build --pull \
+            -f deploy/Dockerfile.v1-web \
+            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
+            --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \
+            --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
+            --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
+            --build-arg NEXT_PUBLIC_KAKAO_SCOPE="${KAKAO_SCOPE:-}" \
+            --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${GA_MEASUREMENT_ID:-}" \
+            -t "teameet-v1-web:${RELEASE_SHA}" .
+
+          # 이번 릴리스 태그까지 포함해 정확히 5개만 남긴다.
+          prune_stale_release_tags teameet-v1-api 5
+          prune_stale_release_tags teameet-v1-web 5
+
+          echo "[INFO] Built teameet-v1-api:${RELEASE_SHA} and teameet-v1-web:${RELEASE_SHA}"
+          echo "[INFO] Images are staged only — :latest still points at the running release."
+          echo "[INFO] deploy/.env was not modified — runtime env sync happens after approval."
+          REMOTE_SCRIPT
+          } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
+
+  # ── Deploy job: 승인 후 마이그레이션 + 컨테이너 교체만 수행 ─────────────────
+  deploy:
+    name: Deploy
+    needs: build-images
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    # 수동 승인 게이트: production environment의 required reviewer가
+    # GitHub UI에서 승인해야 배포가 시작된다 (main push 자동 배포 제거)
+    environment: production
+    # 프로덕션 배포 직렬화: 진행 중 배포는 취소하지 않고 뒤에 큐잉
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Setup SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          set -Eeuo pipefail
+          if [[ -z "${EC2_HOST}" || -z "${EC2_KNOWN_HOSTS}" || -z "${EC2_SSH_KEY}" ]]; then
+            echo "EC2_HOST, EC2_KNOWN_HOSTS, and EC2_SSH_KEY are required" >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "${EC2_SSH_KEY}" > ~/.ssh/deploy_key
+          printf '%s\n' "${EC2_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 400 ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/known_hosts
+          if ! ssh-keygen -F "${EC2_HOST}" -f ~/.ssh/known_hosts >/dev/null; then
+            echo "EC2_KNOWN_HOSTS does not contain the configured EC2_HOST" >&2
+            exit 1
+          fi
+          cat >> ~/.ssh/config << EOF
+          Host ec2
+            HostName ${EC2_HOST}
+            User ec2-user
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+          EOF
+
+      # 승인된 릴리스만 :latest 가 된다. compose 가 :latest 를 참조하므로, 이 단계 전까지는
+      # 호스트가 재부팅되더라도 이전 릴리스가 그대로 뜬다.
+      # 런타임 env(.env) 동기화도 여기서 한다 — 승인 전에 바꾸면 그 사이 재기동이
+      # '새 설정 + 옛 이미지' 조합을 띄울 수 있다.
+      - name: Sync runtime env, promote release images and migrate
+        timeout-minutes: 15
+        env:
+          RELEASE_SHA: ${{ github.sha }}
           KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
           KAKAO_CLIENT_SECRET_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
           KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
+          # 공개 동의항목 목록이라 시크릿이 아닌 repository variable.
+          KAKAO_SCOPE_SECRET: ${{ vars.KAKAO_SCOPE }}
           V1_HOST_ADMIN_PASSWORD_SECRET: ${{ secrets.V1_HOST_ADMIN_PASSWORD }}
           GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
+          VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
+          # 휴대폰 SMS OTP 발송처. alpha(deploy-alpha.yml)에만 있어서 prod 컨테이너는
+          # GABIA/SOLAPI 값이 전부 빈 문자열이 됐고, 발송이 SMS_NOT_CONFIGURED 로 막혔다.
+          # 솔라피·가비아 양쪽을 모두 주입하고 SMS_PROVIDER 플래그로만 전환한다.
+          SMS_PROVIDER_SECRET: ${{ secrets.SMS_PROVIDER }}
+          SOLAPI_API_KEY_SECRET: ${{ secrets.SOLAPI_API_KEY }}
+          SOLAPI_API_SECRET_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
+          SOLAPI_SENDER_NUMBER_SECRET: ${{ secrets.SOLAPI_SENDER_NUMBER }}
+          GABIA_SMS_ID_SECRET: ${{ secrets.GABIA_SMS_ID }}
+          GABIA_API_KEY_SECRET: ${{ secrets.GABIA_API_KEY }}
+          GABIA_SENDER_NUMBER_SECRET: ${{ secrets.GABIA_SENDER_NUMBER }}
+          # 이메일 OTP 발송처(SesEmailSender). 둘 다 있어야 enabled 이고 하나라도 비면
+          # 이메일 인증이 조용히 비활성화된다 — SMS 와 같은 누락이 여기에도 있었다.
+          # 값이 공개 설정이라 시크릿이 아닌 repository variable 이다(alpha 와 동일 출처).
+          SES_REGION_SECRET: ${{ vars.SES_REGION }}
+          EMAIL_FROM_SECRET: ${{ vars.EMAIL_FROM }}
         run: |
           KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_CLIENT_SECRET_B64="$(printf '%s' "${KAKAO_CLIENT_SECRET_SECRET:-}" | base64 | tr -d '\n')"
           KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
+          KAKAO_SCOPE_B64="$(printf '%s' "${KAKAO_SCOPE_SECRET:-}" | base64 | tr -d '\n')"
           V1_HOST_ADMIN_PASSWORD_B64="$(printf '%s' "${V1_HOST_ADMIN_PASSWORD_SECRET:-}" | base64 | tr -d '\n')"
           GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PUBLIC_KEY_B64="$(printf '%s' "${VAPID_PUBLIC_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_PRIVATE_KEY_B64="$(printf '%s' "${VAPID_PRIVATE_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          VAPID_SUBJECT_B64="$(printf '%s' "${VAPID_SUBJECT_SECRET:-}" | base64 | tr -d '\n')"
+          SMS_PROVIDER_B64="$(printf '%s' "${SMS_PROVIDER_SECRET:-}" | base64 | tr -d '\n')"
+          SOLAPI_API_KEY_B64="$(printf '%s' "${SOLAPI_API_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          SOLAPI_API_SECRET_B64="$(printf '%s' "${SOLAPI_API_SECRET_SECRET:-}" | base64 | tr -d '\n')"
+          SOLAPI_SENDER_NUMBER_B64="$(printf '%s' "${SOLAPI_SENDER_NUMBER_SECRET:-}" | base64 | tr -d '\n')"
+          GABIA_SMS_ID_B64="$(printf '%s' "${GABIA_SMS_ID_SECRET:-}" | base64 | tr -d '\n')"
+          GABIA_API_KEY_B64="$(printf '%s' "${GABIA_API_KEY_SECRET:-}" | base64 | tr -d '\n')"
+          GABIA_SENDER_NUMBER_B64="$(printf '%s' "${GABIA_SENDER_NUMBER_SECRET:-}" | base64 | tr -d '\n')"
+          SES_REGION_B64="$(printf '%s' "${SES_REGION_SECRET:-}" | base64 | tr -d '\n')"
+          EMAIL_FROM_B64="$(printf '%s' "${EMAIL_FROM_SECRET:-}" | base64 | tr -d '\n')"
 
           {
+            printf 'RELEASE_SHA=%s\n' "${RELEASE_SHA}"
             printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
             printf 'KAKAO_CLIENT_SECRET_B64=%s\n' "${KAKAO_CLIENT_SECRET_B64}"
             printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
+            printf 'KAKAO_SCOPE_B64=%s\n' "${KAKAO_SCOPE_B64}"
             printf 'V1_HOST_ADMIN_PASSWORD_B64=%s\n' "${V1_HOST_ADMIN_PASSWORD_B64}"
             printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
+            printf 'VAPID_PUBLIC_KEY_B64=%s\n' "${VAPID_PUBLIC_KEY_B64}"
+            printf 'VAPID_PRIVATE_KEY_B64=%s\n' "${VAPID_PRIVATE_KEY_B64}"
+            printf 'VAPID_SUBJECT_B64=%s\n' "${VAPID_SUBJECT_B64}"
+            printf 'SMS_PROVIDER_B64=%s\n' "${SMS_PROVIDER_B64}"
+            printf 'SOLAPI_API_KEY_B64=%s\n' "${SOLAPI_API_KEY_B64}"
+            printf 'SOLAPI_API_SECRET_B64=%s\n' "${SOLAPI_API_SECRET_B64}"
+            printf 'SOLAPI_SENDER_NUMBER_B64=%s\n' "${SOLAPI_SENDER_NUMBER_B64}"
+            printf 'GABIA_SMS_ID_B64=%s\n' "${GABIA_SMS_ID_B64}"
+            printf 'GABIA_API_KEY_B64=%s\n' "${GABIA_API_KEY_B64}"
+            printf 'GABIA_SENDER_NUMBER_B64=%s\n' "${GABIA_SENDER_NUMBER_B64}"
+            printf 'SES_REGION_B64=%s\n' "${SES_REGION_B64}"
+            printf 'EMAIL_FROM_B64=%s\n' "${EMAIL_FROM_B64}"
             cat <<'REMOTE_SCRIPT'
           set -euo pipefail
 
@@ -277,8 +579,21 @@ jobs:
           sync_env_from_github_secret "KAKAO_CLIENT_ID" "${KAKAO_CLIENT_ID_B64:-}"
           sync_env_from_github_secret "KAKAO_CLIENT_SECRET" "${KAKAO_CLIENT_SECRET_B64:-}"
           sync_env_from_github_secret "KAKAO_REDIRECT_URI" "${KAKAO_REDIRECT_URI_B64:-}"
+          sync_env_from_github_secret "KAKAO_SCOPE" "${KAKAO_SCOPE_B64:-}"
           sync_env_from_github_secret "V1_HOST_ADMIN_PASSWORD" "${V1_HOST_ADMIN_PASSWORD_B64:-}"
           sync_env_from_github_secret "GA_MEASUREMENT_ID" "${GA_MEASUREMENT_ID_B64:-}"
+          sync_env_from_github_secret "VAPID_PUBLIC_KEY" "${VAPID_PUBLIC_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_PRIVATE_KEY" "${VAPID_PRIVATE_KEY_B64:-}"
+          sync_env_from_github_secret "VAPID_SUBJECT" "${VAPID_SUBJECT_B64:-}"
+          sync_env_from_github_secret "SMS_PROVIDER" "${SMS_PROVIDER_B64:-}"
+          sync_env_from_github_secret "SOLAPI_API_KEY" "${SOLAPI_API_KEY_B64:-}"
+          sync_env_from_github_secret "SOLAPI_API_SECRET" "${SOLAPI_API_SECRET_B64:-}"
+          sync_env_from_github_secret "SOLAPI_SENDER_NUMBER" "${SOLAPI_SENDER_NUMBER_B64:-}"
+          sync_env_from_github_secret "GABIA_SMS_ID" "${GABIA_SMS_ID_B64:-}"
+          sync_env_from_github_secret "GABIA_API_KEY" "${GABIA_API_KEY_B64:-}"
+          sync_env_from_github_secret "GABIA_SENDER_NUMBER" "${GABIA_SENDER_NUMBER_B64:-}"
+          sync_env_from_github_secret "SES_REGION" "${SES_REGION_B64:-}"
+          sync_env_from_github_secret "EMAIL_FROM" "${EMAIL_FROM_B64:-}"
 
           # Harden deploy/.env perms against EC2 umask 022 — contains DB_PASSWORD/JWT_SECRET and other secrets
           chmod 600 deploy/.env
@@ -295,51 +610,40 @@ jobs:
             fi
           done
 
-          V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}"
-
-          if ! sudo docker buildx version >/dev/null 2>&1; then
-            echo "[ERROR] Docker BuildKit/buildx is required for production image builds"
-            exit 1
+          # ── env 드리프트 경고 ──────────────────────────────────────────────
+          # compose 는 ${VAR:-} 형태라 값이 없어도 빈 문자열로 조용히 치환된다. 앱은 그걸
+          # "설정 없음"으로 보고 기능을 graceful disable 하므로, 배포는 성공한 채 해당 기능만
+          # 죽는다 — 가비아 SMS(SMS_NOT_CONFIGURED)와 SES 이메일이 실제로 이렇게 오래 죽어
+          # 있었다. 위 sync 목록과 compose 참조 목록이 어긋나면 여기서 눈에 띄게 만든다.
+          # 실패시키지 않는 이유: LOG_LEVEL 처럼 compose 기본값에 의존하는 것이 정상인 키가
+          # 섞여 있어, 배포를 막는 대신 로그로 드러내는 편이 안전하다.
+          drift_keys=$(grep -ohE '\$\{[A-Z0-9_]+' deploy/docker-compose.prod.yml | tr -d '${' | sort -u)
+          empty_keys=""
+          for drift_key in ${drift_keys}; do
+            if [ -z "${!drift_key:-}" ]; then
+              empty_keys="${empty_keys} ${drift_key}"
+            fi
+          done
+          if [ -n "${empty_keys}" ]; then
+            echo "[WARN] compose 가 참조하지만 deploy/.env 에 값이 없는 키:${empty_keys}"
+            echo "[WARN] 의도한 기본값이 아니라면 GitHub secret/variable 등록과 이 워크플로의 sync 목록을 함께 확인할 것."
           fi
 
-          # ── Pre-build disk cleanup ────────────────────────────────────────
-          # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
-          # dangling images, stopped containers, and unused build cache.
-          # Volumes are NOT touched (v1_postgres data must persist).
-          echo "[cleanup] Disk usage before prune:"
-          df -h / | tail -1
-          # Use `docker image prune -f` (without -a) to remove only dangling images.
-          # `-a` would delete ALL unused images including cached base layers (node:22-alpine,
-          # postgres:16-alpine, etc.) forcing a full re-pull on every deploy.
-          sudo docker image prune -f || true
-          sudo docker container prune -f || true
-          BUILDX_PRUNE_HELP="$(sudo docker buildx prune --help)"
-          for required_flag in --max-used-space --min-free-space; do
-            if ! grep -q -- "${required_flag}" <<<"${BUILDX_PRUNE_HELP}"; then
-              echo "[ERROR] Docker Buildx must support ${required_flag} for bounded production cache cleanup"
+          for release_image in "teameet-v1-api:${RELEASE_SHA}" "teameet-v1-web:${RELEASE_SHA}"; do
+            if ! sudo docker image inspect "${release_image}" >/dev/null 2>&1; then
+              echo "[ERROR] Missing ${release_image} — build-images job did not stage this release"
               exit 1
             fi
           done
-          sudo docker buildx prune -f --filter 'until=168h'
-          sudo docker buildx prune -f --max-used-space 10GB --min-free-space 20GB
-          sudo docker network prune -f || true
-          echo "[cleanup] Disk usage after prune:"
-          df -h / | tail -1
 
-          sudo env DOCKER_BUILDKIT=1 docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
-          sudo env DOCKER_BUILDKIT=1 docker build --no-cache \
-            -f deploy/Dockerfile.v1-web \
-            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-            --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \
-            --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
-            --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
-            --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${GA_MEASUREMENT_ID:-}" \
-            -t teameet-v1-web .
+          echo "[INFO] Promoting ${RELEASE_SHA} to :latest"
+          sudo docker tag "teameet-v1-api:${RELEASE_SHA}" teameet-v1-api:latest
+          sudo docker tag "teameet-v1-web:${RELEASE_SHA}" teameet-v1-web:latest
 
           cd deploy
 
           # ── Ensure v1_postgres is running before migrations ────────────────
-          # network prune above may have removed the deploy_default network.
+          # network prune in the build job may have removed the deploy_default network.
           # Start the DB service first so the migration container can reach it.
           echo "[INFO] Starting database services..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
@@ -361,7 +665,7 @@ jobs:
           echo "[INFO] Syncing v1 deploy database schema..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
-          echo "[INFO] Build phase complete."
+          echo "[INFO] Migration phase complete."
           REMOTE_SCRIPT
           } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
 
@@ -380,7 +684,7 @@ jobs:
                         grep -qx 200 && \
                         curl -fsS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 https://teameet.co.kr/api/v1/health 2>/dev/null | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
-                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "404"'; then
+                        test "$(curl -sS --connect-timeout 5 --max-time 15 --resolve teameet.co.kr:443:127.0.0.1 -o /dev/null -w %{http_code} https://teameet.co.kr/v1/home 2>/dev/null)" = "308"'; then
               echo "Deploy OK"
               exit 0
             fi

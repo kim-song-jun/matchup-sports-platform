@@ -1,0 +1,286 @@
+import { renderHook, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/api-client', () => ({
+  v1Get: vi.fn(),
+  v1Post: vi.fn(),
+  v1Delete: vi.fn(),
+}));
+
+vi.mock('@/lib/client-error-reporter', () => ({
+  reportClientError: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  trackEvent: vi.fn(),
+}));
+
+import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
+import { reportClientError } from '@/lib/client-error-reporter';
+import { trackEvent } from '@/lib/analytics';
+
+const subscription = {
+  endpoint: 'https://push.example/abc',
+  toJSON: () => ({ endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' } }),
+  unsubscribe: vi.fn().mockResolvedValue(true),
+};
+const pushManager = { getSubscription: vi.fn(), subscribe: vi.fn() };
+const registration = { pushManager };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  pushManager.getSubscription.mockResolvedValue(null);
+  pushManager.subscribe.mockResolvedValue(subscription);
+  Object.defineProperty(global.navigator, 'serviceWorker', {
+    configurable: true,
+    value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.resolve(registration) },
+  });
+  Object.defineProperty(global, 'PushManager', {
+    configurable: true,
+    writable: true,
+    value: class {},
+  });
+  Object.defineProperty(global, 'Notification', {
+    configurable: true,
+    writable: true,
+    value: { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') },
+  });
+  (v1Get as ReturnType<typeof vi.fn>).mockResolvedValue({ publicKey: 'BPUBLICKEY' });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('useV1PushRegistration', () => {
+  it('subscribes: requests permission, registers the SW, and posts the subscription', async () => {
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(Notification.requestPermission).toHaveBeenCalled();
+    expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw-push.js');
+    expect(v1Post).toHaveBeenCalledWith('/notifications/push-subscribe', {
+      endpoint: 'https://push.example/abc',
+      keys: { p256dh: 'p', auth: 'a' },
+    });
+  });
+
+  it('tracks push_subscribe_complete only after the server subscribe call succeeds', async () => {
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(trackEvent).toHaveBeenCalledWith('push_subscribe_complete', {});
+    // Ordering: the GA event must fire after v1Post resolves, not before.
+    const postOrder = (v1Post as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    const trackOrder = (trackEvent as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    expect(trackOrder).toBeGreaterThan(postOrder);
+  });
+
+  it('does not track push_subscribe_complete when the server subscribe call fails', async () => {
+    (v1Post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('server exploded'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(trackEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not register the service worker when the server has no VAPID public key', async () => {
+    (v1Get as ReturnType<typeof vi.fn>).mockResolvedValue({ publicKey: null });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(navigator.serviceWorker.register).not.toHaveBeenCalled();
+    expect(v1Post).not.toHaveBeenCalled();
+  });
+
+  it('subscribes via the pushManager from navigator.serviceWorker.ready, not the one register() resolves to immediately', async () => {
+    // Real-world bug (found via live E2E testing on first-ever subscription):
+    // register() resolves as soon as the registration exists, while the worker
+    // is still installing — calling pushManager.subscribe() on THAT registration
+    // throws "Failed to execute 'subscribe' on 'PushManager': Subscription
+    // failed - no active Service Worker". Model that exact split here: register()
+    // resolves to a not-yet-active registration whose subscribe() rejects, while
+    // .ready resolves (once the worker activates) to a registration that works.
+    const installingRegistration = {
+      pushManager: {
+        subscribe: vi.fn().mockRejectedValue(
+          new Error("Failed to execute 'subscribe' on 'PushManager': Subscription failed - no active Service Worker"),
+        ),
+      },
+    };
+    Object.defineProperty(global.navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        register: vi.fn().mockResolvedValue(installingRegistration),
+        ready: Promise.resolve(registration),
+      },
+    });
+
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(installingRegistration.pushManager.subscribe).not.toHaveBeenCalled();
+    expect(pushManager.subscribe).toHaveBeenCalled();
+    expect(v1Post).toHaveBeenCalledWith('/notifications/push-subscribe', {
+      endpoint: 'https://push.example/abc',
+      keys: { p256dh: 'p', auth: 'a' },
+    });
+    expect(reportClientError).not.toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'push-subscribe' }) }),
+    );
+  });
+
+  it('does nothing when permission is already denied', async () => {
+    Object.defineProperty(global, 'Notification', {
+      configurable: true,
+      writable: true,
+      value: { permission: 'denied', requestPermission: vi.fn() },
+    });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(v1Post).not.toHaveBeenCalled();
+  });
+
+  it('unsubscribe calls the server delete before the browser unsubscribe', async () => {
+    pushManager.getSubscription.mockResolvedValue(subscription);
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(v1Delete).toHaveBeenCalledWith('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' });
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+
+  it('unsubscribe syncs isSubscribed to false when the browser has no active subscription', async () => {
+    pushManager.getSubscription.mockResolvedValueOnce(subscription).mockResolvedValueOnce(null);
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(v1Delete).not.toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+  });
+
+  it('unsubscribe still unsubscribes the browser and reports the error when the server call fails', async () => {
+    pushManager.getSubscription.mockResolvedValue(subscription);
+    (v1Delete as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('network down'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(subscription.unsubscribe).toHaveBeenCalled();
+    expect(result.current.isSubscribed).toBe(false);
+    expect(reportClientError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'push-unsubscribe-server' }) }),
+    );
+  });
+
+  it('reports the initial subscription-status check failure instead of swallowing it silently', async () => {
+    Object.defineProperty(global.navigator, 'serviceWorker', {
+      configurable: true,
+      value: { register: vi.fn().mockResolvedValue(registration), ready: Promise.reject(new Error('sw registration lost')) },
+    });
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    renderHook(() => useV1PushRegistration());
+
+    await waitFor(() =>
+      expect(reportClientError).toHaveBeenCalledWith(
+        expect.objectContaining({ context: expect.objectContaining({ flow: 'push-subscription-check' }) }),
+      ),
+    );
+  });
+
+  it('subscribe swallows and reports a rejection instead of throwing (no unhandled rejection)', async () => {
+    (v1Post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('server exploded'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await expect(result.current.subscribe()).resolves.toBe(false);
+    });
+
+    expect(reportClientError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'push-subscribe' }) }),
+    );
+    expect(result.current.isSubscribed).toBe(false);
+  });
+
+  /**
+   * isPending 이 풀리지 않으면 토글이 영원히 "켜는 중…" 으로 잠긴다 — 실패 경로에서
+   * 특히 위험해서(사용자는 재시도조차 못 한다) 성공/실패 양쪽을 확인한다.
+   */
+  it('subscribe 성공 후 isPending 이 풀린다', async () => {
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    expect(result.current.isPending).toBe(false);
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(result.current.isSubscribed).toBe(true);
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it('subscribe 가 실패해도 isPending 이 풀려 다시 시도할 수 있다', async () => {
+    (v1Post as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('server exploded'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it('unsubscribe 가 실패해도 isPending 이 풀린다', async () => {
+    pushManager.getSubscription.mockRejectedValue(new Error('sw gone'));
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    expect(result.current.isPending).toBe(false);
+  });
+});

@@ -44,6 +44,12 @@ function buildKakaoAuthUrl() {
     response_type: 'code',
   });
 
+  // 이름/전화번호/성별 자동 채움용 추가 동의항목. 카카오는 콘솔에서 승인되지 않은 scope 를
+  // 요청하면 authorize 단계에서 실패시키므로 기본값을 두지 않는다 — 검수 승인 후
+  // NEXT_PUBLIC_KAKAO_SCOPE='name,phone_number,gender' 로 켜면 코드 변경 없이 동작한다.
+  const scope = process.env.NEXT_PUBLIC_KAKAO_SCOPE?.trim();
+  if (scope) params.set('scope', scope);
+
   return `https://kauth.kakao.com/oauth/authorize?${params.toString()}`;
 }
 

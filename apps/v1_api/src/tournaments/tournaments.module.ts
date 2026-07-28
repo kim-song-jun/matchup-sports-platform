@@ -18,7 +18,6 @@ import { TournamentsReadController } from './tournaments-read.controller';
 import { TournamentsReadService } from './tournaments-read.service';
 import { TournamentAnnouncementsController } from './tournament-announcements.controller';
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
-import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
 import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
 import { TournamentPopupController } from './tournament-popup.controller';
@@ -69,7 +68,6 @@ import { TournamentCampaignStatusService } from './tournament-campaign-status.se
     TournamentAnnouncementsService,
     TournamentSponsorsService,
     TournamentPopupService,
-    TournamentPaymentExpiryService,
     TournamentReviewsService,
     KakaoGeocodingService,
     TournamentCampaignReadService,

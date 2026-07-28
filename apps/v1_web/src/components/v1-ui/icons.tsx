@@ -177,3 +177,23 @@ export function EyeOffIcon(props: IconProps) {
     </SvgIcon>
   );
 }
+
+export function AlertTriangleIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M12 3 L22 20 H2 Z" />
+      <path d="M12 9.5 V13.5" />
+      <path d="M12 16.8 V17" />
+    </SvgIcon>
+  );
+}
+
+export function InfoCircleIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M12 11 V16.5" />
+      <path d="M12 7.5 V7.7" />
+    </SvgIcon>
+  );
+}

@@ -5,12 +5,12 @@
  * tournament open/deadline guards, submit agreements + payment-method rules,
  * and cancel-request transitions. Asserts observable behaviour only.
  */
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { TournamentPaymentExpiryService } from './tournament-payment-expiry.service';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
 
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -48,12 +48,24 @@ function paymentRow(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
-const validSubmit = { paymentMethod: 'bank_transfer' as const, depositorName: '홍길동', agreedRules: true, agreedPrivacy: true, agreedRefund: true };
+const RULES_ID = '11111111-1111-4111-8111-111111111111';
+const PRIVACY_ID = '22222222-2222-4222-8222-222222222222';
+const REFUND_ID = '33333333-3333-4333-8333-333333333333';
+const MEDIA_ID = '44444444-4444-4444-8444-444444444444';
+const validSubmit = {
+  termsDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID],
+  paymentMethod: 'bank_transfer' as const,
+  depositorName: '홍길동',
+  agreedRules: true,
+  agreedPrivacy: true,
+  agreedRefund: true,
+};
 
 describe('TournamentRegistrationsService', () => {
   let service: TournamentRegistrationsService;
   let prisma: {
     v1TeamMembership: { findFirst: jest.Mock };
+    v1User: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
@@ -62,10 +74,19 @@ describe('TournamentRegistrationsService', () => {
     $queryRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock };
+  let managedTerms: {
+    assertTournamentAcceptances: jest.Mock;
+    recordTournamentDecisions: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
       v1TeamMembership: { findFirst: jest.fn() },
+      // 기본은 "본인인증을 마친 신청자" — 제출 게이트의 정상 경로.
+      // 미인증 케이스는 개별 테스트에서 phoneVerifiedAt: null 로 덮어쓴다.
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({ phoneVerifiedAt: new Date('2026-07-01T00:00:00.000Z') }),
+      },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
@@ -85,13 +106,28 @@ describe('TournamentRegistrationsService', () => {
     });
 
     notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+    managedTerms = {
+      assertTournamentAcceptances: jest.fn().mockImplementation(async (documentIds: string[]) => {
+        if (![RULES_ID, PRIVACY_ID, REFUND_ID].every((id) => documentIds.includes(id))) {
+          throw new BadRequestException({ code: 'AGREEMENTS_REQUIRED' });
+        }
+        const acceptedCodes = new Set(['tournament_rules', 'tournament_privacy', 'tournament_refund']);
+        if (documentIds.includes(MEDIA_ID)) acceptedCodes.add('tournament_media');
+        return {
+          acceptedDocumentIds: documentIds,
+          notAcceptedDocumentIds: documentIds.includes(MEDIA_ID) ? [] : [MEDIA_ID],
+          acceptedCodes,
+        };
+      }),
+      recordTournamentDecisions: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TournamentRegistrationsService,
-        TournamentPaymentExpiryService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: ManagedTermsRuntimeService, useValue: managedTerms },
       ],
     }).compile();
     service = module.get(TournamentRegistrationsService);
@@ -231,6 +267,32 @@ describe('TournamentRegistrationsService', () => {
 
   // ─── submit ───────────────────────────────────────────────────────────────────
 
+  it('submit: 본인인증을 안 한 신청자는 403 PHONE_NOT_VERIFIED 로 막고 약관 검증까지 가지 않는다', async () => {
+    prisma.v1User.findUnique.mockResolvedValue({ phoneVerifiedAt: null });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+
+    await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+      response: { code: 'PHONE_NOT_VERIFIED' },
+    });
+    expect(managedTerms.assertTournamentAcceptances).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('submit: 인증 강제가 꺼진 환경에서는 미인증이어도 제출을 막지 않는다', async () => {
+    process.env.V1_PHONE_VERIFICATION_DISABLED = 'true';
+    try {
+      prisma.v1User.findUnique.mockResolvedValue({ phoneVerifiedAt: null });
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+
+      // 인증이 아니라 그 다음 가드(draft 아님)에서 걸려야 한다 = 인증 게이트를 통과했다는 뜻
+      await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+        response: { code: 'REGISTRATION_NOT_DRAFT' },
+      });
+    } finally {
+      delete process.env.V1_PHONE_VERIFICATION_DISABLED;
+    }
+  });
+
   it('submit: not draft → 409 REGISTRATION_NOT_DRAFT', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
     await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
@@ -241,7 +303,11 @@ describe('TournamentRegistrationsService', () => {
   it('submit: missing agreements → 400 AGREEMENTS_REQUIRED', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     await expect(
-      service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, agreedRefund: false }),
+      service.submit(manager, 'tournament-1', 'reg-1', {
+        ...validSubmit,
+        termsDocumentIds: [RULES_ID, PRIVACY_ID],
+        agreedRefund: false,
+      }),
     ).rejects.toMatchObject({ response: { code: 'AGREEMENTS_REQUIRED' } });
   });
 
@@ -299,7 +365,6 @@ describe('TournamentRegistrationsService', () => {
         method: 'bank_transfer',
         status: 'ready',
         amount: 120000,
-        paymentDueAt: '2026-06-14T02:00:00.000Z',
       },
       paymentInstructions: {
         bankName: '국민은행',
@@ -375,7 +440,7 @@ describe('TournamentRegistrationsService', () => {
     prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
     prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow({ method: 'pg' }));
     const result = await service.submit(manager, 'tournament-1', 'reg-1', {
-      paymentMethod: 'pg', agreedRules: true, agreedPrivacy: true, agreedRefund: true,
+      ...validSubmit, paymentMethod: 'pg', depositorName: undefined,
     });
     expect(result).toMatchObject({ payment: { method: 'pg' } });
   });
@@ -508,47 +573,23 @@ describe('TournamentRegistrationsService', () => {
     );
   });
 
-  it('getMyRegistration: overdue awaiting-payment is cancelled before serialization', async () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-06-14T02:01:00.000Z'));
+  it('getMyRegistration: 입금 안내 후 오래 지난 awaiting_payment 신청도 자동 취소되지 않고 그대로 유지된다', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-20T00:00:00.000Z'));
     const createdAt = new Date('2026-06-14T00:00:00.000Z');
-    const overdueRegistration = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
-    const overduePayment = paymentRow({ createdAt, status: 'ready' });
-    const cancelledRegistration = registrationRow({
-      appliedByUserId: manager.id,
-      status: 'cancelled',
-      cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
-    });
-    const cancelledPayment = paymentRow({
-      createdAt,
-      status: 'cancelled',
-      cancelledAt: new Date('2026-06-14T02:01:00.000Z'),
-    });
-    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(overdueRegistration);
-    prisma.v1TournamentPayment.findUnique.mockResolvedValue(overduePayment);
-    prisma.v1TournamentRegistration.update.mockResolvedValue(cancelledRegistration);
-    prisma.v1TournamentPayment.update.mockResolvedValue(cancelledPayment);
+    const longOverdueRegistration = registrationRow({ appliedByUserId: manager.id, status: 'awaiting_payment' });
+    const longOverduePayment = paymentRow({ createdAt, status: 'ready' });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(longOverdueRegistration);
+    prisma.v1TournamentPayment.findUnique.mockResolvedValue(longOverduePayment);
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
 
     const result = await service.getMyRegistration(manager, 'tournament-1');
 
     expect(result).toMatchObject({
-      status: 'cancelled',
-      cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
-      payment: {
-        status: 'cancelled',
-        paymentDueAt: '2026-06-14T02:00:00.000Z',
-      },
+      status: 'awaiting_payment',
+      payment: { status: 'ready' },
     });
-    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'cancelled',
-          cancelReason: '입금 안내 후 2시간 내 입금 확인이 없어 자동 취소됐어요.',
-        }),
-      }),
-    );
-    expect(prisma.v1TournamentPayment.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'cancelled' }) }),
-    );
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.update).not.toHaveBeenCalled();
     jest.useRealTimers();
   });
 

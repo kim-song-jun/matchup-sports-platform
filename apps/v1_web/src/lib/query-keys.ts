@@ -1,6 +1,11 @@
+import type { QueryClient } from '@tanstack/react-query';
+
 export const v1Keys = {
   all: ['v1'] as const,
   authMe: () => [...v1Keys.all, 'auth', 'me'] as const,
+  currentTerms: (context: 'signup' | 'tournament_application' | 'footer') =>
+    [...v1Keys.all, 'terms', 'current', context] as const,
+  currentSignupTerms: () => v1Keys.currentTerms('signup'),
   onboarding: () => [...v1Keys.all, 'onboarding'] as const,
   masterSports: () => [...v1Keys.all, 'master', 'sports'] as const,
   masterRegions: () => [...v1Keys.all, 'master', 'regions'] as const,
@@ -18,6 +23,7 @@ export const v1Keys = {
   reviews: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', filters ?? {}] as const,
   reviewSource: (sourceType: string, sourceId: string) => [...v1Keys.all, 'reviews', 'sources', sourceType, sourceId] as const,
   reviewsReceived: (filters?: Record<string, unknown>) => [...v1Keys.all, 'reviews', 'received', filters ?? {}] as const,
+  reviewsReceivedSummary: (targetType: 'user' | 'team', period?: string) => [...v1Keys.all, 'reviews', 'received', 'summary', targetType, period ?? 'all'] as const,
   chatRooms: () => [...v1Keys.all, 'chat', 'rooms'] as const,
   chatRoom: (roomId: string) => [...v1Keys.chatRooms(), roomId] as const,
   chatMessages: (roomId: string) => [...v1Keys.chatRoom(roomId), 'messages'] as const,
@@ -43,12 +49,17 @@ export const v1Keys = {
   adminPopup: (id: string) => [...v1Keys.all, 'admin', 'popups', id] as const,
   adminNotices: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'notices', filters ?? {}] as const,
   adminNotice: (id: string) => [...v1Keys.all, 'admin', 'notices', id] as const,
+  adminTerms: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'terms', filters ?? {}] as const,
+  adminTermsPolicy: (id: string) => [...v1Keys.all, 'admin', 'terms', id] as const,
   adminInquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'inquiries', filters ?? {}] as const,
   adminInquiry: (id: string) => [...v1Keys.all, 'admin', 'inquiries', id] as const,
   adminInquiriesPendingCount: () => [...v1Keys.all, 'admin', 'inquiries', 'pending-count'] as const,
   adminTeamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'team-matches', filters ?? {}] as const,
   adminStatusChangeLogs: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'status-change-logs', filters ?? {}] as const,
   adminAdmins: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'admins', filters ?? {}] as const,
+  adminPushFailures: (filters?: { limit?: number }) => [...v1Keys.all, 'admin', 'push-failures', filters ?? {}] as const,
+  adminSmsFailures: (filters?: { limit?: number }) => [...v1Keys.all, 'admin', 'sms-failures', filters ?? {}] as const,
+  adminOpsSummary: () => [...v1Keys.all, 'admin', 'ops-summary'] as const,
   tournaments: (filters?: Record<string, unknown>) => [...v1Keys.all, 'tournaments', filters ?? {}] as const,
   tournament: (id: string) => [...v1Keys.all, 'tournaments', id] as const,
   tournamentCampaigns: (filters?: Record<string, unknown>) => [...v1Keys.all, 'tournaments', 'campaigns', filters ?? {}] as const,
@@ -79,6 +90,13 @@ export const v1Keys = {
     [...v1Keys.all, 'admin', 'tournaments', tournamentId, 'popups'] as const,
   teamInvitations: (teamId: string) => [...v1Keys.all, 'teams', teamId, 'invitations'] as const,
   receivedInvitations: () => [...v1Keys.all, 'me', 'invitations'] as const,
+  myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
 };
+
+// 로그인/회원가입 등 identity 전환 시 반드시 호출 — 캐시가 identity로 스코프되지 않아
+// 이전 사용자 데이터(채팅방/알림 등)가 새 사용자에게 그대로 노출되는 것을 막는다.
+export function clearV1IdentityCache(queryClient: QueryClient) {
+  queryClient.removeQueries({ queryKey: v1Keys.all });
+}

@@ -8,7 +8,14 @@ Report contract: the canonical manifest, coverage, findings, 21 detailed write-u
 
 This ledger separates source changes from verified closure. `Patched, unverified` never means fixed: the focused contract test, runtime proof where applicable, and final changed-scope gate must still pass.
 
-## Current Status (updated 2026-07-16)
+## Current Status (updated 2026-07-26)
+
+The dev-to-main release candidate CodeQL gate reported six high-severity findings on
+2026-07-26. The release branch replaces the uncontrolled URL-query regular expression
+with bounded token processing, requires Web Crypto UUIDs for browser correlation IDs,
+restricts video preview sources to root-relative uploads or HTTP(S) video URLs, and
+fully escapes CSS string backslashes, quotes, and control characters. These patches
+remain unverified until focused tests and the rerun CodeQL check pass.
 
 | Finding | Severity | Risk | Status | Evidence or next action |
 |---|---:|---|---|---|

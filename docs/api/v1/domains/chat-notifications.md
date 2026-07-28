@@ -39,9 +39,11 @@ Chat v1 is linked-room and text-only for user-authored messages. Match, team mat
 
 ## Navigation Contract
 
-Notification rows may carry a deep link target. Frontend must use explicit read-and-navigate handling so read mutation, list invalidation, and route navigation do not race. The web client accepts only same-origin root-relative paths beginning with one `/`; absolute URLs, protocol-relative URLs, backslash paths, and non-path schemes resolve to `/notifications` instead of being passed to the router.
+Notification rows may carry a deep link target. Tapping a notification card opens a detail sheet rather than navigating: the card tap marks the row read, and navigation happens only from the sheet's CTA. This keeps the read mutation, list invalidation, and route navigation from racing, and gives the full body a place to render (the card clamps it to two lines). The web client accepts only same-origin root-relative paths beginning with one `/`; absolute URLs, protocol-relative URLs, backslash paths, and non-path schemes resolve to `/notifications` instead of being passed to the router.
 
-These are in-app database notifications. Browser Push API, service-worker delivery, VAPID subscriptions, and browser notification permission prompts are not part of the active v1 runtime contract.
+Every notification is an in-app database row. The same emit path also attempts a Web Push delivery (`WebPushService.sendToUser`) on a separate, non-blocking channel: when `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` are unset the service logs a warning at boot and every send is a silent no-op, so the in-app row is still created. Push therefore requires those three environment variables in the target environment — see `docs/ops/vapid-setup.md`.
+
+`targetType` values are `match`, `team`, `team_match`, `chat`, `notice`, `system`, `tournament`, `inquiry`. Admin replies to a 1:1 inquiry emit `inquiry_answered` (targetType `inquiry`, deep link `/my/inquiries/:inquiryId`) to the member who asked; guest inquiries have no account and are answered through their contact details instead. That event is gated by `importantEnabled`, not `activityEnabled`.
 
 ## Primary Tables
 

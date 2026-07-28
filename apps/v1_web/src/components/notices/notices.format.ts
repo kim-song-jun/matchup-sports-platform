@@ -1,4 +1,5 @@
 import type { V1Notice } from '@/types/api';
+import { richContentPreviewText } from '@/lib/rich-content';
 import type { NoticeModel } from './notices.types';
 
 // API 시드 데이터 body에 포함된 " seed data" 접미어를 제거한다.
@@ -25,9 +26,10 @@ export function toNotice(notice: V1Notice): NoticeModel {
     id: notice.noticeId ?? notice.id ?? 'notice',
     tag: notice.category ?? notice.audience ?? '공지',
     title: notice.title,
-    summary: displayBody,
+    summary: richContentPreviewText(notice.content, displayBody),
     date: formatDate(notice.publishedAt),
     body: splitNoticeBody(displayBody),
+    content: notice.content ?? undefined,
   };
 }
 

@@ -4,11 +4,21 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { isSafePopupLink } from '../popups/popup-screen';
+import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
+import { normalizeRichContent } from '../content/rich-content';
+import { UploadedFile, UploadsService } from '../uploads/uploads.service';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
@@ -42,9 +52,69 @@ type ActiveAdmin = {
   status: 'active';
 };
 
+type CountGroup = { key: string; count: number };
+
+function buildCountMap<K extends string>(keys: readonly K[], groups: readonly CountGroup[]): Record<K, number> {
+  const counts = Object.fromEntries(keys.map((key) => [key, 0])) as Record<K, number>;
+  for (const group of groups) {
+    if (group.key in counts) counts[group.key as K] = group.count;
+  }
+  return counts;
+}
+
+function buildListSummary<K extends string>(keys: readonly K[], groups: readonly CountGroup[]) {
+  const byStatus = buildCountMap(keys, groups);
+  return {
+    total: Object.values(byStatus).reduce<number>((sum, count) => sum + Number(count), 0),
+    byStatus,
+  };
+}
+
+const USER_LIST_STATUSES = ['active', 'suspended', 'blocked', 'withdrawal_pending', 'deleted'] as const;
+const MATCH_LIST_STATUSES = ['recruiting', 'closed', 'cancelled', 'completed', 'archived'] as const;
+const TEAM_LIST_STATUSES = ['active', 'suspended', 'archived'] as const;
+const TEAM_MATCH_LIST_STATUSES = ['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'archived'] as const;
+const NOTICE_LIST_STATUSES = ['published', 'draft', 'archived'] as const;
+const NOTICE_AUDIENCES = ['public', 'users', 'admins'] as const;
+const POPUP_LIST_STATUSES = ['published', 'archived', 'draft'] as const;
+const INQUIRY_LIST_STATUSES = ['received', 'reviewing', 'answered', 'closed'] as const;
+const INQUIRY_CATEGORIES = ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'] as const;
+const ADMIN_LIST_STATUSES = ['active', 'suspended', 'revoked'] as const;
+
 @Injectable()
-export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+export class AdminService implements OnModuleInit, OnModuleDestroy {
+  private staleAssetCleanupTimer?: ReturnType<typeof setInterval>;
+  private staleAssetCleanupRun?: Promise<void>;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly uploadsService?: UploadsService,
+    // Optional: AdminModule always wires RealtimeModule in production (see
+    // admin.module.ts), so these resolve normally there. They're marked
+    // optional purely so unit-test modules for other AdminService methods
+    // (which have no reason to know about realtime disconnection) don't have
+    // to provide unrelated mocks just to compile — changeUserStatus() itself
+    // treats a missing/failing gateway as non-fatal via optional chaining +
+    // try/catch below, consistent with "realtime failures must never block a
+    // status change."
+    @Optional() private readonly realtimeGateway?: RealtimeGateway,
+    @Optional() @InjectPinoLogger(AdminService.name) private readonly logger?: PinoLogger,
+    // Optional for the same reason as realtimeGateway: AdminModule imports
+    // NotificationsModule in production, so this always resolves there.
+    @Optional() private readonly notifications?: NotificationsService,
+  ) {}
+
+  onModuleInit() {
+    this.staleAssetCleanupTimer = setInterval(() => {
+      void this.runStaleTemporaryAssetCleanup();
+    }, 60 * 60 * 1000);
+    this.staleAssetCleanupTimer.unref?.();
+    void this.runStaleTemporaryAssetCleanup();
+  }
+
+  onModuleDestroy() {
+    if (this.staleAssetCleanupTimer) clearInterval(this.staleAssetCleanupTimer);
+  }
 
   async me(user: V1AuthUser) {
     const admin = await this.getActiveAdmin(user.id);
@@ -56,6 +126,41 @@ export class AdminService {
       capabilities: getCapabilities(admin.adminRole),
       lastActiveAt: null,
     };
+  }
+
+  async createContentAsset(user: V1AuthUser, files: UploadedFile[]) {
+    const admin = await this.getMutationAdmin(user.id);
+    if (!this.uploadsService) throw new ConflictException({ code: 'UPLOADS_UNAVAILABLE', message: '콘텐츠 이미지 저장소를 사용할 수 없어요.' });
+    await this.runStaleTemporaryAssetCleanup();
+    const stored = await this.uploadsService.storeFiles(files, user.id);
+    const url = stored.urls[0];
+    if (!url) throw new BadRequestException({ code: 'CONTENT_ASSET_REQUIRED', message: '이미지 파일을 선택해 주세요.' });
+    try {
+      const asset = await this.prisma.v1ContentAsset.create({
+        data: {
+          url,
+          storagePath: url.slice(`${UploadsService.SERVE_PREFIX}/`.length),
+          uploadedByAdminUserId: admin.id,
+        },
+      });
+      return { assetId: asset.id, url: asset.url, status: asset.status };
+    } catch (error) {
+      await this.uploadsService.removeStoredUrl(url);
+      throw error;
+    }
+  }
+
+  async deleteContentAsset(user: V1AuthUser, assetId: string) {
+    const admin = await this.getMutationAdmin(user.id);
+    const asset = await this.prisma.v1ContentAsset.findUnique({ where: { id: assetId } });
+    if (!asset) throw new NotFoundException({ code: 'NOT_FOUND', message: '콘텐츠 이미지를 찾을 수 없어요.' });
+    if (asset.status !== 'temporary') throw new ConflictException({ code: 'CONTENT_ASSET_ATTACHED', message: '사용 중인 이미지는 직접 삭제할 수 없어요.' });
+    if (asset.uploadedByAdminUserId !== admin.id && admin.adminRole !== 'owner') {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '다른 운영자가 올린 임시 이미지는 삭제할 수 없어요.' });
+    }
+    await this.prisma.v1ContentAsset.delete({ where: { id: assetId } });
+    await this.uploadsService?.removeStoredUrl(asset.url);
+    return { assetId, deleted: true };
   }
 
   async overview(user: V1AuthUser, _query: AdminOverviewQueryDto) {
@@ -107,7 +212,7 @@ export class AdminService {
   }
 
   async changeUserStatus(user: V1AuthUser, userId: string, dto: ChangeUserStatusDto) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
       await this.lockUserRow(tx, userId);
@@ -154,11 +259,27 @@ export class AdminService {
         tx,
       );
     });
+
+    // Disable-class statuses must cut off any realtime channel the user already
+    // holds — otherwise a socket connected before this change keeps receiving
+    // notifications/chat until it happens to reconnect. This runs after the
+    // transaction commits and must never roll back the status change itself if
+    // the gateway throws, so it's isolated in its own try/catch (same
+    // fire-and-forget isolation pattern as NotificationsService.emitToUser).
+    if (dto.status === 'suspended' || dto.status === 'blocked' || dto.status === 'deleted') {
+      try {
+        this.realtimeGateway?.forceDisconnectUser(userId);
+      } catch (err) {
+        this.logger?.warn({ userId, status: dto.status, err }, '상태 변경 후 실시간 소켓 강제 종료 실패');
+      }
+    }
+
+    return result;
   }
 
   async deleteUser(user: V1AuthUser, userId: string, dto: DeleteAdminUserDto) {
     const deletedAt = new Date();
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
       await this.lockUserRow(tx, userId);
@@ -253,6 +374,18 @@ export class AdminService {
 
       return { ...result, deletedAt };
     });
+
+    // Same isolation as changeUserStatus(): deletion also lands on the
+    // disable-class accountStatus, so an already-connected socket must be
+    // cut off here too — otherwise a deleted account keeps receiving
+    // notifications/chat until it happens to reconnect.
+    try {
+      this.realtimeGateway?.forceDisconnectUser(userId);
+    } catch (err) {
+      this.logger?.warn({ userId, err }, '탈퇴 처리 후 실시간 소켓 강제 종료 실패');
+    }
+
+    return result;
   }
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {
@@ -330,17 +463,22 @@ export class AdminService {
   async actionLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const logs = await this.prisma.v1AdminActionLog.findMany({
-      where: {
-        ...(query.adminUserId ? { adminUserId: query.adminUserId } : {}),
-        ...(query.targetType ? { targetType: query.targetType } : {}),
-        ...(query.targetId ? { targetId: query.targetId } : {}),
-        ...(query.actionType ? { action: query.actionType } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const where = {
+      ...(query.adminUserId ? { adminUserId: query.adminUserId } : {}),
+      ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.actionType ? { action: query.actionType } : {}),
+    };
+    // 페이지 버튼을 그리려면 총 건수가 필요하다 — 목록과 함께 한 번에 집계한다.
+    const [logs, total] = await Promise.all([
+      this.prisma.v1AdminActionLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+      }),
+      this.prisma.v1AdminActionLog.count({ where }),
+    ]);
     const pageItems = logs.slice(0, limit);
     const hasNext = logs.length > limit;
     return {
@@ -355,23 +493,33 @@ export class AdminService {
         afterState: log.afterJson,
         createdAt: log.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
     };
   }
 
   async statusChangeLogs(user: V1AuthUser, query: AdminLogsQueryDto) {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const logs = await this.prisma.v1StatusChangeLog.findMany({
-      where: {
-        ...(query.targetType ? { targetType: query.targetType } : {}),
-        ...(query.targetId ? { targetId: query.targetId } : {}),
-        ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const where = {
+      ...(query.targetType ? { targetType: query.targetType } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
+    };
+    const [logs, total] = await Promise.all([
+      this.prisma.v1StatusChangeLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limit + 1,
+        ...paginationArgs(query, limit),
+      }),
+      this.prisma.v1StatusChangeLog.count({ where }),
+    ]);
     const pageItems = logs.slice(0, limit);
     const hasNext = logs.length > limit;
     return {
@@ -386,7 +534,13 @@ export class AdminService {
         reason: log.reason,
         createdAt: log.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
     };
   }
 
@@ -407,14 +561,14 @@ export class AdminService {
         }
       : {};
 
-    const rows = await this.prisma.v1User.findMany({
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1User.findMany({
       where: {
         ...(query.status ? { accountStatus: query.status } : {}),
         ...searchWhere,
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         email: true,
@@ -441,10 +595,19 @@ export class AdminService {
           },
         },
       },
-    });
+    }), this.prisma.v1User.groupBy({
+      by: ['accountStatus'],
+      where: searchWhere,
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+
+    const summary = buildListSummary(
+      USER_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.accountStatus, count: group._count._all })),
+    );
 
     return {
       items: pageItems.map((row) => ({
@@ -468,7 +631,14 @@ export class AdminService {
         },
         adminRole: row.adminUser?.adminRole ?? null,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -618,15 +788,18 @@ export class AdminService {
         }
       : {};
 
-    const rows = await this.prisma.v1Match.findMany({
+    const statusFacetWhere: Prisma.V1MatchWhereInput = {
+      ...(query.sportId ? { sportId: query.sportId } : {}),
+      ...searchWhere,
+    };
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1Match.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
-        ...(query.sportId ? { sportId: query.sportId } : {}),
-        ...searchWhere,
+        ...statusFacetWhere,
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         title: true,
@@ -640,10 +813,19 @@ export class AdminService {
         hostUser: { select: { profile: { select: { nickname: true } } } },
         _count: { select: { participants: true } },
       },
-    });
+    }), this.prisma.v1Match.groupBy({
+      by: ['status'],
+      where: statusFacetWhere,
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+
+    const summary = buildListSummary(
+      MATCH_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
 
     return {
       items: pageItems.map((row) => ({
@@ -660,7 +842,14 @@ export class AdminService {
         maxParticipants: row.maxParticipants,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -715,14 +904,17 @@ export class AdminService {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
-    const rows = await this.prisma.v1Team.findMany({
+    const statusFacetWhere: Prisma.V1TeamWhereInput = {
+      ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
+    };
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1Team.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
-        ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
+        ...statusFacetWhere,
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         name: true,
@@ -734,10 +926,19 @@ export class AdminService {
         sport: { select: { name: true } },
         ownerUser: { select: { profile: { select: { nickname: true } } } },
       },
-    });
+    }), this.prisma.v1Team.groupBy({
+      by: ['status'],
+      where: statusFacetWhere,
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+
+    const summary = buildListSummary(
+      TEAM_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
 
     return {
       items: pageItems.map((row) => ({
@@ -751,7 +952,14 @@ export class AdminService {
         status: row.status,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -772,7 +980,7 @@ export class AdminService {
         region: { select: { name: true } },
         ownerUser: { select: { profile: { select: { nickname: true } } } },
         trustScore: {
-          select: { trustState: true, mannerScore: true, matchCount: true, calculatedAt: true },
+          select: { matchCount: true, calculatedAt: true },
         },
         hostedTeamMatches: {
           take: 5,
@@ -783,6 +991,8 @@ export class AdminService {
     });
 
     if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
+
+    const revealedTrust = (await computeRevealedTeamTrustBatch(this.prisma, [row.id])).get(row.id) ?? null;
 
     return {
       teamId: row.id,
@@ -797,8 +1007,8 @@ export class AdminService {
       createdAt: row.createdAt,
       trustScore: row.trustScore
         ? {
-            trustState: row.trustScore.trustState,
-            mannerScore: row.trustScore.mannerScore,
+            trustState: revealedTrust?.trustState ?? 'sample',
+            mannerScore: revealedTrust?.mannerScore ?? null,
             matchCount: row.trustScore.matchCount,
             calculatedAt: row.trustScore.calculatedAt,
           }
@@ -826,21 +1036,37 @@ export class AdminService {
         }
       : {};
 
-    const rows = await this.prisma.v1Popup.findMany({
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1Popup.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
         ...searchWhere,
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+      ...paginationArgs(query, limit),
+    }), this.prisma.v1Popup.groupBy({
+      by: ['status'],
+      where: searchWhere,
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+    const summary = buildListSummary(
+      POPUP_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+
     return {
       items: pageItems.map((row) => this.toAdminPopupRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -860,13 +1086,16 @@ export class AdminService {
     const archivedAt = dto.status === 'archived' ? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
     const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
+    const content = normalizeRichContent(dto.content, dto.body);
 
     const row = await this.prisma.$transaction(async (tx) => {
       const popup = await tx.v1Popup.create({
         data: {
           audience: dto.audience,
           title: dto.title.trim(),
-          body: dto.body.trim(),
+          body: content.plainText,
+          contentJson: content.document as Prisma.InputJsonValue,
+          contentVersion: 1,
           targetScreens,
           linkUrl,
           linkLabel,
@@ -877,6 +1106,8 @@ export class AdminService {
           displayEndAt,
         },
       });
+
+      await this.syncContentAssets(tx, admin.id, 'popup', popup.id, content.assets);
 
       await tx.v1AdminActionLog.create({
         data: {
@@ -895,6 +1126,8 @@ export class AdminService {
             linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
             displayEndAt: popup.displayEndAt?.toISOString() ?? null,
+            contentVersion: popup.contentVersion,
+            contentAssetCount: content.assets.length,
           } as Prisma.InputJsonValue,
         },
       });
@@ -918,14 +1151,17 @@ export class AdminService {
     const archivedAt = dto.status === 'archived' ? existing.archivedAt ?? now : null;
     const { displayStartAt, displayEndAt } = this.parsePopupDisplayWindow(dto);
     const { targetScreens, linkUrl, linkLabel } = this.parsePopupTargeting(dto);
+    const content = normalizeRichContent(dto.content, dto.body ?? existing.body);
 
-    const row = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const popup = await tx.v1Popup.update({
         where: { id: popupId },
         data: {
           audience: dto.audience,
           title: dto.title.trim(),
-          body: dto.body.trim(),
+          body: content.plainText,
+          contentJson: content.document as Prisma.InputJsonValue,
+          contentVersion: { increment: 1 },
           targetScreens,
           linkUrl,
           linkLabel,
@@ -936,6 +1172,8 @@ export class AdminService {
           displayEndAt,
         },
       });
+
+      const removedAssetUrls = await this.syncContentAssets(tx, admin.id, 'popup', popup.id, content.assets);
 
       await tx.v1AdminActionLog.create({
         data: {
@@ -963,14 +1201,17 @@ export class AdminService {
             linkLabel: popup.linkLabel,
             displayStartAt: popup.displayStartAt?.toISOString() ?? null,
             displayEndAt: popup.displayEndAt?.toISOString() ?? null,
+            contentVersion: popup.contentVersion,
+            contentAssetCount: content.assets.length,
           } as Prisma.InputJsonValue,
         },
       });
 
-      return popup;
+      return { popup, removedAssetUrls };
     });
 
-    return { popup: this.toAdminPopupRow(row) };
+    await this.removeAssetUrls(result.removedAssetUrls);
+    return { popup: this.toAdminPopupRow(result.popup) };
   }
 
   async deletePopup(user: V1AuthUser, popupId: string) {
@@ -979,6 +1220,7 @@ export class AdminService {
     if (!existing) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Popup was not found' });
     }
+    const contentAssets = await this.prisma.v1ContentAsset.findMany({ where: { popupId }, select: { url: true } });
 
     await this.prisma.$transaction(async (tx) => {
       await tx.v1AdminActionLog.create({
@@ -1000,6 +1242,8 @@ export class AdminService {
       await tx.v1Popup.delete({ where: { id: popupId } });
     });
 
+    await this.removeAssetUrls(contentAssets.map((asset) => asset.url));
+
     return { popupId, deleted: true };
   }
 
@@ -1017,23 +1261,59 @@ export class AdminService {
         }
       : {};
 
-    const rows = await this.prisma.v1Notice.findMany({
+    const statusFacetWhere: Prisma.V1NoticeWhereInput = {
+      ...(query.audience ? { audience: query.audience } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...searchWhere,
+    };
+    const audienceFacetWhere: Prisma.V1NoticeWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...searchWhere,
+    };
+    const [rows, statusGroups, audienceGroups] = await Promise.all([this.prisma.v1Notice.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
-        ...(query.audience ? { audience: query.audience } : {}),
-        ...(query.category ? { category: query.category } : {}),
-        ...searchWhere,
+        ...statusFacetWhere,
       },
       orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+      ...paginationArgs(query, limit),
+    }), this.prisma.v1Notice.groupBy({
+      by: ['status'],
+      where: statusFacetWhere,
+      _count: { _all: true },
+    }), this.prisma.v1Notice.groupBy({
+      by: ['audience'],
+      where: audienceFacetWhere,
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+    const summary = buildListSummary(
+      NOTICE_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status ? summary.byStatus[query.status] ?? 0 : summary.total;
     return {
       items: pageItems.map((row) => this.toAdminNoticeRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
+      summary: {
+        ...summary,
+        byAudience: buildCountMap(
+          NOTICE_AUDIENCES,
+          audienceGroups.map((group) => ({ key: group.audience, count: group._count._all })),
+        ),
+      },
     };
   }
 
@@ -1051,6 +1331,7 @@ export class AdminService {
     const now = new Date();
     const publishedAt = dto.status === 'published' ? now : null;
     const archivedAt = dto.status === 'archived' ? now : null;
+    const content = normalizeRichContent(dto.content, dto.body);
 
     const row = await this.prisma.$transaction(async (tx) => {
       const notice = await tx.v1Notice.create({
@@ -1058,12 +1339,16 @@ export class AdminService {
           audience: dto.audience,
           category: dto.category,
           title: dto.title.trim(),
-          body: dto.body.trim(),
+          body: content.plainText,
+          contentJson: content.document as Prisma.InputJsonValue,
+          contentVersion: 1,
           status: dto.status,
           publishedAt,
           archivedAt,
         },
       });
+
+      await this.syncContentAssets(tx, admin.id, 'notice', notice.id, content.assets);
 
       await tx.v1AdminActionLog.create({
         data: {
@@ -1078,6 +1363,8 @@ export class AdminService {
             audience: notice.audience,
             category: notice.category,
             status: notice.status,
+            contentVersion: notice.contentVersion,
+            contentAssetCount: content.assets.length,
           } as Prisma.InputJsonValue,
         },
       });
@@ -1099,20 +1386,25 @@ export class AdminService {
     const statusChanged = existing.status !== dto.status;
     const publishedAt = dto.status === 'published' ? existing.publishedAt ?? now : null;
     const archivedAt = dto.status === 'archived' ? existing.archivedAt ?? now : null;
+    const content = normalizeRichContent(dto.content, dto.body ?? existing.body);
 
-    const row = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const notice = await tx.v1Notice.update({
         where: { id: noticeId },
         data: {
           audience: dto.audience,
           category: dto.category,
           title: dto.title.trim(),
-          body: dto.body.trim(),
+          body: content.plainText,
+          contentJson: content.document as Prisma.InputJsonValue,
+          contentVersion: { increment: 1 },
           status: dto.status,
           publishedAt,
           archivedAt,
         },
       });
+
+      const removedAssetUrls = await this.syncContentAssets(tx, admin.id, 'notice', notice.id, content.assets);
 
       await tx.v1AdminActionLog.create({
         data: {
@@ -1132,14 +1424,17 @@ export class AdminService {
             audience: notice.audience,
             category: notice.category,
             status: notice.status,
+            contentVersion: notice.contentVersion,
+            contentAssetCount: content.assets.length,
           } as Prisma.InputJsonValue,
         },
       });
 
-      return notice;
+      return { notice, removedAssetUrls };
     });
 
-    return { notice: this.toAdminNoticeRow(row) };
+    await this.removeAssetUrls(result.removedAssetUrls);
+    return { notice: this.toAdminNoticeRow(result.notice) };
   }
 
   async deleteNotice(user: V1AuthUser, noticeId: string) {
@@ -1148,6 +1443,7 @@ export class AdminService {
     if (!existing) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Notice was not found' });
     }
+    const contentAssets = await this.prisma.v1ContentAsset.findMany({ where: { noticeId }, select: { url: true } });
 
     await this.prisma.$transaction(async (tx) => {
       await tx.v1AdminActionLog.create({
@@ -1170,6 +1466,8 @@ export class AdminService {
       await tx.v1Notice.delete({ where: { id: noticeId } });
     });
 
+    await this.removeAssetUrls(contentAssets.map((asset) => asset.url));
+
     return { noticeId, deleted: true };
   }
   // ─── Inquiry list / detail / replies ───────────────────────────────────────
@@ -1190,15 +1488,22 @@ export class AdminService {
         }
       : {};
 
-    const rows = await this.prisma.v1Inquiry.findMany({
+    const statusFacetWhere: Prisma.V1InquiryWhereInput = {
+      ...(query.category ? { category: query.category } : {}),
+      ...searchWhere,
+    };
+    const categoryFacetWhere: Prisma.V1InquiryWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...searchWhere,
+    };
+    const [rows, statusGroups, categoryGroups] = await Promise.all([this.prisma.v1Inquiry.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
-        ...(query.category ? { category: query.category } : {}),
-        ...searchWhere,
+        ...statusFacetWhere,
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         category: true,
@@ -1215,14 +1520,42 @@ export class AdminService {
         user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
         _count: { select: { replies: true } },
       },
-    });
+    }), this.prisma.v1Inquiry.groupBy({
+      by: ['status'],
+      where: statusFacetWhere,
+      _count: { _all: true },
+    }), this.prisma.v1Inquiry.groupBy({
+      by: ['category'],
+      where: categoryFacetWhere,
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
 
+    const summary = buildListSummary(
+      INQUIRY_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status ? summary.byStatus[query.status] ?? 0 : summary.total;
     return {
       items: pageItems.map((row) => this.toAdminInquiryRow(row)),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
+      summary: {
+        ...summary,
+        byCategory: buildCountMap(
+          INQUIRY_CATEGORIES,
+          categoryGroups.map((group) => ({ key: group.category, count: group._count._all })),
+        ),
+      },
     };
   }
 
@@ -1284,7 +1617,7 @@ export class AdminService {
       throw new BadRequestException({ code: 'INVALID_INQUIRY_REPLY', message: 'Reply body is required' });
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    const asked = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.v1Inquiry.findUnique({ where: { id: inquiryId } });
       if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
 
@@ -1312,7 +1645,20 @@ export class AdminService {
         },
         tx,
       );
+
+      return { userId: existing.userId, title: existing.title };
     });
+
+    // 커밋 이후에만 알림을 보낸다 — 롤백된 답변으로 "답변 등록" 알림만 남는 상황을 막는다.
+    // 게스트 문의(userId=null)는 계정이 없어 인앱/푸시 알림 대상이 아니다(연락처로만 회신).
+    if (asked.userId) {
+      void this.notifications?.emitNotification(
+        asked.userId,
+        'inquiry_answered',
+        inquiryId,
+        `"${asked.title}" 문의 답변: ${previewInquiryReply(body)}`,
+      );
+    }
 
     return this.getInquiry(user, inquiryId);
   }
@@ -1393,13 +1739,13 @@ export class AdminService {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
-    const rows = await this.prisma.v1TeamMatch.findMany({
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1TeamMatch.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       select: {
         id: true,
         title: true,
@@ -1410,10 +1756,18 @@ export class AdminService {
         hostTeam: { select: { name: true } },
         sport: { select: { name: true } },
       },
-    });
+    }), this.prisma.v1TeamMatch.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+
+    const summary = buildListSummary(
+      TEAM_MATCH_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
 
     return {
       items: pageItems.map((row) => ({
@@ -1426,7 +1780,14 @@ export class AdminService {
         status: row.status,
         createdAt: row.createdAt,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -1436,13 +1797,13 @@ export class AdminService {
     await this.getOwnerAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
-    const rows = await this.prisma.v1AdminUser.findMany({
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1AdminUser.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
       },
       orderBy: { grantedAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       include: {
         user: {
           select: {
@@ -1451,10 +1812,18 @@ export class AdminService {
           },
         },
       },
-    });
+    }), this.prisma.v1AdminUser.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    })]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
+
+    const summary = buildListSummary(
+      ADMIN_LIST_STATUSES,
+      statusGroups.map((group) => ({ key: group.status, count: group._count._all })),
+    );
 
     return {
       items: pageItems.map((row) => ({
@@ -1469,7 +1838,14 @@ export class AdminService {
         grantedAt: row.grantedAt,
         revokedAt: row.revokedAt ?? null,
       })),
-      pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        hasNext,
+        nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
+      }),
+      summary,
     };
   }
 
@@ -1791,6 +2167,107 @@ export class AdminService {
     };
   }
 
+  private async syncContentAssets(
+    tx: Prisma.TransactionClient,
+    adminUserId: string,
+    ownerType: 'notice' | 'popup',
+    ownerId: string,
+    assets: Array<{ assetId: string; url: string }>,
+  ): Promise<string[]> {
+    const assetIds = assets.map((asset) => asset.assetId);
+    const referenced = assetIds.length
+      ? await tx.v1ContentAsset.findMany({ where: { id: { in: assetIds } } })
+      : [];
+    if (referenced.length !== assetIds.length) {
+      throw new BadRequestException({ code: 'CONTENT_ASSET_NOT_FOUND', message: '본문 이미지 중 업로드 정보를 찾을 수 없는 항목이 있어요.' });
+    }
+
+    for (const asset of referenced) {
+      const requested = assets.find((candidate) => candidate.assetId === asset.id);
+      const ownedByEntity = ownerType === 'notice' ? asset.noticeId === ownerId : asset.popupId === ownerId;
+      const availableTemporary = asset.status === 'temporary' && !asset.noticeId && !asset.popupId && asset.uploadedByAdminUserId === adminUserId;
+      if (!requested || requested.url !== asset.url) {
+        throw new BadRequestException({ code: 'CONTENT_ASSET_URL_MISMATCH', message: '본문 이미지 URL이 업로드 정보와 일치하지 않아요.' });
+      }
+      if (!ownedByEntity && !availableTemporary) {
+        throw new BadRequestException({ code: 'CONTENT_ASSET_UNAVAILABLE', message: '다른 콘텐츠가 사용 중인 이미지는 첨부할 수 없어요.' });
+      }
+    }
+
+    const ownerWhere = ownerType === 'notice' ? { noticeId: ownerId } : { popupId: ownerId };
+    const removed = await tx.v1ContentAsset.findMany({
+      where: { ...ownerWhere, ...(assetIds.length ? { id: { notIn: assetIds } } : {}) },
+      select: { id: true, url: true },
+    });
+
+    if (assetIds.length) {
+      const attached = await tx.v1ContentAsset.updateMany({
+        where: { id: { in: assetIds } },
+        data: ownerType === 'notice'
+          ? { status: 'attached', noticeId: ownerId, popupId: null, attachedAt: new Date() }
+          : { status: 'attached', noticeId: null, popupId: ownerId, attachedAt: new Date() },
+      });
+      if (attached.count !== assetIds.length) {
+        throw new BadRequestException({
+          code: 'CONTENT_ASSET_UNAVAILABLE',
+          message: '본문 이미지 상태가 변경됐어요. 이미지를 다시 올린 뒤 저장해 주세요.',
+        });
+      }
+    }
+    if (removed.length) {
+      await tx.v1ContentAsset.deleteMany({ where: { id: { in: removed.map((asset) => asset.id) } } });
+    }
+    return removed.map((asset) => asset.url);
+  }
+
+  private runStaleTemporaryAssetCleanup() {
+    if (this.staleAssetCleanupRun) return this.staleAssetCleanupRun;
+    this.staleAssetCleanupRun = this.cleanupStaleTemporaryAssets()
+      .catch((error) => {
+        this.logger?.error({ err: error }, '임시 콘텐츠 이미지 정리 실패');
+      })
+      .finally(() => {
+        this.staleAssetCleanupRun = undefined;
+      });
+    return this.staleAssetCleanupRun;
+  }
+
+  private async cleanupStaleTemporaryAssets() {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const candidates = await this.prisma.v1ContentAsset.findMany({
+      where: { status: 'temporary', createdAt: { lt: cutoff } },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+      select: { id: true, url: true },
+    });
+    if (!candidates.length) return;
+
+    const claimedUrls: string[] = [];
+    for (const candidate of candidates) {
+      const deleted = await this.prisma.v1ContentAsset.deleteMany({
+        where: {
+          id: candidate.id,
+          status: 'temporary',
+          createdAt: { lt: cutoff },
+          noticeId: null,
+          popupId: null,
+        },
+      });
+      if (deleted.count === 1) claimedUrls.push(candidate.url);
+    }
+    await this.removeAssetUrls(claimedUrls);
+  }
+
+  private async removeAssetUrls(urls: string[]) {
+    if (!this.uploadsService || !urls.length) return;
+    const results = await Promise.allSettled(urls.map((url) => this.uploadsService!.removeStoredUrl(url)));
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        this.logger?.error({ url: urls[index], err: result.reason }, '콘텐츠 이미지 파일 정리 실패');
+      }
+    });
+  }
+
   private parsePopupDisplayWindow(dto: CreateAdminPopupDto) {
     const displayStartAt = dto.displayStartAt ? new Date(dto.displayStartAt) : null;
     const displayEndAt = dto.displayEndAt ? new Date(dto.displayEndAt) : null;
@@ -1835,6 +2312,8 @@ export class AdminService {
     audience: string;
     title: string;
     body: string;
+    contentJson: Prisma.JsonValue | null;
+    contentVersion: number;
     targetScreens: string[];
     linkUrl: string | null;
     linkLabel: string | null;
@@ -1851,6 +2330,8 @@ export class AdminService {
       audience: row.audience,
       title: row.title,
       body: row.body,
+      content: row.contentJson,
+      contentVersion: row.contentVersion,
       targetScreens: row.targetScreens,
       linkUrl: row.linkUrl,
       linkLabel: row.linkLabel,
@@ -1870,6 +2351,8 @@ export class AdminService {
     category: string;
     title: string;
     body: string;
+    contentJson: Prisma.JsonValue | null;
+    contentVersion: number;
     status: string;
     publishedAt: Date | null;
     archivedAt: Date | null;
@@ -1882,6 +2365,8 @@ export class AdminService {
       category: row.category,
       title: row.title,
       body: row.body,
+      content: row.contentJson,
+      contentVersion: row.contentVersion,
       status: row.status,
       publishedAt: row.publishedAt,
       archivedAt: row.archivedAt,
@@ -2013,4 +2498,16 @@ function buildDeletedProviderUserKey(userId: string, identityId: string) {
 
 function buildDeletedNickname(userId: string) {
   return `deleted_${userId.slice(0, 8)}`;
+}
+
+/**
+ * 문의 답변 알림 본문에 넣을 답변 미리보기. 알림 본문은 인앱 목록·상세 시트와
+ * 웹 푸시 payload에 그대로 실리므로, 줄바꿈을 공백으로 접고 길이를 제한한다.
+ */
+const INQUIRY_REPLY_PREVIEW_LIMIT = 160;
+
+function previewInquiryReply(body: string): string {
+  const flattened = body.replace(/\s+/g, ' ').trim();
+  if (flattened.length <= INQUIRY_REPLY_PREVIEW_LIMIT) return flattened;
+  return `${flattened.slice(0, INQUIRY_REPLY_PREVIEW_LIMIT)}…`;
 }

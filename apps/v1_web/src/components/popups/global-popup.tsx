@@ -17,6 +17,7 @@ export function GlobalPopup() {
         id: popup.popupId,
         title: popup.title,
         body: popup.body,
+        content: popup.content,
         trailing: popup.publishedAt
           ? new Date(popup.publishedAt).toLocaleDateString('ko-KR')
           : '팝업',

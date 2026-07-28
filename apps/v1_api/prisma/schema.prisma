@@ -52,6 +52,31 @@ enum V1TermsKind {
   marketing
 }
 
+enum V1ManagedTermsContext {
+  signup
+  tournament_application
+  footer
+}
+
+enum V1ManagedTermsRequirement {
+  required
+  optional
+  display_only
+}
+
+enum V1ManagedTermsConsentDecision {
+  accepted
+  not_accepted
+  revoked
+}
+
+enum V1ManagedTermsConsentSource {
+  web
+  admin
+  legacy_user_consent
+  legacy_tournament_boolean
+}
+
 enum V1NoticeAudience {
   public
   users
@@ -207,6 +232,7 @@ enum V1NotificationTargetType {
   notice
   system
   tournament
+  inquiry
 }
 
 enum V1AdminRole {
@@ -219,6 +245,11 @@ enum V1AdminStatus {
   active
   suspended
   revoked
+}
+
+enum V1ContentAssetStatus {
+  temporary
+  attached
 }
 
 enum V1StatusActorType {
@@ -307,6 +338,9 @@ model V1User {
   chatMessages                   V1ChatMessage[]            @relation("V1ChatMessageSender")
   notifications                  V1Notification[]
   notificationPreference         V1NotificationPreference?
+  pushSubscriptions              V1PushSubscription[]
+  webPushFailureLogs             V1WebPushFailureLog[]      @relation("V1WebPushFailureLogUser")
+  acknowledgedPushFailureLogs    V1WebPushFailureLog[]      @relation("V1WebPushFailureLogAcknowledgedBy")
   searchHistories                V1SearchHistory[]
   adminUser                      V1AdminUser?               @relation("V1AdminUserAccount")
   grantedAdmins                  V1AdminUser[]              @relation("V1AdminGrantor")
@@ -386,6 +420,37 @@ model V1VerificationToken {
   @@map("v1_verification_tokens")
 }
 
+model V1PhoneVerificationChallenge {
+  id           String    @id @default(uuid())
+  phone        String    @unique
+  codeHash     String    @map("code_hash")
+  expiresAt    DateTime  @map("expires_at")
+  attemptCount Int       @default(0) @map("attempt_count")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("v1_phone_verification_challenges")
+}
+
+/**
+ * 비로그인 이메일 OTP 챌린지(비밀번호 재설정). V1VerificationToken 은 userId 가 필수라
+ * 가입되지 않은 주소로는 행을 만들 수 없고, 그러면 "가입 안 된 이메일"만 응답이 갈려
+ * 계정 존재 여부가 새어 나간다. 그래서 휴대폰 챌린지와 같은 모양으로 따로 둔다.
+ */
+model V1EmailVerificationChallenge {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  codeHash     String    @map("code_hash")
+  expiresAt    DateTime  @map("expires_at")
+  attemptCount Int       @default(0) @map("attempt_count")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("v1_email_verification_challenges")
+}
+
 model V1UserProfile {
   id              String    @id @default(uuid())
   userId          String    @unique @map("user_id")
@@ -459,6 +524,115 @@ model V1UserTermsConsent {
   @@unique([userId, termsDocumentId])
   @@index([termsDocumentId])
   @@map("v1_user_terms_consents")
+}
+
+/// Stable identity for a managed legal/content policy. Versions live in
+/// V1ManagedTermsDocument and are never overwritten after publication.
+model V1ManagedTermsPolicy {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  documents  V1ManagedTermsDocument[]
+  placements V1ManagedTermsPlacement[]
+
+  @@index([isActive])
+  @@map("v1_managed_terms_policies")
+}
+
+/// Immutable published version of a managed policy. content contains the
+/// exact plain-text document shown by the current v1 UI baseline.
+model V1ManagedTermsDocument {
+  id                   String                @id @default(uuid())
+  policyId             String                @map("policy_id")
+  version              String
+  title                String
+  subtitle             String?               @db.Text
+  content              String                @db.Text
+  contentHash          String                @map("content_hash")
+  changeSummary        String?               @map("change_summary") @db.Text
+  requiresReconsent    Boolean               @default(true) @map("requires_reconsent")
+  enforcementAt        DateTime?             @map("enforcement_at")
+  status               V1TermsDocumentStatus @default(draft)
+  effectiveAt          DateTime?             @map("effective_at")
+  publishedAt          DateTime?             @map("published_at")
+  archivedAt           DateTime?             @map("archived_at")
+  supersedesDocumentId String?               @map("supersedes_document_id")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  policy             V1ManagedTermsPolicy         @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  supersedesDocument V1ManagedTermsDocument?      @relation("V1ManagedTermsDocumentHistory", fields: [supersedesDocumentId], references: [id], onDelete: Restrict)
+  supersededBy       V1ManagedTermsDocument[]     @relation("V1ManagedTermsDocumentHistory")
+  consentEvents      V1ManagedTermsConsentEvent[]
+
+  @@unique([policyId, version])
+  @@index([status, effectiveAt])
+  @@index([status, enforcementAt])
+  @@index([supersedesDocumentId])
+  @@map("v1_managed_terms_documents")
+}
+
+/// Declares where a policy is shown and whether that flow treats it as
+/// required, optional, or display-only.
+model V1ManagedTermsPlacement {
+  id           String                    @id @default(uuid())
+  policyId     String                    @map("policy_id")
+  context      V1ManagedTermsContext
+  requirement  V1ManagedTermsRequirement
+  displayOrder Int                       @default(0) @map("display_order")
+  isActive     Boolean                   @default(true) @map("is_active")
+  createdAt    DateTime                  @default(now()) @map("created_at")
+  updatedAt    DateTime                  @updatedAt @map("updated_at")
+
+  policy V1ManagedTermsPolicy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@unique([policyId, context])
+  @@index([context, isActive, displayOrder])
+  @@map("v1_managed_terms_placements")
+}
+
+/// Append-only consent history. Legacy source identifiers are stored as
+/// snapshots rather than cascading foreign keys so operational deletion cannot
+/// erase the audit record.
+model V1ManagedTermsConsentEvent {
+  id                       String                        @id @default(uuid())
+  documentId               String                        @map("document_id")
+  userId                   String                        @map("user_id")
+  context                  V1ManagedTermsContext
+  decision                 V1ManagedTermsConsentDecision
+  decidedAt                DateTime?                     @map("decided_at")
+  recordedAt               DateTime                      @default(now()) @map("recorded_at")
+  source                   V1ManagedTermsConsentSource
+  versionVerified          Boolean                       @default(true) @map("version_verified")
+  legacyUserConsentId      String?                       @map("legacy_user_consent_id")
+  tournamentRegistrationId String?                       @map("tournament_registration_id")
+  teamId                   String?                       @map("team_id")
+  legacyBooleanValue       Boolean?                      @map("legacy_boolean_value")
+  dedupeKey                String?                       @unique @map("dedupe_key")
+  createdAt                DateTime                      @default(now()) @map("created_at")
+
+  document V1ManagedTermsDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@index([userId, context, recordedAt])
+  @@index([documentId, decision])
+  @@index([legacyUserConsentId])
+  @@index([tournamentRegistrationId])
+  @@index([teamId])
+  @@map("v1_managed_terms_consent_events")
+}
+
+/// Immutable count/distribution evidence captured by a data migration.
+model V1ManagedTermsMigrationAudit {
+  id           String   @id @default(uuid())
+  migrationKey String   @unique @map("migration_key")
+  snapshot     Json
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("v1_managed_terms_migration_audits")
 }
 
 model V1Sport {
@@ -537,6 +711,8 @@ model V1Notice {
   category    String           @default("안내")
   title       String
   body        String
+  contentJson Json?            @map("content_json")
+  contentVersion Int           @default(1) @map("content_version")
   status      V1NoticeStatus   @default(draft)
   publishedAt DateTime?        @map("published_at")
   archivedAt  DateTime?        @map("archived_at")
@@ -544,6 +720,8 @@ model V1Notice {
   displayEndAt   DateTime?     @map("display_end_at")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  contentAssets V1ContentAsset[]
 
   @@index([audience, status, publishedAt])
   @@index([category, status, displayStartAt, displayEndAt], map: "v1_notices_popup_display_window_idx")
@@ -557,6 +735,8 @@ model V1Popup {
   audience       V1NoticeAudience @default(public)
   title          String
   body           String
+  contentJson    Json?            @map("content_json")
+  contentVersion Int              @default(1) @map("content_version")
   targetScreens  String[]         @default(["home"]) @map("target_screens")
   linkUrl        String?          @map("link_url")
   linkLabel      String?          @map("link_label")
@@ -568,10 +748,35 @@ model V1Popup {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
+  contentAssets  V1ContentAsset[]
+
   @@index([audience, status, displayStartAt, displayEndAt, publishedAt], map: "v1_popups_active_window_idx")
   @@index([createdAt])
   @@index([targetScreens], type: Gin, map: "v1_popups_target_screens_idx")
   @@map("v1_popups")
+}
+
+model V1ContentAsset {
+  id                    String               @id @default(uuid())
+  url                   String               @unique
+  storagePath           String               @unique @map("storage_path")
+  status                V1ContentAssetStatus @default(temporary)
+  uploadedByAdminUserId String               @map("uploaded_by_admin_user_id")
+  noticeId              String?              @map("notice_id")
+  popupId               String?              @map("popup_id")
+  attachedAt            DateTime?            @map("attached_at")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+
+  uploadedByAdminUser V1AdminUser @relation(fields: [uploadedByAdminUserId], references: [id], onDelete: Restrict)
+  notice             V1Notice?    @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  popup              V1Popup?     @relation(fields: [popupId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([uploadedByAdminUserId, createdAt])
+  @@index([noticeId])
+  @@index([popupId])
+  @@map("v1_content_assets")
 }
 
 model V1UserSportPreference {
@@ -852,15 +1057,24 @@ model V1TeamInvitation {
 }
 
 model V1TeamTrustScore {
-  id           String       @id @default(uuid())
-  teamId       String       @unique @map("team_id")
-  trustState   V1TrustState @default(sample) @map("trust_state")
-  mannerScore  Decimal?     @map("manner_score") @db.Decimal(4, 2)
-  matchCount   Int          @default(0) @map("match_count")
-  sourceLabel  String?      @map("source_label")
-  calculatedAt DateTime?    @map("calculated_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id                     String       @id @default(uuid())
+  teamId                 String       @unique @map("team_id")
+  trustState             V1TrustState @default(sample) @map("trust_state")
+  mannerScore            Decimal?     @map("manner_score") @db.Decimal(4, 2)
+  matchCount             Int          @default(0) @map("match_count")
+  // 대회후기(tournament_fixture) 전용 평점 — team_match 전용 mannerScore와 소스 분리(두 recalculate 함수가 같은 컬럼을 덮어쓰는 문제 방지)
+  tournamentMannerScore  Decimal?     @map("tournament_manner_score") @db.Decimal(4, 2)
+  tournamentReviewCount  Int          @default(0) @map("tournament_review_count")
+  // trustState/matchCount/sourceLabel과 마찬가지로, 대회후기(tournament_fixture) 전용 컬럼을 분리한다 —
+  // 두 컬럼군을 공유하면 recalculateTeamTrust(team_match)와 recalculateTournamentFixtureTeamTrust(tournament_fixture)가
+  // 서로 다른 모집단을 계산하면서도 같은 row를 last-write-wins로 덮어써 버린다.
+  tournamentTrustState   V1TrustState @default(sample) @map("tournament_trust_state")
+  tournamentMatchCount   Int          @default(0) @map("tournament_match_count")
+  tournamentSourceLabel  String?      @map("tournament_source_label")
+  sourceLabel            String?      @map("source_label")
+  calculatedAt           DateTime?    @map("calculated_at")
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
 
   team V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
@@ -879,6 +1093,7 @@ model V1PostEventReview {
   targetUserId   String?                     @map("target_user_id")
   targetTeamId   String?                     @map("target_team_id")
   rating         Int
+  sportId        String?                     @map("sport_id")
   status         V1PostEventReviewStatus     @default(submitted)
   submittedAt    DateTime                    @default(now()) @map("submitted_at")
   hiddenAt       DateTime?                   @map("hidden_at")
@@ -903,6 +1118,8 @@ model V1PostEventReview {
   @@index([sourceType, sourceGroupId])
   @@index([targetType])
   @@index([status])
+  @@index([targetUserId, sportId, submittedAt], map: "v1_post_event_reviews_target_user_sport_idx")
+  @@index([targetTeamId, sportId, submittedAt], map: "v1_post_event_reviews_target_team_sport_idx")
   @@map("v1_post_event_reviews")
 }
 
@@ -1082,6 +1299,103 @@ model V1Notification {
   @@map("v1_notifications")
 }
 
+model V1PushSubscription {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user         V1User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  failureLogs  V1WebPushFailureLog[]
+
+  @@index([userId])
+  @@map("v1_push_subscriptions")
+}
+
+model V1WebPushFailureLog {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  subscriptionId String?   @map("subscription_id")
+  statusCode     Int?      @map("status_code")
+  errorCode      String?   @map("error_code")
+  endpointSuffix String    @map("endpoint_suffix")
+  occurredAt     DateTime  @default(now()) @map("occurred_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedBy String?   @map("acknowledged_by")
+
+  user               V1User              @relation("V1WebPushFailureLogUser", fields: [userId], references: [id], onDelete: Cascade)
+  subscription       V1PushSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  acknowledgedByUser V1User?             @relation("V1WebPushFailureLogAcknowledgedBy", fields: [acknowledgedBy], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt])
+  @@index([acknowledgedAt])
+  @@index([userId])
+  @@index([subscriptionId])
+  @@map("v1_web_push_failure_logs")
+}
+
+/// SMS 발송 / 휴대폰·이메일 인증 실패 이벤트 로그(V1WebPushFailureLog 미러).
+/// 실패·이슈만 기록하고 성공 이벤트는 남기지 않는다 — 운영자가 "지금 무엇이 깨졌나"만
+/// 보면 되고, 성공까지 적재하면 유료 SMS 트래픽 전량이 그대로 테이블이 되기 때문이다.
+/// 가입 전(pre-account) 인증에도 쓰이므로 userId 관계가 없고, 식별자는 번호 끝 4자리
+/// (phoneMasked)만 저장해 원본 번호가 어드민 표면에 도달하지 않게 한다.
+model V1SmsEventLog {
+  id             String    @id @default(uuid())
+  eventType      String    @map("event_type")
+  resultCode     String?   @map("result_code")
+  phoneMasked    String    @map("phone_masked")
+  provider       String?
+  detail         String?
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([acknowledgedAt])
+  @@map("v1_sms_event_logs")
+}
+
+/// 서버(AllExceptionsFilter)·클라이언트(POST /logs/client-error) 에러를 어드민에서
+/// 조사할 수 있도록 적재하는 로그. 창(window) 버킷으로 같은 에러를 한 행에 접어
+/// occurrenceCount 로 누적한다 — 정상 흐름 전수 적재라 dedupe 없이는 목록이 즉시 뒤덮인다.
+/// statusCode 401/403 은 24시간 창, 그 외는 1시간 창을 쓴다(ErrorLogService 참조).
+/// 보존 기한 없음(무기한) — 마스킹(mask-sensitive.ts)이 유일한 방어선이므로 신규 필드
+/// 추가 시 반드시 민감정보 목록을 함께 점검한다.
+model V1ErrorLog {
+  id              String   @id @default(uuid())
+  fingerprint     String
+  windowBucket    DateTime @map("window_bucket")
+  occurrenceCount Int      @default(1) @map("occurrence_count")
+
+  source     String
+  level      String
+  statusCode Int?    @map("status_code")
+  errorCode  String? @map("error_code")
+  method     String?
+  route      String?
+  message    String
+  stack      String?
+
+  requestBody    Json? @map("request_body")
+  requestHeaders Json? @map("request_headers")
+  responseBody   Json? @map("response_body")
+  context        Json?
+
+  userId     String? @map("user_id")
+  userAgent  String? @map("user_agent")
+  releaseSha String? @map("release_sha")
+
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([fingerprint, windowBucket])
+  @@index([lastSeenAt])
+  @@index([source, statusCode])
+  @@map("v1_error_logs")
+}
+
 model V1NotificationPreference {
   id               String   @id @default(uuid())
   userId           String   @unique @map("user_id")
@@ -1138,6 +1452,7 @@ model V1AdminUser {
   confirmedTournamentPayments      V1TournamentPayment[]       @relation("V1TournamentPaymentConfirmedByAdmin")
   recordedTournamentResults        V1TournamentFixtureResult[] @relation("V1TournamentFixtureResultRecordedByAdmin")
   inquiryReplies                   V1InquiryReply[]            @relation("V1InquiryReplyAdmin")
+  contentAssets                    V1ContentAsset[]
 
   @@index([adminRole, status])
   @@index([grantedByAdminUserId])
@@ -1331,6 +1646,10 @@ model V1Tournament {
   registrationDeadlineAt DateTime?          @map("registration_deadline_at")
   rosterDeadlineAt       DateTime?          @map("roster_deadline_at")
   bracketPublishedAt     DateTime?          @map("bracket_published_at")
+  // 예약 공개 시각. 스케줄러 없이 조회 시점에 판정한다(now >= 이 값이면 공개로 간주하며,
+  // 이때 bracketPublishedAt 은 null 로 남는다 — 공개 근거가 이 컬럼이다).
+  // 즉시 공개(publishBracket)와 공개 취소(unpublishBracket)는 이 값을 null 로 비운다.
+  bracketPublishScheduledAt DateTime?       @map("bracket_publish_scheduled_at")
   scheduledAt            DateTime?          @map("scheduled_at")
   scheduledEndAt         DateTime?          @map("scheduled_end_at")
   venue                  String?

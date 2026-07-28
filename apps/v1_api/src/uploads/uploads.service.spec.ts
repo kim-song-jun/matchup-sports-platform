@@ -166,3 +166,59 @@ function uploadedFile(filePath: string, mimetype: string) {
     path: filePath,
   };
 }
+
+// removeStoredUrl() (managed content-image cleanup, e.g. AdminService's stale
+// asset cleanup) has no Prisma dependency itself, but the service constructor
+// does — reuse the same real-tempdir convention as the suite above instead of
+// a jest.mock('fs/promises') double, since storeFiles' real signature
+// validation elsewhere in this file relies on real file bytes and a
+// module-level fs mock would break it if it ever shared this file.
+describe('UploadsService.removeStoredUrl', () => {
+  const originalUploadBase = UploadsService.UPLOAD_BASE;
+  let tempDir: string;
+  let service: UploadsService;
+  const prisma = { $transaction: jest.fn() };
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'teameet-upload-remove-'));
+    Object.defineProperty(UploadsService, 'UPLOAD_BASE', {
+      configurable: true,
+      value: path.join(tempDir, 'stored'),
+    });
+    const module = await Test.createTestingModule({
+      providers: [UploadsService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+    service = module.get(UploadsService);
+  });
+
+  afterEach(async () => {
+    Object.defineProperty(UploadsService, 'UPLOAD_BASE', {
+      configurable: true,
+      value: originalUploadBase,
+    });
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('rejects unsafe stored URLs without touching the filesystem', async () => {
+    await expect(service.removeStoredUrl('/uploads/../secret.txt')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.removeStoredUrl('https://example.com/image.webp')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(service.removeStoredUrl('/uploads\\escape.webp')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('removes a valid managed URL and treats an already-missing file as cleaned', async () => {
+    const relativePath = path.join('2026', '07', 'image.webp');
+    const absolutePath = path.join(UploadsService.UPLOAD_BASE, relativePath);
+    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+    await fs.writeFile(absolutePath, 'content');
+
+    await service.removeStoredUrl(`/uploads/${relativePath.split(path.sep).join('/')}`);
+    await expect(fs.stat(absolutePath)).rejects.toMatchObject({ code: 'ENOENT' });
+
+    // Already-missing file must resolve cleanly, not throw.
+    await expect(
+      service.removeStoredUrl(`/uploads/${relativePath.split(path.sep).join('/')}`),
+    ).resolves.toBeUndefined();
+  });
+});

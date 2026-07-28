@@ -3,5 +3,11 @@ export function publicAssetPath(path: string) {
 }
 
 export function cssUrl(path: string) {
-  return `url("${publicAssetPath(path).replace(/"/g, '\\"')}")`;
+  const escaped = publicAssetPath(path)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\d ')
+    .replace(/\n/g, '\\a ')
+    .replace(/\f/g, '\\c ');
+  return `url("${escaped}")`;
 }

@@ -67,6 +67,7 @@
 - [ ] [15-focused-full-flow-test-matrix.md](./15-focused-full-flow-test-matrix.md) - in progress: Task 122가 alpha 프로필·대회 persona E2E를 canonical v1 route와 6개 상태 fixture로 좁혔고, completed detail→results→영상 tab→awards 실제 이동과 awards mobile/tablet overflow 0을 확인했다. Awards 높이 수정은 alpha 배포됐고 after 캡처가 남았다. 영상 제어·profile/upload·registration/admin permission과 exact-ID cleanup은 남음
 - [x] [16-tournament-campaigns.md](./16-tournament-campaigns.md) - Verified: API/DB/role/migration, dev lifecycle/public-admin UI/real 404/exact cleanup, campaign story·prize·motion, 375/768/1280 final alpha visual review까지 완료
 - [ ] [17-tournament-gender-wizard.md](./17-tournament-gender-wizard.md) - Implemented: 성별 카테고리·혼성 쿼터와 4단계 생성/공용 편집 계약 구현, host-gated focused/live/visual verification pending
+- [x] [18-managed-terms-v11-data-migration.md](./18-managed-terms-v11-data-migration.md) - Verified: 고정 약관 11건을 독립 v1.1 문서로 등록하고 기존 회원·대회 동의 원본/false 보존과 백필 멱등성을 검증했다. owner/ops 관리·감사, support read-only, 회원가입 정확 문서 ID 바인딩, 기존 사용자 새 필수 약관 차단/재동의, `/admin/terms` 및 재동의 화면 1440/768/390 실제 브라우저 QA까지 통과
 - [x] [native-route-parity-contract.md](./native-route-parity-contract.md) - Verified: Task 100 Wave 0 native parity contract covers all 87 current v1 web routes, backend ownership, native surface target, web reference, and implementation wave
 - [x] [native-backend-contract-audit.md](./native-backend-contract-audit.md) - Verified: Task 100 Wave 1 backend/native owner contract maps every native route `backendOwner` token to v1 API runtime, docs, or explicit native-local/deferred decision
 - [x] [native-mobile-foundation.md](./native-mobile-foundation.md) - Verified: Task 100 Wave 2 Expo SDK 56 `apps/v1_mobile` foundation exists with 87-route manifest, native API/auth/design boundaries, and no WebView dependency
@@ -222,6 +223,14 @@
 | 2026-07-15 | Task 94 required signup profile | Passed with final integration gate pending | Email/social signup requires trimmed visible name, 11-digit phone, real `YYYYMMDD` birth date, and male/female gender; image remains optional. Focused API 55/55, Web 28/28, MSW 14/14, onboarding barrier 14/14, signup 390/768/1440 live QA, overlength email/social 390/768 checks passed. | Repository-wide typecheck/full tests/build run once at the final integration gate. |
 | 2026-07-15 | Browser root promotion | Passed | Existing Web/API returned `/home` 200, legacy browser `/v1/home` 404, and `/api/v1/health` 200. Web pages/assets/uploads use root paths while backend `/api/v1` remains canonical. | Deployment health contract must retain the negative `/v1/*` 404 check. |
 | 2026-07-19 | Dynamic tournament campaign lifecycle | Passed | Existing dev Web/API/PostgreSQL lifecycle, public/admin/archive behavior, exact cleanup, hero/fact/story/highlight/prize/sponsor/FAQ/CTA polish, 375/768/1280 responsive evidence and clone-fidelity re-review passed. Final CTA is natural-flow and does not obscure prize rows or mobile navigation. | Production header-auth posture remains an infrastructure/security release gate, not a campaign UI gap. |
+
+### 2026-07-19 Admin rich-content image matrix
+
+- Status: Passed
+- Coverage: focused automation 71/71, full API 578/578, full Web 139/139, browser 14/14, live API/DB lifecycle 6/6
+- Scenario: [16-admin-rich-content-images.md](./16-admin-rich-content-images.md)
+- Browser evidence: output/playwright/visual-audit/rich-content-image-matrix-2026-07-19/report.json
+- Finding fixed during QA: selecting multiple images inserted only one image; the editor now inserts the ordered image node array in one Tiptap transaction.
 
 ## Historical Run Summary
 

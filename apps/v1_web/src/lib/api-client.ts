@@ -1,6 +1,11 @@
 import type { ApiEnvelope, ApiErrorBody } from '@/types/api';
 import { getStoredV1Session } from './session-storage';
+import { randomUuid } from './uuid';
 import { reportClientError } from './client-error-reporter';
+import {
+  PHONE_VERIFICATION_REQUIRED_CODE,
+  notifyPhoneVerificationRequired,
+} from './phone-verification-required';
 
 type QueryValue = string | number | boolean | null | undefined;
 type QueryParams = Record<string, QueryValue>;
@@ -17,6 +22,28 @@ export class V1ApiError extends Error {
     this.code = body.code;
     this.details = body.details;
   }
+}
+
+// 401(만료·미인증)과 5xx·네트워크 오류는 대응이 정반대다. 전자는 즉시 로그아웃 처리해야
+// 하지만 후자는 서버가 잠시 밀린 것이라 재시도해야 한다. 이 구분을 각 화면이 따로 구현하다
+// 놓치면, 세션이 멀쩡한데도 로그인이 풀린 것처럼 보인다.
+export function isUnauthenticatedError(error: unknown): boolean {
+  return error instanceof V1ApiError
+    && (error.statusCode === 401 || error.code === 'UNAUTHENTICATED');
+}
+
+// React Query의 retry 옵션용. 서버가 잠시 밀린 경우(5xx·요청량 초과·네트워크 단절)만
+// 두 번까지 다시 시도한다.
+//
+// 4xx는 같은 요청을 반복해도 답이 같으므로 재시도하지 않는다 — /auth/me만 해도 401(만료)
+// 외에 403이 계정 정지·소셜 가입 미완·약관 재동의로 흔하게 나오는데, 이걸 재시도하면
+// 사용자에게는 지수 백오프만큼 지연이 얹히고 서버에는 요청이 3배로 간다. rate limit을
+// 고치려는 코드가 스스로 한도를 3배로 소모하는 셈이 된다.
+export function retryTransientFailure(failureCount: number, error: unknown): boolean {
+  if (failureCount >= 2) return false;
+  // 네트워크 단절은 응답 자체가 없어 V1ApiError로 감싸이지 않고 그대로 전파된다.
+  if (!(error instanceof V1ApiError)) return true;
+  return error.statusCode >= 500 || error.statusCode === 429;
 }
 
 function toErrorMessage(message: unknown) {
@@ -65,7 +92,7 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     },
   });
 
-  const body = await response.json().catch(() => null);
+  const body = response.status === 204 ? null : await response.json().catch(() => null);
 
   if (!response.ok || body?.status === 'error') {
     const errorBody: ApiErrorBody =
@@ -77,13 +104,29 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
         timestamp: new Date().toISOString(),
       };
     const error = new V1ApiError(errorBody);
-    reportClientError({
-      message: error.message,
-      level: error.statusCode >= 500 ? 'error' : 'warn',
-      context: { path, statusCode: error.statusCode, code: error.code, requestId: errorBody.requestId },
-    });
+    // 휴대폰 미인증 차단은 설계된 제품 상태이지 클라이언트 오류가 아니다. 리포터의 dedupe 는
+    // 10초 창이라 미인증 사용자 수만큼 에러 로그가 실제로 쌓이고, 그러면 어드민 에러 뷰어에서
+    // 진짜 장애가 이 잡음에 묻힌다 — 로그는 건너뛰고 안내 신호만 보낸다.
+    const phoneVerificationRequired = error.code === PHONE_VERIFICATION_REQUIRED_CODE;
+    if (!phoneVerificationRequired) {
+      reportClientError({
+        message: error.message,
+        level: error.statusCode >= 500 ? 'error' : 'warn',
+        context: {
+          path: path.split('?')[0],
+          statusCode: error.statusCode,
+          code: error.code,
+          requestId: errorBody.requestId,
+        },
+      });
+    }
+    // 미인증 계정이 쓰기를 시도한 경우 — 실패 토스트만 남기면 사용자는 이유를 알 수 없다.
+    // 전역 모달이 인증 화면으로 안내하도록 여기서 한 번만 신호를 쏜다.
+    if (phoneVerificationRequired) notifyPhoneVerificationRequired();
     throw error;
   }
+
+  if (response.status === 204) return undefined as T;
 
   return (body as ApiEnvelope<T>).data;
 }
@@ -104,8 +147,8 @@ export function v1Patch<T>(path: string, body?: unknown, init?: RequestInit) {
   return v1Api<T>(path, { ...init, method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
-export function v1Delete<T>(path: string, init?: RequestInit) {
-  return v1Api<T>(path, { ...init, method: 'DELETE' });
+export function v1Delete<T>(path: string, body?: unknown, init?: RequestInit) {
+  return v1Api<T>(path, { ...init, method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
 function withQuery(path: string, query?: QueryParams) {
@@ -125,9 +168,7 @@ function getV1SearchSessionId() {
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
 
-  const next = typeof window.crypto?.randomUUID === 'function'
-    ? window.crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const next = randomUuid();
   window.localStorage.setItem(key, next);
   return next;
 }

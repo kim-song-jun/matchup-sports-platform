@@ -69,7 +69,7 @@ GA4 명명 규칙(snake_case) 준수. 카테고리별 이벤트 카탈로그:
 
 **유입/탐색**
 - `landing_cta_click { cta }`
-- `search { query, resultCount, domain }` (domain: match|team|tournament)
+- `search { queryLength, resultCount, domain }` — 실제 전송 필드는 `query`가 아니라 `queryLength`(문자 길이, PII 방지)다. `domain`은 검색 결과가 있었던 도메인들을 콤마로 join한 문자열(`match`/`team_match`/`team` 중 0개 이상 조합, 전부 0건이면 빈 문자열). `tournament`는 통합검색 대상이 아니므로 포함되지 않는다 (구현: `apps/v1_web/src/components/search/search-experience.tsx`의 `trackEvent('search', { queryLength, resultCount, domain })`)
 - `home_view {}`
 
 **매칭(개인)**

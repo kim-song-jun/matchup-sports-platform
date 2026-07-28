@@ -95,6 +95,8 @@ Tournament registration ownership is team-scoped, not user-singleton. A user can
 
 Submission repeats the paid-tournament account invariant under the tournament row lock. A paid `bank_transfer` submission with missing bank details is rejected with `409 TOURNAMENT_PAYMENT_INSTRUCTIONS_MISSING` before the registration enters `awaiting_payment`, so the two-hour payment-expiry clock never starts without usable instructions.
 
+`SubmitRegistrationDto.termsDocumentIds` is the accepted current managed-document UUID list. The service rejects stale IDs and missing required current documents before the registration transaction. In the same transaction as the legacy agreement booleans and payment row, it appends verified `web` consent events with registration/team/applicant provenance; unchecked optional documents become `not_accepted`. The four legacy boolean columns remain populated from the canonical tournament policy codes for compatibility.
+
 Public tournament list/detail responses include both `confirmedCount` and `pendingPaymentCount`. `pendingPaymentCount` counts registrations in payment-stage statuses (`awaiting_payment`, `payment_checking`, `paid`) so clients can show predicted capacity as confirmed + payment-pending teams. `POST /registrations` and `POST /registrations/:registrationId/submit` reject with `409 TOURNAMENT_CAPACITY_FULL` when confirmed + payment-stage registrations already reaches `teamCount`; draft registrations do not reserve capacity.
 
 ## Roster Endpoints

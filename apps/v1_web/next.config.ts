@@ -47,6 +47,12 @@ const noIndexRoutes = [
 const nextConfig: NextConfig = {
   output: isProd ? 'standalone' : undefined,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  // socket.io-client always requests the polling/upgrade handshake with a trailing
+  // slash (/socket.io/?EIO=...). Next's default trailing-slash redirect (308 to
+  // /socket.io?EIO=...) runs BEFORE rewrites, and the redirected path no longer
+  // matches the `/socket.io/:path*` rewrite below — so every realtime connection
+  // 404s. Skipping the redirect lets the rewrite match the original request as-is.
+  skipTrailingSlashRedirect: true,
   experimental: {
     optimizePackageImports: ['@tanstack/react-query'],
   },
@@ -62,6 +68,14 @@ const nextConfig: NextConfig = {
       })),
     ];
   },
+  async redirects() {
+    return [
+      // 구 basePath(/v1) 시대의 URL — 북마크·외부 링크·카카오 redirect_uri(/v1/callback/kakao)가
+      // 아직 살아있어서 현재 경로로 넘겨준다. 쿼리스트링은 Next가 그대로 이어붙인다.
+      { source: '/v1', destination: '/', permanent: true },
+      { source: '/v1/:path*', destination: '/:path*', permanent: true },
+    ];
+  },
   async rewrites() {
     return [
       {
@@ -74,6 +88,14 @@ const nextConfig: NextConfig = {
         // them without CORS and so stored relative URLs resolve in dev + prod.
         source: '/uploads/:path*',
         destination: `${internalApiOrigin}/uploads/:path*`,
+      },
+      {
+        // The bare handshake request (no extra path segments) still needs an
+        // explicit rule: `/socket.io/:path*` alone collapses to a destination
+        // without the trailing slash when :path* is empty, and the Engine.IO
+        // server 404s without it.
+        source: '/socket.io',
+        destination: `${internalApiOrigin}/socket.io/`,
       },
       {
         source: '/socket.io/:path*',

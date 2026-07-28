@@ -46,7 +46,7 @@ CloudTrail, IAM least privilege의 실제 부여 상태, S3 encryption/public ac
 | 공개 포트 | `80`, `443` |
 | 관리 포트 | `22`, 현재 운영자 공인 IP `/32`만 허용 |
 | 애플리케이션 | `apps/v1_api`, `apps/v1_web` |
-| 브라우저 경로 | `/`; `/v1/*` alias는 없으며 `/v1/home`은 `404` |
+| 브라우저 경로 | `/`; 구 `/v1/*` URL은 현재 경로로 `308` redirect (`/v1/home` → `/home`) |
 | API 경로 | `/api/v1/*` |
 
 Nginx Basic Auth는 사용하지 않는다. 애플리케이션의 비공개 기능은 v1 세션 인증과 권한 가드로 보호한다. 검색 엔진 유입을 막기 위해 alpha 응답에는 `X-Robots-Tag: noindex, nofollow, noarchive`를 유지하고, sitemap이나 외부 링크에서 alpha origin을 공개하지 않는다.
@@ -228,7 +228,7 @@ sudo journalctl -u teameet-alpha-certbot.service --since today
 ```bash
 curl -fsSI https://alpha.teameet.co.kr/landing
 curl -fsS https://alpha.teameet.co.kr/api/v1/health | jq -e '.data.checks.db == true'
-test "$(curl -sS -o /dev/null -w '%{http_code}' https://alpha.teameet.co.kr/v1/home)" = 404
+test "$(curl -sS -o /dev/null -w '%{http_code}' https://alpha.teameet.co.kr/v1/home)" = 308
 ```
 
 ## 운영·장애 대응

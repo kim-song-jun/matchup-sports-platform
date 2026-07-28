@@ -701,13 +701,38 @@ button:disabled {
   box-shadow: var(--sh-1);
 }
 
+/* 모드 탭 아래 한 단계 낮은 선택지(계정 찾기의 '본인 확인 방법')에 쓰는 축소 변형.
+   같은 무게의 세그먼트를 두 줄로 쌓으면 어느 쪽이 상위인지 읽히지 않는다.
+   단 높이는 기본값(터치 타겟)을 그대로 두고, 위계는 자족·간격·모서리로만 낮춘다 —
+   여기서 높이를 줄이면 손가락으로 누르기 어려운 표면이 하나 생긴다. */
+.tm-auth-segmented-sm {
+  gap: 4px;
+  padding: 3px;
+  border-radius: 12px;
+}
+
+.tm-auth-segmented-sm .tm-auth-segment {
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 인증 폼 안의 보조 영역(사진 업로드·휴대폰 인증) 공통 표면.
+   폼 자체가 카드(데스크톱)인 곳에서 흰 카드를 또 겹치면 테두리가 이중으로 보이므로,
+   내부 영역은 카드가 아니라 tint 된 inset 으로 통일한다. */
+.tm-auth-inset {
+  border: 1px solid var(--grey200);
+  border-radius: 16px;
+  background: var(--grey50);
+}
+
 .tm-auth-profile-upload {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   padding: 14px;
-  border: 1px dashed var(--grey300);
+  border: 1px solid var(--grey200);
   border-radius: 16px;
   background: var(--grey50);
 }
@@ -1218,6 +1243,30 @@ button:disabled {
 .tm-btn-ghost {
   background: transparent;
   color: var(--text);
+}
+
+/* 인라인 로딩 스피너 (문자 도착 자동 확인 등). light-only + reduced-motion 대응. */
+.tm-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--blue500);
+  animation: tm-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes tm-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-spinner {
+    animation: none;
+  }
 }
 
 .tm-btn-primary {
@@ -1956,7 +2005,7 @@ button:disabled {
 }
 
 .tm-match-list {
-  padding: 14px 20px 108px;
+  padding: 14px var(--v1-shell-page-x) 108px;
 }
 
 .tm-sport-chip-row {
@@ -2353,6 +2402,77 @@ button:disabled {
   margin-top: 22px;
 }
 
+.tm-team-logo-picker {
+  display: grid;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.tm-team-logo-current {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tm-team-logo-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 52px);
+  gap: 8px;
+}
+
+.tm-team-logo-preset {
+  position: relative;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  padding: 5px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-surface);
+  cursor: pointer;
+}
+
+.tm-team-logo-preset:hover {
+  border-color: var(--grey400);
+}
+
+.tm-team-logo-preset[aria-pressed='true'] {
+  border-color: var(--blue500);
+  box-shadow: 0 0 0 1px var(--blue500);
+}
+
+.tm-team-logo-preset:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-team-logo-preset:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.tm-team-logo-check {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 2px solid var(--card-surface);
+  border-radius: 50%;
+  background: var(--blue500);
+  color: var(--static-white);
+}
+
+@media (min-width: 720px) {
+  .tm-team-logo-picker {
+    grid-template-columns: minmax(210px, 1fr) auto;
+    align-items: center;
+  }
+}
+
 .tm-create-input {
   min-height: 48px;
   margin-top: 10px;
@@ -2554,7 +2674,7 @@ button:disabled {
 }
 
 .tm-team-list {
-  padding: 14px 20px 104px;
+  padding: 14px var(--v1-shell-page-x) 104px;
 }
 
 .tm-list-search-input {
@@ -2832,6 +2952,26 @@ button:disabled {
 
 .tm-team-detail-body {
   padding: 18px 20px 128px;
+}
+
+/* 가입 승인 대기 안내 — 토스트가 사라진 뒤에도 상태를 알려주는 상시 카드.
+   배경은 팀매치·매치 안내 카드와 같은 --tint-orange 톤을 쓴다(주황 안내 카드 관례). */
+.tm-team-join-pending {
+  margin-top: 12px;
+  background: var(--tint-orange);
+}
+
+.tm-team-join-pending-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-team-join-pending-body {
+  margin: 8px 0 0;
+  line-height: 1.6;
+  color: var(--text-muted);
 }
 
 .tm-section-title {
@@ -3448,23 +3588,25 @@ button:disabled {
 }
 
 .tm-notification-card {
+  width: 100%;
   min-height: 82px;
   border: 1px solid var(--grey100);
   border-radius: 16px;
   background: var(--bg);
   color: inherit;
   text-decoration: none;
+  text-align: left;
   padding: 14px;
   display: flex;
   gap: 12px;
+  cursor: pointer;
 }
 
 .tm-notification-card-unread {
-  /* 단일 액센트 규약: 카드 면은 중립 --bg, 미읽음 신호는 좌측 6px 마커로만 표현 */
+  /* 미읽음 신호는 굵은 좌측 마커 대신 아이콘 tint + 제목 옆 점으로 표현한다.
+     카드 테두리·라운드가 목록 전체에서 동일하게 유지돼 리듬이 흐트러지지 않는다. */
   background: var(--bg);
-  border-color: var(--grey100);
-  border-left: 6px solid var(--blue500);
-  padding-left: 10px; /* 좌측 border 6px 보정 — 전체 패딩 14px 유지 */
+  border-color: var(--blue100);
 }
 
 .tm-notification-icon {
@@ -3479,13 +3621,28 @@ button:disabled {
 }
 
 .tm-notification-card-unread .tm-notification-icon {
-  background: var(--blue500);
-  color: var(--static-white);
+  background: var(--blue50);
+  color: var(--blue500);
 }
 
-/* 미읽음 카드 제목 — blue500으로 마커 컬러와 일관성 */
-.tm-notification-card-unread .tm-text-body-lg {
-  color: var(--blue500);
+.tm-notification-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 미읽음 카드 제목 — 컬러 반전 대신 굵기로 강조(본문 대비 유지) */
+.tm-notification-card-unread .tm-notification-card-title .tm-text-body-lg {
+  font-weight: 800;
+}
+
+/* 미읽음 점 — sr-only "읽지 않음" 텍스트와 병행(컬러 단독 전달 금지) */
+.tm-notification-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue500);
+  flex: 0 0 auto;
 }
 
 .tm-notification-meta {
@@ -3493,6 +3650,78 @@ button:disabled {
   color: var(--text-caption);
   font-size: var(--font-size-caption); /* 12px — R-T2 토큰 */
   font-weight: 700;
+}
+
+/* ── 알림 상세 시트 ────────────────────────────────────────────────────────
+ * 카드 본문이 2줄로 잘리므로 전문·수신 시각·이동 CTA를 시트에서 제공한다.
+ * 모션·라운드·그림자는 기존 필터 시트(tm-filter-sheet) 규약을 그대로 따른다.
+ * ───────────────────────────────────────────────────────────────────────── */
+.tm-notification-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(25, 31, 40, 0.45);
+  animation: tm-filter-scrim-fade 0.18s ease-out;
+}
+
+.tm-notification-sheet {
+  width: min(100%, var(--v1-app-chrome-frame-width));
+  padding: 10px var(--v1-shell-page-x) calc(20px + var(--v1-shell-safe-bottom));
+  border-radius: 24px 24px 0 0;
+  background: var(--bg);
+  box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
+  animation: tm-filter-sheet-up 0.22s ease-out;
+}
+
+.tm-notification-sheet-grabber {
+  width: 42px;
+  height: 4px;
+  margin: 0 auto 16px;
+  border-radius: 999px;
+  background: var(--grey300);
+}
+
+.tm-notification-sheet-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.tm-notification-sheet-body {
+  margin: 16px 0 20px;
+  color: var(--text-strong);
+  font-size: var(--font-size-body); /* 15px — R-T2 토큰 */
+  line-height: 1.65;
+  white-space: pre-wrap; /* 서버가 넣은 줄바꿈 보존 */
+  word-break: break-word;
+}
+
+.tm-notification-sheet-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 데스크톱에서는 하단 시트 대신 중앙 다이얼로그로 — 하단 고정 nav가 없는 폭이다 */
+@media (min-width: 1024px) {
+  .tm-notification-sheet-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .tm-notification-sheet {
+    width: min(100%, 440px);
+    padding: 20px 24px 24px;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(20, 28, 45, 0.14);
+    animation: fade-in 0.18s ease-out;
+  }
+
+  .tm-notification-sheet-grabber {
+    display: none;
+  }
 }
 
 .tm-empty-state {
@@ -4162,7 +4391,7 @@ button:disabled {
 .tm-my-shell {
   display: grid;
   gap: 14px;
-  padding: 18px 20px 124px;
+  padding: 18px var(--v1-shell-page-x) 124px;
 }
 
 .tm-my-profile-head {
@@ -4372,10 +4601,25 @@ button:disabled {
   border-radius: 14px;
   background: var(--grey100);
 }
+
+/* 매치 유형(개인/팀) 세그먼트 — 스크롤 영역 직속 자식이라 좌우 여백을 스스로 확보해야 한다.
+   위 검색바 입력·아래 종목 칩/카드가 모두 --v1-shell-page-x 인셋이므로 같은 토큰으로 맞춘다. */
+.tm-match-type-segment {
+  margin: 0 var(--v1-shell-page-x) 12px;
+}
+
+@media (min-width: 1024px) {
+  /* 데스크탑에서는 리스트·검색바의 모바일 패딩이 0으로 리셋되고 스크롤 영역이 열 여백을 담당하므로
+     세그먼트도 열 가장자리에 맞춰야 제목·검색바와 정렬된다. */
+  .tm-match-type-segment {
+    margin-inline: 0;
+  }
+}
+
 .tm-review-shell {
   display: grid;
   gap: 14px;
-  padding: 18px 20px 124px;
+  padding: 18px var(--v1-shell-page-x) 124px;
 }
 
 .tm-review-compose-shell {
@@ -4644,6 +4888,70 @@ button:disabled {
   background: var(--red50);
   color: var(--red500);
   padding: 18px;
+}
+
+.tm-withdrawal-info-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tm-withdrawal-info-arrow {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--text-caption);
+  transition: transform 0.15s ease;
+}
+
+.tm-withdrawal-info-toggle[aria-expanded="true"] .tm-withdrawal-info-arrow {
+  transform: rotate(90deg);
+}
+
+.tm-withdrawal-info-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grey100);
+  display: grid;
+  gap: 10px;
+}
+
+.tm-danger-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tm-danger-panel-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--red500);
+  display: grid;
+  place-items: center;
+}
+
+.tm-withdrawal-info-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--blue50);
+  color: var(--blue500);
+  display: grid;
+  place-items: center;
 }
 
 @media (min-width: 760px) {
@@ -4999,6 +5307,23 @@ button:disabled {
   border-radius: 10px;
   padding: 10px 12px;
   line-height: 1.5;
+}
+
+/* 보낸 가입 신청 카드 — 초대 카드(.tm-invitation-card)와 같은 골격을 쓰고 차이만 덧댄다 */
+.tm-join-application-team-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tm-join-application-team-link:hover {
+  text-decoration: underline;
+}
+
+.tm-join-application-hint {
+  margin: 0;
+  font-size: var(--font-size-label);    /* 13px */
+  color: var(--text-muted);
+  line-height: 1.55;
 }
 
 /* 카드 하단 CTA 버튼 그룹 */
@@ -6953,4 +7278,119 @@ button:disabled {
     min-width: 120px;
     justify-content: center !important;
   }
+}
+
+.tm-rich-editor .ProseMirror {
+  min-height: 280px;
+  padding: 18px;
+  color: var(--text-strong);
+  font-size: 14px;
+  line-height: 1.7;
+  outline: none;
+}
+
+.tm-rich-editor .ProseMirror[contenteditable='false'] {
+  background: var(--grey50);
+  color: var(--text-muted);
+}
+
+.tm-rich-content > :first-child,
+.tm-rich-editor .ProseMirror > :first-child {
+  margin-top: 0;
+}
+
+.tm-rich-content > :last-child,
+.tm-rich-editor .ProseMirror > :last-child {
+  margin-bottom: 0;
+}
+
+.tm-rich-content p,
+.tm-rich-editor .ProseMirror p {
+  margin: 0.75em 0;
+  white-space: pre-wrap;
+}
+
+.tm-rich-content h2,
+.tm-rich-editor .ProseMirror h2 {
+  margin: 1.5em 0 0.55em;
+  font-size: 1.35em;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.tm-rich-content h3,
+.tm-rich-editor .ProseMirror h3 {
+  margin: 1.3em 0 0.5em;
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.tm-rich-content ul,
+.tm-rich-content ol,
+.tm-rich-editor .ProseMirror ul,
+.tm-rich-editor .ProseMirror ol {
+  margin: 0.9em 0;
+  padding-left: 1.5em;
+}
+
+.tm-rich-content ul,
+.tm-rich-editor .ProseMirror ul {
+  list-style: disc;
+}
+
+.tm-rich-content ol,
+.tm-rich-editor .ProseMirror ol {
+  list-style: decimal;
+}
+
+.tm-rich-content li,
+.tm-rich-editor .ProseMirror li {
+  margin: 0.3em 0;
+}
+
+.tm-rich-content blockquote,
+.tm-rich-editor .ProseMirror blockquote {
+  margin: 1em 0;
+  border: 1px solid var(--grey200);
+  border-radius: 12px;
+  background: var(--grey50);
+  padding: 12px 14px;
+  color: var(--text-muted);
+}
+
+.tm-rich-content hr,
+.tm-rich-editor .ProseMirror hr {
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid var(--grey200);
+}
+
+.tm-rich-content a,
+.tm-rich-editor .ProseMirror a {
+  color: var(--blue500);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tm-rich-content figure,
+.tm-rich-editor .ProseMirror img {
+  margin: 1.25em 0;
+}
+
+.tm-rich-content figure img,
+.tm-rich-editor .ProseMirror img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 720px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+
+.tm-rich-content figcaption {
+  margin-top: 8px;
+  color: var(--text-caption);
+  font-size: 12px;
+  text-align: center;
 }

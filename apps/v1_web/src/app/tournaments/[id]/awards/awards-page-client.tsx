@@ -381,7 +381,7 @@ function ReviewFormModal({
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {photoUrls.map((url) => (
               <div key={url} style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
-                <img src={publicAssetPath(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <button
                   type="button"
                   onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
@@ -464,7 +464,7 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           {photoUrls.map((url) => (
             <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-              <img src={publicAssetPath(url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </a>
           ))}
         </div>
@@ -707,7 +707,7 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
 
   if (isLoading) {
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments">
         <AwardsPageSkeleton />
       </AppChrome>
     );
@@ -716,7 +716,7 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} bottomNav={false} activeTab="tournaments">
+      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments">
         <div style={{ padding: '40px 20px' }}>
           <ErrorState message={msg} onRetry={() => void refetch()} />
         </div>
@@ -728,7 +728,6 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
     <AppChrome
       title="시상·리뷰"
       backHref={`/tournaments/${tournamentId}/results`}
-      bottomNav={false}
       activeTab="tournaments"
     >
       <AwardsPageContent tournament={data} />

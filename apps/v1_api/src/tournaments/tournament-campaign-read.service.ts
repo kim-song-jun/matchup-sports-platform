@@ -312,19 +312,24 @@ export class TournamentCampaignReadService {
         confirmedCount: _count.registrations,
         pendingPaymentCount,
         registrationAvailability,
-        participantTeams: registrations
-          .filter((registration) =>
-            registration.status === 'confirmed' || registration.status === 'waitlisted',
-          )
-          .map((registration) => ({
-            registrationId: registration.id,
-            teamId: registration.team.id,
-            teamName: registration.team.name,
-            teamLogoUrl: registration.team.profile?.logoUrl ?? null,
-            teamRegionName: registration.team.region?.name ?? null,
-            status: registration.status,
-            confirmedAt: registration.confirmedAt?.toISOString() ?? null,
-          })),
+        // 모집 중(open)에는 참가팀 명단(팀명·로고·지역)을 비공개한다. confirmedCount는 status와
+        // 무관하게 위에서 항상 정확한 확정 인원수를 반환하므로 "몇 팀이 참가하는지"는 계속 노출된다.
+        participantTeams:
+          tournament.status === 'open'
+            ? []
+            : registrations
+                .filter((registration) =>
+                  registration.status === 'confirmed' || registration.status === 'waitlisted',
+                )
+                .map((registration) => ({
+                  registrationId: registration.id,
+                  teamId: registration.team.id,
+                  teamName: registration.team.name,
+                  teamLogoUrl: registration.team.profile?.logoUrl ?? null,
+                  teamRegionName: registration.team.region?.name ?? null,
+                  status: registration.status,
+                  confirmedAt: registration.confirmedAt?.toISOString() ?? null,
+                })),
         registrationDeadlineAt: tournament.registrationDeadlineAt?.toISOString() ?? null,
         scheduledAt: tournament.scheduledAt?.toISOString() ?? null,
         scheduledEndAt: tournament.scheduledEndAt?.toISOString() ?? null,

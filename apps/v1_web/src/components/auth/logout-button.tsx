@@ -1,11 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useV1Logout } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { clearStoredV1Session } from '@/lib/session-storage';
-import { v1Keys } from '@/lib/query-keys';
+import { disconnectV1Socket } from '@/lib/v1-socket';
+import { clearV1IdentityCache } from '@/lib/query-keys';
 import { Button } from '@/components/v1-ui/button';
 
 type LogoutButtonProps = {
@@ -17,14 +17,17 @@ type LogoutButtonProps = {
 };
 
 export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const logout = useV1Logout();
 
   const clearAndRedirect = () => {
     clearStoredV1Session();
-    queryClient.removeQueries({ queryKey: v1Keys.all });
-    router.replace('/login');
+    disconnectV1Socket();
+    clearV1IdentityCache(queryClient);
+    // router.replace()는 로그인 상태에서 prefetch된 /login 인스턴스를 재사용해
+    // 로그아웃 이전 시점의 세션 스냅샷이 남아있는 채로 멈출 수 있다.
+    // 하드 네비게이션으로 QueryClient·컴포넌트 트리를 완전히 새로 만든다.
+    window.location.replace('/login');
   };
 
   const isGhost = variant === 'ghost';

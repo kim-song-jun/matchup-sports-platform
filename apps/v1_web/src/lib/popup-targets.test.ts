@@ -22,7 +22,7 @@ describe('resolvePopupTargetScreen', () => {
 
   it('accepts internal and HTTPS links while rejecting unsafe schemes', () => {
     expect(isSafePopupLink('/matches?tab=open')).toBe(true);
-    expect(isSafePopupLink('https://teameet.co.kr/v1/matches')).toBe(true);
+    expect(isSafePopupLink('https://teameet.co.kr/matches')).toBe(true);
     expect(isSafePopupLink('//evil.example')).toBe(false);
     expect(isSafePopupLink('javascript:alert(1)')).toBe(false);
   });

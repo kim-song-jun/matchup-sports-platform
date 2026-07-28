@@ -54,6 +54,7 @@ const tournament: V1Tournament = {
   registrationDeadlineAt: '2026-08-01T00:00:00.000Z',
   rosterDeadlineAt: '2026-08-05T00:00:00.000Z',
   bracketPublishedAt: null,
+  bracketPublishScheduledAt: null,
   scheduledAt: '2026-08-10T00:00:00.000Z',
   scheduledEndAt: '2026-08-11T00:00:00.000Z',
   venue: '서울 풋살장',
@@ -125,9 +126,9 @@ describe('TournamentDetailClient campaign tab wiring', () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: '캠페인' }));
+    await user.click(screen.getByRole('tab', { name: '캠페인' }));
 
-    expect(screen.getByRole('button', { name: '캠페인' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('tab', { name: '캠페인' })).toHaveAttribute('aria-selected', 'true');
     expect(document.querySelector('#panel-campaign')).toBeVisible();
   });
 

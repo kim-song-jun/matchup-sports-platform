@@ -39,6 +39,8 @@ function checkHapnida() {
     );
   } catch { /* grep no-match exits 1 */ }
   for (const line of out.split('\n').filter(Boolean)) {
+    // Destructive-action confirmation contracts can intentionally require this exact phrase.
+    if (line.includes("confirmationPhrase: '확인했습니다'")) continue;
     const loc = line.split(':').slice(0, 2).join(':');
     if (HAPNIDA_ALLOW.some((a) => {
       // :N 라인 핀은 loc 끝과 정확 일치만 — ':1'이 ':11'·':100' 등에 부분매칭되는 것 방지 (Copilot)

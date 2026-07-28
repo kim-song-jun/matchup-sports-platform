@@ -1,4 +1,8 @@
-name: Prepare Main Release PR
+# 이 워크플로는 alpha 에서 검증된 커밋을 기준으로 Changesets 버전 PR 을 만든다.
+# base 는 dev 다 — 통합·배포 브랜치가 dev 하나이므로 버전 커밋도 dev 에 들어가야 한다.
+# (파일명은 release-main.yml 로 남겨 두었다. main 승격이 폐기되기 전 이름이고,
+#  참조 문서·메모리가 이 이름을 쓰고 있어 지금 바꾸면 추적만 어려워진다.)
+name: Prepare Release PR
 
 on:
   workflow_dispatch:
@@ -21,13 +25,13 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: prepare-main-release
+  group: prepare-release-pr
   cancel-in-progress: false
 
 jobs:
   release-pr:
     if: >-
-      github.ref == 'refs/heads/main' &&
+      github.ref == 'refs/heads/dev' &&
       inputs.confirmation == 'CREATE_RELEASE_PR'
     runs-on: ubuntu-latest
 
@@ -72,6 +76,16 @@ jobs:
             --sha "${ALPHA_SHA}" \
             --date "${release_date}")"
           test "$(jq -er '.prereleaseVersion' <<< "${metadata}")" = "${ALPHA_RELEASE}"
+
+          # 소비할 changeset 이 없으면 여기서 멈춘다. 리졸버는 0개여도 버전을 계산하므로
+          # (alpha 배포가 깨지지 않게 하려는 의도), 그 상태로 계속 가면 changesets version
+          # 이 아무것도 바꾸지 못해 빈 릴리스 PR 이 열린다.
+          if ! jq -e '.changesets | length > 0' >/dev/null <<< "${metadata}"; then
+            echo "No unreleased Changesets on this ref — nothing to release" >&2
+            exit 1
+          fi
+          echo "Releasing $(jq -er '.changesets | length' <<< "${metadata}") Changeset(s)"
+
           echo "stable=$(jq -er '.stableVersion' <<< "${metadata}")" >> "${GITHUB_OUTPUT}"
 
       - name: Create draft Changesets release PR

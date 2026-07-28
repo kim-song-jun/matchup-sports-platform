@@ -1,13 +1,19 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { V1AuthProvider } from '@prisma/client';
+import { V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
+import { buildKakaoSignupPrefill, readKakaoSignupPrefill, type KakaoSignupPrefill } from './kakao-profile';
+import { isPendingSocialSignup } from './social-signup-access';
+import { normalizeEmail } from './normalize-email';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { hashPassword, verifyPassword } from './password-hash';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
+import { PhoneVerificationService } from '../verification/phone-verification.service';
+import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -15,11 +21,17 @@ type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
   profileImageUrl: string | null;
+  /** 콘솔 동의항목이 승인된 앱에서만 값이 온다. 미승인이면 null. */
+  signupPrefill: KakaoSignupPrefill | null;
 };
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly managedTerms: ManagedTermsRuntimeService,
+    private readonly phoneVerification: PhoneVerificationService,
+  ) {}
 
   async register(dto: RegisterDto) {
     if (!dto.requiredTermsAccepted) {
@@ -43,6 +55,10 @@ export class AuthService {
         message: 'Birth date must be a valid YYYYMMDD value',
       });
     }
+
+    const signupTermsDecisions = await this.managedTerms.assertSignupAcceptances(
+      dto.acceptedTermsDocumentIds ?? [],
+    );
 
     const existing = await this.prisma.v1User.findUnique({
       where: { email },
@@ -82,16 +98,26 @@ export class AuthService {
       }
     }
 
+    const phoneVerificationRequired = this.phoneVerification.enabled;
+    if (phoneVerificationRequired && (!dto.phoneProofToken || !verifyPhoneProofToken(dto.phoneProofToken, phone))) {
+      throw new BadRequestException({
+        code: 'PHONE_NOT_VERIFIED',
+        message: '휴대폰 본인인증을 먼저 완료해 주세요.',
+      });
+    }
+
     const requiredTerms = await this.prisma.v1TermsDocument.findMany({
       where: { isRequired: true, status: 'published' },
       select: { id: true },
     });
 
     const passwordHash = await hashPassword(dto.password);
-    const user = await this.prisma.v1User.create({
+    const user = await this.prisma.$transaction(async (transaction) => {
+      const created = await transaction.v1User.create({
       data: {
         email,
         phone,
+        phoneVerifiedAt: phoneVerificationRequired ? new Date() : null,
         accountStatus: 'active',
         onboardingStatus: 'signup_done',
         lastLoginAt: new Date(),
@@ -130,7 +156,14 @@ export class AuthService {
         },
         ...(buildTermsConsentCreate(requiredTerms)),
       },
-      select: { id: true, email: true },
+        select: { id: true, email: true },
+      });
+      await this.managedTerms.recordSignupDecisions(
+        transaction,
+        created.id,
+        signupTermsDecisions,
+      );
+      return created;
     });
 
     return this.sessionResponse(user.id, user.email);
@@ -205,6 +238,7 @@ export class AuthService {
     }
 
     if (identity.status !== 'active' || identity.user.accountStatus !== 'active') {
+      this.assertNotWithdrawalPending(identity.user.accountStatus);
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: 'This account cannot sign in',
@@ -256,6 +290,7 @@ export class AuthService {
         await this.prisma.v1User.delete({ where: { id: existingIdentity.user.id } });
       } else {
         if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
+          this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
           throw new ForbiddenException({
             code: 'PERMISSION_DENIED',
             message: 'This account cannot sign in',
@@ -294,6 +329,7 @@ export class AuthService {
 
     if (existingUser) {
       if (existingUser.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(existingUser.accountStatus);
         throw new ForbiddenException({
           code: 'PERMISSION_DENIED',
           message: 'This account cannot sign in',
@@ -338,8 +374,17 @@ export class AuthService {
         onboardingProgress: {
           create: {
             currentStep: 'terms',
+            // 카카오가 준 값은 가입 완료 전까지 여기 보관했다가 프로필 입력 화면에서 자동 채움에 쓴다
+            // (별도 테이블 없이 기존 draftJson 을 확장 — 동의항목 미승인이면 kakao* 키가 아예 없다).
             draftJson: {
               kakaoProfileImageUrl: profile.profileImageUrl,
+              ...(profile.signupPrefill
+                ? {
+                    kakaoName: profile.signupPrefill.name,
+                    kakaoPhone: profile.signupPrefill.phone,
+                    kakaoGender: profile.signupPrefill.gender,
+                  }
+                : {}),
             },
           },
         },
@@ -413,6 +458,11 @@ export class AuthService {
       });
     }
 
+    const signupTermsDecisions = await this.managedTerms.assertSignupAcceptances(
+      dto.acceptedTermsDocumentIds ?? [],
+      userId,
+    );
+
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: 'social_terms_required' },
@@ -443,6 +493,11 @@ export class AuthService {
           skipDuplicates: true,
         });
       }
+      await this.managedTerms.recordSignupDecisions(
+        transaction,
+        userId,
+        signupTermsDecisions,
+      );
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });
@@ -558,6 +613,19 @@ export class AuthService {
       }
     }
 
+    if (this.phoneVerification.enabled) {
+      const verified = await this.prisma.v1User.findUnique({
+        where: { id: userId },
+        select: { phone: true, phoneVerifiedAt: true },
+      });
+      if (!verified?.phoneVerifiedAt || verified.phone !== phone) {
+        throw new BadRequestException({
+          code: 'PHONE_NOT_VERIFIED',
+          message: '휴대폰 본인인증을 먼저 완료해 주세요.',
+        });
+      }
+    }
+
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: 'social_profile_required' },
@@ -657,8 +725,15 @@ export class AuthService {
       hasRequiredTerms: hasAcceptedRequiredTerms(user.onboardingStatus, user.termsConsents.length),
       hasProfile: Boolean(user.profile?.nickname),
     });
+    const termsCompliance = await this.managedTerms.signupCompliance(user.id);
+    // 소셜 가입이 진행 중일 때만 내려준다 — 가입이 끝나면 같은 값이 프로필/유저에 저장되므로
+    // 이 필드를 계속 실어 보낼 이유가 없고, 노출 범위도 필요한 순간으로 좁힌다.
+    const socialSignupPrefill = isPendingSocialSignup(user.onboardingStatus)
+      ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)
+      : null;
 
     return {
+      socialSignupPrefill,
       user: {
         id: user.id,
         email: user.email,
@@ -682,6 +757,7 @@ export class AuthService {
         regionSummary: user.profile?.displayRegion ?? user.regions[0]?.region.name ?? null,
       },
       onboarding,
+      termsCompliance,
       reputation: {
         mannerScore: user.reputationSummary?.mannerScore
           ? Number(user.reputationSummary.mannerScore)
@@ -692,9 +768,22 @@ export class AuthService {
     };
   }
 
+  private assertNotWithdrawalPending(accountStatus: V1AccountStatus) {
+    if (accountStatus === 'withdrawal_pending') {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_WITHDRAWAL_PENDING',
+        message: '탈퇴 신청 중인 계정이에요. 문의는 고객센터로 연락해 주세요.',
+      });
+    }
+  }
+
   private async sessionResponse(userId: string, userEmail: string | null, options?: { social?: boolean }) {
     const snapshot = await this.me(userId);
-    const nextRoute = getAuthNextRoute(snapshot.onboarding, options);
+    const onboardingRoute = getAuthNextRoute(snapshot.onboarding, options);
+    const nextRoute = onboardingRoute
+      ?? (snapshot.termsCompliance?.compliant === false
+        ? snapshot.termsCompliance.nextRoute ?? '/terms?mode=renewal'
+        : null);
 
     return {
       session: {
@@ -760,6 +849,11 @@ export class AuthService {
       id?: number | string;
       kakao_account?: {
         email?: string;
+        // 이름/전화번호/성별은 카카오 콘솔 동의항목이 승인된 앱에만 내려온다(미승인 시 필드 자체가 없음).
+        // 따라서 전부 optional 로 두고, 없으면 프리필을 포기한다.
+        name?: string;
+        phone_number?: string;
+        gender?: string;
         profile?: {
           nickname?: string;
           profile_image_url?: string;
@@ -786,13 +880,14 @@ export class AuthService {
         userData.kakao_account?.profile?.profile_image_url ??
         userData.properties?.profile_image ??
         null,
+      signupPrefill: buildKakaoSignupPrefill({
+        name: userData.kakao_account?.name,
+        phone: userData.kakao_account?.phone_number,
+        gender: userData.kakao_account?.gender,
+      }),
     };
   }
 
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
 }
 
 function getAuthNextRoute(onboarding: { status: string; missing: string[]; currentStep: string }, options?: { social?: boolean }) {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getV1ApiBaseUrl, getV1DevAuthHeaders, v1Get } from './api-client';
+import { getV1ApiBaseUrl, getV1DevAuthHeaders, v1Delete, v1Get } from './api-client';
 import { V1_USER_EMAIL_KEY, V1_USER_ID_KEY } from './session-storage';
 import * as clientErrorReporter from './client-error-reporter';
 
@@ -65,6 +65,37 @@ describe('v1Api error reporting', () => {
     );
   });
 
+  it('strips the query string from the reported path so PII in query params is never sent to the log endpoint', async () => {
+    const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          status: 'error',
+          statusCode: 409,
+          code: 'EMAIL_TAKEN',
+          message: '이미 사용중인 이메일이에요.',
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    );
+
+    await expect(v1Get('/auth/check-email', { email: 'x@example.com' })).rejects.toThrow();
+
+    expect(reportSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ path: '/auth/check-email' }),
+      }),
+    );
+    const [[reportedPayload]] = reportSpy.mock.calls;
+    const reportedContext = reportedPayload.context as Record<string, unknown>;
+    expect(String(reportedContext.path)).toBe('/auth/check-email');
+    expect(String(reportedContext.path)).not.toContain('?');
+    expect(String(reportedContext.path)).not.toContain('x@example.com');
+  });
+
   it('reports 5xx as level "error"', async () => {
     const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
     vi.stubGlobal(
@@ -85,5 +116,20 @@ describe('v1Api error reporting', () => {
     await expect(v1Get('/matches/1')).rejects.toThrow();
 
     expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ level: 'error' }));
+  });
+
+  it('resolves without throwing on a 204 No Content response with an empty body', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+        json: async () => {
+          throw new SyntaxError('Unexpected end of JSON input');
+        },
+      }),
+    );
+
+    await expect(v1Delete('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' })).resolves.toBeUndefined();
   });
 });

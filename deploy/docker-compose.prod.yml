@@ -56,9 +56,23 @@ services:
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
+      SOLAPI_API_KEY: ${SOLAPI_API_KEY:-}
+      SOLAPI_API_SECRET: ${SOLAPI_API_SECRET:-}
+      SOLAPI_SENDER_NUMBER: ${SOLAPI_SENDER_NUMBER:-}
+      SMS_PROVIDER: ${SMS_PROVIDER:-solapi}
+      GABIA_SMS_ID: ${GABIA_SMS_ID:-}
+      GABIA_API_KEY: ${GABIA_API_KEY:-}
+      GABIA_SENDER_NUMBER: ${GABIA_SENDER_NUMBER:-}
+      # SES 이메일 발송. 자격증명은 인스턴스 IAM 역할에 맡기고 리전/발신주소만 준다.
+      # 둘 중 하나라도 비면 EmailSender.enabled=false → 기존 로그 스텁 그대로다.
+      SES_REGION: ${SES_REGION:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
       API_PORT: 8121
       NODE_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     logging:
       driver: json-file
       options:
@@ -96,6 +110,7 @@ services:
       NEXT_PUBLIC_API_URL: /api/v1
       NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       NEXT_PUBLIC_KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
+      NEXT_PUBLIC_KAKAO_SCOPE: ${KAKAO_SCOPE:-}
       INTERNAL_API_ORIGIN: ${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}
       HOSTNAME: 0.0.0.0
       PORT: 3013

@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { v1Api, v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { v1Keys } from '@/lib/query-keys';
+import type { V1Profile } from '@/types/api';
 import {
   useV1AdminTournamentReviews,
   useV1ChatRooms,
@@ -14,6 +16,7 @@ import {
   useV1RosterDeadlineOverrideRevoke,
   useV1SubmitReview,
   useV1UnhideReview,
+  useV1UpdateProfile,
 } from './use-v1-api';
 
 vi.mock('@/lib/api-client', async () => {
@@ -330,5 +333,48 @@ describe('useV1SubmitReview', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(trackEventMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useV1UpdateProfile', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('reflects the saved nickname in the profile cache immediately, without waiting for a background refetch', async () => {
+    const initialProfile: V1Profile = {
+      userId: 'user-1',
+      accountStatus: 'active',
+      email: 'user@test.com',
+      authProvider: 'email',
+      regionName: '서울',
+      profile: {
+        displayName: '실명유저',
+        realName: '실명유저',
+        nickname: '이전닉네임',
+        profileImageUrl: null,
+        gender: 'male',
+      },
+      reputation: { trustState: 'sample', mannerScore: null, activityCount: 0, reviewCount: 0 },
+    };
+
+    const { wrapper, queryClient } = createWrapperWithClient();
+    queryClient.setQueryData(v1Keys.profile(), initialProfile);
+
+    v1PatchMock.mockResolvedValue({
+      profile: { ...initialProfile.profile, nickname: '새닉네임' },
+      updatedAt: '2026-07-23T00:00:00.000Z',
+    });
+
+    const { result } = renderHook(() => useV1UpdateProfile(), { wrapper });
+
+    result.current.mutate({ nickname: '새닉네임', gender: 'male' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    // invalidateQueries만으론 백그라운드 리페치가 끝나기 전에 호출부가 다음 화면으로
+    // 이동해 버려 저장 직후 이전 닉네임이 잠깐(혹은 리페치 실패 시 계속) 보였다 —
+    // 응답으로 캐시를 직접 갱신해 새 닉네임이 동기적으로 반영돼야 한다.
+    expect(queryClient.getQueryData<V1Profile>(v1Keys.profile())?.profile.nickname).toBe('새닉네임');
   });
 });

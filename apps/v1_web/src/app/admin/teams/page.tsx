@@ -12,11 +12,11 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { User, Users, Calendar } from 'lucide-react';
 import {
   AdminPageHeader,
-  AdminCardList,
+  AdminDataTable,
+  AdminStatusPill,
   AdminFilterBar,
   AdminReasonModal,
   AdminEmpty,
-  AdminTableSkeleton,
   STATUS_META,
   useAdminToast,
   AdminToasts,
@@ -51,6 +51,8 @@ const REASON_MODAL_STATUS_OPTIONS = [
   { value: 'archived', label: STATUS_META['archived']?.label ?? '보관' },
 ];
 
+const PAGE_SIZE = 20;
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminTeamsPage() {
@@ -64,8 +66,8 @@ export default function AdminTeamsPage() {
   const [activeStatus, setActiveStatus] = useState('');
 
   // ── Cursor pagination ──────────────────────────────────────────────
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [accumulatedRows, setAccumulatedRows] = useState<V1AdminTeamRow[]>([]);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
 
   // URL searchParam pre-selection on mount
   useEffect(() => {
@@ -82,8 +84,7 @@ export default function AdminTeamsPage() {
 
   // Reset pagination whenever an applied filter changes
   useEffect(() => {
-    setAccumulatedRows([]);
-    setCursor(null);
+    setPage(1);
   }, [debouncedQ, activeStatus]);
 
   const handleSearchChange = (value: string) => setSearchInput(value);
@@ -92,29 +93,18 @@ export default function AdminTeamsPage() {
   const filters = {
     ...(debouncedQ ? { q: debouncedQ } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
-    ...(cursor ? { cursor } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
-  const { data, isPending, isError, error, refetch } = useV1AdminTeams(filters);
+  const { data, isPending, isFetching, isError, error, refetch } = useV1AdminTeams(filters);
+  const rows = data?.items ?? [];
+  const pageInfo = data?.pageInfo;
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? data?.summary.byStatus[option.value] : data?.summary.total,
+  }));
 
-  // Accumulate rows as pages load
-  useEffect(() => {
-    if (!data?.items) return;
-    if (!cursor) {
-      setAccumulatedRows(data.items);
-    } else {
-      setAccumulatedRows((prev) => [...prev, ...data.items]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
-
-  const nextCursor = data?.nextCursor ?? data?.pageInfo?.nextCursor ?? null;
-  const hasMore = !!nextCursor;
-
-  const handleLoadMore = () => {
-    if (nextCursor) setCursor(nextCursor);
-  };
 
   // ── Moderation modal ───────────────────────────────────────────────
   const [modalRow, setModalRow] = useState<V1AdminTeamRow | null>(null);
@@ -131,8 +121,7 @@ export default function AdminTeamsPage() {
         onSuccess: () => {
           setModalRow(null);
           showToast('팀 상태를 변경했어요.', 'success');
-          setAccumulatedRows([]);
-          setCursor(null);
+          setPage(1);
         },
         onError: (err) => {
           showToast(extractErrorMessage(err, '처리 중 오류가 발생했어요.'), 'error');
@@ -142,9 +131,9 @@ export default function AdminTeamsPage() {
   };
 
   // ── Loading / error for initial load ───────────────────────────────
-  const isInitialLoad = isPending && accumulatedRows.length === 0;
+  const isInitialLoad = isPending && rows.length === 0;
   const errorMessage =
-    isError && accumulatedRows.length === 0
+    isError && rows.length === 0
       ? extractErrorMessage(error, '팀 목록을 불러오지 못했어요.')
       : undefined;
 
@@ -163,38 +152,69 @@ export default function AdminTeamsPage() {
           searchPlaceholder="팀명 검색"
           searchValue={searchInput}
           onSearchChange={handleSearchChange}
-          statusOptions={STATUS_OPTIONS}
+          statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={handleStatusChange}
         />
 
         {/* Card list */}
-        <AdminCardList<V1AdminTeamRow>
-          rows={accumulatedRows}
+        <AdminDataTable<V1AdminTeamRow>
+          rows={rows}
           keyExtractor={(r) => r.teamId}
-          card={(row) => ({
-            title: row.name,
-            subtitle: row.sportName,
-            status: row.status,
-            meta: [
-              {
-                icon: <User size={14} aria-hidden="true" />,
-                label: row.ownerName ?? '—',
-              },
-              {
-                icon: <Users size={14} aria-hidden="true" />,
-                label: `멤버 ${row.memberCount} · 매니저 ${row.managerCount}`,
-              },
-              {
-                icon: <Calendar size={14} aria-hidden="true" />,
-                label: formatDate(row.createdAt),
-              },
-            ],
-            tone:
-              row.status === 'suspended' || row.status === 'archived'
-                ? 'warning'
-                : undefined,
-          })}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) =>
+            row.status === 'suspended' || row.status === 'archived' ? 'warning' : undefined
+          }
+          columns={[
+            {
+              key: 'name',
+              header: '팀',
+              render: (row) => (
+                <span className="block truncate font-medium text-gray-900" title={row.name}>
+                  {row.name}
+                </span>
+              ),
+            },
+            {
+              key: 'status',
+              header: '상태',
+              width: 'w-[104px]',
+              render: (row) => <AdminStatusPill status={row.status} />,
+            },
+            {
+              key: 'sportName',
+              header: '종목',
+              width: 'w-[104px]',
+              render: (row) => <span className="text-gray-600">{row.sportName}</span>,
+            },
+            {
+              key: 'ownerName',
+              header: '팀장',
+              width: 'w-[132px]',
+              render: (row) => (
+                <span className="block truncate text-gray-600">{row.ownerName ?? '—'}</span>
+              ),
+            },
+            {
+              key: 'members',
+              header: '멤버 / 매니저',
+              align: 'center',
+              width: 'w-[116px]',
+              render: (row) => (
+                <span className="tabular-nums whitespace-nowrap text-gray-600">
+                  {row.memberCount} / {row.managerCount}
+                </span>
+              ),
+            },
+            {
+              key: 'createdAt',
+              header: '생성',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">{formatDate(row.createdAt)}</span>
+              ),
+            },
+          ]}
           renderActions={(row) => (
             <>
               <Link
@@ -233,28 +253,24 @@ export default function AdminTeamsPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonCards={8}
+          skeletonRows={8}
+          pagination={
+            pageInfo?.totalPages
+              ? {
+                  page: pageInfo.page ?? page,
+                  totalPages: pageInfo.totalPages,
+                  total: pageInfo.total ?? 0,
+                  limit: pageInfo.limit ?? PAGE_SIZE,
+                  onPageChange: setPage,
+                  loading: isFetching,
+                }
+              : undefined
+          }
         />
 
         {/* Load more */}
-        {hasMore && !isInitialLoad && !isPending && (
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              onClick={handleLoadMore}
-              className={[
-                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
-                'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-              ].join(' ')}
-            >
-              더 보기
-            </button>
-          </div>
-        )}
 
         {/* Loading more skeleton */}
-        {isPending && accumulatedRows.length > 0 && <AdminTableSkeleton rows={4} />}
       </div>
 
       {/* Moderation modal */}

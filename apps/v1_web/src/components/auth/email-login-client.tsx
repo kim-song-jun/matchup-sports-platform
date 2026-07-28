@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
@@ -11,6 +12,7 @@ import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { useV1EmailLogin } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { clearV1IdentityCache } from '@/lib/query-keys';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
@@ -26,6 +28,7 @@ function mapEmailLoginError(err: unknown): string {
 export function EmailLoginClient() {
   const model = getEmailLoginViewModel();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const login = useV1EmailLogin();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,9 +49,16 @@ export function EmailLoginClient() {
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
+          clearV1IdentityCache(queryClient);
           trackEvent('login', { method: 'email' });
           const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
-          router.replace(redirect ?? '/home');
+          const apiNext = sanitizeRedirectPath(result.next?.route);
+          if (apiNext?.startsWith('/terms?mode=renewal')) {
+            const separator = apiNext.includes('?') ? '&' : '?';
+            router.replace(redirect ? `${apiNext}${separator}redirect=${encodeURIComponent(redirect)}` : apiNext);
+            return;
+          }
+          router.replace(redirect ?? apiNext ?? '/home');
         },
         onError: (nextError) => {
           trackEvent('login_failed', { method: 'email', reason: nextError instanceof V1ApiError ? nextError.code : 'unknown' });
@@ -119,7 +129,9 @@ export function EmailLoginClient() {
           {model.primary.label}
         </Button>
         <div className="tm-auth-link-row">
-          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/auth/password-reset">비밀번호 찾기</Link>
+          {/* /auth/password-reset 은 안내 문구만 있던 자리표시자였다 — 실제로 동작하는
+              계정 찾기 화면으로 연결한다(아이디 찾기·비밀번호 재설정 한 화면). */}
+          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href="/auth/find-account">아이디·비밀번호 찾기</Link>
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={model.signupHref}>회원가입</Link>
         </div>
         {!error && model.notice ? (

@@ -4,18 +4,26 @@ import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { Clock, Pencil, Tag, Users, X } from 'lucide-react';
 import {
-  AdminCardList,
+  AdminDataTable,
   AdminEmpty,
   AdminFilterBar,
   AdminPageHeader,
   AdminStatusPill,
-  AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
-import { useV1AdminMe, useV1AdminNotices, useV1CreateAdminNotice, useV1UpdateAdminNotice } from '@/hooks/use-v1-api';
+import { AdminContentPreview } from '@/components/admin/admin-content-preview';
+import { RichTextEditor } from '@/components/content/rich-text-editor';
+import {
+  useV1AdminMe,
+  useV1AdminNotices,
+  useV1CreateAdminNotice,
+  useV1UpdateAdminNotice,
+} from '@/hooks/use-v1-api';
+import { useTemporaryContentAssets } from '@/hooks/use-temporary-content-assets';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
+import { EMPTY_RICH_CONTENT, isRichContentEmpty, resolveRichContent, richContentPlainText } from '@/lib/rich-content';
 import type {
   AdminListFilters,
   CursorPage,
@@ -75,17 +83,18 @@ function formatDateTime(value: string | null | undefined) {
   });
 }
 
+const PAGE_SIZE = 20;
+
 export default function AdminNoticesPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeStatus, setActiveStatus] = useState('');
   const [activeAudience, setActiveAudience] = useState('');
-  const [extraRows, setExtraRows] = useState<V1AdminNoticeRow[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
 
   const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+  const [content, setContent] = useState(EMPTY_RICH_CONTENT);
   const [audience, setAudience] = useState<V1AdminNoticeAudience>('public');
   const [category, setCategory] = useState<V1AdminNoticeCategory>('안내');
   const [createStatus, setCreateStatus] = useState<Extract<V1AdminNoticeStatus, 'draft' | 'published'>>('published');
@@ -101,60 +110,57 @@ export default function AdminNoticesPage() {
   }, [search]);
 
   useEffect(() => {
-    setExtraRows([]);
-    setNextCursor(null);
+    setPage(1);
   }, [debouncedSearch, activeStatus, activeAudience]);
 
   const filters: AdminListFilters = {
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(activeStatus ? { status: activeStatus } : {}),
     ...(activeAudience ? { audience: activeAudience } : {}),
-    limit: 20,
+    page,
+    limit: PAGE_SIZE,
   };
 
-  const { data: firstPage, isPending, isError, error, refetch } = useV1AdminNotices(filters);
+  const { data: firstPage, isPending, isFetching, isError, error, refetch } =
+    useV1AdminNotices(filters);
   const createNotice = useV1CreateAdminNotice();
   const updateNotice = useV1UpdateAdminNotice();
+  const contentAssets = useTemporaryContentAssets();
   const isSaving = createNotice.isPending || updateNotice.isPending;
 
   useEffect(() => {
-    if (firstPage) {
-      setNextCursor(firstPage.nextCursor ?? firstPage.pageInfo?.nextCursor ?? null);
-    }
-  }, [firstPage]);
+    if (!contentAssets.cleanupError) return;
+    showToast(contentAssets.cleanupError, 'error');
+    contentAssets.clearCleanupError();
+  }, [contentAssets.cleanupError]);
 
-  const rows = [...(firstPage?.items ?? []), ...extraRows];
 
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await v1Get<CursorPage<V1AdminNoticeRow>>('/admin/notices', {
-        ...filters,
-        cursor: nextCursor,
-      });
-      setExtraRows((prev) => [...prev, ...page.items]);
-      setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
-    } catch (err) {
-      showToast(extractErrorMessage(err, '추가 공지를 불러오지 못했어요.'), 'error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  const rows = firstPage?.items ?? [];
+  const pageInfo = firstPage?.pageInfo;
+  const statusOptions = STATUS_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
+  }));
 
-  function resetForm() {
+  function clearForm() {
     setTitle('');
-    setBody('');
+    setContent(EMPTY_RICH_CONTENT);
     setAudience('public');
     setCategory('안내');
     setCreateStatus('published');
     setEditingNotice(null);
   }
 
+  async function cancelForm() {
+    await contentAssets.discard();
+    clearForm();
+  }
+
   function startEdit(row: V1AdminNoticeRow) {
+    void contentAssets.discard();
     setEditingNotice(row);
     setTitle(row.title);
-    setBody(row.body);
+    setContent(resolveRichContent(row.content, row.body));
     setAudience(row.audience);
     setCategory(row.category);
     setCreateStatus(row.status === 'published' ? 'published' : 'draft');
@@ -166,11 +172,11 @@ export default function AdminNoticesPage() {
       audience,
       category,
       title: title.trim(),
-      body: body.trim(),
+      content,
       status: createStatus,
     };
 
-    if (!payload.title || !payload.body) {
+    if (!payload.title || isRichContentEmpty(content)) {
       showToast('제목과 본문을 입력해 주세요.', 'error');
       return;
     }
@@ -178,9 +184,9 @@ export default function AdminNoticesPage() {
     if (editingNotice) {
       updateNotice.mutate({ noticeId: editingNotice.noticeId, body: payload }, {
         onSuccess: () => {
-          resetForm();
-          setExtraRows([]);
-          setNextCursor(null);
+          void contentAssets.commit(content);
+          clearForm();
+          setPage(1);
           showToast(payload.status === 'published' ? '공지를 수정하고 발행 상태로 저장했어요.' : '공지 수정사항을 초안으로 저장했어요.', 'success');
         },
         onError: (err) => {
@@ -192,9 +198,9 @@ export default function AdminNoticesPage() {
 
     createNotice.mutate(payload, {
       onSuccess: () => {
-        resetForm();
-        setExtraRows([]);
-        setNextCursor(null);
+        void contentAssets.commit(content);
+        clearForm();
+        setPage(1);
         showToast(payload.status === 'published' ? '공지를 발행했어요.' : '공지 초안을 저장했어요.', 'success');
       },
       onError: (err) => {
@@ -203,10 +209,17 @@ export default function AdminNoticesPage() {
     });
   }
 
+  const audienceCounts = firstPage?.summary.byAudience;
+  const audienceTotal = audienceCounts
+    ? Object.values(audienceCounts).reduce((sum, count) => sum + count, 0)
+    : undefined;
   const audienceOptions = [
     { value: '', label: '전체 대상' },
     ...AUDIENCE_OPTIONS,
-  ];
+  ].map((option) => ({
+    ...option,
+    count: option.value ? audienceCounts?.[option.value] : audienceTotal,
+  }));
 
   const errorMessage = isError ? extractErrorMessage(error, '공지 목록을 불러오지 못했어요.') : undefined;
 
@@ -224,7 +237,7 @@ export default function AdminNoticesPage() {
             searchPlaceholder="제목·본문 검색"
             searchValue={search}
             onSearchChange={setSearch}
-            statusOptions={STATUS_OPTIONS}
+            statusOptions={statusOptions}
             activeStatus={activeStatus}
             onStatusChange={setActiveStatus}
             rightSlot={
@@ -235,20 +248,34 @@ export default function AdminNoticesPage() {
                 className="h-[44px] rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               >
                 {audienceOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.label} {typeof option.count === 'number' ? option.count.toLocaleString('ko-KR') : '—'}
+                  </option>
                 ))}
               </select>
             }
           />
 
-          <AdminCardList<V1AdminNoticeRow>
+          <AdminDataTable<V1AdminNoticeRow>
             rows={rows}
             keyExtractor={(row) => row.noticeId}
             loading={isPending && rows.length === 0}
             error={errorMessage}
             onRetry={() => void refetch()}
             empty={<AdminEmpty title="공지사항이 없어요" description="조건에 맞는 공지가 없어요." />}
-            skeletonCards={8}
+            skeletonRows={8}
+            pagination={
+              pageInfo?.totalPages
+                ? {
+                    page: pageInfo.page ?? page,
+                    totalPages: pageInfo.totalPages,
+                    total: pageInfo.total ?? 0,
+                    limit: pageInfo.limit ?? PAGE_SIZE,
+                    onPageChange: setPage,
+                    loading: isFetching,
+                  }
+                : undefined
+            }
             renderActions={(row) => (
               <button
                 type="button"
@@ -260,38 +287,59 @@ export default function AdminNoticesPage() {
                 수정
               </button>
             )}
-            card={(row) => ({
-              title: row.title,
-              subtitle: `${audienceLabel[row.audience]} · ${row.category}`,
-              statusNode: (
-                <span className="flex items-center gap-1.5 flex-wrap justify-end">
-
+            tableMaxWidth="max-w-none"
+            rowTone={(row) => (row.status === 'archived' ? 'warning' : undefined)}
+            columns={[
+              {
+                key: 'publishedAt',
+                header: '게시',
+                width: 'w-[132px]',
+                render: (row) => (
+                  <span className="whitespace-nowrap text-gray-500">
+                    {formatDateTime(row.publishedAt)}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: '상태',
+                width: 'w-[96px]',
+                render: (row) => (
                   <AdminStatusPill status={row.status} label={statusLabel[row.status]} />
-                </span>
-              ),
-              meta: [
-                { icon: <Users size={14} aria-hidden="true" />, label: audienceLabel[row.audience] },
-                { icon: <Tag size={14} aria-hidden="true" />, label: row.category },
-                { icon: <Clock size={14} aria-hidden="true" />, label: formatDateTime(row.publishedAt) },
-              ],
-              description: noticeSummary(row.body),
-              tone: row.status === 'archived' ? 'warning' : undefined,
-            })}
+                ),
+              },
+              {
+                key: 'title',
+                header: '제목',
+                render: (row) => (
+                  <div className="min-w-0">
+                    <span className="block truncate font-medium text-gray-900" title={row.title}>
+                      {row.title}
+                    </span>
+                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500">
+                      {noticeSummary(row.body, row.content)}
+                    </span>
+                  </div>
+                ),
+              },
+              {
+                key: 'audience',
+                header: '대상',
+                width: 'w-[104px]',
+                render: (row) => (
+                  <span className="text-gray-600">{audienceLabel[row.audience]}</span>
+                ),
+              },
+              {
+                key: 'category',
+                header: '분류',
+                width: 'w-[104px]',
+                render: (row) => (
+                  <span className="block truncate text-gray-600">{row.category}</span>
+                ),
+              },
+            ]}
           />
-
-          {nextCursor ? (
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="inline-flex h-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white px-6 text-sm font-medium text-gray-700 transition-colors hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                {loadingMore ? '불러오는 중...' : '더 보기'}
-              </button>
-            </div>
-          ) : null}
-          {loadingMore ? <AdminTableSkeleton rows={3} /> : null}
         </section>
 
         <section className="rounded-2xl border border-gray-100 bg-white p-4 h-fit" aria-label={editingNotice ? '공지 수정' : '공지 작성'}>
@@ -301,7 +349,7 @@ export default function AdminNoticesPage() {
               {editingNotice ? (
                 <button
                   type="button"
-                  onClick={resetForm}
+                  onClick={() => void cancelForm()}
                   disabled={isSaving}
                   className="inline-flex min-h-[32px] items-center justify-center gap-1 rounded-lg px-2 text-[var(--font-size-label)] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                 >
@@ -373,18 +421,14 @@ export default function AdminNoticesPage() {
             </label>
 
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[var(--font-size-label)] font-semibold text-gray-700">본문</span>
-              <textarea
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                maxLength={5000}
-                disabled={!canWrite || isSaving}
-                rows={8}
-                className="resize-y rounded-xl border border-gray-200 px-3 py-2.5 text-sm leading-relaxed text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
-                placeholder="공지 내용을 입력해 주세요."
-              />
-            </label>
+            <RichTextEditor
+              value={content}
+              onChange={(document) => {
+                setContent(document);
+              }}
+              onUploadImage={contentAssets.uploadImage}
+              disabled={!canWrite || isSaving}
+            />
 
             {!canWrite ? (
               <p className="rounded-xl bg-gray-50 px-3 py-2 text-[var(--font-size-caption)] text-gray-500">
@@ -402,6 +446,16 @@ export default function AdminNoticesPage() {
           </form>
         </section>
       </div>
+
+      <AdminContentPreview
+        payload={{
+          kind: 'notice',
+          title,
+          category,
+          content,
+          body: richContentPlainText(content),
+        }}
+      />
 
       <AdminToasts toasts={toasts} />
     </>

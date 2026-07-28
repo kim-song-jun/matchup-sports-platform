@@ -25,6 +25,7 @@ import {
   useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
+import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
@@ -236,7 +237,7 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
             message: '',
           },
         },
-        mode: toDetailMode(query.data),
+        mode: toDetailMode(query.data, eligibility.data),
         ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
         ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
         onCta: teamDetailCtaAction({
@@ -252,12 +253,14 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
           }),
           withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
         }),
-        ctaSuccessMessage: query.data.viewer.role === 'none'
-          ? undefined
-          : '팀 채팅으로 이동해요.',
-        ctaFailureMessage: query.data.viewer.role === 'none'
-          ? undefined
-          : '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.',
+        // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
+        // 특히 신청 성공은 "승인이 남았다"는 사실을 반드시 알려야 사용자가 기다릴 대상을 안다.
+        ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data),
+        ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data),
+        joinRequest:
+          toDetailMode(query.data, eligibility.data) === 'pending'
+            ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
+            : undefined,
         operations: buildTeamOperations(query.data),
         onShare: () => shareTeam(query.data),
         openMatches,
@@ -298,8 +301,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [leaveError, setLeaveError] = useState<string | null>(null);
-  // 취소 중인 초대 1건만 추적 — 아이템별 pending 상태(전역 boolean이면 무관한 카드도 함께 비활성화됨)
-  const [cancellingInvitationId, setCancellingInvitationId] = useState<string | null>(null);
+  // 아이템별 취소 pending (usePendingIds 주석에 단일 id 방식의 결함 설명)
+  const cancellingInvitations = usePendingIds();
 
   const memberItems = members.data?.items ?? [];
   const requestItems = applications.data?.items ?? [];
@@ -387,7 +390,13 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
             delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
             demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
-            remove: () => confirmAction(confirm, { title: '멤버 내보내기', message: `${member.displayName}님을 팀에서 내보낼까요?`, tone: 'danger' }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
+            remove: () => confirmAction(confirm, {
+              title: '멤버 내보내기',
+              message: `${member.displayName}님을 팀에서 내보낼까요? 팀에 저장된 활동 기록은 유지돼요.`,
+              confirmLabel: '내보내기',
+              tone: 'danger',
+              confirmationPhrase: '확인했습니다',
+            }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_member_page' })),
             selfLeave:
               viewerMembershipId && member.membershipId === viewerMembershipId
                 ? {
@@ -439,16 +448,16 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             displayName: inv.invitedUser.displayName,
             createdAt: inv.createdAt,
             message: inv.message,
-            cancelPending: cancellingInvitationId === inv.invitationId,
+            cancelPending: cancellingInvitations.has(inv.invitationId),
             onCancel: () =>
               confirmAction(
                 confirm,
-                { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '취소', tone: 'danger' },
+                { title: '초대 취소', message: `${inv.invitedUser.displayName}님에 대한 초대를 취소할까요?`, confirmLabel: '초대 취소', tone: 'danger' },
                 () => {
-                  setCancellingInvitationId(inv.invitationId);
+                  cancellingInvitations.start(inv.invitationId);
                   cancelInvitation.mutate(
                     { invitationId: inv.invitationId },
-                    { onSettled: () => setCancellingInvitationId(null) },
+                    { onSettled: () => cancellingInvitations.finish(inv.invitationId) },
                   );
                 },
               ),
@@ -673,18 +682,68 @@ function splitTeamRegion(region?: { name: string; parentName?: string | null } |
   return { city, county: countyParts.join(' ') };
 }
 
-function toDetailMode(team: V1TeamDetail): TeamDetailViewModel['mode'] {
+/**
+ * 화면 전체가 참조하는 가입 상태 단일 소스.
+ *
+ * 팀 상세(`viewer.joinState`)와 join-eligibility는 별개 쿼리라 갱신 시점이 어긋난다.
+ * 예전에는 배지가 상세를, CTA 라벨이 eligibility를 각각 보고 있어서 신청 직후
+ * 둘이 다른 상태를 표시했다. 가입 가능 여부의 기준은 eligibility이므로 그 값을
+ * 우선하고, 아직 도착 전일 때만 상세로 폴백한다.
+ */
+function resolveJoinState(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string },
+): string {
+  return eligibility?.joinState ?? team.viewer.joinState;
+}
+
+function toDetailMode(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string },
+): TeamDetailViewModel['mode'] {
   if (isTeamMemberRole(team.viewer.role)) return 'mine';
-  if (team.viewer.joinState === 'requested') return 'pending';
+  if (resolveJoinState(team, eligibility) === 'requested') return 'pending';
   if (team.profile.joinPolicy === 'closed') return 'closed';
   return 'default';
 }
 
 function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
-  if (eligibility?.joinState === 'requested') return '신청 취소';
+  if (resolveJoinState(team, eligibility) === 'requested') return '신청 취소';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
+}
+
+/**
+ * CTA 성공 안내. 신청 성공 문구가 승인 대기를 명시하지 않으면 사용자는
+ * "신청이 곧 가입"이라 오해하고, 왜 팀에 못 들어가는지 알 수 없게 된다.
+ */
+function teamDetailCtaSuccessMessage(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string; eligible: boolean },
+): string | undefined {
+  if (isTeamMemberRole(team.viewer.role)) return '팀 채팅으로 이동해요.';
+  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소했어요.';
+  if (eligibility?.eligible) return '가입 신청을 보냈어요. 관리자가 승인하면 알림으로 알려드려요.';
+  return undefined;
+}
+
+function teamDetailCtaFailureMessage(
+  team: V1TeamDetail,
+  eligibility?: { joinState: string; eligible: boolean },
+): string | undefined {
+  if (isTeamMemberRole(team.viewer.role)) return '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (eligibility?.eligible) return '가입 신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.';
+  return undefined;
+}
+
+function formatJoinRequestedAt(requestedAt?: string | null): string | undefined {
+  if (!requestedAt) return undefined;
+  // formatDate는 파싱 실패 시 '날짜 미정'을 돌려주므로 그대로 쓰면 "날짜 미정 신청"이 된다.
+  // 신청일은 부가 정보라 알 수 없으면 줄 자체를 감춘다.
+  if (Number.isNaN(new Date(requestedAt).getTime())) return undefined;
+  return `${formatDate(requestedAt)} 신청`;
 }
 
 function teamDetailCtaAction({
@@ -701,7 +760,7 @@ function teamDetailCtaAction({
   withdraw: () => Promise<unknown>;
 }): (() => void | Promise<unknown>) | undefined {
   if (isTeamMemberRole(team.viewer.role)) return chat;
-  if (eligibility?.joinState === 'requested') return withdraw;
+  if (resolveJoinState(team, eligibility) === 'requested') return withdraw;
   if (eligibility?.eligible) return join;
   return undefined;
 }

@@ -4,6 +4,8 @@ services:
 
   v1_api:
     image: ${ALPHA_API_IMAGE:?ALPHA_API_IMAGE must be an ECR digest URI}
+    environment:
+      V1_RELEASE: ${ALPHA_RELEASE_VERSION:-}
 
   v1_web:
     image: ${ALPHA_WEB_IMAGE:?ALPHA_WEB_IMAGE must be an ECR digest URI}

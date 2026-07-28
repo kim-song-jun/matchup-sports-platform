@@ -15,6 +15,9 @@
  *     대회 상세 페이지의 일정 표시 전용 — 참가비/장소처럼 시각이 불필요한 다른 슬롯은
  *     그대로 formatTournamentDateRangeShort/Long 사용.
  *
+ * 목록 카드 날짜 슬롯:
+ *   - formatMonthDay(dateStr) → 'M월 D일' (초대·가입 신청 등 "언제였는지"만 필요한 슬롯)
+ *
  * 금액 포맷터:
  *   - formatEntryFee(fee)   → 0이면 '무료', 그 외 'N원' (ko-KR 천 단위 구분)
  */
@@ -119,7 +122,32 @@ export function formatTournamentDateRangeWithTime(
  * 참가비 포맷터: 0이면 '무료', 그 외 ko-KR 천 단위 구분 + '원'.
  * 예) 0 → '무료', 30000 → '30,000원'
  */
+/**
+ * 목록 카드용 짧은 날짜: 'M월 D일'
+ * 받은 초대 · 보낸 가입 신청처럼 "언제 있었던 일인지"만 알면 되는 슬롯에서 사용해요.
+ * dateStr 이 없거나 invalid 이면 null 을 반환해, 호출부가 줄 자체를 감출 수 있게 해요.
+ */
+export function formatMonthDay(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
 export function formatEntryFee(fee: number): string {
   if (fee === 0) return '무료';
   return `${fee.toLocaleString('ko-KR')}원`;
+}
+
+/**
+ * 관리자 운영 화면 공용 일시 포맷터: 'YYYY.M.D HH:MM'
+ * 대회 도메인 밖의 관리자 로그/운영 테이블(예: 웹 푸시 실패 로그)에서 사용해요.
+ * dateStr 이 없거나 invalid 이면 원본 문자열을 그대로 반환.
+ */
+export function formatAdminDateTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  const hour = String(d.getHours()).padStart(2, '0');
+  const minute = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hour}:${minute}`;
 }

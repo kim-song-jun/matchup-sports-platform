@@ -8,8 +8,10 @@ import {
 import { Prisma, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
+import { isBracketPublished } from './tournament-detail.presenter';
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
@@ -32,6 +34,8 @@ const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
   cancelled: [],
 };
 
+const TOURNAMENT_LIST_STATUSES = ['draft', 'open', 'closed', 'in_progress', 'completed', 'cancelled'] as const;
+
 function nullableText(value: string | undefined): string | null | undefined {
   if (value === undefined) return undefined;
   const trimmed = value.trim();
@@ -52,27 +56,57 @@ export class TournamentsAdminService {
     await this.adminContext.getActiveAdmin(user.id);
     const limit = query.limit ?? 20;
 
-    const where: Prisma.V1TournamentWhereInput = {
+    const statusFacetWhere: Prisma.V1TournamentWhereInput = {
       deletedAt: null,
-      ...(query.status ? { status: query.status } : {}),
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
     };
 
-    const rows = await this.prisma.v1Tournament.findMany({
+    const where: Prisma.V1TournamentWhereInput = {
+      ...statusFacetWhere,
+      ...(query.status ? { status: query.status } : {}),
+    };
+
+    const [rows, statusGroups] = await Promise.all([this.prisma.v1Tournament.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      ...paginationArgs(query, limit),
       include: { _count: { select: { registrations: true } } },
-    });
+    }), this.prisma.v1Tournament.groupBy({
+      by: ['status'],
+      where: statusFacetWhere,
+      _count: { _all: true },
+    })]);
 
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
+    const byStatus = Object.fromEntries(TOURNAMENT_LIST_STATUSES.map((status) => [status, 0])) as Record<
+      (typeof TOURNAMENT_LIST_STATUSES)[number],
+      number
+    >;
+    for (const group of statusGroups) byStatus[group.status] = group._count._all;
+
+    // status 필터가 걸리면 그 상태의 건수가, 없으면 전체가 곧 이 목록의 총 건수다.
+    // groupBy 는 status 를 제외한 같은 필터로 집계하므로 추가 쿼리 없이 정확하다.
+    const total = query.status
+      ? byStatus[query.status] ?? 0
+      : Object.values(byStatus).reduce((sum, count) => sum + count, 0);
+
     return {
       items: pageItems.map((row) => this.serialize(row, row._count.registrations)),
-      pageInfo: { nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null, hasNext },
+      pageInfo: buildPageInfo({
+        page: query.page,
+        limit,
+        total,
+        hasNext,
+        nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
+      }),
+      summary: {
+        total: Object.values(byStatus).reduce((sum, count) => sum + count, 0),
+        byStatus,
+      },
     };
   }
 
@@ -80,12 +114,16 @@ export class TournamentsAdminService {
     await this.adminContext.getActiveAdmin(user.id);
     const row = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
-      include: { _count: { select: { registrations: true } } },
+      include: { _count: { select: { registrations: true, fixtures: true, announcements: true } } },
     });
     if (!row) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    return this.serialize(row, row._count.registrations);
+    return this.serialize(row, row._count.registrations, {
+      registrations: row._count.registrations,
+      fixtures: row._count.fixtures,
+      announcements: row._count.announcements,
+    });
   }
 
   async create(user: V1AuthUser, dto: CreateTournamentDto) {
@@ -397,8 +435,12 @@ export class TournamentsAdminService {
    * 접수마감(registrationDeadlineAt) 이후에만 강제하지는 않는다(운영자 재량으로 조기 공개 허용) —
    * 마감 전 공개 여부 경고는 프론트 확인 모달에서 처리한다. idempotent: 이미 공개된 경우
    * 트랜잭션/로그 없이 alreadyPublished:true 반환.
+   *
+   * scheduledAt 을 주면 즉시 공개하지 않고 예약만 기록한다. 공개 판정은 스케줄러가 아니라
+   * 조회 시점에 `isBracketPublished()` 가 하므로, 예약 시각이 지나는 순간 별도 작업 없이
+   * 공개로 전환된다. 이미 지난 시각은 받지 않는다(즉시 공개와 구분되지 않아 혼란스럽다).
    */
-  async publishBracket(user: V1AuthUser, tournamentId: string) {
+  async publishBracket(user: V1AuthUser, tournamentId: string, scheduledAt?: Date) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const existing = await this.prisma.v1Tournament.findFirst({
       where: { id: tournamentId, deletedAt: null },
@@ -407,19 +449,27 @@ export class TournamentsAdminService {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
 
-    if (existing.bracketPublishedAt) {
+    // "이미 공개됨"은 조회 시점 판정과 같은 규칙으로 봐야 한다. bracketPublishedAt 만 보면
+    // 예약 시각이 지나 이미 공개 중인 대진표에 다시 미래 예약을 걸어 재비공개시키거나,
+    // 불필요한 즉시 공개로 공개 시각을 실제보다 늦게 기록하게 된다.
+    if (isBracketPublished(existing.bracketPublishedAt, existing.bracketPublishScheduledAt)) {
       return {
         tournamentId,
-        bracketPublishedAt: existing.bracketPublishedAt.toISOString(),
+        bracketPublishedAt: existing.bracketPublishedAt?.toISOString() ?? null,
+        bracketPublishScheduledAt: existing.bracketPublishScheduledAt?.toISOString() ?? null,
         alreadyPublished: true,
       };
+    }
+
+    if (scheduledAt) {
+      return this.scheduleBracketPublish(admin, tournamentId, scheduledAt);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
       const publishedAt = new Date();
       const transition = await tx.v1Tournament.updateMany({
         where: { id: tournamentId, deletedAt: null, bracketPublishedAt: null },
-        data: { bracketPublishedAt: publishedAt },
+        data: { bracketPublishedAt: publishedAt, bracketPublishScheduledAt: null },
       });
 
       if (transition.count === 0) {
@@ -439,6 +489,7 @@ export class TournamentsAdminService {
         return {
           tournamentId,
           bracketPublishedAt: current.bracketPublishedAt.toISOString(),
+          bracketPublishScheduledAt: null,
           alreadyPublished: true,
         };
       }
@@ -454,10 +505,125 @@ export class TournamentsAdminService {
         tx,
       );
 
-      return { tournamentId, bracketPublishedAt: publishedAt.toISOString(), alreadyPublished: false };
+      return {
+        tournamentId,
+        bracketPublishedAt: publishedAt.toISOString(),
+        bracketPublishScheduledAt: null,
+        alreadyPublished: false,
+      };
     });
 
     return result;
+  }
+
+  /**
+   * 예약 공개 기록. 공개 여부 판정은 조회 시점(`isBracketPublished`)이 하므로 여기서는
+   * 시각만 저장한다. 같은 엔드포인트를 다시 호출하면 예약 시각이 덮어써진다(변경 = 재예약).
+   */
+  private async scheduleBracketPublish(
+    admin: Awaited<ReturnType<AdminContextService['getMutationAdmin']>>,
+    tournamentId: string,
+    scheduledAt: Date,
+  ) {
+    if (scheduledAt.getTime() <= Date.now()) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_BRACKET_PUBLISH_SCHEDULE_PAST',
+        message: '공개 예약 시각은 현재 시각 이후여야 해요.',
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const transition = await tx.v1Tournament.updateMany({
+        // 아직 공개 전일 때만 예약을 쓴다. bracketPublishedAt 만 검사하면, 예약 시각이
+        // 막 지나 공개로 간주되는 순간에 레이스로 예약을 미래로 덮어써서 공개된 대진표가
+        // 다시 감춰진다. "예약이 없거나 아직 오지 않았을 때"까지 조건에 넣는다.
+        where: {
+          id: tournamentId,
+          deletedAt: null,
+          bracketPublishedAt: null,
+          OR: [{ bracketPublishScheduledAt: null }, { bracketPublishScheduledAt: { gt: now } }],
+        },
+        data: { bracketPublishScheduledAt: scheduledAt },
+      });
+
+      if (transition.count === 0) {
+        // 예약을 거는 사이 다른 관리자가 즉시 공개했거나, 기존 예약 시각이 지나 공개된 상태.
+        const current = await tx.v1Tournament.findUnique({
+          where: { id: tournamentId },
+          select: { bracketPublishedAt: true, deletedAt: true },
+        });
+        if (!current || current.deletedAt) {
+          throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+        }
+        throw new ConflictException({
+          code: 'TOURNAMENT_BRACKET_ALREADY_PUBLISHED',
+          message: '이미 공개된 대진표예요. 예약할 수 없어요.',
+        });
+      }
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket_publish_schedule',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          afterJson: { bracketPublishScheduledAt: scheduledAt.toISOString() },
+        },
+        tx,
+      );
+
+      return {
+        tournamentId,
+        bracketPublishedAt: null,
+        bracketPublishScheduledAt: scheduledAt.toISOString(),
+        alreadyPublished: false,
+      };
+    });
+  }
+
+  /**
+   * 대진표 공개 취소 — 즉시 공개분과 예약분을 모두 되돌린다. 이미 대진표를 본 참가자에게서
+   * 기억을 되돌릴 수는 없으므로, 되돌릴 수 없다는 경고는 프론트 확인 모달이 담당한다.
+   * idempotent: 이미 비공개면 트랜잭션/로그 없이 alreadyUnpublished:true 반환.
+   */
+  async unpublishBracket(user: V1AuthUser, tournamentId: string) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const existing = await this.prisma.v1Tournament.findFirst({
+      where: { id: tournamentId, deletedAt: null },
+      select: { bracketPublishedAt: true, bracketPublishScheduledAt: true },
+    });
+    if (!existing) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+
+    if (!existing.bracketPublishedAt && !existing.bracketPublishScheduledAt) {
+      return { tournamentId, bracketPublishedAt: null, bracketPublishScheduledAt: null, alreadyUnpublished: true };
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, deletedAt: null },
+        data: { bracketPublishedAt: null, bracketPublishScheduledAt: null },
+      });
+
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'tournament.bracket_unpublish',
+          targetType: 'tournament',
+          targetId: tournamentId,
+          beforeJson: {
+            bracketPublishedAt: existing.bracketPublishedAt?.toISOString() ?? null,
+            bracketPublishScheduledAt: existing.bracketPublishScheduledAt?.toISOString() ?? null,
+          },
+          afterJson: { bracketPublishedAt: null, bracketPublishScheduledAt: null },
+        },
+        tx,
+      );
+
+      return { tournamentId, bracketPublishedAt: null, bracketPublishScheduledAt: null, alreadyUnpublished: false };
+    });
   }
 
   /**
@@ -561,7 +727,11 @@ export class TournamentsAdminService {
     }
   }
 
-  private serialize(row: V1Tournament, registrationCount: number) {
+  private serialize(
+    row: V1Tournament,
+    registrationCount: number,
+    operationCounts?: { registrations: number; fixtures: number; announcements: number },
+  ) {
     return {
       id: row.id,
       sportId: row.sportId,
@@ -571,6 +741,7 @@ export class TournamentsAdminService {
       registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
       rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
       bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,
+      bracketPublishScheduledAt: row.bracketPublishScheduledAt?.toISOString() ?? null,
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
@@ -615,6 +786,7 @@ export class TournamentsAdminService {
       promoListPrizeText: row.promoListPrizeText,
       promoListPriority: row.promoListPriority,
       registrationCount,
+      ...(operationCounts ? { operationCounts } : {}),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

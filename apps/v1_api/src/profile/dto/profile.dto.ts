@@ -24,6 +24,16 @@ export class UpdateProfileDto {
   @MaxLength(320)
   email?: string | null;
 
+  /**
+   * 휴대폰 번호를 바꿀 때만 필요한 본인인증 증명. 가입과 같은 발급 경로
+   * (POST /auth/phone/issue → verify)에서 받은 토큰을 그대로 전달한다.
+   * 번호를 바꾸지 않는 저장에는 없어도 된다.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  phoneProofToken?: string | null;
+
   @IsOptional()
   @IsString()
   profileImageUrl?: string | null;

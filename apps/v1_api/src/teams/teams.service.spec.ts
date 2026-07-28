@@ -118,7 +118,7 @@ describe('TeamsService', () => {
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; updateMany: jest.Mock; count: jest.Mock };
-    v1TeamJoinApplication: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
+    v1TeamJoinApplication: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock };
     v1TeamInvitation: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1User: { findUnique: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
@@ -127,6 +127,7 @@ describe('TeamsService', () => {
     v1ChatRoom: { findUnique: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatRoomParticipant: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; create: jest.Mock; upsert: jest.Mock };
     v1ChatMessage: { create: jest.Mock };
+    v1PostEventReview: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
@@ -149,6 +150,7 @@ describe('TeamsService', () => {
       },
       v1TeamJoinApplication: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
         create: jest.fn(),
       },
@@ -168,6 +170,7 @@ describe('TeamsService', () => {
       v1ChatRoom: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatRoomParticipant: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
       v1ChatMessage: { create: jest.fn() },
+      v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn(),
     };
@@ -240,6 +243,7 @@ describe('TeamsService', () => {
           sportId: 'sport-1',
           regionId: 'region-seoul',
           name: '서울 전체 팀',
+          logoUrl: '/images/team-logos/team-logo-04.jpg',
           joinPolicy: 'approval_required',
         }),
       ).resolves.toMatchObject({
@@ -256,6 +260,11 @@ describe('TeamsService', () => {
           data: expect.objectContaining({
             membersVisible: true,
             regionId: 'region-seoul',
+            profile: {
+              create: expect.objectContaining({
+                logoUrl: '/images/team-logos/team-logo-04.jpg',
+              }),
+            },
           }),
         }),
       );
@@ -281,7 +290,7 @@ describe('TeamsService', () => {
           sportId: 'sport-1',
           regionId: 'region-seoul',
           name: '서울 전체 팀',
-          logoUrl: null,
+          logoUrl: '/images/team-logos/team-logo-07.jpg',
           coverImageUrl: null,
           introduction: null,
           activityAreaText: null,
@@ -312,6 +321,17 @@ describe('TeamsService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             regionId: 'region-seoul',
+          }),
+        }),
+      );
+      expect(prisma.v1TeamProfile.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { teamId: 'team-1' },
+          update: expect.objectContaining({
+            logoUrl: '/images/team-logos/team-logo-07.jpg',
+          }),
+          create: expect.objectContaining({
+            logoUrl: '/images/team-logos/team-logo-07.jpg',
           }),
         }),
       );
@@ -351,12 +371,12 @@ describe('TeamsService', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0].owner).toEqual({
         userId: owner.id,
-        displayName: '오너',
+        displayName: 'owner-nick',
         profileImageUrl: 'https://example.com/owner.png',
       });
       expect(result.items[0].manager).toEqual({
         userId: manager.id,
-        displayName: '감독님',
+        displayName: 'manager-nick',
       });
     });
 
@@ -393,6 +413,103 @@ describe('TeamsService', () => {
         profileImageUrl: null,
       });
       expect(result.items[0].manager).toBeNull();
+    });
+
+    it('returns live-recalculated trustState instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1Team.findMany.mockResolvedValueOnce([
+        {
+          ...teamRow({ id: 'team-live' }),
+          name: '실시간팀',
+          sport: { id: 'sport-1', name: 'Soccer' },
+          region: null,
+          profile: null,
+          memberships: [],
+          joinApplications: [],
+          // 캐시는 예전 verified 상태를 그대로 들고 있지만(72시간 경과 직후 cron이 없어 갱신 누락),
+          // 아직 상대팀이 리뷰를 제출하지 않았고 72시간도 지나지 않아 실제로는 공개된 리뷰가 0건이다.
+          trustScore: { trustState: 'verified', mannerScore: null, matchCount: 3 },
+          ownerUser: { id: owner.id, profile: null },
+        },
+      ]);
+      // candidates: 팀이 받은 리뷰 1건, 방금 제출되어 아직 reveal 조건(상호제출 또는 72시간 경과) 미충족.
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      // reverse: 상대팀은 아직 리뷰를 제출하지 않았다.
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.list(null, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].trustState).toBe('none');
+    });
+  });
+
+  describe('myTeams', () => {
+    it('returns live-recalculated trust instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
+        {
+          ...membershipRow({ id: 'mem-live', teamId: 'team-live', userId: owner.id, role: 'owner' }),
+          team: {
+            ...teamRow({ id: 'team-live' }),
+            sport: { id: 'sport-1', name: 'Soccer' },
+            region: null,
+            profile: null,
+            // 캐시는 예전 verified/4.8점을 들고 있지만 아직 상호제출/72시간 reveal 조건을 만족하지 못한다.
+            trustScore: { trustState: 'verified', mannerScore: 4.8 },
+          },
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.myTeams(owner, {});
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].trust).toEqual({ trustState: 'none', score: null });
+    });
+  });
+
+  describe('detail (getPublicTeam)', () => {
+    it('returns live-recalculated trustState instead of the stale V1TeamTrustScore cache', async () => {
+      prisma.v1Team.findFirst.mockResolvedValueOnce({
+        ...teamRow({ id: 'team-live' }),
+        sport: { id: 'sport-1', name: 'Soccer' },
+        region: null,
+        profile: null,
+        memberships: [],
+        joinApplications: [],
+        trustScore: { trustState: 'verified', mannerScore: null, matchCount: 3 },
+        ownerUser: { id: owner.id, profile: null },
+      });
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([
+        {
+          targetTeamId: 'team-live',
+          sourceId: 'tm-1',
+          reviewerTeamId: 'opponent-team',
+          rating: 5,
+          submittedAt: new Date(),
+        },
+      ]);
+      prisma.v1PostEventReview.findMany.mockResolvedValueOnce([]);
+
+      const result = await service.detail(null, 'team-live');
+
+      expect(result.trustState).toBe('none');
     });
   });
 
@@ -1427,7 +1544,13 @@ describe('TeamsService', () => {
     const result = await service.removeMembership(manager, 'mem-1', {});
 
     expect(prisma.v1TeamMembership.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'removed' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'removed',
+          leftAt: expect.any(Date),
+          removedByUserId: manager.id,
+        }),
+      }),
     );
     expect(result).toMatchObject({ status: 'removed', memberCount: 4 });
   });
@@ -1964,6 +2087,70 @@ describe('TeamsService', () => {
       expect(result.items[0].team).toMatchObject({ teamId: 'team-1', name: '테스트팀', sportId: 'sport-1' });
       expect(result.items[0].team.introductionPreview).toHaveLength(120); // 200자 → 120 컷
       expect(result.items[0].invitedBy.displayName).toBe('매니저'); // displayName null → nickname fallback
+    });
+  });
+
+  describe('myJoinApplications', () => {
+    it('승인 대기 건이 처리 완료 건보다 항상 앞에 오고, 두 그룹을 따로 조회한다', async () => {
+      prisma.v1TeamJoinApplication.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'app-pending',
+            teamId: 'team-1',
+            status: 'requested',
+            message: '가입하고 싶어요',
+            createdAt: new Date('2026-06-01'),
+            reviewedAt: null,
+            withdrawnAt: null,
+            team: { id: 'team-1', name: '대기팀', sportId: 'sport-1', profile: { logoUrl: null, description: null } },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'app-rejected',
+            teamId: 'team-2',
+            status: 'rejected',
+            message: null,
+            createdAt: new Date('2026-06-20'), // 대기 건보다 최신이지만 뒤에 와야 한다
+            reviewedAt: new Date('2026-06-21'),
+            withdrawnAt: null,
+            team: { id: 'team-2', name: '거절팀', sportId: 'sport-1', profile: { logoUrl: null, description: null } },
+          },
+        ]);
+
+      const result = await service.myJoinApplications(invitee);
+
+      // 본인 신청만 조회 — requested / not requested 두 그룹
+      expect(prisma.v1TeamJoinApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { applicantUserId: invitee.id, status: 'requested' } }),
+      );
+      expect(prisma.v1TeamJoinApplication.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { applicantUserId: invitee.id, status: { not: 'requested' } } }),
+      );
+      expect(result.items.map((item) => item.applicationId)).toEqual(['app-pending', 'app-rejected']);
+      expect(result.items[0].team).toMatchObject({ teamId: 'team-1', name: '대기팀' });
+      expect(result.items[1].status).toBe('rejected');
+    });
+
+    it('팀 소개는 120자로 자른다', async () => {
+      prisma.v1TeamJoinApplication.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'app-1',
+            teamId: 'team-1',
+            status: 'requested',
+            message: null,
+            createdAt: new Date('2026-06-01'),
+            reviewedAt: null,
+            withdrawnAt: null,
+            team: { id: 'team-1', name: '팀', sportId: 'sport-1', profile: { logoUrl: null, description: 'a'.repeat(200) } },
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.myJoinApplications(invitee);
+
+      expect(result.items[0].team.introductionPreview).toHaveLength(120);
     });
   });
 

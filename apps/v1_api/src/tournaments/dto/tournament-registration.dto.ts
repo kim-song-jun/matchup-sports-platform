@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export const TOURNAMENT_PAYMENT_METHODS = ['pg', 'bank_transfer'] as const;
 export type TournamentPaymentMethod = (typeof TOURNAMENT_PAYMENT_METHODS)[number];
@@ -13,6 +13,12 @@ export class CreateRegistrationDto {
  * (서비스 계층 검증). 제출 시 draft → awaiting_payment 로 전이하며 결제 레코드 생성.
  */
 export class SubmitRegistrationDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  termsDocumentIds!: string[];
+
   @IsIn(TOURNAMENT_PAYMENT_METHODS)
   paymentMethod!: TournamentPaymentMethod;
 

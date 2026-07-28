@@ -8,6 +8,7 @@ import type {
   ApiEnvelope,
   ApiErrorBody,
   AdminListFilters,
+  AdminCursorPage,
   CursorPage,
   V1AdminGrantResult,
   V1AdminInquiryDetail,
@@ -16,6 +17,7 @@ import type {
   V1AdminInquiryRow,
   V1AdminInquiryStatusPayload,
   V1AdminLog,
+  V1AdminContentAsset,
   V1AdminPopupCreatePayload,
   V1AdminPopupCreateResult,
   V1AdminPopupDeleteResult,
@@ -31,7 +33,22 @@ import type {
   V1AdminNoticeRow,
   V1AdminNoticeUpdatePayload,
   V1AdminNoticeUpdateResult,
+  V1AdminTermsListResult,
+  V1AdminTermsPolicy,
+  V1AdminTermsPolicyCreatePayload,
+  V1AdminTermsPolicyUpdatePayload,
+  V1AdminTermsStatusPayload,
+  V1AdminTermsVersionPayload,
   V1AdminRow,
+  V1PushFailureSummary,
+  V1FoundAccount,
+  V1SmsFailureSummary,
+  V1AdminOpsSummary,
+  V1AdminErrorLogsPage,
+  V1AdminErrorLogDetail,
+  V1AdminErrorLogFilters,
+  V1AdminPushSendPayload,
+  V1AdminPushSendResult,
   V1AdminMatchDetail,
   V1AdminMatchRow,
   V1AdminMe,
@@ -46,6 +63,8 @@ import type {
   V1AdminUserRow,
   V1AuthMe,
   V1AuthSessionResponse,
+  V1CurrentSignupTerms,
+  V1CurrentTerms,
   V1ChatMessage,
   V1ChatMessageSendResult,
   V1ChatRoom,
@@ -68,6 +87,7 @@ import type {
   V1MatchMutationResult,
   V1MatchUpdatePayload,
   V1MyActivitySummary,
+  V1MyJoinApplicationsPage,
   V1MyRegionUpdateResult,
   V1MyTeamsResponse,
   V1MyTeamMatch,
@@ -89,6 +109,7 @@ import type {
   V1RecentSearchesResponse,
   V1ReviewListResponse,
   V1ReviewReceivedResponse,
+  V1ReviewReceivedSummaryResponse,
   V1ReviewSourceResponse,
   V1ReviewSourceType,
   V1ReviewSubmitPayload,
@@ -145,6 +166,7 @@ import type {
   V1DeleteTournamentPopupResult,
   V1AdminTournamentStatusChangeResult,
   V1PublishBracketResult,
+  V1UnpublishBracketResult,
   V1StandingsRecalculateResult,
   V1ExportRosterCsvResult,
   V1Tournament,
@@ -185,7 +207,12 @@ import type {
 type ListFilters = Record<string, string | number | boolean | null | undefined>;
 type QueryOptions = { enabled?: boolean };
 
-export function useV1AuthMe(options?: { enabled?: boolean; retry?: boolean | number }) {
+export function useV1AuthMe(options?: {
+  enabled?: boolean;
+  // 함수형 retry를 허용한다 — 세션 확인은 4xx면 즉시 포기하고 5xx는 재시도해야 해서
+  // boolean 하나로는 두 정책을 같이 표현할 수 없다(retryTransientFailure 참고).
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+}) {
   return useQuery({
     queryKey: v1Keys.authMe(),
     queryFn: () => v1Get<V1AuthMe>('/auth/me'),
@@ -204,7 +231,10 @@ export function useV1EmailLogin() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { email: string; password: string }) => v1Post<V1AuthSessionResponse>('/auth/login', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    // Mutation callbacks run before the component callback that stores the
+    // local session hint. Refetching here can send /auth/me without headers
+    // and cache a 401 that immediately ejects the newly-created session.
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
   });
 }
 
@@ -222,9 +252,11 @@ export function useV1Register() {
       birthDate: string;
       profileImageUrl?: string;
       requiredTermsAccepted: boolean;
+      acceptedTermsDocumentIds: string[];
+      phoneProofToken?: string;
     }) =>
       v1Post<V1AuthSessionResponse>('/auth/register', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
   });
 }
 
@@ -248,8 +280,90 @@ export function useV1CompleteSocialProfile() {
 export function useV1CompleteSocialTerms() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { requiredTermsAccepted: boolean }) =>
+    mutationFn: (body: { requiredTermsAccepted: boolean; acceptedTermsDocumentIds: string[] }) =>
       v1Post<V1AuthSessionResponse & { next: { route: string } }>('/auth/social-terms', body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+  });
+}
+
+export function useV1PhoneIssue() {
+  return useMutation({
+    mutationFn: (body: { phone: string }) =>
+      v1Post<{ expiresAt: string; devCode?: string }>('/auth/phone/issue', body),
+  });
+}
+
+export function useV1PhoneVerify() {
+  return useMutation({
+    // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
+    // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
+      v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+  });
+}
+
+export function useV1FindAccountByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string }) =>
+      v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
+  });
+}
+
+export function useV1ResetPasswordByPhone() {
+  return useMutation({
+    mutationFn: (body: { phone: string; proofToken: string; newPassword: string }) =>
+      v1Post<{ ok: true }>('/auth/recovery/reset-password', body),
+  });
+}
+
+/**
+ * 비로그인 이메일 OTP — 비밀번호 재설정 전용. 로그인 후 이메일 인증(/verification/email/*)은
+ * 인증 가드 뒤라 여기 쓸 수 없어 공개 엔드포인트가 따로 있다.
+ *
+ * 응답은 가입 여부를 드러내지 않는다(계정 열거 방어) — 화면도 "가입된 주소면 보냈다"는 식으로만
+ * 안내하고, 없는 계정을 드러내는 문구를 쓰지 않는다. devCode 는 실발송 수단이 하나도 없는
+ * 개발/CI 환경(dev-echo)에서만, 그것도 메일을 실제로 보낸 경우에만 붙는다.
+ */
+export function useV1RecoveryEmailIssue() {
+  return useMutation({
+    mutationFn: (body: { email: string }) =>
+      v1Post<{ sent: true; expiresAt: string; devCode?: string }>('/auth/recovery/email/request', body),
+  });
+}
+
+export function useV1RecoveryEmailVerify() {
+  return useMutation({
+    // 용도(purpose)를 보내지 않는다 — 이 경로가 발급하는 증명은 서버가 재설정용으로 고정한다.
+    mutationFn: (body: { email: string; code: string }) =>
+      v1Post<{ verified: boolean; proofToken?: string }>('/auth/recovery/email/confirm', body),
+  });
+}
+
+export function useV1ResetPasswordByEmail() {
+  return useMutation({
+    mutationFn: (body: { email: string; proofToken: string; newPassword: string }) =>
+      v1Post<{ ok: true }>('/auth/recovery/email/reset-password', body),
+  });
+}
+
+export function useV1AuthedPhoneRequest() {
+  return useMutation({
+    mutationFn: (body: { phone: string }) =>
+      v1Post<{ sent: boolean; channel: 'phone'; target?: string; alreadyVerified?: boolean; expiresAt?: string; devCode?: string }>(
+        '/verification/phone/request',
+        body,
+      ),
+  });
+}
+
+export function useV1AuthedPhoneConfirm() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { code: string }) =>
+      v1Post<{ verified: boolean; verification: { emailVerified: boolean; phoneVerified: boolean } }>(
+        '/verification/phone/confirm',
+        body,
+      ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
   });
 }
@@ -757,16 +871,54 @@ export function useV1TeamJoinEligibility(teamId: string, options?: { enabled?: b
   });
 }
 
+/**
+ * 가입 신청/철회 후 다시 읽어야 하는 쿼리들.
+ *
+ * `invalidateQueries`의 프라미스를 **await**하는 것이 핵심이다. React Query는
+ * onSuccess가 resolve될 때까지 `isPending`을 유지하므로, 버튼이 "처리 중"에서
+ * 풀리는 시점엔 이미 새 상태가 캐시에 들어와 있다. await하지 않으면 버튼만 먼저
+ * 활성화되고 라벨·배지는 한 박자 뒤에 바뀌어 "상태가 안 바뀐다"로 보인다.
+ */
+async function refetchTeamJoinState(queryClient: QueryClient, teamId: string) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.teams() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.myJoinApplications() }),
+  ]);
+}
+
 export function useV1CreateTeamJoinApplication(teamId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body?: { message?: string | null }) =>
       v1Post<V1TeamJoinApplicationResult>(`/teams/${teamId}/join-applications`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
-    },
+    onSuccess: () => refetchTeamJoinState(queryClient, teamId),
+  });
+}
+
+/** GET /me/join-applications — 내가 보낸 가입 신청 목록(승인 대기 + 최근 처리 결과) */
+export function useV1MyJoinApplications() {
+  return useQuery({
+    queryKey: v1Keys.myJoinApplications(),
+    queryFn: () => v1Get<V1MyJoinApplicationsPage>('/me/join-applications'),
+  });
+}
+
+/**
+ * 신청 현황 목록에서의 신청 취소.
+ *
+ * 팀 상세용 `useV1WithdrawTeamJoinApplication`은 teamId·applicationId를 훅 인자로 받아
+ * 한 팀에 고정된다. 목록은 여러 팀의 신청을 한 화면에서 다루므로 대상 식별자를
+ * mutate 인자로 받는 훅이 따로 필요하다.
+ */
+export function useV1WithdrawMyJoinApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, reason }: { applicationId: string; teamId: string; reason?: string | null }) =>
+      v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/withdraw`, {
+        reason: reason ?? null,
+      }),
+    onSuccess: (_result, variables) => refetchTeamJoinState(queryClient, variables.teamId),
   });
 }
 
@@ -784,11 +936,7 @@ export function useV1WithdrawTeamJoinApplication(teamId: string, applicationId?:
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<V1TeamJoinApplicationResult>(`/team-join-applications/${applicationId}/withdraw`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'join-eligibility'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teams() });
-    },
+    onSuccess: () => refetchTeamJoinState(queryClient, teamId),
   });
 }
 
@@ -1043,6 +1191,14 @@ export function useV1ReceivedReviews(filters?: ListFilters, options?: QueryOptio
   });
 }
 
+export function useV1ReceivedReviewSummary(targetType: 'user' | 'team', period?: string, options?: QueryOptions) {
+  return useQuery({
+    queryKey: v1Keys.reviewsReceivedSummary(targetType, period),
+    queryFn: () => v1Get<V1ReviewReceivedSummaryResponse>('/reviews/received/summary', { targetType, period }),
+    enabled: options?.enabled,
+  });
+}
+
 export function useV1ReviewSource(sourceType: V1ReviewSourceType, sourceId: string, options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.reviewSource(sourceType, sourceId),
@@ -1238,12 +1394,19 @@ export function useV1UpdateProfile() {
       email?: string | null;
       profileImageUrl?: string | null;
       phone?: string | null;
+      /** 번호를 바꿀 때만 필요 — 서버가 register 와 동일하게 본인인증 증명을 요구한다. */
+      phoneProofToken?: string | null;
       birthDate?: string | null;
       gender: 'male' | 'female';
     }) =>
       v1Patch<{ profile: V1Profile['profile']; updatedAt: string }>('/me/profile', body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.profile() });
+    // 응답에 이미 최신 profile이 있는데도 invalidate만 하면, 리페치가 끝나기 전에
+    // 호출부가 다음 화면으로 이동해 버려 마이페이지 등에서 방금 저장한 값 대신
+    // 이전 캐시 값이 잠깐(또는 리페치 실패 시 계속) 보였다. setQueryData로 즉시 반영.
+    onSuccess: (result) => {
+      queryClient.setQueryData<V1Profile>(v1Keys.profile(), (current) =>
+        current ? { ...current, profile: result.profile } : current,
+      );
       queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
       queryClient.invalidateQueries({ queryKey: v1Keys.settings() });
       queryClient.invalidateQueries({ queryKey: v1Keys.home() });
@@ -1429,6 +1592,9 @@ export function useV1AdminActionLogs(filters?: ListFilters) {
   return useQuery({
     queryKey: [...v1Keys.adminActionLogs(), filters ?? {}] as const,
     queryFn: () => v1Get<CursorPage<V1AdminLog>>('/admin/action-logs', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1446,7 +1612,10 @@ export function useV1AdminMe() {
 export function useV1AdminUsers(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminUsers(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminUserRow>>('/admin/users', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminUserRow>>('/admin/users', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1461,7 +1630,10 @@ export function useV1AdminUser(userId: string) {
 export function useV1AdminMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminMatches(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminMatchRow>>('/admin/matches', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminMatchRow>>('/admin/matches', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1476,7 +1648,10 @@ export function useV1AdminMatch(matchId: string) {
 export function useV1AdminTeams(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeams(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminTeamRow>>('/admin/teams', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminTeamRow>>('/admin/teams', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1491,7 +1666,7 @@ export function useV1AdminTeam(teamId: string) {
 export function useV1AdminPopups(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminPopups(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminPopupRow>>('/admin/popups', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminPopupRow>>('/admin/popups', filters),
   });
 }
 
@@ -1505,7 +1680,10 @@ export function useV1AdminPopupDetail(popupId: string) {
 export function useV1AdminNotices(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminNotices(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminNoticeRow>>('/admin/notices', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1517,10 +1695,59 @@ export function useV1AdminNoticeDetail(noticeId: string) {
   });
 }
 
+export function useV1CurrentSignupTerms(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: v1Keys.currentSignupTerms(),
+    queryFn: () => v1Get<V1CurrentSignupTerms>('/terms/current', { context: 'signup' }),
+    enabled: options?.enabled,
+  });
+}
+
+export function useV1CurrentTerms(
+  context: 'signup' | 'tournament_application' | 'footer',
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: v1Keys.currentTerms(context),
+    queryFn: () => v1Get<V1CurrentTerms>('/terms/current', { context }),
+    enabled: options?.enabled,
+  });
+}
+
+export function useV1AcceptSignupTerms() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { documentIds: string[] }) =>
+      v1Post<V1CurrentSignupTerms>('/terms/consents', body),
+    onSuccess: (result) => {
+      queryClient.setQueryData(v1Keys.currentSignupTerms(), result);
+      queryClient.invalidateQueries({ queryKey: v1Keys.authMe() });
+    },
+  });
+}
+
+export function useV1AdminTerms(filters?: AdminListFilters) {
+  return useQuery({
+    queryKey: v1Keys.adminTerms(filters),
+    queryFn: () => v1Get<V1AdminTermsListResult>('/admin/terms', filters),
+  });
+}
+
+export function useV1AdminTermsPolicy(policyId: string) {
+  return useQuery({
+    queryKey: v1Keys.adminTermsPolicy(policyId),
+    queryFn: () => v1Get<V1AdminTermsPolicy>(`/admin/terms/${policyId}`),
+    enabled: !!policyId,
+  });
+}
+
 export function useV1AdminInquiries(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminInquiries(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminInquiryRow>>('/admin/inquiries', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminInquiryRow>>('/admin/inquiries', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1585,7 +1812,10 @@ export function useV1ChangeAdminInquiryStatus(inquiryId: string) {
 export function useV1AdminTeamMatches(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTeamMatches(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminTeamMatchRow>>('/admin/team-matches', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1593,6 +1823,9 @@ export function useV1AdminStatusChangeLogs(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminStatusChangeLogs(filters as Record<string, unknown>),
     queryFn: () => v1Get<CursorPage<V1AdminStatusChangeLog>>('/admin/status-change-logs', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1743,6 +1976,74 @@ export function useV1DeleteAdminNotice() {
   });
 }
 
+function invalidateAdminTerms(queryClient: QueryClient, policyId?: string) {
+  queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'terms'] });
+  if (policyId) queryClient.invalidateQueries({ queryKey: v1Keys.adminTermsPolicy(policyId) });
+}
+
+export function useV1CreateAdminTermsPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminTermsPolicyCreatePayload) =>
+      v1Post<V1AdminTermsPolicy>('/admin/terms', body),
+    onSuccess: () => invalidateAdminTerms(queryClient),
+  });
+}
+
+export function useV1UpdateAdminTermsPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ policyId, body }: { policyId: string; body: V1AdminTermsPolicyUpdatePayload }) =>
+      v1Patch<V1AdminTermsPolicy>(`/admin/terms/${policyId}`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1CreateAdminTermsVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ policyId, body }: { policyId: string; body: V1AdminTermsVersionPayload }) =>
+      v1Post<V1AdminTermsPolicy>(`/admin/terms/${policyId}/documents`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1UpdateAdminTermsDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      policyId,
+      documentId,
+      body,
+    }: {
+      policyId: string;
+      documentId: string;
+      body: V1AdminTermsVersionPayload;
+    }) => v1Patch<V1AdminTermsPolicy>(`/admin/terms/${policyId}/documents/${documentId}`, body),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
+export function useV1ChangeAdminTermsStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      policyId,
+      documentId,
+      body,
+    }: {
+      policyId: string;
+      documentId: string;
+      body: V1AdminTermsStatusPayload;
+    }) =>
+      v1Post<V1AdminTermsPolicy>(
+        `/admin/terms/${policyId}/documents/${documentId}/status`,
+        body,
+      ),
+    onSuccess: (_data, { policyId }) => invalidateAdminTerms(queryClient, policyId),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Admin — admin-management (owner-only)
 // ---------------------------------------------------------------------------
@@ -1750,7 +2051,10 @@ export function useV1DeleteAdminNotice() {
 export function useV1AdminAdmins(filters?: AdminListFilters) {
   return useQuery({
     queryKey: v1Keys.adminAdmins(filters as Record<string, unknown>),
-    queryFn: () => v1Get<CursorPage<V1AdminRow>>('/admin/admins', filters),
+    queryFn: () => v1Get<AdminCursorPage<V1AdminRow>>('/admin/admins', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -1775,6 +2079,100 @@ export function useV1UpdateAdminRole() {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminAdmins() });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — ops (web push failure log)
+// ---------------------------------------------------------------------------
+
+export function useV1RecentPushFailures(limit = 20) {
+  return useQuery({
+    queryKey: v1Keys.adminPushFailures({ limit }),
+    queryFn: () => v1Get<V1PushFailureSummary[]>('/admin/ops/recent-push-failures', { limit }),
+  });
+}
+
+export function useV1AckPushFailures() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => v1Post('/admin/ops/push-failures/ack', { ids }),
+    onSuccess: () => {
+      // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+    },
+  });
+}
+
+/**
+ * 어드민 수동 웹 푸시 발송 — 특정 유저 또는 전체 구독자 브로드캐스트.
+ * 성공 시 push-failures 목록(새 실패가 즉시 생겼을 수 있음)을 무효화한다.
+ */
+export function useV1AdminSendPush() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1AdminPushSendPayload) =>
+      v1Post<V1AdminPushSendResult>('/admin/ops/push-send', payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminPushFailures() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — ops (SMS / 인증 실패 로그 + 운영 KPI 요약)
+// ---------------------------------------------------------------------------
+
+export function useV1RecentSmsFailures(limit = 20) {
+  return useQuery({
+    queryKey: v1Keys.adminSmsFailures({ limit }),
+    queryFn: () => v1Get<V1SmsFailureSummary[]>('/admin/ops/recent-sms-failures', { limit }),
+  });
+}
+
+export function useV1AckSmsFailures() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => v1Post('/admin/ops/sms-failures/ack', { ids }),
+    onSuccess: () => {
+      // 빈 filters는 partial match로 모든 limit 변형을 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminSmsFailures() });
+    },
+  });
+}
+
+/**
+ * 운영 대시보드 KPI(최근 5분 웹 푸시 / SMS·인증 실패 건수).
+ * ack 는 "최근 5분 발생 건수"를 바꾸지 않으므로(집계 기준이 createdAt) 무효화 대상이 아니다.
+ */
+export function useV1AdminOpsSummary() {
+  return useQuery({
+    queryKey: v1Keys.adminOpsSummary(),
+    queryFn: () => v1Get<V1AdminOpsSummary>('/admin/ops/summary'),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Admin — 에러 로그 뷰어
+// ---------------------------------------------------------------------------
+
+/** 에러 로그 목록 (cursor 페이지네이션, source/statusCode/level/기간/검색어 필터) */
+export function useAdminErrorLogs(filters?: V1AdminErrorLogFilters) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'admin', 'error-logs', filters ?? {}] as const,
+    queryFn: () => v1Get<V1AdminErrorLogsPage>('/admin/ops/errors', filters),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** 에러 로그 상세 — traceback/request/response/context 포함 */
+export function useAdminErrorLog(id: string) {
+  return useQuery({
+    queryKey: [...v1Keys.all, 'admin', 'error-log', id] as const,
+    queryFn: () => v1Get<V1AdminErrorLogDetail>(`/admin/ops/errors/${id}`),
+    enabled: !!id,
   });
 }
 
@@ -2214,6 +2612,9 @@ export function useV1AdminTournaments(params?: AdminTournamentListFilters) {
   return useQuery({
     queryKey: v1Keys.adminTournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1AdminTournamentListPage>('/admin/tournaments', params),
+    // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
+    // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -2261,11 +2662,32 @@ export function useV1ChangeTournamentStatus(id: string) {
   });
 }
 
-/** Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개. 성공 시 어드민 상세 + 공개 상세를 모두 invalidate. */
+/**
+ * Task 109 Track 6 — 대진표(조/픽스처) 일괄 공개. 성공 시 어드민 상세 + 공개 상세를 모두 invalidate.
+ * `scheduledAt`(ISO)을 넘기면 즉시 공개하지 않고 그 시각에 공개되도록 예약한다.
+ * 과거 시각은 서버가 400 `TOURNAMENT_BRACKET_PUBLISH_SCHEDULE_PAST` 로 거부한다.
+ */
 export function useV1PublishTournamentBracket(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => v1Post<V1PublishBracketResult>(`/admin/tournaments/${id}/publish-bracket`, {}),
+    mutationFn: (vars?: { scheduledAt?: string }) =>
+      v1Post<V1PublishBracketResult>(
+        `/admin/tournaments/${id}/publish-bracket`,
+        vars?.scheduledAt ? { scheduledAt: vars.scheduledAt } : {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
+    },
+  });
+}
+
+/** 대진표 공개 취소 — 즉시 공개분과 예약분을 모두 되돌린다(비공개 전환). */
+export function useV1UnpublishTournamentBracket(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<V1UnpublishBracketResult>(`/admin/tournaments/${id}/unpublish-bracket`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
@@ -2487,6 +2909,7 @@ export function useV1CreateGroup(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),
       });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournamentId) });
     },
   });
 }
@@ -2922,5 +3345,24 @@ export function useV1PublicKakaoMapsKey(options?: QueryOptions) {
     queryFn: () => v1Get<V1PublicKakaoMapsKeyResponse>('/public/integrations/kakao-maps-key'),
     staleTime: 5 * 60 * 1000,
     enabled: options?.enabled,
+  });
+}
+
+// ─── 어드민: 콘텐츠(공지/팝업) 본문 이미지 업로드 ────────────────────────────
+
+export function useV1UploadAdminContentAsset() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('files', file);
+      return v1MultipartPost<V1AdminContentAsset>('/admin/content-assets', formData);
+    },
+  });
+}
+
+export function useV1DeleteAdminContentAsset() {
+  return useMutation({
+    mutationFn: (assetId: string) =>
+      v1Delete<{ assetId: string; deleted: true }>(`/admin/content-assets/${assetId}`),
   });
 }

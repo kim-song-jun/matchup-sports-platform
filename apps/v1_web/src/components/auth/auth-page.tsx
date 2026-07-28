@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
+import { AuthBackButton } from './auth-back-button';
 import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { KakaoLoginButton } from './kakao-login-button';
@@ -107,23 +108,57 @@ export function SignupCompletePageView({ model }: { model: SignupCompleteViewMod
   );
 }
 
-export function AuthFrame({ children, topTitle, backHref, skipHref, fixedAction, className }: { children: ReactNode; topTitle?: string; backHref?: string; skipHref?: string; fixedAction?: ReactNode; className?: string }) {
+export function AuthFrame({ children, topTitle, backHref, onBack, backLabel, skipHref, fixedAction, className }: {
+  children: ReactNode;
+  topTitle?: string;
+  backHref?: string;
+  /**
+   * 이동이 아니라 동작(확인 모달 → 로그아웃 등)이 필요한 뒤로가기. backHref 와 배타적으로 쓰며,
+   * 둘 다 없으면 상단 좌측이 비어 화면을 빠져나갈 방법이 사라진다.
+   */
+  onBack?: () => void;
+  /** 스크린리더용 라벨. 동작이 단순 뒤로가기가 아닐 때 무엇을 하는지 알린다. */
+  backLabel?: string;
+  skipHref?: string;
+  fixedAction?: ReactNode;
+  className?: string;
+}) {
+  const hasBack = Boolean(backHref || onBack);
   return (
     <div className={`tm-auth-frame${className ? ` ${className}` : ''}`}>
-      {topTitle || backHref || skipHref ? (
+      {topTitle || hasBack || skipHref ? (
         <header className="tm-auth-topbar">
           <div className="tm-auth-topbar-left">
             {backHref ? (
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label="뒤로가기">
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
+            ) : onBack ? (
+              <AuthBackButton className="tm-btn tm-btn-icon tm-btn-ghost" label={backLabel ?? '뒤로가기'} onClick={onBack} />
             ) : null}
             {topTitle ? <div className="tm-text-body-lg">{topTitle}</div> : null}
           </div>
           {skipHref ? <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={skipHref}>건너뛰기</Link> : null}
         </header>
       ) : null}
-      <main className={`tm-auth-scroll ${fixedAction ? 'tm-auth-scroll-with-cta' : ''} ${topTitle || backHref || skipHref ? '' : 'tm-auth-scroll-full'}`}>
+      {/* 데스크톱(≥1024)에서는 desktop/auth.css 가 .tm-auth-topbar 를 통째로 숨긴다. 상단바에만
+          뒤로가기를 두면 그 폭에서는 화면을 빠져나갈 컨트롤이 아예 사라지므로(로그인·약관·
+          회원가입이 실제로 그랬다), 온보딩 위저드와 같은 in-card 내비로 복원한다.
+          backHref 는 링크, onBack 은 버튼 — 둘 다 오면 동작이 다른 뒤로가기가 둘 생기니
+          backHref 를 정본으로 하나만 렌더한다. */}
+      {hasBack ? (
+        <div className="tm-onboarding-desktop-nav tm-show-desktop">
+          {backHref ? (
+            <Link className="tm-onboarding-desktop-back" href={backHref} aria-label={backLabel ?? '뒤로가기'}>
+              <ChevronLeftIcon size={22} strokeWidth={2.2} />
+            </Link>
+          ) : (
+            <AuthBackButton className="tm-onboarding-desktop-back" label={backLabel ?? '뒤로가기'} onClick={onBack!} />
+          )}
+          {topTitle ? <span className="tm-onboarding-desktop-nav-title">{topTitle}</span> : null}
+        </div>
+      ) : null}
+      <main className={`tm-auth-scroll ${fixedAction ? 'tm-auth-scroll-with-cta' : ''} ${topTitle || hasBack || skipHref ? '' : 'tm-auth-scroll-full'}`}>
         {children}
       </main>
       {fixedAction ? <div className="tm-auth-fixed-cta">{fixedAction}</div> : null}

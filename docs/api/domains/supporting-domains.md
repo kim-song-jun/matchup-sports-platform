@@ -219,6 +219,7 @@
 - `CreateRegistrationDto`
   - `teamId`: UUID
 - `SubmitRegistrationDto`
+  - `termsDocumentIds`: 현재 `tournament_application` 문서 중 사용자가 동의한 정확한 UUID 배열
   - `paymentMethod`: `pg | bank_transfer`
   - `depositorName?`: 계좌이체 선택 시 서비스 계층에서 필수
   - `agreedRules`, `agreedPrivacy`, `agreedRefund`: 필수 boolean
@@ -278,10 +279,13 @@
   - 필드: `id`, `name`, `description`, `logoUrl`, `websiteUrl`, `instagramUrl`, `benefitText`, `boothText`, `eventTitle`, `eventDescription`, `eventResultText`, `sortOrder`
   - 프론트는 `sponsors.length > 0`일 때 `#tournament-sponsors` 섹션을 렌더하고, 후속 허브의 협찬 CTA도 이 앵커를 우선 사용한다. `announcements.category=sponsor`는 구조화 sponsor row가 없을 때 운영진 공지 fallback으로만 사용한다.
 - `participantTeams`는 공개 가능한 참가팀 목록이다.
-  - 포함 상태: `confirmed`, `waitlisted`
-  - 제외 상태: `draft`, `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested`, `cancelled`
-  - 필드: `registrationId`, `teamId`, `teamName`, `status`, `confirmedAt`
-  - 확정 팀이 대기 팀보다 먼저 렌더링될 수 있도록 API가 `confirmed` 우선 순서로 직렬화한다.
+  - 대회 `status`가 `open`(모집중)이면 `participantTeams`는 항상 빈 배열이다 — 모집 중에는 참가팀의 신원 정보(팀명·로고·지역)를 비공개한다.
+  - `status`가 `closed`(모집마감) 이후(`closed | in_progress | completed`)부터는 아래 등록 상태 기준으로 필터링된 참가팀 목록을 그대로 노출한다.
+    - 포함 상태: `confirmed`, `waitlisted`
+    - 제외 상태: `draft`, `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested`, `cancelled`
+    - 필드: `registrationId`, `teamId`, `teamName`, `status`, `confirmedAt`
+    - 확정 팀이 대기 팀보다 먼저 렌더링될 수 있도록 API가 `confirmed` 우선 순서로 직렬화한다.
+  - `confirmedCount`는 대회 `status`와 무관하게 항상 정확한 확정 인원수(실제 confirmed 등록 수)를 반환한다 — 모집 중에도 "몇 팀이 참가하는지"는 계속 노출된다.
 - 계좌이체 신청 화면에서 안내가 필요하므로 상세 응답에는 `bankName`, `bankAccount`, `bankHolder`가 포함된다.
 
 ### 신청/결제 응답 계약
@@ -333,6 +337,20 @@
 4. tournament 쿼리의 `limit`은 숫자 문자열로 전달해도 되지만, 프론트는 명시적으로 숫자 범위를 통제한다.
 5. tournament detail의 `participantTeams`는 공개 참가팀 표시 전용이다. 신청 상태 확인, 입금 대기, 로스터 편집은 registration endpoints를 별도로 조회한다.
 
+## Managed terms v1.1 data foundation
+
+Task 124 registers the current fixed v1 copy as 11 independent policies, 11 immutable `v1.1` documents, and 11 placements. Signup service terms and footer service terms intentionally remain separate documents even when their current bodies are identical, so each surface can be versioned and managed independently.
+
+- Contexts: `signup`, `tournament_application`, `footer`
+- Tournament requirements: rules/privacy/refund are `required`; photo/video use is `optional`
+- Footer documents are `display_only` and never create consent events by display alone.
+- `support` is managed public content only and has no consent history.
+- Every existing tournament registration produces four provenance events. A source `true` becomes `accepted`; a source `false` becomes `not_accepted`. The original four booleans remain authoritative and unchanged.
+- Historical tournament decision time is not inferred from registration timestamps, so migrated events keep `decidedAt=null` and `versionVerified=false`.
+- Event dedupe keys make the backfill safe to rerun. The migration audit stores source row counts and the true-value distribution for all four tournament agreement columns.
+
+The admin management API and `/admin/terms` UI are implemented. `subtitle` and `changeSummary` are separate, and future-effective publication keeps the currently effective version active until the schedule arrives. Signup, tournament application, and footer/direct-document surfaces all consume `GET /api/v1/terms/current` for their context. Email/social signup and tournament submission bind exact current document IDs. Tournament submission appends accepted/not-accepted events in the registration transaction while preserving the four legacy booleans. Existing-user re-consent is enforced after optional `enforcementAt` without rewriting old choices.
+
 ## Source References
 
 - `apps/v1_api/src/reviews/reviews.controller.ts`, `reviews.service.ts`, `tournament-fixture-reviews.service.ts`
@@ -346,4 +364,8 @@
 - `apps/v1_api/src/tournaments/tournament-registrations.controller.ts`, `tournament-registrations.service.ts`, `dto/tournament-registration.dto.ts`
 - `apps/v1_api/src/tournaments/tournament-players.controller.ts`, `tournament-players.service.ts`
 - `apps/v1_api/src/health/health.controller.ts`
+- `apps/v1_api/prisma/data/managed-terms-v1.1.json`
+- `apps/v1_api/prisma/migrations/20260722090000_v1_managed_terms_v11_baseline/migration.sql`
+- `apps/v1_api/prisma/migrations/20260722130000_v1_managed_terms_reconsent_runtime/migration.sql`
+- `apps/v1_api/src/terms/terms.controller.ts`, `managed-terms-runtime.service.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`, `apps/v1_web/src/types/api.ts`

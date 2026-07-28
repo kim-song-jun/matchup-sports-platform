@@ -1,9 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
+import { useRouter } from 'next/navigation';
+import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
+import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { PendingTournamentReviewModal } from '@/components/tournaments/pending-review-modal';
 import { HomePageView } from './home-page';
@@ -12,12 +16,16 @@ import type { HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
 
 export function HomePageClient() {
+  const router = useRouter();
+
   useEffect(() => {
     trackEvent('home_view', {});
   }, []);
 
   const query = useV1Home();
   const isAuthenticated = query.data?.viewer?.authenticated === true;
+  const onboardingCompleted = query.data?.viewer?.onboardingStatus === 'completed';
+  const authMe = useV1AuthMe({ enabled: isAuthenticated });
   const chatRooms = useV1ChatRooms({ enabled: isAuthenticated });
   const {
     weather,
@@ -25,6 +33,44 @@ export function HomePageClient() {
     refreshing: weatherRefreshing,
     refresh: refreshWeather,
   } = useCurrentLocationWeather();
+  const pushRegistration = useV1PushRegistration();
+  const [pushNudgeSubscribing, setPushNudgeSubscribing] = useState(false);
+  const [pushNudgeDismissed, setPushNudgeDismissed] = useState(true);
+  useEffect(() => {
+    setPushNudgeDismissed(!shouldShowPushNudge());
+  }, []);
+  const showPushNudge =
+    isAuthenticated &&
+    onboardingCompleted &&
+    !pushNudgeDismissed &&
+    pushRegistration.permission === 'default' &&
+    !pushRegistration.isSubscribed;
+  const pushNudge = showPushNudge
+    ? {
+        subscribing: pushNudgeSubscribing,
+        onSubscribe: () => {
+          setPushNudgeSubscribing(true);
+          void pushRegistration.subscribe().then((subscribed) => {
+            if (subscribed) {
+              dismissPushNudge();
+              setPushNudgeDismissed(true);
+            }
+          }).finally(() => {
+            setPushNudgeSubscribing(false);
+          });
+        },
+        onDismiss: () => {
+          dismissPushNudge();
+          setPushNudgeDismissed(true);
+        },
+      }
+    : undefined;
+  // 인증을 마칠 때까지 계속 보이는 상시 배너 — 닫을 수 있게 두면 한 번 닫은 사용자는
+  // 왜 신청·등록이 막히는지 알 방법이 없어진다(조회는 열려 있어 화면상 정상으로 보인다).
+  const phoneVerifyNudge =
+    isAuthenticated && authMe.data?.verification?.phoneVerified === false
+      ? { onVerify: () => router.push(buildPhoneVerifyHref('/home')) }
+      : undefined;
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
@@ -48,6 +94,7 @@ export function HomePageClient() {
             weatherRefreshing,
             refreshWeather,
             retry: () => void query.refetch(),
+            phoneVerifyNudge,
           }}
         />
       </>
@@ -67,8 +114,10 @@ export function HomePageClient() {
                 weatherPermission,
                 weatherRefreshing,
                 refreshWeather,
+                pushNudge,
+                phoneVerifyNudge,
               }
-            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather }
+            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge }
         }
       />
     </>

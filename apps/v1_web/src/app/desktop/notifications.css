@@ -57,7 +57,7 @@
     background: var(--grey50);
   }
 
-  /* 미읽음 hover: 마커 유지 + 동일 tint */
+  /* 미읽음 hover: 아이콘 tint·미읽음 점은 유지한 채 동일 배경 tint */
   .tm-notification-card-unread:hover {
     background: var(--grey50);
   }

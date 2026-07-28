@@ -4,12 +4,14 @@ import Link from 'next/link';
 import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, Lock } from 'lucide-react';
+import { Check, ChevronDown, Lock } from 'lucide-react';
 import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
+import { extractErrorMessage } from '@/lib/error-message';
+import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import type {
   TeamDetailViewModel,
   TeamFormViewModel,
@@ -302,7 +304,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const { team, mode } = model;
   const locked = mode === 'pending' || mode === 'closed';
   const cta = model.ctaLabel ?? (mode === 'mine' ? '팀 관리' : mode === 'pending' ? '신청 상태 보기' : mode === 'closed' ? '모집 알림 받기' : '가입 신청');
-  const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
+  // 승인 대기 중의 CTA는 "신청 취소"(파괴적 액션)다. 상태는 안내 카드가 이미 설명하므로
+  // 버튼까지 최강 강조로 두면 취소가 권장 행동처럼 읽힌다 → neutral로 낮춘다.
+  const ctaTone = mode === 'pending' || mode === 'closed' ? 'tm-btn-neutral' : 'tm-btn-primary';
   const memberCapacity = formatMemberCapacity(team);
   const capacity = formatCapacity(team);
   const [heroMessage, setHeroMessage] = useState('');
@@ -320,11 +324,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       .then(() => action())
       .then(() => {
         setHeroMessage(successMessage);
-        window.setTimeout(() => setHeroMessage(''), 2000);
+        window.setTimeout(() => setHeroMessage(''), 2600);
       })
-      .catch(() => {
-        setHeroMessage(failureMessage);
-        window.setTimeout(() => setHeroMessage(''), 2000);
+      .catch((err: unknown) => {
+        // 서버는 '이미 가입 신청해서 승인을 기다리고 있어요.'처럼 구체적인 사유를 준다.
+        // 이를 버리고 일반 문구로 덮으면 사용자는 무엇이 잘못됐는지 알 수 없다.
+        setHeroMessage(extractErrorMessage(err, failureMessage));
+        window.setTimeout(() => setHeroMessage(''), 4000);
       })
       .finally(() => {
         heroActionBusyRef.current = false;
@@ -426,9 +432,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             </div>
           ) : null}
           <div className="tm-team-detail-sidebar-divider" />
-          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
-          </div>
+          {mode === 'pending' ? (
+            <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
+          ) : (
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {locked ? '신청 상태를 확인하고 다음 행동을 선택해 주세요.' : '신청 전에 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}
+            </div>
+          )}
           {/* P2: 완료 메시지에 .tm-complete-check 마이크로인터랙션 적용 (globals.css 키프레임) */}
           {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginTop: 6 }}>{heroMessage}</div> : null}
           <div className="tm-team-detail-sidebar-cta">
@@ -464,6 +474,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
           </div>
         </Card>
+        {mode === 'pending' ? (
+          <TeamJoinPendingNotice requestedAtLabel={model.joinRequest?.requestedAtLabel} />
+        ) : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
         <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
         <Card pad={16}>
@@ -506,7 +519,10 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         </Card>
       </article>
       <div className="tm-fixed-cta tm-hide-desktop">
-        <div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>
+        {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}
+        {mode === 'pending' ? null : (
+          <div className="tm-text-caption" style={{ marginBottom: 8 }}>{locked ? '상태를 확인한 뒤 다음 행동을 선택해 주세요.' : '신청 전 팀 정보와 내 프로필 공개 범위를 확인해 주세요.'}</div>
+        )}
         {/* P2: 완료 메시지 .tm-complete-check 마이크로인터랙션 */}
         {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--text-caption)', marginBottom: 6 }}>{heroMessage}</div> : null}
         <button className={`tm-btn tm-btn-lg ${ctaTone} tm-btn-block`} type="button" disabled={!model.onCta || model.ctaPending} onClick={() => runHeroAction(model.onCta, model.ctaSuccessMessage ?? (mode === 'pending' ? '신청을 취소했어요.' : '신청을 완료했어요.'), model.ctaFailureMessage)}>
@@ -514,6 +530,27 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         </button>
       </div>
     </AppChrome>
+  );
+}
+
+/**
+ * 승인 대기 안내.
+ *
+ * 신청 직후의 토스트는 몇 초 뒤 사라지고, 다시 들어온 사용자에게 남는 단서는
+ * "신청 취소" 버튼뿐이었다. 그것만으로는 승인을 기다리는 중인지, 무엇이 잘못된 건지
+ * 알 수 없어 상태를 화면에 상시로 남긴다.
+ */
+function TeamJoinPendingNotice({ requestedAtLabel }: { requestedAtLabel?: string }) {
+  return (
+    <Card pad={16} className="tm-team-join-pending">
+      <div className="tm-team-join-pending-head">
+        <span className="tm-badge tm-badge-orange">승인 대기 중</span>
+        {requestedAtLabel ? <span className="tm-text-caption">{requestedAtLabel}</span> : null}
+      </div>
+      <p className="tm-text-body tm-team-join-pending-body">
+        관리자가 가입 신청을 확인하고 있어요. 승인되면 알림으로 알려드릴게요.
+      </p>
+    </Card>
   );
 }
 
@@ -832,9 +869,8 @@ function labelFromOptions(options: ReadonlyArray<{ value: string; label: string 
 }
 
 /**
- * Optional team-logo upload. Uploads via form.uploadImage (→ /uploads) and stores
- * the returned URL in draft.logoUrl. Skippable — without a logo the team falls back
- * to its first character, matching the listing card.
+ * Team-logo presets and custom upload share the existing draft.logoUrl contract.
+ * TeamAvatar remains the final fallback when the selected URL cannot be loaded.
  */
 function TeamLogoField({
   logoUrl,
@@ -868,32 +904,43 @@ function TeamLogoField({
 
   return (
     <div className="tm-create-field">
-      <div className="tm-text-label">
-        팀 로고 <span className="tm-text-caption" style={{ fontWeight: 400 }}>(선택)</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 10 }}>
-        {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용(TeamAvatar 자체 fallback과 동일 규칙). */}
-        <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+      <div className="tm-text-label">팀 로고</div>
+      <div className="tm-team-logo-picker">
+        <div className="tm-team-logo-current">
+          {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용(TeamAvatar 자체 fallback과 동일 규칙). */}
+          <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
             <button
               type="button"
               className="tm-btn tm-btn-sm tm-btn-neutral"
               disabled={uploading || !uploadImage}
               onClick={() => inputRef.current?.click()}
             >
-              {uploading ? '올리는 중…' : logoUrl ? '변경' : '이미지 선택'}
+              {uploading ? '올리는 중…' : '내 이미지 업로드'}
             </button>
-            {logoUrl ? (
-              <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={uploading} onClick={() => onChange(null)}>
-                삭제
+            <div className="tm-text-caption">
+              기본 로고를 고르거나 정사각형 이미지를 직접 올릴 수 있어요.
+            </div>
+          </div>
+        </div>
+        <div className="tm-team-logo-presets" role="group" aria-label="기본 팀 로고 선택">
+          {TEAM_LOGO_PRESETS.map((presetUrl, index) => {
+            const selected = isTeamLogoPreset(logoUrl) && logoUrl === presetUrl;
+            return (
+              <button
+                key={presetUrl}
+                type="button"
+                className="tm-team-logo-preset"
+                aria-label={'기본 팀 로고 ' + (index + 1)}
+                aria-pressed={selected}
+                disabled={uploading}
+                onClick={() => onChange(presetUrl)}
+              >
+                <TeamAvatar seed={presetUrl} name={'기본 팀 로고 ' + (index + 1)} logoUrl={presetUrl} size="md" />
+                {selected ? <span className="tm-team-logo-check" aria-hidden="true"><Check size={12} strokeWidth={3} /></span> : null}
               </button>
-            ) : null}
-          </div>
-          <div className="tm-text-caption">
-            정사각형·투명 배경 이미지를 권장해요. 배경색이 있는 이미지는 테두리처럼 보일 수 있어요.
-            안 올려도 팀 아이콘이 자동으로 만들어져요.
-          </div>
+            );
+          })}
         </div>
         <input
           ref={inputRef}

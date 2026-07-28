@@ -13,7 +13,8 @@ import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
   AdminPageHeader,
-  AdminCardList,
+  AdminFilterBar,
+  AdminDataTable,
   AdminReasonModal,
   AdminEmpty,
   AdminTableSkeleton,
@@ -22,6 +23,13 @@ import {
 } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import type { V1AdminRow, CursorPage } from '@/types/api';
+
+const ADMIN_STATUS_FILTER_OPTIONS = [
+  { value: '', label: '전체' },
+  { value: 'active', label: '활성' },
+  { value: 'suspended', label: '정지' },
+  { value: 'revoked', label: '회수' },
+];
 
 // ── Date formatter ─────────────────────────────────────────────────────────
 function formatDateCompact(dateStr: string | null | undefined): string {
@@ -336,14 +344,15 @@ interface ActionModalState {
   action: AdminAction;
 }
 
+const PAGE_SIZE = 20;
+
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function AdminAdminsPage() {
   const { data: adminMe, isPending: mePending } = useV1AdminMe();
 
-  // Accumulated rows across cursor pages
-  const [extraRows, setExtraRows] = useState<V1AdminRow[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  // 커서 누적 대신 페이지 단위 교체다 — 목록 어디쯤인지와 총량이 보여야 한다.
+  const [page, setPage] = useState(1);
+  const [activeStatus, setActiveStatus] = useState('');
 
   // Modal state
   const [grantModalOpen, setGrantModalOpen] = useState(false);
@@ -355,17 +364,19 @@ export default function AdminAdminsPage() {
   const {
     data: firstPage,
     isPending: listPending,
+    isFetching: listFetching,
     isError,
     error,
     refetch,
-  } = useV1AdminAdmins({ limit: 20 });
+  } = useV1AdminAdmins({
+    ...(activeStatus ? { status: activeStatus } : {}),
+    page,
+    limit: PAGE_SIZE,
+  });
 
-  // Sync cursor from first page
   useEffect(() => {
-    if (firstPage) {
-      setNextCursor(firstPage.nextCursor ?? firstPage.pageInfo?.nextCursor ?? null);
-    }
-  }, [firstPage]);
+    setPage(1);
+  }, [activeStatus]);
 
   // ── Loading / gate states ────────────────────────────────────────────────
   if (mePending) {
@@ -388,27 +399,14 @@ export default function AdminAdminsPage() {
   }
 
   // ── Data ─────────────────────────────────────────────────────────────────
-  const firstRows = firstPage?.items ?? [];
-  const rows = [...firstRows, ...extraRows];
+  const rows = firstPage?.items ?? [];
+  const pageInfo = firstPage?.pageInfo;
+  const statusOptions = ADMIN_STATUS_FILTER_OPTIONS.map((option) => ({
+    ...option,
+    count: option.value ? firstPage?.summary.byStatus[option.value] : firstPage?.summary.total,
+  }));
 
   const myAdminUserId = adminMe?.adminUserId;
-
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await v1Get<CursorPage<V1AdminRow>>('/admin/admins', {
-        limit: 20,
-        cursor: nextCursor,
-      });
-      setExtraRows((prev) => [...prev, ...page.items]);
-      setNextCursor(page.nextCursor ?? page.pageInfo?.nextCursor ?? null);
-    } catch (err) {
-      showToast(extractErrorMessage(err, '추가 데이터를 불러오지 못했어요.'), 'error');
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   // Role-change modal submit
   function handleActionSubmit(status: string, reason: string) {
@@ -501,35 +499,70 @@ export default function AdminAdminsPage() {
       />
 
       <div className="flex flex-col gap-4">
+        <AdminFilterBar hideSearch searchValue={''} onSearchChange={setActiveStatus} statusOptions={statusOptions} activeStatus={activeStatus} onStatusChange={setActiveStatus} />
+
         {/* Card list */}
-        <AdminCardList<V1AdminRow>
+        <AdminDataTable<V1AdminRow>
           rows={rows}
           keyExtractor={(row) => row.adminUserId}
-          card={(row) => ({
-            title: formatUserTitle(row),
-            subtitle: row.email ?? undefined,
-            statusNode: <AdminRoleBadge role={row.adminRole} />,
-            meta: [
-              {
-                icon: <Activity size={14} aria-hidden="true" />,
-                label: row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지',
-              },
-              {
-                icon: <Calendar size={14} aria-hidden="true" />,
-                label: `부여 ${formatDateCompact(row.grantedAt)}`,
-              },
-              {
-                icon: <Clock size={14} aria-hidden="true" />,
-                label: row.revokedAt ? `회수 ${formatDateCompact(row.revokedAt)}` : '회수일 없음',
-              },
-            ],
-            tone:
-              row.status === 'revoked'
-                ? 'danger'
-                : row.status === 'suspended'
-                  ? 'warning'
-                  : undefined,
-          })}
+          tableMaxWidth="max-w-none"
+          rowTone={(row) =>
+            row.status === 'revoked' ? 'danger' : row.status === 'suspended' ? 'warning' : undefined
+          }
+          columns={[
+            {
+              key: 'user',
+              header: '운영자',
+              render: (row) => (
+                <div className="min-w-0">
+                  <span className="block truncate font-medium text-gray-900">
+                    {formatUserTitle(row)}
+                  </span>
+                  {row.email ? (
+                    <span className="block truncate text-[var(--font-size-micro)] text-gray-500" title={row.email}>
+                      {row.email}
+                    </span>
+                  ) : null}
+                </div>
+              ),
+            },
+            {
+              key: 'adminRole',
+              header: '권한',
+              width: 'w-[112px]',
+              render: (row) => <AdminRoleBadge role={row.adminRole} />,
+            },
+            {
+              key: 'status',
+              header: '상태',
+              width: 'w-[88px]',
+              render: (row) => (
+                <span className="text-gray-600">
+                  {row.status === 'active' ? '활성' : row.status === 'revoked' ? '회수됨' : '정지'}
+                </span>
+              ),
+            },
+            {
+              key: 'grantedAt',
+              header: '부여',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">
+                  {formatDateCompact(row.grantedAt)}
+                </span>
+              ),
+            },
+            {
+              key: 'revokedAt',
+              header: '회수',
+              width: 'w-[112px]',
+              render: (row) => (
+                <span className="whitespace-nowrap text-gray-500">
+                  {row.revokedAt ? formatDateCompact(row.revokedAt) : '—'}
+                </span>
+              ),
+            },
+          ]}
           renderActions={(row) => {
             // Hide actions for owner rows — owner role cannot be changed via UI
             if (row.adminRole === 'owner') return null;
@@ -584,7 +617,7 @@ export default function AdminAdminsPage() {
               </div>
             );
           }}
-          loading={listPending}
+          loading={listPending && rows.length === 0}
           empty={
             <AdminEmpty
               title="운영자가 없어요"
@@ -593,27 +626,20 @@ export default function AdminAdminsPage() {
           }
           error={errorMessage}
           onRetry={() => void refetch()}
-          skeletonCards={5}
+          skeletonRows={5}
+          pagination={
+            pageInfo?.totalPages
+              ? {
+                  page: pageInfo.page ?? page,
+                  totalPages: pageInfo.totalPages,
+                  total: pageInfo.total ?? 0,
+                  limit: pageInfo.limit ?? PAGE_SIZE,
+                  onPageChange: setPage,
+                  loading: listFetching,
+                }
+              : undefined
+          }
         />
-
-        {/* Load more */}
-        {nextCursor && !listPending && !isError && !loadingMore && (
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              onClick={() => void loadMore()}
-              className={[
-                'h-[44px] px-6 rounded-xl text-[var(--font-size-body-sm)] font-semibold transition-colors',
-                'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50',
-                'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-              ].join(' ')}
-            >
-              더 보기
-            </button>
-          </div>
-        )}
-
-        {loadingMore && <AdminTableSkeleton rows={3} />}
       </div>
 
       {/* Grant modal */}
@@ -621,7 +647,6 @@ export default function AdminAdminsPage() {
         open={grantModalOpen}
         onClose={() => setGrantModalOpen(false)}
         onGrantSuccess={() => {
-          setExtraRows([]);
           void refetch();
         }}
       />

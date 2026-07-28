@@ -512,6 +512,9 @@ async function seedUsers() {
       where: { email },
       update: {
         phone,
+        // 휴대폰 본인인증은 쓰기 전역 게이트(V1AuthGuard)의 조건이다 — 시드 계정을 미인증으로
+        // 두면 로그인은 되는데 아무 동작도 못 하는 반쪽 계정이 된다.
+        phoneVerifiedAt: seedNow,
         accountStatus: 'active',
         onboardingStatus: 'completed',
         profile: {
@@ -524,6 +527,7 @@ async function seedUsers() {
       create: {
         email,
         phone,
+        phoneVerifiedAt: seedNow,
         accountStatus: 'active',
         onboardingStatus: 'completed',
         authIdentities: {
@@ -1521,13 +1525,17 @@ async function upsertCoverageUser(input: {
   const accountStatus = input.accountStatus ?? 'active';
   const onboardingStatus = input.onboardingStatus ?? 'completed';
   const deletedAt = accountStatus === 'deleted' ? seedNow : null;
+  // 번호가 있는 시드 계정은 인증까지 끝난 상태로 둔다 — 미인증이면 쓰기 전역 게이트에 걸려
+  // 로그인만 되고 아무 동작도 못 하는 계정이 된다.
+  const phoneVerifiedAt = input.phone ? seedNow : null;
   const user = await prisma.v1User.upsert({
     where: { email: input.email },
-    update: { phone: input.phone, accountStatus, onboardingStatus, deletedAt },
+    update: { phone: input.phone, phoneVerifiedAt, accountStatus, onboardingStatus, deletedAt },
     create: {
       id: input.id,
       email: input.email,
       phone: input.phone,
+      phoneVerifiedAt,
       accountStatus,
       onboardingStatus,
       deletedAt,

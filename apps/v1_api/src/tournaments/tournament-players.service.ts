@@ -8,6 +8,7 @@ import {
 import { Prisma, V1TournamentPlayer, V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AddPlayerDto, UpdatePlayerEligibilityDto } from './dto/tournament-player.dto';
 
@@ -174,6 +175,7 @@ export class TournamentPlayersService {
           user: {
             select: {
               phone: true,
+              phoneVerifiedAt: true,
               profile: { select: { realName: true, birthDate: true, gender: true } },
             },
           },
@@ -196,6 +198,14 @@ export class TournamentPlayersService {
           message: requiresGender
             ? '실명, 생년월일, 휴대폰 번호, 성별이 모두 등록된 팀원만 선수로 등록할 수 있어요.'
             : '실명, 생년월일, 휴대폰 번호가 모두 등록된 팀원만 선수로 등록할 수 있어요.',
+        });
+      }
+      // 번호가 "적혀 있는지"만 보면 대회 명단이 약속하는 본인확인이 성립하지 않는다 —
+      // 실제로 그 번호의 소유자임을 확인한(phoneVerifiedAt) 팀원만 출전 명단에 올린다.
+      if (isPhoneVerificationEnforced() && !teamMembership.user.phoneVerifiedAt) {
+        throw new BadRequestException({
+          code: 'PLAYER_PHONE_NOT_VERIFIED',
+          message: '휴대폰 본인인증을 마친 팀원만 선수로 등록할 수 있어요.',
         });
       }
       const existingActive = await tx.v1TournamentPlayer.findFirst({

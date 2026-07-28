@@ -41,6 +41,36 @@ export function youtubeEmbedUrl(videoId: string): string {
 
 export type VideoKind = 'youtube' | 'file' | 'external';
 
+const UPLOADS_PREFIX = '/uploads/';
+
+export function safeVideoFileUrl(url: string): string | null {
+  const value = url.trim();
+  if (value.startsWith(UPLOADS_PREFIX)) {
+    if (value.includes('\\')) return null;
+    let normalized: URL;
+    try {
+      // 상대 경로를 정규화하기 위한 더미 origin — 반환값에는 쓰지 않는다.
+      normalized = new URL(value, 'https://uploads.invalid');
+    } catch {
+      return null;
+    }
+    // `/uploads/../admin` 처럼 uploads 밖을 가리키는 경로는 업로드 파일이 아니다.
+    // URL 정규화가 `../` 와 `%2e%2e/` 는 접어주지만 인코딩된 슬래시(`%2f`)는 남으므로,
+    // 프록시 단에서 디코딩돼 prefix를 벗어나는 경우까지 함께 막는다.
+    if (!normalized.pathname.startsWith(UPLOADS_PREFIX)) return null;
+    if (/%2e|%2f|%5c/i.test(normalized.pathname)) return null;
+    return `${normalized.pathname}${normalized.search}`;
+  }
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+    return /\.(mp4|webm|mov|m4v)$/i.test(parsed.pathname) ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 영상 URL 종류 판별.
  * - youtube: 페이지 내 iframe 재생
@@ -49,12 +79,6 @@ export type VideoKind = 'youtube' | 'file' | 'external';
  */
 export function videoKind(url: string): VideoKind {
   if (extractYoutubeVideoId(url)) return 'youtube';
-  if (url.startsWith('/uploads/')) return 'file';
-  try {
-    const pathname = new URL(url, 'http://placeholder.local').pathname;
-    if (/\.(mp4|webm|mov|m4v)$/i.test(pathname)) return 'file';
-  } catch {
-    // URL 파싱 불가 — external 폴백
-  }
+  if (safeVideoFileUrl(url)) return 'file';
   return 'external';
 }

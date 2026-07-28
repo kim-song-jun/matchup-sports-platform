@@ -130,7 +130,7 @@ function ReviewsTable({ reviews }: { reviews: V1TournamentReview[] }) {
                     <div className="tm-reviews-table-photos">
                       {photoUrls.slice(0, 3).map((url) => (
                         <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer">
-                          <img src={publicAssetPath(url)} alt="" />
+                          <img src={publicAssetPath(url)} alt="" loading="lazy" />
                         </a>
                       ))}
                       {photoUrls.length > 3 && (
@@ -179,7 +179,6 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
     <AppChrome
       title="참가팀 후기"
       backHref={`/tournaments/${tournamentId}/awards`}
-      bottomNav={false}
       activeTab="tournaments"
     >
       <div className="tm-tourn-sub-page">

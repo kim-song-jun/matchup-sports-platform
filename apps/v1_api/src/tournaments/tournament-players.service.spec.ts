@@ -109,6 +109,9 @@ function teamPlayerMembershipRow(overrides: Record<string, unknown> = {}) {
     role: 'member',
     user: {
       phone: '01012345678',
+      // 기본값은 "인증을 마친 팀원" — 명단 등록의 정상 경로다.
+      // 미인증 케이스는 이 필드를 null 로 덮어써서 개별 테스트에서 다룬다.
+      phoneVerifiedAt: new Date('2026-07-01T00:00:00.000Z'),
       profile: {
         realName: '홍길동',
         birthDate: '1995-03-15',
@@ -549,6 +552,32 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
   });
 
+  it('addPlayer: 번호는 있지만 본인인증을 안 한 팀원은 400 PLAYER_PHONE_NOT_VERIFIED 로 막는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(
+        teamPlayerMembershipRow({
+          user: {
+            phone: '01012345678',
+            phoneVerifiedAt: null, // 값만 적혀 있고 소유 확인은 안 된 상태
+            profile: { realName: '홍길동', birthDate: '1995-03-15', gender: 'male' },
+          },
+        }),
+      );
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_PHONE_NOT_VERIFIED' } });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
   it('addPlayer: missing optional gender does not block roster registration', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst
@@ -556,6 +585,7 @@ describe('TournamentPlayersService', () => {
       .mockResolvedValueOnce(teamPlayerMembershipRow({
         user: {
           phone: '01012345678',
+          phoneVerifiedAt: new Date('2026-07-01T00:00:00.000Z'),
           profile: { realName: '홍길동', birthDate: '1995-03-15', gender: null },
         },
       }));

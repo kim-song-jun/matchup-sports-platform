@@ -41,6 +41,14 @@ export class AdminTournamentListQueryDto {
   @IsString()
   cursor?: string;
 
+  // 어드민 표는 "몇 번째 페이지인지"가 보여야 운영자가 위치를 잃지 않는다. cursor 도 계속
+  // 받아 기존 호출자를 깨뜨리지 않고, 둘 다 오면 page 가 이긴다 — paginationArgs 참고.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ message: '페이지 번호는 정수여야 해요.' })
+  @Min(1, { message: '페이지 번호는 1 이상이어야 해요.' })
+  page?: number;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '페이지 크기는 정수여야 해요.' })
@@ -558,4 +566,14 @@ export class ChangeTournamentStatusDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+}
+
+export class PublishBracketDto {
+  /**
+   * 공개 예약 시각(ISO). 생략하면 즉시 공개한다. 과거 시각은 서비스에서 거부한다
+   * (즉시 공개와 구분되지 않아 운영자가 의도를 확인할 수 없다).
+   */
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
 }

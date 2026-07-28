@@ -13,6 +13,11 @@ const popup: V1AdminPopupRow = {
   audience: 'public' as const,
   title: '서비스 점검 안내',
   body: '7월 15일 새벽에 서비스 점검을 진행합니다.',
+  content: {
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text: '7월 15일 새벽에 서비스 점검을 진행합니다.' }] }],
+  },
+  contentVersion: 1,
   targetScreens: ['home', 'matches'],
   linkUrl: '/matches',
   linkLabel: '매치 보기',
@@ -28,7 +33,11 @@ const popup: V1AdminPopupRow = {
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
   useV1AdminPopups: () => ({
-    data: { items: [popup], pageInfo: { hasNext: false, nextCursor: null } },
+    data: {
+      items: [popup],
+      pageInfo: { hasNext: false, nextCursor: null },
+      summary: { total: 1, byStatus: { published: 1, archived: 0, draft: 0 } },
+    },
     isPending: false,
     isError: false,
     error: null,
@@ -43,6 +52,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CreateAdminPopup: () => ({ mutate: createMutate, isPending: false }),
   useV1UpdateAdminPopup: () => ({ mutate: updateMutate, isPending: false }),
   useV1DeleteAdminPopup: () => ({ mutate: deleteMutate, isPending: false }),
+  useV1UploadAdminContentAsset: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1DeleteAdminContentAsset: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 describe('AdminPopupsPage', () => {
@@ -56,9 +67,9 @@ describe('AdminPopupsPage', () => {
     render(<AdminPopupsPage />);
 
     expect(screen.getByRole('heading', { name: '팝업 관리' })).toBeInTheDocument();
-    expect(screen.getByText('서비스 점검 안내')).toBeInTheDocument();
+    expect(screen.getAllByText('서비스 점검 안내')[0]).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '조회' }));
+    await user.click(screen.getAllByRole('button', { name: '조회' })[0]);
     expect((await screen.findAllByText('7월 15일 새벽에 서비스 점검을 진행합니다.')).length).toBeGreaterThan(1);
 
     await user.click(within(screen.getByLabelText('팝업 상세 조회')).getByRole('button', { name: '수정하기' }));
@@ -68,7 +79,7 @@ describe('AdminPopupsPage', () => {
     await user.click(screen.getByRole('button', { name: '새 팝업' }));
     expect(screen.getByRole('heading', { name: '새 팝업 생성' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '삭제' }));
+    await user.click(screen.getAllByRole('button', { name: '삭제' })[0]);
     expect(window.confirm).toHaveBeenCalled();
     expect(deleteMutate).toHaveBeenCalledWith('popup-1', expect.any(Object));
   });
@@ -77,7 +88,7 @@ describe('AdminPopupsPage', () => {
     const user = userEvent.setup();
     render(<AdminPopupsPage />);
 
-    await user.click(screen.getByRole('button', { name: '수정' }));
+    await user.click(screen.getAllByRole('button', { name: '수정' })[0]);
 
     const status = screen.getByLabelText('공개 상태');
     expect(within(status).getByRole('option', { name: '공개' })).toBeInTheDocument();
@@ -115,7 +126,7 @@ describe('AdminPopupsPage', () => {
     const user = userEvent.setup();
     render(<AdminPopupsPage />);
 
-    await user.click(screen.getByRole('button', { name: '수정' }));
+    await user.click(screen.getAllByRole('button', { name: '수정' })[0]);
     await user.click(screen.getByRole('checkbox', { name: /홈/ }));
     await user.click(screen.getByRole('checkbox', { name: /개인 매치/ }));
     await user.click(screen.getByRole('button', { name: '수정 저장' }));
@@ -128,7 +139,7 @@ describe('AdminPopupsPage', () => {
     const user = userEvent.setup();
     render(<AdminPopupsPage />);
 
-    await user.click(screen.getByRole('button', { name: '수정' }));
+    await user.click(screen.getAllByRole('button', { name: '수정' })[0]);
     fireEvent.change(screen.getByLabelText('노출 시작'), { target: { value: '2026-07-20T10:00' } });
     fireEvent.change(screen.getByLabelText('노출 종료'), { target: { value: '2026-07-20T10:00' } });
     await user.click(screen.getByRole('button', { name: '수정 저장' }));

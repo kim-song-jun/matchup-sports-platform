@@ -40,6 +40,30 @@ describe('reportClientError', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('does NOT dedupe a same-text report when severity level differs (a 4xx warn must not suppress a genuinely different 5xx error)', () => {
+    reportClientError({ message: 'Request failed', level: 'warn' });
+    reportClientError({ message: 'Request failed', level: 'error' });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does NOT dedupe a same-text, same-level report when the stack differs (different call sites are different errors)', () => {
+    reportClientError({ message: 'Request failed', level: 'error', stack: 'at siteA.ts:1:1' });
+    reportClientError({ message: 'Request failed', level: 'error', stack: 'at siteB.ts:2:2' });
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('dedupes two reports whose stacks are identical only within the first 4000 chars (key uses the same truncation as the payload)', () => {
+    const sharedPrefix = 'a'.repeat(4000);
+    reportClientError({ message: 'stack-tail-differs', level: 'error', stack: `${sharedPrefix}-tail-one` });
+    reportClientError({ message: 'stack-tail-differs', level: 'error', stack: `${sharedPrefix}-tail-two` });
+
+    // Both stacks are identical in their logged (truncated) form, so this is genuinely
+    // the same reported error — the dedupe key must not grow unbounded with raw stack text.
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('never throws when the report request itself fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 

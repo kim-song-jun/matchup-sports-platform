@@ -1,0 +1,46 @@
+{
+  "admin-list": {
+    "asserts": {
+      "챔피언십": true
+    },
+    "console": [],
+    "net4xx": []
+  },
+  "admin-new": {
+    "asserts": {
+      "만들기": true,
+      "참가비": true
+    },
+    "console": [],
+    "net4xx": []
+  },
+  "admin-detail": {
+    "asserts": {
+      "챔피언십": true,
+      "신청": true
+    },
+    "console": [],
+    "net4xx": []
+  },
+  "consumer-apply": {
+    "asserts": {
+      "팀": true
+    },
+    "console": [],
+    "net4xx": []
+  },
+  "consumer-my": {
+    "asserts": {
+      "참가 확정": true
+    },
+    "console": [],
+    "net4xx": []
+  },
+  "consumer-roster": {
+    "asserts": {
+      "명단": true
+    },
+    "console": [],
+    "net4xx": []
+  }
+}

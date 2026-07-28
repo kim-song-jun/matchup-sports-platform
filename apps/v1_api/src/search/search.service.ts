@@ -9,6 +9,8 @@ type SearchIdentity = {
   sessionKey?: string;
 };
 
+const MAX_SEARCH_HISTORY_ROWS_PER_IDENTITY = 20;
+
 @Injectable()
 export class SearchService {
   constructor(private readonly prisma: PrismaService) {}
@@ -51,32 +53,55 @@ export class SearchService {
       });
     }
 
-    const existing = await this.prisma.v1SearchHistory.findFirst({
-      where: {
-        ...this.identityWhere(identity),
-        query: normalizedQuery,
-      },
-      select: { id: true },
-    });
-
     const data = {
       query: normalizedQuery,
       filters: dto.filters ? (dto.filters as Prisma.InputJsonValue) : Prisma.JsonNull,
       searchedAt: new Date(),
     };
 
-    const item = existing
-      ? await this.prisma.v1SearchHistory.update({
+    const item = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.v1SearchHistory.findFirst({
+        where: {
+          ...this.identityWhere(identity),
+          query: normalizedQuery,
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        return tx.v1SearchHistory.update({
           where: { id: existing.id },
           data,
-        })
-      : await this.prisma.v1SearchHistory.create({
-          data: {
-            ...data,
-            userId: identity.userId,
-            sessionKey: identity.sessionKey,
-          },
         });
+      }
+
+      const created = await tx.v1SearchHistory.create({
+        data: {
+          ...data,
+          userId: identity.userId,
+          sessionKey: identity.sessionKey,
+        },
+      });
+
+      const rowCount = await tx.v1SearchHistory.count({
+        where: this.identityWhere(identity),
+      });
+
+      const overflow = rowCount - MAX_SEARCH_HISTORY_ROWS_PER_IDENTITY;
+      if (overflow > 0) {
+        const oldest = await tx.v1SearchHistory.findMany({
+          where: this.identityWhere(identity),
+          orderBy: { searchedAt: 'asc' },
+          take: overflow,
+          select: { id: true },
+        });
+        await tx.v1SearchHistory.deleteMany({
+          where: { id: { in: oldest.map((row) => row.id) } },
+        });
+      }
+
+      return created;
+    });
 
     return {
       id: item.id,

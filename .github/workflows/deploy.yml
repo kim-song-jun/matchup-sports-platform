@@ -270,7 +270,6 @@ jobs:
             fi
           done
 
-          WEB_INTERNAL_API_ORIGIN="${INTERNAL_API_ORIGIN:-http://api:8100}"
           V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}"
 
           # ── Pre-build disk cleanup ────────────────────────────────────────
@@ -289,52 +288,21 @@ jobs:
           echo "[cleanup] Disk usage after prune:"
           df -h / | tail -1
 
-          sudo docker build --no-cache -f deploy/Dockerfile.api -t teameet-api .
-          sudo docker build --no-cache \
-            -f deploy/Dockerfile.web \
-            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-            --build-arg NEXT_PUBLIC_TOSS_CLIENT_KEY="${TOSS_CLIENT_KEY:-}" \
-            --build-arg INTERNAL_API_ORIGIN="${WEB_INTERNAL_API_ORIGIN}" \
-            -t teameet-web .
           sudo docker build --no-cache -f deploy/Dockerfile.v1-api -t teameet-v1-api .
           sudo docker build --no-cache \
             -f deploy/Dockerfile.v1-web \
-            --build-arg NEXT_PUBLIC_API_URL=/v1/api/v1 \
+            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
             --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \
-            --build-arg NEXT_PUBLIC_BASE_PATH=/v1 \
             --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
             --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
             -t teameet-v1-web .
 
           cd deploy
 
-          # ── Ensure postgres and redis are running before migrations ───────
           # network prune above may have removed the deploy_default network.
-          # Start DB services first so the migration container can reach them.
-          echo "[INFO] Starting database services..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d postgres redis v1_postgres
+          echo "[INFO] Starting v1 database service..."
+          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
 
-          echo "[INFO] Waiting for postgres to be healthy..."
-          for i in $(seq 1 30); do
-            if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T postgres \
-                pg_isready >/dev/null 2>&1; then
-              echo "[INFO] postgres is ready (attempt $i)"
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "[ERROR] postgres did not become healthy in time"
-              exit 1
-            fi
-            sleep 2
-          done
-
-          # ── Bootstrap or apply database migrations before new containers ──
-          # Empty databases cannot replay the current migration chain from
-          # scratch because the repo lacks an old baseline migration. In that
-          # case we bootstrap the current schema with prisma db push and mark
-          # the existing migrations as applied. Non-empty databases still use
-          # migrate deploy, and a non-empty DB without migration history fails
-          # closed instead of auto-resolving unknown drift.
           echo "[INFO] Waiting for v1_postgres to be healthy..."
           for i in $(seq 1 30); do
             if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T v1_postgres \
@@ -349,10 +317,7 @@ jobs:
             sleep 2
           done
 
-          echo "[INFO] Bootstrapping deploy database..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T api sh -c "cd /app/apps/api && ./node_modules/.bin/ts-node prisma/bootstrap-deploy-db.ts"
-          echo "[INFO] Syncing v1 deploy database schema..."
+          echo "[INFO] Applying v1 deploy database migrations..."
           ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
             run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
           echo "[INFO] Build phase complete."
@@ -367,16 +332,11 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 12); do
-            if ssh ec2 'curl -fsS http://localhost:8100/api/v1/health | \
-                        jq -e ".data.checks.db == true and .data.checks.redis == true" > /dev/null 2>&1 && \
-                        curl -fsS http://localhost:8121/api/v1/health | \
+            if ssh ec2 'curl -fsS http://localhost:8121/api/v1/health | \
                         jq -e ".data.checks.db == true" > /dev/null 2>&1 && \
                         curl -fsS http://localhost/landing > /dev/null 2>&1 && \
-                        curl -fsS http://localhost/v1/landing > /dev/null 2>&1 && \
-                        curl -fsSI http://localhost/v1/api/v1/health | \
-                        grep -qE "^HTTP/[0-9.]+ 301" && \
-                        curl -fsSI http://localhost/api/v1/health | \
-                        grep -qE "^HTTP/[0-9.]+ 301"'; then
+                        curl -fsS http://localhost/api/v1/health | \
+                        jq -e ".data.checks.db == true" > /dev/null 2>&1'; then
               echo "Deploy OK"
               exit 0
             fi

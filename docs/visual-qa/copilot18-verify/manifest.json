@@ -1,0 +1,10 @@
+{
+  "assertions": {
+    "신청자관리헤더": true,
+    "관리버튼수": 1,
+    "더보기노출": false,
+    "빈상태": false
+  },
+  "consoleErrors": [],
+  "net4xx": []
+}

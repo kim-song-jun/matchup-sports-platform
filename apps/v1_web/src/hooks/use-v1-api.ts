@@ -1685,6 +1685,15 @@ export function useV1SubmitTournamentReview(tournamentId: string) {
   });
 }
 
+/** 어드민: 어워드 조회 — 어드민 대회 상세 응답에는 awards가 포함되지 않아 별도 조회가 필요하다 */
+export function useV1AdminTournamentAwards(tournamentId: string) {
+  return useQuery({
+    queryKey: ['admin-tournament-awards', tournamentId],
+    queryFn: () => v1Get<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`),
+    enabled: !!tournamentId,
+  });
+}
+
 /** 어드민: 어워드 설정 */
 export function useV1SetTournamentAwards(tournamentId: string) {
   const queryClient = useQueryClient();
@@ -1695,6 +1704,7 @@ export function useV1SetTournamentAwards(tournamentId: string) {
     }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-awards', tournamentId] });
     },
   });
 }

@@ -28,7 +28,7 @@ describe('auth view models', () => {
 
   it('enables Kakao when Kakao OAuth env is configured', () => {
     process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID = 'kakao-rest-key';
-    process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI = 'https://teameet.co.kr/v1/callback/kakao';
+    process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI = 'https://teameet.co.kr/callback/kakao';
 
     const model = getLoginViewModel();
 
@@ -40,7 +40,7 @@ describe('auth view models', () => {
       disabled: false,
     });
     expect(model.providers[0].href).toBe(
-      'https://kauth.kakao.com/oauth/authorize?client_id=kakao-rest-key&redirect_uri=https%3A%2F%2Fteameet.co.kr%2Fv1%2Fcallback%2Fkakao&response_type=code',
+      'https://kauth.kakao.com/oauth/authorize?client_id=kakao-rest-key&redirect_uri=https%3A%2F%2Fteameet.co.kr%2Fcallback%2Fkakao&response_type=code',
     );
     expect(model.providers.slice(1).every((provider) => provider.disabled === true)).toBe(true);
   });

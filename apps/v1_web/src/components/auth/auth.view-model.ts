@@ -19,6 +19,20 @@ export function getLoginViewModel(redirectPath?: string | null): LoginViewModel 
   };
 }
 
+// 로그인 CSRF(세션 고정) 방지용 state 값을 저장하는 sessionStorage 키.
+// kakao-login-button.tsx가 클릭 시점(브라우저)에 state를 생성·저장하고,
+// kakao-callback-client.tsx가 콜백에서 동일 키로 대조 검증한다.
+export const KAKAO_OAUTH_STATE_STORAGE_KEY = 'teameet.v1.kakao_oauth_state';
+
+// CSPRNG 기반 state 생성. 저장은 반드시 브라우저 클릭 시점(kakao-login-button)에서 수행한다 —
+// buildKakaoAuthUrl은 SSR(Server Component)로 실행돼 window가 없어 sessionStorage에 저장할 수 없다.
+export function generateKakaoOAuthState(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// authorize 기본 URL(state 제외)만 만든다. CSRF 방지 state는 클라이언트 버튼이 클릭 시점에 붙인다.
 function buildKakaoAuthUrl() {
   const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
   const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;

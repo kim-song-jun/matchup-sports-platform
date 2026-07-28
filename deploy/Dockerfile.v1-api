@@ -27,5 +27,13 @@ COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 ENV NODE_ENV=production
 EXPOSE 8121
+
+# 고정 UID/GID(1001): 기존 uploads 볼륨이 root 소유일 때 운영자가 예측 가능한 값으로
+# chown 할 수 있도록 pin. (docs/security/v1-deploy-security-hardening.md 운영자 조치 참조)
+RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
+  && mkdir -p /app/apps/v1_api/uploads \
+  && chown -R app:app /app
+
 WORKDIR /app/apps/v1_api
+USER app
 CMD ["node", "dist/src/main.js"]

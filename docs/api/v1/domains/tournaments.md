@@ -82,3 +82,65 @@ If any required source field is missing, the API rejects the request with `400 P
 The stored roster snapshot uses the server-side member profile values for `realName` and `birthDateSnapshot`; clients must not treat editable form values as the source of truth.
 
 `PATCH /players/:playerId` is available only before `rosterLockedAt`. It lets team managers correct the player's `eligibilityStatus` only. The already stored roster snapshots (`realName`, `birthDateSnapshot`) are not refreshed by eligibility edits, and the current member profile/phone is not revalidated on this path.
+
+## Campaign Endpoints
+
+Campaigns attach editable marketing content (hero image, intro, highlights, FAQ) to a tournament. Tournament data (dates, venue, registrations, sponsors) is always served from the tournament record; only the campaign content blob is independently edited.
+
+### Public Campaign Endpoints
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/tournaments/campaigns` | public | `cursor?`, `limit?` (max 50), `sportCode?` | `{ items: CampaignListItem[], nextCursor: string \| null }` |
+| `GET` | `/api/v1/tournaments/campaigns/:slug` | public | slug path param | full `V1PublicTournamentCampaign` |
+| `HEAD` | `/api/v1/tournaments/campaigns/:slug/availability` | public | slug path param | 200 if available, 404 if not found/not published |
+
+`GET /tournaments/campaigns` returns only `status === 'published'` campaigns whose tournament is not deleted and has a public status (`open`, `in_progress`, `completed`). Results are ordered by `publishedAt desc`.
+
+Each `CampaignListItem` contains: `id`, `slug`, `heroTitle`, `heroSummary`, `heroImageUrl`, `publishedAt`, `updatedAt`, and a `tournament` sub-object with `id`, `title`, `status`, `sport`, `scheduledAt`, `scheduledEndAt`, `registrationDeadlineAt`, `venue`, `coverImageUrl`, `teamCount`, `entryFee`, `prizePool`, `prizeSummary`, `confirmedCount`, `pendingPaymentCount`, `registrationAvailability`.
+
+`registrationAvailability` is computed server-side:
+- `closed` when `tournament.status !== 'open'`
+- `started` when `scheduledAt <= now`
+- `deadline_passed` when `registrationDeadlineAt <= now`
+- `full` when `confirmedCount + pendingPaymentCount >= teamCount`
+- `available` otherwise
+
+### Admin Campaign Endpoints
+
+All admin campaign endpoints require `V1AuthGuard` (active admin session).
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/admin/tournaments/:id/campaign` | admin | path id | `V1TournamentCampaign` |
+| `GET` | `/api/v1/admin/tournaments/:id/campaign/preview` | admin | path id | `V1AdminTournamentCampaignPreview` (merged tournament + campaign) |
+| `POST` | `/api/v1/admin/tournaments/:id/campaign` | admin | `CreateTournamentCampaignDto { slug, content }` | created `V1TournamentCampaign` |
+| `PATCH` | `/api/v1/admin/tournaments/:id/campaign` | admin | `UpdateTournamentCampaignDto { slug?, content? }` | updated `V1TournamentCampaign` |
+| `POST` | `/api/v1/admin/tournaments/:id/campaign/status` | admin | `ChangeTournamentCampaignStatusDto { status, reason }` | status change result |
+
+### Campaign Status Transitions
+
+```
+draft ──→ published ──→ archived
+          published ←── archived   (re-publish)
+```
+
+`draft → archived` is not allowed. `slug` is mutable only while `publishedAt` is null (before first publish). `status` values: `draft`, `published`, `archived`.
+
+Status change response includes `alreadyInStatus: true` when the campaign was already in the requested status; in that case, the campaign record is unchanged and no audit log is written.
+
+### Campaign Content Schema (version 1)
+
+```typescript
+{
+  version: 1;
+  hero: { title: string; summary?: string; imageUrl?: string };
+  intro: { title: string; body: string };
+  highlightsSectionTitle: string;
+  highlights: Array<{ title: string; body: string; imageUrl?: string }>;
+  faqSectionTitle: string;
+  faq: Array<{ question: string; answer: string }>;
+}
+```
+
+Content is stored as JSON in the `V1TournamentCampaign.content` column and parsed at read time. `parseCampaignContentJson` validates the version field and applies safe defaults for missing optional fields.

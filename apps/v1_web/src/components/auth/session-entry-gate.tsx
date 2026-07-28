@@ -25,7 +25,9 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
     if (hasSessionHint === null) return;
 
     if (!hasSessionHint) {
-      if (mode === 'root') router.replace('/login');
+      // router.replace()는 로그인 상태에서 prefetch된 /login 인스턴스를 재사용해
+      // 세션 무효화 이전 스냅샷에 멈출 수 있다(하드 네비게이션으로 우회).
+      if (mode === 'root') window.location.replace('/login');
       return;
     }
 
@@ -37,7 +39,7 @@ export function SessionEntryGate({ mode, children }: SessionEntryGateProps) {
 
     if (authMe.isError) {
       clearStoredV1Session();
-      if (mode === 'root') router.replace('/login');
+      if (mode === 'root') window.location.replace('/login');
     }
   }, [authMe.isError, authMe.isSuccess, hasSessionHint, mode, router]);
 

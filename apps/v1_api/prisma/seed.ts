@@ -41,7 +41,7 @@ const futureEnd = new Date('2026-06-20T11:00:00.000Z');
 const pastStart = new Date('2026-05-01T10:00:00.000Z');
 const pastEnd = new Date('2026-05-01T11:00:00.000Z');
 const hostAdminEmail = 'host@teameet.v1';
-const hostAdminPassword = process.env.V1_HOST_ADMIN_PASSWORD?.trim() || '11111111';
+const hostAdminPassword = process.env.V1_HOST_ADMIN_PASSWORD?.trim();
 const scrypt = promisify(scryptCallback);
 const passwordKeyLength = 64;
 const passwordScheme = 'scrypt';
@@ -1451,12 +1451,10 @@ async function seedAdmin(userIds: Record<string, string>) {
 }
 
 async function seedHostAdminPassword(userId: string) {
-  if (!hostAdminPassword) {
-    return;
-  }
-
-  if (hostAdminPassword.length < 8) {
-    throw new Error('V1_HOST_ADMIN_PASSWORD must be at least 8 characters.');
+  if (!hostAdminPassword || hostAdminPassword.length < 8) {
+    throw new Error(
+      'V1_HOST_ADMIN_PASSWORD 환경변수를 8자 이상으로 설정해주세요. (demo/coverage/all seed 모드에서 host@teameet.v1 계정 비밀번호로 사용됩니다.)',
+    );
   }
 
   const passwordHash = await hashSeedPassword(hostAdminPassword);

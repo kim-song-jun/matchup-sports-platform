@@ -640,12 +640,15 @@ export class MatchesService {
       throw stateConflict('Match is not recruiting');
     }
 
-    const activeParticipantCount = await this.getActiveParticipantCount(application.matchId);
-    if (activeParticipantCount >= application.match.maxParticipants) {
-      throw stateConflict('Match is full', 'FULL');
-    }
-
     const result = await this.prisma.$transaction(async (tx) => {
+      // 동시 승인 레이스 방지: match 행을 잠가 정원 체크~참가자 upsert 를 직렬화한다.
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${application.matchId} FOR UPDATE`;
+
+      const activeParticipantCount = await this.getActiveParticipantCount(application.matchId, tx);
+      if (activeParticipantCount >= application.match.maxParticipants) {
+        throw stateConflict('Match is full', 'FULL');
+      }
+
       const updated = await tx.v1MatchApplication.update({
         where: { id: application.id },
         data: {
@@ -1014,8 +1017,11 @@ export class MatchesService {
     }
   }
 
-  private getActiveParticipantCount(matchId: string) {
-    return this.prisma.v1MatchParticipant.count({
+  private getActiveParticipantCount(
+    matchId: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return client.v1MatchParticipant.count({
       where: { matchId, status: 'active' },
     });
   }

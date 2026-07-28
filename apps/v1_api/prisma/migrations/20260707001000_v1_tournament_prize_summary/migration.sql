@@ -1,2 +1,2 @@
 ALTER TABLE "v1_tournaments"
-ADD COLUMN "prize_summary" TEXT;
+ADD COLUMN IF NOT EXISTS "prize_summary" TEXT;

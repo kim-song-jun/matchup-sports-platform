@@ -1,0 +1,20 @@
+{
+  "complete": {
+    "assertions": {
+      "목록으로_라벨": true,
+      "목록으로_href": "/team-matches",
+      "구상세보기_라벨": false,
+      "team_match_1_링크": false
+    },
+    "consoleErrors": [],
+    "net4xx": []
+  },
+  "applications": {
+    "assertions": {
+      "수동승인_라벨": true,
+      "중립문구_잔존": false
+    },
+    "consoleErrors": [],
+    "net4xx": []
+  }
+}

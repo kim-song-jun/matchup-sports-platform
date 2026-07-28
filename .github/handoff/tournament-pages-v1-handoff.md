@@ -7,8 +7,8 @@
 
 ## 프로젝트 컨텍스트
 
-**Repository**: `matchup-sports-platform` (pnpm monorepo, Turborepo)  
-**Active Branch**: `feat/tournament-results-2leg-desktop`  
+**Repository**: `matchup-sports-platform` (pnpm monorepo, Turborepo)
+**Active Branch**: `feat/tournament-results-2leg-desktop`
 **PR**: #31 (https://github.com/kim-song-jun/matchup-sports-platform/pull/31)
 
 ### 실행 환경
@@ -159,10 +159,10 @@ apps/v1_api/
 SELECT id, title, status FROM v1_tournaments WHERE id = '5c46e679-7f80-4e55-a126-6075ca7ad4b2';
 
 -- 4강 픽스처 확인 (2차전 데이터 포함)
-SELECT fixture_number, leg_number, home_team_name, away_team_name 
-FROM v1_tournament_fixtures 
-WHERE tournament_id = '5c46e679-7f80-4e55-a126-6075ca7ad4b2' 
-AND round = 'semi' 
+SELECT fixture_number, leg_number, home_team_name, away_team_name
+FROM v1_tournament_fixtures
+WHERE tournament_id = '5c46e679-7f80-4e55-a126-6075ca7ad4b2'
+AND round = 'semi'
 ORDER BY fixture_number, leg_number;
 
 -- 신규 테이블 확인

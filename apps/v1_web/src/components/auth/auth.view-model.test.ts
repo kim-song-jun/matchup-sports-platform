@@ -63,13 +63,16 @@ describe('auth view models', () => {
     expect(model.primary.label).toBe('회원가입하고 계속');
   });
 
-  it('does not present per-use location access as a persisted signup consent', () => {
+  it('offers an optional location-based service agreement during signup', () => {
     const model = getTermsViewModel();
 
     expect(model.agreements.map((agreement) => agreement.title)).toEqual([
       '서비스 이용약관',
       '개인정보 수집 및 이용 동의',
+      '위치기반서비스 이용 동의',
     ]);
+    const locationAgreement = model.agreements.find((agreement) => agreement.locationBased);
+    expect(locationAgreement?.required).toBe(false);
   });
 
   it('marks signup completion as a real post-registration state', () => {

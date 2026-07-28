@@ -110,4 +110,3 @@ touched.
 - 2026-07-19: Decision B approved. Current ledger, upload service, consumer URL
   fields, and missing delete route confirmed. Reference scope additionally
   includes tournament review photo arrays discovered in the current schema.
-

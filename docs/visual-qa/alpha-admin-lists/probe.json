@@ -1,0 +1,138 @@
+[
+  {
+    "name": "audit",
+    "label": "desktop",
+    "width": 1440,
+    "file": "audit-desktop-1440.png",
+    "rows": 40,
+    "headers": [
+      "시각",
+      "대상",
+      "액션",
+      "대상 ID",
+      "실행자",
+      "사유",
+      "시각",
+      "대상",
+      "변경",
+      "대상 ID",
+      "실행자",
+      "사유"
+    ]
+  },
+  {
+    "name": "inquiries",
+    "label": "desktop",
+    "width": 1440,
+    "file": "inquiries-desktop-1440.png",
+    "rows": 1,
+    "headers": [
+      "접수",
+      "상태",
+      "분류",
+      "제목",
+      "문의자",
+      "답변",
+      "작업"
+    ]
+  },
+  {
+    "name": "popups",
+    "label": "desktop",
+    "width": 1440,
+    "file": "popups-desktop-1440.png",
+    "rows": 1,
+    "headers": [
+      "상태",
+      "제목",
+      "게시 기간",
+      "작업"
+    ]
+  },
+  {
+    "name": "users",
+    "label": "desktop",
+    "width": 1440,
+    "file": "users-desktop-1440.png",
+    "rows": 20,
+    "headers": [
+      "회원",
+      "상태",
+      "성별",
+      "로그인",
+      "매치 / 소유팀",
+      "소속 (팀장/운영진/멤버)",
+      "가입",
+      "최근 로그인",
+      "작업"
+    ]
+  },
+  {
+    "name": "audit",
+    "label": "mobile",
+    "width": 390,
+    "file": "audit-mobile-390.png",
+    "rows": 40,
+    "headers": [
+      "시각",
+      "대상",
+      "액션",
+      "대상 ID",
+      "실행자",
+      "사유",
+      "시각",
+      "대상",
+      "변경",
+      "대상 ID",
+      "실행자",
+      "사유"
+    ]
+  },
+  {
+    "name": "inquiries",
+    "label": "mobile",
+    "width": 390,
+    "file": "inquiries-mobile-390.png",
+    "rows": 1,
+    "headers": [
+      "접수",
+      "상태",
+      "분류",
+      "제목",
+      "문의자",
+      "답변",
+      "작업"
+    ]
+  },
+  {
+    "name": "popups",
+    "label": "mobile",
+    "width": 390,
+    "file": "popups-mobile-390.png",
+    "rows": 1,
+    "headers": [
+      "상태",
+      "제목",
+      "게시 기간",
+      "작업"
+    ]
+  },
+  {
+    "name": "users",
+    "label": "mobile",
+    "width": 390,
+    "file": "users-mobile-390.png",
+    "rows": 20,
+    "headers": [
+      "회원",
+      "상태",
+      "성별",
+      "로그인",
+      "매치 / 소유팀",
+      "소속 (팀장/운영진/멤버)",
+      "가입",
+      "최근 로그인",
+      "작업"
+    ]
+  }
+]

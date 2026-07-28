@@ -516,6 +516,11 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 ## 코드 컨벤션
 
 - Git 컨벤션, 코드 품질, 응답 구조: 글로벌 `~/.claude/CLAUDE.md` 참조
+- **Codex 미러**: 이 문서와 전역 지침의 핵심 운영 규칙은 `AGENTS.md`의 "공통 운영 규칙
+  (Codex ↔ Claude 공유)" 절에도 요약돼 있다(Codex는 `~/.claude/CLAUDE.md`와 Claude 메모리를
+  읽지 못하기 때문). **정본은 이 문서다.** 브랜치 정책·git 안전·DB 마이그레이션·PR 워크플로 등
+  양쪽에 있는 규칙을 바꿀 때는 `AGENTS.md`도 같은 변경에서 함께 고친다 — 과거 캡처 스크립트
+  경로 컨벤션이 두 문서에서 갈려 리뷰어가 반복 지적한 전례가 있다.
 - 한국어 사용자 대상이므로 UI 텍스트는 한국어
 - 에러 코드: `DOMAIN_CODE` 형태 (e.g., MATCH_NOT_FOUND)
 

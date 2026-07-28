@@ -1333,6 +1333,105 @@ async function seedHostMinDemoData(
   });
 }
 
+/**
+ * "매치 진행 중" QA 확인용 — seed 실행 시점 기준 상대 시각으로 계산해 재실행할 때마다 "지금 진행 중"을 재현한다.
+ *
+ * 참고: V1MatchStatus에는 in_progress가 없다(V1Tournament 전용 상태). MatchesService.getDisplayState()는
+ * status === 'recruiting' && startAt < now 이면 'expired'를 반환하고, 프론트 matches-client.tsx의 statusLabel()은
+ * expired를 closed/cancelled/completed와 동일하게 "신청 마감"으로 묶어 표시한다 — 즉 매치가 실제로 진행 중이어도
+ * 전용 "진행 중" 배지는 없다. 이 시드는 그 동작을 실측 가능하게 재현/문서화한다.
+ *
+ * 추가로 admin 필터 커버리지를 위해 archived 상태 매치도 하나 만든다(기존 seed에는 없었음).
+ */
+async function seedLiveStateMatches(userIds: Record<string, string>, sportIds: Record<string, string>, regionId: string) {
+  const now = Date.now();
+  const liveStart = new Date(now - 60 * 60 * 1000);
+  const liveEnd = new Date(now + 60 * 60 * 1000);
+  const futsalNoviceIntermediate = await getLevelRangeIds(sportIds.futsal, 'novice', 'intermediate');
+
+  const liveMatch = await prisma.v1Match.upsert({
+    where: { id: '00000000-0000-4000-8000-000000000209' },
+    update: {
+      title: '잠실 풋살파크 진행 중 매치',
+      status: 'recruiting',
+      startAt: liveStart,
+      endAt: liveEnd,
+      ...futsalNoviceIntermediate,
+    },
+    create: {
+      id: '00000000-0000-4000-8000-000000000209',
+      hostUserId: userIds['host@teameet.v1'],
+      sportId: sportIds.futsal,
+      regionId,
+      title: '잠실 풋살파크 진행 중 매치',
+      description:
+        '경기 시작 시각이 지나 실제로 진행 중인 개인매치입니다. DB status는 recruiting 그대로지만 화면에는 신청 마감으로 표시됩니다(진행 중 전용 배지 없음, admin/QA 확인용).',
+      placeName: '잠실 풋살파크',
+      placeAddress: '서울 송파구',
+      startAt: liveStart,
+      endAt: liveEnd,
+      maxParticipants: 10,
+      levelNote: '진행 중 상태 확인용',
+      ...futsalNoviceIntermediate,
+      genderRule: '성별 무관',
+      costNote: '구장비 N분의 1',
+      status: 'recruiting',
+      participants: {
+        create: {
+          userId: userIds['host@teameet.v1'],
+          role: V1MatchParticipantRole.host,
+          status: 'active',
+          approvedAt: liveStart,
+        },
+      },
+    },
+  });
+
+  await prisma.v1MatchParticipant.upsert({
+    where: { matchId_userId: { matchId: liveMatch.id, userId: userIds['owner@teameet.v1'] } },
+    update: { role: V1MatchParticipantRole.participant, status: 'active', approvedAt: liveStart },
+    create: {
+      matchId: liveMatch.id,
+      userId: userIds['owner@teameet.v1'],
+      role: V1MatchParticipantRole.participant,
+      status: 'active',
+      approvedAt: liveStart,
+    },
+  });
+
+  await prisma.v1Match.upsert({
+    where: { id: '00000000-0000-4000-8000-000000000210' },
+    update: { title: '오래된 보관 매치', status: 'archived' },
+    create: {
+      id: '00000000-0000-4000-8000-000000000210',
+      hostUserId: userIds['host@teameet.v1'],
+      sportId: sportIds.running,
+      regionId,
+      title: '오래된 보관 매치',
+      description: 'admin 보관(archived) 필터 확인용 개인매치입니다.',
+      placeName: '탄천 산책로',
+      placeAddress: '서울 강남구',
+      startAt: new Date('2026-04-01T10:00:00.000Z'),
+      endAt: new Date('2026-04-01T11:00:00.000Z'),
+      maxParticipants: 6,
+      levelNote: '보관 상태 확인용',
+      genderRule: '성별 무관',
+      costNote: '무료',
+      status: 'archived',
+      participants: {
+        create: {
+          userId: userIds['host@teameet.v1'],
+          role: V1MatchParticipantRole.host,
+          status: 'active',
+          approvedAt: new Date('2026-04-01T00:00:00.000Z'),
+        },
+      },
+    },
+  });
+
+  return liveMatch;
+}
+
 async function seedChatAndNotifications(
   userIds: Record<string, string>,
   matchId: string,
@@ -2515,6 +2614,7 @@ async function main() {
   const match = await seedMatches(userIds, sportIds, regions.seoulGangnam.id);
   const teamMatch = await seedTeamMatches(userIds, sportIds, regions.seoulSongpa.id, ownerTeam.id, applicantTeam.id);
   await seedHostMinDemoData(userIds, sportIds, regions.seoulGangnam.id, ownerTeam.id, applicantTeam.id);
+  await seedLiveStateMatches(userIds, sportIds, regions.seoulGangnam.id);
 
   await seedChatAndNotifications(userIds, match.id, teamMatch.id);
   await seedHostChatDemoData(userIds, sportIds, regions.seoulSongpa.id, match.id, teamMatch.id, ownerTeam.id);

@@ -113,6 +113,7 @@
 
 - Inquiry item fields: `inquiryId`, `category`, `title`, `body`, `contact`, `relatedType`, `relatedId`, `status`, `createdAt`, `updatedAt`, `closedAt`.
 - `contact` may be `null`; logged-in user identity is the primary contact context.
+- New inquiries require an authenticated member. Historical guest inquiry rows remain readable by admins for backward-compatible operations, but the public create contract no longer accepts guest contact fields.
 - `status`: `received | reviewing | answered | closed`.
 - List response is cursor-shaped: `{ items, pageInfo: { nextCursor, hasNext } }`.
 - Detail response may include `replies`: `{ replyId, adminName, adminRole, body, createdAt, updatedAt }[]`.

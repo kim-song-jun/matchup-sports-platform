@@ -15,7 +15,7 @@ import {
 import { useTournamentInquiryDialog } from './use-tournament-inquiry-dialog';
 import { TournamentInquiryContext } from './tournament-inquiry-context';
 
-type InquiryFormErrors = Partial<Record<'title' | 'body' | 'guestContact' | 'form', string>>;
+type InquiryFormErrors = Partial<Record<'title' | 'body' | 'form', string>>;
 type TournamentInquiryModalProps = {
   readonly tournamentId: string;
   readonly tournamentTitle: string;
@@ -38,13 +38,10 @@ export function TournamentInquiryModal({
   onSubmitted,
 }: TournamentInquiryModalProps) {
   const createInquiry = useV1CreateInquiry();
-  const isLoggedIn = authUser !== null;
-  const isSessionBlocked = isSessionChecking || hasSessionError;
+  const isSessionBlocked = isSessionChecking || hasSessionError || authUser === null;
   const [topic, setTopic] = useState<TournamentInquiryTopic>('participation');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
   const [errors, setErrors] = useState<InquiryFormErrors>({});
   const dialogRef = useTournamentInquiryDialog(onClose);
   const submitBusyRef = useRef(false);
@@ -56,8 +53,6 @@ export function TournamentInquiryModal({
     if (submitBusyRef.current || isSessionBlocked) return;
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
-    const trimmedEmail = guestEmail.trim();
-    const trimmedPhone = guestPhone.trim();
     const nextErrors: InquiryFormErrors = {};
 
     if (!trimmedTitle) nextErrors.title = '문의 제목을 입력해 주세요.';
@@ -65,9 +60,6 @@ export function TournamentInquiryModal({
       nextErrors.title = `문의 제목은 ${maximumTitleLength}자 이내로 입력해 주세요.`;
     }
     if (!trimmedBody) nextErrors.body = '문의 내용을 입력해 주세요.';
-    if (!isLoggedIn && !trimmedEmail && !trimmedPhone) {
-      nextErrors.guestContact = '답변받을 이메일 또는 전화번호 중 하나를 입력해 주세요.';
-    }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -81,12 +73,6 @@ export function TournamentInquiryModal({
         body: trimmedBody,
         relatedType: 'tournament',
         relatedId: tournamentId,
-        ...(isLoggedIn
-          ? {}
-          : {
-              ...(trimmedEmail ? { guestEmail: trimmedEmail } : {}),
-              ...(trimmedPhone ? { guestPhone: trimmedPhone } : {}),
-            }),
       },
       {
         onSuccess: onSubmitted,
@@ -97,10 +83,6 @@ export function TournamentInquiryModal({
       },
     );
   };
-
-  const guestContactDescription = errors.guestContact
-    ? 'tournament-guest-contact-help tournament-guest-contact-error'
-    : 'tournament-guest-contact-help';
 
   return (
     <div
@@ -186,35 +168,6 @@ export function TournamentInquiryModal({
               onChange={(event) => setBody(event.target.value)}
               placeholder="상황을 자세히 적어 주시면 더 정확히 답변할 수 있어요"
             />
-
-            {!isLoggedIn && !isSessionBlocked ? (
-              <fieldset className={styles.guestFields}>
-                <legend className={styles.guestHeading}>
-                  <strong>답변받을 연락처</strong>
-                  <span>둘 중 하나만 입력해도 돼요.</span>
-                </legend>
-                <TextField
-                  label="이메일"
-                  type="email"
-                  value={guestEmail}
-                  aria-invalid={Boolean(errors.guestContact)}
-                  aria-describedby={guestContactDescription}
-                  onChange={(event) => setGuestEmail(event.target.value)}
-                  placeholder="name@example.com"
-                />
-                <TextField
-                  label="전화번호"
-                  type="tel"
-                  value={guestPhone}
-                  aria-invalid={Boolean(errors.guestContact)}
-                  aria-describedby={guestContactDescription}
-                  onChange={(event) => setGuestPhone(event.target.value)}
-                  placeholder="010-1234-5678"
-                />
-                <p id="tournament-guest-contact-help" className={styles.fieldHint}>답변을 받을 연락처 한 가지만 입력해 주세요.</p>
-                {errors.guestContact ? <p id="tournament-guest-contact-error" role="alert" className={styles.error}>{errors.guestContact}</p> : null}
-              </fieldset>
-            ) : null}
 
             {errors.form ? <p role="alert" className={styles.errorBanner}>{errors.form}</p> : null}
           </div>

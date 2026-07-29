@@ -1,0 +1,52 @@
+.section {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.memberNotice {
+  color: var(--text-caption);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.contactList {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.contactItem {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 20px 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--grey100);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.contactItem strong {
+  min-width: 0;
+  color: var(--text-strong);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.contactItem:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .contactItem:hover {
+    border-color: var(--grey200);
+    background: var(--grey50);
+  }
+}

@@ -352,10 +352,6 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
-  /** 비로그인(게스트) 문의자의 이메일 — 로그인 상태가 아니면 guestPhone과 함께 최소 1개 필수 */
-  guestEmail?: string;
-  /** 비로그인(게스트) 문의자의 전화번호 — 로그인 상태가 아니면 guestEmail과 함께 최소 1개 필수 */
-  guestPhone?: string;
 };
 
 export type V1Match = {

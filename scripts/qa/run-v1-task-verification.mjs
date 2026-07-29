@@ -40,6 +40,7 @@ const HISTORICAL_TASK_ONE_OVERRIDE_SHA256 =
   '2042407ad7b8f634f118d4ee9f0154ad1503564ceeac5874c6681f458e8c16da';
 const VERIFICATION_SESSION_ID =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
+const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
 const BOOLEAN_OPTIONS = new Set([
   'adopt-candidate-attempt',
   'child-browser-owner',
@@ -698,26 +699,58 @@ function immutableWriteOrReuse(filePath, value) {
   return { path: filePath, sha256: descriptor.sha256 };
 }
 
-function sourceEntries(repoRoot, sourceTreeSHA, ownedPaths) {
+function treePathIdentity(repoRoot, treeish, ownedPath) {
   const output = git(
-    ['ls-tree', '-r', '-z', sourceTreeSHA, '--', ...ownedPaths],
+    ['ls-tree', '-z', treeish, '--', ownedPath],
     { cwd: repoRoot, encoding: null },
   );
-  return output.toString('utf8').split('\0').filter(Boolean).map((line) => {
-    const match = line.match(/^(\d+) (blob|commit) ([0-9a-f]+)\t([\s\S]+)$/);
-    if (!match) {
-      throw new HarnessError('SOURCE_MANIFEST_INVALID', `Cannot parse tree entry: ${line}`, 68);
-    }
-    const bytes = git(['cat-file', match[2], match[3]], { cwd: repoRoot, encoding: null });
+  const records = output.toString('utf8').split('\0').filter(Boolean);
+  if (records.length === 0) return { state: 'deleted' };
+  if (records.length !== 1) {
+    throw new HarnessError(
+      'SOURCE_MANIFEST_INVALID',
+      `Expected exactly one tree entry for ${ownedPath}; observed ${records.length}`,
+      68,
+    );
+  }
+  const match = records[0].match(/^(\d+) (blob|tree|commit) ([0-9a-f]+)\t([\s\S]+)$/);
+  if (!match || match[4] !== ownedPath) {
+    throw new HarnessError(
+      'SOURCE_MANIFEST_INVALID',
+      `Tree entry does not exactly match owned path ${ownedPath}`,
+      68,
+    );
+  }
+  const bytes = git(['cat-file', match[2], match[3]], { cwd: repoRoot, encoding: null });
+  return {
+    state: 'present',
+    mode: match[1],
+    type: match[2],
+    blob: match[3],
+    sha256: sha256(bytes),
+    size: bytes.length,
+  };
+}
+
+function sourceEntries(repoRoot, sourceTreeSHA, ownedPaths, baselineSHA, headSHA) {
+  const uniquePaths = new Set(ownedPaths);
+  if (uniquePaths.size !== ownedPaths.length) {
+    throw new HarnessError(
+      'SOURCE_MANIFEST_INVALID',
+      'Ownership outputs must not contain duplicate paths',
+      68,
+    );
+  }
+  return ownedPaths.map((ownedPath) => {
+    const candidate = treePathIdentity(repoRoot, sourceTreeSHA, ownedPath);
     return {
-      path: match[4],
-      mode: match[1],
-      type: match[2],
-      blob: match[3],
-      sha256: sha256(bytes),
-      size: bytes.length,
+      path: ownedPath,
+      state: candidate.state,
+      baseline: treePathIdentity(repoRoot, baselineSHA, ownedPath),
+      head: treePathIdentity(repoRoot, headSHA, ownedPath),
+      candidate,
     };
-  }).sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)));
+  });
 }
 
 function createSourceSnapshot(
@@ -731,6 +764,7 @@ function createSourceSnapshot(
   const ownedPaths = task === null ? [] : ownershipRow(ledger, task).outputs;
   const privateIndex = privateIndexTree(repoRoot, ownedPaths);
   try {
+    const headSHA = git(['rev-parse', 'HEAD'], { cwd: repoRoot }).trim();
     const attemptDir = resolve(
       evidenceRoot,
       candidateSHA ? 'commit-sha256' : 'tree-sha256',
@@ -738,11 +772,19 @@ function createSourceSnapshot(
       `attempt-${attemptId}`,
     );
     mkdirSync(attemptDir, { recursive: true });
-    const entries = sourceEntries(repoRoot, privateIndex.sourceTreeSHA, ownedPaths);
+    const entries = sourceEntries(
+      repoRoot,
+      privateIndex.sourceTreeSHA,
+      ownedPaths,
+      ledger.baselineSHA,
+      headSHA,
+    );
     const manifest = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       attemptId,
       task,
+      baselineSHA: ledger.baselineSHA,
+      headSHA,
       sourceTreeSHA: privateIndex.sourceTreeSHA,
       ownedPaths,
       entries,
@@ -767,6 +809,9 @@ function createSourceSnapshot(
       sourceArchivePath: archiveReceipt.path,
       sourceArchiveSHA: archiveReceipt.sha256,
       temporaryIndexPath: privateIndex.temporaryIndexPath,
+      ownedPaths,
+      baselineSHA: ledger.baselineSHA,
+      headSHA,
       entries,
     };
   } finally {
@@ -775,10 +820,68 @@ function createSourceSnapshot(
 }
 
 function verifyCommittedSnapshot(repoRoot, snapshot) {
+  if (
+    !Array.isArray(snapshot.ownedPaths) ||
+    !Array.isArray(snapshot.entries) ||
+    !/^[0-9a-f]{40}$/.test(snapshot.baselineSHA ?? '') ||
+    !/^[0-9a-f]{40}$/.test(snapshot.headSHA ?? '')
+  ) {
+    throw new HarnessError('SOURCE_MANIFEST_INVALID', 'Owned paths and entries must be arrays', 68);
+  }
+  const expectedPaths = snapshot.ownedPaths;
+  const actualPaths = snapshot.entries.map((entry) => entry?.path);
+  if (
+    new Set(expectedPaths).size !== expectedPaths.length ||
+    new Set(actualPaths).size !== actualPaths.length ||
+    expectedPaths.length !== actualPaths.length ||
+    expectedPaths.some((ownedPath, index) => actualPaths[index] !== ownedPath)
+  ) {
+    throw new HarnessError(
+      'SOURCE_MANIFEST_INVALID',
+      'Source manifest entries must exactly and uniquely match ordered ownership outputs',
+      68,
+    );
+  }
   for (const entry of snapshot.entries) {
-    const committed = git(['ls-tree', 'HEAD', '--', entry.path], { cwd: repoRoot }).trim();
-    const match = committed.match(/^(\d+) (blob|commit) ([0-9a-f]+)\t/);
-    if (!match || match[1] !== entry.mode || match[3] !== entry.blob) {
+    const baseline = treePathIdentity(repoRoot, snapshot.baselineSHA, entry.path);
+    const head = treePathIdentity(repoRoot, snapshot.headSHA, entry.path);
+    const sameIdentity = (left, right) =>
+      left?.state === right?.state &&
+      (left.state === 'deleted' ||
+        (
+          left.mode === right.mode &&
+          left.type === right.type &&
+          left.blob === right.blob
+        ));
+    if (
+      !['present', 'deleted'].includes(entry.state) ||
+      entry.state !== entry.candidate?.state ||
+      !sameIdentity(entry.baseline, baseline) ||
+      !sameIdentity(entry.head, head)
+    ) {
+      throw new HarnessError(
+        'SOURCE_MANIFEST_INVALID',
+        `Invalid baseline, HEAD, or candidate identity for ${entry.path}`,
+        68,
+      );
+    }
+    const committed = treePathIdentity(repoRoot, 'HEAD', entry.path);
+    if (entry.state === 'deleted') {
+      if (committed.state !== 'deleted') {
+        throw new HarnessError(
+          'SOURCE_SNAPSHOT_COMMIT_DRIFT',
+          `Committed path is present but manifest declares deletion: ${entry.path}`,
+          68,
+        );
+      }
+      continue;
+    }
+    if (
+      committed.state !== 'present' ||
+      committed.mode !== entry.candidate.mode ||
+      committed.type !== entry.candidate.type ||
+      committed.blob !== entry.candidate.blob
+    ) {
       throw new HarnessError(
         'SOURCE_SNAPSHOT_COMMIT_DRIFT',
         `Committed blob/mode drift for ${entry.path}`,
@@ -1021,21 +1124,62 @@ function dropDatabase(database) {
 }
 
 function processTable() {
-  const result = commandOutput('ps', ['-axo', 'pid=,ppid=,pgid=,command=']);
+  const result = commandOutput('ps', ['-axo', 'pid=,ppid=,pgid=,lstart=,command=']);
   if (result.status !== 0) {
     throw new HarnessError('PROCESS_INSPECTION_UNAVAILABLE', 'Could not inspect child processes');
   }
   return result.stdout.split('\n').filter(Boolean).map((line) => {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+([\s\S]*)$/);
+    const match = line.trim().match(
+      /^(\d+)\s+(\d+)\s+(\d+)\s+(.{24})\s+([\s\S]*)$/,
+    );
     return match
-      ? { pid: Number(match[1]), ppid: Number(match[2]), pgid: Number(match[3]), command: match[4] }
+      ? {
+          pid: Number(match[1]),
+          ppid: Number(match[2]),
+          pgid: Number(match[3]),
+          startIdentity: match[4],
+          command: match[5],
+        }
       : null;
   }).filter(Boolean);
 }
 
-function alive(pid) {
+function markerPids(marker) {
+  const result = commandOutput('ps', ['eww', '-axo', 'pid=,command=']);
+  if (result.status !== 0) {
+    throw new HarnessError(
+      'PROCESS_INSPECTION_UNAVAILABLE',
+      'Could not inspect process ownership markers',
+    );
+  }
+  const token = `${PROCESS_OWNER_ENV}=${marker}`;
+  return new Set(result.stdout.split('\n').flatMap((line) => {
+    const match = line.match(/^\s*(\d+)\s+([\s\S]*)$/);
+    return match && match[2].includes(token) ? [Number(match[1])] : [];
+  }));
+}
+
+function processIdentity(processEntry) {
+  return {
+    pid: processEntry.pid,
+    startIdentity: processEntry.startIdentity,
+  };
+}
+
+function identityKey(identity) {
+  return `${identity.pid}:${identity.startIdentity}`;
+}
+
+function identityMatches(identity, table = processTable()) {
+  const observed = table.find(({ pid }) => pid === identity.pid);
+  return observed?.startIdentity === identity.startIdentity;
+}
+
+function signalIdentity(identity, signal) {
+  const table = processTable();
+  if (!identityMatches(identity, table)) return false;
   try {
-    process.kill(pid, 0);
+    process.kill(identity.pid, signal);
     return true;
   } catch (error) {
     if (error.code === 'ESRCH') return false;
@@ -1043,31 +1187,77 @@ function alive(pid) {
   }
 }
 
-async function cleanupProcessGroup(groupId, lifecycle) {
-  const owned = processTable().filter(({ pgid, pid }) => pgid === groupId && pid !== process.pid);
-  for (const processEntry of owned) {
-    if (alive(processEntry.pid)) process.kill(processEntry.pid, 'SIGTERM');
-  }
-  const deadline = Date.now() + 2000;
-  while (Date.now() < deadline && owned.some(({ pid }) => alive(pid))) {
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
-  }
-  const killed = [];
-  for (const processEntry of owned) {
-    if (alive(processEntry.pid)) {
-      process.kill(processEntry.pid, 'SIGKILL');
-      killed.push(processEntry.pid);
+function sampleOwnedProcesses(rootPid, marker, baselineKeys, ownedIdentities) {
+  const table = processTable();
+  const byPid = new Map(table.map((entry) => [entry.pid, entry]));
+  const marked = markerPids(marker);
+  const trackedPids = new Set(
+    [...ownedIdentities.values()]
+      .filter((identity) => identityMatches(identity, table))
+      .map(({ pid }) => pid),
+  );
+  const descendsFromOwned = (entry) => {
+    const visited = new Set();
+    let parentPid = entry.ppid;
+    while (parentPid > 0 && !visited.has(parentPid)) {
+      if (parentPid === rootPid || trackedPids.has(parentPid)) return true;
+      visited.add(parentPid);
+      parentPid = byPid.get(parentPid)?.ppid ?? 0;
+    }
+    return false;
+  };
+  for (const entry of table) {
+    const identity = processIdentity(entry);
+    const key = identityKey(identity);
+    if (
+      entry.pid !== process.pid &&
+      !baselineKeys.has(key) &&
+      (entry.pid === rootPid || marked.has(entry.pid) || descendsFromOwned(entry))
+    ) {
+      ownedIdentities.set(key, identity);
     }
   }
-  lifecycle.cleanup.termPids.push(...owned.map(({ pid }) => pid));
-  lifecycle.cleanup.killPids.push(...killed);
-  lifecycle.cleanup.leakedPids.push(...owned.filter(({ pid }) => alive(pid)).map(({ pid }) => pid));
+}
+
+async function cleanupOwnedProcesses(rootPid, marker, baselineKeys, ownedIdentities, lifecycle) {
+  sampleOwnedProcesses(rootPid, marker, baselineKeys, ownedIdentities);
+  const owned = [...ownedIdentities.values()];
+  const termIdentities = owned.filter((identity) => signalIdentity(identity, 'SIGTERM'));
+  lifecycle.cleanup.termIdentities.push(...termIdentities);
+  lifecycle.cleanup.termPids.push(...termIdentities.map(({ pid }) => pid));
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline) {
+    sampleOwnedProcesses(rootPid, marker, baselineKeys, ownedIdentities);
+    if (![...ownedIdentities.values()].some((identity) => identityMatches(identity))) break;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 50));
+  }
+  sampleOwnedProcesses(rootPid, marker, baselineKeys, ownedIdentities);
+  const killIdentities = [...ownedIdentities.values()]
+    .filter((identity) => signalIdentity(identity, 'SIGKILL'));
+  lifecycle.cleanup.killIdentities.push(...killIdentities);
+  lifecycle.cleanup.killPids.push(...killIdentities.map(({ pid }) => pid));
+  const killDeadline = Date.now() + 1000;
+  while (
+    Date.now() < killDeadline &&
+    [...ownedIdentities.values()].some((identity) => identityMatches(identity))
+  ) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+  }
+  sampleOwnedProcesses(rootPid, marker, baselineKeys, ownedIdentities);
+  const leakedIdentities = [...ownedIdentities.values()]
+    .filter((identity) => identityMatches(identity));
+  lifecycle.cleanup.ownedProcessIdentities.push(...ownedIdentities.values());
+  lifecycle.cleanup.leakedIdentities.push(...leakedIdentities);
+  lifecycle.cleanup.leakedPids.push(...leakedIdentities.map(({ pid }) => pid));
 }
 
 async function runChild(command, args, { cwd, env, lifecycle, ports = [] }) {
+  const marker = randomUUID();
+  const baselineKeys = new Set(processTable().map((entry) => identityKey(processIdentity(entry))));
+  const ownedIdentities = new Map();
   const child = spawn(command, args, {
     cwd,
-    env,
+    env: { ...env, [PROCESS_OWNER_ENV]: marker },
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -1077,6 +1267,7 @@ async function runChild(command, args, { cwd, env, lifecycle, ports = [] }) {
     command: [command, ...args],
     ports,
     startedAt: new Date().toISOString(),
+    ownershipMarkerSHA256: sha256(marker),
   };
   lifecycle.children.push(childRecord);
   let stdout = '';
@@ -1087,14 +1278,37 @@ async function runChild(command, args, { cwd, env, lifecycle, ports = [] }) {
   child.stderr.on('data', (chunk) => {
     stderr += chunk;
   });
+  let samplingError = null;
+  try {
+    sampleOwnedProcesses(child.pid, marker, baselineKeys, ownedIdentities);
+  } catch (error) {
+    samplingError = error;
+  }
+  const sampler = setInterval(() => {
+    try {
+      sampleOwnedProcesses(child.pid, marker, baselineKeys, ownedIdentities);
+    } catch (error) {
+      samplingError ??= error;
+    }
+  }, 25);
+  sampler.unref();
   const status = await new Promise((resolveStatus, reject) => {
     child.once('error', reject);
     child.once('close', (code, signal) => resolveStatus({ code, signal }));
+  }).finally(() => {
+    clearInterval(sampler);
   });
   childRecord.exitCode = status.code;
   childRecord.signal = status.signal;
   childRecord.finishedAt = new Date().toISOString();
-  await cleanupProcessGroup(child.pid, lifecycle);
+  await cleanupOwnedProcesses(
+    child.pid,
+    marker,
+    baselineKeys,
+    ownedIdentities,
+    lifecycle,
+  );
+  if (samplingError) throw samplingError;
   return { ...status, stdout, stderr };
 }
 
@@ -1310,6 +1524,9 @@ async function main() {
         sourceManifestPath: parentLifecycle.receipt.sourceManifestPath,
         sourceManifestSHA: parentLifecycle.receipt.sourceManifestSHA,
         temporaryIndexPath: null,
+        ownedPaths: [],
+        baselineSHA: ledger.baselineSHA,
+        headSHA: liveHead,
         entries: [],
       }
     : createSourceSnapshot(
@@ -1377,6 +1594,10 @@ async function main() {
       termPids: [],
       killPids: [],
       leakedPids: [],
+      ownedProcessIdentities: [],
+      termIdentities: [],
+      killIdentities: [],
+      leakedIdentities: [],
       leakedPorts: [],
       removedTemporaryDatabases: [],
     },

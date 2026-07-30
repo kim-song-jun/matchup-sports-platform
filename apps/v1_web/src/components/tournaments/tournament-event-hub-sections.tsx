@@ -34,7 +34,7 @@ export function TournamentApplicationGuideSection() {
     },
     {
       title: '2시간 내 입금 확인',
-      body: '계좌 안내 후 2시간 안에 입금이 확인되지 않으면 신청이 취소될 수 있어요. 입금 확인 후 대회 참가가 확정됩니다.',
+      body: '계좌 안내 후 2시간 안에 입금이 확인되지 않으면 신청이 취소될 수 있어요. 입금 확인 후 대회 참가가 확정돼요.',
     },
     {
       title: '선수단 확정',

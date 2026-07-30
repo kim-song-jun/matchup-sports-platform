@@ -37,3 +37,4 @@
 ## Progress Snapshot
 
 - 2026-07-30: implementation, focused contract tests, backend type-check, frontend lint, and empty-DB migration replay complete. Visual runtime QA remains pending; dev push deploys to Alpha after CI.
+- 2026-07-30: first dev CI exposed pre-existing blockers in an upload guard test and release helper contract tests, plus the guide copy style gate. The tests now exercise the real auth guard and current immutable Alpha helper contract; runtime deploy scripts were not changed.

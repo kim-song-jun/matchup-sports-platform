@@ -21,6 +21,8 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const planSHA = 'dc4ecb2f76592799f8460135d9ea755a6e8fd768de17a29af7e61cf2b21508dd';
 const workload = 'task-1-host-supervisor-v1';
 const image = 'teameet-v1-verification:node22-pnpm9.15.4';
+const baselineSHA = '71f67b0d24e272eecd216cebb31eefbd66c9ca02';
+const restartHeadSHA = 'a4823d2f575d9396323421024a81a63dacf0cf67';
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -74,6 +76,70 @@ function immutableBytesAt(receiptPath, bytes) {
 
 function immutableReceipt(directory, value) {
   return immutableReceiptAt(join(directory, 'host-supervisor.json'), value);
+}
+
+function gitTreeIdentity(treeish, ownedPath) {
+  const entry = spawnSync('git', ['ls-tree', '-z', treeish, '--', ownedPath], {
+    cwd: repoRoot,
+    encoding: null,
+  });
+  assert.equal(entry.status, 0, entry.stderr?.toString('utf8'));
+  const records = entry.stdout.toString('utf8').split('\0').filter(Boolean);
+  if (records.length === 0) return { state: 'deleted' };
+  assert.equal(records.length, 1);
+  const match = records[0].match(/^(\d+) (blob|tree|commit) ([0-9a-f]+)\t([\s\S]+)$/);
+  assert.ok(match);
+  assert.equal(match[4], ownedPath);
+  const object = spawnSync('git', ['cat-file', match[2], match[3]], {
+    cwd: repoRoot,
+    encoding: null,
+  });
+  assert.equal(object.status, 0, object.stderr?.toString('utf8'));
+  return {
+    state: 'present',
+    mode: match[1],
+    type: match[2],
+    blob: match[3],
+    sha256: sha256(object.stdout),
+    size: object.stdout.length,
+  };
+}
+
+function candidateSourceManifest(temporaryDirectory, ledger) {
+  const ownedPaths = ledger.ownership.find(({ todo }) => todo === 1).outputs;
+  const sourceTree = spawnSync('git', ['rev-parse', 'HEAD^{tree}'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(sourceTree.status, 0, sourceTree.stderr);
+  const sourceTreeSHA = sourceTree.stdout.trim();
+  const sourceManifest = {
+    schemaVersion: 2,
+    task: 1,
+    attemptId: `contract-candidate-${sourceTreeSHA.slice(0, 12)}`,
+    baselineSHA,
+    headSHA: restartHeadSHA,
+    sourceTreeSHA,
+    ownedPaths,
+    entries: ownedPaths.map((ownedPath) => {
+      const candidate = gitTreeIdentity(sourceTreeSHA, ownedPath);
+      return {
+        path: ownedPath,
+        state: candidate.state,
+        baseline: gitTreeIdentity(baselineSHA, ownedPath),
+        head: gitTreeIdentity(restartHeadSHA, ownedPath),
+        candidate,
+      };
+    }),
+    createdAt: '2026-07-30T10:00:00.000Z',
+  };
+  const sourceManifestPath = join(temporaryDirectory, 'source-manifest.json');
+  const receipt = immutableReceiptAt(sourceManifestPath, sourceManifest);
+  return {
+    sourceManifest,
+    sourceManifestPath,
+    sourceManifestSHA: receipt.sha256,
+  };
 }
 
 function candidateFixture({
@@ -144,9 +210,11 @@ function candidateFixture({
     encoding: 'utf8',
   });
   assert.equal(indexResult.status, 0, indexResult.stderr);
-  const sourceManifestPath =
-    '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1/tree-sha256/e4bd756b6566367697fc79bc489c9ddfa4fadcee/attempt-00244511-9dc7-4b64-8f99-302066c836bb/source-manifest.json';
-  const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'));
+  const {
+    sourceManifest,
+    sourceManifestPath,
+    sourceManifestSHA,
+  } = candidateSourceManifest(temporaryDirectory, ledger);
   const candidateSHA = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: worktree,
     env: gitEnvironment,
@@ -160,8 +228,7 @@ function candidateFixture({
       candidateSHA,
       sourceTreeSHA: sourceManifest.sourceTreeSHA,
       sourceManifestPath,
-      sourceManifestSHA:
-        '67b20cbdf9e0424a4193c05b59c6cc7d4ab466be93e129406d9f766fcf86d293',
+      sourceManifestSHA,
       planSHA,
       approvalReceipt: {
         path: '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
@@ -201,6 +268,7 @@ function candidateFixture({
     evidenceRoot: join(temporaryDirectory, 'evidence'),
     sourceManifest,
     sourceManifestPath,
+    sourceManifestSHA,
     worktree,
     cleanup: () => rmSync(temporaryDirectory, { recursive: true, force: true }),
   };
@@ -507,10 +575,7 @@ test('plan-schema Task-1 candidate receipt binds the committed source manifest',
     assert.equal(receipt.liveHead, fixture.candidateSHA);
     assert.equal(receipt.sourceTreeSHA, fixture.sourceManifest.sourceTreeSHA);
     assert.equal(receipt.sourceManifestPath, fixture.sourceManifestPath);
-    assert.equal(
-      receipt.sourceManifestSHA,
-      '67b20cbdf9e0424a4193c05b59c6cc7d4ab466be93e129406d9f766fcf86d293',
-    );
+    assert.equal(receipt.sourceManifestSHA, fixture.sourceManifestSHA);
     assert.equal(receipt.payloadExitCode, 0);
     assert.equal(receipt.verdict, 'accepted');
     assert.deepEqual(receipt.cleanup, {
@@ -830,7 +895,7 @@ test('trusted host supervisor contract', () => {
     const durable = immutableReceiptAt(
       resolve(
         repoRoot,
-        '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r5.json',
+        '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r6.json',
       ),
       {
         ...supervisorValue,

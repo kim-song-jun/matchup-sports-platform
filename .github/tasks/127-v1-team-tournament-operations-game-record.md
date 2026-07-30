@@ -1,7 +1,7 @@
 # Task 127 - V1 Team, Tournament Operations, and Game Record
 
 Owner: root execution pipeline
-Status: Task 1 containment complete; committed candidate verification enforced by immutable receipt and ledger
+Status: Task 1 containment baseline frozen; every source revision requires fresh immutable verification evidence
 Target: v1 backend + v1 frontend + QA/docs
 Canonical plan: `.omo/plans/teameet-team-tournament-operations-v1.md`
 
@@ -195,15 +195,16 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
 - [x] Trusted host supervisor contract passed with zero labeled Docker residue.
 - [x] V1 clean-restart precommit verification passed before the root commit.
 - [x] Root pathspec commits contain exactly the Task 1 ownership outputs.
-- [x] Immutable candidate receipt binds the committed six-path tree.
-- [x] Independent candidate V1 verification accepted the committed tree with zero residual resources.
+- [x] Historical immutable candidate receipt bound the prior committed six-path tree before the relative-growth continuation.
+- [x] Historical independent candidate V1 accepted that prior committed tree with zero residual resources; it is stale after any subsequent source-byte change and cannot be reused.
 
 ## Task 1 containment evidence
 
 - V0 execution consumption: `.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json` (`6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4`).
 - Trusted host supervisor: `.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r6.json` (`d041831fa37ea9e12301a1e934be855e6094f88beac109ed7735ed456fb6f698`), including canonical-byte receipt validation, nonroot isolation, denied Docker control and hostile environment access, read-only source, timeout/nonzero rejection, signal cleanup, and zero residual resources.
-- PIN/RED/GREEN, source-manifest, candidate-receipt, and terminal candidate V1 artifacts are bound by exact path and SHA in the durable start-work ledger outside this tracked document.
-- The terminal candidate path and SHA are intentionally not embedded here because changing this file creates a new committed blob; the immutable ledger binding is the non-self-referential authority.
+- The immutable relative-growth continuation receipt is `.omo/evidence/task-1-relative-growth-override-dc4ecb2f.json` (`2a1b41aedcece05f389e53fc639d732d6e01c2b886a9762286f3c0a66de7ca36`). It supersedes the Node/MCP-only receipt for Task 1 preflight relative-growth checks only; load, Docker, ports, browser absolute cap, in-run growth, source/candidate identity, and cleanup gates remain hard failures.
+- PIN/RED/GREEN, source-manifest, clean-restart, candidate-receipt, and terminal V1 artifacts are bound by exact path and SHA in the durable start-work ledger outside this tracked document. Evidence from a prior source revision is historical and must not be reused for changed bytes.
+- Terminal V1 paths and SHAs are intentionally not embedded here because changing this file creates a new source blob; the immutable ledger binding is the non-self-referential authority.
 
 ## Ambiguity log
 

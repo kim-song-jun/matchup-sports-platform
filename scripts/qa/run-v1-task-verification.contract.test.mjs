@@ -7,16 +7,20 @@ import {
   constants,
   cpSync,
   fsyncSync,
+  lstatSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   openSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { test } from 'node:test';
 import { dirname, join, resolve } from 'node:path';
+import { descriptorRead } from './verify-team-tournament-bound-sources.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const planSHA = 'dc4ecb2f76592799f8460135d9ea755a6e8fd768de17a29af7e61cf2b21508dd';
@@ -28,6 +32,10 @@ const nodeMcpOverridePath =
   '.omo/evidence/task-1-node-mcp-growth-override-dc4ecb2f.json';
 const nodeMcpOverrideSHA =
   '08714fb7985dc7d71931e86cb8926f55bff48d52a035211a6c7b216d4c1d36ed';
+const relativeGrowthOverridePath =
+  '.omo/evidence/task-1-relative-growth-override-dc4ecb2f.json';
+const relativeGrowthOverrideSHA =
+  '2a1b41aedcece05f389e53fc639d732d6e01c2b886a9762286f3c0a66de7ca36';
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -151,6 +159,8 @@ function candidateFixture({
   mutateCandidate = (value) => value,
   mutateWorktree = () => {},
   nodeMcpCount = 0,
+  browserCount = 0,
+  processSnapshots = null,
 } = {}) {
   const temporaryDirectory = mkdtempSync(
     '/private/tmp/teameet-v1-candidate-contract-',
@@ -161,13 +171,40 @@ function candidateFixture({
   mkdirSync(worktree);
   mkdirSync(fixtureBin);
   const fixturePs = join(fixtureBin, 'ps');
+  const snapshots = processSnapshots ?? [{ nodeMcpCount, browserCount }];
+  const snapshotCases = snapshots.map((snapshot, index) => [
+    `${index})`,
+    `  node_count=${snapshot.nodeMcpCount}`,
+    `  browser_count=${snapshot.browserCount}`,
+    '  ;;',
+  ].join('\n'));
+  const lastSnapshot = snapshots.at(-1);
+  const processState = join(temporaryDirectory, 'ps-call-count');
   writeFileSync(
     fixturePs,
     [
       '#!/bin/sh',
+      `state_file=${JSON.stringify(processState)}`,
+      'call_count=0',
+      'if [ -f "$state_file" ]; then',
+      '  call_count=$(sed -n "1p" "$state_file")',
+      'fi',
+      'case "$call_count" in',
+      ...snapshotCases,
+      '*)',
+      `  node_count=${lastSnapshot.nodeMcpCount}`,
+      `  browser_count=${lastSnapshot.browserCount}`,
+      '  ;;',
+      'esac',
+      'printf "%s\\n" "$((call_count + 1))" > "$state_file"',
       'index=0',
-      `while [ "$index" -lt ${nodeMcpCount} ]; do`,
+      'while [ "$index" -lt "$node_count" ]; do',
       '  printf "%s 1 node fixture-mcp\\n" "$((1000 + index))"',
+      '  index=$((index + 1))',
+      'done',
+      'index=0',
+      'while [ "$index" -lt "$browser_count" ]; do',
+      '  printf "%s 1 Chrome fixture-browser\\n" "$((2000 + index))"',
       '  index=$((index + 1))',
       'done',
       '',
@@ -203,6 +240,7 @@ function candidateFixture({
     '.omo/evidence/task-1-rollback-a-recovered.json',
     '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r6.json',
     nodeMcpOverridePath,
+    relativeGrowthOverridePath,
   ];
   for (const path of [
     ...ledger.unrelatedDirty.paths.map((entry) => entry.path),
@@ -292,7 +330,13 @@ function candidateFixture({
   };
 }
 
-function candidateCommand(fixture, { nodeMcpOverride = null } = {}) {
+function candidateCommand(
+  fixture,
+  {
+    nodeMcpOverride = null,
+    relativeGrowthOverride = null,
+  } = {},
+) {
   return [
     resolve(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
     '--task',
@@ -317,6 +361,18 @@ function candidateCommand(fixture, { nodeMcpOverride = null } = {}) {
           nodeMcpOverride.sha256,
         ]
       : []),
+    ...(relativeGrowthOverride?.path
+      ? [
+          '--require-relative-growth-override-receipt',
+          relativeGrowthOverride.path,
+        ]
+      : []),
+    ...(relativeGrowthOverride?.sha256
+      ? [
+          '--require-relative-growth-override-receipt-sha',
+          relativeGrowthOverride.sha256,
+        ]
+      : []),
     '--evidence-root',
     fixture.evidenceRoot,
     '--',
@@ -324,6 +380,26 @@ function candidateCommand(fixture, { nodeMcpOverride = null } = {}) {
     '-e',
     'process.exit(0)',
   ];
+}
+
+function relativeGrowthReceiptDescriptor() {
+  const receiptPath = resolve(repoRoot, relativeGrowthOverridePath);
+  const stat = lstatSync(receiptPath);
+  assert.equal(stat.isFile(), true);
+  assert.equal(stat.isSymbolicLink(), false);
+  assert.equal((stat.mode & 0o777).toString(8), '444');
+  assert.equal(stat.nlink, 1);
+  const descriptor = descriptorRead(receiptPath);
+  assert.equal(descriptor.sha256, relativeGrowthOverrideSHA);
+  const receipt = JSON.parse(descriptor.bytes.toString('utf8'));
+  return {
+    ...descriptor,
+    receipt,
+    waivers: {
+      nodeMcpGrowth: true,
+      browserRelativeGrowth: true,
+    },
+  };
 }
 
 function taskOneHostGateFunction(assertPortsFree = () => {}) {
@@ -646,6 +722,13 @@ test('Task-1 pressure override preserves non-waivable process growth gates', () 
     browserCount: 60,
     targetPorts: { 3013: [], 8121: [] },
   };
+  const nodeMcpReceipt = {
+    sha256: nodeMcpOverrideSHA,
+    waivers: {
+      nodeMcpGrowth: true,
+      browserRelativeGrowth: false,
+    },
+  };
 
   assert.doesNotThrow(() => assertHostGates(healthy, chain));
   assert.throws(
@@ -655,16 +738,25 @@ test('Task-1 pressure override preserves non-waivable process growth gates', () 
       error.message.includes('NODE_MCP_GROWTH'),
   );
   assert.doesNotThrow(() =>
-    assertHostGates({ ...healthy, nodeMcpCount: 280 }, chain, {
-      sha256: nodeMcpOverrideSHA,
-    }),
+    assertHostGates({ ...healthy, nodeMcpCount: 280 }, chain, nodeMcpReceipt),
   );
   assert.throws(
     () =>
       assertHostGates(
         { ...healthy, nodeMcpCount: 280, browserCount: 61 },
         chain,
-        { sha256: nodeMcpOverrideSHA },
+        nodeMcpReceipt,
+      ),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('BROWSER_GROWTH'),
+  );
+  assert.throws(
+    () =>
+      assertHostGates(
+        { ...healthy, nodeMcpCount: 280, browserCount: 201 },
+        chain,
+        nodeMcpReceipt,
       ),
     (error) =>
       error.code === 'HOST_PREFLIGHT_BLOCKED' &&
@@ -675,7 +767,7 @@ test('Task-1 pressure override preserves non-waivable process growth gates', () 
       assertHostGates(
         { ...healthy, nodeMcpCount: 280, loadAverage: [25, 1, 1] },
         chain,
-        { sha256: nodeMcpOverrideSHA },
+        nodeMcpReceipt,
       ),
     (error) =>
       error.code === 'HOST_PREFLIGHT_BLOCKED' &&
@@ -686,7 +778,7 @@ test('Task-1 pressure override preserves non-waivable process growth gates', () 
       assertHostGates(
         { ...healthy, nodeMcpCount: 280, docker: { state: 'unavailable' } },
         chain,
-        { sha256: nodeMcpOverrideSHA },
+        nodeMcpReceipt,
       ),
     (error) =>
       error.code === 'HOST_PREFLIGHT_BLOCKED' &&
@@ -703,10 +795,349 @@ test('Task-1 pressure override preserves non-waivable process growth gates', () 
       assertPortGate(
         { ...healthy, nodeMcpCount: 280 },
         chain,
-        { sha256: nodeMcpOverrideSHA },
+        nodeMcpReceipt,
       ),
     (error) => error.code === 'FOREIGN_PORT_OWNER',
   );
+});
+
+test('Task-1 relative-growth continuation accepts only preflight relative growth', () => {
+  const assertHostGates = taskOneHostGateFunction();
+  const receipt = relativeGrowthReceiptDescriptor();
+  const chain = {
+    consumption: {
+      receipt: {
+        hardGates: {
+          nodeMcpCount: 230,
+          browserCount: 41,
+        },
+      },
+    },
+    override: {
+      receipt: {
+        hardGrowthGates: {
+          nodeMcpGrowthAtLeast: 50,
+          swapGrowthBytesAtLeast: 2_147_483_648,
+        },
+      },
+    },
+  };
+  const currentHost = {
+    logicalCores: 12,
+    loadAverage: [4, 4, 4],
+    docker: { state: 'available' },
+    nodeMcpCount: 567,
+    browserCount: 75,
+    targetPorts: { 3013: [], 8121: [] },
+  };
+
+  assert.doesNotThrow(() => assertHostGates(currentHost, chain, receipt));
+  assert.throws(
+    () => assertHostGates({ ...currentHost, browserCount: 201 }, chain, receipt),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('BROWSER_PROCESS_PROLIFERATION'),
+  );
+  assert.throws(
+    () => assertHostGates({ ...currentHost, loadAverage: [25, 4, 4] }, chain, receipt),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('LOAD_PER_CORE_PRESSURE'),
+  );
+  assert.throws(
+    () => assertHostGates({ ...currentHost, docker: { state: 'unavailable' } }, chain, receipt),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('DOCKER_UNHEALTHY'),
+  );
+});
+
+for (const inRunGrowth of [
+  {
+    name: 'Node/MCP',
+    start: { nodeMcpCount: 0, browserCount: 0 },
+    end: { nodeMcpCount: 50, browserCount: 0 },
+  },
+  {
+    name: 'browser',
+    start: { nodeMcpCount: 0, browserCount: 0 },
+    end: { nodeMcpCount: 0, browserCount: 20 },
+  },
+]) {
+  test(`Task-1 continuation PIN keeps in-run ${inRunGrowth.name} growth hard`, () => {
+    const fixture = candidateFixture({
+      processSnapshots: [inRunGrowth.start, inRunGrowth.end],
+    });
+    try {
+      const result = runNode(candidateCommand(fixture), {
+        cwd: fixture.worktree,
+        env: fixture.environment,
+        timeout: 120_000,
+      });
+      assert.equal(result.status, 79, result.stderr);
+      assert.match(result.stderr, /HOST_GROWTH_HARD_GATE/);
+      const attempts = readdirSync(fixture.evidenceRoot, { recursive: true })
+        .filter((entry) => entry.endsWith('cleanup-journal.json'));
+      assert.equal(attempts.length, 1);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+}
+
+test('Task-1 exact relative-growth receipt waives preflight Node and browser relative growth', () => {
+  const fixture = candidateFixture({
+    nodeMcpCount: 567,
+    browserCount: 75,
+  });
+  try {
+    const result = runNode(
+      candidateCommand(fixture, {
+        relativeGrowthOverride: {
+          path: resolve(fixture.worktree, relativeGrowthOverridePath),
+          sha256: relativeGrowthOverrideSHA,
+        },
+      }),
+      {
+        cwd: fixture.worktree,
+        env: fixture.environment,
+        timeout: 120_000,
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const receipt = JSON.parse(result.stdout);
+    assert.equal(receipt.verdict, 'accepted');
+    assert.equal(
+      receipt.relativeGrowthOverrideReceiptSHA,
+      relativeGrowthOverrideSHA,
+    );
+    assert.equal(receipt.hostMetrics.before.nodeMcpCount, 567);
+    assert.equal(receipt.hostMetrics.before.browserCount, 75);
+    assert.deepEqual(receipt.hostMetrics.before.targetPorts, {
+      3013: [],
+      8121: [],
+    });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+function replaceRelativeGrowthOverride(fixture, bytes) {
+  const receiptPath = resolve(fixture.worktree, relativeGrowthOverridePath);
+  chmodSync(receiptPath, 0o644);
+  rmSync(receiptPath);
+  return immutableBytesAt(receiptPath, bytes);
+}
+
+test('Task-1 relative-growth override rejects malformed, stale, mutable, and overbroad receipts', () => {
+  const canonicalReceipt = JSON.parse(
+    readFileSync(resolve(repoRoot, relativeGrowthOverridePath), 'utf8'),
+  );
+  const canonicalBytes = Buffer.from(JSON.stringify(stable(canonicalReceipt)));
+  const cases = [
+    {
+      name: 'missing SHA pair',
+      prepare: (fixture) => ({
+        path: resolve(fixture.worktree, relativeGrowthOverridePath),
+      }),
+    },
+    {
+      name: 'missing path pair',
+      prepare: () => ({ sha256: relativeGrowthOverrideSHA }),
+    },
+    {
+      name: 'wrong path',
+      prepare: (fixture) => {
+        const targetPath = resolve(
+          fixture.worktree,
+          '.omo/evidence/task-1-relative-growth-override-wrong-path.json',
+        );
+        const target = immutableBytesAt(targetPath, canonicalBytes);
+        return { path: target.path, sha256: target.sha256 };
+      },
+    },
+    {
+      name: 'wrong SHA',
+      prepare: (fixture) => ({
+        path: resolve(fixture.worktree, relativeGrowthOverridePath),
+        sha256: '0'.repeat(64),
+      }),
+    },
+    {
+      name: 'symlinked',
+      prepare: (fixture) => {
+        const receiptPath = resolve(fixture.worktree, relativeGrowthOverridePath);
+        const targetPath = resolve(
+          fixture.worktree,
+          '.omo/evidence/task-1-relative-growth-override-target.json',
+        );
+        const target = immutableBytesAt(targetPath, canonicalBytes);
+        chmodSync(receiptPath, 0o644);
+        rmSync(receiptPath);
+        symlinkSync(targetPath, receiptPath);
+        return { path: receiptPath, sha256: target.sha256 };
+      },
+    },
+    {
+      name: 'mutable mode',
+      prepare: (fixture) => {
+        const receiptPath = resolve(fixture.worktree, relativeGrowthOverridePath);
+        chmodSync(receiptPath, 0o644);
+        return { path: receiptPath, sha256: relativeGrowthOverrideSHA };
+      },
+    },
+    {
+      name: 'hard linked',
+      prepare: (fixture) => {
+        const receiptPath = resolve(fixture.worktree, relativeGrowthOverridePath);
+        linkSync(
+          receiptPath,
+          resolve(
+            fixture.worktree,
+            '.omo/evidence/task-1-relative-growth-override-hardlink.json',
+          ),
+        );
+        return { path: receiptPath, sha256: relativeGrowthOverrideSHA };
+      },
+    },
+    {
+      name: 'duplicate key',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(`{"schemaVersion":1,${canonicalBytes.toString('utf8').slice(1)}`),
+        ),
+    },
+    {
+      name: 'trailing byte',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.concat([canonicalBytes, Buffer.from('\n')]),
+        ),
+    },
+    {
+      name: 'noncanonical JSON',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(JSON.stringify(canonicalReceipt, null, 2)),
+        ),
+    },
+    {
+      name: 'stale plan',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({ ...canonicalReceipt, planSHA256: '0'.repeat(64) })),
+          ),
+        ),
+    },
+    {
+      name: 'wrong session',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({ ...canonicalReceipt, sessionId: 'codex:wrong-session' })),
+          ),
+        ),
+    },
+    {
+      name: 'wrong predecessor',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({
+              ...canonicalReceipt,
+              supersedesReceipt: {
+                ...canonicalReceipt.supersedesReceipt,
+                sha256: '0'.repeat(64),
+              },
+            })),
+          ),
+        ),
+    },
+    {
+      name: 'overbroad scope',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({
+              ...canonicalReceipt,
+              scope: 'all-host-and-runtime-gates',
+              waivedPreflightFailures: ['HOST_PREFLIGHT_BLOCKED'],
+            })),
+          ),
+        ),
+    },
+    {
+      name: 'omitted preserved gate',
+      prepare: (fixture) =>
+        replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({
+              ...canonicalReceipt,
+              preservedFailures: canonicalReceipt.preservedFailures.filter(
+                (failure) => failure !== 'BROWSER_PROCESS_PROLIFERATION',
+              ),
+            })),
+          ),
+        ),
+    },
+    {
+      name: 'altered user text',
+      prepare: (fixture) => {
+        const alteredText = `${canonicalReceipt.userAuthorizations[1].text} altered`;
+        return replaceRelativeGrowthOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({
+              ...canonicalReceipt,
+              userAuthorizations: [
+                canonicalReceipt.userAuthorizations[0],
+                {
+                  ...canonicalReceipt.userAuthorizations[1],
+                  text: alteredText,
+                  sha256: sha256(alteredText),
+                },
+              ],
+            })),
+          ),
+        );
+      },
+    },
+  ];
+
+  for (const receiptCase of cases) {
+    const fixture = candidateFixture({
+      nodeMcpCount: 567,
+      browserCount: 75,
+    });
+    try {
+      const relativeGrowthOverride = receiptCase.prepare(fixture);
+      const result = runNode(
+        candidateCommand(fixture, { relativeGrowthOverride }),
+        {
+          cwd: fixture.worktree,
+          env: fixture.environment,
+          timeout: 120_000,
+        },
+      );
+      assert.equal(result.status, 75, `${receiptCase.name}: ${result.stderr}`);
+      assert.match(
+        result.stderr,
+        /RELATIVE_GROWTH_OVERRIDE_INVALID/,
+        receiptCase.name,
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  }
 });
 
 test('Task-1 exact user receipt waives only NODE_MCP_GROWTH', () => {

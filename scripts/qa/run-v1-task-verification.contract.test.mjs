@@ -76,13 +76,21 @@ function immutableReceipt(directory, value) {
   return immutableReceiptAt(join(directory, 'host-supervisor.json'), value);
 }
 
-function candidateFixture() {
+function candidateFixture({
+  mutateCandidate = (value) => value,
+  mutateWorktree = () => {},
+} = {}) {
   const temporaryDirectory = mkdtempSync(
     '/private/tmp/teameet-v1-candidate-contract-',
   );
   const worktree = join(temporaryDirectory, 'worktree');
   const index = join(temporaryDirectory, 'index');
+  const fixtureBin = join(temporaryDirectory, 'bin');
   mkdirSync(worktree);
+  mkdirSync(fixtureBin);
+  const fixturePs = join(fixtureBin, 'ps');
+  writeFileSync(fixturePs, '#!/bin/sh\nexit 0\n');
+  chmodSync(fixturePs, 0o755);
   const archive = spawnSync('git', ['archive', '--format=tar', 'HEAD'], {
     cwd: repoRoot,
     encoding: null,
@@ -122,7 +130,7 @@ function candidateFixture() {
     cpSync(source, target);
   }
   const gitEnvironment = {
-    PATH: process.env.PATH,
+    PATH: `${fixtureBin}:${process.env.PATH}`,
     HOME: process.env.HOME,
     LANG: 'C.UTF-8',
     TZ: 'UTC',
@@ -137,16 +145,14 @@ function candidateFixture() {
   });
   assert.equal(indexResult.status, 0, indexResult.stderr);
   const sourceManifestPath =
-    '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1/tree-sha256/a48c8be7ff1a23ed7511c89a8f8167eb48382dc0/attempt-50863f5b-9aba-4be1-833b-bef8558241cd/source-manifest.json';
+    '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1/tree-sha256/e4bd756b6566367697fc79bc489c9ddfa4fadcee/attempt-00244511-9dc7-4b64-8f99-302066c836bb/source-manifest.json';
   const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'));
   const candidateSHA = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: worktree,
     env: gitEnvironment,
     encoding: 'utf8',
   }).stdout.trim();
-  const candidate = immutableReceiptAt(
-    join(temporaryDirectory, 'candidate.json'),
-    {
+  const candidateValue = mutateCandidate({
       schemaVersion: 1,
       phase: 'candidate',
       baselineSHA: '71f67b0d24e272eecd216cebb31eefbd66c9ca02',
@@ -155,7 +161,7 @@ function candidateFixture() {
       sourceTreeSHA: sourceManifest.sourceTreeSHA,
       sourceManifestPath,
       sourceManifestSHA:
-        '4e39da5d4d994705c8167b9061fa4f14a0ad95b354f6e5e0bdfd00b1551d70ae',
+        '67b20cbdf9e0424a4193c05b59c6cc7d4ab466be93e129406d9f766fcf86d293',
       planSHA,
       approvalReceipt: {
         path: '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
@@ -179,8 +185,12 @@ function candidateFixture() {
         blobSHA: entry.blob,
       })),
       createdAt: '2026-07-30T10:00:00.000Z',
-    },
+    });
+  const candidate = immutableReceiptAt(
+    join(temporaryDirectory, 'candidate.json'),
+    candidateValue,
   );
+  mutateWorktree({ worktree, ledger, candidateValue });
   return {
     candidate,
     candidateSHA,
@@ -194,6 +204,66 @@ function candidateFixture() {
     worktree,
     cleanup: () => rmSync(temporaryDirectory, { recursive: true, force: true }),
   };
+}
+
+function candidateCommand(fixture) {
+  return [
+    resolve(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
+    '--task',
+    '1',
+    '--phase',
+    'candidate',
+    '--plan-sha',
+    planSHA,
+    '--candidate-receipt',
+    fixture.candidate.path,
+    '--candidate-receipt-sha',
+    fixture.candidate.sha256,
+    '--require-host-supervisor-receipt',
+    resolve(repoRoot, '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json'),
+    '--require-host-supervisor-receipt-sha',
+    '5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300',
+    '--evidence-root',
+    fixture.evidenceRoot,
+    '--',
+    'node',
+    '-e',
+    'process.exit(0)',
+  ];
+}
+
+function taskOneHostGateFunction() {
+  const source = readFileSync(
+    join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
+    'utf8',
+  );
+  const start = source.indexOf('function assertTaskOneHostGates(');
+  assert.notEqual(start, -1);
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  let end = -1;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) {
+      end = index + 1;
+      break;
+    }
+  }
+  assert.notEqual(end, -1);
+  const declaration = source.slice(start, end);
+  class TestHarnessError extends Error {
+    constructor(code, message, exitCode) {
+      super(message);
+      this.code = code;
+      this.exitCode = exitCode;
+    }
+  }
+  return Function(
+    'assertPortsFree',
+    'HarnessError',
+    `${declaration}; return assertTaskOneHostGates;`,
+  )(() => {}, TestHarnessError);
 }
 
 function cleanRestartFixture() {
@@ -422,40 +492,7 @@ test('plan-schema Task-1 candidate receipt binds the committed source manifest',
   const fixture = candidateFixture();
   try {
     const result = runNode(
-      [
-        resolve(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
-        '--task',
-        '1',
-        '--phase',
-        'candidate',
-        '--plan-sha',
-        planSHA,
-        '--candidate-receipt',
-        fixture.candidate.path,
-        '--candidate-receipt-sha',
-        fixture.candidate.sha256,
-        '--require-host-supervisor-receipt',
-        resolve(repoRoot, '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json'),
-        '--require-host-supervisor-receipt-sha',
-        '5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300',
-        '--evidence-root',
-        fixture.evidenceRoot,
-        '--',
-        'node',
-        'scripts/qa/validate-team-tournament-ledger.mjs',
-        '.github/tasks/127-v1-team-tournament-operations-game-record.md',
-        '--verify-clean-restart-cursor-chain',
-        '--verify-rollback-clean-state',
-        '--verify-source-manifest',
-        '--pdf-sha',
-        '1558110dc711d421f7c4eea5cd98accc528180e625e1980578f92e1256806d50',
-        '--preview-sha',
-        '7d8e101ad27a6a227f1a525a729888aa4286845b5a6819aaa034b57cc55ba9f1',
-        '--design-commit',
-        '71f67b0d24e272eecd216cebb31eefbd66c9ca02',
-        '--design-sha',
-        '3ee8aedd03c507a7b7540bc9134e52abf49e8210a30d338bca2a899beca0f8a2',
-      ],
+      candidateCommand(fixture),
       {
         cwd: fixture.worktree,
         env: fixture.environment,
@@ -472,7 +509,7 @@ test('plan-schema Task-1 candidate receipt binds the committed source manifest',
     assert.equal(receipt.sourceManifestPath, fixture.sourceManifestPath);
     assert.equal(
       receipt.sourceManifestSHA,
-      '4e39da5d4d994705c8167b9061fa4f14a0ad95b354f6e5e0bdfd00b1551d70ae',
+      '67b20cbdf9e0424a4193c05b59c6cc7d4ab466be93e129406d9f766fcf86d293',
     );
     assert.equal(receipt.payloadExitCode, 0);
     assert.equal(receipt.verdict, 'accepted');
@@ -489,6 +526,124 @@ test('plan-schema Task-1 candidate receipt binds the committed source manifest',
     fixture.cleanup();
   }
 });
+
+test('Task-1 pressure override preserves non-waivable process growth gates', () => {
+  const assertHostGates = taskOneHostGateFunction();
+  const chain = {
+    consumption: {
+      receipt: {
+        hardGates: {
+          nodeMcpCount: 230,
+          browserCount: 41,
+        },
+      },
+    },
+    override: {
+      receipt: {
+        hardGrowthGates: {
+          nodeMcpGrowthAtLeast: 50,
+          swapGrowthBytesAtLeast: 2_147_483_648,
+        },
+      },
+    },
+  };
+  const healthy = {
+    logicalCores: 12,
+    loadAverage: [1, 1, 1],
+    docker: { state: 'available' },
+    nodeMcpCount: 279,
+    browserCount: 60,
+    targetPorts: { 3013: [], 8121: [] },
+  };
+
+  assert.doesNotThrow(() => assertHostGates(healthy, chain));
+  assert.throws(
+    () => assertHostGates({ ...healthy, nodeMcpCount: 280 }, chain),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('NODE_MCP_GROWTH'),
+  );
+  assert.throws(
+    () => assertHostGates({ ...healthy, browserCount: 61 }, chain),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('BROWSER_GROWTH'),
+  );
+});
+
+const candidateNegativeCases = [
+  {
+    name: 'wrong live HEAD',
+    mutateCandidate: (value) => ({ ...value, candidateSHA: '0'.repeat(40) }),
+  },
+  {
+    name: 'wrong owned blob',
+    mutateCandidate: (value) => ({
+      ...value,
+      ownedPathBlobs: value.ownedPathBlobs.map((entry, index) =>
+        index === 0 ? { ...entry, blobSHA: '0'.repeat(40) } : entry),
+    }),
+  },
+  {
+    name: 'wrong owned mode',
+    mutateCandidate: (value) => ({
+      ...value,
+      ownedPathBlobs: value.ownedPathBlobs.map((entry, index) =>
+        index === 0 ? { ...entry, mode: '100755' } : entry),
+    }),
+  },
+  {
+    name: 'wrong authority receipt',
+    mutateCandidate: (value) => ({
+      ...value,
+      approvalReceipt: { ...value.approvalReceipt, sha256: '0'.repeat(64) },
+    }),
+  },
+  {
+    name: 'wrong source manifest',
+    mutateCandidate: (value) => ({
+      ...value,
+      sourceManifestSHA: '0'.repeat(64),
+    }),
+  },
+  {
+    name: 'dirty owned path',
+    mutateWorktree: ({ worktree, ledger }) => {
+      const owned = ledger.ownership.find(({ todo }) => todo === 1).outputs[0];
+      const target = join(worktree, owned);
+      writeFileSync(target, `${readFileSync(target, 'utf8')}\nfixture-owned-drift\n`);
+    },
+  },
+  {
+    name: 'unrelated fingerprint drift',
+    expectedError: 'UNRELATED_DIRTY_FINGERPRINT_DRIFT',
+    mutateWorktree: ({ worktree, ledger }) => {
+      const unrelated = ledger.unrelatedDirty.paths[0].path;
+      const target = join(worktree, unrelated);
+      writeFileSync(target, `${readFileSync(target, 'utf8')}\nfixture-unrelated-drift\n`);
+    },
+  },
+];
+
+for (const fixtureCase of candidateNegativeCases) {
+  test(`Task-1 candidate rejects ${fixtureCase.name}`, () => {
+    const fixture = candidateFixture(fixtureCase);
+    try {
+      const result = runNode(candidateCommand(fixture), {
+        cwd: fixture.worktree,
+        env: fixture.environment,
+        timeout: 30_000,
+      });
+      assert.equal(result.status, 68, result.stdout);
+      assert.match(
+        result.stderr,
+        new RegExp(fixtureCase.expectedError ?? 'CANDIDATE_BINDING_MISMATCH'),
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  });
+}
 
 test('trusted host supervisor contract', () => {
   const probeAttemptId = realDockerSupervisorProbe();
@@ -675,7 +830,7 @@ test('trusted host supervisor contract', () => {
     const durable = immutableReceiptAt(
       resolve(
         repoRoot,
-        '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r4.json',
+        '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r5.json',
       ),
       {
         ...supervisorValue,

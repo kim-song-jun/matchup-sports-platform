@@ -2030,12 +2030,17 @@ function exactDockerCleanup(resources, labels) {
   return cleanupErrors;
 }
 
-function assertTaskOneHostGates(preflight) {
+function assertTaskOneHostGates(preflight, chain) {
   assertPortsFree(preflight);
+  const baseline = chain.consumption.receipt.hardGates;
+  const limits = chain.override.receipt.hardGrowthGates;
   const failures = [];
   if (preflight.loadAverage[0] > preflight.logicalCores * 2) failures.push('LOAD_PER_CORE_PRESSURE');
   if (preflight.docker.state !== 'available') failures.push('DOCKER_UNHEALTHY');
-  if (preflight.browserCount > 200) {
+  if (preflight.nodeMcpCount - baseline.nodeMcpCount >= limits.nodeMcpGrowthAtLeast) {
+    failures.push('NODE_MCP_GROWTH');
+  }
+  if (preflight.browserCount - baseline.browserCount >= 20 || preflight.browserCount > 200) {
     failures.push('BROWSER_GROWTH');
   }
   if (failures.length > 0) {
@@ -2157,7 +2162,7 @@ async function runTaskOneCleanRestart({
     verifyOwnedPathsClean(repoRoot, ownershipRow(ledger, 1).outputs);
   }
   const preflightStart = hostPreflight().preflight;
-  assertTaskOneHostGates(preflightStart);
+  assertTaskOneHostGates(preflightStart, chain);
   const attemptId = randomUUID();
   const evidenceRoot = resolve(options['evidence-root'] ?? DEFAULT_EVIDENCE_ROOT);
   const snapshot = candidate

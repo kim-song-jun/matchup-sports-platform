@@ -158,6 +158,20 @@ jobs:
           cache-from: type=gha,scope=alpha-v1-web
           cache-to: type=gha,mode=max,scope=alpha-v1-web
 
+      - name: 'TEMP DIAGNOSTIC: dump ECR scan config (remove after investigation)'
+        env:
+          IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+        run: |
+          set -Eeuo pipefail
+          echo '--- repository scanning configuration ---'
+          aws ecr describe-repositories --repository-names "${API_REPOSITORY}" "${WEB_REPOSITORY}" \
+            --query 'repositories[].{name:repositoryName,scanOnPush:imageScanningConfiguration.scanOnPush}' || true
+          echo '--- registry scanning configuration ---'
+          aws ecr get-registry-scanning-configuration || true
+          echo '--- describe-images for the pushed api tag ---'
+          aws ecr describe-images --repository-name "${API_REPOSITORY}" \
+            --image-ids "imageTag=${IMAGE_TAG}" || true
+
       - name: Gate ECR critical findings
         env:
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}

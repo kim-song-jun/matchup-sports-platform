@@ -62,6 +62,23 @@ const TASK_ONE_RECEIPTS = {
     sha256: '087a173e40dbe889eee8d5b1e2f177d8ec690f2635ace8f7610dad551ef31979',
   },
 };
+const TASK_ONE_NODE_MCP_OVERRIDE = {
+  path: '.omo/evidence/task-1-node-mcp-growth-override-dc4ecb2f.json',
+  sha256: '08714fb7985dc7d71931e86cb8926f55bff48d52a035211a6c7b216d4c1d36ed',
+};
+const TASK_ONE_NODE_MCP_OVERRIDE_TEXT =
+  'Task 1 호스트 게이트 재확인: FAIL. 이거 그냥 진행하면 괜찮아 내가 승인했어 아직 리로스가 많이 남앙ㅆ는거야.';
+const TASK_ONE_NODE_MCP_PRESERVED_FAILURES = [
+  'LOAD_PER_CORE_PRESSURE',
+  'DOCKER_UNHEALTHY',
+  'FOREIGN_PORT_OWNER',
+  'BROWSER_GROWTH',
+  'HOST_GROWTH_HARD_GATE',
+  'DOCKER_CLEANUP_LEAK',
+  'CANDIDATE_BINDING_MISMATCH',
+  'SOURCE_SNAPSHOT_COMMIT_DRIFT',
+  'UNRELATED_DIRTY_FINGERPRINT_DRIFT',
+];
 const BEGIN = '<!-- TASK127_LEDGER_JSON_BEGIN -->';
 const END = '<!-- TASK127_LEDGER_JSON_END -->';
 const OVERRIDE_PATH = '.omo/start-work/host-pressure-override-plan.json';
@@ -101,6 +118,8 @@ const VALUE_OPTIONS = new Set([
   'predecessor-chain',
   'require-host-supervisor-receipt',
   'require-host-supervisor-receipt-sha',
+  'require-node-mcp-override-receipt',
+  'require-node-mcp-override-receipt-sha',
   'require-task127-cursor-mode',
   'require-task127-cursor-receipt',
   'require-task127-cursor-receipt-sha',
@@ -2030,14 +2049,17 @@ function exactDockerCleanup(resources, labels) {
   return cleanupErrors;
 }
 
-function assertTaskOneHostGates(preflight, chain) {
+function assertTaskOneHostGates(preflight, chain, nodeMcpOverride = null) {
   assertPortsFree(preflight);
   const baseline = chain.consumption.receipt.hardGates;
   const limits = chain.override.receipt.hardGrowthGates;
   const failures = [];
   if (preflight.loadAverage[0] > preflight.logicalCores * 2) failures.push('LOAD_PER_CORE_PRESSURE');
   if (preflight.docker.state !== 'available') failures.push('DOCKER_UNHEALTHY');
-  if (preflight.nodeMcpCount - baseline.nodeMcpCount >= limits.nodeMcpGrowthAtLeast) {
+  if (
+    preflight.nodeMcpCount - baseline.nodeMcpCount >= limits.nodeMcpGrowthAtLeast &&
+    nodeMcpOverride === null
+  ) {
     failures.push('NODE_MCP_GROWTH');
   }
   if (preflight.browserCount - baseline.browserCount >= 20 || preflight.browserCount > 200) {
@@ -2046,6 +2068,102 @@ function assertTaskOneHostGates(preflight, chain) {
   if (failures.length > 0) {
     throw new HarnessError('HOST_PREFLIGHT_BLOCKED', failures.join(','), 72);
   }
+}
+
+function exactObjectKeys(value, expected) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...expected].sort())
+  );
+}
+
+function taskOneAuthorityPairMatches(repoRoot, supplied, expected) {
+  return (
+    exactObjectKeys(supplied, ['path', 'sha256']) &&
+    resolve(repoRoot, supplied.path) === expected.path &&
+    supplied.sha256 === expected.sha256
+  );
+}
+
+function verifyTaskOneNodeMcpOverride(options, repoRoot, plan, phase, chain) {
+  const suppliedPath = options['require-node-mcp-override-receipt'];
+  const suppliedSHA = options['require-node-mcp-override-receipt-sha'];
+  if (!suppliedPath || !suppliedSHA) {
+    throw new HarnessError(
+      'NODE_MCP_OVERRIDE_INVALID',
+      'Task-1 Node/MCP override receipt path and SHA are both required',
+      75,
+    );
+  }
+  const canonicalPath = resolve(repoRoot, TASK_ONE_NODE_MCP_OVERRIDE.path);
+  const absoluteSuppliedPath = isAbsolute(suppliedPath)
+    ? resolve(suppliedPath)
+    : resolve(repoRoot, suppliedPath);
+  if (absoluteSuppliedPath !== canonicalPath) {
+    throw new HarnessError(
+      'NODE_MCP_OVERRIDE_INVALID',
+      `Task-1 Node/MCP override receipt path must be ${TASK_ONE_NODE_MCP_OVERRIDE.path}`,
+      75,
+    );
+  }
+  const descriptor = secureImmutableDescriptor(
+    absoluteSuppliedPath,
+    suppliedSHA,
+    'NODE_MCP_OVERRIDE_INVALID',
+    75,
+  );
+  const receipt = descriptor.receipt;
+  const authority = receipt.authorityReceipts;
+  const valid =
+    exactObjectKeys(receipt, [
+      'appliesToPhases',
+      'authorityReceipts',
+      'createdAt',
+      'planPath',
+      'planSHA256',
+      'preservedFailures',
+      'receiptType',
+      'schemaVersion',
+      'scope',
+      'sessionId',
+      'taskId',
+      'userAuthorization',
+      'waivedFailure',
+      'workloadId',
+    ]) &&
+    exactObjectKeys(authority, ['approval', 'consumption', 'cursor', 'hostSupervisor']) &&
+    exactObjectKeys(receipt.userAuthorization, ['sha256', 'text']) &&
+    receipt.schemaVersion === 1 &&
+    receipt.receiptType === 'task-1-node-mcp-growth-override' &&
+    receipt.planPath === PLAN_PATH &&
+    receipt.planSHA256 === plan.selectedSHA &&
+    receipt.taskId === 1 &&
+    receipt.workloadId === TASK_ONE_WORKLOAD &&
+    receipt.sessionId === VERIFICATION_SESSION_ID &&
+    receipt.scope === 'node-mcp-preflight-growth-only' &&
+    JSON.stringify(receipt.appliesToPhases) ===
+      JSON.stringify(['clean-restart', 'candidate']) &&
+    receipt.appliesToPhases.includes(phase) &&
+    receipt.waivedFailure === 'NODE_MCP_GROWTH' &&
+    JSON.stringify(receipt.preservedFailures) ===
+      JSON.stringify(TASK_ONE_NODE_MCP_PRESERVED_FAILURES) &&
+    receipt.userAuthorization.text === TASK_ONE_NODE_MCP_OVERRIDE_TEXT &&
+    receipt.userAuthorization.sha256 === sha256(TASK_ONE_NODE_MCP_OVERRIDE_TEXT) &&
+    receipt.createdAt === '2026-07-30T12:34:26.310Z' &&
+    taskOneAuthorityPairMatches(repoRoot, authority?.approval, chain.approval) &&
+    taskOneAuthorityPairMatches(repoRoot, authority?.cursor, chain.cursor) &&
+    taskOneAuthorityPairMatches(repoRoot, authority?.consumption, chain.consumption) &&
+    taskOneAuthorityPairMatches(repoRoot, authority?.hostSupervisor, chain.host);
+  if (!valid || descriptor.sha256 !== TASK_ONE_NODE_MCP_OVERRIDE.sha256) {
+    throw new HarnessError(
+      'NODE_MCP_OVERRIDE_INVALID',
+      'Task-1 Node/MCP override does not bind the exact plan, session, authority chain, or narrow failure scope',
+      75,
+    );
+  }
+  return descriptor;
 }
 
 function taskOneMounts(repoRoot, snapshot, chain) {
@@ -2162,7 +2280,16 @@ async function runTaskOneCleanRestart({
     verifyOwnedPathsClean(repoRoot, ownershipRow(ledger, 1).outputs);
   }
   const preflightStart = hostPreflight().preflight;
-  assertTaskOneHostGates(preflightStart, chain);
+  const nodeMcpGrowth =
+    preflightStart.nodeMcpCount - chain.consumption.receipt.hardGates.nodeMcpCount >=
+    chain.override.receipt.hardGrowthGates.nodeMcpGrowthAtLeast;
+  const nodeMcpOverride =
+    nodeMcpGrowth ||
+    options['require-node-mcp-override-receipt'] !== undefined ||
+    options['require-node-mcp-override-receipt-sha'] !== undefined
+      ? verifyTaskOneNodeMcpOverride(options, repoRoot, plan, phase, chain)
+      : null;
+  assertTaskOneHostGates(preflightStart, chain, nodeMcpOverride);
   const attemptId = randomUUID();
   const evidenceRoot = resolve(options['evidence-root'] ?? DEFAULT_EVIDENCE_ROOT);
   const snapshot = candidate
@@ -2411,6 +2538,12 @@ async function runTaskOneCleanRestart({
     task127CursorReceiptSHA: chain.cursor.sha256,
     hostSupervisorReceiptPath: chain.host.path,
     hostSupervisorReceiptSHA: chain.host.sha256,
+    ...(nodeMcpOverride
+      ? {
+          nodeMcpOverrideReceiptPath: nodeMcpOverride.path,
+          nodeMcpOverrideReceiptSHA: nodeMcpOverride.sha256,
+        }
+      : {}),
     approvalReceiptPath: chain.approval.path,
     approvalReceiptSHA: chain.approval.sha256,
     overrideReceiptPath: chain.override.path,

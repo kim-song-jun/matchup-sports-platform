@@ -1,7 +1,7 @@
 # Task 127 - V1 Team, Tournament Operations, and Game Record
 
 Owner: root execution pipeline
-Status: Task 1 containment GREEN; trusted host supervisor APPROVE; V1 clean-restart precommit PASS; pathspec commit pending
+Status: Task 1 containment complete; committed candidate verification enforced by immutable receipt and ledger
 Target: v1 backend + v1 frontend + QA/docs
 Canonical plan: `.omo/plans/teameet-team-tournament-operations-v1.md`
 
@@ -57,8 +57,8 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
       "sha256": "6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4"
     },
     "hostSupervisorReceipt": {
-      "path": ".omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json",
-      "sha256": "5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300"
+      "path": ".omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r6.json",
+      "sha256": "d041831fa37ea9e12301a1e934be855e6094f88beac109ed7735ed456fb6f698"
     },
     "restartHeadSHA": "a4823d2f575d9396323421024a81a63dacf0cf67",
     "predecessorChain": [
@@ -191,19 +191,22 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
 - [x] Screen ledger mapped 18/18.
 - [x] Ownership manifest mapped 27/27.
 - [x] V0 execution authority consumed exactly once before expiry.
-- [x] Current a482 bound-source PIN passed before production edits.
+- [x] Clean-restart bound-source PIN passed before production edits.
 - [x] Trusted host supervisor contract passed with zero labeled Docker residue.
-- [x] V1 clean-restart precommit verification passed with `candidateSHA: null`.
-- [ ] Root pathspec commit (outside this executor's no-commit scope).
+- [x] V1 clean-restart precommit verification passed before the root commit.
+- [x] Root pathspec commits contain exactly the Task 1 ownership outputs.
+- [x] Immutable candidate receipt binds the committed six-path tree.
+- [x] Independent candidate V1 verification accepted the committed tree with zero residual resources.
 
-## Task 1 precommit evidence
+## Task 1 containment evidence
 
 - V0 execution consumption: `.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json` (`6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4`).
-- Trusted host supervisor: `.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json` (`5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300`), including canonical-byte receipt validation, nonroot isolation, denied Docker control and hostile environment access, read-only source, timeout/nonzero rejection, signal cleanup, and zero residual resources.
-- PIN/RED/GREEN artifacts: `/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1/task-1-clean-restart/`.
-- The terminal V1 runtime receipt is emitted outside the repository from the exact six-path source manifest; it binds `candidateSHA: null`, payload exit `0`, and seven zero-valued cleanup observables.
+- Trusted host supervisor: `.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r6.json` (`d041831fa37ea9e12301a1e934be855e6094f88beac109ed7735ed456fb6f698`), including canonical-byte receipt validation, nonroot isolation, denied Docker control and hostile environment access, read-only source, timeout/nonzero rejection, signal cleanup, and zero residual resources.
+- PIN/RED/GREEN, source-manifest, candidate-receipt, and terminal candidate V1 artifacts are bound by exact path and SHA in the durable start-work ledger outside this tracked document.
+- The terminal candidate path and SHA are intentionally not embedded here because changing this file creates a new committed blob; the immutable ledger binding is the non-self-referential authority.
 
 ## Ambiguity log
 
 - PDF artboards show tournament field operations under `/admin/**`; approved D-04 and the selected plan supersede only that route example with `/tournament-ops/**`. Existing global admin tournament management remains unchanged.
 - `T-08` and `P-03` intentionally resolve to the same public team-record route. They are distinct product entry/context IDs with one implementation owner, not duplicate ownership.
+- The v1 live-entry MVP is tournament-operations only. Tapping a player freezes that moment's server-synchronized game clock in an event draft; choosing `GOAL`, `YELLOW_CARD`, or `RED_CARD` submits the acknowledged event with that captured clock. `GOAL` requires the scorer and may include one optional assist. A generic `FOUL` event and an ordinary-team-match live console are deferred; team management uses the shared event/result contract through its post-match result workflow. Public live timelines render acknowledged events only.

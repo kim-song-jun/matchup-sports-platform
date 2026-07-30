@@ -12,6 +12,7 @@ import {
   openSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { test } from 'node:test';
@@ -23,6 +24,10 @@ const workload = 'task-1-host-supervisor-v1';
 const image = 'teameet-v1-verification:node22-pnpm9.15.4';
 const baselineSHA = '71f67b0d24e272eecd216cebb31eefbd66c9ca02';
 const restartHeadSHA = 'a4823d2f575d9396323421024a81a63dacf0cf67';
+const nodeMcpOverridePath =
+  '.omo/evidence/task-1-node-mcp-growth-override-dc4ecb2f.json';
+const nodeMcpOverrideSHA =
+  '08714fb7985dc7d71931e86cb8926f55bff48d52a035211a6c7b216d4c1d36ed';
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -145,6 +150,7 @@ function candidateSourceManifest(temporaryDirectory, ledger) {
 function candidateFixture({
   mutateCandidate = (value) => value,
   mutateWorktree = () => {},
+  nodeMcpCount = 0,
 } = {}) {
   const temporaryDirectory = mkdtempSync(
     '/private/tmp/teameet-v1-candidate-contract-',
@@ -155,7 +161,18 @@ function candidateFixture({
   mkdirSync(worktree);
   mkdirSync(fixtureBin);
   const fixturePs = join(fixtureBin, 'ps');
-  writeFileSync(fixturePs, '#!/bin/sh\nexit 0\n');
+  writeFileSync(
+    fixturePs,
+    [
+      '#!/bin/sh',
+      'index=0',
+      `while [ "$index" -lt ${nodeMcpCount} ]; do`,
+      '  printf "%s 1 node fixture-mcp\\n" "$((1000 + index))"',
+      '  index=$((index + 1))',
+      'done',
+      '',
+    ].join('\n'),
+  );
   chmodSync(fixturePs, 0o755);
   const archive = spawnSync('git', ['archive', '--format=tar', 'HEAD'], {
     cwd: repoRoot,
@@ -184,7 +201,8 @@ function candidateFixture({
     '.omo/evidence/task-1-host-pressure-override-dc4ecb2f-r2.json',
     '.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json',
     '.omo/evidence/task-1-rollback-a-recovered.json',
-    '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json',
+    '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r6.json',
+    nodeMcpOverridePath,
   ];
   for (const path of [
     ...ledger.unrelatedDirty.paths.map((entry) => entry.path),
@@ -274,7 +292,7 @@ function candidateFixture({
   };
 }
 
-function candidateCommand(fixture) {
+function candidateCommand(fixture, { nodeMcpOverride = null } = {}) {
   return [
     resolve(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
     '--task',
@@ -288,9 +306,17 @@ function candidateCommand(fixture) {
     '--candidate-receipt-sha',
     fixture.candidate.sha256,
     '--require-host-supervisor-receipt',
-    resolve(repoRoot, '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json'),
+    resolve(fixture.worktree, '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r6.json'),
     '--require-host-supervisor-receipt-sha',
-    '5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300',
+    'd041831fa37ea9e12301a1e934be855e6094f88beac109ed7735ed456fb6f698',
+    ...(nodeMcpOverride
+      ? [
+          '--require-node-mcp-override-receipt',
+          nodeMcpOverride.path,
+          '--require-node-mcp-override-receipt-sha',
+          nodeMcpOverride.sha256,
+        ]
+      : []),
     '--evidence-root',
     fixture.evidenceRoot,
     '--',
@@ -300,7 +326,7 @@ function candidateCommand(fixture) {
   ];
 }
 
-function taskOneHostGateFunction() {
+function taskOneHostGateFunction(assertPortsFree = () => {}) {
   const source = readFileSync(
     join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
     'utf8',
@@ -331,7 +357,7 @@ function taskOneHostGateFunction() {
     'assertPortsFree',
     'HarnessError',
     `${declaration}; return assertTaskOneHostGates;`,
-  )(() => {}, TestHarnessError);
+  )(assertPortsFree, TestHarnessError);
 }
 
 function cleanRestartFixture() {
@@ -628,12 +654,205 @@ test('Task-1 pressure override preserves non-waivable process growth gates', () 
       error.code === 'HOST_PREFLIGHT_BLOCKED' &&
       error.message.includes('NODE_MCP_GROWTH'),
   );
+  assert.doesNotThrow(() =>
+    assertHostGates({ ...healthy, nodeMcpCount: 280 }, chain, {
+      sha256: nodeMcpOverrideSHA,
+    }),
+  );
   assert.throws(
-    () => assertHostGates({ ...healthy, browserCount: 61 }, chain),
+    () =>
+      assertHostGates(
+        { ...healthy, nodeMcpCount: 280, browserCount: 61 },
+        chain,
+        { sha256: nodeMcpOverrideSHA },
+      ),
     (error) =>
       error.code === 'HOST_PREFLIGHT_BLOCKED' &&
       error.message.includes('BROWSER_GROWTH'),
   );
+  assert.throws(
+    () =>
+      assertHostGates(
+        { ...healthy, nodeMcpCount: 280, loadAverage: [25, 1, 1] },
+        chain,
+        { sha256: nodeMcpOverrideSHA },
+      ),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('LOAD_PER_CORE_PRESSURE'),
+  );
+  assert.throws(
+    () =>
+      assertHostGates(
+        { ...healthy, nodeMcpCount: 280, docker: { state: 'unavailable' } },
+        chain,
+        { sha256: nodeMcpOverrideSHA },
+      ),
+    (error) =>
+      error.code === 'HOST_PREFLIGHT_BLOCKED' &&
+      error.message.includes('DOCKER_UNHEALTHY'),
+  );
+  const portError = Object.assign(new Error('occupied'), {
+    code: 'FOREIGN_PORT_OWNER',
+  });
+  const assertPortGate = taskOneHostGateFunction(() => {
+    throw portError;
+  });
+  assert.throws(
+    () =>
+      assertPortGate(
+        { ...healthy, nodeMcpCount: 280 },
+        chain,
+        { sha256: nodeMcpOverrideSHA },
+      ),
+    (error) => error.code === 'FOREIGN_PORT_OWNER',
+  );
+});
+
+test('Task-1 exact user receipt waives only NODE_MCP_GROWTH', () => {
+  const fixture = candidateFixture({ nodeMcpCount: 337 });
+  try {
+    const result = runNode(
+      candidateCommand(fixture, {
+        nodeMcpOverride: {
+          path: resolve(fixture.worktree, nodeMcpOverridePath),
+          sha256: nodeMcpOverrideSHA,
+        },
+      }),
+      {
+        cwd: fixture.worktree,
+        env: fixture.environment,
+        timeout: 120_000,
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const receipt = JSON.parse(result.stdout);
+    assert.equal(receipt.verdict, 'accepted');
+    assert.equal(receipt.nodeMcpOverrideReceiptSHA, nodeMcpOverrideSHA);
+    assert.deepEqual(receipt.hostMetrics.before.targetPorts, {
+      3013: [],
+      8121: [],
+    });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+function replaceNodeMcpOverride(fixture, bytes) {
+  const receiptPath = resolve(fixture.worktree, nodeMcpOverridePath);
+  chmodSync(receiptPath, 0o644);
+  rmSync(receiptPath);
+  return immutableBytesAt(receiptPath, bytes);
+}
+
+test('Task-1 node override rejects missing, malformed, symlinked, stale, mutable, and overbroad receipts', () => {
+  const canonicalReceipt = JSON.parse(
+    readFileSync(resolve(repoRoot, nodeMcpOverridePath), 'utf8'),
+  );
+  const cases = [
+    {
+      name: 'missing',
+      prepare: () => null,
+    },
+    {
+      name: 'malformed JSON',
+      prepare: (fixture) =>
+        replaceNodeMcpOverride(fixture, Buffer.from('{"schemaVersion":')),
+    },
+    {
+      name: 'symlinked',
+      prepare: (fixture) => {
+        const receiptPath = resolve(fixture.worktree, nodeMcpOverridePath);
+        const targetPath = resolve(
+          fixture.worktree,
+          '.omo/evidence/task-1-node-mcp-growth-override-target.json',
+        );
+        const target = immutableReceiptAt(targetPath, canonicalReceipt);
+        chmodSync(receiptPath, 0o644);
+        rmSync(receiptPath);
+        symlinkSync(targetPath, receiptPath);
+        return { path: receiptPath, sha256: target.sha256 };
+      },
+    },
+    {
+      name: 'stale plan',
+      prepare: (fixture) =>
+        replaceNodeMcpOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({ ...canonicalReceipt, planSHA256: '0'.repeat(64) })),
+          ),
+        ),
+    },
+    {
+      name: 'wrong session',
+      prepare: (fixture) =>
+        replaceNodeMcpOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(stable({ ...canonicalReceipt, sessionId: 'codex:wrong-session' })),
+          ),
+        ),
+    },
+    {
+      name: 'trailing byte',
+      prepare: (fixture) =>
+        replaceNodeMcpOverride(
+          fixture,
+          Buffer.concat([
+            Buffer.from(JSON.stringify(stable(canonicalReceipt))),
+            Buffer.from('\n'),
+          ]),
+        ),
+    },
+    {
+      name: 'mutable mode',
+      prepare: (fixture) => {
+        const receiptPath = resolve(fixture.worktree, nodeMcpOverridePath);
+        chmodSync(receiptPath, 0o644);
+        return { path: receiptPath, sha256: nodeMcpOverrideSHA };
+      },
+    },
+    {
+      name: 'overbroad waiver',
+      prepare: (fixture) =>
+        replaceNodeMcpOverride(
+          fixture,
+          Buffer.from(
+            JSON.stringify(
+              stable({
+                ...canonicalReceipt,
+                scope: 'all-host-gates',
+                waivedFailure: 'HOST_PREFLIGHT_BLOCKED',
+              }),
+            ),
+          ),
+        ),
+    },
+  ];
+
+  for (const receiptCase of cases) {
+    const fixture = candidateFixture({ nodeMcpCount: 337 });
+    try {
+      const nodeMcpOverride = receiptCase.prepare(fixture);
+      const result = runNode(
+        candidateCommand(fixture, { nodeMcpOverride }),
+        {
+          cwd: fixture.worktree,
+          env: fixture.environment,
+          timeout: 120_000,
+        },
+      );
+      assert.equal(result.status, 75, `${receiptCase.name}: ${result.stderr}`);
+      assert.match(
+        result.stderr,
+        /NODE_MCP_OVERRIDE_INVALID/,
+        receiptCase.name,
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  }
 });
 
 const candidateNegativeCases = [

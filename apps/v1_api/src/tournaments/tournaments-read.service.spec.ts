@@ -82,6 +82,7 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     scheduledAt: new Date('2026-07-01T09:00:00.000Z'),
     scheduledEndAt: null,
     venue: '서울 풋살장',
+    parkingInfo: '지하 주차장 2시간 무료',
     coverImageUrl: '/uploads/tournaments/spring-cup.webp',
     teamCount: 8,
     minPlayers: 6,
@@ -357,6 +358,7 @@ describe('TournamentsReadService', () => {
       sportId: 'sport-1',
       sport: { code: 'futsal', name: '풋살' },
       coverImageUrl: '/uploads/tournaments/spring-cup.webp',
+      parkingInfo: '지하 주차장 2시간 무료',
       confirmedCount: 4,
       pendingPaymentCount: 1,
     });

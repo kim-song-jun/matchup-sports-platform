@@ -268,6 +268,7 @@
 
 - `GET /api/v1/tournaments`와 `GET /api/v1/tournaments/:id`는 로그인 없이 접근 가능한 공개 탐색 API다. 신청, 내 신청, 로스터, 관리자 조작은 별도 guarded endpoint에서만 처리한다.
 - `GET /api/v1/tournaments/:id`는 대회 기본 정보, `bracketPublishedAt`, `groups`, `fixtures`, `announcements`, `confirmedCount`, `popup`을 반환한다.
+- 공개·어드민 대회 응답은 `parkingInfo: string | null`을 포함한다. `PATCH /api/v1/admin/tournaments/:id`에서 최대 500자로 수정하며, `null`은 공개 상세 장소 아래 주차 안내를 숨긴다.
 - `announcements`는 public detail에서 `publishedAt != null`인 공지만 포함한다.
   - 필드: `id`, `title`, `body`, `category`, `audience`, `publishedAt`, `createdAt`
   - `category`: `general | venue | sponsor | media | results | review`

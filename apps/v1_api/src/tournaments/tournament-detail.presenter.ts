@@ -44,6 +44,7 @@ export function presentTournamentDetail(row: TournamentDetailRow, now: Date = ne
     scheduledAt: row.scheduledAt?.toISOString() ?? null,
     scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
     venue: row.venue,
+    parkingInfo: row.parkingInfo,
     latitude: row.latitude,
     longitude: row.longitude,
     coverImageUrl: row.coverImageUrl,

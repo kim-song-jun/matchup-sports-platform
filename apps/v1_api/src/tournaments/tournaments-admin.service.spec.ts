@@ -30,6 +30,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,
+    parkingInfo: '주차와 입장 동선은 지도에서 확인해요.',
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
@@ -586,6 +587,7 @@ describe('TournamentsAdminService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     const existing = tournamentRow({
       venue: '기존 장소',
+      parkingInfo: '기존 주차 안내',
       latitude: 5,
       longitude: 5,
       entryFee: 0,
@@ -594,6 +596,7 @@ describe('TournamentsAdminService', () => {
     });
     const updated = tournamentRow({
       venue: null,
+      parkingInfo: null,
       latitude: null,
       longitude: null,
       bankName: null,
@@ -606,6 +609,7 @@ describe('TournamentsAdminService', () => {
 
     await service.update(ownerAuthUser, 'tournament-1', {
       venue: null,
+      parkingInfo: null,
       bankName: null,
       rulesText: null,
     });
@@ -615,6 +619,7 @@ describe('TournamentsAdminService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           venue: null,
+          parkingInfo: null,
           latitude: null,
           longitude: null,
           bankName: null,

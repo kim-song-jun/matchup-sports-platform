@@ -16,6 +16,10 @@ expected_bucket="teameet-alpha-deploy-${account_id}-${ALPHA_AWS_REGION}"
   echo "Alpha bucket identity mismatch" >&2
   exit 1
 }
+aws s3api head-bucket --bucket "${ALPHA_DEPLOY_BUCKET}" --expected-bucket-owner "${account_id}"
+[[ "$(aws s3api get-bucket-versioning --bucket "${ALPHA_DEPLOY_BUCKET}" \
+  --expected-bucket-owner "${account_id}" --query Status --output text)" == Enabled ]]
+
 instance_json="$(aws ec2 describe-instances --region "${ALPHA_AWS_REGION}" \
   --instance-ids "${ALPHA_EC2_INSTANCE_ID}" \
   --query 'Reservations[0].Instances[0].{State:State.Name,Name:Tags[?Key==`Name`]|[0].Value,Environment:Tags[?Key==`Environment`]|[0].Value,Branch:Tags[?Key==`Branch`]|[0].Value}' \

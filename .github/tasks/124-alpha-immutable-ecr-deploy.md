@@ -127,17 +127,12 @@ mutation.
   code and infra reviews both APPROVE with Critical 0 / High 0. The remaining
   non-blocking limitation is that full EC2 failure recovery and GitHub `alpha`
   environment reviewer/dev-only settings require later authorized live proof.
-- 2026-07-31: Deploy Alpha run `30554189093` proved CI/OIDC success but failed
-  before build at `head-bucket` with 403. The target verifier unnecessarily
-  required `s3:ListBucket`; deployment only needs pinned object operations and
-  bucket versioning metadata. Replaced the redundant probe with
-  `get-bucket-versioning --expected-bucket-owner`, retained fail-closed owner
-  and versioning checks, removed `ListBucket` from the converged role policy,
-  and added static regression coverage.
-- 2026-07-31: Follow-up run `30555906701` showed the live role also lacks
-  `s3:GetBucketVersioning`. Removed the remaining metadata-only preflight and
-  policy action. Release source and manifest operations remain fail-closed:
-  every S3 object request pins `--expected-bucket-owner`, create operations are
-  immutable, and both paths require a valid returned `VersionId`, which rejects
-  an unversioned bucket before deployment mutation. The static guardrail now
-  enforces this object-level owner/version contract.
+- 2026-07-31: Live runs `30554189093`, `30555906701`, and `30557516033`
+  established that OIDC assumption succeeds but the live
+  `teameet-alpha-github-deploy` role is missing the converged immutable deploy
+  policy: `s3:ListBucket`, `s3:GetBucketVersioning`, and
+  `ec2:DescribeInstances` each failed with no identity-based allow. Temporary
+  attempts to reduce metadata calls were reverted after the broader drift was
+  proven; fail-closed target verification remains intact. An AWS administrator
+  must run `scripts/infra/provision-alpha-immutable-deploy.sh` with the pinned
+  alpha variables before rerunning Deploy Alpha.

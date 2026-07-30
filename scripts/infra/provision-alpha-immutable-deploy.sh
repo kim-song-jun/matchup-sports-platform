@@ -112,6 +112,7 @@ github_policy="$(jq -nc \
   '{Version:"2012-10-17",Statement:[
     {Sid:"EcrLogin",Effect:"Allow",Action:"ecr:GetAuthorizationToken",Resource:"*"},
     {Sid:"ImmutableImagePush",Effect:"Allow",Action:["ecr:BatchCheckLayerAvailability","ecr:BatchGetImage","ecr:CompleteLayerUpload","ecr:DescribeImages","ecr:DescribeImageScanFindings","ecr:DescribeRepositories","ecr:GetDownloadUrlForLayer","ecr:InitiateLayerUpload","ecr:PutImage","ecr:UploadLayerPart"],Resource:[("arn:aws:ecr:"+$region+":"+$account+":repository/"+$api),("arn:aws:ecr:"+$region+":"+$account+":repository/"+$web)]},
+    {Sid:"ReleaseBucketMetadata",Effect:"Allow",Action:["s3:GetBucketVersioning","s3:ListBucket"],Resource:("arn:aws:s3:::"+$bucket)},
     {Sid:"ImmutableReleaseObjects",Effect:"Allow",Action:["s3:GetObject","s3:GetObjectVersion","s3:PutObject"],Resource:[("arn:aws:s3:::"+$bucket+"/releases/*"),("arn:aws:s3:::"+$bucket+"/manifests/*")]},
     {Sid:"DescribeAlphaTarget",Effect:"Allow",Action:"ec2:DescribeInstances",Resource:"*"},
     {Sid:"InvokeAlphaInstance",Effect:"Allow",Action:"ssm:SendCommand",Resource:[("arn:aws:ssm:"+$region+"::document/AWS-RunShellScript"),("arn:aws:ec2:"+$region+":"+$account+":instance/"+$instance)]},

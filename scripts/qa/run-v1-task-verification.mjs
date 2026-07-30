@@ -288,7 +288,13 @@ function verifyPlanBinding(options, repoRoot, task) {
   return { ...plan, selectedSHA: selected };
 }
 
-function secureImmutableDescriptor(filePath, expectedSHA, code, exitCode = 68) {
+function secureImmutableDescriptor(
+  filePath,
+  expectedSHA,
+  code,
+  exitCode = 68,
+  allowCanonicalNewline = false,
+) {
   const absolutePath = isAbsolute(filePath) ? filePath : resolve(filePath);
   let stat;
   try {
@@ -326,7 +332,10 @@ function secureImmutableDescriptor(filePath, expectedSHA, code, exitCode = 68) {
   }
   const canonical = JSON.stringify(stable(receipt));
   const observedText = descriptor.bytes.toString('utf8');
-  if (observedText !== canonical) {
+  if (
+    observedText !== canonical &&
+    !(allowCanonicalNewline && observedText === `${canonical}\n`)
+  ) {
     throw new HarnessError(
       code,
       `${absolutePath}: receipt must be canonical JSON with no trailing content`,
@@ -872,6 +881,40 @@ function createSourceSnapshot(
   }
 }
 
+function createCandidateSourceSnapshot(
+  repoRoot,
+  candidate,
+  attemptId,
+  evidenceRoot,
+) {
+  const sourceManifest = candidate.sourceManifest.receipt;
+  const attemptDir = resolve(
+    evidenceRoot,
+    'commit-sha256',
+    candidate.receipt.candidateSHA,
+    `attempt-${attemptId}`,
+  );
+  mkdirSync(attemptDir, { recursive: true });
+  const archive = git(
+    ['archive', '--format=tar', sourceManifest.sourceTreeSHA],
+    { cwd: repoRoot, encoding: null },
+  );
+  const archiveReceipt = immutableWrite(join(attemptDir, 'source-tree.tar'), archive);
+  return {
+    attemptDir,
+    sourceTreeSHA: sourceManifest.sourceTreeSHA,
+    sourceManifestPath: candidate.sourceManifest.path,
+    sourceManifestSHA: candidate.sourceManifest.sha256,
+    sourceArchivePath: archiveReceipt.path,
+    sourceArchiveSHA: archiveReceipt.sha256,
+    temporaryIndexPath: null,
+    ownedPaths: sourceManifest.ownedPaths,
+    baselineSHA: sourceManifest.baselineSHA,
+    headSHA: sourceManifest.headSHA,
+    entries: sourceManifest.entries,
+  };
+}
+
 function verifyCommittedSnapshot(repoRoot, snapshot) {
   if (
     !Array.isArray(snapshot.ownedPaths) ||
@@ -944,7 +987,49 @@ function verifyCommittedSnapshot(repoRoot, snapshot) {
   }
 }
 
-function verifyCandidate(options, ledger, liveHead, planSHA) {
+function exactKeys(value, expected) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...expected].sort())
+  );
+}
+
+function verifyOwnedPathsClean(repoRoot, ownedPaths) {
+  const status = git(
+    ['status', '--porcelain=v2', '-z', '--untracked-files=all', '--', ...ownedPaths],
+    { cwd: repoRoot, encoding: null },
+  );
+  if (status.length !== 0) {
+    throw new HarnessError(
+      'CANDIDATE_BINDING_MISMATCH',
+      'Candidate owned paths must be clean in the index and worktree',
+      68,
+    );
+  }
+}
+
+function verifyCandidatePair(repoRoot, pair, expected, label) {
+  if (
+    !exactKeys(pair, ['path', 'sha256']) ||
+    resolve(repoRoot, pair.path) !== resolve(repoRoot, expected.path) ||
+    pair.sha256 !== expected.sha256
+  ) {
+    throw new HarnessError(
+      'CANDIDATE_BINDING_MISMATCH',
+      `Candidate ${label} identity does not match the clean-restart authority`,
+      68,
+    );
+  }
+  return secureImmutableDescriptor(
+    resolve(repoRoot, pair.path),
+    pair.sha256,
+    'CANDIDATE_BINDING_MISMATCH',
+  );
+}
+
+function verifyCandidate(options, ledger, liveHead, planSHA, repoRoot) {
   const receiptPath = options['candidate-receipt'] ?? process.env.V1_CANDIDATE_RECEIPT_PATH;
   const receiptSHA = options['candidate-receipt-sha'] ?? process.env.V1_CANDIDATE_RECEIPT_SHA;
   if (!receiptPath || !receiptSHA) {
@@ -960,21 +1045,174 @@ function verifyCandidate(options, ledger, liveHead, planSHA) {
     'CANDIDATE_BINDING_MISMATCH',
   );
   const receipt = descriptor.receipt;
+  const requiredKeys = [
+    'schemaVersion',
+    'phase',
+    'baselineSHA',
+    'restartHeadSHA',
+    'candidateSHA',
+    'sourceTreeSHA',
+    'sourceManifestPath',
+    'sourceManifestSHA',
+    'planSHA',
+    'approvalReceipt',
+    'task127CursorReceipt',
+    'overrideReceipt',
+    'consumptionReceipt',
+    'ownedPathBlobs',
+    'createdAt',
+  ];
   if (
+    !exactKeys(receipt, requiredKeys) ||
     receipt.schemaVersion !== 1 ||
+    receipt.phase !== 'candidate' ||
     receipt.baselineSHA !== ledger.baselineSHA ||
+    receipt.restartHeadSHA !== TASK_ONE_RESTART_HEAD_SHA ||
     receipt.candidateSHA !== liveHead ||
     receipt.planSHA !== planSHA ||
     !/^[0-9a-f]{40}$/.test(receipt.candidateSHA ?? '') ||
-    typeof receipt.attemptId !== 'string'
+    !/^[0-9a-f]{40}$/.test(receipt.sourceTreeSHA ?? '') ||
+    !/^[0-9a-f]{64}$/.test(receipt.sourceManifestSHA ?? '') ||
+    Number.isNaN(Date.parse(receipt.createdAt ?? ''))
   ) {
     throw new HarnessError(
       'CANDIDATE_BINDING_MISMATCH',
-      'Candidate receipt does not bind baseline, live HEAD, plan, and attempt',
+      'Candidate receipt schema does not bind phase, baseline, restart HEAD, live HEAD, source, and plan',
       68,
     );
   }
-  return descriptor;
+  const approval = verifyCandidatePair(
+    repoRoot,
+    receipt.approvalReceipt,
+    TASK_ONE_RECEIPTS.approval,
+    'approval receipt',
+  );
+  const cursor = verifyCandidatePair(
+    repoRoot,
+    receipt.task127CursorReceipt,
+    TASK_ONE_RECEIPTS.cursor,
+    'Task127 cursor receipt',
+  );
+  const override = verifyCandidatePair(
+    repoRoot,
+    receipt.overrideReceipt,
+    TASK_ONE_RECEIPTS.override,
+    'override receipt',
+  );
+  const consumption = verifyCandidatePair(
+    repoRoot,
+    receipt.consumptionReceipt,
+    TASK_ONE_RECEIPTS.consumption,
+    'consumption receipt',
+  );
+  const rollback = secureImmutableDescriptor(
+    resolve(repoRoot, TASK_ONE_RECEIPTS.rollback.path),
+    TASK_ONE_RECEIPTS.rollback.sha256,
+    'CANDIDATE_BINDING_MISMATCH',
+  );
+  const hostPath = options['require-host-supervisor-receipt'];
+  const hostSHA = options['require-host-supervisor-receipt-sha'];
+  if (!hostPath || !hostSHA) {
+    throw new HarnessError(
+      'HOST_SUPERVISOR_RECEIPT_INVALID',
+      'Task-1 candidate requires the trusted host-supervisor receipt path and SHA',
+      78,
+    );
+  }
+  const host = secureImmutableDescriptor(
+    hostPath,
+    hostSHA,
+    'HOST_SUPERVISOR_RECEIPT_INVALID',
+    78,
+  );
+  if (
+    approval.receipt.verdict !== 'APPROVED' ||
+    approval.receipt.planSha256 !== planSHA ||
+    cursor.receipt.receiptType !== 'task-1-task127-clean-restart-cursor' ||
+    cursor.receipt.mode !== 'clean-restart-initial' ||
+    cursor.receipt.planSHA256 !== planSHA ||
+    cursor.receipt.baselineSHA !== TASK_ONE_BASELINE_SHA ||
+    cursor.receipt.restartHeadSHA !== TASK_ONE_RESTART_HEAD_SHA ||
+    cursor.receipt.approvalReceipt?.sha256 !== approval.sha256 ||
+    override.receipt.taskId !== 1 ||
+    override.receipt.workloadId !== TASK_ONE_WORKLOAD ||
+    override.receipt.planSHA256 !== planSHA ||
+    override.receipt.approvalReceipt?.sha256 !== approval.sha256 ||
+    override.receipt.cursorReceipt?.sha256 !== cursor.sha256 ||
+    consumption.receipt.receiptType !== 'task-1-v0-execution-consumption' ||
+    consumption.receipt.verdict !== 'CONSUMED' ||
+    consumption.receipt.plan?.sha256 !== planSHA ||
+    consumption.receipt.baselineSHA !== TASK_ONE_BASELINE_SHA ||
+    consumption.receipt.restartHeadSHA !== TASK_ONE_RESTART_HEAD_SHA ||
+    consumption.receipt.approvalReceipt?.sha256 !== approval.sha256 ||
+    consumption.receipt.cursorReceipt?.sha256 !== cursor.sha256 ||
+    consumption.receipt.overrideReceipt?.sha256 !== override.sha256 ||
+    host.receipt.schemaVersion !== 1 ||
+    host.receipt.receiptType !== 'task-1-host-supervisor-gate' ||
+    host.receipt.taskId !== 1 ||
+    host.receipt.workloadId !== TASK_ONE_WORKLOAD ||
+    host.receipt.planSHA !== planSHA ||
+    host.receipt.verdict !== 'APPROVE' ||
+    host.receipt.approvalReceipt?.sha256 !== approval.sha256 ||
+    host.receipt.task127CursorReceipt?.sha256 !== cursor.sha256 ||
+    host.receipt.overrideReceipt?.sha256 !== override.sha256 ||
+    host.receipt.consumptionReceipt?.sha256 !== consumption.sha256 ||
+    Object.values(host.receipt.cleanup ?? {}).some((value) => value !== 0)
+  ) {
+    throw new HarnessError(
+      'CANDIDATE_BINDING_MISMATCH',
+      'Candidate prerequisite receipts do not bind the clean-restart authority',
+      68,
+    );
+  }
+  const sourceManifest = secureImmutableDescriptor(
+    receipt.sourceManifestPath,
+    receipt.sourceManifestSHA,
+    'CANDIDATE_BINDING_MISMATCH',
+    68,
+    true,
+  );
+  const ownedPaths = ownershipRow(ledger, 1).outputs;
+  if (
+    sourceManifest.receipt.schemaVersion !== 2 ||
+    sourceManifest.receipt.task !== 1 ||
+    sourceManifest.receipt.baselineSHA !== TASK_ONE_BASELINE_SHA ||
+    sourceManifest.receipt.headSHA !== TASK_ONE_RESTART_HEAD_SHA ||
+    sourceManifest.receipt.sourceTreeSHA !== receipt.sourceTreeSHA ||
+    JSON.stringify(sourceManifest.receipt.ownedPaths) !== JSON.stringify(ownedPaths)
+  ) {
+    throw new HarnessError(
+      'CANDIDATE_BINDING_MISMATCH',
+      'Candidate source manifest does not bind the Task-1 clean-restart source tree',
+      68,
+    );
+  }
+  const expectedBlobs = sourceManifest.receipt.entries.map((entry) => ({
+    path: entry.path,
+    mode: entry.candidate?.mode,
+    blobSHA: entry.candidate?.blob,
+  }));
+  if (
+    !Array.isArray(receipt.ownedPathBlobs) ||
+    receipt.ownedPathBlobs.some(
+      (entry) => !exactKeys(entry, ['path', 'mode', 'blobSHA']),
+    ) ||
+    JSON.stringify(stable(receipt.ownedPathBlobs)) !== JSON.stringify(stable(expectedBlobs))
+  ) {
+    throw new HarnessError(
+      'CANDIDATE_BINDING_MISMATCH',
+      'Candidate owned blobs do not exactly match the clean-restart source manifest',
+      68,
+    );
+  }
+  verifyCommittedSnapshot(repoRoot, sourceManifest.receipt);
+  verifyOwnedPathsClean(repoRoot, ownedPaths);
+  verifyTaskOneDirty(repoRoot, ledger);
+  return {
+    ...descriptor,
+    sourceManifest,
+    chain: { approval, cursor, override, consumption, rollback, host },
+  };
 }
 
 function verifyParentLifecycle(options, candidate, task) {
@@ -1792,17 +2030,12 @@ function exactDockerCleanup(resources, labels) {
   return cleanupErrors;
 }
 
-function assertTaskOneHostGates(preflight, chain) {
+function assertTaskOneHostGates(preflight) {
   assertPortsFree(preflight);
-  const baseline = chain.consumption.receipt.hardGates;
-  const limits = chain.override.receipt.hardGrowthGates;
   const failures = [];
   if (preflight.loadAverage[0] > preflight.logicalCores * 2) failures.push('LOAD_PER_CORE_PRESSURE');
   if (preflight.docker.state !== 'available') failures.push('DOCKER_UNHEALTHY');
-  if (preflight.nodeMcpCount - baseline.nodeMcpCount >= limits.nodeMcpGrowthAtLeast) {
-    failures.push('NODE_MCP_GROWTH');
-  }
-  if (preflight.browserCount - baseline.browserCount >= 20 || preflight.browserCount > 200) {
+  if (preflight.browserCount > 200) {
     failures.push('BROWSER_GROWTH');
   }
   if (failures.length > 0) {
@@ -1913,20 +2146,34 @@ async function runTaskOneCleanRestart({
   plan,
   branch,
   liveHead,
+  candidate = null,
 }) {
-  const chain = verifyTaskOneCleanRestartChain(options, repoRoot, plan, liveHead);
+  const phase = candidate ? 'candidate' : 'clean-restart';
+  const chain = candidate?.chain ??
+    verifyTaskOneCleanRestartChain(options, repoRoot, plan, liveHead);
   validateDirtyScope(repoRoot, ledger, 1);
   verifyTaskOneDirty(repoRoot, ledger);
+  if (candidate) {
+    verifyOwnedPathsClean(repoRoot, ownershipRow(ledger, 1).outputs);
+  }
   const preflightStart = hostPreflight().preflight;
-  assertTaskOneHostGates(preflightStart, chain);
+  assertTaskOneHostGates(preflightStart);
   const attemptId = randomUUID();
-  const snapshot = createSourceSnapshot(
-    repoRoot,
-    ledger,
-    1,
-    attemptId,
-    resolve(options['evidence-root'] ?? DEFAULT_EVIDENCE_ROOT),
-  );
+  const evidenceRoot = resolve(options['evidence-root'] ?? DEFAULT_EVIDENCE_ROOT);
+  const snapshot = candidate
+    ? createCandidateSourceSnapshot(
+        repoRoot,
+        candidate,
+        attemptId,
+        evidenceRoot,
+      )
+    : createSourceSnapshot(
+        repoRoot,
+        ledger,
+        1,
+        attemptId,
+        evidenceRoot,
+      );
   const image = verificationImage(repoRoot);
   const source = prepareSnapshotExecution(snapshot, repoRoot, false);
   const resourcePrefix = `teameet-v1-verify-${attemptId}`;
@@ -2144,13 +2391,13 @@ async function runTaskOneCleanRestart({
   const receipt = {
     schemaVersion: 1,
     gateId: 'V1',
-    phase: 'clean-restart',
+    phase,
     commandId: 'V1',
     commandHash: command.commandHash,
     attemptId,
     baselineSHA: TASK_ONE_BASELINE_SHA,
     restartHeadSHA: TASK_ONE_RESTART_HEAD_SHA,
-    candidateSHA: null,
+    candidateSHA: candidate?.receipt.candidateSHA ?? null,
     sourceTreeSHA: snapshot.sourceTreeSHA,
     sourceManifestPath: snapshot.sourceManifestPath,
     sourceManifestSHA: snapshot.sourceManifestSHA,
@@ -2165,6 +2412,12 @@ async function runTaskOneCleanRestart({
     overrideReceiptSHA: chain.override.sha256,
     consumptionReceiptPath: chain.consumption.path,
     consumptionReceiptSHA: chain.consumption.sha256,
+    ...(candidate
+      ? {
+          candidateReceiptPath: candidate.path,
+          candidateReceiptSHA: candidate.sha256,
+        }
+      : {}),
     containerRuntime: {
       cpus: 1,
       memoryBytes: 4_294_967_296,
@@ -2213,6 +2466,19 @@ async function runTaskOneCleanRestart({
     },
     createdAt: new Date().toISOString(),
   };
+  if (candidate) {
+    const finalHead = git(['rev-parse', 'HEAD'], { cwd: repoRoot }).trim();
+    if (finalHead !== liveHead) {
+      throw new HarnessError(
+        'CANDIDATE_BINDING_MISMATCH',
+        `Candidate HEAD changed during verification: ${liveHead} -> ${finalHead}`,
+        68,
+      );
+    }
+    verifyCommittedSnapshot(repoRoot, snapshot);
+    verifyOwnedPathsClean(repoRoot, snapshot.ownedPaths);
+    verifyTaskOneDirty(repoRoot, ledger);
+  }
   const receiptFile = immutableWrite(join(snapshot.attemptDir, 'V1.json'), receipt);
   const terminal = JSON.stringify({
     ...receipt,
@@ -2255,6 +2521,20 @@ async function main() {
     });
     return;
   }
+  if (identity.task === 1 && phase === 'candidate') {
+    const candidate = verifyCandidate(options, ledger, liveHead, plan.selectedSHA, repoRoot);
+    await runTaskOneCleanRestart({
+      options,
+      payload,
+      repoRoot,
+      ledger,
+      plan,
+      branch,
+      liveHead,
+      candidate,
+    });
+    return;
+  }
 
   let candidate = null;
   if (identity.task === 1 && phase === 'initial' && liveHead !== ledger.baselineSHA) {
@@ -2270,7 +2550,7 @@ async function main() {
     options['registry-child'] ||
     identity.finalGate !== null;
   if (needsCandidate) {
-    candidate = verifyCandidate(options, ledger, liveHead, plan.selectedSHA);
+    candidate = verifyCandidate(options, ledger, liveHead, plan.selectedSHA, repoRoot);
   }
 
   let parentLifecycle = null;

@@ -5,9 +5,12 @@ import {
   chmodSync,
   closeSync,
   constants,
+  cpSync,
   fsyncSync,
+  mkdirSync,
   mkdtempSync,
   openSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -21,7 +24,7 @@ const image = 'teameet-v1-verification:node22-pnpm9.15.4';
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
-    cwd: repoRoot,
+    cwd: options.cwd ?? repoRoot,
     encoding: 'utf8',
     env: options.env ?? process.env,
     timeout: options.timeout ?? 30_000,
@@ -71,6 +74,218 @@ function immutableBytesAt(receiptPath, bytes) {
 
 function immutableReceipt(directory, value) {
   return immutableReceiptAt(join(directory, 'host-supervisor.json'), value);
+}
+
+function candidateFixture() {
+  const temporaryDirectory = mkdtempSync(
+    '/private/tmp/teameet-v1-candidate-contract-',
+  );
+  const worktree = join(temporaryDirectory, 'worktree');
+  const index = join(temporaryDirectory, 'index');
+  mkdirSync(worktree);
+  const archive = spawnSync('git', ['archive', '--format=tar', 'HEAD'], {
+    cwd: repoRoot,
+    encoding: null,
+    maxBuffer: 512 * 1024 * 1024,
+  });
+  assert.equal(archive.status, 0, archive.stderr?.toString('utf8'));
+  const extracted = spawnSync('tar', ['-xf', '-', '-C', worktree], {
+    input: archive.stdout,
+    encoding: 'utf8',
+  });
+  assert.equal(extracted.status, 0, extracted.stderr);
+  const ledgerText = readFileSync(
+    join(worktree, '.github/tasks/127-v1-team-tournament-operations-game-record.md'),
+    'utf8',
+  );
+  const ledgerMatch = ledgerText.match(
+    /<!-- TASK127_LEDGER_JSON_BEGIN -->\s*```json\n([\s\S]*?)\n```\s*<!-- TASK127_LEDGER_JSON_END -->/,
+  );
+  assert.ok(ledgerMatch);
+  const ledger = JSON.parse(ledgerMatch[1]);
+  const fixtureOnlyPaths = [
+    '.omo/plans/teameet-team-tournament-operations-v1.md',
+    '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
+    '.omo/evidence/task-1-task127-clean-restart-cursor-dc4ecb2f.json',
+    '.omo/evidence/task-1-host-pressure-override-dc4ecb2f-r2.json',
+    '.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json',
+    '.omo/evidence/task-1-rollback-a-recovered.json',
+    '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json',
+  ];
+  for (const path of [
+    ...ledger.unrelatedDirty.paths.map((entry) => entry.path),
+    ...fixtureOnlyPaths,
+  ]) {
+    const source = join(repoRoot, path);
+    const target = join(worktree, path);
+    mkdirSync(dirname(target), { recursive: true });
+    cpSync(source, target);
+  }
+  const gitEnvironment = {
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    LANG: 'C.UTF-8',
+    TZ: 'UTC',
+    GIT_DIR: join(repoRoot, '.git'),
+    GIT_WORK_TREE: worktree,
+    GIT_INDEX_FILE: index,
+  };
+  const indexResult = spawnSync('git', ['read-tree', 'HEAD'], {
+    cwd: worktree,
+    env: gitEnvironment,
+    encoding: 'utf8',
+  });
+  assert.equal(indexResult.status, 0, indexResult.stderr);
+  const sourceManifestPath =
+    '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1/tree-sha256/a48c8be7ff1a23ed7511c89a8f8167eb48382dc0/attempt-50863f5b-9aba-4be1-833b-bef8558241cd/source-manifest.json';
+  const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'));
+  const candidateSHA = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: worktree,
+    env: gitEnvironment,
+    encoding: 'utf8',
+  }).stdout.trim();
+  const candidate = immutableReceiptAt(
+    join(temporaryDirectory, 'candidate.json'),
+    {
+      schemaVersion: 1,
+      phase: 'candidate',
+      baselineSHA: '71f67b0d24e272eecd216cebb31eefbd66c9ca02',
+      restartHeadSHA: 'a4823d2f575d9396323421024a81a63dacf0cf67',
+      candidateSHA,
+      sourceTreeSHA: sourceManifest.sourceTreeSHA,
+      sourceManifestPath,
+      sourceManifestSHA:
+        '4e39da5d4d994705c8167b9061fa4f14a0ad95b354f6e5e0bdfd00b1551d70ae',
+      planSHA,
+      approvalReceipt: {
+        path: '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
+        sha256: 'd30d3688ef97b0cefabfad3e6deb8343bb9e8b8f017bae0ff91572be901527ae',
+      },
+      task127CursorReceipt: {
+        path: '.omo/evidence/task-1-task127-clean-restart-cursor-dc4ecb2f.json',
+        sha256: '0946bd0170f9034fdc4c5d99803e2b0ecf7afb46344988e9903933bcee55d9a7',
+      },
+      overrideReceipt: {
+        path: '.omo/evidence/task-1-host-pressure-override-dc4ecb2f-r2.json',
+        sha256: '84ab59119f5f83bcffed1478faa50b185b0c02bbb3ca5ecc37822a3c49e92748',
+      },
+      consumptionReceipt: {
+        path: '.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json',
+        sha256: '6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4',
+      },
+      ownedPathBlobs: sourceManifest.entries.map(({ path, candidate: entry }) => ({
+        path,
+        mode: entry.mode,
+        blobSHA: entry.blob,
+      })),
+      createdAt: '2026-07-30T10:00:00.000Z',
+    },
+  );
+  return {
+    candidate,
+    candidateSHA,
+    environment: {
+      ...gitEnvironment,
+      OMO_SELECTED_PLAN_SHA: planSHA,
+    },
+    evidenceRoot: join(temporaryDirectory, 'evidence'),
+    sourceManifest,
+    sourceManifestPath,
+    worktree,
+    cleanup: () => rmSync(temporaryDirectory, { recursive: true, force: true }),
+  };
+}
+
+function cleanRestartFixture() {
+  const temporaryDirectory = mkdtempSync(
+    '/private/tmp/teameet-v1-clean-restart-contract-',
+  );
+  const worktree = join(temporaryDirectory, 'worktree');
+  mkdirSync(worktree);
+  const archive = spawnSync(
+    'git',
+    ['archive', '--format=tar', 'a4823d2f575d9396323421024a81a63dacf0cf67'],
+    {
+      cwd: repoRoot,
+      encoding: null,
+      maxBuffer: 512 * 1024 * 1024,
+    },
+  );
+  assert.equal(archive.status, 0, archive.stderr?.toString('utf8'));
+  const extracted = spawnSync('tar', ['-xf', '-', '-C', worktree], {
+    input: archive.stdout,
+    encoding: 'utf8',
+  });
+  assert.equal(extracted.status, 0, extracted.stderr);
+  const initialized = spawnSync('git', ['init', '--initial-branch=dev'], {
+    cwd: worktree,
+    encoding: 'utf8',
+  });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const objectsInfo = join(worktree, '.git/objects/info');
+  mkdirSync(objectsInfo, { recursive: true });
+  writeFileSync(
+    join(objectsInfo, 'alternates'),
+    `${join(repoRoot, '.git/objects')}\n`,
+  );
+  writeFileSync(
+    join(worktree, '.git/info/exclude'),
+    `${readFileSync(join(repoRoot, '.git/info/exclude'), 'utf8')}\n.omo/\n`,
+  );
+  const head = spawnSync(
+    'git',
+    ['update-ref', 'refs/heads/dev', 'a4823d2f575d9396323421024a81a63dacf0cf67'],
+    { cwd: worktree, encoding: 'utf8' },
+  );
+  assert.equal(head.status, 0, head.stderr);
+  const index = spawnSync('git', ['read-tree', 'HEAD'], {
+    cwd: worktree,
+    encoding: 'utf8',
+  });
+  assert.equal(index.status, 0, index.stderr);
+  const ledgerText = readFileSync(
+    join(worktree, '.github/tasks/127-v1-team-tournament-operations-game-record.md'),
+    'utf8',
+  );
+  const ledgerMatch = ledgerText.match(
+    /<!-- TASK127_LEDGER_JSON_BEGIN -->\s*```json\n([\s\S]*?)\n```\s*<!-- TASK127_LEDGER_JSON_END -->/,
+  );
+  assert.ok(ledgerMatch);
+  const ledger = JSON.parse(ledgerMatch[1]);
+  const ownedPaths = ledger.ownership.find(({ todo }) => todo === 1).outputs;
+  const fixtureOnlyPaths = [
+    '.omo/plans/teameet-team-tournament-operations-v1.md',
+    '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
+    '.omo/evidence/task-1-task127-clean-restart-cursor-dc4ecb2f.json',
+    '.omo/evidence/task-1-host-pressure-override-dc4ecb2f-r2.json',
+    '.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json',
+    '.omo/evidence/task-1-rollback-a-recovered.json',
+  ];
+  for (const path of [
+    ...ownedPaths,
+    ...ledger.unrelatedDirty.paths.map((entry) => entry.path),
+    ...fixtureOnlyPaths,
+  ]) {
+    const source = join(repoRoot, path);
+    const target = join(worktree, path);
+    mkdirSync(dirname(target), { recursive: true });
+    cpSync(source, target);
+  }
+  return {
+    worktree: repoRoot,
+    evidenceRoot: join(temporaryDirectory, 'evidence'),
+    environment: {
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      LANG: 'C.UTF-8',
+      TZ: 'UTC',
+      GIT_DIR: join(worktree, '.git'),
+      GIT_WORK_TREE: repoRoot,
+      GIT_INDEX_FILE: join(worktree, '.git/index'),
+      OMO_SELECTED_PLAN_SHA: planSHA,
+    },
+    cleanup: () => rmSync(temporaryDirectory, { recursive: true, force: true }),
+  };
 }
 
 function docker(args, expectedStatus = 0) {
@@ -203,8 +418,81 @@ test('current a482 bound-source validator contract', () => {
   );
 });
 
+test('plan-schema Task-1 candidate receipt binds the committed source manifest', () => {
+  const fixture = candidateFixture();
+  try {
+    const result = runNode(
+      [
+        resolve(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
+        '--task',
+        '1',
+        '--phase',
+        'candidate',
+        '--plan-sha',
+        planSHA,
+        '--candidate-receipt',
+        fixture.candidate.path,
+        '--candidate-receipt-sha',
+        fixture.candidate.sha256,
+        '--require-host-supervisor-receipt',
+        resolve(repoRoot, '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json'),
+        '--require-host-supervisor-receipt-sha',
+        '5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300',
+        '--evidence-root',
+        fixture.evidenceRoot,
+        '--',
+        'node',
+        'scripts/qa/validate-team-tournament-ledger.mjs',
+        '.github/tasks/127-v1-team-tournament-operations-game-record.md',
+        '--verify-clean-restart-cursor-chain',
+        '--verify-rollback-clean-state',
+        '--verify-source-manifest',
+        '--pdf-sha',
+        '1558110dc711d421f7c4eea5cd98accc528180e625e1980578f92e1256806d50',
+        '--preview-sha',
+        '7d8e101ad27a6a227f1a525a729888aa4286845b5a6819aaa034b57cc55ba9f1',
+        '--design-commit',
+        '71f67b0d24e272eecd216cebb31eefbd66c9ca02',
+        '--design-sha',
+        '3ee8aedd03c507a7b7540bc9134e52abf49e8210a30d338bca2a899beca0f8a2',
+      ],
+      {
+        cwd: fixture.worktree,
+        env: fixture.environment,
+        timeout: 120_000,
+      },
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    const receipt = JSON.parse(result.stdout);
+    assert.equal(receipt.phase, 'candidate');
+    assert.equal(receipt.candidateSHA, fixture.candidateSHA);
+    assert.equal(receipt.liveHead, fixture.candidateSHA);
+    assert.equal(receipt.sourceTreeSHA, fixture.sourceManifest.sourceTreeSHA);
+    assert.equal(receipt.sourceManifestPath, fixture.sourceManifestPath);
+    assert.equal(
+      receipt.sourceManifestSHA,
+      '4e39da5d4d994705c8167b9061fa4f14a0ad95b354f6e5e0bdfd00b1551d70ae',
+    );
+    assert.equal(receipt.payloadExitCode, 0);
+    assert.equal(receipt.verdict, 'accepted');
+    assert.deepEqual(receipt.cleanup, {
+      containers: 0,
+      networks: 0,
+      volumes: 0,
+      overlays: 0,
+      publishedPorts: 0,
+      hostBrowserPids: 0,
+      tempRoots: 0,
+    });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test('trusted host supervisor contract', () => {
   const probeAttemptId = realDockerSupervisorProbe();
+  const restart = cleanRestartFixture();
   const temporaryDirectory = mkdtempSync(
     '/private/tmp/teameet-v1-supervisor-contract-',
   );
@@ -276,7 +564,7 @@ test('trusted host supervisor contract', () => {
       'process.stdout.write(JSON.stringify({contained:true,dockerSocket:false,sourceReadonly:true}))',
     ].join('');
     const wrapperArguments = (payloadScript, hostReceipt = supervisor) => [
-        'scripts/qa/run-v1-task-verification.mjs',
+        resolve(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
         '--task',
         '1',
         '--phase',
@@ -302,17 +590,15 @@ test('trusted host supervisor contract', () => {
         '--require-host-supervisor-receipt-sha',
         hostReceipt.sha256,
         '--hostile-no-docker-control',
+        '--evidence-root',
+        restart.evidenceRoot,
         '--',
         'node',
         '-e',
         payloadScript,
       ];
     const wrapperEnvironment = {
-          PATH: process.env.PATH,
-          HOME: process.env.HOME,
-          LANG: 'C.UTF-8',
-          TZ: 'UTC',
-          OMO_SELECTED_PLAN_SHA: planSHA,
+          ...restart.environment,
           OMO_REVIEW_RECEIPT_PATH:
             '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
           OMO_REVIEW_RECEIPT_SHA:
@@ -333,6 +619,7 @@ test('trusted host supervisor contract', () => {
     const result = runNode(
       wrapperArguments(hostilePayload),
       {
+        cwd: restart.worktree,
         env: wrapperEnvironment,
         timeout: 120_000,
       },
@@ -360,7 +647,7 @@ test('trusted host supervisor contract', () => {
     });
     const trailing = runNode(
       wrapperArguments('process.exit(0)', trailingSupervisor),
-      { env: wrapperEnvironment, timeout: 120_000 },
+      { cwd: restart.worktree, env: wrapperEnvironment, timeout: 120_000 },
     );
     assert.notEqual(trailing.status, 0, trailing.stdout);
     assert.match(trailing.stderr, /HOST_SUPERVISOR_RECEIPT_INVALID/);
@@ -368,7 +655,7 @@ test('trusted host supervisor contract', () => {
       wrapperArguments(
         'process.stdout.write(\"VERDICT=accepted\");process.stderr.write(\"real failure\");process.exit(23)',
       ),
-      { env: wrapperEnvironment, timeout: 120_000 },
+      { cwd: restart.worktree, env: wrapperEnvironment, timeout: 120_000 },
     );
     assert.equal(misleading.status, 23, misleading.stderr);
     const misleadingReceipt = JSON.parse(misleading.stderr);
@@ -378,7 +665,7 @@ test('trusted host supervisor contract', () => {
 
     const hung = runNode(
       wrapperArguments('setInterval(()=>{},1000)'),
-      { env: wrapperEnvironment, timeout: 120_000 },
+      { cwd: restart.worktree, env: wrapperEnvironment, timeout: 120_000 },
     );
     assert.notEqual(hung.status, 0, hung.stdout);
     const hungReceipt = JSON.parse(hung.stderr);
@@ -388,7 +675,7 @@ test('trusted host supervisor contract', () => {
     const durable = immutableReceiptAt(
       resolve(
         repoRoot,
-        '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json',
+        '.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r4.json',
       ),
       {
         ...supervisorValue,
@@ -413,5 +700,6 @@ test('trusted host supervisor contract', () => {
     process.stdout.write(`V1_HOST_SUPERVISOR_RECEIPT_SHA=${durable.sha256}\n`);
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
+    restart.cleanup();
   }
 });

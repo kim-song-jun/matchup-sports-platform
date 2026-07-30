@@ -127,3 +127,10 @@ mutation.
   code and infra reviews both APPROVE with Critical 0 / High 0. The remaining
   non-blocking limitation is that full EC2 failure recovery and GitHub `alpha`
   environment reviewer/dev-only settings require later authorized live proof.
+- 2026-07-31: Deploy Alpha run `30554189093` proved CI/OIDC success but failed
+  before build at `head-bucket` with 403. The target verifier unnecessarily
+  required `s3:ListBucket`; deployment only needs pinned object operations and
+  bucket versioning metadata. Replaced the redundant probe with
+  `get-bucket-versioning --expected-bucket-owner`, retained fail-closed owner
+  and versioning checks, removed `ListBucket` from the converged role policy,
+  and added static regression coverage.

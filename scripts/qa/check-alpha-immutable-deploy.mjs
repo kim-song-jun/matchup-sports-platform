@@ -16,6 +16,7 @@ const sourceLibraryPath = 'deploy/alpha-source-common.sh';
 const manifestLibraryPath = 'deploy/alpha-manifest-common.sh';
 const rollbackWorkflowPath = '.github/workflows/rollback-alpha.yml';
 const provisioningPath = 'scripts/infra/provision-alpha-immutable-deploy.sh';
+const targetVerificationPath = 'scripts/release/verify-alpha-aws-target.sh';
 const manifestBuilderPath = 'scripts/release/create-alpha-release-manifest.sh';
 const ssmDeployPath = 'scripts/release/deploy-alpha-via-ssm.sh';
 const rollbackBasePath = 'scripts/release/resolve-alpha-rollback-base.sh';
@@ -30,6 +31,7 @@ const sources = new Map([
   [manifestLibraryPath, readRequiredFile(manifestLibraryPath)],
   [rollbackWorkflowPath, readRequiredFile(rollbackWorkflowPath)],
   [provisioningPath, readRequiredFile(provisioningPath)],
+  [targetVerificationPath, readRequiredFile(targetVerificationPath)],
   [manifestBuilderPath, readRequiredFile(manifestBuilderPath)],
   [ssmDeployPath, readRequiredFile(ssmDeployPath)],
   [rollbackBasePath, readRequiredFile(rollbackBasePath)],
@@ -150,6 +152,16 @@ requirePatterns(provisioningPath, [
 
 forbidPatterns(provisioningPath, [
   [/imageCountMoreThan/, 'lifecycle must not blindly expire tagged rollback images'],
+  [/s3:ListBucket/, 'GitHub deploy role must not require bucket listing'],
+]);
+
+requirePatterns(targetVerificationPath, [
+  [/get-bucket-versioning/, 'target verification must verify the release bucket versioning state'],
+  [/--expected-bucket-owner/, 'target verification must pin the release bucket owner'],
+]);
+
+forbidPatterns(targetVerificationPath, [
+  [/head-bucket/, 'target verification must not require s3:ListBucket'],
 ]);
 
 if (errors.length > 0) {

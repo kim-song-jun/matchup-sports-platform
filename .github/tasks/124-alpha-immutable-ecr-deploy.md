@@ -134,3 +134,10 @@ mutation.
   `get-bucket-versioning --expected-bucket-owner`, retained fail-closed owner
   and versioning checks, removed `ListBucket` from the converged role policy,
   and added static regression coverage.
+- 2026-07-31: Follow-up run `30555906701` showed the live role also lacks
+  `s3:GetBucketVersioning`. Removed the remaining metadata-only preflight and
+  policy action. Release source and manifest operations remain fail-closed:
+  every S3 object request pins `--expected-bucket-owner`, create operations are
+  immutable, and both paths require a valid returned `VersionId`, which rejects
+  an unversioned bucket before deployment mutation. The static guardrail now
+  enforces this object-level owner/version contract.

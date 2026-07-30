@@ -17,6 +17,7 @@ const manifestLibraryPath = 'deploy/alpha-manifest-common.sh';
 const rollbackWorkflowPath = '.github/workflows/rollback-alpha.yml';
 const provisioningPath = 'scripts/infra/provision-alpha-immutable-deploy.sh';
 const targetVerificationPath = 'scripts/release/verify-alpha-aws-target.sh';
+const sourcePreparationPath = 'scripts/release/prepare-alpha-source.sh';
 const manifestBuilderPath = 'scripts/release/create-alpha-release-manifest.sh';
 const ssmDeployPath = 'scripts/release/deploy-alpha-via-ssm.sh';
 const rollbackBasePath = 'scripts/release/resolve-alpha-rollback-base.sh';
@@ -32,6 +33,7 @@ const sources = new Map([
   [rollbackWorkflowPath, readRequiredFile(rollbackWorkflowPath)],
   [provisioningPath, readRequiredFile(provisioningPath)],
   [targetVerificationPath, readRequiredFile(targetVerificationPath)],
+  [sourcePreparationPath, readRequiredFile(sourcePreparationPath)],
   [manifestBuilderPath, readRequiredFile(manifestBuilderPath)],
   [ssmDeployPath, readRequiredFile(ssmDeployPath)],
   [rollbackBasePath, readRequiredFile(rollbackBasePath)],
@@ -153,15 +155,24 @@ requirePatterns(provisioningPath, [
 forbidPatterns(provisioningPath, [
   [/imageCountMoreThan/, 'lifecycle must not blindly expire tagged rollback images'],
   [/s3:ListBucket/, 'GitHub deploy role must not require bucket listing'],
-]);
-
-requirePatterns(targetVerificationPath, [
-  [/get-bucket-versioning/, 'target verification must verify the release bucket versioning state'],
-  [/--expected-bucket-owner/, 'target verification must pin the release bucket owner'],
+  [/s3:GetBucketVersioning/, 'GitHub deploy role must not require bucket metadata access'],
 ]);
 
 forbidPatterns(targetVerificationPath, [
   [/head-bucket/, 'target verification must not require s3:ListBucket'],
+  [/get-bucket-versioning/, 'target verification must not require bucket metadata access'],
+]);
+
+requirePatterns(sourcePreparationPath, [
+  [/--expected-bucket-owner/, 'source object operations must pin the release bucket owner'],
+  [/--query VersionId --output text/, 'source upload must require an S3 object version'],
+  [/\[\[ "\$\{source_version_id\}" =~/, 'source upload must reject a missing or malformed object version'],
+]);
+
+requirePatterns(manifestBuilderPath, [
+  [/--expected-bucket-owner/, 'manifest object operations must pin the release bucket owner'],
+  [/--query VersionId --output text/, 'manifest upload must require an S3 object version'],
+  [/\[\[ "\$\{manifest_version_id\}" =~/, 'manifest upload must reject a missing or malformed object version'],
 ]);
 
 if (errors.length > 0) {

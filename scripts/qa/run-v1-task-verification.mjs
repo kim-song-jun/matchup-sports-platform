@@ -29,6 +29,39 @@ const DEFAULT_EVIDENCE_ROOT =
   '/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1';
 const PLAN_PATH = '.omo/plans/teameet-team-tournament-operations-v1.md';
 const SCRIPT_PATH = 'scripts/qa/run-v1-task-verification.mjs';
+const VERIFICATION_DOCKERFILE = 'deploy/Dockerfile.v1-verification';
+const VERIFICATION_IMAGE = 'teameet-v1-verification:node22-pnpm9.15.4';
+const TASK_ONE_WORKLOAD = 'task-1-host-supervisor-v1';
+const TASK_ONE_BASELINE_SHA = '71f67b0d24e272eecd216cebb31eefbd66c9ca02';
+const TASK_ONE_RESTART_HEAD_SHA = 'a4823d2f575d9396323421024a81a63dacf0cf67';
+const TASK_ONE_PREDECESSOR_CHAIN = [
+  TASK_ONE_BASELINE_SHA,
+  'a84a6e5277c4d29f9281140dca6a630fb5a2ca15',
+  'd444649adaf1ba88c3dddd755f6728135d8476b4',
+  TASK_ONE_RESTART_HEAD_SHA,
+];
+const TASK_ONE_RECEIPTS = {
+  approval: {
+    path: '.omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json',
+    sha256: 'd30d3688ef97b0cefabfad3e6deb8343bb9e8b8f017bae0ff91572be901527ae',
+  },
+  cursor: {
+    path: '.omo/evidence/task-1-task127-clean-restart-cursor-dc4ecb2f.json',
+    sha256: '0946bd0170f9034fdc4c5d99803e2b0ecf7afb46344988e9903933bcee55d9a7',
+  },
+  override: {
+    path: '.omo/evidence/task-1-host-pressure-override-dc4ecb2f-r2.json',
+    sha256: '84ab59119f5f83bcffed1478faa50b185b0c02bbb3ca5ecc37822a3c49e92748',
+  },
+  consumption: {
+    path: '.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json',
+    sha256: '6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4',
+  },
+  rollback: {
+    path: '.omo/evidence/task-1-rollback-a-recovered.json',
+    sha256: '087a173e40dbe889eee8d5b1e2f177d8ec690f2635ace8f7610dad551ef31979',
+  },
+};
 const BEGIN = '<!-- TASK127_LEDGER_JSON_BEGIN -->';
 const END = '<!-- TASK127_LEDGER_JSON_END -->';
 const OVERRIDE_PATH = '.omo/start-work/host-pressure-override-plan.json';
@@ -44,11 +77,14 @@ const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
 const BOOLEAN_OPTIONS = new Set([
   'adopt-candidate-attempt',
   'child-browser-owner',
+  'hostile-no-docker-control',
   'registry-child',
   'snapshot-owned',
 ]);
 const VALUE_OPTIONS = new Set([
+  'baseline-sha',
   'browser',
+  'candidate-sha',
   'candidate-receipt',
   'candidate-receipt-sha',
   'db',
@@ -62,8 +98,16 @@ const VALUE_OPTIONS = new Set([
   'parent-lifecycle-receipt-sha',
   'phase',
   'plan-sha',
+  'predecessor-chain',
+  'require-host-supervisor-receipt',
+  'require-host-supervisor-receipt-sha',
+  'require-task127-cursor-mode',
+  'require-task127-cursor-receipt',
+  'require-task127-cursor-receipt-sha',
+  'restart-head-sha',
   'root-prepare',
   'task',
+  'verify-committed-row',
 ]);
 const TARGET_PORTS = [3013, 8121];
 
@@ -279,6 +323,15 @@ function secureImmutableDescriptor(filePath, expectedSHA, code, exitCode = 68) {
     receipt = JSON.parse(descriptor.bytes.toString('utf8'));
   } catch (error) {
     throw new HarnessError(code, `${absolutePath}: invalid receipt JSON: ${error.message}`, exitCode);
+  }
+  const canonical = JSON.stringify(stable(receipt));
+  const observedText = descriptor.bytes.toString('utf8');
+  if (observedText !== canonical) {
+    throw new HarnessError(
+      code,
+      `${absolutePath}: receipt must be canonical JSON with no trailing content`,
+      exitCode,
+    );
   }
   return { path: absolutePath, sha256: descriptor.sha256, receipt };
 }
@@ -1328,8 +1381,10 @@ function packageCwd(repoRoot, packageName) {
   return resolve(repoRoot, 'apps', packageName);
 }
 
-function prepareSnapshotExecution(snapshot, repoRoot) {
-  const temporaryDirectory = mkdtempSync(join(tmpdir(), 'teameet-v1-source-'));
+function prepareSnapshotExecution(snapshot, repoRoot, includeHostModules = true) {
+  const temporaryDirectory = mkdtempSync(
+    join(process.platform === 'darwin' ? '/private/tmp' : tmpdir(), 'teameet-v1-source-'),
+  );
   const extractedRoot = join(temporaryDirectory, 'tree');
   mkdirSync(extractedRoot);
   const extracted = spawnSync(
@@ -1345,12 +1400,14 @@ function prepareSnapshotExecution(snapshot, repoRoot) {
       68,
     );
   }
-  for (const relativePath of ['node_modules', 'apps/v1_api/node_modules', 'apps/v1_web/node_modules']) {
-    const source = resolve(repoRoot, relativePath);
-    const target = resolve(extractedRoot, relativePath);
-    if (existsSync(source) && !existsSync(target)) {
-      mkdirSync(dirname(target), { recursive: true });
-      symlinkSync(source, target, 'dir');
+  if (includeHostModules) {
+    for (const relativePath of ['node_modules', 'apps/v1_api/node_modules', 'apps/v1_web/node_modules']) {
+      const source = resolve(repoRoot, relativePath);
+      const target = resolve(extractedRoot, relativePath);
+      if (existsSync(source) && !existsSync(target)) {
+        mkdirSync(dirname(target), { recursive: true });
+        symlinkSync(source, target, 'dir');
+      }
     }
   }
   return {
@@ -1438,6 +1495,738 @@ function commandIdentity(options, payload) {
   return { commands, commandHash: sha256(JSON.stringify(commands)) };
 }
 
+function requireExactOption(options, name, expected) {
+  if (options[name] !== expected) {
+    throw new HarnessError(
+      'V0_EXECUTION_CHAIN_INVALID',
+      `--${name} must exactly match the clean-restart authority`,
+      78,
+    );
+  }
+}
+
+function requireEnvironmentPair(pathName, shaName, expected) {
+  const suppliedPath = process.env[pathName];
+  const suppliedSHA = process.env[shaName];
+  if (
+    !suppliedPath ||
+    !suppliedSHA ||
+    resolve(suppliedPath) !== resolve(expected.path) ||
+    suppliedSHA !== expected.sha256
+  ) {
+    throw new HarnessError(
+      'V0_EXECUTION_CHAIN_INVALID',
+      `${pathName}/${shaName} must be supplied as the exact canonical pair`,
+      78,
+    );
+  }
+}
+
+function verifyTaskOneCleanRestartChain(options, repoRoot, plan, liveHead) {
+  requireExactOption(options, 'plan-sha', plan.selectedSHA);
+  requireExactOption(options, 'baseline-sha', TASK_ONE_BASELINE_SHA);
+  requireExactOption(options, 'restart-head-sha', TASK_ONE_RESTART_HEAD_SHA);
+  requireExactOption(options, 'predecessor-chain', TASK_ONE_PREDECESSOR_CHAIN.join(','));
+  requireExactOption(options, 'candidate-sha', 'null');
+  requireExactOption(options, 'require-task127-cursor-mode', 'clean-restart-initial');
+  requireExactOption(options, 'require-task127-cursor-receipt', TASK_ONE_RECEIPTS.cursor.path);
+  requireExactOption(
+    options,
+    'require-task127-cursor-receipt-sha',
+    TASK_ONE_RECEIPTS.cursor.sha256,
+  );
+  if (!options['hostile-no-docker-control']) {
+    throw new HarnessError(
+      'V0_EXECUTION_CHAIN_INVALID',
+      'V1 clean restart requires --hostile-no-docker-control',
+      78,
+    );
+  }
+  if (liveHead !== TASK_ONE_RESTART_HEAD_SHA) {
+    throw new HarnessError(
+      'BASELINE_INPUT_DRIFT',
+      `V1 clean restart requires HEAD=${TASK_ONE_RESTART_HEAD_SHA}; observed ${liveHead}`,
+      68,
+    );
+  }
+
+  requireEnvironmentPair(
+    'OMO_REVIEW_RECEIPT_PATH',
+    'OMO_REVIEW_RECEIPT_SHA',
+    TASK_ONE_RECEIPTS.approval,
+  );
+  requireEnvironmentPair(
+    'V1_TASK127_CURSOR_RECEIPT_PATH',
+    'V1_TASK127_CURSOR_RECEIPT_SHA',
+    TASK_ONE_RECEIPTS.cursor,
+  );
+  requireEnvironmentPair(
+    'V1_HOST_PRESSURE_OVERRIDE_RECEIPT_PATH',
+    'V1_HOST_PRESSURE_OVERRIDE_RECEIPT_SHA',
+    TASK_ONE_RECEIPTS.override,
+  );
+  requireEnvironmentPair(
+    'V1_V0_CONSUMPTION_RECEIPT_PATH',
+    'V1_V0_CONSUMPTION_RECEIPT_SHA',
+    TASK_ONE_RECEIPTS.consumption,
+  );
+
+  const descriptors = Object.fromEntries(
+    Object.entries(TASK_ONE_RECEIPTS).map(([name, identity]) => [
+      name,
+      secureImmutableDescriptor(
+        resolve(repoRoot, identity.path),
+        identity.sha256,
+        'V0_EXECUTION_CHAIN_INVALID',
+        78,
+      ),
+    ]),
+  );
+  const hostPath = options['require-host-supervisor-receipt'];
+  const hostSHA = options['require-host-supervisor-receipt-sha'];
+  if (!hostPath || !hostSHA) {
+    throw new HarnessError(
+      'HOST_SUPERVISOR_RECEIPT_INVALID',
+      'Trusted host-supervisor receipt path and SHA are both required',
+      78,
+    );
+  }
+  const host = secureImmutableDescriptor(
+    hostPath,
+    hostSHA,
+    'HOST_SUPERVISOR_RECEIPT_INVALID',
+    78,
+  );
+  const approval = descriptors.approval.receipt;
+  const cursor = descriptors.cursor.receipt;
+  const override = descriptors.override.receipt;
+  const consumption = descriptors.consumption.receipt;
+  const rollback = descriptors.rollback.receipt;
+  if (
+    approval.verdict !== 'APPROVED' ||
+    approval.planSha256 !== plan.selectedSHA ||
+    cursor.receiptType !== 'task-1-task127-clean-restart-cursor' ||
+    cursor.mode !== 'clean-restart-initial' ||
+    cursor.planSHA256 !== plan.selectedSHA ||
+    cursor.restartHeadSHA !== TASK_ONE_RESTART_HEAD_SHA ||
+    JSON.stringify(cursor.predecessorChain) !== JSON.stringify(TASK_ONE_PREDECESSOR_CHAIN) ||
+    cursor.unrelatedDirtyFingerprintAfter !==
+      '65051bf57a83e1bf287a654fdb121e7361bd9136e673bac0a9a149ecf11c4923' ||
+    override.taskId !== 1 ||
+    override.workloadId !== TASK_ONE_WORKLOAD ||
+    override.planSHA256 !== plan.selectedSHA ||
+    override.scope !== 'stable-absolute-swap-and-node-mcp-count-only' ||
+    override.resourceLimits?.cpus !== 1 ||
+    override.resourceLimits?.memoryBytes !== 4_294_967_296 ||
+    override.resourceLimits?.pidsLimit !== 256 ||
+    consumption.receiptType !== 'task-1-v0-execution-consumption' ||
+    consumption.verdict !== 'CONSUMED' ||
+    consumption.singleUse !== true ||
+    consumption.plan?.sha256 !== plan.selectedSHA ||
+    consumption.overrideReceipt?.sha256 !== TASK_ONE_RECEIPTS.override.sha256 ||
+    !(new Date(consumption.consumedAt) < new Date(consumption.overrideReceipt.expiresAt)) ||
+    rollback.schemaVersion !== 1
+  ) {
+    throw new HarnessError(
+      'V0_EXECUTION_CHAIN_INVALID',
+      'Approval, cursor, override, consumption, or rollback semantics do not match',
+      78,
+    );
+  }
+  if (
+    host.receipt.schemaVersion !== 1 ||
+    host.receipt.receiptType !== 'task-1-host-supervisor-gate' ||
+    host.receipt.taskId !== 1 ||
+    host.receipt.workloadId !== TASK_ONE_WORKLOAD ||
+    host.receipt.planSHA !== plan.selectedSHA ||
+    host.receipt.verdict !== 'APPROVE' ||
+    host.receipt.approvalReceipt?.sha256 !== TASK_ONE_RECEIPTS.approval.sha256 ||
+    host.receipt.task127CursorReceipt?.sha256 !== TASK_ONE_RECEIPTS.cursor.sha256 ||
+    host.receipt.overrideReceipt?.sha256 !== TASK_ONE_RECEIPTS.override.sha256 ||
+    host.receipt.consumptionReceipt?.sha256 !== TASK_ONE_RECEIPTS.consumption.sha256 ||
+    Object.values(host.receipt.cleanup ?? {}).some((value) => value !== 0)
+  ) {
+    throw new HarnessError(
+      'HOST_SUPERVISOR_RECEIPT_INVALID',
+      'Trusted host-supervisor receipt does not bind the clean-restart chain',
+      78,
+    );
+  }
+  return { ...descriptors, host };
+}
+
+function dockerResult(args, options = {}) {
+  return spawnSync('docker', args, {
+    cwd: options.cwd,
+    env: options.env,
+    encoding: 'utf8',
+    maxBuffer: 128 * 1024 * 1024,
+    timeout: options.timeout ?? 30_000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+function dockerRequired(args, code = 'DOCKER_LIFECYCLE_FAILED', options = {}) {
+  const result = dockerResult(args, options);
+  if (result.error || result.status !== 0 || result.signal) {
+    throw new HarnessError(
+      code,
+      `docker ${args[0]} failed: ${result.error?.message ?? result.stderr.trim()}`,
+      73,
+    );
+  }
+  return result.stdout.trim();
+}
+
+function verificationImage(repoRoot) {
+  const dockerfilePath = resolve(repoRoot, VERIFICATION_DOCKERFILE);
+  const dockerfileSHA = descriptorRead(dockerfilePath).sha256;
+  const lockfileSHA = descriptorRead(resolve(repoRoot, 'pnpm-lock.yaml')).sha256;
+  const expectedLabels = {
+    'com.teameet.verification.image': '1',
+    'com.teameet.verification.dockerfile-sha': dockerfileSHA,
+    'com.teameet.verification.lockfile-sha': lockfileSHA,
+    'com.teameet.verification.node': '>=22',
+    'com.teameet.verification.pnpm': '9.15.4',
+  };
+  let inspect = dockerResult(['image', 'inspect', VERIFICATION_IMAGE]);
+  let parsed = inspect.status === 0 ? JSON.parse(inspect.stdout)[0] : null;
+  const labelsMatch = parsed && Object.entries(expectedLabels).every(
+    ([name, value]) => parsed.Config?.Labels?.[name] === value,
+  );
+  if (!labelsMatch) {
+    const buildArgs = ['build', '--file', VERIFICATION_DOCKERFILE, '--tag', VERIFICATION_IMAGE];
+    for (const [name, value] of Object.entries(expectedLabels)) {
+      buildArgs.push('--label', `${name}=${value}`);
+    }
+    buildArgs.push('.');
+    dockerRequired(buildArgs, 'VERIFICATION_IMAGE_INVALID', {
+      cwd: repoRoot,
+      timeout: 600_000,
+    });
+    inspect = dockerResult(['image', 'inspect', VERIFICATION_IMAGE]);
+    if (inspect.status !== 0) {
+      throw new HarnessError(
+        'VERIFICATION_IMAGE_INVALID',
+        'Built verification image cannot be inspected',
+        73,
+      );
+    }
+    parsed = JSON.parse(inspect.stdout)[0];
+  }
+  if (
+    parsed.Os !== 'linux' ||
+    !['amd64', 'arm64'].includes(parsed.Architecture) ||
+    parsed.Config?.User !== '10001:10001'
+  ) {
+    throw new HarnessError(
+      'VERIFICATION_IMAGE_INVALID',
+      'Verification image platform or non-root user does not match',
+      73,
+    );
+  }
+  return {
+    name: VERIFICATION_IMAGE,
+    id: parsed.Id,
+    platform: `linux/${parsed.Architecture}`,
+    dockerfilePath: VERIFICATION_DOCKERFILE,
+    dockerfileSHA,
+    lockfileSHA,
+    nodeVersion: parsed.Config?.Labels?.['com.teameet.verification.node'],
+    pnpmVersion: parsed.Config?.Labels?.['com.teameet.verification.pnpm'],
+  };
+}
+
+function verifyResourceLabels(resourceType, identity, expectedLabels) {
+  const inspected = JSON.parse(dockerRequired(['inspect', '--type', resourceType, identity]))[0];
+  const observedLabels = inspected.Config?.Labels ?? inspected.Labels ?? {};
+  for (const [name, value] of Object.entries(expectedLabels)) {
+    if (observedLabels[name] !== value) {
+      throw new HarnessError(
+        'DOCKER_RESOURCE_IDENTITY_MISMATCH',
+        `${resourceType} ${identity} label ${name} does not match`,
+        73,
+      );
+    }
+  }
+  return inspected;
+}
+
+function exactDockerCleanup(resources, labels) {
+  const cleanupErrors = [];
+  if (resources.containerId) {
+    try {
+      verifyResourceLabels('container', resources.containerId, labels);
+      dockerResult(['stop', '--time', '3', resources.containerId], { timeout: 10_000 });
+      const removed = dockerResult(['rm', '--force', resources.containerId], { timeout: 10_000 });
+      if (removed.status !== 0 && !/No such container/i.test(removed.stderr)) {
+        cleanupErrors.push(removed.stderr.trim());
+      }
+    } catch (error) {
+      cleanupErrors.push(error.message);
+    }
+  }
+  for (const volume of resources.volumes) {
+    const inspected = dockerResult(['volume', 'inspect', volume]);
+    if (inspected.status === 0) {
+      const value = JSON.parse(inspected.stdout)[0];
+      if (Object.entries(labels).some(([name, label]) => value.Labels?.[name] !== label)) {
+        cleanupErrors.push(`volume ${volume} label mismatch`);
+        continue;
+      }
+      const removed = dockerResult(['volume', 'rm', '--force', volume]);
+      if (removed.status !== 0) cleanupErrors.push(removed.stderr.trim());
+    }
+  }
+  if (resources.networkId) {
+    try {
+      verifyResourceLabels('network', resources.networkId, labels);
+      const removed = dockerResult(['network', 'rm', resources.networkId], { timeout: 10_000 });
+      if (removed.status !== 0 && !/not found/i.test(removed.stderr)) {
+        cleanupErrors.push(removed.stderr.trim());
+      }
+    } catch (error) {
+      cleanupErrors.push(error.message);
+    }
+  }
+  return cleanupErrors;
+}
+
+function assertTaskOneHostGates(preflight, chain) {
+  assertPortsFree(preflight);
+  const baseline = chain.consumption.receipt.hardGates;
+  const limits = chain.override.receipt.hardGrowthGates;
+  const failures = [];
+  if (preflight.loadAverage[0] > preflight.logicalCores * 2) failures.push('LOAD_PER_CORE_PRESSURE');
+  if (preflight.docker.state !== 'available') failures.push('DOCKER_UNHEALTHY');
+  if (preflight.nodeMcpCount - baseline.nodeMcpCount >= limits.nodeMcpGrowthAtLeast) {
+    failures.push('NODE_MCP_GROWTH');
+  }
+  if (preflight.browserCount - baseline.browserCount >= 20 || preflight.browserCount > 200) {
+    failures.push('BROWSER_GROWTH');
+  }
+  if (failures.length > 0) {
+    throw new HarnessError('HOST_PREFLIGHT_BLOCKED', failures.join(','), 72);
+  }
+}
+
+function taskOneMounts(repoRoot, snapshot, chain) {
+  const designBytes = git(
+    [
+      'show',
+      `${TASK_ONE_BASELINE_SHA}:docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`,
+    ],
+    { cwd: repoRoot, encoding: null },
+  );
+  const designReceipt = immutableWriteOrReuse(
+    join(snapshot.attemptDir, 'bound-design.html'),
+    designBytes,
+  );
+  const mounts = [
+    {
+      source: chain.approval.path,
+      target: '/verification/receipts/approval.json',
+      envPath: 'OMO_REVIEW_RECEIPT_PATH',
+      envSHA: 'OMO_REVIEW_RECEIPT_SHA',
+      sha256: chain.approval.sha256,
+    },
+    {
+      source: chain.cursor.path,
+      target: '/verification/receipts/cursor.json',
+      envPath: 'V1_TASK127_CURSOR_RECEIPT_PATH',
+      envSHA: 'V1_TASK127_CURSOR_RECEIPT_SHA',
+      sha256: chain.cursor.sha256,
+    },
+    {
+      source: chain.override.path,
+      target: '/verification/receipts/override.json',
+      envPath: 'V1_HOST_PRESSURE_OVERRIDE_RECEIPT_PATH',
+      envSHA: 'V1_HOST_PRESSURE_OVERRIDE_RECEIPT_SHA',
+      sha256: chain.override.sha256,
+    },
+    {
+      source: chain.consumption.path,
+      target: '/verification/receipts/consumption.json',
+      envPath: 'V1_V0_CONSUMPTION_RECEIPT_PATH',
+      envSHA: 'V1_V0_CONSUMPTION_RECEIPT_SHA',
+      sha256: chain.consumption.sha256,
+    },
+    {
+      source: chain.rollback.path,
+      target: '/verification/receipts/rollback.json',
+      envPath: 'V1_ROLLBACK_RECEIPT_PATH',
+      envSHA: 'V1_ROLLBACK_RECEIPT_SHA',
+      sha256: chain.rollback.sha256,
+    },
+    {
+      source: chain.host.path,
+      target: '/verification/receipts/host-supervisor.json',
+      envPath: 'V1_HOST_SUPERVISOR_RECEIPT_PATH',
+      envSHA: 'V1_HOST_SUPERVISOR_RECEIPT_SHA',
+      sha256: chain.host.sha256,
+    },
+    {
+      source: resolve(repoRoot, PLAN_PATH),
+      target: '/verification/receipts/plan.md',
+      envPath: 'V1_SELECTED_PLAN_PATH',
+      envSHA: 'OMO_SELECTED_PLAN_SHA',
+      sha256: chain.approval.receipt.planSha256,
+    },
+    {
+      source: snapshot.sourceManifestPath,
+      target: '/verification/receipts/source-manifest.json',
+      envPath: 'V1_SOURCE_MANIFEST_PATH',
+      envSHA: 'V1_SOURCE_MANIFEST_SHA',
+      sha256: snapshot.sourceManifestSHA,
+    },
+    {
+      source:
+        '/Users/sungjun/Downloads/Teameet_app_v1_팀관리_대회운영_상세기획서_2026-07-28.pdf',
+      target: '/verification/bound/product.pdf',
+      envPath: 'V1_BOUND_PDF_PATH',
+      envSHA: null,
+      sha256: null,
+    },
+    {
+      source: '/Users/sungjun/Downloads/preview.html',
+      target: '/verification/bound/preview.html',
+      envPath: 'V1_BOUND_PREVIEW_PATH',
+      envSHA: null,
+      sha256: null,
+    },
+    {
+      source: designReceipt.path,
+      target: '/verification/bound/design.html',
+      envPath: 'V1_BOUND_DESIGN_PATH',
+      envSHA: null,
+      sha256: designReceipt.sha256,
+    },
+  ];
+  return mounts;
+}
+
+async function runTaskOneCleanRestart({
+  options,
+  payload,
+  repoRoot,
+  ledger,
+  plan,
+  branch,
+  liveHead,
+}) {
+  const chain = verifyTaskOneCleanRestartChain(options, repoRoot, plan, liveHead);
+  validateDirtyScope(repoRoot, ledger, 1);
+  verifyTaskOneDirty(repoRoot, ledger);
+  const preflightStart = hostPreflight().preflight;
+  assertTaskOneHostGates(preflightStart, chain);
+  const attemptId = randomUUID();
+  const snapshot = createSourceSnapshot(
+    repoRoot,
+    ledger,
+    1,
+    attemptId,
+    resolve(options['evidence-root'] ?? DEFAULT_EVIDENCE_ROOT),
+  );
+  const image = verificationImage(repoRoot);
+  const source = prepareSnapshotExecution(snapshot, repoRoot, false);
+  const resourcePrefix = `teameet-v1-verify-${attemptId}`;
+  const resources = {
+    containerName: `${resourcePrefix}-payload`,
+    containerId: null,
+    networkName: `${resourcePrefix}-net`,
+    networkId: null,
+    volumes: [`${resourcePrefix}-cache-pnpm`],
+  };
+  const labels = {
+    'com.teameet.verification': '1',
+    'com.teameet.attempt': attemptId,
+    'com.teameet.plan-sha': plan.selectedSHA,
+    'com.teameet.source-tree': snapshot.sourceTreeSHA,
+    'com.teameet.owner': 'outer',
+  };
+  const labelArgs = Object.entries(labels).flatMap(([name, value]) => ['--label', `${name}=${value}`]);
+  const mounts = taskOneMounts(repoRoot, snapshot, chain);
+  const containerEnvironment = {
+    CI: '1',
+    TZ: 'UTC',
+    LANG: 'C.UTF-8',
+    HOME: '/verification/cache/home',
+    PNPM_HOME: '/verification/cache/pnpm',
+    V1_TASK_ATTEMPT_ID: attemptId,
+    V1_TASK_GATE_ID: 'V1',
+    V1_TASK_SOURCE_TREE_SHA: snapshot.sourceTreeSHA,
+    ...Object.fromEntries(mounts.flatMap((mount) => [
+      [mount.envPath, mount.target],
+      ...(mount.envSHA ? [[mount.envSHA, mount.sha256]] : []),
+    ])),
+  };
+  let payloadResult = { status: null, signal: null, stdout: '', stderr: '', error: null };
+  let payloadExitCode = null;
+  let inspect = null;
+  let cleanupErrors = [];
+  let interrupted = false;
+  const onInterrupt = () => {
+    interrupted = true;
+    if (resources.containerId) {
+      dockerResult(['stop', '--time', '3', resources.containerId], { timeout: 10_000 });
+    }
+  };
+  process.on('SIGINT', onInterrupt);
+  process.on('SIGTERM', onInterrupt);
+  try {
+    resources.networkId = dockerRequired([
+      'network',
+      'create',
+      ...labelArgs,
+      resources.networkName,
+    ]);
+    verifyResourceLabels('network', resources.networkId, labels);
+    for (const volume of resources.volumes) {
+      dockerRequired(['volume', 'create', ...labelArgs, volume]);
+      const volumeInspect = JSON.parse(dockerRequired(['volume', 'inspect', volume]))[0];
+      if (Object.entries(labels).some(([name, value]) => volumeInspect.Labels?.[name] !== value)) {
+        throw new HarnessError(
+          'DOCKER_RESOURCE_IDENTITY_MISMATCH',
+          `volume ${volume} labels do not match`,
+          73,
+        );
+      }
+    }
+    const createArgs = [
+      'create',
+      '--name',
+      resources.containerName,
+      ...labelArgs,
+      '--user',
+      '10001:10001',
+      '--cap-drop',
+      'ALL',
+      '--security-opt',
+      'no-new-privileges',
+      '--cpus',
+      '1',
+      '--memory',
+      '4g',
+      '--pids-limit',
+      '256',
+      '--read-only',
+      '--network',
+      resources.networkName,
+      '--ipc',
+      'private',
+      '--tmpfs',
+      '/tmp:rw,noexec,nosuid,nodev,size=128m',
+      '--mount',
+      `type=bind,src=${source.root},dst=/verification/source,readonly`,
+      '--mount',
+      `type=volume,src=${resources.volumes[0]},dst=/verification/cache`,
+      '--workdir',
+      options.package
+        ? `/verification/source/apps/${options.package}`
+        : '/verification/source',
+    ];
+    for (const [name, value] of Object.entries(containerEnvironment)) {
+      createArgs.push('--env', `${name}=${value}`);
+    }
+    for (const mount of mounts) {
+      createArgs.push('--mount', `type=bind,src=${mount.source},dst=${mount.target},readonly`);
+    }
+    createArgs.push(image.name, ...payload);
+    resources.containerId = dockerRequired(createArgs);
+    inspect = verifyResourceLabels('container', resources.containerId, labels);
+    if (
+      inspect.HostConfig.NanoCpus !== 1_000_000_000 ||
+      inspect.HostConfig.Memory !== 4_294_967_296 ||
+      inspect.HostConfig.PidsLimit !== 256 ||
+      inspect.HostConfig.ReadonlyRootfs !== true ||
+      inspect.HostConfig.Privileged !== false ||
+      inspect.HostConfig.NetworkMode !== resources.networkName ||
+      inspect.HostConfig.CapDrop?.join(',') !== 'ALL' ||
+      inspect.HostConfig.SecurityOpt?.includes('no-new-privileges') !== true ||
+      inspect.Mounts.some((mount) => mount.Destination === '/var/run/docker.sock') ||
+      Object.keys(inspect.HostConfig.PortBindings ?? {}).length !== 0
+    ) {
+      throw new HarnessError(
+        'PAYLOAD_CONTAINMENT_INVALID',
+        'Payload container does not match the frozen cgroup/security contract',
+        73,
+      );
+    }
+    const journal = {
+      schemaVersion: 1,
+      attemptId,
+      workloadId: TASK_ONE_WORKLOAD,
+      labels,
+      resources,
+      createdAt: new Date().toISOString(),
+    };
+    immutableWrite(join(snapshot.attemptDir, 'cleanup-journal.json'), journal);
+    payloadResult = dockerResult(['start', '--attach', resources.containerId], {
+      timeout: 5_000,
+    });
+    if (payloadResult.error?.code === 'ETIMEDOUT') {
+      dockerResult(['stop', '--time', '3', resources.containerId], { timeout: 10_000 });
+    }
+    const finalInspect = JSON.parse(
+      dockerRequired(['inspect', resources.containerId]),
+    )[0];
+    payloadExitCode = finalInspect.State.ExitCode;
+  } finally {
+    process.off('SIGINT', onInterrupt);
+    process.off('SIGTERM', onInterrupt);
+    cleanupErrors = exactDockerCleanup(resources, labels);
+    source.cleanup();
+  }
+
+  const residual = {
+    containers: dockerRequired([
+      'ps',
+      '-aq',
+      '--filter',
+      `label=com.teameet.attempt=${attemptId}`,
+    ]),
+    networks: dockerRequired([
+      'network',
+      'ls',
+      '-q',
+      '--filter',
+      `label=com.teameet.attempt=${attemptId}`,
+    ]),
+    volumes: dockerRequired([
+      'volume',
+      'ls',
+      '-q',
+      '--filter',
+      `label=com.teameet.attempt=${attemptId}`,
+    ]),
+  };
+  if (cleanupErrors.length > 0 || Object.values(residual).some(Boolean)) {
+    throw new HarnessError(
+      'DOCKER_CLEANUP_LEAK',
+      [...cleanupErrors, JSON.stringify(residual)].join('; '),
+      79,
+    );
+  }
+  const preflightEnd = hostPreflight().preflight;
+  if (
+    preflightEnd.nodeMcpCount - preflightStart.nodeMcpCount >= 50 ||
+    preflightEnd.browserCount - preflightStart.browserCount >= 20 ||
+    preflightEnd.swapUsedGB - preflightStart.swapUsedGB >= 2
+  ) {
+    throw new HarnessError(
+      'HOST_GROWTH_HARD_GATE',
+      'Host process, browser, or swap growth exceeded the hard limit',
+      79,
+    );
+  }
+  const stdoutReceipt = immutableWrite(
+    join(snapshot.attemptDir, 'payload.stdout'),
+    Buffer.from(payloadResult.stdout),
+  );
+  const stderrReceipt = immutableWrite(
+    join(snapshot.attemptDir, 'payload.stderr'),
+    Buffer.from(payloadResult.stderr),
+  );
+  const cleanup = {
+    containers: 0,
+    networks: 0,
+    volumes: 0,
+    overlays: 0,
+    publishedPorts: 0,
+    hostBrowserPids: 0,
+    tempRoots: 0,
+  };
+  const accepted =
+    payloadResult.error === undefined || payloadResult.error === null
+      ? payloadResult.status === 0 && payloadExitCode === 0 && !interrupted
+      : false;
+  const command = commandIdentity(options, payload);
+  const receipt = {
+    schemaVersion: 1,
+    gateId: 'V1',
+    phase: 'clean-restart',
+    commandId: 'V1',
+    commandHash: command.commandHash,
+    attemptId,
+    baselineSHA: TASK_ONE_BASELINE_SHA,
+    restartHeadSHA: TASK_ONE_RESTART_HEAD_SHA,
+    candidateSHA: null,
+    sourceTreeSHA: snapshot.sourceTreeSHA,
+    sourceManifestPath: snapshot.sourceManifestPath,
+    sourceManifestSHA: snapshot.sourceManifestSHA,
+    planSHA: plan.selectedSHA,
+    task127CursorReceiptPath: chain.cursor.path,
+    task127CursorReceiptSHA: chain.cursor.sha256,
+    hostSupervisorReceiptPath: chain.host.path,
+    hostSupervisorReceiptSHA: chain.host.sha256,
+    approvalReceiptPath: chain.approval.path,
+    approvalReceiptSHA: chain.approval.sha256,
+    overrideReceiptPath: chain.override.path,
+    overrideReceiptSHA: chain.override.sha256,
+    consumptionReceiptPath: chain.consumption.path,
+    consumptionReceiptSHA: chain.consumption.sha256,
+    containerRuntime: {
+      cpus: 1,
+      memoryBytes: 4_294_967_296,
+      pidsLimit: 256,
+      privileged: false,
+      dockerSocketMounted: false,
+      user: '10001:10001',
+      capDrop: ['ALL'],
+      noNewPrivileges: true,
+      readonlyRootfs: true,
+    },
+    verificationImage: image,
+    payloadContainer: {
+      id: resources.containerId,
+      name: resources.containerName,
+      labels,
+    },
+    network: {
+      id: resources.networkId,
+      name: resources.networkName,
+      labels,
+    },
+    volumes: resources.volumes,
+    publishedPorts: [],
+    sourceMount: {
+      hostPath: source.root,
+      containerPath: '/verification/source',
+      readonly: true,
+      sourceTreeSHA: snapshot.sourceTreeSHA,
+    },
+    cache: {
+      overlays: resources.volumes,
+      perAttempt: true,
+      retainedSeedImage: image.id,
+    },
+    stdoutPath: stdoutReceipt.path,
+    stderrPath: stderrReceipt.path,
+    payloadExitCode,
+    cleanup,
+    verdict: accepted ? 'accepted' : 'rejected',
+    branch,
+    liveHead,
+    hostMetrics: {
+      before: preflightStart,
+      after: preflightEnd,
+    },
+    createdAt: new Date().toISOString(),
+  };
+  const receiptFile = immutableWrite(join(snapshot.attemptDir, 'V1.json'), receipt);
+  const terminal = JSON.stringify({
+    ...receipt,
+    receiptPath: receiptFile.path,
+    receiptSHA: receiptFile.sha256,
+  });
+  if (!accepted) {
+    process.stderr.write(`${terminal}\n`);
+    process.exitCode = payloadExitCode || (interrupted ? 130 : 1);
+    return;
+  }
+  process.stdout.write(`${terminal}\n`);
+}
+
 async function main() {
   const { options, payload } = parseArgs(process.argv.slice(2));
   const identity = parseIdentity(options);
@@ -1451,8 +2240,20 @@ async function main() {
   }
 
   const phase = options.phase ?? (identity.task === 1 ? 'initial' : 'standalone');
-  if (!['initial', 'standalone', 'candidate', 'local-precleanup'].includes(phase)) {
+  if (!['initial', 'clean-restart', 'standalone', 'candidate', 'local-precleanup'].includes(phase)) {
     throw new HarnessError('MALFORMED_INPUT', `Unsupported phase: ${phase}`, 64);
+  }
+  if (identity.task === 1 && phase === 'clean-restart') {
+    await runTaskOneCleanRestart({
+      options,
+      payload,
+      repoRoot,
+      ledger,
+      plan,
+      branch,
+      liveHead,
+    });
+    return;
   }
 
   let candidate = null;

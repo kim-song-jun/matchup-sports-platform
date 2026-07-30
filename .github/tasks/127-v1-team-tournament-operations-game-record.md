@@ -1,7 +1,7 @@
 # Task 127 - V1 Team, Tournament Operations, and Game Record
 
 Owner: root execution pipeline
-Status: Baseline frozen; Task 1 complete pending independent verification
+Status: Task 1 containment GREEN; trusted host supervisor APPROVE; V1 clean-restart precommit PASS; pathspec commit pending
 Target: v1 backend + v1 frontend + QA/docs
 Canonical plan: `.omo/plans/teameet-team-tournament-operations-v1.md`
 
@@ -33,6 +33,41 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
   "branch": "dev",
   "baselineSHA": "71f67b0d24e272eecd216cebb31eefbd66c9ca02",
   "planPath": ".omo/plans/teameet-team-tournament-operations-v1.md",
+  "planSHA": "dc4ecb2f76592799f8460135d9ea755a6e8fd768de17a29af7e61cf2b21508dd",
+  "cleanRestartAuthority": {
+    "approvalReceipt": {
+      "path": ".omo/evidence/approved-task-1-clean-restart-v0-dc4ecb2f.json",
+      "sha256": "d30d3688ef97b0cefabfad3e6deb8343bb9e8b8f017bae0ff91572be901527ae"
+    },
+    "rollbackReceipt": {
+      "path": ".omo/evidence/task-1-rollback-a-recovered.json",
+      "sha256": "087a173e40dbe889eee8d5b1e2f177d8ec690f2635ace8f7610dad551ef31979",
+      "authority": "clean-predecessor-evidence-only"
+    },
+    "cursorReceipt": {
+      "path": ".omo/evidence/task-1-task127-clean-restart-cursor-dc4ecb2f.json",
+      "sha256": "0946bd0170f9034fdc4c5d99803e2b0ecf7afb46344988e9903933bcee55d9a7"
+    },
+    "overrideReceipt": {
+      "path": ".omo/evidence/task-1-host-pressure-override-dc4ecb2f-r2.json",
+      "sha256": "84ab59119f5f83bcffed1478faa50b185b0c02bbb3ca5ecc37822a3c49e92748"
+    },
+    "consumptionReceipt": {
+      "path": ".omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json",
+      "sha256": "6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4"
+    },
+    "hostSupervisorReceipt": {
+      "path": ".omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json",
+      "sha256": "5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300"
+    },
+    "restartHeadSHA": "a4823d2f575d9396323421024a81a63dacf0cf67",
+    "predecessorChain": [
+      "71f67b0d24e272eecd216cebb31eefbd66c9ca02",
+      "a84a6e5277c4d29f9281140dca6a630fb5a2ca15",
+      "d444649adaf1ba88c3dddd755f6728135d8476b4",
+      "a4823d2f575d9396323421024a81a63dacf0cf67"
+    ]
+  },
   "sources": {
     "pdf": "1558110dc711d421f7c4eea5cd98accc528180e625e1980578f92e1256806d50",
     "preview": "7d8e101ad27a6a227f1a525a729888aa4286845b5a6819aaa034b57cc55ba9f1",
@@ -43,7 +78,9 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
     ".github/tasks/127-v1-team-tournament-operations-game-record.md": "absent",
     "scripts/qa/validate-team-tournament-ledger.mjs": "absent",
     "scripts/qa/run-v1-task-verification.mjs": "absent",
-    "scripts/qa/verify-team-tournament-bound-sources.mjs": "absent"
+    "scripts/qa/verify-team-tournament-bound-sources.mjs": "absent",
+    "scripts/qa/run-v1-task-verification.contract.test.mjs": "absent",
+    "deploy/Dockerfile.v1-verification": "absent"
   },
   "globalForbidden": [
     ".env*",
@@ -85,7 +122,7 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
     {"path":"docs/scenarios/17-tournament-gender-wizard.md","classification":"keep","reason":"Competition roster and gender rules remain prerequisites for lineup eligibility.","supersededBy":null}
   ],
   "ownership": [
-    {"todo":1,"inputs":"bound PDF/preview/design hashes; named task/scenario docs","outputs":[".github/tasks/127-v1-team-tournament-operations-game-record.md","scripts/qa/validate-team-tournament-ledger.mjs","scripts/qa/run-v1-task-verification.mjs","scripts/qa/verify-team-tournament-bound-sources.mjs"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
+    {"todo":1,"inputs":"bound PDF/preview/design hashes; named task/scenario docs; root Node/pnpm contract; existing v1 Docker/deploy patterns","outputs":[".github/tasks/127-v1-team-tournament-operations-game-record.md","scripts/qa/validate-team-tournament-ledger.mjs","scripts/qa/run-v1-task-verification.mjs","scripts/qa/run-v1-task-verification.contract.test.mjs","scripts/qa/verify-team-tournament-bound-sources.mjs","deploy/Dockerfile.v1-verification"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
     {"todo":2,"inputs":"Todo-1 ledger; named v1 auth/schema/admin-shell files","outputs":[".github/tasks/127-v1-team-tournament-operations-game-record.md","scripts/qa/validate-game-record-adrs.mjs"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
     {"todo":3,"inputs":"named baseline API indexes/contracts","outputs":["docs/api/README.md","docs/api/global-contract.md","docs/api/domains/games.md","docs/api/domains/team-schedules.md","docs/api/domains/tournament-operations.md","docs/api/domains/tournament-operations-auth.md","docs/api/domains/tournament-operations-escalations.md","docs/api/domains/game-realtime.md","docs/api/domains/game-migration.md","docs/api/domains/public-records.md","docs/api/domains/tournaments.md","docs/api/v1/domains/tournaments.md","docs/api/v1/domains/deferred-boundaries.md","docs/api/v1/domains/admin-audit.md","scripts/docs/check-api-contract-tree.mjs"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
     {"todo":4,"inputs":"`apps/v1_api/prisma/schema.prisma`; named baseline migrations","outputs":["apps/v1_api/prisma/schema.prisma","apps/v1_api/prisma/migrations/20260729000100_v1_game_operations","apps/v1_api/test/games/game-schema.integration-spec.ts","apps/v1_api/test/fixtures/game-schema.fixture.ts"],"forbidden":[".env*","apps/api/**","apps/web/**","docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html","unrelatedDirty.paths[*]","every ownership output not listed in the active todo row"]},
@@ -153,7 +190,18 @@ The machine ledger binds all 18 product screen IDs to one route, actor shell, ba
 - [x] Relevant task/scenario references classified.
 - [x] Screen ledger mapped 18/18.
 - [x] Ownership manifest mapped 27/27.
-- [ ] Root independent verification and pathspec commit.
+- [x] V0 execution authority consumed exactly once before expiry.
+- [x] Current a482 bound-source PIN passed before production edits.
+- [x] Trusted host supervisor contract passed with zero labeled Docker residue.
+- [x] V1 clean-restart precommit verification passed with `candidateSHA: null`.
+- [ ] Root pathspec commit (outside this executor's no-commit scope).
+
+## Task 1 precommit evidence
+
+- V0 execution consumption: `.omo/evidence/task-1-v0-execution-consumption-dc4ecb2f.json` (`6cfd41dcbb56bbb07fe3dfb5eb208f2449b8dbb90cef6742618b75481d8ecac4`).
+- Trusted host supervisor: `.omo/evidence/task-1-host-supervisor-receipt-dc4ecb2f-r3.json` (`5d5190feb0af56e763b06e3b699b1c7f060e0f05f36ce15b09bdfcd7b45d5300`), including canonical-byte receipt validation, nonroot isolation, denied Docker control and hostile environment access, read-only source, timeout/nonzero rejection, signal cleanup, and zero residual resources.
+- PIN/RED/GREEN artifacts: `/private/tmp/teameet-ulw-evidence/teameet-team-tournament-operations-v1/task-1-clean-restart/`.
+- The terminal V1 runtime receipt is emitted outside the repository from the exact six-path source manifest; it binds `candidateSHA: null`, payload exit `0`, and seven zero-valued cleanup observables.
 
 ## Ambiguity log
 

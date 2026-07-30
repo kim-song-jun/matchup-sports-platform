@@ -37,7 +37,11 @@ function parseArgs(argv) {
     if (!value || value.startsWith('--')) {
       throw new VerificationError('MALFORMED_INPUT', `Missing value for ${token}`);
     }
-    options[token.slice(2)] = value;
+    const name = token.slice(2);
+    if (Object.hasOwn(options, name)) {
+      throw new VerificationError('MALFORMED_INPUT', `Duplicate option: ${token}`);
+    }
+    options[name] = value;
     index += 1;
   }
   return options;
@@ -265,10 +269,15 @@ function readCommittedDesign(commit, repoRoot) {
 }
 
 export function verifyBoundSources(options, repoRoot = process.cwd()) {
-  const pdf = descriptorRead(options['pdf-path'] ?? DEFAULT_PDF);
-  const preview = descriptorRead(options['preview-path'] ?? DEFAULT_PREVIEW);
-  const design = options['design-path']
-    ? descriptorRead(options['design-path'])
+  const pdf = descriptorRead(
+    options['pdf-path'] ?? process.env.V1_BOUND_PDF_PATH ?? DEFAULT_PDF,
+  );
+  const preview = descriptorRead(
+    options['preview-path'] ?? process.env.V1_BOUND_PREVIEW_PATH ?? DEFAULT_PREVIEW,
+  );
+  const designPath = options['design-path'] ?? process.env.V1_BOUND_DESIGN_PATH;
+  const design = designPath
+    ? descriptorRead(designPath)
     : readCommittedDesign(options['design-commit'], repoRoot);
 
   verifyDigest('PDF', pdf.sha256, options['pdf-sha']);

@@ -2,15 +2,20 @@
 
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { verifyBoundSources } from './verify-team-tournament-bound-sources.mjs';
+import {
+  descriptorRead,
+  verifyBoundSources,
+} from './verify-team-tournament-bound-sources.mjs';
 
 const TASK_ONE_OUTPUTS = [
   '.github/tasks/127-v1-team-tournament-operations-game-record.md',
   'scripts/qa/validate-team-tournament-ledger.mjs',
   'scripts/qa/run-v1-task-verification.mjs',
+  'scripts/qa/run-v1-task-verification.contract.test.mjs',
   'scripts/qa/verify-team-tournament-bound-sources.mjs',
+  'deploy/Dockerfile.v1-verification',
 ];
 const EXPECTED_OWNED_PATH_BASELINE_STATE = Object.fromEntries(
   TASK_ONE_OUTPUTS.map((path) => [path, 'absent']),
@@ -34,6 +39,11 @@ const EXPECTED_SCREEN_IDS = [
 const PLAN_PATH = '.omo/plans/teameet-team-tournament-operations-v1.md';
 const BEGIN = '<!-- TASK127_LEDGER_JSON_BEGIN -->';
 const END = '<!-- TASK127_LEDGER_JSON_END -->';
+const BOOLEAN_OPTIONS = new Set([
+  'verify-clean-restart-cursor-chain',
+  'verify-rollback-clean-state',
+  'verify-source-manifest',
+]);
 
 class LedgerError extends Error {
   constructor(code, message) {
@@ -47,11 +57,18 @@ function parseArgs(argv) {
   if (!ledgerPath || ledgerPath.startsWith('--')) {
     throw new LedgerError('MALFORMED_INPUT', 'Ledger path is required');
   }
-  const options = { ledgerPath, 'verify-source-manifest': false };
+  const options = Object.fromEntries(
+    [...BOOLEAN_OPTIONS].map((name) => [name, false]),
+  );
+  options.ledgerPath = ledgerPath;
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index];
-    if (token === '--verify-source-manifest') {
-      options['verify-source-manifest'] = true;
+    const name = token.slice(2);
+    if (token.startsWith('--') && BOOLEAN_OPTIONS.has(name)) {
+      if (options[name] === true) {
+        throw new LedgerError('MALFORMED_INPUT', `Duplicate option: ${token}`);
+      }
+      options[name] = true;
       continue;
     }
     if (!token.startsWith('--')) {
@@ -61,7 +78,10 @@ function parseArgs(argv) {
     if (!value || value.startsWith('--')) {
       throw new LedgerError('MALFORMED_INPUT', `Missing value for ${token}`);
     }
-    options[token.slice(2)] = value;
+    if (Object.hasOwn(options, name) && options[name] !== false) {
+      throw new LedgerError('MALFORMED_INPUT', `Duplicate option: ${token}`);
+    }
+    options[name] = value;
     index += 1;
   }
   return options;
@@ -135,6 +155,138 @@ function assert(condition, code, message) {
   if (!condition) throw new LedgerError(code, message);
 }
 
+function receiptFromEnvironment(pathName, shaName, code) {
+  const path = process.env[pathName];
+  const expectedSHA = process.env[shaName];
+  assert(path && /^[0-9a-f]{64}$/.test(expectedSHA ?? ''), code, `${pathName}/${shaName} pair is required`);
+  const stat = lstatSync(path);
+  assert(
+    stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o777) === 0o444,
+    code,
+    `${pathName} must name an immutable regular file`,
+  );
+  const descriptor = descriptorRead(path);
+  assert(descriptor.sha256 === expectedSHA, code, `${pathName} digest mismatch`);
+  let receipt;
+  try {
+    receipt = JSON.parse(descriptor.bytes.toString('utf8'));
+  } catch (error) {
+    throw new LedgerError(code, `${pathName} is not valid JSON: ${error.message}`);
+  }
+  const canonical = JSON.stringify(stable(receipt));
+  const observed = descriptor.bytes.toString('utf8');
+  assert(
+    observed === canonical || observed === `${canonical}\n`,
+    code,
+    `${pathName} has duplicate keys, trailing data, or noncanonical bytes`,
+  );
+  return { path, sha256: expectedSHA, receipt };
+}
+
+function validateCleanRestartAuthority(ledger, options) {
+  if (
+    !options['verify-clean-restart-cursor-chain'] &&
+    !options['verify-rollback-clean-state']
+  ) {
+    return null;
+  }
+  const approval = receiptFromEnvironment(
+    'OMO_REVIEW_RECEIPT_PATH',
+    'OMO_REVIEW_RECEIPT_SHA',
+    'V0_EXECUTION_CHAIN_INVALID',
+  );
+  const cursor = receiptFromEnvironment(
+    'V1_TASK127_CURSOR_RECEIPT_PATH',
+    'V1_TASK127_CURSOR_RECEIPT_SHA',
+    'V0_EXECUTION_CHAIN_INVALID',
+  );
+  const override = receiptFromEnvironment(
+    'V1_HOST_PRESSURE_OVERRIDE_RECEIPT_PATH',
+    'V1_HOST_PRESSURE_OVERRIDE_RECEIPT_SHA',
+    'V0_EXECUTION_CHAIN_INVALID',
+  );
+  const consumption = receiptFromEnvironment(
+    'V1_V0_CONSUMPTION_RECEIPT_PATH',
+    'V1_V0_CONSUMPTION_RECEIPT_SHA',
+    'V0_EXECUTION_CHAIN_INVALID',
+  );
+  const rollback = receiptFromEnvironment(
+    'V1_ROLLBACK_RECEIPT_PATH',
+    'V1_ROLLBACK_RECEIPT_SHA',
+    'V0_EXECUTION_CHAIN_INVALID',
+  );
+  const host = receiptFromEnvironment(
+    'V1_HOST_SUPERVISOR_RECEIPT_PATH',
+    'V1_HOST_SUPERVISOR_RECEIPT_SHA',
+    'HOST_SUPERVISOR_RECEIPT_INVALID',
+  );
+  assert(
+    approval.receipt.verdict === 'APPROVED' &&
+      approval.receipt.planSha256 === ledger.planSHA &&
+      cursor.receipt.mode === 'clean-restart-initial' &&
+      cursor.receipt.planSHA256 === ledger.planSHA &&
+      cursor.receipt.restartHeadSHA ===
+        'a4823d2f575d9396323421024a81a63dacf0cf67' &&
+      cursor.receipt.unrelatedDirtyFingerprintAfter ===
+        '65051bf57a83e1bf287a654fdb121e7361bd9136e673bac0a9a149ecf11c4923' &&
+      override.receipt.taskId === 1 &&
+      override.receipt.scope === 'stable-absolute-swap-and-node-mcp-count-only' &&
+      consumption.receipt.verdict === 'CONSUMED' &&
+      consumption.receipt.singleUse === true &&
+      consumption.receipt.cursorReceipt.sha256 === cursor.sha256 &&
+      consumption.receipt.overrideReceipt.sha256 === override.sha256 &&
+      rollback.receipt.schemaVersion === 1 &&
+      host.receipt.verdict === 'APPROVE' &&
+      host.receipt.planSHA === ledger.planSHA &&
+      host.receipt.consumptionReceipt.sha256 === consumption.sha256 &&
+      Object.values(host.receipt.cleanup).every((value) => value === 0),
+    'V0_EXECUTION_CHAIN_INVALID',
+    'Clean-restart authority chain semantics do not match the ledger',
+  );
+  return {
+    approvalSHA: approval.sha256,
+    cursorSHA: cursor.sha256,
+    overrideSHA: override.sha256,
+    consumptionSHA: consumption.sha256,
+    rollbackSHA: rollback.sha256,
+    hostSupervisorSHA: host.sha256,
+  };
+}
+
+function validateSourceManifest(options) {
+  if (!options['verify-source-manifest']) return null;
+  const source = receiptFromEnvironment(
+    'V1_SOURCE_MANIFEST_PATH',
+    'V1_SOURCE_MANIFEST_SHA',
+    'SOURCE_MANIFEST_INVALID',
+  );
+  const receipt = source.receipt;
+  assert(
+    receipt.schemaVersion === 2 &&
+      receipt.task === 1 &&
+      receipt.sourceTreeSHA === process.env.V1_TASK_SOURCE_TREE_SHA &&
+      equal(receipt.ownedPaths, TASK_ONE_OUTPUTS) &&
+      equal(receipt.entries.map((entry) => entry.path), TASK_ONE_OUTPUTS) &&
+      receipt.entries.every(
+        (entry) =>
+          entry.state === 'present' &&
+          entry.baseline?.state === 'deleted' &&
+          entry.candidate?.state === 'present' &&
+          entry.candidate?.type === 'blob' &&
+          /^[0-9a-f]{40}$/.test(entry.candidate?.blob ?? '') &&
+          /^[0-9a-f]{64}$/.test(entry.candidate?.sha256 ?? ''),
+      ),
+    'SOURCE_MANIFEST_INVALID',
+    'Private-index source manifest does not bind the six Task 1 outputs',
+  );
+  return {
+    path: source.path,
+    sha256: source.sha256,
+    sourceTreeSHA: receipt.sourceTreeSHA,
+    entries: receipt.entries.length,
+  };
+}
+
 function validateSources(ledger, options) {
   const expected = {
     pdf: options['pdf-sha'],
@@ -200,24 +352,26 @@ function validateBaseline(ledger, repoRoot) {
   assert(
     equal(ledger.ownedPathBaselineState, EXPECTED_OWNED_PATH_BASELINE_STATE),
     'OWNED_PATH_DIRTY_BEFORE_START',
-    'Task 1 baseline state must contain exactly the four canonical owned paths, all absent',
+    'Task 1 baseline state must contain exactly the six canonical owned paths, all absent',
   );
-  const baselineTree = spawnSync(
-    'git',
-    ['ls-tree', '-r', '-z', '--name-only', ledger.baselineSHA, '--', ...TASK_ONE_OUTPUTS],
-    { cwd: repoRoot, encoding: null, maxBuffer: 1024 * 1024 },
-  );
-  assert(
-    baselineTree.status === 0,
-    'BASELINE_INPUT_DRIFT',
-    `Unable to inspect baseline tree: ${baselineTree.stderr?.toString('utf8').trim()}`,
-  );
-  const trackedAtBaseline = baselineTree.stdout.toString('utf8').split('\0').filter(Boolean);
-  assert(
-    trackedAtBaseline.length === 0,
-    'OWNED_PATH_DIRTY_BEFORE_START',
-    `Task 1 owned paths existed in the baseline tree: ${trackedAtBaseline.join(', ')}`,
-  );
+  if (!process.env.V1_TASK_SOURCE_TREE_SHA) {
+    const baselineTree = spawnSync(
+      'git',
+      ['ls-tree', '-r', '-z', '--name-only', ledger.baselineSHA, '--', ...TASK_ONE_OUTPUTS],
+      { cwd: repoRoot, encoding: null, maxBuffer: 1024 * 1024 },
+    );
+    assert(
+      baselineTree.status === 0,
+      'BASELINE_INPUT_DRIFT',
+      `Unable to inspect baseline tree: ${baselineTree.stderr?.toString('utf8').trim()}`,
+    );
+    const trackedAtBaseline = baselineTree.stdout.toString('utf8').split('\0').filter(Boolean);
+    assert(
+      trackedAtBaseline.length === 0,
+      'OWNED_PATH_DIRTY_BEFORE_START',
+      `Task 1 owned paths existed in the baseline tree: ${trackedAtBaseline.join(', ')}`,
+    );
+  }
   const dirty = ledger.unrelatedDirty;
   assert(dirty?.schemaVersion === 1 && Array.isArray(dirty.records) && Array.isArray(dirty.paths), 'DIRTY_FINGERPRINT_INVALID', 'Unrelated dirty fingerprint is malformed');
   const baselineDirtyPaths = new Set(dirty.paths.map((entry) => entry.path));
@@ -256,12 +410,17 @@ function validateClassifications(ledger) {
 
 export function validateLedger(options, repoRoot = process.cwd()) {
   const ledger = parseLedger(resolve(repoRoot, options.ledgerPath));
-  const planText = readFileSync(resolve(repoRoot, PLAN_PATH), 'utf8');
+  const planText = readFileSync(
+    resolve(repoRoot, process.env.V1_SELECTED_PLAN_PATH ?? PLAN_PATH),
+    'utf8',
+  );
   validateBaseline(ledger, repoRoot);
   validateScreens(ledger);
   validateOwnership(ledger, planText);
   validateClassifications(ledger);
   const sources = options['verify-source-manifest'] ? validateSources(ledger, options) : null;
+  const cleanRestartAuthority = validateCleanRestartAuthority(ledger, options);
+  const sourceManifest = validateSourceManifest(options);
   return {
     code: 'TEAM_TOURNAMENT_LEDGER_OK',
     baselineSHA: ledger.baselineSHA,
@@ -270,6 +429,8 @@ export function validateLedger(options, repoRoot = process.cwd()) {
     classifications: ledger.classifications.length,
     dirtyFingerprintSHA256: ledger.unrelatedDirty.fingerprintSHA256,
     sources,
+    cleanRestartAuthority,
+    sourceManifest,
   };
 }
 

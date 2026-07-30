@@ -1,100 +1,67 @@
-# Global Contract
+# Global v1 API contract
 
-## Base URL / Prefix
+This contract is frozen against the approved Task 127 plan. Domain documents provide navigation and domain-specific policy; this registry is the exact cross-domain REST, field, actor, idempotency, error, transition, and compensation contract.
 
-- Local dev API origin: `http://localhost:8111`
-- Prefix: `/api/v1`
-- Swagger: `http://localhost:8111/docs`
+<!-- API_CONTRACT_PLAN_SHA256:06e363a416b9f031c14ec854e1842f5412f4d72e971745edcd792c9365249edc -->
 
-## Content-Type
+<!-- API_CONTRACT_SECTION_BEGIN:Frozen REST and idempotency contract -->
+### Frozen REST and idempotency contract
+All responses use `{status,data,timestamp}`. Collection reads use `limit` (default 20, max 100), opaque `cursor`, and `{items,nextCursor}`. All authenticated mutations carry `Idempotency-Key`; all versioned mutations carry `expectedVersion`. Canonical scope is `(actorUserId, action, resourceType, resourceId, idempotencyKey)`, retained 30 days. Same key + same SHA-256 payload replays the original status/body; same key + different payload returns `409 IDEMPOTENCY_PAYLOAD_CONFLICT`. For game commands, `clientCommandId` is required to equal the normalized `Idempotency-Key`; the same value is persisted atomically in `V1IdempotencyRecord`, so changing only the header or only the body returns `422 COMMAND_IDEMPOTENCY_KEY_MISMATCH`, and reusing the value with a different payload returns the canonical 409. Stale version returns `409 VERSION_CONFLICT`; validation `422`; missing resource `404`; unauthenticated `401`; authorization `403`.
 
-- JSON API: `application/json`
-- 파일 업로드: `multipart/form-data`
+| Method/path | Request → response fields | Authorized actor/action |
+|---|---|---|
+| `GET/POST /api/v1/teams/:teamId/schedules` | filters or `{title,type,startAt,endAt,timezone,capacity,rsvpDeadlineAt,visibility,teamMatchId?,version}` → schedule summary/detail | member read; team_manager/team_owner create |
+| `GET/PATCH /api/v1/teams/:teamId/schedules/:scheduleId` | read or `{expectedVersion,title?,startAt?,endAt?,capacity?,rsvpDeadlineAt?,visibility?}` → versioned schedule/history | member read; team_manager/team_owner mutate |
+| `POST /api/v1/teams/:teamId/schedules/:scheduleId/cancel` | `{expectedVersion,cancelReason}` → `{state:"cancelled",version,cancelledAt}` | team_manager/team_owner; closes reminders/recruitment, never deletes |
+| `PUT /api/v1/teams/:teamId/schedules/:scheduleId/attendance/me` | `{status:attending|not_attending|undecided,expectedVersion}` → attendance counts/waitlist position | member self |
+| `POST /api/v1/teams/:teamId/schedules/:scheduleId/reminders` | `{kind}` → durable job ID/status | team_manager/team_owner |
+| `GET/POST/PATCH /api/v1/teams/:teamId/schedules/:scheduleId/guest-recruitment` | read; create/update `{expectedVersion,slots,closesAt,note,visibility,state:open|closed}` → recruitment/version/applicant count | member read if permitted; team_manager/team_owner mutate |
+| `POST /api/v1/teams/:teamId/schedules/:scheduleId/guest-recruitment/applications` | `{displayName,note}` → application ID/state with `userId` derived only from the authenticated actor | authenticated user; caller-supplied userId is forbidden by DTO whitelist; duplicate returns idempotent original |
+| `GET /api/v1/me/schedule` | `{cursor,from,to,status}` → permitted schedule summaries | authenticated member |
+| `GET /api/v1/team-matches/:teamMatchId/lineup` | no body → lineup/version/state/publicLineupAt | scoped team actors read |
+| `PUT /api/v1/team-matches/:teamMatchId/lineup` | `{expectedVersion,formation,starters,bench}` → saved draft/version | team_manager/team_owner |
+| `POST /api/v1/team-matches/:teamMatchId/lineup/submit` | `{expectedVersion}` → submitted lineup/version/publicLineupAt | team_manager/team_owner |
+| `POST /api/v1/team-matches/:teamMatchId/lineup/change-request` | `{expectedVersion,reason}` → change-requested lineup/version | opponent_manager before lock; audited |
+| `GET /api/v1/games/:gameId` | no body → game, sides, periods, lifecycle, currentVersion, lastSequence, current official/draft refs | resource-scoped actor |
+| `POST /api/v1/games/:gameId/commands/:command` | `{expectedVersion,clientCommandId,takeoverToken,occurredAt,payload}` where command is `start|pause|resume|end` and `clientCommandId` must equal `Idempotency-Key` → committed version/state | tournament fixtures: assigned field_operator, assigned tournament_director, or platform_ops with a valid exclusive token; team matches: no generic command surface, because validated team result submission owns the end transition |
+| `POST /api/v1/games/:gameId/cancel` | `{expectedVersion,reason}` → cancelled game/version and hidden public projection | team_owner/team_manager for team match; tournament_director/platform_ops for tournament; cancels lineup publication, result SLA, and pending fixture jobs |
+| `GET/POST /api/v1/games/:gameId/events` | `afterSequence` or `{expectedVersion,clientEventId,takeoverToken,type,sideId,participantId?,period,clockMs,occurredAt,payload}` → ordered events/ack sequence | scoped reader; assigned field_operator, assigned tournament_director, or platform_ops append with valid token |
+| `POST /api/v1/games/:gameId/events/:eventId/reverse` | `{expectedVersion,clientEventId,takeoverToken,reason}` → one append-only compensating event `{reversalSequence,version}` | assigned tournament_director/platform_ops; a corrected replacement is a separate normal append with its own clientEventId/payloadHash/ack |
+| `GET/POST /api/v1/games/:gameId/result-revisions` | GET reads history; POST `{expectedVersion,score,actualParticipants,eventsHash,mvpParticipantId?,reason?}` creates a content-immutable team-match draft only | scoped actors read; team_manager/team_owner POST for team match; tournament POST returns `409 TOURNAMENT_RESULT_DERIVED_ONLY` because normal `end` derives+submits, zero-revision drift uses recovery, and corrections use `/corrections` |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/submit` | `{expectedVersion}` → submitted revision/SLA timestamps; for a team-match source only, the same transaction validates authority/result and moves `SCHEDULED|LIVE|PAUSED→ENDED` before submission | owning team_manager/team_owner |
+| `POST /api/v1/games/:gameId/result-recovery/derive-and-submit` | `{expectedVersion,takeoverToken,eventsHash,reason}` → atomically derived submitted revision/review timestamps | assigned tournament_director or platform_ops; only when game is `ENDED` and has no result revision, otherwise `409 RESULT_RECOVERY_NOT_REQUIRED` |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/decision` | `{expectedVersion,decision:approve|change_request,reason?}` → official/pending state | opponent_manager for team match |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/review-decision` | `{expectedVersion,decision:reject|request_supplement,reason}` → rejected/supplement-requested state and audit | tournament_director/platform_ops; closes or restarts the applicable review SLA |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/supersede-and-submit` | `{expectedVersion,score,actualParticipants,eventsHash,mvpParticipantId?,reason}` → atomically creates a content-immutable superseding revision, moves it `DRAFT→SUBMITTED`, and starts a fresh review SLA | tournament_director/platform_ops; base must be `REJECTED|SUPPLEMENT_REQUESTED`, otherwise `409 RESULT_RESUBMISSION_NOT_ALLOWED` |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/officialize` | `{expectedVersion,projectionPreviewHash}` → official revision/outbox watermark | platform_ops; tournament_director only when audited flag enabled |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/void` | `{expectedVersion,reason}` → append-only void revision/current pointer/outbox watermark | platform_ops; audited tournament_director only when flag enabled |
+| `POST /api/v1/games/:gameId/corrections` | `{expectedVersion,baseRevisionId,reason,changes}` → superseding draft revision | platform_ops/tournament_director |
+| `POST /api/v1/games/:gameId/participants/:participantId/identity-link-requests` | `{expectedVersion}` → `{requestId,state:"pending_attestation",version,effectiveAt,expiresAt}` | authenticated user is server-derived; database transaction time is `effectiveAt`, expiry is database `effectiveAt+24h`; caller identity/time fields are forbidden |
+| `POST /api/v1/games/:gameId/participants/:participantId/identity-link-requests/:requestId/attest` | `{expectedVersion,decision:approve|reject,reason}` → append-only attestation event and active/rejected link state | owning team_owner or platform_ops; cannot self-attest; expired/race-lost request returns `409 IDENTITY_LINK_REQUEST_EXPIRED` |
+| `POST /api/v1/games/:gameId/participants/:participantId/identity-links/:linkId/revoke` | `{expectedVersion,reason}` → append-only revoke event/version with database-derived `effectiveAt` and ≤5s public purge watermark | linked user or platform_ops |
+| `POST /api/v1/games/:gameId/participants/:participantId/consents/grant` | `{expectedVersion,linkId,policyHash}` → append-only granted consent version with database-derived `effectiveAt` | actively linked user only |
+| `POST /api/v1/games/:gameId/participants/:participantId/consents/revoke` | `{expectedVersion,reason}` → append-only revoked consent version with database-derived `effectiveAt` and ≤5s purge watermark | linked user or platform_ops for legal removal |
+| `GET/POST /api/v1/tournament-ops/tournaments/:tournamentId/staff` | list or `{userId,role,fieldId?,fixtureIds?,expiresAt}` → assignment/version/audit | platform_ops; tournament_director may manage field_operator/support_readonly |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke` | `{expectedVersion,reason}` → revoked assignment/version/audit/realtime eviction | platform_ops; owning tournament_director for subordinate roles |
+| `GET/POST /api/v1/tournament-ops/tournaments/:tournamentId/fields` and `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fields/:fieldId` | list or `{scopeKey,name,sortOrder}` / `{expectedVersion,name?,sortOrder?,active?}` → stable field/version | platform_ops; tournament_director read |
+| `GET/PUT /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup` and `POST .../lineup/submit` | read; `{expectedVersion,sideId,formation,starters,bench}`; `{expectedVersion,takeoverToken}` → fixture lineup/version/state | assigned tournament_director save/submit; assigned field_operator may capture actual participants after start |
+| `POST /api/v1/tournament-ops/jobs/:jobId/requeue` | `{expectedVersion,reason}` → `{status:"RETRY",attempts:0,retryGeneration,availableAt,version}` | platform_ops only; atomically requires `POISONED`, increments retryGeneration/version, resets attempts to 0, clears lease/lastError, audits `JOB_REQUEUED`; otherwise `409 JOB_NOT_POISONED` |
+| `GET/PATCH /api/v1/tournament-ops/operation-flags/:key` | read or `{expectedVersion,value,gateBundlePath,gateBundleHash,reason}` → flag/value/version/audit | platform_ops; descriptor-verifies the attempt-bound bundle then applies frozen CAS transition |
+| `POST /api/v1/tournament-ops/operation-flags/tuple-transition` | `{expectedVersions:{GAME_WRITE,GAME_READ,PUBLIC_LIVE?,DIRECTOR_OFFICIALIZE?},transitions:[{key,from,to}],gateBundlePath,gateBundleHash,reason}` → atomically updated tuple with each changed flag version incremented once | platform_ops only; locks keys in lexical order plus `V1GameCutoverEpoch`, descriptor-verifies one tuple gate, and rolls back all flag/audit/outbox writes if any expected value/version or latch check fails |
+| `GET/POST /api/v1/tournament-ops/competition-configs` and `GET/POST /api/v1/tournament-ops/competition-configs/:id/versions` | filters or `{sportCode,name,periods,events,lineup,result,tieBreak,visibility}` → immutable version/contentHash | platform_ops read/create; tournament_director read |
+| `POST /api/v1/tournament-ops/tournaments/:id/competition-config` | `{expectedVersion,competitionConfigVersionId,previewHash,confirmRecalculation}` → pinned version/impact | platform_ops; returns `409 CONFIG_RECALCULATION_CONFIRMATION_REQUIRED` without matching preview confirmation |
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/operations` | `{cursor,status,fieldId,warning}` → incremental fixture snapshot + watermark | assigned tournament staff |
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/escalations` and `POST .../:id/:action` | filters or `{action:ack|resolve,reason}` → durable queue state/audit | assigned tournament_director read only; platform_ops/support_readonly read/ack; platform_ops resolve |
+| `GET /api/v1/tournaments/:id/schedule` and `GET /api/v1/tournaments/:id/matches/:fixtureId` | cursor/filter → visibility-filtered public projection | public |
+| `GET /api/v1/teams/:id/records` and `GET /api/v1/users/:id/records` | cursor/season → official, consent-filtered records | public |
 
-## 인증
+State transitions are literal: schedule `scheduled→cancelled|completed` only; lineup `draft→submitted→locked`, `submitted→change_requested→draft`, and any new submission supersedes rather than mutates; tournament-fixture game commands permit exactly `SCHEDULED→LIVE`, `LIVE→PAUSED`, `PAUSED→LIVE`, `LIVE|PAUSED→ENDED`, and `SCHEDULED|LIVE|PAUSED→CANCELLED`; team-match result submission alone additionally permits `SCHEDULED|LIVE|PAUSED→ENDED` in the same transaction as the validated submission; no transition leaves `ENDED|CANCELLED`. Team result revision state is `draft→submitted→official|change_requested`, `change_requested→superseding draft`; tournament review is `draft→submitted→rejected|supplement_requested|official`, and `rejected|supplement_requested→atomically created superseding draft→submitted`; official correction is `official→superseding correction draft→official|void`. Cancellation/void/reject/supplement/reverse always require reason, expected version, idempotency key, actor audit, transactional outbox, and named visibility/SLA cleanup. Invalid transitions return `409 INVALID_STATE_TRANSITION`. Team-match result submit is team_owner/team_manager, decision is opponent_manager, and tournament officialize/void is platform_ops or audited flag-enabled tournament_director.
 
-- 보호 endpoint는 `Authorization: Bearer <accessToken>` 필요
-- Access token 만료 시 프론트는 `POST /auth/refresh` 후 원 요청 재시도
-- refresh 실패 시 프론트 interceptor가 logout + `/login` 이동
+Review and compensation effects are exact:
+- Tournament `end` atomically commits the ended state, derives one draft from the event stream, immediately moves it to `submitted`, and writes `game:<gameId>:revision:<revision>:submitted`; failure rolls back all three, so normal operation never leaves a draft-only result. The game-level `result-recovery/derive-and-submit` route exists only for pre-existing or manually repaired `ENDED` data with zero revision rows; it derives and submits in one transaction and never accepts a nonexistent revision ID.
+- `reject` is terminal `REJECTED`: cancel all pending reminder/escalation jobs for that revision, expose no public numeric result, leave `currentOfficialRevisionId` unchanged/null, and write business key `game:<gameId>:revision:<revision>:rejected`. A new result is possible only through `supersede-and-submit`, which creates a new draft and submits it atomically so no unreachable draft remains.
+- `request_supplement` enters terminal `SUPPLEMENT_REQUESTED`: cancel current review jobs; `supersede-and-submit` creates and submits the successor atomically with a fresh `submittedAt` and new 24h/48h jobs; write `game:<gameId>:revision:<revision>:supplement-requested`.
+- `void` creates an immutable `VOID` superseding revision and makes it the current official pointer. Its outbox key `game:<gameId>:revision:<voidRevision>:voided` transactionally removes the prior numeric score/events/participant records from public output, compensates team/player/standings aggregates, and recalculates affected next fixtures; a locked downstream fixture returns `409 NEXT_FIXTURE_CONFLICT` before pointer swap.
+- Event reversal appends exactly one event whose unique non-null `reversesEventId` points to the target and whose business key is `game:<gameId>:event:<reversalSequence>`; a target may be reversed once. Any replacement is a separate append and therefore receives a separate sequence/ack.
 
-## Success Envelope
-
-모든 정상 응답은 `TransformInterceptor`에 의해 아래 형태로 래핑된다.
-
-```json
-{
-  "status": "success",
-  "data": {},
-  "timestamp": "2026-04-11T12:00:00.000Z"
-}
-```
-
-프론트 훅(`use-api.ts`)은 `extractData<T>()`로 `data`만 꺼내서 사용한다.
-
-## Error Envelope
-
-모든 예외 응답은 `AllExceptionsFilter`에서 아래 형태로 내려간다.
-
-```json
-{
-  "status": "error",
-  "statusCode": 400,
-  "message": "Bad Request",
-  "timestamp": "2026-04-11T12:00:00.000Z"
-}
-```
-
-`message`는 `string`으로 오는 경우가 가장 많지만, validation 계열에서는 배열 또는 객체에서 추출된 값이 내려올 수 있다.
-
-## ValidationPipe 계약
-
-`main.ts` 전역 설정:
-
-- `whitelist: true`
-- `forbidNonWhitelisted: true`
-- `transform: true`
-- `enableImplicitConversion: true`
-
-의미:
-
-- DTO에 없는 필드를 보내면 `400` 발생 가능
-- query/body number/boolean 변환이 DTO+transform 규칙에 의해 수행
-- endpoint마다 DTO 사용 여부가 달라 파싱 결과가 동일하지 않을 수 있음
-
-## 날짜/시간 포맷
-
-- date: `YYYY-MM-DD`
-- time: `HH:mm`
-- timestamp: ISO 8601
-
-## Pagination 기본 shape
-
-cursor 기반 목록 API는 보통 아래 shape를 반환한다.
-
-```json
-{
-  "items": [],
-  "nextCursor": null
-}
-```
-
-## Optional / Nullable / Omitted 규칙
-
-- `optional` 필드는 생략 가능
-- `nullable` 필드는 `null` 허용
-- 일부 필드는 `undefined`와 `null`이 다르게 처리됨
-- PUT이 아니라 PATCH/부분 갱신 패턴이므로, "보내지 않은 필드"는 기존 값 유지가 기본
-
-## CAUTION: DTO-less / weakly typed
-
-- 일부 endpoint는 DTO가 느슨하거나 JSON object 필드(`Record<string, unknown>`)를 받는다.
-- 이런 endpoint는 프론트에서 UI 전용 필드를 그대로 보내지 않도록 submit payload를 명시적으로 정리해야 한다.
-
-## Source References
-
-- `apps/api/src/main.ts`
-- `apps/api/src/common/interceptors/transform.interceptor.ts`
-- `apps/api/src/common/filters/http-exception.filter.ts`
-- `apps/web/src/lib/api.ts`
-- `apps/web/src/hooks/use-api.ts`
-
+<!-- API_CONTRACT_SECTION_END:Frozen REST and idempotency contract -->

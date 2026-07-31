@@ -45,9 +45,9 @@ export type TournamentCampaignFormErrors = Partial<Record<
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export function emptyTournamentCampaignForm(): TournamentCampaignForm {
+export function emptyTournamentCampaignForm(tournamentId: string): TournamentCampaignForm {
   return {
-    slug: '',
+    slug: `campaign-${tournamentId}`,
     heroTitle: '',
     heroSummary: '',
     heroImageUrl: '',
@@ -95,9 +95,9 @@ export function validateTournamentCampaignForm(
     errors.slug = '주소는 3~80자의 영문 소문자, 숫자, 하이픈만 사용할 수 있어요.';
   }
 
-  validateRequired(errors, 'heroTitle', form.heroTitle, 120, '히어로 제목');
-  validateOptional(errors, 'heroSummary', form.heroSummary, 300, '히어로 요약');
-  validateImage(errors, 'heroImageUrl', form.heroImageUrl, '히어로 이미지');
+  validateRequired(errors, 'heroTitle', form.heroTitle, 120, '대제목');
+  validateOptional(errors, 'heroSummary', form.heroSummary, 300, '서브 내용');
+  validateImage(errors, 'heroImageUrl', form.heroImageUrl, '메인 상단 이미지');
   validateRequired(errors, 'introTitle', form.introTitle, 120, '소개 제목');
   validateRequired(errors, 'introBody', form.introBody, 3000, '소개 내용');
   validateRequired(
@@ -105,18 +105,18 @@ export function validateTournamentCampaignForm(
     'highlightsSectionTitle',
     form.highlightsSectionTitle,
     120,
-    '하이라이트 섹션 제목',
+    '참가할 이유',
   );
   validateRequired(errors, 'faqSectionTitle', form.faqSectionTitle, 120, 'FAQ 섹션 제목');
 
   if (form.highlights.length > 8) {
-    errors.highlights = '하이라이트는 최대 8개까지 추가할 수 있어요.';
+    errors.highlights = '참가할 이유는 최대 8개까지 추가할 수 있어요.';
   } else if (form.highlights.some((item) => !item.title.trim() || !item.body.trim())) {
-    errors.highlights = '각 하이라이트의 제목과 내용을 모두 입력해 주세요.';
+    errors.highlights = '각 참가 이유의 제목과 내용을 모두 입력해 주세요.';
   } else if (form.highlights.some((item) => item.title.trim().length > 100 || item.body.trim().length > 500)) {
-    errors.highlights = '하이라이트 제목은 100자, 내용은 500자 이하여야 해요.';
+    errors.highlights = '참가 이유 제목은 100자, 내용은 500자 이하여야 해요.';
   } else if (form.highlights.some((item) => !isValidImage(item.imageUrl))) {
-    errors.highlights = '하이라이트 이미지는 HTTPS 주소 또는 /uploads/ 경로여야 해요.';
+    errors.highlights = '참가 이유 이미지는 업로드된 이미지여야 해요.';
   }
 
   if (form.faq.length > 12) {
@@ -182,8 +182,14 @@ function validateRequired(
   label: string,
 ): void {
   const trimmed = value.trim();
-  if (!trimmed) errors[key] = `${label}을 입력해 주세요.`;
+  if (!trimmed) errors[key] = `${label}${objectParticle(label)} 입력해 주세요.`;
   else if (trimmed.length > max) errors[key] = `${label}은 ${max.toLocaleString('ko-KR')}자 이하여야 해요.`;
+}
+
+function objectParticle(label: string): '을' | '를' {
+  const lastCodePoint = label.codePointAt(label.length - 1);
+  if (lastCodePoint === undefined || lastCodePoint < 0xac00 || lastCodePoint > 0xd7a3) return '을';
+  return (lastCodePoint - 0xac00) % 28 === 0 ? '를' : '을';
 }
 
 function validateOptional(

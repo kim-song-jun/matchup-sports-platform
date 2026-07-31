@@ -23,6 +23,7 @@
 
 - [x] public `/tournaments/campaigns/[slug]`가 Teameet 대회 전용 페이지 템플릿으로 렌더된다.
 - [x] admin 대회 상세에서 campaign create/edit/preview/publish/archive가 실제 API에 연결된다.
+- [x] 캠페인 생성 시 공개 URL slug는 대회 ID로 자동 생성되며 관리자는 URL 규칙을 직접 입력하지 않는다.
 - [x] upstream campaign 404만 server boundary에서 Next `notFound()`로 변환한다. archive 후 public API와 browser proxy의 `GET`/`HEAD`는 실제 HTTP 404이며, 5xx는 soft-404나 빈 화면으로 숨기지 않는다.
 - [x] campaign canonical/OG/sitemap URL의 환경변수 미설정 fallback은 production nginx host와 같은 `https://teameet.co.kr`이며 회귀 테스트로 고정한다.
 - [x] public campaign 신청 CTA는 단순 `status=open`이 아니라 시작 시각, 접수 마감, 확정 팀과 입금 대기 팀이 차지한 정원을 반영한 서버 `registrationAvailability` 계약을 따른다. 신청 불가 상태는 상세 링크만 남기고 이유를 제목으로 표시한다.

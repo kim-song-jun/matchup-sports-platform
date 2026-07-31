@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
+import { useV1UploadImages } from '@/hooks/use-v1-api';
+import { extractErrorMessage } from '@/lib/error-message';
 import type {
   TournamentCampaignForm,
   TournamentCampaignFormErrors,
@@ -34,6 +37,9 @@ export function TournamentCampaignEditor({
 }: EditorProps) {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState<TournamentCampaignFormErrors>({});
+  const [uploadingSlot, setUploadingSlot] = useState<'hero' | `highlight-${number}` | null>(null);
+  const [uploadError, setUploadError] = useState('');
+  const uploadImages = useV1UploadImages();
 
   const setField = (field: TextField, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -42,10 +48,37 @@ export function TournamentCampaignEditor({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (uploadingSlot !== null) return;
     const nextErrors = validateTournamentCampaignForm(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     onSubmit(form);
+  };
+
+  const uploadImage = async (slot: 'hero' | `highlight-${number}`, file: File) => {
+    setUploadingSlot(slot);
+    setUploadError('');
+    try {
+      const uploaded = await uploadImages.mutateAsync(file);
+      const imageUrl = uploaded.urls[0];
+      if (!imageUrl) throw new Error('이미지 업로드 결과가 비어 있어요.');
+      if (slot === 'hero') {
+        setField('heroImageUrl', imageUrl);
+      } else {
+        const index = Number(slot.slice('highlight-'.length));
+        setForm((current) => ({
+          ...current,
+          highlights: current.highlights.map((item, itemIndex) => (
+            itemIndex === index ? { ...item, imageUrl } : item
+          )),
+        }));
+        setErrors((current) => ({ ...current, highlights: undefined }));
+      }
+    } catch (error) {
+      setUploadError(extractErrorMessage(error, '캠페인 이미지를 업로드하지 못했어요.'));
+    } finally {
+      setUploadingSlot(null);
+    }
   };
 
   return (
@@ -58,13 +91,28 @@ export function TournamentCampaignEditor({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <EditorField label="캠페인 주소" value={form.slug} error={errors.slug} maxLength={80} disabled={slugLocked} onChange={(value) => setField('slug', value)} />
-        <EditorField label="히어로 제목" value={form.heroTitle} error={errors.heroTitle} maxLength={120} onChange={(value) => setField('heroTitle', value)} />
-        <EditorField label="히어로 요약" value={form.heroSummary} error={errors.heroSummary} maxLength={300} onChange={(value) => setField('heroSummary', value)} />
-        <EditorField label="히어로 이미지 주소" value={form.heroImageUrl} error={errors.heroImageUrl} maxLength={2048} onChange={(value) => setField('heroImageUrl', value)} />
+        <EditorField label="공개 URL" value={`/tournaments/campaigns/${form.slug}`} error={errors.slug} maxLength={103} disabled onChange={() => undefined} />
+        <EditorField label="대제목" value={form.heroTitle} error={errors.heroTitle} maxLength={120} onChange={(value) => setField('heroTitle', value)} />
+        <EditorField label="서브 내용" value={form.heroSummary} error={errors.heroSummary} maxLength={300} onChange={(value) => setField('heroSummary', value)} />
       </div>
 
-      {slugLocked ? <p className="-mt-4 text-xs text-gray-500">한 번 공개된 캠페인의 주소는 보관 후에도 유지돼요.</p> : null}
+      <CoverImageUploader
+        label="메인 상단 이미지"
+        value={form.heroImageUrl || null}
+        onSelectFile={(file) => void uploadImage('hero', file)}
+        onClear={() => setField('heroImageUrl', '')}
+        uploading={uploadingSlot === 'hero'}
+        disabled={pending || uploadingSlot !== null}
+        helperText="JPG, PNG, WebP · 최대 5MB. 캠페인 상단 배경으로 표시돼요."
+        previewAlt={form.heroImageUrl ? '메인 상단 이미지 미리보기' : '메인 상단 이미지 예시'}
+        eager
+      />
+      {errors.heroImageUrl ? <p className="text-xs text-red-500" role="alert">{errors.heroImageUrl}</p> : null}
+      {uploadError ? <p className="text-xs text-red-500" role="alert">{uploadError}</p> : null}
+
+      <p className="-mt-4 text-xs text-gray-500">
+        {slugLocked ? '한 번 공개된 캠페인의 URL은 보관 후에도 유지돼요.' : '대회별 공개 URL은 자동으로 만들어져요.'}
+      </p>
 
       <section className="grid gap-4" aria-label="소개 편집">
         <h3 className="text-sm font-bold text-gray-900">소개</h3>
@@ -72,7 +120,7 @@ export function TournamentCampaignEditor({
         <EditorField label="소개 내용" value={form.introBody} error={errors.introBody} maxLength={3000} multiline onChange={(value) => setField('introBody', value)} />
       </section>
 
-      <EditorField label="하이라이트 섹션 제목" value={form.highlightsSectionTitle} error={errors.highlightsSectionTitle} maxLength={120} onChange={(value) => setField('highlightsSectionTitle', value)} />
+      <EditorField label="참가할 이유" value={form.highlightsSectionTitle} error={errors.highlightsSectionTitle} maxLength={120} onChange={(value) => setField('highlightsSectionTitle', value)} />
       <TournamentCampaignEditorCollections
         form={form}
         errors={errors}
@@ -83,6 +131,18 @@ export function TournamentCampaignEditor({
           setForm((current) => ({ ...current, highlights }));
           setErrors((current) => ({ ...current, highlights: undefined }));
         }}
+        onHighlightImageSelect={(index, file) => void uploadImage(`highlight-${index}`, file)}
+        onHighlightImageClear={(index) => {
+          setForm((current) => ({
+            ...current,
+            highlights: current.highlights.map((item, itemIndex) => (
+              itemIndex === index ? { ...item, imageUrl: '' } : item
+            )),
+          }));
+          setErrors((current) => ({ ...current, highlights: undefined }));
+        }}
+        uploadingHighlightIndex={uploadingSlot?.startsWith('highlight-') ? Number(uploadingSlot.slice('highlight-'.length)) : null}
+        imageUploadDisabled={pending || uploadingSlot !== null}
         onFaqChange={(faq) => {
           setForm((current) => ({ ...current, faq }));
           setErrors((current) => ({ ...current, faq: undefined }));
@@ -90,9 +150,9 @@ export function TournamentCampaignEditor({
       />
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-5">
-        <button type="button" onClick={onCancel} disabled={pending} className="min-h-[44px] rounded-xl bg-gray-100 px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50">취소</button>
-        <button type="submit" disabled={pending} className="min-h-[44px] rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50">
-          {pending ? '저장 중…' : mode === 'create' ? '캠페인 생성' : '변경 저장'}
+        <button type="button" onClick={onCancel} disabled={pending || uploadingSlot !== null} className="min-h-[44px] rounded-xl bg-gray-100 px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50">취소</button>
+        <button type="submit" disabled={pending || uploadingSlot !== null} className="min-h-[44px] rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50">
+          {uploadingSlot ? '이미지 업로드 중…' : pending ? '저장 중…' : mode === 'create' ? '캠페인 생성' : '변경 저장'}
         </button>
       </div>
     </form>

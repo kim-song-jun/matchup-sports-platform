@@ -1,0 +1,578 @@
+import { HttpException } from '@nestjs/common';
+import {
+  V1GameEventType,
+  V1GameSideKey,
+  V1GameSourceType,
+  type Prisma,
+} from '@prisma/client';
+import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
+import type {
+  GameActorScope,
+  GameCommandContext,
+  GameSourceCreationInput,
+} from '../../src/games/games.types';
+import { PrismaService } from '../../src/prisma/prisma.service';
+
+const ids = {
+  platformOps: '77000000-0000-4000-8000-000000000001',
+  director: '77000000-0000-4000-8000-000000000002',
+  fieldOperator: '77000000-0000-4000-8000-000000000003',
+  supportReadonly: '77000000-0000-4000-8000-000000000004',
+  teamManager: '77000000-0000-4000-8000-000000000005',
+  public: '77000000-0000-4000-8000-000000000006',
+  teamOwner: '77000000-0000-4000-8000-000000000007',
+  opponentOwner: '77000000-0000-4000-8000-000000000008',
+  crossTournamentOperator: '77000000-0000-4000-8000-000000000009',
+  crossFixtureOperator: '77000000-0000-4000-8000-00000000000a',
+  revokedOperator: '77000000-0000-4000-8000-00000000000b',
+  expiredOperator: '77000000-0000-4000-8000-00000000000c',
+  staleSession: '77000000-0000-4000-8000-00000000000d',
+  sport: '77000000-0000-4000-8000-000000000010',
+  region: '77000000-0000-4000-8000-000000000011',
+  hostTeam: '77000000-0000-4000-8000-000000000020',
+  opponentTeam: '77000000-0000-4000-8000-000000000021',
+  teamMatch: '77000000-0000-4000-8000-000000000030',
+  tournament: '77000000-0000-4000-8000-000000000040',
+  otherTournament: '77000000-0000-4000-8000-000000000041',
+  fixture: '77000000-0000-4000-8000-000000000050',
+  otherFixture: '77000000-0000-4000-8000-000000000051',
+  crossTournamentFixture: '77000000-0000-4000-8000-000000000052',
+  field: '77000000-0000-4000-8000-000000000060',
+} as const;
+
+const prisma = new PrismaService();
+const service = new GamesService(prisma);
+
+const authUser = (id: string) => ({
+  id,
+  email: `${id}@task7.example.test`,
+  accountStatus: 'active' as const,
+  onboardingStatus: 'completed' as const,
+});
+
+function sourceContext(
+  actor: GameActorScope,
+  commandId: string,
+  payload: unknown,
+): GameCommandContext {
+  return {
+    actor,
+    expectedVersion: 0,
+    durableCommandId: commandId,
+    payloadHash: canonicalGameCommandPayloadHash(payload),
+  };
+}
+
+async function captureFailure(operation: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await operation();
+  } catch (error) {
+    return error;
+  }
+  throw new Error('Expected operation to fail');
+}
+
+function expectForbidden(error: unknown) {
+  expect(error).toBeInstanceOf(HttpException);
+  const exception = error as HttpException;
+  expect(exception.getStatus()).toBe(403);
+  expect(exception.getResponse()).toEqual(
+    expect.objectContaining({ code: 'PERMISSION_DENIED' }),
+  );
+}
+
+type WriteSnapshot = {
+  version: number;
+  lastSequence: number;
+  events: number;
+  revisions: number;
+  idempotency: number;
+  audits: number;
+};
+
+async function writeSnapshot(gameId: string): Promise<WriteSnapshot> {
+  const [game, events, revisions, idempotency, audits] = await Promise.all([
+    prisma.v1Game.findUniqueOrThrow({
+      where: { id: gameId },
+      select: { version: true, lastSequence: true },
+    }),
+    prisma.v1GameEvent.count({ where: { gameId } }),
+    prisma.v1GameResultRevision.count({ where: { gameId } }),
+    prisma.v1IdempotencyRecord.count({ where: { resourceType: 'GAME', resourceId: gameId } }),
+    prisma.v1OperationAudit.count({ where: { resourceType: 'GAME', resourceId: gameId } }),
+  ]);
+  return { ...game, events, revisions, idempotency, audits };
+}
+
+async function expectDeniedWithoutWrite(
+  gameId: string,
+  operation: () => Promise<unknown>,
+): Promise<void> {
+  const before = await writeSnapshot(gameId);
+  expectForbidden(await captureFailure(operation));
+  expect(await writeSnapshot(gameId)).toEqual(before);
+}
+
+describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
+  let configId: string;
+  let sportId: string;
+  let tournamentGameId: string;
+  let teamGameId: string;
+  let tournamentHomeSideId: string;
+  let allowed = 0;
+  let denied = 0;
+  let deniedWrites = 0;
+
+  beforeAll(async () => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required for the Task 7 actor matrix PIN');
+    }
+    await prisma.$connect();
+    const config = await prisma.v1CompetitionConfigVersion.findFirst({
+      where: { name: 'football-v1', status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+    });
+    if (config === null) {
+      throw new Error('The migrated football-v1 competition preset is required');
+    }
+    configId = config.id;
+
+    const userIds = [
+      ids.platformOps,
+      ids.director,
+      ids.fieldOperator,
+      ids.supportReadonly,
+      ids.teamManager,
+      ids.public,
+      ids.teamOwner,
+      ids.opponentOwner,
+      ids.crossTournamentOperator,
+      ids.crossFixtureOperator,
+      ids.revokedOperator,
+      ids.expiredOperator,
+      ids.staleSession,
+    ];
+    await prisma.v1User.createMany({
+      data: userIds.map((id, index) => ({
+        id,
+        email: `task7-actor-${index}@example.test`,
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      })),
+    });
+    await prisma.v1AdminUser.create({
+      data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
+    });
+    sportId = (
+      await prisma.v1Sport.upsert({
+        where: { code: 'football' },
+        create: { id: ids.sport, code: 'football', name: 'Task 7 Football' },
+        update: {},
+      })
+    ).id;
+    await prisma.v1Region.create({
+      data: { id: ids.region, code: 'TASK7_ACTOR_REGION', name: 'Task 7 Region', level: 1 },
+    });
+    await prisma.v1Team.createMany({
+      data: [
+        {
+          id: ids.hostTeam,
+          ownerUserId: ids.teamOwner,
+          sportId,
+          regionId: ids.region,
+          name: 'Task 7 Host',
+        },
+        {
+          id: ids.opponentTeam,
+          ownerUserId: ids.opponentOwner,
+          sportId,
+          regionId: ids.region,
+          name: 'Task 7 Opponent',
+        },
+      ],
+    });
+    await prisma.v1TeamMembership.createMany({
+      data: [
+        { teamId: ids.hostTeam, userId: ids.teamOwner, role: 'owner', status: 'active' },
+        { teamId: ids.hostTeam, userId: ids.teamManager, role: 'manager', status: 'active' },
+        {
+          teamId: ids.opponentTeam,
+          userId: ids.opponentOwner,
+          role: 'owner',
+          status: 'active',
+        },
+      ],
+    });
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.teamMatch,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.teamOwner,
+        sportId,
+        regionId: ids.region,
+        title: 'Task 7 team match',
+        placeName: 'Task 7 ground',
+        startAt: new Date('2026-08-01T12:00:00.000Z'),
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1Tournament.createMany({
+      data: [
+        {
+          id: ids.tournament,
+          sportId,
+          title: 'Task 7 tournament',
+          competitionConfigVersionId: configId,
+        },
+        {
+          id: ids.otherTournament,
+          sportId,
+          title: 'Task 7 other tournament',
+          competitionConfigVersionId: configId,
+        },
+      ],
+    });
+    await prisma.v1TournamentFixture.createMany({
+      data: [
+        {
+          id: ids.fixture,
+          tournamentId: ids.tournament,
+          round: 'group',
+          fixtureNumber: 1,
+          competitionConfigVersionId: configId,
+        },
+        {
+          id: ids.otherFixture,
+          tournamentId: ids.tournament,
+          round: 'group',
+          fixtureNumber: 2,
+          competitionConfigVersionId: configId,
+        },
+        {
+          id: ids.crossTournamentFixture,
+          tournamentId: ids.otherTournament,
+          round: 'group',
+          fixtureNumber: 1,
+          competitionConfigVersionId: configId,
+        },
+      ],
+    });
+    await prisma.v1TournamentField.create({
+      data: {
+        id: ids.field,
+        tournamentId: ids.tournament,
+        scopeKey: 'main-court',
+        name: 'Main court',
+      },
+    });
+
+    const assignmentRows: Prisma.V1TournamentStaffAssignmentCreateManyInput[] = [
+      {
+        tournamentId: ids.tournament,
+        userId: ids.director,
+        role: 'TOURNAMENT_DIRECTOR',
+        grantedByUserId: ids.platformOps,
+      },
+      {
+        tournamentId: ids.tournament,
+        userId: ids.fieldOperator,
+        role: 'FIELD_OPERATOR',
+        fieldId: ids.field,
+        grantedByUserId: ids.director,
+      },
+      {
+        tournamentId: ids.tournament,
+        userId: ids.supportReadonly,
+        role: 'SUPPORT_READONLY',
+        grantedByUserId: ids.director,
+      },
+      {
+        tournamentId: ids.otherTournament,
+        userId: ids.crossTournamentOperator,
+        role: 'FIELD_OPERATOR',
+        grantedByUserId: ids.platformOps,
+      },
+      {
+        tournamentId: ids.tournament,
+        userId: ids.crossFixtureOperator,
+        role: 'FIELD_OPERATOR',
+        grantedByUserId: ids.platformOps,
+      },
+      {
+        tournamentId: ids.tournament,
+        userId: ids.revokedOperator,
+        role: 'FIELD_OPERATOR',
+        grantedByUserId: ids.platformOps,
+        revokedAt: new Date('2026-07-31T00:00:00.000Z'),
+      },
+      {
+        tournamentId: ids.tournament,
+        userId: ids.expiredOperator,
+        role: 'FIELD_OPERATOR',
+        grantedByUserId: ids.platformOps,
+        expiresAt: new Date('2026-07-31T00:00:00.000Z'),
+      },
+    ];
+    for (const assignment of assignmentRows) {
+      await prisma.$transaction(async (tx) => {
+        const created = await tx.v1TournamentStaffAssignment.create({ data: assignment });
+        if (assignment.role === 'FIELD_OPERATOR') {
+          const fixtureId =
+            assignment.userId === ids.crossTournamentOperator
+              ? ids.crossTournamentFixture
+              : assignment.userId === ids.crossFixtureOperator
+                ? ids.otherFixture
+                : ids.fixture;
+          await tx.v1TournamentStaffFixtureScope.create({
+            data: { assignmentId: created.id, fixtureId },
+          });
+        }
+      });
+    }
+
+    await prisma.v1GameOperationFlag.upsert({
+      where: { key: 'PUBLIC_LIVE' },
+      create: { key: 'PUBLIC_LIVE', value: 'on', ownerActor: 'platform_ops' },
+      update: { value: 'on' },
+    });
+
+    const tournamentInput: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceId: ids.fixture,
+      competitionConfigVersionId: configId,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Task 7 Host' },
+        {
+          sideKey: V1GameSideKey.AWAY,
+          teamId: ids.opponentTeam,
+          displayNameSnapshot: 'Task 7 Opponent',
+        },
+      ],
+      participants: [],
+    };
+    const tournamentCreated = await prisma.$transaction((tx) =>
+      service.createFromSourceInTransaction(
+        tx,
+        tournamentInput,
+        sourceContext(
+          {
+            actorType: 'USER',
+            actorUserId: ids.platformOps,
+            role: 'platform_ops',
+            tournamentId: ids.tournament,
+            fixtureId: ids.fixture,
+          },
+          'task7-create-tournament-game',
+          tournamentInput,
+        ),
+      ),
+    );
+    tournamentGameId = tournamentCreated.gameId;
+    tournamentHomeSideId = (
+      await prisma.v1GameSide.findFirstOrThrow({
+        where: { gameId: tournamentGameId, sideKey: V1GameSideKey.HOME },
+      })
+    ).id;
+
+    const teamInput: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: ids.teamMatch,
+      competitionConfigVersionId: configId,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Task 7 Host' },
+        {
+          sideKey: V1GameSideKey.AWAY,
+          teamId: ids.opponentTeam,
+          displayNameSnapshot: 'Task 7 Opponent',
+        },
+      ],
+      participants: [],
+    };
+    teamGameId = (
+      await prisma.$transaction((tx) =>
+        service.createFromSourceInTransaction(
+          tx,
+          teamInput,
+          sourceContext(
+            {
+              actorType: 'USER',
+              actorUserId: ids.teamOwner,
+              role: 'team_owner',
+              teamId: ids.hostTeam,
+            },
+            'task7-create-team-game',
+            teamInput,
+          ),
+        ),
+      )
+    ).gameId;
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it('PINs the frozen six-persona read and representative mutation matrix', async () => {
+    const tournamentRows = [
+      { actor: 'platform_ops', userId: ids.platformOps, mutation: 'allow' },
+      { actor: 'tournament_director', userId: ids.director, mutation: 'allow' },
+      { actor: 'field_operator', userId: ids.fieldOperator, mutation: 'allow' },
+      { actor: 'support_readonly', userId: ids.supportReadonly, mutation: 'deny' },
+    ] as const;
+
+    for (const row of tournamentRows) {
+      const read = await service.getGame(authUser(row.userId), tournamentGameId);
+      expect(read.actorRole).toBe(row.actor);
+      allowed += 1;
+
+      const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
+      const eventId = `task7-${row.actor}-event`;
+      const mutation = () =>
+        service.appendEvent(authUser(row.userId), tournamentGameId, eventId, {
+          expectedVersion: current.version,
+          clientEventId: eventId,
+          takeoverToken: `task7-${row.actor}-takeover`,
+          type: V1GameEventType.PERIOD_START,
+          sideId: tournamentHomeSideId,
+          period: 1,
+          clockMs: current.lastSequence * 1000,
+          occurredAt: new Date(Date.UTC(2026, 7, 1, 12, 0, current.lastSequence)).toISOString(),
+          payload: { actor: row.actor },
+        });
+      if (row.mutation === 'allow') {
+        const result = await mutation();
+        expect(result).toEqual(
+          expect.objectContaining({
+            gameId: tournamentGameId,
+            version: current.version + 1,
+            sequence: current.lastSequence + 1,
+          }),
+        );
+        const persisted = await prisma.v1GameEvent.findUniqueOrThrow({
+          where: {
+            gameId_clientEventId: { gameId: tournamentGameId, clientEventId: eventId },
+          },
+        });
+        expect(persisted.actorUserId).toBe(row.userId);
+        allowed += 1;
+      } else {
+        await expectDeniedWithoutWrite(tournamentGameId, mutation);
+        denied += 1;
+      }
+    }
+
+    const teamRead = await service.getGame(authUser(ids.teamManager), teamGameId);
+    expect(teamRead.actorRole).toBe('team_manager');
+    allowed += 1;
+    const teamMutation = await service.createResultRevision(
+      authUser(ids.teamManager),
+      teamGameId,
+      'task7-team-manager-result',
+      {
+        expectedVersion: 0,
+        clientCommandId: 'task7-team-manager-result',
+        score: { home: 0, away: 0 },
+        actualParticipants: [],
+        eventsHash: 'task7-empty-events',
+      },
+    );
+    expect(
+      await prisma.v1GameResultRevision.findUniqueOrThrow({
+        where: { id: teamMutation.revisionId },
+      }),
+    ).toEqual(expect.objectContaining({ createdByUserId: ids.teamManager, state: 'DRAFT' }));
+    allowed += 1;
+
+    const publicRead = await service.getVisibility(tournamentGameId);
+    expect(publicRead).toEqual(expect.objectContaining({ gameId: tournamentGameId }));
+    allowed += 1;
+    const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
+    await expectDeniedWithoutWrite(tournamentGameId, () =>
+      service.appendEvent(authUser(ids.public), tournamentGameId, 'task7-public-event', {
+        expectedVersion: current.version,
+        clientEventId: 'task7-public-event',
+        takeoverToken: 'task7-public-takeover',
+        type: V1GameEventType.PERIOD_START,
+        sideId: tournamentHomeSideId,
+        period: 1,
+        clockMs: 9000,
+        occurredAt: '2026-08-01T12:00:09.000Z',
+        payload: { actor: 'public' },
+      }),
+    );
+    denied += 1;
+
+    expect({ allowed, denied, deniedWrites }).toEqual({ allowed: 10, denied: 2, deniedWrites: 0 });
+  });
+
+  it('probes malformed, cross-scope, revoked, expired, and stale authorization without writes', async () => {
+    const malformedRole = 'MALFORMED_ROLE';
+    const malformedBefore = await prisma.v1TournamentStaffAssignment.count();
+    await expect(
+      prisma.$executeRaw`
+        INSERT INTO v1_tournament_staff_assignments
+          (id, tournament_id, user_id, role, granted_by_user_id, created_at, updated_at)
+        VALUES
+          (${`77000000-0000-4000-8000-000000000099`}::uuid, ${ids.tournament}::uuid,
+           ${ids.staleSession}::uuid, CAST(${malformedRole} AS "V1TournamentStaffRole"),
+           ${ids.platformOps}::uuid, NOW(), NOW())
+      `,
+    ).rejects.toThrow();
+    expect(await prisma.v1TournamentStaffAssignment.count()).toBe(malformedBefore);
+
+    const deniedUsers = [
+      ['cross-tournament', ids.crossTournamentOperator],
+      ['cross-fixture', ids.crossFixtureOperator],
+      ['revoked', ids.revokedOperator],
+      ['expired', ids.expiredOperator],
+      ['stale-session', ids.staleSession],
+    ] as const;
+    for (const [probe, userId] of deniedUsers) {
+      const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
+      const eventId = `task7-probe-${probe}`;
+      await expectDeniedWithoutWrite(tournamentGameId, () =>
+        service.appendEvent(authUser(userId), tournamentGameId, eventId, {
+          expectedVersion: current.version,
+          clientEventId: eventId,
+          takeoverToken: `task7-probe-${probe}-takeover`,
+          type: V1GameEventType.PERIOD_START,
+          sideId: tournamentHomeSideId,
+          period: 1,
+          clockMs: 10000,
+          occurredAt: '2026-08-01T12:00:10.000Z',
+          payload: { probe },
+        }),
+      );
+      expect(await prisma.v1GameEvent.count({ where: { gameId: tournamentGameId, clientEventId: eventId } })).toBe(0);
+    }
+
+    const successfulAudits = await prisma.v1OperationAudit.findMany({
+      where: {
+        resourceType: 'GAME',
+        resourceId: tournamentGameId,
+        action: 'EVENT_APPEND',
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { actorUserId: true, requestId: true, before: true, after: true },
+    });
+    expect(successfulAudits).toHaveLength(3);
+    expect(successfulAudits.map((audit) => audit.actorUserId)).toEqual([
+      ids.platformOps,
+      ids.director,
+      ids.fieldOperator,
+    ]);
+    expect(
+      successfulAudits.every(
+        (audit) => audit.requestId.length > 0 && audit.before !== null && audit.after !== null,
+      ),
+    ).toBe(true);
+
+    process.stdout.write(
+      `TASK7_ACTOR_MATRIX_PIN=PASS personas=6 allowed=${allowed} denied=${denied} deniedWrites=${deniedWrites}\n`,
+    );
+    process.stdout.write(
+      'TASK7_ULTRAQA=PASS malformed=denied crossTournament=denied crossFixture=denied revoked=denied expired=denied staleSession=denied publicMutation=denied supportMutation=denied misleadingSuccess=0\n',
+    );
+  });
+});

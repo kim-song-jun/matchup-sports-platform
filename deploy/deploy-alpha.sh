@@ -142,7 +142,8 @@ restore_legacy_runtime() {
   ALPHA_RELEASE_VERSION="${legacy_release_version}"
   ALPHA_RELEASE_SHA="${legacy_release_sha}"
   export ALPHA_API_IMAGE ALPHA_WEB_IMAGE ALPHA_RELEASE_VERSION ALPHA_RELEASE_SHA
-  "${compose[@]}" up -d --no-deps v1_api v1_web || return 1
+  "${compose[@]}" up -d --force-recreate --no-deps \
+    v1_api v1_web v1_game_operations_worker || return 1
   "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
   local restored_api_container
   local restored_web_container
@@ -217,6 +218,8 @@ done
   'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
 
 "${compose[@]}" up -d
+"${compose[@]}" up -d --force-recreate --no-deps \
+  v1_api v1_web v1_game_operations_worker
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_alpha_health_contract
 assert_running_release_digests

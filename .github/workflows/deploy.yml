@@ -672,6 +672,37 @@ jobs:
           REMOTE_SCRIPT
           } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
 
+      # alpha 는 x-teameet-release / x-teameet-commit 헤더로 "지금 무엇이 떠 있는지"를
+      # 즉시 답할 수 있는데 prod 에는 그 헤더가 없어 장애 때 배포본을 확인할 방법이 없었다.
+      # nginx 가 include 하는 스니펫에 이번 릴리스 값을 찍는다.
+      #
+      # 릴리스 버전은 이미 동기화된 호스트의 apps/v1_api/package.json 에서 읽는다 —
+      # deploy job 은 저장소를 체크아웃하지 않으므로 러너에 로컬 파일이 없다.
+      # 값을 못 읽어도 unknown 으로 두고 배포는 계속한다: 헤더 스탬프가 프로덕션 배포를
+      # 막는 사유가 되어서는 안 되고, unknown 은 눈에 보이므로 조용한 실패도 아니다.
+      #
+      # 이 파일은 bind mount 라 교체하면 inode 가 바뀐다. reload 만으로는 컨테이너가
+      # 새 파일을 못 보므로 다음 스텝의 restart-containers.sh 가 nginx 를
+      # --force-recreate 해야 반영된다.
+      - name: Stamp prod release metadata
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          {
+            printf 'RELEASE_SHA=%s\n' "${RELEASE_SHA}"
+            cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          release_version="$(jq -r '.version // "unknown"' ~/teameet/apps/v1_api/package.json 2>/dev/null || echo unknown)"
+          metadata_tmp="$(mktemp)"
+          printf 'add_header X-Teameet-Release "%s" always;\nadd_header X-Teameet-Commit "%s" always;\n' \
+            "${release_version}" "${RELEASE_SHA}" > "${metadata_tmp}"
+          chmod 644 "${metadata_tmp}"
+          mv "${metadata_tmp}" ~/teameet/deploy/release-metadata.prod.conf
+          echo "[INFO] Stamped prod release metadata: ${release_version} / ${RELEASE_SHA}"
+          REMOTE_SCRIPT
+          } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
+
       - name: Restart containers
         timeout-minutes: 15
         run: |

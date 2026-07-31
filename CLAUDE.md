@@ -2,13 +2,30 @@
 
 풋살/농구/아이스하키/배드민턴 등 생활체육 종목의 개인 및 팀을 AI로 최적 매칭하는 플랫폼.
 
-## Git 브랜치 정책 (Critical — 2026-07-20 갱신, 사용자 재지정)
+## Git 브랜치 정책 (Critical — 2026-07-31 실측 기준 정정)
 
-- **dev → main 승격 절대 금지.** `git push`/`gh pr merge`/`gh pr create --base main` 등 어떤 방식으로든 dev를 main에 승격하지 않는다 — main promotion 자체가 이 프로젝트에서 완전히 폐기된 워크플로다. 사용자 승인 여부와 무관하게 하지 않는다(과거 "사용자 게이트" 조항은 폐기됨).
-- **모든 작업은 `dev`에서만.** 통합 브랜치·배포 트리거 브랜치 모두 `dev` 하나다. 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
-- **`main`은 과거 유산 브랜치일 뿐, 배포와 무관하다.** main에 새 커밋이 생겼다면(다른 세션·실수 등) 그 변경분을 **origin/main → dev로 병합**해 흡수한다(반대 방향 금지). main 자체는 더 이상 갱신·유지하지 않는다.
-- **배포는 dev push가 자동 트리거한다.** `.github/workflows/deploy-alpha.yml`이 `push: branches: [dev]`에 반응해 승인 게이트 없이 자동으로 alpha(alpha.teameet.co.kr)에 배포한다 — dev에 머지하는 즉시 실배포로 이어진다는 뜻이므로, dev 머지 전 검증(테스트·tsc·lint)을 프로덕션 배포 게이트로 취급한다.
-- **`deploy.yml`(main 트리거, `environment: production` 승인 게이트)은 이 정책 하에서 사용하지 않는다.** 존재는 하지만 main에 아무것도 push하지 않으므로 발동하지 않는다.
+> 2026-07-20판은 "main은 유산 브랜치이고 배포와 무관하다 · `deploy.yml`은 사용하지 않는다"라고
+> 적고 있었다. **둘 다 사실이 아니다.** 그 서술을 믿고 `deploy.yml`의 main 전용 job을 dead code로
+> 오판해 삭제 직전까지 간 사고가 2026-07-31에 있었다 — 그 job은 라이브 프로덕션의 유일한 배포
+> 경로다. 아래는 실측(프로덕션 200 응답 · `deploy.yml` main 실행 6회 성공)으로 다시 쓴 내용이다.
+
+- **`dev`와 `main` 둘 다 살아 있고, 각자 다른 환경의 배포를 트리거한다.**
+  | 브랜치 | 트리거 워크플로 | 배포 대상 | 승인 게이트 |
+  |---|---|---|---|
+  | `dev` push | `deploy-alpha.yml` | **alpha.teameet.co.kr** | 없음 (즉시 실배포) |
+  | `main` push | `deploy.yml`의 `build-images` + `deploy` job | **teameet.co.kr (프로덕션)** | `environment: production` |
+- **모든 작업은 `dev`에서 시작한다.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
+- **`dev → main` 승격은 사용자만 한다.** 에이전트는 `gh pr merge`·`git push origin dev:main` 등
+  **어떤 방식으로도 직접 실행하지 않는다.** 승격이 필요해 보이면 사용자에게 알리고 멈춘다.
+  사용자가 GitHub에서 직접 PR을 머지하는 것이 유일한 승격 경로이며, **자동으로 승격하는
+  워크플로는 존재하지 않는다**(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이고,
+  `release-main.yml`이 만드는 PR의 base도 `dev`다).
+- **dev 머지 = 즉시 alpha 실배포.** 승인 게이트가 없으므로 dev 머지 전 검증(테스트·tsc·lint)을
+  실배포 게이트로 취급한다.
+- **`main`에 dev에 없는 커밋이 생겼다면 `origin/main → dev` 방향으로 흡수한다.** 반대 방향으로
+  dev 내용을 main 기준에 맞춰 되돌리지 않는다.
+- **`main`에는 브랜치 보호가 없다**(2026-07-31 확인, `404 Branch not protected`). PR을 거치지
+  않은 직접 push도 막히지 않고 그대로 프로덕션 배포로 이어진다 — 관례로만 지켜지는 상태다.
 - **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다. dev push = 자동 실배포이므로, 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 실제 배포 시점의 코드가 어긋날 위험도 커진다.
   - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
 

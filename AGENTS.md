@@ -345,15 +345,26 @@ The sections below fill project-specific gaps while preserving curated content a
 > 같은 변경에서 한다** — 이 저장소는 과거에 캡처 스크립트 경로 컨벤션이 두 문서에서
 > 달라 리뷰어가 반복 지적한 전례가 있다.
 
-## S1) 브랜치 · 배포 정책 (Critical)
+## S1) 브랜치 · 배포 정책 (Critical — 2026-07-31 실측 기준 정정)
 
-- **`dev` → `main` 승격 금지.** `git push`/`gh pr merge`/`gh pr create --base main` 어느
-  방식으로도 하지 않는다. 사용자 승인 여부와 무관하다(과거 "사용자 게이트" 조항은 폐기).
+> 이전 판은 "`main`은 유산 브랜치이고 배포와 무관"이라고 적고 있었는데 **사실이 아니다.**
+> 그 서술 때문에 `deploy.yml`의 main 전용 job을 dead code로 오판해 삭제 직전까지 간 사고가
+> 2026-07-31에 있었다 — 그 job은 라이브 프로덕션(teameet.co.kr)의 유일한 배포 경로다.
+
+- **`dev`와 `main` 둘 다 살아 있고 각자 다른 환경을 배포한다.**
+  - `dev` push → `deploy-alpha.yml` → **alpha.teameet.co.kr**, 승인 게이트 없음.
+  - `main` push → `deploy.yml`의 `build-images` + `deploy` job → **teameet.co.kr(프로덕션)**,
+    `environment: production` 승인 게이트 있음. 2026-07-27까지 6회 성공한 살아 있는 경로다.
 - **모든 작업은 `dev`에서만.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
-- **`main`은 유산 브랜치**이고 배포와 무관하다. main에 새 커밋이 생겼다면 `origin/main → dev`
-  방향으로만 흡수한다.
+- **`dev` → `main` 승격은 사용자만 한다.** 에이전트는 `git push`/`gh pr merge`/
+  `gh pr create --base main` 어느 방식으로도 **직접 실행하지 않는다** — 필요해 보이면 사용자에게
+  알리고 멈춘다. 사용자가 GitHub에서 PR을 머지하는 것이 유일한 승격 경로이고, 자동으로 승격하는
+  워크플로는 없다(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
+- **`main`에 dev에 없는 커밋이 생겼다면** `origin/main → dev` 방향으로만 흡수한다.
+- **`main`에는 브랜치 보호가 없다**(2026-07-31 확인). 직접 push도 막히지 않고 그대로 프로덕션
+  배포로 이어진다 — 관례로만 지켜지는 상태이므로 더 조심한다.
 - **dev push = alpha 자동 실배포.** `deploy-alpha.yml`이 승인 게이트 없이
-  alpha.teameet.co.kr에 배포한다 → **dev 머지 전 검증(테스트·tsc·lint)을 프로덕션 배포
+  alpha.teameet.co.kr에 배포한다 → **dev 머지 전 검증(테스트·tsc·lint)을 실배포
   게이트로 취급하라.**
 - **worktree는 항상 `git fetch origin dev` **직후** `origin/dev`에서 만든다.**
   로컬 `dev` 브랜치를 체크아웃해 base로 쓰지 않는다 — 여러 세션이 각자

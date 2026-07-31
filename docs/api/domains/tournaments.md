@@ -40,6 +40,22 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+## Competition Configuration
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/admin/competition-configs` | active admin; support read allowed | optional `sportCode`, `version` | deterministic version list |
+| `POST` | `/api/v1/admin/competition-configs` | owner/ops | `CreateCompetitionConfigDto` | new named config at version `1` |
+| `GET` | `/api/v1/admin/competition-configs/:configId/versions` | active admin; support read allowed | path id | versions for the source config's sport/name |
+| `POST` | `/api/v1/admin/competition-configs/:configId/versions` | owner/ops | `CreateCompetitionConfigVersionDto` | next immutable version |
+| `PATCH` | `/api/v1/admin/tournaments/:tournamentId/competition-config` | owner/ops | `ChangeTournamentCompetitionConfigDto` | preview or confirmed pin change |
+
+Every persisted tournament, tournament fixture, and team match stores a non-null `competitionConfigVersionId`. Inserts resolve the preset from the persisted `sportId` in the database transaction; reads never infer a config. Canonical v1 presets are `football-v1` for sport codes `soccer` or `football`, and `futsal-v1` for `futsal`. A missing sport fails with `COMPETITION_CONFIG_SPORT_REQUIRED`; any other sport fails with `COMPETITION_CONFIG_SPORT_UNSUPPORTED`. Migration backfill checks every tournament and team match before updating any row and aborts its single transaction on the first unsupported or missing source.
+
+The v1 config document fixes periods, supported events, lineup/substitution bounds, tournament and ordinary-match scorer policy, zero-or-one MVP, visibility states, points, and this exact standings tie-break order: points, head-to-head, goal difference, goals for, fair play, seeded draw. Seeded draw uses SHA-256 over `tournamentId + ":" + configVersionId + ":" + sortedRegistrationIds`; no registration insertion order or random runtime value is used. Invalid documents fail with `COMPETITION_CONFIG_INVALID`.
+
+Config rows are append-only once referenced by a game, tournament, team match, or fixture. Updating or deleting a used row fails with `COMPETITION_CONFIG_VERSION_IN_USE`; operators create a new version instead. A tournament config change uses `expectedVersion` equal to the current tournament `updatedAt` ISO timestamp. If completed fixtures or standings exist, the first request returns `confirmationRequired=true`, `impact`, and the selected config's `previewHash` without changing data. The confirming request must repeat the current `expectedVersion`, set `confirmRecalculation=true`, and return the same `previewHash`. Scheduled fixtures move to the new pin; completed fixtures keep their historical pin. Standings recalculation reads the tournament's persisted config and returns the applied config version id.
+
 Paid tournaments (`entryFee > 0`) require `bankName`, `bankAccount`, and `bankHolder`. Create/update rejects incomplete payment instructions with `400 TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED`, and a draft cannot transition to `open` until the same invariant is satisfied. The four-step Web wizard validates this before submission so applicants are never placed on a payment-expiry clock without usable transfer instructions.
 
 Admin create/update accepts `rulesText` up to 10,000 characters. `refundPolicyText` remains a separate field with a 2,000-character limit.

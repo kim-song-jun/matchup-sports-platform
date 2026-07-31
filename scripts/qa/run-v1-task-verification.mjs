@@ -109,7 +109,8 @@ const HISTORICAL_TASK_ONE_OVERRIDE_SHA256 =
 const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH =
   '.omo/start-work/host-pressure-override-task-5-11.json';
 const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256 =
-  '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c';
+  '292432a0001ce5aaaf480db0a9c825c84a4f95cfcb78962f2a81055ae2484aeb';
+const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE = 915;
 const VERIFICATION_SESSION_ID =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
 const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
@@ -138,6 +139,8 @@ const VALUE_OPTIONS = new Set([
   'phase',
   'plan-sha',
   'predecessor-chain',
+  'pressure-receipt-only',
+  'pressure-receipt-sha',
   'require-host-supervisor-receipt',
   'require-host-supervisor-receipt-sha',
   'require-node-mcp-override-receipt',
@@ -224,7 +227,10 @@ function parseArgs(argv) {
     options[name] = value;
     index += 1;
   }
-  if (payload.length === 0 && !options.sequence) {
+  const descriptorOnly =
+    options['pressure-receipt-only'] !== undefined ||
+    options['pressure-receipt-sha'] !== undefined;
+  if (payload.length === 0 && !options.sequence && !descriptorOnly) {
     throw new HarnessError('MALFORMED_INPUT', 'Payload command must follow --', 64);
   }
   return { options, payload };
@@ -337,6 +343,7 @@ function secureImmutableDescriptor(
   code,
   exitCode = 68,
   allowCanonicalNewline = false,
+  expectedSize = null,
 ) {
   const absolutePath = isAbsolute(filePath) ? filePath : resolve(filePath);
   let stat;
@@ -364,8 +371,12 @@ function secureImmutableDescriptor(
   } catch (error) {
     throw new HarnessError(code, `${absolutePath}: ${error.message}`, exitCode);
   }
-  if (!/^[0-9a-f]{64}$/.test(expectedSHA ?? '') || descriptor.sha256 !== expectedSHA) {
-    throw new HarnessError(code, `${absolutePath}: receipt SHA-256 mismatch`, exitCode);
+  if (
+    !/^[0-9a-f]{64}$/.test(expectedSHA ?? '') ||
+    descriptor.sha256 !== expectedSHA ||
+    (expectedSize !== null && descriptor.size !== expectedSize)
+  ) {
+    throw new HarnessError(code, `${absolutePath}: receipt SHA-256/size mismatch`, exitCode);
   }
   let receipt;
   try {
@@ -385,7 +396,12 @@ function secureImmutableDescriptor(
       exitCode,
     );
   }
-  return { path: absolutePath, sha256: descriptor.sha256, receipt };
+  return {
+    path: absolutePath,
+    size: descriptor.size,
+    sha256: descriptor.sha256,
+    receipt,
+  };
 }
 
 function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseline = null, lifecycle = null) {
@@ -421,6 +437,8 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     expectedSHA,
     'HOST_PRESSURE_OVERRIDE_INVALID',
     75,
+    false,
+    pressureB ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE : null,
   );
   const receipt = descriptor.receipt;
   const allowed = historical
@@ -955,6 +973,41 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     pressureBTransition,
     completePressureBLifecycle,
   };
+}
+
+function validatePressureReceiptOnly(options, payload) {
+  const allowedOptions = ['pressure-receipt-only', 'pressure-receipt-sha'];
+  if (
+    payload.length !== 0 ||
+    options.sequence !== undefined ||
+    JSON.stringify(Object.keys(options).sort()) !== JSON.stringify(allowedOptions)
+  ) {
+    throw new HarnessError(
+      'HOST_PRESSURE_OVERRIDE_INVALID',
+      'Descriptor-only pressure receipt validation accepts only the exact path/SHA pair',
+      75,
+    );
+  }
+  const receiptPath = options['pressure-receipt-only'];
+  const suppliedSHA = options['pressure-receipt-sha'];
+  if (suppliedSHA !== TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256) {
+    throw new HarnessError(
+      'HOST_PRESSURE_OVERRIDE_INVALID',
+      'Descriptor-only pressure receipt SHA does not match the immutable authority',
+      75,
+    );
+  }
+  const descriptor = secureImmutableDescriptor(
+    receiptPath,
+    suppliedSHA,
+    'HOST_PRESSURE_OVERRIDE_INVALID',
+    75,
+    false,
+    TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE,
+  );
+  process.stdout.write(
+    `TASK5_PRESSURE_RECEIPT_CANONICAL_PASS exact_bytes=${descriptor.size} exact_sha=${descriptor.sha256} accepted=true\n`,
+  );
 }
 
 function commandOutput(command, args, options = {}) {
@@ -3373,6 +3426,13 @@ async function runTaskOneCleanRestart({
 
 async function main() {
   const { options, payload } = parseArgs(process.argv.slice(2));
+  if (
+    options['pressure-receipt-only'] !== undefined ||
+    options['pressure-receipt-sha'] !== undefined
+  ) {
+    validatePressureReceiptOnly(options, payload);
+    return;
+  }
   const identity = parseIdentity(options);
   const repoRoot = process.cwd();
   const ledger = parseLedger(resolve(repoRoot, options.ledger ?? DEFAULT_LEDGER));

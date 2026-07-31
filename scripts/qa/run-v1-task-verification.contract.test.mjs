@@ -22,7 +22,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { test } from 'node:test';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { descriptorRead } from './verify-team-tournament-bound-sources.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -39,6 +39,9 @@ const relativeGrowthOverridePath =
   '.omo/evidence/task-1-relative-growth-override-dc4ecb2f.json';
 const relativeGrowthOverrideSHA =
   '2a1b41aedcece05f389e53fc639d732d6e01c2b886a9762286f3c0a66de7ca36';
+const pressureBOverrideSHA =
+  '292432a0001ce5aaaf480db0a9c825c84a4f95cfcb78962f2a81055ae2484aeb';
+const pressureBOverrideSize = 915;
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -478,6 +481,7 @@ function hostPressureOverrideFunction({
     'HISTORICAL_TASK_ONE_OVERRIDE_SHA256',
     'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH',
     'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256',
+    'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE',
     'OVERRIDE_SHA256',
     'VERIFICATION_SESSION_ID',
     'secureImmutableDescriptor',
@@ -504,7 +508,8 @@ function hostPressureOverrideFunction({
     '.omo/start-work/host-pressure-override-task-1.json',
     '2042407ad7b8f634f118d4ee9f0154ad1503564ceeac5874c6681f458e8c16da',
     '.omo/start-work/host-pressure-override-task-5-11.json',
-    '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+    pressureBOverrideSHA,
+    pressureBOverrideSize,
     '2c04e6621fccb1017838c6b479ac8addabba9061852654cec4c893ed588631c2',
     'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
     (path, expectedSHA, code, exitCode) => {
@@ -539,6 +544,51 @@ function hostPressureOverrideFunction({
     },
     readFileSync,
     spawnSync,
+  );
+}
+
+function secureImmutableDescriptorFunction() {
+  const source = readFileSync(
+    join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
+    'utf8',
+  );
+  const start = source.indexOf('function secureImmutableDescriptor(');
+  assert.notEqual(start, -1);
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  let end = -1;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) {
+      end = index + 1;
+      break;
+    }
+  }
+  assert.notEqual(end, -1);
+  const declaration = source.slice(start, end);
+  class TestHarnessError extends Error {
+    constructor(code, message, exitCode) {
+      super(message);
+      this.code = code;
+      this.exitCode = exitCode;
+    }
+  }
+  return Function(
+    'isAbsolute',
+    'resolve',
+    'lstatSync',
+    'descriptorRead',
+    'HarnessError',
+    'stable',
+    `${declaration}; return secureImmutableDescriptor;`,
+  )(
+    isAbsolute,
+    resolve,
+    lstatSync,
+    descriptorRead,
+    TestHarnessError,
+    stable,
   );
 }
 
@@ -646,7 +696,7 @@ function withPressureBLifecycle(callback) {
       const verifyOverride = hostPressureOverrideFunction({
         overridePath,
         receipt: pressureBReceipt(),
-        sha256: '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+        sha256: pressureBOverrideSHA,
       });
       const { baseline, current } = pressureBPreflight();
       return callback({ baseline, current, plan, stateRoot, verifyOverride });
@@ -681,7 +731,7 @@ for (let index = bodyStart; index < source.length; index += 1) {
   if (depth === 0) { end = index + 1; break; }
 }
 class HarnessError extends Error { constructor(code, message, exitCode) { super(message); this.code = code; this.exitCode = exitCode; } }
-const expectedReceiptSHA = '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c';
+const expectedReceiptSHA = '${pressureBOverrideSHA}';
 const controlledMkdirSync = (path, options) => nativeMkdirSync(path, options);
 const controlledRenameSync = (sourcePath, targetPath) => {
   const result = renameSync(sourcePath, targetPath);
@@ -715,7 +765,8 @@ const controlledRenameSync = (sourcePath, targetPath) => {
 };
 const verifyOverride = Function(
   'resolve', 'PLAN_PATH', 'OVERRIDE_PATH', 'HISTORICAL_TASK_ONE_OVERRIDE_PATH', 'HISTORICAL_TASK_ONE_OVERRIDE_SHA256',
-  'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH', 'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256', 'OVERRIDE_SHA256',
+  'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH', 'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256',
+  'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE', 'OVERRIDE_SHA256',
   'VERIFICATION_SESSION_ID', 'secureImmutableDescriptor', 'HarnessError', 'join', 'randomUUID', 'constants', 'openSync',
   'writeSync', 'fsyncSync', 'closeSync', 'renameSync', 'rmSync', 'mkdirSync', 'lstatSync', 'existsSync', 'readFileSync', 'spawnSync',
   source.slice(start, end) + '; return verifyOverride;',
@@ -723,6 +774,7 @@ const verifyOverride = Function(
   resolve, '.omo/plans/teameet-team-tournament-operations-v1.md', '.omo/start-work/host-pressure-override-plan.json',
   '.omo/start-work/host-pressure-override-task-1.json', '2042407ad7b8f634f118d4ee9f0154ad1503564ceeac5874c6681f458e8c16da',
   '.omo/start-work/host-pressure-override-task-5-11.json', expectedReceiptSHA,
+  ${pressureBOverrideSize},
   '2c04e6621fccb1017838c6b479ac8addabba9061852654cec4c893ed588631c2', 'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
   (path, expectedSHA, code, exitCode) => {
     if (expectedSHA !== expectedReceiptSHA) throw new HarnessError(code, 'unexpected fixture receipt SHA', exitCode);
@@ -833,6 +885,126 @@ test('pressure-B V11-first receipt accepts only the bounded serial contract', ()
       'v11-complete',
     );
   });
+});
+
+test('pressure-B receipt accepts only exact no-trailing canonical bytes', () => {
+  const source = readFileSync(
+    join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
+    'utf8',
+  );
+  const productionSHA = source.match(
+    /const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256 =\s*'([0-9a-f]{64})'/,
+  )?.[1];
+  const productionSize = Number(source.match(
+    /const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE =\s*(\d+);/,
+  )?.[1] ?? 916);
+  const verifyDescriptor = secureImmutableDescriptorFunction();
+  const temporaryDirectory = mkdtempSync('/private/tmp/teameet-pressure-b-canonical-');
+  try {
+    const canonical = Buffer.from(JSON.stringify(stable(pressureBReceipt())));
+    assert.equal(canonical.length, pressureBOverrideSize);
+    assert.equal(sha256(canonical), pressureBOverrideSHA);
+    const exactPath = join(temporaryDirectory, 'exact.json');
+    immutableBytesAt(exactPath, canonical);
+    assert.doesNotThrow(() => verifyDescriptor(
+      exactPath,
+      productionSHA,
+      'HOST_PRESSURE_OVERRIDE_INVALID',
+      75,
+      false,
+      productionSize,
+    ));
+    assert.equal(productionSHA, pressureBOverrideSHA);
+    assert.equal(productionSize, pressureBOverrideSize);
+    const cliExact = runNode([
+      'scripts/qa/run-v1-task-verification.mjs',
+      '--pressure-receipt-only',
+      exactPath,
+      '--pressure-receipt-sha',
+      pressureBOverrideSHA,
+    ]);
+    assert.equal(cliExact.status, 0, cliExact.stderr);
+    assert.equal(
+      cliExact.stdout.trim(),
+      `TASK5_PRESSURE_RECEIPT_CANONICAL_PASS exact_bytes=${pressureBOverrideSize} exact_sha=${pressureBOverrideSHA} accepted=true`,
+    );
+
+    const rejected = [
+      ['trailing LF', Buffer.concat([canonical, Buffer.from('\n')])],
+      ['trailing byte', Buffer.concat([canonical, Buffer.from('x')])],
+      ['trailing content', Buffer.concat([canonical, Buffer.from('{}')])],
+      ['malformed JSON', Buffer.from('{"scope":')],
+    ];
+    for (const [name, bytes] of rejected) {
+      const receiptPath = join(temporaryDirectory, `${name.replaceAll(' ', '-')}.json`);
+      immutableBytesAt(receiptPath, bytes);
+      assert.throws(
+        () => verifyDescriptor(
+          receiptPath,
+          sha256(bytes),
+          'HOST_PRESSURE_OVERRIDE_INVALID',
+          75,
+          false,
+          bytes.length,
+        ),
+        (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID' && error.exitCode === 75,
+        name,
+      );
+    }
+    const trailingCliPath = join(temporaryDirectory, 'trailing-cli.json');
+    immutableBytesAt(trailingCliPath, Buffer.concat([canonical, Buffer.from('\n')]));
+    const cliTrailing = runNode([
+      'scripts/qa/run-v1-task-verification.mjs',
+      '--pressure-receipt-only',
+      trailingCliPath,
+      '--pressure-receipt-sha',
+      pressureBOverrideSHA,
+    ]);
+    assert.equal(cliTrailing.status, 75, cliTrailing.stderr);
+    assert.match(cliTrailing.stderr, /HOST_PRESSURE_OVERRIDE_INVALID/);
+
+    assert.throws(
+      () => verifyDescriptor(
+        exactPath,
+        '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        75,
+        false,
+        916,
+      ),
+      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID' && error.exitCode === 75,
+      'stale LF-bearing receipt identity',
+    );
+    assert.throws(
+      () => verifyDescriptor(
+        exactPath,
+        pressureBOverrideSHA,
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        75,
+        false,
+        pressureBOverrideSize + 1,
+      ),
+      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID' && error.exitCode === 75,
+      'mismatched receipt size identity',
+    );
+
+    const symlinkPath = join(temporaryDirectory, 'receipt-alias.json');
+    symlinkSync(exactPath, symlinkPath);
+    assert.throws(
+      () => verifyDescriptor(
+        symlinkPath,
+        pressureBOverrideSHA,
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        75,
+        false,
+        pressureBOverrideSize,
+      ),
+      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID' && error.exitCode === 75,
+      'symlink alias',
+    );
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
 });
 
 test('pressure-B consumes a valid V11 authority exactly once', () => {
@@ -980,7 +1152,7 @@ test('pressure-B recovers a killed lock owner through bounded authenticated stat
       ['malformed', '{not-json', false],
       ['mismatched', JSON.stringify({
         schemaVersion: 1,
-        receiptSHA256: '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+        receiptSHA256: pressureBOverrideSHA,
         planSHA256: 'wrong-plan',
         sessionId: 'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
         attemptId: 'other-attempt',
@@ -1162,7 +1334,7 @@ test('pressure-B rejects tamper, plan, scope, task, order, reuse, parallel, and 
       const verifyOverride = hostPressureOverrideFunction({
         overridePath,
         receipt: variant.receipt,
-        sha256: variant.sha256 ?? '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+        sha256: variant.sha256 ?? pressureBOverrideSHA,
       });
       assert.throws(
         () => verifyOverride(

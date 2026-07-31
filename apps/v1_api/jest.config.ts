@@ -21,7 +21,10 @@ const config: Config = {
       ...base,
       displayName: 'integration',
       rootDir: '.',
-      testMatch: ['<rootDir>/test/integration/**/*.e2e-spec.ts'],
+      testMatch: [
+        '<rootDir>/test/integration/**/*.e2e-spec.ts',
+        '<rootDir>/test/tournaments/**/*.integration-spec.ts',
+      ],
     },
   ],
   testTimeout: 15000,

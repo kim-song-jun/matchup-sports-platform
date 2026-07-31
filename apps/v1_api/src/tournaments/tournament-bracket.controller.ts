@@ -134,7 +134,6 @@ export class TournamentBracketController {
     return this.bracketService.deleteFixture(user, fixtureId);
   }
 
-  /** DELETE /admin/fixtures/:fixtureId/result — 결과 삭제 (오입력 복구, status → scheduled) */
   @Delete('admin/fixtures/:fixtureId/result')
   deleteFixtureResult(@CurrentUser() user: V1AuthUser, @Param('fixtureId') fixtureId: string) {
     return this.bracketService.deleteFixtureResult(user, fixtureId);
@@ -162,10 +161,6 @@ export class TournamentBracketController {
     return this.bracketService.removeGroupTeam(user, groupTeamId);
   }
 
-  /**
-   * POST /admin/fixtures/:fixtureId/result — 경기 결과 기록 (upsert)
-   * fixture.status → completed. hasPenalty=true 시 양측 penalty 점수 필수.
-   */
   @Post('admin/fixtures/:fixtureId/result')
   recordResult(
     @CurrentUser() user: V1AuthUser,

@@ -5,8 +5,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1TeamMatch, V1TeamMatchApplication } from '@prisma/client';
+import {
+  Prisma,
+  V1GameSideKey,
+  V1GameSourceType,
+  V1TeamMatch,
+  V1TeamMatchApplication,
+} from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import {
+  canonicalGameCommandPayloadHash,
+  GamesService,
+} from '../games/games.service';
+import type {
+  GameCommandContext,
+  GameSourceCreationInput,
+} from '../games/games.types';
 import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -52,6 +66,7 @@ export class TeamMatchesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly games: GamesService,
   ) {}
 
   async list(user: V1AuthUser | null, query: TeamMatchesQueryDto) {
@@ -236,14 +251,57 @@ export class TeamMatchesService {
     };
   }
 
-  async create(user: V1AuthUser, dto: MutateTeamMatchDto) {
+  async create(
+    user: V1AuthUser,
+    dto: MutateTeamMatchDto,
+    durableCommandId?: string,
+  ) {
     this.assertActiveAccount(user);
     await assertCreatorProfileComplete(this.prisma, user.id);
     await this.assertCanManageTeam(user.id, dto.hostTeamId);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const dates = this.validateDates(dto);
+    const payloadHash = canonicalGameCommandPayloadHash({
+      actorUserId: user.id,
+      dto,
+    });
+    const commandId = durableCommandId?.trim() || payloadHash;
 
-    const teamMatch = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-match-create:${user.id}:${commandId}`}, 0))`;
+      const existingCommand = await tx.v1IdempotencyRecord.findFirst({
+        where: {
+          actorUserId: user.id,
+          action: 'source_create',
+          resourceType: V1GameSourceType.TEAM_MATCH,
+          idempotencyKey: commandId,
+        },
+        select: { resourceId: true },
+      });
+      if (existingCommand !== null) {
+        const existingTeamMatch = await tx.v1TeamMatch.findUniqueOrThrow({
+          where: { id: existingCommand.resourceId },
+        });
+        const actorRole = await this.resolveTeamGameActorRole(
+          tx,
+          existingTeamMatch.hostTeamId,
+          user.id,
+        );
+        const input = await this.loadPersistedGameSourceInput(tx, existingTeamMatch.id);
+        const game = await this.games.createFromSourceInTransaction(
+          tx,
+          input,
+          this.teamMatchGameContext(user, actorRole, commandId, payloadHash),
+        );
+        return { teamMatch: existingTeamMatch, game };
+      }
+
+      const source = await this.loadTeamMatchCreationSource(
+        tx,
+        dto.hostTeamId,
+        dto.sportId,
+        user.id,
+      );
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const created = await tx.v1TeamMatch.create({
         data: {
@@ -264,8 +322,14 @@ export class TeamMatchesService {
           genderRule: dto.genderRule ?? null,
           costNote: dto.costNote ?? null,
           status: 'recruiting',
+          competitionConfigVersionId: source.competitionConfigVersionId,
         },
       });
+      const game = await this.games.createFromSourceInTransaction(
+        tx,
+        this.teamMatchGameSourceInput(created.id, source),
+        this.teamMatchGameContext(user, source.actorRole, commandId, payloadHash),
+      );
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'team_match',
@@ -277,15 +341,16 @@ export class TeamMatchesService {
           reason: 'team_match_created',
         },
       });
-      return created;
+      return { teamMatch: created, game };
     });
 
     return {
-      teamMatchId: teamMatch.id,
-      status: teamMatch.status,
-      hostTeamId: teamMatch.hostTeamId,
-      detailRoute: `/team-matches/${teamMatch.id}`,
-      manageRoute: `/team-matches/${teamMatch.id}/manage`,
+      teamMatchId: result.teamMatch.id,
+      gameId: result.game.gameId,
+      status: result.teamMatch.status,
+      hostTeamId: result.teamMatch.hostTeamId,
+      detailRoute: `/team-matches/${result.teamMatch.id}`,
+      manageRoute: `/team-matches/${result.teamMatch.id}/manage`,
     };
   }
 
@@ -326,6 +391,12 @@ export class TeamMatchesService {
     if (teamMatch.updatedAt.toISOString() !== dto.version) throw stateConflict('Team match version is stale', 'VERSION_CONFLICT');
     if (teamMatch.status !== 'recruiting' || this.getApiStatus(teamMatch) === 'expired') throw stateConflict('Team match cannot be updated in current status');
     if (dto.hostTeamId !== teamMatch.hostTeamId) throw stateConflict('Host team cannot be changed');
+    if (dto.sportId !== teamMatch.sportId) {
+      throw stateConflict(
+        'The sport cannot change after the Game competition config is pinned',
+        'COMPETITION_CONFIG_IMMUTABLE',
+      );
+    }
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
     const dates = this.validateDates(dto);
@@ -793,6 +864,11 @@ export class TeamMatchesService {
           approvedApplicantTeamId: application.applicantTeamId,
         },
       });
+      await this.hydrateApprovedAwaySnapshot(
+        tx,
+        application.teamMatchId,
+        application.applicantTeamId,
+      );
       await tx.v1TeamMatchApplication.updateMany({
         where: {
           teamMatchId: application.teamMatchId,
@@ -1131,6 +1207,275 @@ export class TeamMatchesService {
       select: { id: true },
     });
     if (!membership) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only team owners or managers can manage team matches' });
+  }
+
+  private teamMatchGameContext(
+    user: V1AuthUser,
+    role: 'team_owner' | 'team_manager',
+    durableCommandId: string,
+    payloadHash: string,
+  ): GameCommandContext {
+    return {
+      actor: {
+        actorType: 'USER',
+        actorUserId: user.id,
+        role,
+      },
+      expectedVersion: 0,
+      durableCommandId,
+      payloadHash,
+    };
+  }
+
+  private async loadTeamMatchCreationSource(
+    tx: Prisma.TransactionClient,
+    hostTeamId: string,
+    sportId: string,
+    actorUserId: string,
+  ) {
+    const [sport, hostTeam] = await Promise.all([
+      tx.v1Sport.findFirst({
+        where: { id: sportId, isActive: true },
+        select: { code: true },
+      }),
+      tx.v1Team.findFirst({
+        where: { id: hostTeamId, status: 'active', deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          memberships: {
+            where: { status: 'active' },
+            orderBy: { id: 'asc' },
+            select: {
+              id: true,
+              userId: true,
+              role: true,
+              user: {
+                select: {
+                  profile: { select: { nickname: true, displayName: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    const competitionSportCode =
+      sport?.code.toLowerCase() === 'soccer' || sport?.code.toLowerCase() === 'football'
+        ? 'football'
+        : sport?.code.toLowerCase() === 'futsal'
+          ? 'futsal'
+          : null;
+    const competitionConfig =
+      competitionSportCode === null
+        ? null
+        : await tx.v1CompetitionConfigVersion.findFirst({
+            where: {
+              sportCode: competitionSportCode,
+              name: `${competitionSportCode}-v1`,
+              status: 'ACTIVE',
+            },
+            orderBy: { version: 'desc' },
+            select: { id: true },
+          });
+    if (competitionConfig === null || hostTeam === null) {
+      throw new ConflictException({
+        code: 'COMPETITION_CONFIG_REQUIRED',
+        message: 'Team match creation requires an active competition config preset',
+      });
+    }
+    const actorMembership = hostTeam.memberships.find(
+      (membership) => membership.userId === actorUserId,
+    );
+    if (
+      actorMembership === undefined ||
+      (actorMembership.role !== 'owner' && actorMembership.role !== 'manager')
+    ) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Only team owners or managers can create a team match game',
+      });
+    }
+    return {
+      hostTeam,
+      competitionConfigVersionId: competitionConfig.id,
+      actorRole:
+        actorMembership.role === 'owner'
+          ? ('team_owner' as const)
+          : ('team_manager' as const),
+    };
+  }
+
+  private async resolveTeamGameActorRole(
+    tx: Prisma.TransactionClient,
+    teamId: string,
+    actorUserId: string,
+  ): Promise<'team_owner' | 'team_manager'> {
+    const membership = await tx.v1TeamMembership.findFirst({
+      where: {
+        teamId,
+        userId: actorUserId,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+      },
+      select: { role: true },
+    });
+    if (membership === null) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: 'Only team owners or managers can replay a team match command',
+      });
+    }
+    return membership.role === 'owner' ? 'team_owner' : 'team_manager';
+  }
+
+  private teamMatchGameSourceInput(
+    teamMatchId: string,
+    source: Awaited<ReturnType<TeamMatchesService['loadTeamMatchCreationSource']>>,
+  ): GameSourceCreationInput {
+    return {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: teamMatchId,
+      competitionConfigVersionId: source.competitionConfigVersionId,
+      sides: [
+        {
+          sideKey: V1GameSideKey.HOME,
+          teamId: source.hostTeam.id,
+          displayNameSnapshot: source.hostTeam.name,
+        },
+        {
+          sideKey: V1GameSideKey.AWAY,
+          teamId: null,
+          displayNameSnapshot: '상대 팀 미정',
+        },
+      ],
+      participants: source.hostTeam.memberships.map((membership) => ({
+        sourceParticipantId: membership.id,
+        sideKey: V1GameSideKey.HOME,
+        displayNameSnapshot:
+          membership.user.profile?.nickname ??
+          membership.user.profile?.displayName ??
+          '팀원',
+      })),
+    };
+  }
+
+  private async loadPersistedGameSourceInput(
+    tx: Prisma.TransactionClient,
+    teamMatchId: string,
+  ): Promise<GameSourceCreationInput> {
+    const game = await tx.v1Game.findUnique({
+      where: { teamMatchId },
+      include: {
+        sides: { orderBy: { sideKey: 'asc' } },
+        participants: true,
+      },
+    });
+    if (game === null) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'The durable TeamMatch command has no committed Game',
+      });
+    }
+    const sideKeyById = new Map(game.sides.map((side) => [side.id, side.sideKey]));
+    const participants = game.participants.map((participant) => {
+      const sideKey = sideKeyById.get(participant.sideId);
+      if (sideKey === undefined) {
+        throw new ConflictException({
+          code: 'TEAM_MATCH_GAME_REQUIRED',
+          message: 'A persisted Game participant has no source side',
+        });
+      }
+      return {
+        sourceParticipantId: participant.id,
+        sideKey,
+        displayNameSnapshot: participant.displayNameSnapshot,
+        ...(participant.jerseyNumber === null
+          ? {}
+          : { jerseyNumber: participant.jerseyNumber }),
+        ...(participant.position === null ? {} : { position: participant.position }),
+      };
+    });
+    return {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: teamMatchId,
+      competitionConfigVersionId: game.competitionConfigVersionId,
+      sides: game.sides.map((side) => ({
+        sideKey: side.sideKey,
+        teamId: side.teamId,
+        displayNameSnapshot: side.displayNameSnapshot,
+      })),
+      participants,
+    };
+  }
+
+  private async hydrateApprovedAwaySnapshot(
+    tx: Prisma.TransactionClient,
+    teamMatchId: string,
+    awayTeamId: string,
+  ) {
+    const [game, awayTeam] = await Promise.all([
+      tx.v1Game.findUnique({
+        where: { teamMatchId },
+        include: {
+          sides: true,
+          lineups: { where: { revision: 1 } },
+        },
+      }),
+      tx.v1Team.findFirst({
+        where: { id: awayTeamId, status: 'active', deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          memberships: {
+            where: { status: 'active' },
+            orderBy: { id: 'asc' },
+            select: {
+              user: {
+                select: {
+                  profile: { select: { nickname: true, displayName: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    if (game === null || awayTeam === null) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'Approved TeamMatch requires its atomically created Game',
+      });
+    }
+    const awaySide = game.sides.find((side) => side.sideKey === V1GameSideKey.AWAY);
+    const awayLineup = game.lineups.find((lineup) => lineup.sideId === awaySide?.id);
+    if (awaySide === undefined || awayLineup === undefined) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'Approved TeamMatch requires an AWAY side and lineup',
+      });
+    }
+    if (awaySide.teamId !== null && awaySide.teamId !== awayTeam.id) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_GAME_REQUIRED',
+        message: 'The AWAY side is already pinned to another team',
+      });
+    }
+    await tx.v1GameSide.update({
+      where: { id: awaySide.id },
+      data: { teamId: awayTeam.id, displayNameSnapshot: awayTeam.name },
+    });
+    await tx.v1GameParticipant.createMany({
+      data: awayTeam.memberships.map((membership) => ({
+        gameId: game.id,
+        sideId: awaySide.id,
+        lineupId: awayLineup.id,
+        displayNameSnapshot:
+          membership.user.profile?.nickname ??
+          membership.user.profile?.displayName ??
+          '팀원',
+      })),
+    });
   }
 
   private assertActiveAccount(user: V1AuthUser) {

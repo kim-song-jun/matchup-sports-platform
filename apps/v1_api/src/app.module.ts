@@ -31,6 +31,7 @@ import { VerificationModule } from './verification/verification.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { LogsModule } from './logs/logs.module';
 import { ErrorLogsModule } from './error-logs/error-logs.module';
+import { GamesModule } from './games/games.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { ErrorLogsModule } from './error-logs/error-logs.module';
     NoticesModule,
     TeamsModule,
     TeamMatchesModule,
+    GamesModule,
     ChatModule,
     RealtimeModule,
     NotificationsModule,

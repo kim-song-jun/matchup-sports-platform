@@ -14,6 +14,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { GamesService } from '../games/games.service';
 import { TeamMatchesService } from './team-matches.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 
@@ -102,13 +103,17 @@ describe('TeamMatchesService', () => {
     v1TeamMatchApplication: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1Sport: { findFirst: jest.Mock };
     v1Region: { findFirst: jest.Mock };
-    v1Team: { findMany: jest.Mock };
+    v1Team: { findFirst: jest.Mock; findMany: jest.Mock };
+    v1Game: { findUnique: jest.Mock };
+    v1GameSide: { update: jest.Mock };
+    v1GameParticipant: { createMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
   let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
+  let games: { createFromSourceInTransaction: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -124,7 +129,23 @@ describe('TeamMatchesService', () => {
       },
       v1Sport: { findFirst: jest.fn() },
       v1Region: { findFirst: jest.fn() },
-      v1Team: { findMany: jest.fn() },
+      v1Team: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'team-applicant',
+          name: 'Applicant Team',
+          memberships: [],
+        }),
+        findMany: jest.fn(),
+      },
+      v1Game: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'game-1',
+          sides: [{ id: 'side-away', sideKey: 'AWAY', teamId: null }],
+          lineups: [{ id: 'lineup-away', sideId: 'side-away', revision: 1 }],
+        }),
+      },
+      v1GameSide: { update: jest.fn().mockResolvedValue({}) },
+      v1GameParticipant: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
@@ -132,14 +153,16 @@ describe('TeamMatchesService', () => {
     };
 
     // Default: $transaction executes the callback with the same prisma proxy
-    const p = prisma as unknown as Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
     (prisma.$transaction as jest.Mock).mockImplementation(
-      (cb: (tx: typeof p) => Promise<unknown>) => cb(p),
+      (cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma),
     );
 
     notifications = {
       emitNotification: jest.fn().mockResolvedValue(undefined),
       emitToManyDeferred: jest.fn(),
+    };
+    games = {
+      createFromSourceInTransaction: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -147,6 +170,7 @@ describe('TeamMatchesService', () => {
         TeamMatchesService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notifications },
+        { provide: GamesService, useValue: games },
       ],
     }).compile();
 
@@ -190,6 +214,27 @@ describe('TeamMatchesService', () => {
   });
 
   // ─── cancel: 상태 머신 ────────────────────────────────────────────────────
+
+  it('update: Game이 핀한 TeamMatch 종목을 바꾸면 409 COMPETITION_CONFIG_IMMUTABLE', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+
+    await expect(
+      service.update(manager, 'tm-1', {
+        hostTeamId: 'team-host',
+        sportId: 'sport-2',
+        regionId: 'region-1',
+        title: '풀살 상대팀 모집',
+        startsAt: FUTURE.toISOString(),
+        manualPlaceName: '잠실',
+        version: teamMatchRow().updatedAt.toISOString(),
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: { code: 'COMPETITION_CONFIG_IMMUTABLE' },
+    });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
 
   it('cancel: 이미 취소된 팀매치 재취소 → 409 ALREADY_PROCESSED', async () => {
     // getManageableTeamMatch: team match exists + membership exists

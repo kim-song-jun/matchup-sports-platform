@@ -1,6 +1,7 @@
 import { AdminContextService } from '../../src/common/admin-context.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
+import { GamesService } from '../../src/games/games.service';
 import {
   competitionConfigContentHash,
   FOOTBALL_V1_CONFIG,
@@ -17,7 +18,7 @@ import {
 
 const prisma = new PrismaService();
 const adminContext = new AdminContextService(prisma);
-const bracketService = new TournamentBracketService(prisma, adminContext);
+const bracketService = new TournamentBracketService(prisma, adminContext, new GamesService(prisma));
 
 const authUser = {
   id: competitionConfigFixture.adminUserId,

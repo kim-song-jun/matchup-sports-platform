@@ -58,6 +58,33 @@ Config rows are append-only once referenced by a game, tournament, team match, o
 
 Paid tournaments (`entryFee > 0`) require `bankName`, `bankAccount`, and `bankHolder`. Create/update rejects incomplete payment instructions with `400 TOURNAMENT_PAYMENT_INSTRUCTIONS_REQUIRED`, and a draft cannot transition to `open` until the same invariant is satisfied. The four-step Web wizard validates this before submission so applicants are never placed on a payment-expiry clock without usable transfer instructions.
 
+## Task 6 fixture Game and result gate
+
+`POST /api/v1/admin/tournaments/:tournamentId/fixtures` uses `CreateFixtureDto` and requires an
+authenticated mutation-capable admin. In its source transaction, it copies the tournament's
+active `competitionConfigVersionId` to the fixture and creates exactly one `TOURNAMENT_FIXTURE`
+Game with HOME/AWAY side snapshots and the registered participant snapshots. A missing or
+inactive pin fails with `409 COMPETITION_CONFIG_REQUIRED` and rolls back both fixture and Game.
+The deterministic fixture command is derived from tournament, round, fixture number, and leg;
+the same payload replays the original fixture, while a changed payload with that key returns
+`409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`.
+
+| Method | Path | DTO | Result |
+|---|---|---|---|
+| `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. |
+
+The legacy generic result paths remain registered only to reject unsafe writes:
+
+| Method | Path | DTO | Result |
+|---|---|---|---|
+| `POST` | `/api/v1/admin/fixtures/:fixtureId/result` | `RecordResultDto` | authenticated admin reaches the handler and receives `409 TOURNAMENT_RESULT_DERIVED_ONLY`; it creates no legacy result, Game revision, or event. |
+| `DELETE` | `/api/v1/admin/fixtures/:fixtureId/result` | none | authenticated admin reaches the handler and receives `409 TOURNAMENT_RESULT_DERIVED_ONLY`; it deletes nothing. |
+
+Tournament results are produced through the corresponding Game command/result-revision flow:
+the normal tournament `end` command derives and submits the revision atomically, and generic
+fixture result writes cannot bypass that append-only history. Fixture/scorer examples used by
+tests are deterministic non-verified fixtures, never real tournament standings or player proof.
+
 Admin create/update accepts `rulesText` up to 10,000 characters. `refundPolicyText` remains a separate field with a 2,000-character limit.
 
 Tournament schedule stores a start datetime in `scheduledAt` and an optional end datetime in `scheduledEndAt`. Admin create/update rejects `scheduledEndAt` when it is earlier than the final `scheduledAt` with `400 TOURNAMENT_SCHEDULE_RANGE_INVALID`. Public list/detail/admin responses include both fields; clients render a single date when `scheduledEndAt` is empty or the same calendar label, and a range when it spans multiple dates.

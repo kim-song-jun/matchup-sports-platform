@@ -1,5 +1,54 @@
 # Game aggregate contract
 
+## Current Task 6 runtime surface
+
+`GamesModule` is assembled once at the `AppModule` root and exports `GamesService` for the
+Team Match and Tournament source adapters. `TeamMatchesModule` and `TournamentsModule` also
+import that same module to consume the service; Nest resolves the static module once, so this is
+not a duplicate provider registration or a circular dependency.
+
+All successful responses use the v1 `{ status, data, timestamp }` envelope. `V1AuthGuard`
+means an authenticated v1 user, and the service then re-checks source-specific authority. The
+only public read is the visibility projection; it uses `OptionalV1AuthGuard` and never exposes
+raw roster identity fields.
+
+| Method | Path | Guard / service scope | DTO and runtime contract |
+|---|---|---|---|
+| `GET` | `/api/v1/games/:gameId/visibility` | optional auth; public visibility policy | Returns the serialized `live` or `status_only` projection. A missing game or policy is `404`; `PUBLIC_LIVE=off` demotes live output. |
+| `GET` | `/api/v1/games/:gameId` | authenticated; source-scoped reader | Returns game, sides, periods, lineups, current version/sequence and current official revision reference. |
+| `POST` | `/api/v1/games/:gameId/commands/:command` | authenticated tournament command actor | `GameCommandDto`; `command` is `start`, `pause`, `resume`, or `end`. Team-match use is `409 TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN`; tournament `end` derives its result revision in the same transaction. |
+| `POST` | `/api/v1/games/:gameId/cancel` | authenticated source-scoped cancel actor | `CancelGameDto`; transitions to `CANCELLED` and makes visibility status-only. |
+| `GET` | `/api/v1/games/:gameId/events?afterSequence=N` | authenticated; source-scoped reader | `ListGameEventsQueryDto`; ascending append-only events after `N` plus `lastSequence` (sequence cursor, not page cursor). |
+| `POST` | `/api/v1/games/:gameId/events` | authenticated event actor with takeover token | `AppendGameEventDto`; appends one sequenced event. Terminal games reject mutation with `409 TERMINAL_GAME_IMMUTABLE`. |
+| `POST` | `/api/v1/games/:gameId/events/:eventId/reverse` | authenticated reverse actor with takeover token | `ReverseGameEventDto`; appends one `CORRECTION` event that references the original; it does not mutate or delete it. |
+| `GET` | `/api/v1/games/:gameId/lineups` | authenticated; source-scoped reader | Returns lineup revisions in side/revision order. |
+| `PUT` | `/api/v1/games/:gameId/lineups/:sideId` | authenticated lineup actor | `SaveGameLineupDto`; creates a new lineup revision and participant snapshots. |
+| `POST` | `/api/v1/games/:gameId/lineups/:lineupId/submit` | authenticated lineup actor | `SubmitGameLineupDto`; only a `DRAFT` lineup submits; tournament submission additionally needs takeover authority. |
+| `GET` | `/api/v1/games/:gameId/result-revisions` | authenticated; source-scoped reader | Returns newest-first revision history with result participants. |
+| `POST` | `/api/v1/games/:gameId/result-revisions` | authenticated team result submitter | `CreateGameResultRevisionDto`; team-match only. Tournament sources return `409 TOURNAMENT_RESULT_DERIVED_ONLY` before creating a draft. |
+| `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/submit` | authenticated team result submitter | `SubmitGameResultRevisionDto`; team-match only. It atomically validates/submits the revision and moves `SCHEDULED`, `LIVE`, or `PAUSED` to `ENDED`. |
+| `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/decision` | authenticated opposing team result decider | `DecideGameResultRevisionDto`; `approve` or `change_request` for a team-match revision. |
+
+### Mutation, version, and history rules
+
+Every Game mutation requires `expectedVersion`, an `Idempotency-Key` header, and the matching
+body command ID. The matching body field is `clientCommandId` except event append/reverse, which
+uses `clientEventId`. Missing or mismatched header/body values return
+`422 COMMAND_IDEMPOTENCY_KEY_MISMATCH`; a stale version returns `409 VERSION_CONFLICT`; an
+identical retry replays the stored response while a changed payload with the same durable key
+returns `409 IDEMPOTENCY_PAYLOAD_CONFLICT`. Validation remains DTO-enforced (`400
+VALIDATION_ERROR`) and source/role failure is `401`, `403`, or `404` as applicable.
+
+Game events and result revisions are append-only. A reversal is a compensating event; it never
+rewrites the original event. Result participant/scorer records are validated against the
+persisted Game sides/participants and the pinned active competition configuration. Tournament
+scorer policy is required; the ordinary team-match policy permits a missing scorer only with its
+explicit warning marker. No fixture or game source may be created without an active immutable
+competition-config pin: `409 COMPETITION_CONFIG_REQUIRED` leaves no partial source/Game rows.
+
+This is a real v1 persistence contract, not a mock-success flow. Fixture data is deterministic
+test data only and must not be rendered as verified player, score, or standings evidence.
+
 <!-- API_CONTRACT_SECTION_BEGIN:Frozen operational decision table -->
 ### Frozen operational decision table
 | Decision | Literal behavior | Edge/failure contract |

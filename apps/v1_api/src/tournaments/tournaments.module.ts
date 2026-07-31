@@ -32,6 +32,7 @@ import {
 import { TournamentCampaignAdminService } from './tournament-campaign-admin.service';
 import { TournamentCampaignReadService } from './tournament-campaign-read.service';
 import { TournamentCampaignStatusService } from './tournament-campaign-status.service';
+import { GamesModule } from '../games/games.module';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -42,7 +43,7 @@ import { TournamentCampaignStatusService } from './tournament-campaign-status.se
  * 컨트롤러를 와일드카드(:tournamentId) 컨트롤러보다 먼저 두어 매칭 모호성을 줄인다.
  */
 @Module({
-  imports: [AdminContextModule, NotificationsModule, IntegrationsModule],
+  imports: [AdminContextModule, NotificationsModule, IntegrationsModule, GamesModule],
   controllers: [
     TournamentCampaignsPublicController,
     TournamentCampaignsAdminController,

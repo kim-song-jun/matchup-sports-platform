@@ -17,7 +17,7 @@ Nginx는 v1 Web을 별도 브라우저 prefix 없이 루트에 제공한다.
 
 브라우저용 API base는 `/api/v1`, 서버 내부 API origin은 `http://v1_api:8121`이다. Web 페이지, 정적 자산, 업로드 자산은 모두 루트 기준 경로를 사용한다.
 
-기존 browser base path `/v1`은 제거됐다. `/v1`, `/v1/home`, `/v1/tournaments` 같은 browser 경로는 alias나 redirect로 유지하지 않고 HTTP 404여야 한다. 이 negative contract는 backend prefix `/api/v1`과 무관하며, `/api/v1/*`는 계속 canonical API 경로다.
+기존 browser base path `/v1`은 제거됐다. `/v1`, `/v1/home`, `/v1/tournaments` 같은 browser 경로는 직접 서빙되지 않고, 북마크·카카오 OAuth `redirect_uri` 등 레거시 링크 호환을 위해 `/v1` 접두사만 제거한 동일 경로로 308 permanent redirect된다(`apps/v1_web/next.config.ts`의 `redirects()`). 이 redirect 계약은 backend prefix `/api/v1`과 무관하며, `/api/v1/*`는 계속 canonical API 경로다.
 
 ## 2. EC2 준비
 

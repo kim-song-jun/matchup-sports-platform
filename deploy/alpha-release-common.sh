@@ -138,7 +138,7 @@ check_alpha_health_contract() {
   [[ "${deployed_release}" == "${ALPHA_RELEASE_VERSION}" ]] || return 1
   [[ "${deployed_sha}" == "${ALPHA_RELEASE_SHA}" ]] || return 1
   [[ "$(curl -sS --connect-timeout 3 --max-time 10 -o /dev/null -w '%{http_code}' \
-    https://alpha.teameet.co.kr/v1/home)" == "404" ]] || return 1
+    https://alpha.teameet.co.kr/v1/home)" == "308" ]] || return 1
 }
 
 wait_for_alpha_health_contract() {

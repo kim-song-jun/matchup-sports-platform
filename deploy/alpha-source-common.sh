@@ -22,7 +22,7 @@ prepare_alpha_release_source() {
   if [[ ! -d "${ALPHA_RUNTIME_CONFIG_DIR}/certbot" ]]; then
     install -d -m 700 "${ALPHA_RUNTIME_CONFIG_DIR}/certbot"
     if [[ -d "${ALPHA_LIVE_DIR}/deploy/certbot" ]]; then
-      rsync -a "${ALPHA_LIVE_DIR}/deploy/certbot/" "${ALPHA_RUNTIME_CONFIG_DIR}/certbot/"
+      sudo rsync -a "${ALPHA_LIVE_DIR}/deploy/certbot/" "${ALPHA_RUNTIME_CONFIG_DIR}/certbot/"
     fi
   fi
   if [[ ! -f "${ALPHA_RUNTIME_METADATA_FILE}" ]]; then

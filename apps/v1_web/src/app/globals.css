@@ -2677,6 +2677,10 @@ button:disabled {
   padding: 14px var(--v1-shell-page-x) 104px;
 }
 
+.tm-team-searchbar {
+  gap: 1px;
+}
+
 .tm-list-search-input {
   flex: 1;
   min-height: 44px;

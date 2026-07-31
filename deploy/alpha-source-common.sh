@@ -14,6 +14,7 @@ prepare_alpha_release_source() {
   local source_sha256="$3"
   local target_dir="${ALPHA_SOURCE_RELEASES_DIR}/${release_sha}"
   local target_tmp="${target_dir}.tmp.$$"
+  local drift
 
   install -d -m 700 "${ALPHA_SOURCE_RELEASES_DIR}" "${ALPHA_RUNTIME_CONFIG_DIR}"
   if [[ ! -f "${ALPHA_RUNTIME_CONFIG_DIR}/.env" ]]; then
@@ -31,14 +32,32 @@ prepare_alpha_release_source() {
       "${ALPHA_RUNTIME_METADATA_FILE}"
   fi
   if [[ -d "${target_dir}" ]]; then
-    [[ "$(cat "${target_dir}/.source-sha256" 2>/dev/null)" == "${source_sha256}" ]] || return 1
-    [[ -f "${target_dir}/deploy/deploy-alpha.sh" ]] || return 1
-    [[ -z "$(rsync -ani --delete \
+    if [[ "$(cat "${target_dir}/.source-sha256" 2>/dev/null)" != "${source_sha256}" ]]; then
+      echo "[alpha-release] Stored source ${release_sha} has a different .source-sha256" >&2
+      return 1
+    fi
+    if [[ ! -f "${target_dir}/deploy/deploy-alpha.sh" ]]; then
+      echo "[alpha-release] Stored source ${release_sha} is missing deploy/deploy-alpha.sh" >&2
+      return 1
+    fi
+    # --omit-dir-times 가 없으면 이 검사는 자기가 만든 mtime 을 드리프트로 오판한다.
+    # 아래 생성 경로는 rsync -a 로 복사한 뒤 deploy/ 안의 심볼릭 링크 3개와 루트의
+    # .source-sha256 을 만든다 — 그 쓰기가 target 의 ./ 와 deploy/ mtime 을 "그때"로
+    # 바꿔 버려서, 원본의 디렉토리 mtime 과 영구히 달라진다. 그 상태로 rsync -ani(-a 는
+    # -t 포함)를 돌리면 내용이 완전히 같아도 `.d..t......  ./` 두 줄이 나와 드리프트로
+    # 판정됐다. 같은 SHA 를 재배포할 때(전송 실패 후 재시도 등) 반드시 밟는 경로다.
+    # 파일 시각은 그대로 비교하므로 실제 내용 변조 탐지는 약해지지 않는다.
+    drift="$(rsync -ani --delete --omit-dir-times \
       --exclude '/.source-sha256' \
       --exclude '/deploy/.env' \
       --exclude '/deploy/certbot' \
       --exclude '/deploy/release-metadata.alpha.conf' \
-      "${source_dir}/" "${target_dir}/")" ]] || return 1
+      "${source_dir}/" "${target_dir}/")"
+    if [[ -n "${drift}" ]]; then
+      echo "[alpha-release] Stored source ${release_sha} drifted from the packaged source:" >&2
+      printf '%s\n' "${drift}" >&2
+      return 1
+    fi
     return
   fi
 

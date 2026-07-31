@@ -9,11 +9,13 @@
 > 오판해 삭제 직전까지 간 사고가 2026-07-31에 있었다 — 그 job은 라이브 프로덕션의 유일한 배포
 > 경로다. 아래는 실측(프로덕션 200 응답 · `deploy.yml` main 실행 6회 성공)으로 다시 쓴 내용이다.
 
-- **`dev`와 `main` 둘 다 살아 있고, 각자 다른 환경의 배포를 트리거한다.**
-  | 브랜치 | 트리거 워크플로 | 배포 대상 | 승인 게이트 |
-  |---|---|---|---|
-  | `dev` push | `deploy-alpha.yml` | **alpha.teameet.co.kr** | 없음 (즉시 실배포) |
-  | `main` push | `deploy.yml`의 `build-images` + `deploy` job | **teameet.co.kr (프로덕션)** | `environment: production` |
+**`dev`와 `main` 둘 다 살아 있고, 각자 다른 환경의 배포를 트리거한다.**
+
+| 브랜치 | 트리거 워크플로 | 배포 대상 | 승인 게이트 |
+|---|---|---|---|
+| `dev` push | `deploy-alpha.yml` | **alpha.teameet.co.kr** | 없음 (즉시 실배포) |
+| `main` push | `deploy.yml`의 `build-images` + `deploy` job | **teameet.co.kr (프로덕션)** | `environment: production` |
+
 - **모든 작업은 `dev`에서 시작한다.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
 - **`dev → main` 승격은 사용자만 한다.** 에이전트는 `gh pr merge`·`git push origin dev:main` 등
   **어떤 방식으로도 직접 실행하지 않는다.** 승격이 필요해 보이면 사용자에게 알리고 멈춘다.

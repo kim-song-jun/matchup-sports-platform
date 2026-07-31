@@ -11,7 +11,7 @@ export type TournamentVenuePrepItem = {
   key: 'parking';
   label: string;
   value: string;
-  detail: string;
+  detail: string | null;
   /**
    * null이면 이 행에 상태 배지를 렌더하지 않는다. venue가 있는 일반 케이스는 항상
    * null — 장소명·지도 링크가 이미 무조건 노출되는 상태에서 "확인 가능" 배지를
@@ -55,13 +55,17 @@ export type TournamentPostEventCard = {
  * 텍스트 검색 링크와 중복 노출하지 않음). 좌표가 없으면(키 미설정/지오코딩 실패 포함)
  * 기존 네이버 지도 검색 링크 폴백을 그대로 유지 — 회귀 없음.
  */
+const DEFAULT_PARKING_INFO = '주차와 입장 동선은 지도에서 확인해요.';
+
 export function getTournamentVenuePrepItems({
   venue = null,
+  parkingInfo = DEFAULT_PARKING_INFO,
   announcements = [],
   latitude = null,
   longitude = null,
 }: {
   venue?: string | null;
+  parkingInfo?: string | null;
   announcements?: TournamentAnnouncementSummary[];
   latitude?: number | null;
   longitude?: number | null;
@@ -76,7 +80,7 @@ export function getTournamentVenuePrepItems({
         key: 'parking',
         label: '장소',
         value: venue,
-        detail: '주차와 입장 동선은 지도에서 확인해요.',
+        detail: parkingInfo,
         // 장소명 + 지도 링크가 이 행에 항상 함께 노출되므로 "확인 가능" 배지는
         // 아무 부가 정보 없이 중복이었다 — 배지 없음(null)으로 제거.
         status: null,

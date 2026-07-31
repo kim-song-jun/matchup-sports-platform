@@ -22,29 +22,23 @@ export function getParticipantTeamBuckets(
   };
 }
 
-export function TournamentApplicationGuideSection({
-  minPlayers,
-  maxPlayers,
-}: {
-  minPlayers: number;
-  maxPlayers: number;
-}) {
+export function TournamentApplicationGuideSection() {
   const steps = [
     {
       title: '팀 준비',
-      body: 'TeamMeet 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 팀장과 운영진이 대회 신청을 진행할 수 있어요.',
+      body: 'TeamMeet 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장과 운영진이 진행할 수 있어요.',
     },
     {
       title: '팀 선택',
-      body: `참가 신청에서 신청할 팀을 고르고, 팀당 ${minPlayers}~${maxPlayers}명 선수단을 확정해요.`,
-    },
-    {
-      title: '운영진 검토',
-      body: '신청 정보와 명단을 운영진이 확인한 뒤 입금 계좌와 다음 단계를 안내해요.',
+      body: '참가 신청에서 신청할 팀을 고르고, 팀원을 선택해요. 팀원은 미선택 상태로 진행하거나 추후 수정할 수 있어요.',
     },
     {
       title: '2시간 내 입금 확인',
-      body: '계좌 안내 후 2시간 안에 입금 확인이 필요해요. 확인되지 않으면 신청이 취소될 수 있어요.',
+      body: '계좌 안내 후 2시간 안에 입금이 확인되지 않으면 신청이 취소될 수 있어요. 입금 확인 후 대회 참가가 확정돼요.',
+    },
+    {
+      title: '선수단 확정',
+      body: '대회 페이지 내에서 선수단을 등록하고 수정해요. 마감일 전까지 등록을 완료해 주세요.',
     },
     {
       title: '대회 후 기록',
@@ -62,7 +56,7 @@ export function TournamentApplicationGuideSection({
           이 대회는 팀 단위로 신청해요
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
-          팀장 또는 운영진이 팀을 선택해 신청하고, 선수단 명단과 입금 확인까지 완료되면 참가팀으로 공개돼요.
+          팀장 또는 운영진이 팀을 선택해 신청하고, 입금 확인 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
         </div>
         <ol style={{ display: 'grid', gap: 10, listStyle: 'none', margin: '14px 0 0', padding: 0 }}>
           {steps.map((step, index) => (

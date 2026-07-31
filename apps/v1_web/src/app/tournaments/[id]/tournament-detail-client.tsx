@@ -615,10 +615,7 @@ export function TournamentDetailView({
       {/* ── Prize card — shown HIGH in left column, right after metric strip ── */}
       {prizeCard}
 
-      <TournamentApplicationGuideSection
-        minPlayers={tournament.minPlayers}
-        maxPlayers={tournament.maxPlayers}
-      />
+      <TournamentApplicationGuideSection />
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}
@@ -629,6 +626,7 @@ export function TournamentDetailView({
 
       <TournamentVenuePrepSection
         venue={tournament.venue}
+        parkingInfo={tournament.parkingInfo}
         announcements={tournament.announcements}
         latitude={tournament.latitude}
         longitude={tournament.longitude}

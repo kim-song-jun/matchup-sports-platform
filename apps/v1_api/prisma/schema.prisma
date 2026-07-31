@@ -1829,6 +1829,7 @@ model V1Tournament {
   scheduledAt                DateTime?                   @map("scheduled_at")
   scheduledEndAt             DateTime?                   @map("scheduled_end_at")
   venue                      String?
+  parkingInfo                String?                     @default("주차와 입장 동선은 지도에서 확인해요.") @map("parking_info")
   // 카카오 로컬 API 키워드 검색으로 venue를 지오코딩한 좌표(KakaoGeocodingService). 키 미설정/검색
   // 실패 시 null로 남고, 그 경우 프론트는 네이버 지도 검색 링크 폴백을 그대로 사용한다.
   latitude                   Float?

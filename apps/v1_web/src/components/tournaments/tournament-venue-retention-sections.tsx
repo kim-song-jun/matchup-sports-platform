@@ -25,16 +25,18 @@ export {
 export function TournamentVenuePrepSection({
   venue,
   announcements,
+  parkingInfo = null,
   latitude = null,
   longitude = null,
 }: {
   venue: string | null;
+  parkingInfo?: string | null;
   announcements: TournamentAnnouncementSummary[];
   /** 카카오 지오코딩 좌표. 둘 다 있을 때만 지도 임베드 + 내비게이션 버튼을 보여준다. */
   latitude?: number | null;
   longitude?: number | null;
 }) {
-  const items = getTournamentVenuePrepItems({ venue, announcements, latitude, longitude });
+  const items = getTournamentVenuePrepItems({ venue, parkingInfo, announcements, latitude, longitude });
   const hasCoordinates = venue !== null && latitude !== null && longitude !== null;
 
   return (
@@ -282,9 +284,14 @@ function HubFactRow({ item }: { item: TournamentVenuePrepItem }) {
         <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
           {item.value}
         </div>
-        <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 2 }}>
-          {item.detail}
-        </div>
+        {item.detail ? (
+          <div
+            className="tm-text-caption"
+            style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginTop: 2, whiteSpace: 'pre-line' }}
+          >
+            {item.detail}
+          </div>
+        ) : null}
         {item.actionLabel && item.href ? (
           item.hrefExternal ? (
             <a

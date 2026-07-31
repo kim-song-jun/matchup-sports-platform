@@ -36,8 +36,9 @@ const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
 
 const TOURNAMENT_LIST_STATUSES = ['draft', 'open', 'closed', 'in_progress', 'completed', 'cancelled'] as const;
 
-function nullableText(value: string | undefined): string | null | undefined {
+function nullableText(value: string | null | undefined): string | null | undefined {
   if (value === undefined) return undefined;
+  if (value === null) return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 }
@@ -322,6 +323,7 @@ export class TournamentsAdminService {
     if (dto.scheduledAt !== undefined) data.scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
     if (dto.scheduledEndAt !== undefined) data.scheduledEndAt = dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null;
     if (dto.venue !== undefined) data.venue = dto.venue;
+    if (dto.parkingInfo !== undefined) data.parkingInfo = nullableText(dto.parkingInfo);
     if (venueChanged) {
       data.latitude = coordinates?.latitude ?? null;
       data.longitude = coordinates?.longitude ?? null;
@@ -745,6 +747,7 @@ export class TournamentsAdminService {
       scheduledAt: row.scheduledAt?.toISOString() ?? null,
       scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
       venue: row.venue,
+      parkingInfo: row.parkingInfo,
       latitude: row.latitude,
       longitude: row.longitude,
       coverImageUrl: row.coverImageUrl,

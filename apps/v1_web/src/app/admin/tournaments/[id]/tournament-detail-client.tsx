@@ -3230,6 +3230,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
   const [editRosterDeadlineAt, setEditRosterDeadlineAt] = useState('');
   const [editVenue, setEditVenue] = useState('');
+  const [editParkingInfo, setEditParkingInfo] = useState('');
   const [editEntryFee, setEditEntryFee] = useState('');
   const [editTeamCount, setEditTeamCount] = useState('');
   const [editMinPlayers, setEditMinPlayers] = useState('');
@@ -3281,6 +3282,7 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     setEditDeadlineAt(isoToDatetimeLocalValue(tournament.registrationDeadlineAt));
     setEditRosterDeadlineAt(isoToDatetimeLocalValue(tournament.rosterDeadlineAt));
     setEditVenue(tournament.venue ?? '');
+    setEditParkingInfo(tournament.parkingInfo ?? '');
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
     setEditMinPlayers(String(tournament.minPlayers));
@@ -3411,6 +3413,10 @@ export default function TournamentDetailClient({ id }: { id: string }) {
     }
     const normalizedVenue = editVenue.trim() || null;
     if (normalizedVenue !== tournament.venue) payload.venue = normalizedVenue;
+    const normalizedParkingInfo = editParkingInfo.trim() || null;
+    if (normalizedParkingInfo !== (tournament.parkingInfo ?? null)) {
+      payload.parkingInfo = normalizedParkingInfo;
+    }
     if (entryFee !== tournament.entryFee) payload.entryFee = entryFee;
     if (teamCount !== tournament.teamCount) payload.teamCount = teamCount;
     if (minPlayers !== tournament.minPlayers) payload.minPlayers = minPlayers;
@@ -4061,6 +4067,23 @@ export default function TournamentDetailClient({ id }: { id: string }) {
               maxLength={100}
               className={inputCls}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="edit-parking-info" className="text-[13px] text-gray-900">주차 안내</label>
+            <textarea
+              id="edit-parking-info"
+              value={editParkingInfo}
+              onChange={(e) => setEditParkingInfo(e.target.value)}
+              disabled={updateTournament.isPending}
+              maxLength={500}
+              rows={3}
+              placeholder="예: 건물 지하 주차장 2시간 무료, 만차 시 인근 공영주차장을 이용해 주세요."
+              className={inputCls}
+            />
+            <span className="text-[12px] text-gray-500">
+              대회 상세의 현장 안내에서 장소 아래에 표시돼요. 비우면 안내 문구를 숨겨요.
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

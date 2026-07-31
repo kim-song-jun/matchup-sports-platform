@@ -159,4 +159,31 @@ restore_legacy_alpha_source
 [[ ! -L "${ALPHA_LIVE_DIR}" ]]
 [[ "$(cat "${ALPHA_LIVE_DIR}/deploy/.env")" == 'protected=true' ]]
 
+readonly SHA_C=3333333333333333333333333333333333333333
+source_c="${TEST_ROOT}/source-c"
+mkdir -p "${source_c}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_c}/deploy/deploy-alpha.sh"
+printf 'release-c\n' > "${source_c}/release.txt"
+prepare_alpha_release_source "${source_c}" "${SHA_C}" "${DIGEST_A#sha256:}"
+mkdir -p "${ALPHA_SOURCE_RELEASES_DIR}/not-a-sha"
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_C}" ]]
+
+prune_stale_alpha_release_sources "${SHA_B}" "${SHA_A}"
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
+if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_C}" ]]; then
+  echo "Stale release source directory survived pruning" >&2
+  exit 1
+fi
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/not-a-sha" ]]
+
+prune_stale_alpha_release_sources "${SHA_B}" ""
+if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]; then
+  echo "Former previous release directory survived pruning after empty previous" >&2
+  exit 1
+fi
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
+
 echo "[alpha-release-state] passed"

@@ -331,17 +331,22 @@ test('resolver rejects a release when the fixed app versions have drifted', () =
 
 test('alpha deploy consumes a supplied SemVer prerelease instead of incrementing dev.N', () => {
   const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
+  const releaseHelper = readFileSync(join(repoRoot, 'deploy/alpha-release-common.sh'), 'utf8');
 
   assert.match(deployScript, /ALPHA_RELEASE_VERSION:\?ALPHA_RELEASE_VERSION is required/);
   assert.doesNotMatch(deployScript, /release_version="dev\.\$\{next_number\}"/);
-  assert.match(deployScript, /readonly release_version="\$\{ALPHA_RELEASE_VERSION\}"/);
-  assert.match(deployScript, /printf 'release=%s\\nsha=%s\\ndeployed_at=%s\\n'/);
+  assert.match(deployScript, /write_release_metadata "\$\{ALPHA_MANIFEST_FILE\}"/);
+  assert.match(releaseHelper, /release_version="\$\(jq -er '\.release\.version' "\$\{manifest_file\}"\)"/);
+  assert.match(releaseHelper, /printf 'release=%s\\nsha=%s\\ndeployed_at=%s\\n'/);
 });
 
 test('alpha deploy recreates nginx after replacing the release metadata bind mount', () => {
   const deployScript = readFileSync(join(repoRoot, 'deploy/deploy-alpha.sh'), 'utf8');
-  const metadataReplacement = deployScript.indexOf('mv "${metadata_tmp}" "${metadata_snippet}"');
-  const nginxRecreate = deployScript.indexOf('up -d --force-recreate --no-deps nginx');
+  const metadataReplacement = deployScript.indexOf('write_release_metadata "${ALPHA_MANIFEST_FILE}"');
+  const nginxRecreate = deployScript.indexOf(
+    'up -d --force-recreate --no-deps nginx',
+    metadataReplacement,
+  );
 
   assert.notEqual(metadataReplacement, -1);
   assert.ok(nginxRecreate > metadataReplacement);

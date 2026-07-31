@@ -79,6 +79,29 @@ describe('TournamentVenuePrepSection — rendered venue info (regression guard f
     expect(mapLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
+  it('renders the tournament-managed parking info below the venue and hides it when cleared', () => {
+    const { unmount } = render(
+      createElement(TournamentVenuePrepSection, {
+        venue: '데일리그라운드 청라국제도시점',
+        parkingInfo: '건물 지하 주차장 2시간 무료\n만차 시 인근 공영주차장을 이용해 주세요.',
+        announcements: [],
+      }),
+    );
+
+    expect(screen.getByText(/건물 지하 주차장 2시간 무료/)).toBeInTheDocument();
+    unmount();
+
+    render(
+      createElement(TournamentVenuePrepSection, {
+        venue: '데일리그라운드 청라국제도시점',
+        parkingInfo: null,
+        announcements: [],
+      }),
+    );
+
+    expect(screen.queryByText('주차와 입장 동선은 지도에서 확인해요.')).not.toBeInTheDocument();
+  });
+
   it('keeps showing the venue + map link and adds the operator notice as a supplementary line (notice never hides venue info)', () => {
     render(
       createElement(TournamentVenuePrepSection, {

@@ -154,11 +154,13 @@ restore_legacy_runtime() {
   [[ "$(docker inspect --format '{{.Config.Image}} {{.State.Running}}' "${restored_web_container}")" == "${legacy_web_image} true" ]] || return 1
   curl -fsS --connect-timeout 3 --max-time 10 \
     http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null || return 1
-  local restored_headers
+  local restored_headers restored_release restored_sha
   restored_headers="$(curl -fsSI --connect-timeout 3 --max-time 10 \
     https://alpha.teameet.co.kr/landing)" || return 1
-  grep -qi "^x-teameet-release: ${legacy_release_version}\\r\?$" <<< "${restored_headers}" || return 1
-  grep -qi "^x-teameet-commit: ${legacy_release_sha}\\r\?$" <<< "${restored_headers}" || return 1
+  restored_release="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${restored_headers}")"
+  restored_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${restored_headers}")"
+  [[ "${restored_release}" == "${legacy_release_version}" ]] || return 1
+  [[ "${restored_sha}" == "${legacy_release_sha}" ]] || return 1
 }
 
 if ! command -v rsync >/dev/null 2>&1; then
@@ -232,6 +234,10 @@ else
   promote_candidate_manifest
 fi
 trap - ERR
+prune_stale_alpha_release_sources \
+  "$(jq -er '.active.release.sha' "${ALPHA_RELEASE_STATE_FILE}")" \
+  "$(jq -r '.previous.release.sha // empty' "${ALPHA_RELEASE_STATE_FILE}")" ||
+  echo "[alpha-deploy] WARNING: stale release source prune failed" >&2
 if ! write_legacy_release_state; then
   echo "[alpha-deploy] WARNING: canonical state is active but legacy receipt could not be written" >&2
 fi

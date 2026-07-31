@@ -22,7 +22,7 @@ prepare_alpha_release_source() {
   if [[ ! -d "${ALPHA_RUNTIME_CONFIG_DIR}/certbot" ]]; then
     install -d -m 700 "${ALPHA_RUNTIME_CONFIG_DIR}/certbot"
     if [[ -d "${ALPHA_LIVE_DIR}/deploy/certbot" ]]; then
-      rsync -a "${ALPHA_LIVE_DIR}/deploy/certbot/" "${ALPHA_RUNTIME_CONFIG_DIR}/certbot/"
+      sudo rsync -a "${ALPHA_LIVE_DIR}/deploy/certbot/" "${ALPHA_RUNTIME_CONFIG_DIR}/certbot/"
     fi
   fi
   if [[ ! -f "${ALPHA_RUNTIME_METADATA_FILE}" ]]; then
@@ -85,6 +85,23 @@ activate_alpha_release_source() {
     return 1
   fi
   [[ "$(cd -P "${ALPHA_LIVE_DIR}" && pwd)" == "$(cd -P "${target_dir}" && pwd)" ]]
+}
+
+prune_stale_alpha_release_sources() {
+  local keep_active="$1"
+  local keep_previous="$2"
+  local entry sha pruned=0
+
+  [[ -d "${ALPHA_SOURCE_RELEASES_DIR}" ]] || return 0
+  for entry in "${ALPHA_SOURCE_RELEASES_DIR}"/*; do
+    [[ -d "${entry}" ]] || continue
+    sha="$(basename "${entry}")"
+    [[ "${sha}" =~ ^[0-9a-f]{40}$ ]] || continue
+    [[ "${sha}" == "${keep_active}" || "${sha}" == "${keep_previous}" ]] && continue
+    rm -rf "${entry}"
+    pruned=$((pruned + 1))
+  done
+  (( pruned == 0 )) || echo "[alpha-release] Pruned ${pruned} stale release source directories" >&2
 }
 
 restore_legacy_alpha_source() {

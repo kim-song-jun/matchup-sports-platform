@@ -17,7 +17,6 @@ export function TournamentInquiryContext({
   hasSessionError,
   onRetrySession,
 }: TournamentInquiryContextProps) {
-  const isLoggedIn = authUser !== null;
   const requesterName = authUser?.profile.displayName || authUser?.profile.nickname || '로그인 계정';
   const requesterEmail = authUser?.user.email;
 
@@ -37,9 +36,7 @@ export function TournamentInquiryContext({
               ? '계정 확인 중'
               : hasSessionError
                 ? '계정 확인 필요'
-                : isLoggedIn
-                  ? requesterName
-                  : '비회원 문의'}
+                : requesterName}
           </strong>
         </div>
         <p className={styles.contextHint}>
@@ -47,11 +44,9 @@ export function TournamentInquiryContext({
             ? '문의자 정보를 확인하고 있어요.'
             : hasSessionError
               ? '계정 상태를 확인한 뒤 문의를 접수할 수 있어요.'
-              : isLoggedIn
-                ? requesterEmail
-                  ? `${requesterEmail} 계정으로 답변이 연결돼요.`
-                  : '현재 로그인한 계정으로 답변이 연결돼요.'
-                : '아래에 입력한 연락처로 답변드려요.'}
+              : requesterEmail
+                ? `${requesterEmail} 계정으로 답변이 연결돼요.`
+                : '현재 로그인한 계정으로 답변이 연결돼요.'}
         </p>
       </section>
 

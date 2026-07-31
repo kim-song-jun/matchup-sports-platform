@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   closeSync,
   constants,
   cpSync,
+  existsSync,
   fsyncSync,
   lstatSync,
   linkSync,
@@ -14,9 +15,11 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { test } from 'node:test';
 import { dirname, join, resolve } from 'node:path';
@@ -435,6 +438,811 @@ function taskOneHostGateFunction(assertPortsFree = () => {}) {
     `${declaration}; return assertTaskOneHostGates;`,
   )(assertPortsFree, TestHarnessError);
 }
+
+function hostPressureOverrideFunction({
+  receipt,
+  sha256: receiptSHA = 'fixture-receipt-sha',
+  overridePath = '.omo/start-work/host-pressure-override-plan.json',
+} = {}) {
+  const source = readFileSync(
+    join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
+    'utf8',
+  );
+  const start = source.indexOf('function verifyOverride(');
+  assert.notEqual(start, -1);
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  let end = -1;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) {
+      end = index + 1;
+      break;
+    }
+  }
+  assert.notEqual(end, -1);
+  const declaration = source.slice(start, end);
+  class TestHarnessError extends Error {
+    constructor(code, message, exitCode) {
+      super(message);
+      this.code = code;
+      this.exitCode = exitCode;
+    }
+  }
+  return Function(
+    'resolve',
+    'PLAN_PATH',
+    'OVERRIDE_PATH',
+    'HISTORICAL_TASK_ONE_OVERRIDE_PATH',
+    'HISTORICAL_TASK_ONE_OVERRIDE_SHA256',
+    'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH',
+    'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256',
+    'OVERRIDE_SHA256',
+    'VERIFICATION_SESSION_ID',
+    'secureImmutableDescriptor',
+    'HarnessError',
+    'join',
+    'randomUUID',
+    'constants',
+    'openSync',
+    'writeSync',
+    'fsyncSync',
+    'closeSync',
+    'renameSync',
+    'rmSync',
+    'mkdirSync',
+    'lstatSync',
+    'existsSync',
+    'readFileSync',
+    'spawnSync',
+    `${declaration}; return verifyOverride;`,
+  )(
+    resolve,
+    '.omo/plans/teameet-team-tournament-operations-v1.md',
+    overridePath,
+    '.omo/start-work/host-pressure-override-task-1.json',
+    '2042407ad7b8f634f118d4ee9f0154ad1503564ceeac5874c6681f458e8c16da',
+    '.omo/start-work/host-pressure-override-task-5-11.json',
+    '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+    '2c04e6621fccb1017838c6b479ac8addabba9061852654cec4c893ed588631c2',
+    'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
+    (path, expectedSHA, code, exitCode) => {
+      if (receiptSHA !== expectedSHA) {
+        throw new TestHarnessError(code, 'fixture receipt digest mismatch', exitCode);
+      }
+      return {
+        path: resolve(repoRoot, overridePath),
+        sha256: receiptSHA,
+        receipt,
+      };
+    },
+    TestHarnessError,
+    join,
+    randomUUID,
+    constants,
+    openSync,
+    writeSync,
+    fsyncSync,
+    closeSync,
+    renameSync,
+    rmSync,
+    mkdirSync,
+    lstatSync,
+    (path) => {
+      try {
+        lstatSync(path);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    readFileSync,
+    spawnSync,
+  );
+}
+
+function pressureBReceipt(mutate = (receipt) => receipt) {
+  return mutate({
+    absoluteCaps: {
+      browserCountAtMost: 200,
+      loadAverageAtMost: 24,
+      nodeMcpCountAtMost: 1100,
+    },
+    allowedTasks: [11, 5],
+    authorizationSource: 'user-message',
+    baselineGrowthCaps: {
+      browserCountIncreaseLessThan: 20,
+      nodeMcpCountIncreaseLessThan: 50,
+      swapUsedMiBIncreaseLessThan: 2048,
+    },
+    createdAt: '2026-07-31T04:15:00.000Z',
+    dockerMustBeAvailable: true,
+    plan: '.omo/plans/teameet-team-tournament-operations-v1.md',
+    planSHA256: '15fbcdcfff57d01730888eb3728edbd869f1d5ff24f656d18c7a5c9b1d2985a5',
+    receiptType: 'task-5-11-pressure-b-host-override',
+    resourceLimits: { cpus: 1, memoryBytes: 4294967296, pidsLimit: 256 },
+    schemaVersion: 1,
+    scope: 'task-5-11-pressure-b',
+    sequence: { cleanupBetweenTasks: true, firstTask: 11, secondTask: 5 },
+    sessionId: 'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
+    singleUse: true,
+    targetPorts: [3013, 8121],
+    taskExecution: {
+      maxConcurrency: 1,
+      mixedAttemptsAllowed: false,
+      parallelAllowed: false,
+    },
+  });
+}
+
+function pressureBPreflight(mutate = (value) => value) {
+  const baseline = {
+    browserCount: 58,
+    nodeMcpCount: 913,
+    swapUsedGB: 7.0380859375,
+  };
+  const current = {
+    browserCount: 58,
+    docker: { state: 'available' },
+    loadAverage: [6.1142578125, 0, 0],
+    nodeMcpCount: 911,
+    swapUsedGB: 7.0380859375,
+    targetPorts: { 3013: [], 8121: [] },
+  };
+  return mutate({ baseline, current });
+}
+
+function withPressureBEnvironment(callback) {
+  const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+  const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
+  const overridePath = '.omo/start-work/host-pressure-override-task-5-11.json';
+  process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, overridePath);
+  process.env.V1_VERIFICATION_SESSION_ID =
+    'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
+  const restore = () => {
+    if (previousReceipt === undefined) {
+      delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+    } else {
+      process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = previousReceipt;
+    }
+    if (previousSession === undefined) {
+      delete process.env.V1_VERIFICATION_SESSION_ID;
+    } else {
+      process.env.V1_VERIFICATION_SESSION_ID = previousSession;
+    }
+  };
+  try {
+    const result = callback({
+      overridePath,
+      plan: {
+        rawSHA: '15fbcdcfff57d01730888eb3728edbd869f1d5ff24f656d18c7a5c9b1d2985a5',
+        normalizedSHA: 'different-normalized-plan-sha',
+      },
+    });
+    if (result && typeof result.then === 'function') return result.finally(restore);
+    restore();
+    return result;
+  } catch (error) {
+    restore();
+    throw error;
+  }
+}
+
+function pressureBLifecycleContext(stateRoot, attemptId, stage) {
+  return {
+    attemptId,
+    commandHash: '8b1b9f3c0c22c7e34c9d97fb1209302dc892a5c52c4ee1ca617a1a7d1b0ab7cd',
+    stage,
+    stateRoot,
+  };
+}
+
+function withPressureBLifecycle(callback) {
+  const stateRoot = mkdtempSync('/private/tmp/teameet-pressure-b-lifecycle-');
+  const cleanup = () => rmSync(stateRoot, { recursive: true, force: true });
+  try {
+    const result = withPressureBEnvironment(({ overridePath, plan }) => {
+      const verifyOverride = hostPressureOverrideFunction({
+        overridePath,
+        receipt: pressureBReceipt(),
+        sha256: '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+      });
+      const { baseline, current } = pressureBPreflight();
+      return callback({ baseline, current, plan, stateRoot, verifyOverride });
+    });
+    if (result && typeof result.then === 'function') {
+      return result.finally(cleanup);
+    }
+    cleanup();
+    return result;
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+}
+
+function pressureBChildScript() {
+  return `
+import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, closeSync, constants, existsSync, fsyncSync, lstatSync, mkdirSync as nativeMkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync, writeSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+const [repoRoot, stateRoot, attemptId, stage, mode, signalPath, receiptText] = process.argv.slice(2);
+const receipt = JSON.parse(receiptText);
+const source = readFileSync(join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'), 'utf8');
+const start = source.indexOf('function verifyOverride(');
+const bodyStart = source.indexOf('{', start);
+let depth = 0;
+let end = -1;
+for (let index = bodyStart; index < source.length; index += 1) {
+  if (source[index] === '{') depth += 1;
+  if (source[index] === '}') depth -= 1;
+  if (depth === 0) { end = index + 1; break; }
+}
+class HarnessError extends Error { constructor(code, message, exitCode) { super(message); this.code = code; this.exitCode = exitCode; } }
+const expectedReceiptSHA = '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c';
+const controlledMkdirSync = (path, options) => nativeMkdirSync(path, options);
+const controlledRenameSync = (sourcePath, targetPath) => {
+  const result = renameSync(sourcePath, targetPath);
+  if (mode === 'hold-lock' && targetPath.endsWith('/pressure-b-state.json.lock')) {
+    const ownerPath = join(targetPath, 'owner.json');
+    const owner = JSON.parse(readFileSync(ownerPath, 'utf8'));
+    writeFileSync(signalPath, JSON.stringify({
+      pid: process.pid,
+      lockPath: targetPath,
+      owner,
+    }), { flag: 'wx', mode: 0o600 });
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 30_000);
+  }
+  if (mode === 'hold-recovery' && targetPath.includes('.recover-')) {
+    const ownerPath = join(targetPath, 'owner.json');
+    const owner = JSON.parse(readFileSync(ownerPath, 'utf8'));
+    writeFileSync(signalPath, JSON.stringify({
+      pid: process.pid,
+      phase: 'recovered',
+      tombstonePath: targetPath,
+      owner,
+    }), { flag: 'wx', mode: 0o600 });
+    const releasePath = signalPath + '.release';
+    const deadline = Date.now() + 30_000;
+    while (!existsSync(releasePath)) {
+      if (Date.now() >= deadline) throw new Error('Timed out waiting for recovery release');
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
+  return result;
+};
+const verifyOverride = Function(
+  'resolve', 'PLAN_PATH', 'OVERRIDE_PATH', 'HISTORICAL_TASK_ONE_OVERRIDE_PATH', 'HISTORICAL_TASK_ONE_OVERRIDE_SHA256',
+  'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH', 'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256', 'OVERRIDE_SHA256',
+  'VERIFICATION_SESSION_ID', 'secureImmutableDescriptor', 'HarnessError', 'join', 'randomUUID', 'constants', 'openSync',
+  'writeSync', 'fsyncSync', 'closeSync', 'renameSync', 'rmSync', 'mkdirSync', 'lstatSync', 'existsSync', 'readFileSync', 'spawnSync',
+  source.slice(start, end) + '; return verifyOverride;',
+)(
+  resolve, '.omo/plans/teameet-team-tournament-operations-v1.md', '.omo/start-work/host-pressure-override-plan.json',
+  '.omo/start-work/host-pressure-override-task-1.json', '2042407ad7b8f634f118d4ee9f0154ad1503564ceeac5874c6681f458e8c16da',
+  '.omo/start-work/host-pressure-override-task-5-11.json', expectedReceiptSHA,
+  '2c04e6621fccb1017838c6b479ac8addabba9061852654cec4c893ed588631c2', 'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
+  (path, expectedSHA, code, exitCode) => {
+    if (expectedSHA !== expectedReceiptSHA) throw new HarnessError(code, 'unexpected fixture receipt SHA', exitCode);
+    return { path, sha256: expectedReceiptSHA, receipt };
+  },
+  HarnessError, join, randomUUID, constants, openSync, writeSync, fsyncSync, closeSync, controlledRenameSync, rmSync,
+  controlledMkdirSync, lstatSync, existsSync, readFileSync, spawnSync,
+);
+process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, '.omo/start-work/host-pressure-override-task-5-11.json');
+process.env.V1_VERIFICATION_SESSION_ID = 'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
+const baseline = { browserCount: 58, nodeMcpCount: 913, swapUsedGB: 7.0380859375 };
+const current = { browserCount: 58, docker: { state: 'available' }, loadAverage: [6, 0, 0], nodeMcpCount: 911, swapUsedGB: 7.0380859375, targetPorts: { 3013: [], 8121: [] } };
+try {
+  const result = verifyOverride(repoRoot, { rawSHA: receipt.planSHA256, normalizedSHA: 'normalized' }, stage === 'V11' ? 11 : 5, ['NODE_MCP_PROCESS_PROLIFERATION'], current, baseline, { attemptId, commandHash: '8b1b9f3c0c22c7e34c9d97fb1209302dc892a5c52c4ee1ca617a1a7d1b0ab7cd', stage, stateRoot });
+  if (mode === 'complete-v11-success') result.completePressureBLifecycle({ successful: true, cleanupVerified: true });
+  if (mode === 'complete-v11-failed' || mode === 'complete-v5-failed') result.completePressureBLifecycle({ successful: false, cleanupVerified: true });
+  process.stdout.write(JSON.stringify({ ok: true, stage: result.pressureBTransition?.stage ?? null }) + '\\n');
+} catch (error) {
+  process.stderr.write(JSON.stringify({ ok: false, code: error.code ?? 'UNEXPECTED', message: error.message }) + '\\n');
+  process.exitCode = error.exitCode ?? 70;
+}
+`;
+}
+
+function startPressureBChild(fixturePath, stateRoot, attemptId, stage, mode, signalPath = '') {
+  const child = spawn(process.execPath, [
+    fixturePath,
+    repoRoot,
+    stateRoot,
+    attemptId,
+    stage,
+    mode,
+    signalPath,
+    JSON.stringify(pressureBReceipt()),
+  ], { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const completed = new Promise((resolveChild, rejectChild) => {
+    child.once('error', rejectChild);
+    child.once('close', (code, signal) => resolveChild({ child, code, signal, stdout, stderr }));
+  });
+  return { child, completed };
+}
+
+async function waitForPressureBSignal(signalPath, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (existsSync(signalPath)) return JSON.parse(readFileSync(signalPath, 'utf8'));
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+  }
+  throw new Error(`Timed out waiting for pressure-B signal: ${signalPath}`);
+}
+
+function assertNoPressureBLockResidue(stateRoot) {
+  const residue = readdirSync(stateRoot).filter((entry) =>
+    entry === 'pressure-b-state.json.lock' ||
+    entry.startsWith('pressure-b-state.json.lock.pending-') ||
+    entry.startsWith('pressure-b-state.json.lock.recover-'));
+  assert.deepEqual(residue, [], 'canonical, pending, and recovery lock paths must be absent before teardown');
+}
+
+async function withPressureBChildFixture(callback) {
+  const stateRoot = mkdtempSync('/private/tmp/teameet-pressure-b-child-');
+  const fixturePath = join(stateRoot, 'pressure-b-child.mjs');
+  writeFileSync(fixturePath, pressureBChildScript(), { mode: 0o600 });
+  const children = new Set();
+  const start = (attemptId, stage, mode, signalPath = '', root = stateRoot) => {
+    const run = startPressureBChild(
+      fixturePath,
+      root,
+      attemptId,
+      stage,
+      mode,
+      signalPath,
+    );
+    children.add(run.child);
+    run.completed.finally(() => children.delete(run.child));
+    return run;
+  };
+  try {
+    return await callback({ stateRoot, start });
+  } finally {
+    for (const child of children) {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    }
+    rmSync(stateRoot, { recursive: true, force: true });
+    assert.equal(existsSync(stateRoot), false, 'test-owned pressure-B fixture root must be removed');
+  }
+}
+
+test('pressure-B V11-first receipt accepts only the bounded serial contract', () => {
+  withPressureBLifecycle(({ baseline, current, plan, stateRoot, verifyOverride }) => {
+    const lifecycle = pressureBLifecycleContext(stateRoot, 'attempt-v11', 'V11');
+    const result = verifyOverride(
+      repoRoot,
+      plan,
+      11,
+      ['NODE_MCP_PROCESS_PROLIFERATION'],
+      current,
+      baseline,
+      lifecycle,
+    );
+    assert.equal(result.applied, true);
+    assert.equal(
+      result.completePressureBLifecycle({ successful: true, cleanupVerified: true }).stage,
+      'v11-complete',
+    );
+  });
+});
+
+test('pressure-B consumes a valid V11 authority exactly once', () => {
+  withPressureBLifecycle(({ baseline, current, plan, stateRoot, verifyOverride }) => {
+    const lifecycle = pressureBLifecycleContext(stateRoot, 'attempt-v11', 'V11');
+    const firstV11 = verifyOverride(
+        repoRoot,
+        plan,
+        11,
+        ['NODE_MCP_PROCESS_PROLIFERATION'],
+        current,
+        baseline,
+        lifecycle,
+      );
+    assert.equal(firstV11.applied, true);
+    assert.equal(
+      firstV11.completePressureBLifecycle({ successful: true, cleanupVerified: true }).stage,
+      'v11-complete',
+    );
+    const firstV5 = verifyOverride(
+      repoRoot,
+      plan,
+      5,
+      ['NODE_MCP_PROCESS_PROLIFERATION'],
+      current,
+      baseline,
+      pressureBLifecycleContext(stateRoot, 'attempt-v11', 'V5'),
+    );
+    assert.equal(firstV5.applied, true);
+    assert.equal(firstV5.pressureBTransition.stage, 'v5-claimed');
+    assert.equal(
+      firstV5.completePressureBLifecycle({ successful: true, cleanupVerified: true }).stage,
+      'v5-complete',
+    );
+    assert.throws(
+      () => verifyOverride(
+        repoRoot,
+        plan,
+        11,
+        ['NODE_MCP_PROCESS_PROLIFERATION'],
+        current,
+        baseline,
+        lifecycle,
+      ),
+      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+      'an identical valid V11 claim must be consumed after its first use',
+    );
+  });
+});
+
+test('pressure-B rejects V5 until the exact V11 cleanup transition exists', () => {
+  withPressureBLifecycle(({ baseline, current, plan, stateRoot, verifyOverride }) => {
+    assert.throws(
+      () => verifyOverride(
+        repoRoot,
+        plan,
+        5,
+        ['NODE_MCP_PROCESS_PROLIFERATION'],
+        current,
+        baseline,
+        pressureBLifecycleContext(stateRoot, 'attempt-v5', 'V5'),
+      ),
+      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+      'Task 5 cannot claim pressure-B authority before a successful V11 cleanup receipt',
+    );
+  });
+});
+
+test('pressure-B allows one competing V11 claimant and rejects stale or mixed attempts', async () => {
+  return withPressureBLifecycle(async ({ baseline, current, plan, stateRoot, verifyOverride }) => {
+    const invoke = (attemptId, task, stage) => Promise.resolve().then(() =>
+      verifyOverride(
+        repoRoot,
+        plan,
+        task,
+        ['NODE_MCP_PROCESS_PROLIFERATION'],
+        current,
+        baseline,
+        pressureBLifecycleContext(stateRoot, attemptId, stage),
+      ));
+    const claims = await Promise.allSettled([
+      invoke('attempt-a', 11, 'V11'),
+      invoke('attempt-b', 11, 'V11'),
+      invoke('attempt-b', 5, 'V5'),
+    ]);
+    assert.deepEqual(
+      claims.map(({ status }) => status),
+      ['fulfilled', 'rejected', 'rejected'],
+      'exactly one V11 claimant may win; stale and mixed-attempt claims must fail',
+    );
+  });
+});
+
+test('pressure-B has exactly one real cross-process V11 claimant', async () => {
+  await withPressureBChildFixture(async ({ stateRoot, start }) => {
+    const first = start('process-a', 'V11', 'claim');
+    const second = start('process-b', 'V11', 'claim');
+    const results = await Promise.all([first.completed, second.completed]);
+    assert.equal(results.filter(({ code }) => code === 0).length, 1);
+    assert.equal(results.filter(({ code }) => code === 75).length, 1);
+    const state = JSON.parse(readFileSync(join(stateRoot, 'pressure-b-state.json'), 'utf8'));
+    assert.equal(state.stage, 'v11-claimed');
+    assert.equal(existsSync(join(stateRoot, 'pressure-b-state.json.lock')), false);
+  });
+});
+
+test('pressure-B recovers a killed lock owner through bounded authenticated state', async () => {
+  await withPressureBChildFixture(async ({ stateRoot, start }) => {
+    const signalPath = join(stateRoot, 'lock-owner.json');
+    const owner = start('killed-owner', 'V11', 'hold-lock', signalPath);
+    const signal = await waitForPressureBSignal(signalPath);
+    assert.equal(signal.pid, owner.child.pid);
+    const lockPath = join(stateRoot, 'pressure-b-state.json.lock');
+    const publishedOwner = JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8'));
+    assert.equal(signal.lockPath, lockPath);
+    assert.deepEqual(signal.owner, publishedOwner);
+    assert.equal(publishedOwner.pid, owner.child.pid);
+    const ownerIdentity = spawnSync('ps', ['-o', 'lstart=', '-p', String(owner.child.pid)], {
+      encoding: 'utf8',
+    });
+    assert.equal(ownerIdentity.status, 0, ownerIdentity.stderr);
+    assert.equal(ownerIdentity.stdout.trim(), publishedOwner.startIdentity);
+    const liveContender = await start('live-contender', 'V11', 'claim').completed;
+    assert.equal(liveContender.code, 75, liveContender.stderr);
+    assert.equal(existsSync(lockPath), true);
+    assert.equal(owner.child.kill('SIGKILL'), true);
+    const ownerResult = await owner.completed;
+    assert.equal(ownerResult.signal, 'SIGKILL');
+    assert.equal(
+      spawnSync('ps', ['-o', 'pid=', '-p', String(signal.pid)], { encoding: 'utf8' }).status,
+      1,
+      'the registered published owner PID must be dead before recovery begins',
+    );
+    assert.equal(existsSync(lockPath), true);
+    const recovered = await start('recovery-owner', 'V11', 'claim').completed;
+    assert.equal(
+      recovered.code,
+      0,
+      `stale lock must recover without duplicate acceptance: ${recovered.stderr}`,
+    );
+    assert.equal(existsSync(lockPath), false);
+    assertNoPressureBLockResidue(stateRoot);
+
+    const invalidMetadata = [
+      ['malformed', '{not-json', false],
+      ['mismatched', JSON.stringify({
+        schemaVersion: 1,
+        receiptSHA256: '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+        planSHA256: 'wrong-plan',
+        sessionId: 'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
+        attemptId: 'other-attempt',
+        commandHash: '8b1b9f3c0c22c7e34c9d97fb1209302dc892a5c52c4ee1ca617a1a7d1b0ab7cd',
+        pid: 999999,
+        startIdentity: 'impossible-process',
+        createdAt: new Date().toISOString(),
+        nonce: 'wrong-plan-binding',
+      }), false],
+      ['symlink', null, true],
+    ];
+    for (const [name, content, symlink] of invalidMetadata) {
+      const invalidRoot = join(stateRoot, `invalid-${name}`);
+      const lockPath = join(invalidRoot, 'pressure-b-state.json.lock');
+      mkdirSync(lockPath, { recursive: true, mode: 0o700 });
+      const ownerPath = join(lockPath, 'owner.json');
+      if (symlink) {
+        const targetPath = join(invalidRoot, 'external-owner.json');
+        writeFileSync(targetPath, '{}', { mode: 0o600 });
+        symlinkSync(targetPath, ownerPath);
+      } else {
+        writeFileSync(ownerPath, content, { mode: 0o600 });
+      }
+      const rejected = await start(`invalid-${name}`, 'V11', 'claim', '', invalidRoot).completed;
+      assert.equal(rejected.code, 75, `${name} metadata must fail closed: ${rejected.stderr}`);
+      assert.equal(existsSync(lockPath), true, `${name} metadata lock must not be removed`);
+    }
+  });
+});
+
+test('pressure-B competing recovery claimants leave one claim and zero lock residue', async () => {
+  await withPressureBChildFixture(async ({ stateRoot, start }) => {
+    const ownerSignalPath = join(stateRoot, 'owner-published.json');
+    const owner = start('two-recoverer-owner', 'V11', 'hold-lock', ownerSignalPath);
+    const ownerSignal = await waitForPressureBSignal(ownerSignalPath);
+    const lockPath = join(stateRoot, 'pressure-b-state.json.lock');
+    const publishedOwner = JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8'));
+    assert.equal(ownerSignal.pid, owner.child.pid);
+    assert.equal(publishedOwner.pid, owner.child.pid);
+    assert.deepEqual(ownerSignal.owner, publishedOwner);
+    assert.equal(owner.child.kill('SIGKILL'), true);
+    assert.equal((await owner.completed).signal, 'SIGKILL');
+    assert.equal(
+      spawnSync('ps', ['-o', 'pid=', '-p', String(ownerSignal.pid)], { encoding: 'utf8' }).status,
+      1,
+      'the authenticated owner must be dead before concurrent recovery begins',
+    );
+
+    const recoverySignalPath = join(stateRoot, 'first-recoverer.json');
+    const first = start('recoverer-a', 'V11', 'hold-recovery', recoverySignalPath);
+    const recoverySignal = await waitForPressureBSignal(recoverySignalPath);
+    assert.equal(recoverySignal.pid, first.child.pid);
+    assert.equal(recoverySignal.phase, 'recovered');
+    assert.equal(recoverySignal.owner.nonce, publishedOwner.nonce);
+    assert.equal(existsSync(lockPath), false);
+    assert.equal(existsSync(recoverySignal.tombstonePath), true);
+
+    const second = start('recoverer-b', 'V11', 'claim');
+    const secondResult = await second.completed;
+    assert.equal(secondResult.code, 0, secondResult.stderr);
+    writeFileSync(`${recoverySignalPath}.release`, 'release', { flag: 'wx', mode: 0o600 });
+    const firstResult = await first.completed;
+    assert.equal(firstResult.code, 75, firstResult.stderr);
+    assert.match(firstResult.stderr, /HOST_PRESSURE_OVERRIDE_INVALID/);
+    const state = JSON.parse(readFileSync(join(stateRoot, 'pressure-b-state.json'), 'utf8'));
+    assert.equal(state.stage, 'v11-claimed');
+    assertNoPressureBLockResidue(stateRoot);
+  });
+});
+
+test('pressure-B failed V11 and V5 states remain terminal with zero lock residue', async () => {
+  await withPressureBChildFixture(async ({ stateRoot, start }) => {
+    const v11Failed = await start('failed-v11', 'V11', 'complete-v11-failed').completed;
+    assert.equal(v11Failed.code, 0, v11Failed.stderr);
+    assert.equal(
+      JSON.parse(readFileSync(join(stateRoot, 'pressure-b-state.json'), 'utf8')).stage,
+      'v11-failed',
+    );
+    assert.equal(existsSync(join(stateRoot, 'pressure-b-state.json.lock')), false);
+    assert.equal((await start('failed-v11', 'V5', 'claim').completed).code, 75);
+    assert.equal((await start('failed-v11', 'V11', 'claim').completed).code, 75);
+
+    const v5Root = join(stateRoot, 'v5-failure');
+    const v11Succeeded = await start(
+      'failed-v5',
+      'V11',
+      'complete-v11-success',
+      '',
+      v5Root,
+    ).completed;
+    assert.equal(v11Succeeded.code, 0, v11Succeeded.stderr);
+    const v5Failed = await start(
+      'failed-v5',
+      'V5',
+      'complete-v5-failed',
+      '',
+      v5Root,
+    ).completed;
+    assert.equal(v5Failed.code, 0, v5Failed.stderr);
+    assert.equal(
+      JSON.parse(readFileSync(join(v5Root, 'pressure-b-state.json'), 'utf8')).stage,
+      'v5-failed',
+    );
+    assert.equal(existsSync(join(v5Root, 'pressure-b-state.json.lock')), false);
+    assert.equal((await start('failed-v5', 'V5', 'claim', '', v5Root).completed).code, 75);
+  });
+});
+
+test('pressure-B rejects tamper, plan, scope, task, order, reuse, parallel, and mixed-attempt variants', () => {
+  withPressureBEnvironment(({ overridePath, plan }) => {
+    const { baseline, current } = pressureBPreflight();
+    const variants = [
+      {
+        name: 'tampered receipt hash',
+        receipt: pressureBReceipt(),
+        sha256: 'tampered-receipt-sha',
+        task: 11,
+      },
+      {
+        name: 'plan binding',
+        receipt: pressureBReceipt((receipt) => ({ ...receipt, planSHA256: 'wrong-plan' })),
+        task: 11,
+      },
+      {
+        name: 'scope',
+        receipt: pressureBReceipt((receipt) => ({ ...receipt, scope: 'plan-host-preflight-only' })),
+        task: 11,
+      },
+      {
+        name: 'task allowlist',
+        receipt: pressureBReceipt(),
+        task: 6,
+      },
+      {
+        name: 'serial order',
+        receipt: pressureBReceipt((receipt) => ({
+          ...receipt,
+          sequence: { ...receipt.sequence, firstTask: 5, secondTask: 11 },
+        })),
+        task: 11,
+      },
+      {
+        name: 'reuse',
+        receipt: pressureBReceipt((receipt) => ({ ...receipt, singleUse: false })),
+        task: 11,
+      },
+      {
+        name: 'parallel execution',
+        receipt: pressureBReceipt((receipt) => ({
+          ...receipt,
+          taskExecution: { ...receipt.taskExecution, parallelAllowed: true },
+        })),
+        task: 11,
+      },
+      {
+        name: 'mixed attempt execution',
+        receipt: pressureBReceipt((receipt) => ({
+          ...receipt,
+          taskExecution: { ...receipt.taskExecution, mixedAttemptsAllowed: true },
+        })),
+        task: 11,
+      },
+      {
+        name: 'container resource limit',
+        receipt: pressureBReceipt((receipt) => ({
+          ...receipt,
+          resourceLimits: { ...receipt.resourceLimits, pidsLimit: 257 },
+        })),
+        task: 11,
+      },
+      {
+        name: 'hard Docker failure',
+        receipt: pressureBReceipt(),
+        task: 11,
+        failures: ['DOCKER_UNHEALTHY'],
+      },
+    ];
+    for (const variant of variants) {
+      const verifyOverride = hostPressureOverrideFunction({
+        overridePath,
+        receipt: variant.receipt,
+        sha256: variant.sha256 ?? '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c',
+      });
+      assert.throws(
+        () => verifyOverride(
+          repoRoot,
+          plan,
+          variant.task,
+          variant.failures ?? ['NODE_MCP_PROCESS_PROLIFERATION'],
+          current,
+          baseline,
+        ),
+        (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+        variant.name,
+      );
+    }
+  });
+});
+
+test('ordinary no-override host pressure remains fail-closed', () => {
+  const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+  delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+  try {
+    const verifyOverride = hostPressureOverrideFunction();
+    assert.equal(
+      verifyOverride(repoRoot, { rawSHA: 'raw', normalizedSHA: 'normalized' }, 11, [
+        'NODE_MCP_PROCESS_PROLIFERATION',
+      ]),
+      null,
+    );
+  } finally {
+    if (previousReceipt === undefined) {
+      delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+    } else {
+      process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = previousReceipt;
+    }
+  }
+});
+
+test('legacy Task1 host pressure override remains accepted', () => {
+  const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+  const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
+  process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(
+    repoRoot,
+    '.omo/start-work/host-pressure-override-task-1.json',
+  );
+  process.env.V1_VERIFICATION_SESSION_ID =
+    'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
+  try {
+    const verifyOverride = hostPressureOverrideFunction({
+      sha256: '2042407ad7b8f634f118d4ee9f0154ad1503564ceeac5874c6681f458e8c16da',
+      receipt: {
+        schemaVersion: 1,
+        plan: '.omo/plans/teameet-team-tournament-operations-v1.md',
+        planSHA256: 'legacy-plan-sha',
+        task: 1,
+        sessionId: 'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
+        authorizationSource: 'user-message',
+        scope: 'host-preflight-only',
+      },
+    });
+    const result = verifyOverride(
+      repoRoot,
+      { rawSHA: 'legacy-plan-sha', normalizedSHA: 'normalized' },
+      1,
+      ['NODE_MCP_PROCESS_PROLIFERATION'],
+    );
+    assert.equal(result.applied, true);
+    assert.deepEqual(result.observedFailures, ['NODE_MCP_PROCESS_PROLIFERATION']);
+  } finally {
+    if (previousReceipt === undefined) {
+      delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+    } else {
+      process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = previousReceipt;
+    }
+    if (previousSession === undefined) {
+      delete process.env.V1_VERIFICATION_SESSION_ID;
+    } else {
+      process.env.V1_VERIFICATION_SESSION_ID = previousSession;
+    }
+  }
+});
 
 function cleanRestartFixture() {
   const temporaryDirectory = mkdtempSync(

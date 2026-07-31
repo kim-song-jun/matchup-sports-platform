@@ -15,6 +15,7 @@ import {
   readFileSync,
   readSync,
   readlinkSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeSync,
@@ -105,6 +106,10 @@ const HISTORICAL_TASK_ONE_OVERRIDE_PATH =
   '.omo/start-work/host-pressure-override-task-1.json';
 const HISTORICAL_TASK_ONE_OVERRIDE_SHA256 =
   '2042407ad7b8f634f118d4ee9f0154ad1503564ceeac5874c6681f458e8c16da';
+const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH =
+  '.omo/start-work/host-pressure-override-task-5-11.json';
+const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256 =
+  '41c14d9181fcac1e25296b7d363a54df974f833df03894e2e33a11e9a58b355c';
 const VERIFICATION_SESSION_ID =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
 const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
@@ -383,7 +388,7 @@ function secureImmutableDescriptor(
   return { path: absolutePath, sha256: descriptor.sha256, receipt };
 }
 
-function verifyOverride(repoRoot, plan, task, failures) {
+function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseline = null, lifecycle = null) {
   const supplied = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
   if (!supplied) return null;
   if (process.env.V1_VERIFICATION_SESSION_ID !== VERIFICATION_SESSION_ID) {
@@ -395,16 +400,22 @@ function verifyOverride(repoRoot, plan, task, failures) {
   }
   const canonicalPath = resolve(repoRoot, OVERRIDE_PATH);
   const historicalPath = resolve(repoRoot, HISTORICAL_TASK_ONE_OVERRIDE_PATH);
+  const pressureBPath = resolve(repoRoot, TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH);
   const absoluteSupplied = resolve(supplied);
   const historical = task === 1 && absoluteSupplied === historicalPath;
-  if (absoluteSupplied !== canonicalPath && !historical) {
+  const pressureB = absoluteSupplied === pressureBPath;
+  if (absoluteSupplied !== canonicalPath && !historical && !pressureB) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      `Override receipt path must be ${OVERRIDE_PATH}`,
+      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, or ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}`,
       75,
     );
   }
-  const expectedSHA = historical ? HISTORICAL_TASK_ONE_OVERRIDE_SHA256 : OVERRIDE_SHA256;
+  const expectedSHA = historical
+    ? HISTORICAL_TASK_ONE_OVERRIDE_SHA256
+    : pressureB
+      ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256
+      : OVERRIDE_SHA256;
   const descriptor = secureImmutableDescriptor(
     absoluteSupplied,
     expectedSHA,
@@ -412,16 +423,451 @@ function verifyOverride(repoRoot, plan, task, failures) {
     75,
   );
   const receipt = descriptor.receipt;
-  const allowed =
-    historical ? receipt.task === 1 : Array.isArray(receipt.allowedTasks) &&
-      receipt.allowedTasks.includes(task);
+  const allowed = historical
+    ? receipt.task === 1
+    : Array.isArray(receipt.allowedTasks) && receipt.allowedTasks.includes(task);
+  const exactKeys = (value, expected) =>
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...expected].sort());
+  const pressureBPreflightValid =
+    preflight &&
+    baseline &&
+    preflight.nodeMcpCount <= 1100 &&
+    preflight.browserCount <= 200 &&
+    preflight.loadAverage?.[0] <= 24 &&
+    preflight.docker?.state === 'available' &&
+    [3013, 8121].every((port) => Array.isArray(preflight.targetPorts?.[port]) && preflight.targetPorts[port].length === 0) &&
+    preflight.nodeMcpCount - baseline.nodeMcpCount < 50 &&
+    preflight.browserCount - baseline.browserCount < 20 &&
+    (preflight.swapUsedGB - baseline.swapUsedGB) * 1024 < 2048;
+  const pressureBLifecycleValid =
+    exactKeys(lifecycle, ['attemptId', 'commandHash', 'stage', 'stateRoot']) &&
+    typeof lifecycle.attemptId === 'string' &&
+    lifecycle.attemptId.length > 0 &&
+    typeof lifecycle.commandHash === 'string' &&
+    lifecycle.commandHash.length === 64 &&
+    resolve(lifecycle.stateRoot) === lifecycle.stateRoot &&
+    ((task === 11 && lifecycle.stage === 'V11') || (task === 5 && lifecycle.stage === 'V5'));
+  const pressureBStatePath = pressureBLifecycleValid
+    ? join(lifecycle.stateRoot, 'pressure-b-state.json')
+    : null;
+  const pressureBLockPath = pressureBStatePath ? `${pressureBStatePath}.lock` : null;
+  const pressureBLockOwnerPath = pressureBLockPath
+    ? join(pressureBLockPath, 'owner.json')
+    : null;
+  const pressureBStateBinding = (state) =>
+    exactKeys(state, [
+      'attemptId',
+      'planSHA256',
+      'receiptSHA256',
+      'schemaVersion',
+      'sessionId',
+      'stage',
+      'updatedAt',
+      'v11CommandHash',
+      'v11AttemptId',
+    ]) &&
+    state.schemaVersion === 1 &&
+    state.receiptSHA256 === descriptor.sha256 &&
+    state.planSHA256 === receipt.planSHA256 &&
+    state.sessionId === receipt.sessionId &&
+    typeof state.attemptId === 'string' &&
+    typeof state.v11CommandHash === 'string' &&
+    typeof state.v11AttemptId === 'string' &&
+    typeof state.updatedAt === 'string' &&
+    ['v11-claimed', 'v11-complete', 'v11-failed', 'v5-claimed', 'v5-complete', 'v5-failed'].includes(state.stage);
+  const fsyncPressureBDirectory = (directoryPath) => {
+    const directory = openSync(
+      directoryPath,
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+    );
+    try {
+      fsyncSync(directory);
+    } finally {
+      closeSync(directory);
+    }
+  };
+  const writePressureBFile = (
+    targetPath,
+    value,
+    kind,
+    targetDirectoryPath = lifecycle.stateRoot,
+  ) => {
+    const temporaryPath = join(
+      lifecycle.stateRoot,
+      `.pressure-b-${kind}-${process.pid}-${randomUUID()}.tmp`,
+    );
+    const descriptor = openSync(
+      temporaryPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    try {
+      writeSync(descriptor, Buffer.from(JSON.stringify(value)));
+      fsyncSync(descriptor);
+    } finally {
+      closeSync(descriptor);
+    }
+    try {
+      renameSync(temporaryPath, targetPath);
+      fsyncPressureBDirectory(targetDirectoryPath);
+      if (targetDirectoryPath !== lifecycle.stateRoot) {
+        fsyncPressureBDirectory(lifecycle.stateRoot);
+      }
+    } catch (error) {
+      rmSync(temporaryPath, { force: true });
+      throw error;
+    }
+  };
+  const writePressureBState = (state) =>
+    writePressureBFile(pressureBStatePath, state, 'state');
+  const lockOwnerBinding = (owner) =>
+    exactKeys(owner, [
+      'attemptId',
+      'commandHash',
+      'createdAt',
+      'nonce',
+      'pid',
+      'planSHA256',
+      'receiptSHA256',
+      'schemaVersion',
+      'sessionId',
+      'startIdentity',
+    ]) &&
+    owner.schemaVersion === 1 &&
+    owner.receiptSHA256 === descriptor.sha256 &&
+    owner.planSHA256 === receipt.planSHA256 &&
+    owner.sessionId === receipt.sessionId &&
+    typeof owner.attemptId === 'string' && owner.attemptId.length > 0 &&
+    typeof owner.commandHash === 'string' && owner.commandHash.length === 64 &&
+    Number.isInteger(owner.pid) && owner.pid > 0 &&
+    typeof owner.startIdentity === 'string' && owner.startIdentity.length > 0 &&
+    typeof owner.nonce === 'string' && owner.nonce.length > 0 &&
+    Number.isFinite(Date.parse(owner.createdAt));
+  const readLockOwner = (lockPath = pressureBLockPath) => {
+    const ownerPath = join(lockPath, 'owner.json');
+    const ownerStat = lstatSync(ownerPath);
+    if (!ownerStat.isFile() || ownerStat.isSymbolicLink() || ownerStat.nlink !== 1) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle lock metadata must be a single-link regular file',
+        75,
+      );
+    }
+    try {
+      const owner = JSON.parse(readFileSync(ownerPath, 'utf8'));
+      if (!lockOwnerBinding(owner)) {
+        throw new HarnessError(
+          'HOST_PRESSURE_OVERRIDE_INVALID',
+          'Pressure-B lifecycle lock metadata does not bind this claim',
+          75,
+        );
+      }
+      return owner;
+    } catch (error) {
+      if (error instanceof HarnessError) throw error;
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        `Pressure-B lifecycle lock metadata is unreadable: ${error.message}`,
+        75,
+      );
+    }
+  };
+  const ownerStartIdentity = (pid) => {
+    const owner = spawnSync('ps', ['-o', 'lstart=', '-p', String(pid)], {
+      encoding: 'utf8',
+    });
+    if (owner.status === 1) return null;
+    if (owner.status !== 0 || !owner.stdout.trim()) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle owner identity cannot be inspected',
+        75,
+      );
+    }
+    return owner.stdout.trim();
+  };
+  const recoverStalePressureBLock = () => {
+    const lockStat = lstatSync(pressureBLockPath);
+    if (!lockStat.isDirectory() || lockStat.isSymbolicLink()) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle lock must be a real directory',
+        75,
+      );
+    }
+    const owner = readLockOwner();
+    const firstIdentity = ownerStartIdentity(owner.pid);
+    if (firstIdentity !== null) {
+      if (firstIdentity !== owner.startIdentity) {
+        throw new HarnessError(
+          'HOST_PRESSURE_OVERRIDE_INVALID',
+          'Pressure-B lifecycle lock owner PID identity does not match metadata',
+          75,
+        );
+      }
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle lock owner is still alive',
+        75,
+      );
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    if (ownerStartIdentity(owner.pid) !== null) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle lock owner changed during bounded recovery check',
+        75,
+      );
+    }
+    const recoveredPath = `${pressureBLockPath}.recover-${process.pid}-${randomUUID()}`;
+    try {
+      renameSync(pressureBLockPath, recoveredPath);
+    } catch (error) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        `Pressure-B lifecycle stale-lock recovery lost its atomic claim: ${error.message}`,
+        75,
+      );
+    }
+    try {
+      const recoveredOwner = readLockOwner(recoveredPath);
+      if (recoveredOwner.nonce !== owner.nonce) {
+        throw new HarnessError(
+          'HOST_PRESSURE_OVERRIDE_INVALID',
+          'Pressure-B lifecycle recovered lock metadata changed during recovery',
+          75,
+        );
+      }
+      fsyncPressureBDirectory(lifecycle.stateRoot);
+      return { path: recoveredPath, nonce: owner.nonce };
+    } catch (error) {
+      if (error instanceof HarnessError) throw error;
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        `Pressure-B lifecycle stale-lock recovery could not clean its claimed lock: ${error.message}`,
+        75,
+      );
+    }
+  };
+  const removeOwnedRecoveryTombstone = (tombstone) => {
+    const tombstoneStat = lstatSync(tombstone.path);
+    if (!tombstoneStat.isDirectory() || tombstoneStat.isSymbolicLink()) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle recovery tombstone must be a real directory',
+        75,
+      );
+    }
+    const tombstoneOwner = readLockOwner(tombstone.path);
+    if (tombstoneOwner.nonce !== tombstone.nonce) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle recovery tombstone changed before cleanup',
+        75,
+      );
+    }
+    rmSync(tombstone.path, { recursive: true, force: false });
+    fsyncPressureBDirectory(lifecycle.stateRoot);
+  };
+  const withPressureBLock = (transition) => {
+    mkdirSync(lifecycle.stateRoot, { recursive: true, mode: 0o700 });
+    const rootStat = lstatSync(lifecycle.stateRoot);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle root must be a real directory',
+        75,
+      );
+    }
+    let lockOwner = null;
+    let recoveryTombstone = null;
+    for (let claim = 0; claim < 2 && lockOwner === null; claim += 1) {
+      let pendingLockPath = null;
+      let publishedLock = false;
+      try {
+        const startIdentity = ownerStartIdentity(process.pid);
+        if (startIdentity === null) {
+          throw new HarnessError(
+            'HOST_PRESSURE_OVERRIDE_INVALID',
+            'Pressure-B lifecycle cannot bind its own process start identity',
+            75,
+          );
+        }
+        const candidateOwner = {
+          schemaVersion: 1,
+          receiptSHA256: descriptor.sha256,
+          planSHA256: receipt.planSHA256,
+          sessionId: receipt.sessionId,
+          attemptId: lifecycle.attemptId,
+          commandHash: lifecycle.commandHash,
+          pid: process.pid,
+          startIdentity,
+          createdAt: new Date().toISOString(),
+          nonce: randomUUID(),
+        };
+        pendingLockPath = `${pressureBLockPath}.pending-${process.pid}-${randomUUID()}`;
+        mkdirSync(pendingLockPath, { mode: 0o700 });
+        writePressureBFile(
+          join(pendingLockPath, 'owner.json'),
+          candidateOwner,
+          'lock-owner',
+          pendingLockPath,
+        );
+        renameSync(pendingLockPath, pressureBLockPath);
+        pendingLockPath = null;
+        publishedLock = true;
+        lockOwner = candidateOwner;
+        fsyncPressureBDirectory(lifecycle.stateRoot);
+      } catch (error) {
+        if (pendingLockPath !== null) {
+          rmSync(pendingLockPath, { recursive: true, force: true });
+        }
+        if (publishedLock && lockOwner !== null) {
+          const owner = readLockOwner();
+          if (owner.nonce === lockOwner.nonce) {
+            rmSync(pressureBLockPath, { recursive: true, force: false });
+            fsyncPressureBDirectory(lifecycle.stateRoot);
+          }
+        }
+        if (error instanceof HarnessError) throw error;
+        if (!['EEXIST', 'ENOTEMPTY'].includes(error.code) || claim === 1) {
+          throw new HarnessError(
+            'HOST_PRESSURE_OVERRIDE_INVALID',
+            `Pressure-B lifecycle lock is unavailable: ${error.message}`,
+            75,
+          );
+        }
+        recoveryTombstone = recoverStalePressureBLock();
+      }
+    }
+    if (lockOwner === null) {
+      throw new HarnessError(
+        'HOST_PRESSURE_OVERRIDE_INVALID',
+        'Pressure-B lifecycle lock could not be claimed after bounded recovery',
+        75,
+      );
+    }
+    try {
+      let state = null;
+      if (existsSync(pressureBStatePath)) {
+        const stateStat = lstatSync(pressureBStatePath);
+        if (!stateStat.isFile() || stateStat.isSymbolicLink() || stateStat.nlink !== 1) {
+          throw new HarnessError(
+            'HOST_PRESSURE_OVERRIDE_INVALID',
+            'Pressure-B lifecycle state must be a single-link regular file',
+            75,
+          );
+        }
+        try {
+          state = JSON.parse(readFileSync(pressureBStatePath, 'utf8'));
+        } catch (error) {
+          throw new HarnessError(
+            'HOST_PRESSURE_OVERRIDE_INVALID',
+            `Pressure-B lifecycle state is unreadable: ${error.message}`,
+            75,
+          );
+        }
+        if (!pressureBStateBinding(state)) {
+          throw new HarnessError(
+            'HOST_PRESSURE_OVERRIDE_INVALID',
+            'Pressure-B lifecycle state does not bind the receipt, plan, and session',
+            75,
+          );
+        }
+      }
+      return transition(state, writePressureBState);
+    } finally {
+      try {
+        const owner = readLockOwner();
+        if (owner.nonce !== lockOwner.nonce) {
+          throw new HarnessError(
+            'HOST_PRESSURE_OVERRIDE_INVALID',
+            'Pressure-B lifecycle lock metadata changed before release',
+            75,
+          );
+        }
+        rmSync(pressureBLockPath, { recursive: true, force: false });
+        fsyncPressureBDirectory(lifecycle.stateRoot);
+      } finally {
+        if (recoveryTombstone !== null) {
+          removeOwnedRecoveryTombstone(recoveryTombstone);
+        }
+      }
+    }
+  };
+  const pressureBReceiptValid =
+    exactKeys(receipt, [
+      'absoluteCaps',
+      'allowedTasks',
+      'authorizationSource',
+      'baselineGrowthCaps',
+      'createdAt',
+      'dockerMustBeAvailable',
+      'plan',
+      'planSHA256',
+      'receiptType',
+      'resourceLimits',
+      'schemaVersion',
+      'scope',
+      'sequence',
+      'sessionId',
+      'singleUse',
+      'targetPorts',
+      'taskExecution',
+    ]) &&
+    exactKeys(receipt.absoluteCaps, [
+      'browserCountAtMost',
+      'loadAverageAtMost',
+      'nodeMcpCountAtMost',
+    ]) &&
+    exactKeys(receipt.baselineGrowthCaps, [
+      'browserCountIncreaseLessThan',
+      'nodeMcpCountIncreaseLessThan',
+      'swapUsedMiBIncreaseLessThan',
+    ]) &&
+    exactKeys(receipt.resourceLimits, ['cpus', 'memoryBytes', 'pidsLimit']) &&
+    exactKeys(receipt.sequence, ['cleanupBetweenTasks', 'firstTask', 'secondTask']) &&
+    exactKeys(receipt.taskExecution, [
+      'maxConcurrency',
+      'mixedAttemptsAllowed',
+      'parallelAllowed',
+    ]) &&
+    receipt.receiptType === 'task-5-11-pressure-b-host-override' &&
+    JSON.stringify(receipt.allowedTasks) === JSON.stringify([11, 5]) &&
+    receipt.scope === 'task-5-11-pressure-b' &&
+    receipt.sequence.firstTask === 11 &&
+    receipt.sequence.cleanupBetweenTasks === true &&
+    receipt.sequence.secondTask === 5 &&
+    receipt.singleUse === true &&
+    receipt.taskExecution.maxConcurrency === 1 &&
+    receipt.taskExecution.parallelAllowed === false &&
+    receipt.taskExecution.mixedAttemptsAllowed === false &&
+    receipt.resourceLimits.cpus === 1 &&
+    receipt.resourceLimits.memoryBytes === 4_294_967_296 &&
+    receipt.resourceLimits.pidsLimit === 256 &&
+    receipt.absoluteCaps.nodeMcpCountAtMost === 1100 &&
+    receipt.absoluteCaps.loadAverageAtMost === 24 &&
+    receipt.absoluteCaps.browserCountAtMost === 200 &&
+    receipt.baselineGrowthCaps.nodeMcpCountIncreaseLessThan === 50 &&
+    receipt.baselineGrowthCaps.browserCountIncreaseLessThan === 20 &&
+    receipt.baselineGrowthCaps.swapUsedMiBIncreaseLessThan === 2048 &&
+    receipt.dockerMustBeAvailable === true &&
+    JSON.stringify(receipt.targetPorts) === JSON.stringify([3013, 8121]) &&
+    pressureBPreflightValid &&
+    pressureBLifecycleValid &&
+    failures.every((failure) => failure === 'NODE_MCP_PROCESS_PROLIFERATION');
   if (
     receipt.schemaVersion !== 1 ||
     receipt.plan !== PLAN_PATH ||
     ![plan.rawSHA, plan.normalizedSHA].includes(receipt.planSHA256) ||
     receipt.sessionId !== VERIFICATION_SESSION_ID ||
     receipt.authorizationSource !== 'user-message' ||
-    !['host-preflight-only', 'plan-host-preflight-only'].includes(receipt.scope) ||
+    !(pressureB
+      ? pressureBReceiptValid
+      : ['host-preflight-only', 'plan-host-preflight-only'].includes(receipt.scope)) ||
     !allowed
   ) {
     throw new HarnessError(
@@ -430,11 +876,84 @@ function verifyOverride(repoRoot, plan, task, failures) {
       75,
     );
   }
+  const pressureBTransition = pressureB
+    ? withPressureBLock((state, writeState) => {
+      if (task === 11) {
+        if (state !== null) {
+          throw new HarnessError(
+            'HOST_PRESSURE_OVERRIDE_INVALID',
+            'Pressure-B V11 authority has already been claimed or consumed',
+            75,
+          );
+        }
+        const claimed = {
+          schemaVersion: 1,
+          receiptSHA256: descriptor.sha256,
+          planSHA256: receipt.planSHA256,
+          sessionId: receipt.sessionId,
+          stage: 'v11-claimed',
+          attemptId: lifecycle.attemptId,
+          v11CommandHash: lifecycle.commandHash,
+          v11AttemptId: lifecycle.attemptId,
+          updatedAt: new Date().toISOString(),
+        };
+        writeState(claimed);
+        return claimed;
+      }
+      if (
+        state === null ||
+        state.stage !== 'v11-complete' ||
+        state.v11AttemptId !== lifecycle.attemptId
+      ) {
+        throw new HarnessError(
+          'HOST_PRESSURE_OVERRIDE_INVALID',
+          'Pressure-B V5 requires the exact successful V11 cleanup transition for this attempt',
+          75,
+        );
+      }
+      const claimed = {
+        ...state,
+        stage: 'v5-claimed',
+        attemptId: lifecycle.attemptId,
+        updatedAt: new Date().toISOString(),
+      };
+      writeState(claimed);
+      return claimed;
+    })
+    : null;
+  const completePressureBLifecycle = pressureB
+    ? ({ successful, cleanupVerified }) => withPressureBLock((state, writeState) => {
+      const expectedStage = task === 11 ? 'v11-claimed' : 'v5-claimed';
+      if (
+        state === null ||
+        state.stage !== expectedStage ||
+        state.attemptId !== lifecycle.attemptId ||
+        state.v11AttemptId !== lifecycle.attemptId
+      ) {
+        throw new HarnessError(
+          'HOST_PRESSURE_OVERRIDE_INVALID',
+          'Pressure-B lifecycle completion does not match the claimed attempt',
+          75,
+        );
+      }
+      const completed = {
+        ...state,
+        stage: successful && cleanupVerified
+          ? task === 11 ? 'v11-complete' : 'v5-complete'
+          : task === 11 ? 'v11-failed' : 'v5-failed',
+        updatedAt: new Date().toISOString(),
+      };
+      writeState(completed);
+      return completed;
+    })
+    : null;
   return {
     applied: failures.length > 0,
     receiptPath: descriptor.path,
     receiptSHA256: descriptor.sha256,
     observedFailures: failures,
+    pressureBTransition,
+    completePressureBLifecycle,
   };
 }
 
@@ -2952,11 +3471,29 @@ async function main() {
 
   validateDirtyScope(repoRoot, ledger, identity.task);
   if (identity.task === 1) verifyTaskOneDirty(repoRoot, ledger);
+  const requestedPressureBAttempt = process.env.V1_PRESSURE_B_ATTEMPT_ID;
+  if (requestedPressureBAttempt !== undefined && ![5, 11].includes(identity.task)) {
+    throw new HarnessError(
+      'HOST_PRESSURE_OVERRIDE_INVALID',
+      'V1_PRESSURE_B_ATTEMPT_ID is valid only for Task 11 or Task 5',
+      75,
+    );
+  }
   const attemptId =
+    requestedPressureBAttempt ??
     candidate?.receipt.attemptId ??
     parentLifecycle?.receipt.attemptId ??
     randomUUID();
   const evidenceRoot = resolve(options['evidence-root'] ?? DEFAULT_EVIDENCE_ROOT);
+  const command = commandIdentity(options, payload);
+  const pressureBLifecycle = [5, 11].includes(identity.task)
+    ? {
+        attemptId,
+        commandHash: command.commandHash,
+        stage: identity.task === 11 ? 'V11' : 'V5',
+        stateRoot: resolve(evidenceRoot, 'pressure-b-lifecycle'),
+      }
+    : null;
   const snapshot = options['registry-child']
     ? {
         attemptDir: dirname(parentLifecycle.path),
@@ -2980,9 +3517,18 @@ async function main() {
 
   if (candidate) verifyCommittedSnapshot(repoRoot, snapshot);
 
+  const preflightBaseline = hostPreflight().preflight;
   const preflightResult = hostPreflight();
   if (!options['registry-child']) assertPortsFree(preflightResult.preflight);
-  const override = verifyOverride(repoRoot, plan, identity.task ?? 27, preflightResult.failures);
+  const override = verifyOverride(
+    repoRoot,
+    plan,
+    identity.task ?? 27,
+    preflightResult.failures,
+    preflightResult.preflight,
+    preflightBaseline,
+    pressureBLifecycle,
+  );
   const hostPressureOverride = override ?? {
     applied: false,
     receiptPath: null,
@@ -3042,7 +3588,6 @@ async function main() {
       removedTemporaryDatabases: [],
     },
   };
-  const command = commandIdentity(options, payload);
   const lifecycleStart = {
     schemaVersion: 1,
     attemptId,
@@ -3179,6 +3724,18 @@ async function main() {
       lifecycle.baseline.browserCount + preflightResult.preflight.limits.maximumBrowserIncrease ||
     lifecycle.final.swapUsedGB >
       lifecycle.baseline.swapUsedGB + preflightResult.preflight.limits.maximumSwapIncreaseGB;
+  let pressureBCompletion = null;
+  try {
+    if (override?.completePressureBLifecycle) {
+      pressureBCompletion = override.completePressureBLifecycle({
+        successful: !failedResult && !cleanupLeaked && !bindingError && results.length > 0,
+        cleanupVerified: !cleanupLeaked,
+      });
+      hostPressureOverride.pressureBCompletion = pressureBCompletion;
+    }
+  } catch (error) {
+    bindingError ??= error;
+  }
   const verdict = failedResult || cleanupLeaked || bindingError ? 'rejected' : 'accepted';
   const dbLifecycle = database
     ? {

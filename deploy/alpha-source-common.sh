@@ -87,6 +87,23 @@ activate_alpha_release_source() {
   [[ "$(cd -P "${ALPHA_LIVE_DIR}" && pwd)" == "$(cd -P "${target_dir}" && pwd)" ]]
 }
 
+prune_stale_alpha_release_sources() {
+  local keep_active="$1"
+  local keep_previous="$2"
+  local entry sha pruned=0
+
+  [[ -d "${ALPHA_SOURCE_RELEASES_DIR}" ]] || return 0
+  for entry in "${ALPHA_SOURCE_RELEASES_DIR}"/*; do
+    [[ -d "${entry}" ]] || continue
+    sha="$(basename "${entry}")"
+    [[ "${sha}" =~ ^[0-9a-f]{40}$ ]] || continue
+    [[ "${sha}" == "${keep_active}" || "${sha}" == "${keep_previous}" ]] && continue
+    rm -rf "${entry}"
+    pruned=$((pruned + 1))
+  done
+  (( pruned == 0 )) || echo "[alpha-release] Pruned ${pruned} stale release source directories" >&2
+}
+
 restore_legacy_alpha_source() {
   [[ -d "${ALPHA_LEGACY_SOURCE_DIR}" ]] || return 1
   if [[ -L "${ALPHA_LIVE_DIR}" ]]; then

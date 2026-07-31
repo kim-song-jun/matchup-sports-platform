@@ -231,6 +231,10 @@ else
   promote_candidate_manifest
 fi
 trap - ERR
+prune_stale_alpha_release_sources \
+  "$(jq -er '.active.release.sha' "${ALPHA_RELEASE_STATE_FILE}")" \
+  "$(jq -r '.previous.release.sha // empty' "${ALPHA_RELEASE_STATE_FILE}")" ||
+  echo "[alpha-deploy] WARNING: stale release source prune failed" >&2
 if ! write_legacy_release_state; then
   echo "[alpha-deploy] WARNING: canonical state is active but legacy receipt could not be written" >&2
 fi

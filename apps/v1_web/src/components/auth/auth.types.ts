@@ -57,6 +57,7 @@ export type TermsViewModel = {
     required: boolean;
     checked: boolean;
     detail: string;
+    locationBased?: boolean;
   }>;
   primary: AuthAction;
 };

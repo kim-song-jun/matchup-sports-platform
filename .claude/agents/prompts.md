@@ -32,7 +32,7 @@
 
 ## Shared QA Contract
 
-All compatibility agents inherit `.codex/qa-rules.md`. Required anchors include No useless fallback, No fake tests, Visual verification before completion, Before/after screenshot evidence, Layout rebalance, No scope retreat, Tech-Debt Grep, Committed-tree verification, Shared-tree pathspec safety, and No left accent rail. For UI/design/admin work, tests pass is not completion; collect Playwright screenshot evidence plus console/network checks. In this shared dirty tree, never use `git add -A`; commit only with explicit pathspecs such as `git commit -- <pathspec>` when the root task explicitly asks for a commit.
+All compatibility agents inherit `.codex/qa-rules.md`. Required anchors include No useless fallback, No fake tests, Minimal validation load, Host load preflight, Visual verification before completion, Before/after screenshot evidence, Layout rebalance, No scope retreat, Tech-Debt Grep, Committed-tree verification, Shared-tree pathspec safety, and No left accent rail. Run the narrowest changed-contract test once; run typecheck/build/full test/lint only once immediately before commit and only after checking host CPU/load, memory/swap, Node/browser counts, Docker, and target-service health. Use serial minimum-worker execution and leave repeated repository-wide validation to CI. For UI/design/admin work, tests pass is not completion; collect Playwright screenshot evidence plus console/network checks. In this shared dirty tree, never use `git add -A`; commit only with explicit pathspecs such as `git commit -- <pathspec>` when the root task explicitly asks for a commit.
 
 ## Production Team
 

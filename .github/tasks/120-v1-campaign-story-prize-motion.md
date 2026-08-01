@@ -53,3 +53,29 @@
 ## Ambiguity Log
 
 - 사용자 요청은 소개 페이지의 polish이므로 공개 캠페인 UI에 한정하고 대회 상세 데이터 계약은 유지한다.
+
+## Round 2 — C · 신청 결정을 앞당김 (local dev)
+
+- 선택: hero 바로 아래에 신청 가능 상태·마감 시간·primary action을 모은 decision panel을 두고, 상금과 후원사는 하나의 rewards 흐름으로 통합했다.
+- 비영향: API, 대회 상태, 신청·결제·대진·결과 라우팅과 데이터 계약은 바꾸지 않았다.
+- 실행 범위: 로컬 `dev` 코드와 read-only alpha API 기반 화면 검증만 수행했다. AWS, push, alpha 배포, main 병합, production 변경은 실행하지 않았다.
+- 구조 정리: hero/facts, decision, story, rewards CSS 책임을 각각 189/76/126/127줄 모듈로 분리했고, raw CSS 문자열을 그대로 검사하던 implementation-mirroring 테스트를 제거했다.
+- 스크롤 계약: 본문은 항상 `opacity: 1`이며 지원 브라우저에서 `translateY(8px → 0)`만 적용한다. reduced-motion은 hero/story/rewards를 즉시 최종 상태로 표시한다.
+- CJK polish: hero 제목은 쉼표 기준의 두 의미 단위로 표시하고, 모바일 sponsor 빈 상태의 `공식 후원사를 준비하고 있어요`는 한 문장으로 유지한다.
+
+### Local validation
+
+- `v1_web` TypeScript: `tsc --noEmit --pretty false` PASS.
+- focused Vitest: template 17 + primary action 3 + countdown 1 = 21 tests PASS, single worker.
+- `git diff --check` PASS; touched path의 `TODO/FIXME/HACK/XXX`와 raw color 추가 없음.
+- 375×812, 768×1024, 1280×900 모두 horizontal overflow 0, console error 0, 400+ response 0, loading failure 0.
+- CTA와 bottom navigation 간격: 375px `4.21px`, 768px `0.61px`; 겹침 없음.
+- 동일 DOM motion evidence: hero scale `1.025 → 1.0125 → 1`, rewards reveal은 고정 `scrollY: 1000`에서 translateY `8px → 4px → 0`, 모든 프레임 opacity 1.
+- 독립 visual QA 2회 최종 판정: `APPROVE`, blocker 0.
+
+### Evidence
+
+- fresh responsive screenshots: `output/playwright/visual-audit/task-120-campaign-round2/*-final.jpg` (18 files)
+- runtime receipt: `output/playwright/visual-audit/task-120-campaign-round2/responsive-runtime-receipt-final.json`
+- hero motion receipt: `output/playwright/visual-audit/task-120-campaign-round2/hero-motion-state-receipt-final.json`
+- reveal receipt: `output/playwright/visual-audit/task-120-campaign-round2/reveal-motion-state-receipt-final.json`

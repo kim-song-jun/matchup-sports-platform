@@ -58,6 +58,7 @@ const tournament: V1Tournament = {
   scheduledAt: '2026-08-10T00:00:00.000Z',
   scheduledEndAt: '2026-08-11T00:00:00.000Z',
   venue: '서울 풋살장',
+  parkingInfo: '건물 지하 주차장 2시간 무료',
   latitude: null,
   longitude: null,
   coverImageUrl: null,
@@ -154,6 +155,7 @@ describe('TournamentDetailClient campaign tab wiring', () => {
     await user.click(screen.getByRole('button', { name: '대회 정보 수정' }));
     expect(screen.getByLabelText('성별 카테고리')).toHaveValue('');
     await user.clear(screen.getByLabelText('장소'));
+    await user.clear(screen.getByLabelText('주차 안내'));
     await user.clear(screen.getByLabelText('은행명'));
     await user.clear(screen.getByLabelText('계좌번호'));
     await user.clear(screen.getByLabelText('예금주'));
@@ -164,6 +166,7 @@ describe('TournamentDetailClient campaign tab wiring', () => {
     expect(hookMocks.mutation.mutate).toHaveBeenCalledWith(
       expect.objectContaining({
         venue: null,
+        parkingInfo: null,
         bankName: null,
         bankAccount: null,
         bankHolder: null,

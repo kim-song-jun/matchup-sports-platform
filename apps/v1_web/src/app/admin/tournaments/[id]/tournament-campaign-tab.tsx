@@ -78,7 +78,7 @@ export function TournamentCampaignTab({
       return (
         <TournamentCampaignEditor
           mode="create"
-          initialForm={emptyTournamentCampaignForm()}
+          initialForm={emptyTournamentCampaignForm(tournamentId)}
           slugLocked={false}
           pending={createCampaign.isPending}
           onCancel={() => setEditorOpen(false)}

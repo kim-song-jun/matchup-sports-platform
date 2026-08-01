@@ -1,0 +1,32 @@
+[
+  {
+    "name": "mobile",
+    "width": 390,
+    "list": "alpha-errors-list-mobile-390.png",
+    "detail": "alpha-errors-detail-mobile-390.png",
+    "rows": 5,
+    "dialog": 1,
+    "hasV1Route": true,
+    "hasVnRoute": false
+  },
+  {
+    "name": "tablet",
+    "width": 768,
+    "list": "alpha-errors-list-tablet-768.png",
+    "detail": "alpha-errors-detail-tablet-768.png",
+    "rows": 5,
+    "dialog": 1,
+    "hasV1Route": true,
+    "hasVnRoute": false
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "list": "alpha-errors-list-desktop-1440.png",
+    "detail": "alpha-errors-detail-desktop-1440.png",
+    "rows": 6,
+    "dialog": 1,
+    "hasV1Route": true,
+    "hasVnRoute": false
+  }
+]

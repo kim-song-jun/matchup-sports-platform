@@ -2645,6 +2645,7 @@ export function useV1UpdateTournament(id: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTournaments() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(id) });
     },
   });
 }

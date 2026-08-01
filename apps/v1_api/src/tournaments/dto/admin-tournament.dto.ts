@@ -346,6 +346,11 @@ export class UpdateTournamentDto {
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
   venue?: string | null;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: '주차 안내는 500자를 넘을 수 없어요.' })
+  parkingInfo?: string | null;
+
   /** 목록 카드 썸네일용 커버 이미지 URL (/uploads 업로드 후 전달) */
   @IsOptional()
   @IsString()

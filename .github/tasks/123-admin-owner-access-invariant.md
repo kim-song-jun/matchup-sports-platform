@@ -59,8 +59,8 @@ v1 관리자 mutation은 마지막 active owner를 단순 `count -> update`로 �
 - [x] remediation은 runtime과 같은 owner-first 잠금 순서를 사용하고 system 감사 로그를 원자적으로 남긴다.
 - [x] v1 admin/users API 계약 문서가 새 오류와 잠금 계약을 설명한다.
 - [x] 컨트롤러·DTO·서비스·migration 기준 정적 계약 검토에서 legacy/nonexistent route drift가 제거된다.
-- [ ] shared `AdminContextService` 회귀 spec을 포함한 변경이 GitHub CI의 직렬 test gate에서 통과한다.
-- [ ] backend typecheck/integration은 shared gate 보강과 동일 commit GitHub CI에서 통과한다.
+- [x] shared `AdminContextService` 회귀 spec을 포함한 변경이 GitHub CI의 직렬 test gate에서 통과한다.
+- [x] backend typecheck/integration은 shared gate 보강과 동일 commit GitHub CI에서 통과한다.
 - [ ] shared gate 보강 commit 기준 독립 backend/security review에 blocker가 없다.
 
 ## Validation Gate
@@ -78,6 +78,8 @@ v1 관리자 mutation은 마지막 active owner를 단순 `count -> update`로 �
 - 배포: alpha run `29659353464`, release `0.1.0-alpha.20260719.ga608551bbafa`, 동일 SHA header, DB health `true`.
 - 후속 정적 감사: tournament/campaign/integration이 공유하는 `AdminContextService`가 `V1AdminUser.status`만 확인하고 연결된 `V1User.accountStatus`를 읽지 않는 drift를 발견했다. linked-user select와 inactive account 거부 회귀 spec을 추가했다. 2026-07-19 05:39 KST host는 load `9.74/6.75/6.45`, swap `39.55/40GB`, Node-like `1200`, Playwright MCP `33`이라 로컬 Jest/typecheck는 시작하지 않았고, 새 commit 기준 CI/review/alpha 검증이 남았다.
 - CI `29660153971`은 changeset, typecheck, migration replay까지 통과한 뒤 unit 단계에서 기존 9개 tournament spec의 admin row mock에 새 `user.accountStatus` relation이 없어 실패했다. 제품 코드를 느슨하게 fallback하지 않고 해당 fixture 9개를 실제 Prisma select shape로 맞췄다. 다음 commit에서 전체 직렬 unit/build gate를 다시 확인한다.
+- CI `29660283922`는 SHA `1fb7aa65600889d634d0d0960360edbd60dd549d`에서 3분 33초에 changeset/SemVer, guardrails, Prisma generate, typecheck, migration replay/drift, 전체 직렬 unit, build를 모두 통과했다. Alpha deploy `29660283946`은 같은 SHA로 진행 중이다.
+- Alpha deploy `29660283946`은 7분 52초에 통과했다. 공개 alpha는 release `0.1.0-alpha.20260719.g1fb7aa656008`, commit `1fb7aa65600889d634d0d0960360edbd60dd549d`, HTTP `200`, DB health `true`로 동일 SHA를 확인했다.
 
 ## Out of Scope
 

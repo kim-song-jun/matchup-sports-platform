@@ -22,6 +22,7 @@ type HookMocks = {
   createMutate: ReturnType<typeof vi.fn>;
   updateMutate: ReturnType<typeof vi.fn>;
   statusMutate: ReturnType<typeof vi.fn>;
+  uploadMutateAsync: ReturnType<typeof vi.fn>;
 };
 
 const mocks = vi.hoisted<HookMocks>(() => ({
@@ -42,6 +43,14 @@ const mocks = vi.hoisted<HookMocks>(() => ({
   createMutate: vi.fn(),
   updateMutate: vi.fn(),
   statusMutate: vi.fn(),
+  uploadMutateAsync: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1UploadImages: () => ({
+    mutateAsync: mocks.uploadMutateAsync,
+    isPending: false,
+  }),
 }));
 
 vi.mock('@/hooks/use-v1-tournament-campaign', () => ({
@@ -141,6 +150,7 @@ function renderTab(canWrite = true) {
 describe('TournamentCampaignTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/campaign-upload.webp'] });
     Object.assign(mocks.campaignQuery, {
       data: campaign,
       isPending: false,
@@ -165,11 +175,12 @@ describe('TournamentCampaignTab', () => {
     await user.click(screen.getByRole('button', { name: '캠페인 만들기' }));
     await user.click(screen.getByRole('button', { name: '캠페인 생성' }));
 
-    expect(screen.getByText('캠페인 주소를 입력해 주세요.')).toBeInTheDocument();
-    expect(screen.getByText('히어로 제목을 입력해 주세요.')).toBeInTheDocument();
+    expect(screen.getByLabelText('공개 URL')).toHaveValue('/tournaments/campaigns/campaign-tournament-1');
+    expect(screen.getByLabelText('공개 URL')).toBeDisabled();
+    expect(screen.getByText('대제목을 입력해 주세요.')).toBeInTheDocument();
     expect(screen.getByText('소개 제목을 입력해 주세요.')).toBeInTheDocument();
     expect(screen.getByText('소개 내용을 입력해 주세요.')).toBeInTheDocument();
-    expect(screen.getByText('하이라이트 섹션 제목을 입력해 주세요.')).toBeInTheDocument();
+    expect(screen.getByText('참가할 이유를 입력해 주세요.')).toBeInTheDocument();
     expect(screen.getByText('FAQ 섹션 제목을 입력해 주세요.')).toBeInTheDocument();
     expect(mocks.createMutate).not.toHaveBeenCalled();
   });
@@ -181,17 +192,16 @@ describe('TournamentCampaignTab', () => {
     renderTab();
     await user.click(screen.getByRole('button', { name: '캠페인 만들기' }));
 
-    await user.type(screen.getByLabelText('캠페인 주소'), 'summer-cup');
-    await user.type(screen.getByLabelText('히어로 제목'), '여름 풋살 컵');
+    await user.type(screen.getByLabelText('대제목'), '여름 풋살 컵');
     await user.type(screen.getByLabelText('소개 제목'), '대회 소개');
     await user.type(screen.getByLabelText('소개 내용'), '여름에 함께 뛰는 대회예요.');
-    await user.type(screen.getByLabelText('하이라이트 섹션 제목'), '경기 특징');
+    await user.type(screen.getByLabelText('참가할 이유'), '경기 특징');
     await user.type(screen.getByLabelText('FAQ 섹션 제목'), '참가 안내');
     await user.click(screen.getByRole('button', { name: '캠페인 생성' }));
 
     expect(mocks.createMutate).toHaveBeenCalledWith(
       {
-        slug: 'summer-cup',
+        slug: 'campaign-tournament-1',
         content: {
           version: 1,
           hero: { title: '여름 풋살 컵' },
@@ -203,6 +213,38 @@ describe('TournamentCampaignTab', () => {
         },
       },
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it('uploads campaign hero and highlight images instead of accepting image addresses', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await user.click(screen.getByRole('button', { name: '캠페인 편집' }));
+
+    expect(screen.queryByLabelText('메인 상단 이미지 주소')).not.toBeInTheDocument();
+    await user.upload(
+      screen.getByLabelText('메인 상단 이미지 파일 선택'),
+      new File(['hero'], 'hero.webp', { type: 'image/webp' }),
+    );
+    expect(mocks.uploadMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ name: 'hero.webp' }));
+
+    expect(screen.queryByLabelText('참가할 이유 1 이미지 주소')).not.toBeInTheDocument();
+    await user.upload(
+      screen.getByLabelText('참가할 이유 1 이미지 파일 선택'),
+      new File(['highlight'], 'highlight.png', { type: 'image/png' }),
+    );
+    await user.click(screen.getByRole('button', { name: '변경 저장' }));
+
+    expect(mocks.updateMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          hero: expect.objectContaining({ imageUrl: '/uploads/campaign-upload.webp' }),
+          highlights: expect.arrayContaining([
+            expect.objectContaining({ imageUrl: '/uploads/campaign-upload.webp' }),
+          ]),
+        }),
+      }),
+      expect.any(Object),
     );
   });
 
@@ -255,8 +297,8 @@ describe('TournamentCampaignTab', () => {
     renderTab();
     await user.click(screen.getByRole('button', { name: '캠페인 편집' }));
 
-    expect(screen.getByLabelText('캠페인 주소')).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('히어로 제목'), { target: { value: '수정된 대회 제목' } });
+    expect(screen.getByLabelText('공개 URL')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('대제목'), { target: { value: '수정된 대회 제목' } });
     await user.click(screen.getByRole('button', { name: '변경 저장' }));
 
     expect(mocks.updateMutate).toHaveBeenCalledWith(

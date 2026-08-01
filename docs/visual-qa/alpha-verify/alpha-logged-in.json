@@ -1,0 +1,110 @@
+[
+  {
+    "label": "마이",
+    "route": "/my",
+    "http": 200,
+    "navVisible": true,
+    "activeTab": "마이",
+    "homeShortcut": false,
+    "homeWays": 1,
+    "loggedOut": false,
+    "heading": "마이페이지",
+    "url": "/my"
+  },
+  {
+    "label": "매치목록",
+    "route": "/matches",
+    "http": 200,
+    "navVisible": true,
+    "activeTab": "매치",
+    "homeShortcut": false,
+    "homeWays": 1,
+    "loggedOut": false,
+    "heading": "매치",
+    "url": "/matches"
+  },
+  {
+    "label": "대회목록",
+    "route": "/tournaments",
+    "http": 200,
+    "navVisible": true,
+    "activeTab": "대회",
+    "homeShortcut": false,
+    "homeWays": 1,
+    "loggedOut": false,
+    "heading": "스포츠 대회",
+    "url": "/tournaments"
+  },
+  {
+    "label": "공지사항",
+    "route": "/notices",
+    "http": 200,
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": true,
+    "homeWays": 2,
+    "loggedOut": false,
+    "heading": "공지사항",
+    "url": "/notices"
+  },
+  {
+    "label": "설정",
+    "route": "/my/settings",
+    "http": 200,
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": true,
+    "homeWays": 1,
+    "loggedOut": false,
+    "heading": "설정",
+    "url": "/my/settings"
+  },
+  {
+    "label": "대회상세",
+    "route": "/tournaments/ab100000-0000-4000-8000-000000000001",
+    "http": 200,
+    "navVisible": false,
+    "activeTab": null,
+    "homeShortcut": true,
+    "homeWays": 1,
+    "loggedOut": false,
+    "heading": "팀밋 여름 풋살 챔피언십",
+    "url": "/tournaments/ab100000-0000-4000-8000-000000000001"
+  },
+  {
+    "label": "내신청",
+    "route": "/tournaments/ab100000-0000-4000-8000-000000000001/my",
+    "http": 200,
+    "navVisible": true,
+    "activeTab": "대회",
+    "homeShortcut": false,
+    "homeWays": 1,
+    "loggedOut": false,
+    "heading": "",
+    "url": "/tournaments/ab100000-0000-4000-8000-000000000001/my"
+  },
+  {
+    "label": "순위브래킷",
+    "route": "/tournaments/ab100000-0000-4000-8000-000000000001/bracket",
+    "http": 200,
+    "navVisible": true,
+    "activeTab": "대회",
+    "homeShortcut": false,
+    "homeWays": 1,
+    "loggedOut": false,
+    "heading": "팀밋 여름 풋살 챔피언십",
+    "url": "/tournaments/ab100000-0000-4000-8000-000000000001/bracket"
+  },
+  {
+    "label": "404",
+    "route": "/this-route-does-not-exist",
+    "http": 404,
+    "navVisible": true,
+    "activeTab": "",
+    "homeShortcut": false,
+    "homeWays": 2,
+    "loggedOut": false,
+    "heading": "페이지를 찾을 수 없어요",
+    "url": "/this-route-does-not-exist"
+  }
+]

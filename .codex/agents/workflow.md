@@ -64,7 +64,7 @@
 
 ## Quality Gates
 
-0. Apply `.codex/qa-rules.md` before final response, especially No useless fallback, No fake tests, Visual verification before completion, No scope retreat, Tech-Debt Grep, Committed-tree verification, and Shared-tree pathspec safety.
+0. Apply `.codex/qa-rules.md` before final response, especially No useless fallback, No fake tests, Minimal validation load, Host load preflight, Visual verification before completion, No scope retreat, Tech-Debt Grep, Committed-tree verification, and Shared-tree pathspec safety.
 1. mock/fixture/MSW/E2E drift 없을 것
 2. user-facing false affordance 없을 것
 3. trust signal은 sample/estimated/verified를 명확히 구분할 것
@@ -75,6 +75,7 @@
 8. feature screenshot-set analysis는 `scripts/qa/run-e2e-analyzer.mjs`로 수행하고, interrupted job recovery는 `ultraplan/runs/e2e-analyzer*` 디스크 큐 기준으로 재개할 것
 9. UI/design/admin surface changes require Playwright screenshot evidence, before/after screenshot evidence when visible layout changed, console/network checks, and layout rebalance across relevant breakpoints; tests pass is not completion.
 10. Shared dirty tree work must avoid `git add -A`; when a commit is explicitly requested, use `git commit -- <pathspec>` and verify diff scope with `git show --stat` and `git show --name-only`.
+11. Run the narrowest changed-contract test once. Before any automated test/typecheck/build/lint, inspect host CPU/load, memory/swap, Node/browser counts, Docker, and target-service health. Heavy validation runs only once immediately before commit, serially with minimum workers; CI owns repeated repository-wide validation.
 
 ## Compatibility Rule
 

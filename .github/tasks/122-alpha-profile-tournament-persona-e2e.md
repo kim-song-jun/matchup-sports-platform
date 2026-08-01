@@ -110,6 +110,7 @@ Personas: guest, ordinary team member, owner/manager, admin
 - The current upload API has only `POST /uploads` and `POST /uploads/videos`; it has no owner deletion endpoint. Restoring `profileImageUrl` alone does not clean the retained file, ledger row, or quota usage.
 - Until an authenticated owner-delete contract exists, the valid-upload live scenario must record the returned URL and use an exact alpha-only operator cleanup for that single owned asset after restoring the original profile URL. It must delete the file and ledger row together and then prove both are absent. Non-image and 2–5 MB client-rejection scenarios must show zero upload request and need no asset cleanup.
 - This missing owner cleanup contract is a product/security lifecycle gap, not a reason to claim the upload scenario complete. A future implementation must reject deletion of referenced assets and assets owned by another user; no broad filesystem cleanup is allowed.
+- Decision gate: [`teameet-upload-lifecycle-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/19/teameet-upload-lifecycle-decision.html). Static schema audit found active upload URL consumers in profile, match, team, tournament promo/campaign JSON, sponsor, popup, and fixture-video surfaces, so a generic filesystem delete is unsafe. Option B (asset-reference registration plus owner deletion only at zero active references) is recommended; no schema/API/product mutation starts before the user selects A, B, or C.
 
 ### TOURN-ALPHA-004 — Admin lifecycle and permissions
 
@@ -153,7 +154,17 @@ Personas: ordinary user, support/read-only admin, ops/owner admin
   - remaining: 영상 lightbox close/previous/next, results 전체 responsive 캡처, console/network 기록, profile/upload, registration/admin mutation과 cleanup.
 - [x] Static live selectors and duplicate-submit guards mapped for the apply wizard.
 - [x] Exact cleanup blockers mapped: registration has no absent-state admin restore, and uploads have no authenticated owner-delete endpoint.
-- [ ] Add the narrow automated regression cases proven by the live run.
+- [x] Profile edit source/API/security contract re-audited before implementation.
+  - `/my/profile/edit` immediately uploads a selected image, then binds only its URL during the later profile PATCH. Abandon, replacement, validation failure, or profile conflict can therefore retain an unreferenced file, ledger row, and quota charge.
+  - Task 125 lifecycle option B remains the required deletion boundary: explicit asset references plus owner deletion only at zero references. Its separate rolling-quota choice is still a user gate; this task does not invent a frontend-only delete.
+  - `withdrawal_pending` accounts are rejected by profile mutation but can still call image/video upload. The focused server regression must prove both upload methods return `403 PERMISSION_DENIED` without invoking storage, while an active account continues to upload.
+  - Profile save has no synchronous same-tick lock. A focused component regression must prove rapid submit issues one PATCH and that upload/check pending states issue zero PATCH requests.
+  - Profile image selection must reject unsupported MIME types locally using the exact JPEG/PNG/WebP allowlist. The profile-specific 2 MiB cap remains intentional even though the generic upload API permits 5 MiB.
+  - The scenario/design requirement for `bio` is not implemented end-to-end despite the Prisma column. It is a separate API/type/UI slice, not part of the safety-only patch.
+- [ ] Reconnect the Lazyweb connector and run `lazyweb-update`; this session exposes neither the Lazyweb MCP nor its required image-upload tools, so the mandatory profile UI report cannot be generated or replaced manually.
+- [ ] Host gate before focused RED: 2026-07-19 13:10 KST check was 12 cores, load `8.32/9.58/9.83`, swap `17.81/18GB`, Node-like 163, browser-like 67. Do not start Jest/typecheck/build until swap pressure clears; then run only the upload controller regression and profile component regression serially.
+- [ ] Focused upload-controller RED is authored at `apps/v1_api/src/uploads/uploads.controller.spec.ts` but intentionally unrun while the host gate fails. It covers withdrawal-pending image/video rejection before storage and active image/video controls. Production code must remain unchanged until this test fails for the missing guard.
+- [ ] Add the remaining narrow profile component regression cases proven by the live run.
 - [ ] Update `docs/scenarios/index.md` with final evidence and cleanup receipt.
 
 ### Current browser evidence
@@ -168,7 +179,9 @@ Desktop awards audit found a real layout gap: the left prize/awards card stretch
 
 The content-height rebalance shipped to alpha in release `0.1.0-alpha.20260719.ga608551bbafa` at SHA `a608551bbafaa2a4689aabb166600b3ec87690f1`; CI `29659353429` and deploy `29659353464` passed. The after screenshot remains intentionally pending because the stale Codex app-server continued multiplying Playwright MCP processes and host swap reached 38.7/39GB. Restart Codex before the single final visual recheck.
 
+Current alpha advanced through the shared admin authorization hardening to release `0.1.0-alpha.20260719.g1fb7aa656008` at SHA `1fb7aa65600889d634d0d0960360edbd60dd549d`; CI `29660283922` and deploy `29660283946` passed, and DB health is `true`. This security-only increment does not replace the still-pending awards after screenshot or Task 122 browser evidence.
+
 ## Ambiguity Log
 
-- The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed.
+- The phrase “new page” is not mapped to one canonical v1 route. It remains gated instead of being guessed. The interactive decision artifact is [`teameet-new-page-scope-decision.html`](/Users/sungjun/.codex/visualizations/2026/07/14/019f6103-b74c-7b80-9c89-f5578f96784c/teameet-new-page-scope-decision.html): A extends the existing profile route, B creates the currently absent mercenary v1 flow (recommended), and C hardens the already-existing admin tournament-create wizard. No product/schema work starts before the user selects A, B, or C.
 - Alpha QA tournament persona rows do not include passwords in the seed. Browser mutation scenarios must use an explicitly authorized login flow or an isolated QA account; header-auth posture must not be weakened to make tests convenient.

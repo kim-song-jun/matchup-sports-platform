@@ -1,0 +1,8 @@
+{
+  "assertions": {
+    "승인대기_라벨": true,
+    "원문requested_노출": false
+  },
+  "consoleErrors": [],
+  "net4xx": []
+}

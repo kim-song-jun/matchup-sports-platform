@@ -1286,7 +1286,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
 
 function TeamSearchBar({ model }: { model: TeamListViewModel }) {
   return (
-    <div className="tm-list-searchbar">
+    <div className="tm-list-searchbar tm-team-searchbar">
       <form
         className="tm-list-search-form"
         onBlur={(event) => {

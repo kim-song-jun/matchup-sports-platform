@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useTournamentCampaignRegistration } from './tournament-campaign-registration-state';
 
 type PrimaryAction = {
   readonly label: string;
@@ -11,25 +11,15 @@ type PrimaryAction = {
 
 export function TournamentCampaignPrimaryAction({
   action,
-  registrationDeadlineAt,
   enforceRegistrationDeadline,
 }: {
   readonly action: PrimaryAction | null;
-  readonly registrationDeadlineAt: string | null;
   readonly enforceRegistrationDeadline: boolean;
 }) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
+  const { registrationOpen } = useTournamentCampaignRegistration();
 
   if (!action) return null;
-  if (
-    enforceRegistrationDeadline
-    && !isRegistrationDeadlineOpen(registrationDeadlineAt, now)
-  ) return null;
+  if (enforceRegistrationDeadline && !registrationOpen) return null;
 
   return (
     <Link className="tm-btn tm-btn-primary tm-btn-lg" href={action.href}>
@@ -37,13 +27,4 @@ export function TournamentCampaignPrimaryAction({
       <ArrowRight size={18} aria-hidden="true" />
     </Link>
   );
-}
-
-export function isRegistrationDeadlineOpen(
-  registrationDeadlineAt: string | null,
-  now: number,
-): boolean {
-  if (!registrationDeadlineAt) return true;
-  const deadline = new Date(registrationDeadlineAt).getTime();
-  return Number.isFinite(deadline) && deadline > now;
 }

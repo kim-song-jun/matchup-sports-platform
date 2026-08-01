@@ -1,0 +1,18 @@
+{
+  "list": {
+    "챔피언십": true,
+    "조별순위": false,
+    "공지": false,
+    "잠실": true
+  },
+  "detail": {
+    "챔피언십": true,
+    "조별순위": true,
+    "공지": true,
+    "잠실": true
+  },
+  "_console_mobile": [],
+  "_net4xx_mobile": [],
+  "_console_desktop": [],
+  "_net4xx_desktop": []
+}

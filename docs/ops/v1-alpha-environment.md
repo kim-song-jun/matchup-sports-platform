@@ -114,9 +114,10 @@ dev push/merge
   -> CI / Deploy 성공
   -> Changesets에서 다음 정식 SemVer와 alpha prerelease 계산
   -> GitHub OIDC로 alpha 전용 IAM role 취득
-  -> commit SHA별 source archive를 versioning이 켜진 private S3에 업로드
-  -> SSM Run Command가 alpha EC2에서 직렬 빌드·migration·재기동
-  -> health contract 성공 후 prerelease version + SHA 확정
+  -> GitHub runner가 API/Web 이미지를 SHA 불변 태그로 ECR에 push
+  -> source VersionId/checksum + 두 image digest를 release manifest에 고정
+  -> SSM Run Command가 manifest를 검증하고 exact digest pull·migration·재기동
+  -> health/digest/header 성공 후 candidate를 active로 원자적 승격
   -> alpha 실제 사용자 QA
   -> 승인된 경우에만 main release PR 준비
 ```
@@ -127,12 +128,21 @@ GitHub repository variables:
 |---|---|
 | `ALPHA_AWS_ROLE_ARN` | GitHub OIDC가 assume할 alpha 전용 role |
 | `ALPHA_AWS_REGION` | `ap-northeast-2` |
+| `ALPHA_EXPECTED_ACCOUNT_ID` | role drift를 막기 위해 런타임에서 정확히 비교할 alpha AWS account ID |
 | `ALPHA_DEPLOY_BUCKET` | private release artifact bucket |
 | `ALPHA_EC2_INSTANCE_ID` | alpha instance ID |
 
-IAM 신뢰 정책은 `kim-song-jun/matchup-sports-platform` 저장소의 `refs/heads/dev`로 제한한다. GitHub role은 alpha artifact prefix 쓰기와 해당 인스턴스의 SSM 명령 실행만 허용한다. EC2 instance role은 SSM core 권한과 alpha artifact prefix 읽기만 가진다.
+IAM 신뢰 정책은 `kim-song-jun/matchup-sports-platform` 저장소의 정확한 `refs/heads/dev` subject와 수동 rollback용 정확한 `environment:alpha` subject, `sts.amazonaws.com` audience만 허용한다. GitHub의 `alpha` environment 배포 branch policy도 반드시 `dev`만 허용해야 하며, required reviewer 승인 없이 rollback job을 시작하지 않는다. GitHub role은 alpha artifact/manifest prefix와 두 alpha ECR repository push, 해당 인스턴스의 SSM 명령만 허용한다. EC2 instance role은 SSM core, alpha artifact version 읽기, 두 alpha ECR repository pull만 가진다. provisioning은 account ID, 정확한 bucket 이름/owner, EC2 `Name`·`Environment=alpha`·`Branch=dev`, SSM online 상태를 mutation 전에 확인한다. 전용 role의 과거 inline policy는 canonical policy로 교체하며 예상 밖 attached policy가 있으면 자동 삭제하지 않고 중지한다. 초기 또는 drift 복구 시 AWS CLI 로그인 후 아래 멱등 스크립트를 실행한다.
 
-배포는 `COMPOSE_PARALLEL_LIMIT=1`로 API 이미지 다음 Web 이미지를 순차 빌드한다. migration 뒤에는 alpha 전용 결제 안내 비식별화와 대회 lifecycle QA seed를 직렬 적용하며, health check까지 성공해야 `/home/ec2-user/.teameet-alpha-release`가 갱신된다.
+```bash
+ALPHA_AWS_REGION=ap-northeast-2 \
+ALPHA_EXPECTED_ACCOUNT_ID=<alpha-account-id> \
+ALPHA_DEPLOY_BUCKET=<private-versioned-bucket> \
+ALPHA_EC2_INSTANCE_ID=<alpha-instance-id> \
+bash scripts/infra/provision-alpha-immutable-deploy.sh
+```
+
+이미지는 EC2에서 빌드하지 않는다. GitHub runner가 `sha-<40자리 SHA>` 태그로 한 번만 만들고, ECR tag immutability가 같은 태그 덮어쓰기를 거부한다. source와 manifest의 최초 S3 저장은 `If-None-Match: *` create-only 조건을 사용하며, 같은 SHA 재실행은 기존 객체의 VersionId와 checksum을 비교·재사용한다. 소스도 `/home/ec2-user/.teameet-alpha-sources/<SHA>`에 불변 디렉터리로 보존하고 `/home/ec2-user/teameet` symlink만 원자적으로 바꾼다. `.env`, certbot 상태, release header metadata는 `/home/ec2-user/.teameet-alpha-runtime`에 분리하며, 후보 실패나 rollback 때 이미지와 소스를 같은 manifest SHA로 함께 복구한다. 최초 불변 전환에서도 기존 text receipt의 SHA를 공개 header와 대조하고 그 SHA부터 후보 SHA까지 migration 호환성 검사를 통과해야만 배포를 시작하며, manifest의 `migrationValidatedFrom`에 그 기준 SHA를 남긴다. release state는 active/previous manifest 본문과 각각의 SHA-256을 분리 저장해 rollback 전에 다시 대조한다. migration 뒤에는 alpha 전용 결제 안내 비식별화와 대회 lifecycle QA seed를 직렬 적용하며, health·실행 image digest·release header가 모두 성공해야 `/home/ec2-user/.teameet-alpha-releases/state.json`의 candidate가 active가 된다. 호환용 텍스트 receipt `/home/ec2-user/.teameet-alpha-release`도 함께 갱신한다.
 
 SSM 명령은 첫 줄에서 `set -Eeuo pipefail`을 강제한다. deploy가 실패한 뒤 cleanup 명령이 성공해 전체 실행이 성공처럼 보이는 상태를 허용하지 않는다. Amazon Linux 이미지에 `rsync`가 없으면 배포 스크립트가 한 번 설치한 뒤 source mirror를 진행한다. GitHub의 최종 검증은 단순 HTTP 200이 아니라 예상 SemVer prerelease, 전체 commit SHA, DB health가 모두 일치할 때까지 최대 3분 동안 확인한다.
 
@@ -150,24 +160,17 @@ CI의 pnpm 의존성 store 캐시는 `actions/setup-node@v4`의 `cache: pnpm`이
 
 이전 관측에서 legacy integration만 약 6분 46초로 전체 약 11분의 큰 비중을 차지했다. 개선 효과는 한 번의 빠른 실행으로 확정하지 않고, 변경 전후 GitHub Actions의 step timing을 같은 범주의 PR 또는 `dev` 실행에서 비교한다. cold cache와 warm cache를 구분하고 각각 3회 이상 기록해 중앙값과 범위를 남기며, 의존성 설치·migration/integration·unit·build 시간을 따로 본다. alpha 호스트 Docker build 시간은 CI 시간과 섞지 않고 API/Web별로 별도 측정한다.
 
-현재 검증 실행은 CI 3분 38초, alpha 배포 10분 19초다. 전체 테스트를 alpha workflow에 중복 추가하지 않는다. SSM command 대기, source artifact 전송, API build, Web build, migration·sanitize·seed, container restart, health polling을 별도 timing으로 기록해 alpha의 약 10분 병목을 먼저 줄인다.
+기존 검증 실행은 CI 3분 38초, EC2 build 기반 alpha 배포 10분 19초였다. 전체 테스트를 alpha workflow에 중복 추가하지 않는다. 새 경로는 runner API/Web build, ECR push/cache, manifest, SSM pull, migration·sanitize·seed, restart, health를 별도 timing으로 기록한다. 같은 SHA 재실행은 build를 생략해야 한다.
 
 GitHub는 일부 `actions/*@v4` JavaScript action의 Node 20 runtime 폐기와 Node 24 강제 전환 경고를 표시했다. workflow가 현재 성공했다는 이유로 경고를 닫지 말고, 사용하는 action major가 Node 24를 공식 지원하는지 확인해 지원 버전으로 올린 뒤 동일 CI/alpha 계약을 재검증한다. mutable major tag만 신뢰하지 않고 보안 검토된 commit SHA pinning도 함께 검토한다.
 
-### alpha Docker BuildKit 캐시
+### alpha ECR·manifest 상태
 
-alpha API와 Web Dockerfile은 BuildKit cache mount를 사용한다. 두 이미지는 `teameet-pnpm-store`를 공유하고 `sharing=locked`로 동시 쓰기를 막는다. Web의 `.next/cache`는 `teameet-v1-web-next-cache`로 분리한다. 호스트 preflight와 API → Web 순차 build는 그대로 유지되므로 캐시는 배포 순서나 migration·health gate를 대체하지 않는다.
+두 repository는 `teameet-alpha-v1-api`, `teameet-alpha-v1-web`이며 tag immutability, push scan, AES256 encryption을 유지한다. build 뒤 ECR scan 완료를 기다리고 `CRITICAL` finding이 하나라도 있으면 manifest/deploy를 중단하며 `HIGH` 개수는 로그로 남긴다. Compose의 API, Web, upload initializer에는 tag가 아니라 manifest의 `repository@sha256:...`만 전달한다. S3 source와 manifest는 bucket versioning이 켜진 상태에서 VersionId와 SHA-256을 함께 검증한다.
 
-`RUN --mount=type=cache`를 해석하지 못하거나 build frontend 오류가 나면 배포를 중지하고 현재 실행 중인 release를 유지한다. 먼저 `docker version`, `docker buildx version`, `docker info`, `docker system df`로 Docker/Buildx 지원과 디스크 상태를 확인한다. BuildKit이 설치되어 있지만 비활성화된 경우 다음처럼 명시적으로 켜고 preflight 뒤 이미지를 순서대로 다시 빌드한다.
+상태 파일은 `candidate`, `active`, `previous` 의미를 분리한다. 실패 candidate는 `failed/`로 옮기고 active를 바꾸지 않는다. 성공 뒤에만 candidate가 active가 되고 기존 active가 previous가 된다. DB migration은 `expand-contract`, rollback은 `application-images-only` 계약이다. CI는 직전 immutable manifest SHA부터 새 SHA까지 기존 migration 수정과 drop/rename/type/not-null 같은 contract SQL이 없는지 확인하고, manifest의 `rollbackCompatibleWith`에 그 직전 SHA를 고정한다. rollback은 이 값이 실제 previous SHA와 정확히 같지 않으면 거부한다. 최초 immutable release는 previous manifest가 없으므로 rollback 대상이 아니다.
 
-```bash
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
-docker compose --project-name deploy -f docker-compose.prod.yml -f docker-compose.alpha.yml build v1_api
-docker compose --project-name deploy -f docker-compose.prod.yml -f docker-compose.alpha.yml build v1_web
-```
-
-Buildx가 없거나 Docker 버전이 cache mount를 지원하지 않으면 Docker/Buildx를 업그레이드한 뒤 재시도한다. legacy builder에 맞추려고 cache mount를 조용히 제거하거나 migration·재기동으로 진행하지 않는다. 캐시 이상이 의심되면 `docker buildx du`로 사용량을 확인하고, 다른 세션·배포의 캐시까지 지우는 broad prune 전에 영향 범위와 복구 비용을 검토한다.
+수동 rollback은 현재 active 전체 SHA를 stale-operation guard로 입력한다. GitHub의 `Rollback Alpha` workflow는 alpha environment 승인을 거쳐 active/previous를 교환하고 digest·health·header를 다시 확인한다. production에는 이 경로를 사용하지 않는다.
 
 ## Changesets와 배포 버전
 
@@ -192,7 +195,7 @@ curl -fsSI https://alpha.teameet.co.kr/landing | \
   grep -Ei '^(x-teameet-release|x-teameet-commit):'
 ```
 
-API와 Web의 최근 성공 alpha 태그 3개만 유지한다. 단순 `dev.1`, `dev.2` 카운터는 사용하지 않는다.
+ECR의 `sha-*` tagged 이미지는 자동 만료하지 않는다. lifecycle은 7일이 지난 untagged build 잔여물만 제거하므로 active/previous rollback digest를 삭제하지 않는다. 향후 tagged retention을 도입하려면 EC2 active/previous state와 대조하는 state-aware GC가 먼저 필요하다. 단순 `dev.1`, `dev.2` 카운터는 사용하지 않는다.
 
 ## alpha QA와 main 승격
 

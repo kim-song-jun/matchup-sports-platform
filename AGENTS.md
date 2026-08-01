@@ -334,3 +334,167 @@ The sections below fill project-specific gaps while preserving curated content a
 - Task 15에서 정한 canonical/compatibility split을 유지한다. `.codex/agents/`만 갱신하고 `.claude/agents/prompts.md`를 방치하는 drift는 허용하지 않는다.
 
 <!-- /codex-init:delta -->
+
+---
+
+# 공통 운영 규칙 (Codex ↔ Claude 공유)
+
+> **정본은 저장소 루트 `CLAUDE.md`와 사용자 전역 `~/.claude/CLAUDE.md`다.** 이 절은 Codex가
+> 그 문서를 읽지 않고도 지킬 수 있도록 **어기면 바로 사고가 나는 규칙만** 추린 것이다.
+> 충돌하면 `CLAUDE.md`가 이긴다. 여기와 `CLAUDE.md`가 어긋난 걸 발견하면 **고치는 것도
+> 같은 변경에서 한다** — 이 저장소는 과거에 캡처 스크립트 경로 컨벤션이 두 문서에서
+> 달라 리뷰어가 반복 지적한 전례가 있다.
+
+## S1) 브랜치 · 배포 정책 (Critical — 2026-07-31 실측 기준 정정)
+
+> 이전 판은 "`main`은 유산 브랜치이고 배포와 무관"이라고 적고 있었는데 **사실이 아니다.**
+> 그 서술 때문에 `deploy.yml`의 main 전용 job을 dead code로 오판해 삭제 직전까지 간 사고가
+> 2026-07-31에 있었다 — 그 job은 라이브 프로덕션(teameet.co.kr)의 유일한 배포 경로다.
+
+- **`dev`와 `main` 둘 다 살아 있고 각자 다른 환경을 배포한다.**
+  - `dev` push → `deploy-alpha.yml` → **alpha.teameet.co.kr**, 승인 게이트 없음.
+  - `main` push → `deploy.yml`의 `build-images` + `deploy` job → **teameet.co.kr(프로덕션)**,
+    `environment: production` 승인 게이트 있음. 2026-07-27까지 6회 성공한 살아 있는 경로다.
+- **모든 작업은 `dev`에서만.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
+- **`dev` → `main` 승격은 사용자만 한다.** 에이전트는 `git push`/`gh pr merge`/
+  `gh pr create --base main` 어느 방식으로도 **직접 실행하지 않는다** — 필요해 보이면 사용자에게
+  알리고 멈춘다. 사용자가 GitHub에서 PR을 머지하는 것이 유일한 승격 경로이고, 자동으로 승격하는
+  워크플로는 없다(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
+- **`main`에 dev에 없는 커밋이 생겼다면** `origin/main → dev` 방향으로만 흡수한다.
+- **`main`에는 브랜치 보호가 없다**(2026-07-31 확인). 직접 push도 막히지 않고 그대로 프로덕션
+  배포로 이어진다 — 관례로만 지켜지는 상태이므로 더 조심한다.
+- **dev push = alpha 자동 실배포.** `deploy-alpha.yml`이 승인 게이트 없이
+  alpha.teameet.co.kr에 배포한다 → **dev 머지 전 검증(테스트·tsc·lint)을 실배포
+  게이트로 취급하라.**
+- **worktree는 항상 `git fetch origin dev` **직후** `origin/dev`에서 만든다.**
+  로컬 `dev` 브랜치를 체크아웃해 base로 쓰지 않는다 — 여러 세션이 각자
+  `.claude/worktrees/*`를 쓰는 공유 환경이라 로컬 `dev`가 이미 다른 worktree에 물려 있다.
+
+## S2) 공유 작업트리 git 안전 (Critical)
+
+하나의 저장소를 여러 세션이 동시에 쓴다. 아래는 그 자체로 Critical이며 사용자 명시 승인
+없이는 금지한다.
+
+- **`git stash` 절대 금지.** 작업트리 *전체*의 미커밋 변경을 숨긴다 — 다른 세션이 쓰는 중인
+  변경까지 사라진다. 불가피하면 내 파일만 따로 복사/커밋한다.
+- **파괴 명령 금지**: `git reset --hard`, 내가 만들지 않은 변경에 대한 `git checkout --`/
+  `git restore`, `git clean -fd`, `git add -A`, `git commit -a`.
+- **커밋은 내가 만든 파일만 pathspec으로**: `git commit -m "..." -- <명시 경로>` 후 즉시
+  `git show --stat HEAD`로 휩쓸린 파일이 없는지 검증한다.
+- **다른 세션이 동시 수정 중인 공유 파일은 직접 편집하지 않는다.** 바꿔야 하면 해당 위치에
+  코드 주석으로 "무엇을·어떻게"만 남긴다.
+- 새로 만든 파일은 pathspec 커밋 전에 `git add`(또는 `git add -N`)가 필요하다 — 안 하면
+  `did not match any file(s) known to git`으로 실패한다.
+
+## S3) DB 마이그레이션 규율 (Critical)
+
+- **스키마 변경은 반드시 migration 파일을 동반한다.** `prisma db push`로만 dev에 반영하고
+  migration을 빠뜨리면 prod `migrate deploy`가 깨진다(실사례: 리뷰 테이블 migration 누락 →
+  배포 중단·서비스 장애).
+- CI의 `V1 migration replay + drift gate`가 ① 빈 DB에 전체 체인 재생 ② `schema.prisma`
+  드리프트 0을 강제한다.
+- 수동 SQL로 dev에 먼저 적용했다면 같은 내용을 **idempotent migration**으로 작성하고
+  `prisma migrate resolve --applied`로 박제한다.
+
+## S4) 품질 원칙
+
+- **기술부채를 남기지 않는다.** 범위 안의 dead code·workaround·미완 처리는 그것을 건드린
+  *같은 변경*에서 완전히 해결한다(전수 확인 후 완전 삭제 포함).
+- **쓸데없는 fallback 금지.** 임시 우회로 문제를 덮지 말고 근본 원인을 해결한다. 단 의미 있는
+  에러 처리(try/catch + 사용자 알림)는 fallback이 아니다. **silent catch(빈 catch)는 안티패턴.**
+- **진짜 테스트만.** "이 테스트가 깨지면 실제 버그를 잡는가"를 만족해야 한다. mock 자체를
+  검증하지 않는다(불가피한 브라우저 API mock은 예외).
+- **검증은 변경 크기에 비례한다.** 한 줄·문서·버전 bump 같은 기계적 변경에 전용 테스트나
+  서브에이전트 왕복을 붙이지 않는다. 풀스위트는 통합·릴리스 게이트에서만 돌린다.
+- **모호하면 추측하지 않는다.** 컴파일만 되는 "가장 쉬운 경로"를 고르지 않는다. 원본 요청의
+  모든 조건이 설계 → 구현 → 검증까지 살아 있어야 한다.
+
+## S5) UI 변경
+
+- **변경 후 라이브 시각 검증 필수.** 단위 테스트는 요소 존재/부재만 잡고 레이아웃 균형·정렬을
+  못 잡는다 → `tsc 0 + 테스트 pass + lint 0`만으로는 완료가 아니다. 스크린샷으로 확인한다.
+- **요소 제거/재배치 = 레이아웃 재균형까지가 한 작업.** 제거한 요소가 채우던 공간·시각 무게를
+  함께 재설계한다.
+- **UI 변경 PR은 예외 없이 📱mobile 390 / 📲tablet 768 / 🖥desktop 1440 3폭 스크린샷 갤러리를
+  PR 코멘트로 첨부한다.** 뒤늦게 인지했으면 그 PR에 추가로 게시해 채운다.
+  (로직/백엔드 전용 PR은 대상 아님.)
+- 와이드(1440~2560) 반응형 검증은 스크린샷 썸네일이 아니라 **치수 측정**이 신뢰할 수 있다.
+
+## S6) PR · 리뷰 워크플로
+
+상세 런북: `docs/ops/pr-review-visual-workflow.md`
+
+- **PR 제목·본문은 한국어로 작성한다.** (커밋 메시지 관례와 별개 규칙)
+- **v1 기능 PR엔 `.changeset/*.md`가 필수다.** 없으면 dev-push CI가 실패하고 alpha 배포가
+  막힌다(PR CI는 통과해도). 단 `.md`·테스트·`docs/`·`scripts/qa/` 변경은 대상이 아니다.
+- **Copilot 리뷰는 `generated no new comments`가 나올 때까지 반복한다.**
+  요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer`
+  (REST `requested_reviewers`는 422). 도착은 비동기 ~3–8분.
+  각 finding은 **적대적으로 검증해 real만 수정**한다 — Copilot도 틀린다. 스레드는 GraphQL
+  `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve한다.
+  실적: 9라운드 18건 전부 real이었던 사례가 있고, **늦은 라운드에 나온 게 더 치명적일 수
+  있다.**
+- 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
+- CI flake(Postgres `40P01 deadlock` 등)는 내 변경과 무관함을 확인한 뒤
+  `gh run rerun <id> --failed`.
+- **로컬 tsc 통과 ≠ CI 빌드 통과.** 공유 트리의 로컬 검사는 *미커밋 워킹트리*(타 세션 것 포함)를
+  보지만 CI는 **커밋본**을 빌드한다. push 전 커밋본 기준으로 확인하라.
+
+## S7) 로컬 dev 서버 · 호스트 부하
+
+- **web·api 각 1쌍만 유지한다.** 검증용 임시 서버는 끝나는 즉시 종료한다. 새로 띄우기 전
+  기존 프로세스를 먼저 확인하라(단순 `grep node`는 무관한 프로세스를 잡아 잘못된 PID를 kill할
+  위험이 있다):
+  ```
+  lsof -nP -iTCP -sTCP:LISTEN | grep -E ':(3003|3013|301[4-9]|302[0-9]|8100|8111|812[0-9]|822[0-9])'
+  ```
+- **부하 작업(테스트·빌드·브라우저 자동화) 시작 전 호스트 상태를 먼저 확인한다** —
+  `uptime` load, 메모리·swap, Node/브라우저 프로세스 수. load가 코어 수를 크게 넘거나 swap
+  압박이 보이면 시작하지 말고 보고한다. *증상 후 진단이 아니라 시작 전 예방이다.*
+- **내가 띄운 프로세스는 내가 정리한다.** broad `pkill`이나 다른 세션 프로세스 종료는 금지.
+  (2026-07-15 실사고: Node 2,013개·swap 40.7GB·load 153 — MCP/도구 프로세스 수명주기 누수)
+
+## S8) 이 저장소 특유의 함정 (재조사 방지)
+
+- **CI/CD를 다시 조사하기 전에 `docs/ops/cicd-pipeline-audit-2026-07-27.md`를 먼저 읽어라.**
+  2026-07-27에 전수 실측했다. PR CI 2분30초 / alpha 배포 3분43초가 현재 기준선이다.
+- **릴리스 커밋은 `package.json`을 바꿔 도커 `pnpm install` 레이어 캐시를 무효화한다** → 그
+  배포만 11분대가 정상이다. 캐시 회귀로 오진하지 말 것(소스만 바뀐 배포는 4분대).
+- **`gh workflow run`은 표시 이름 인덱싱이 늦다.** `--workflow="<표시 이름>"`이
+  `could not find any workflows`로 실패하면 **파일명**으로 dispatch하라.
+- **`node --test <디렉터리>` 형태는 Node 버전에 따라 모듈 해석으로 넘어가 실패한다.**
+  파일 경로를 명시하라: `node --test scripts/release/versioning.contract.test.mjs`.
+- **`deploy.yml` 구조를 바꾸면** `pnpm qa:production-deploy-security`와
+  `pnpm qa:v1-db-guardrails`가 그 파일을 정규식으로 검사하므로 **반드시 둘 다 통과시켜라.**
+- **alpha는 헤더 인증을 차단한다**(`x-v1-user-id` → 401). 브라우저 세션 쿠키는 httpOnly다.
+  alpha 화면 검증은 실제 로그인을 거쳐야 한다.
+- **alpha에서 "오류 + 인증 풀림"은 세션 문제가 아니라 nginx `limit_req`를 먼저 의심하라**
+  (ALB IP 합산으로 rate limit에 걸린 이력이 있다).
+- **`globals.css`는 혼합 개행 파일이다.** 편집 후 전체 CRLF 정규화가 일어나면 1,200줄대
+  가짜 diff가 생긴다. 커밋 전 diff 크기를 확인하라.
+- **`v1` 대회 도메인**: knockout 판별은 `group.phase`로 한다. `round`는 한글/영문이 혼재하는
+  **표시 라벨**이라 가드 조건으로 쓰면 안 된다.
+- **v1 admin 화면 검증**: dev 인증은 `userId`를 비우고 `userEmail=admin@teameet.v1`로 한다
+  (guard가 email로 resolve).
+- **Edit 도구로 파일이 손상되는 사례가 있다.** 같은 줄을 겨냥한 Edit이 이유 없이
+  `String to replace not found`로 반복 실패하면 제어바이트를 의심하라:
+  ```
+  python3 -c "d=open(P,'rb').read(); print([b for b in set(d) if b<0x20 and b not in (9,10,13)])"
+  ```
+  감지되면 Edit 대신 Python/Perl로 해당 바이트를 직접 치환한다.
+
+## S9) 사용자 상호작용
+
+- **결정·질문은 plain text 단독으로 던지지 않는다.** 선택지를 제시해 사용자가 고르게 한다.
+  다항목이면 ① 표로 overview → ② 선택 요청 순서를 지킨다.
+- **Decision Matrix를 auto-approve하지 않는다.** 여러 옵션·작업규모·권고가 있는 표를 만들었다면
+  "모두 권고대로" 진행 금지 — 사용자에게 명시적 결정을 받는다.
+- **"이어서 진행해줘" 같은 모호한 신호는 *이미 명시된 항목 중 미완*만 가리킨다.** 부탁받지
+  않은 인접 scope로 자율 확장하지 않는다.
+- **완료 보고는 산출물을 인라인으로.** QA 결과·before/after·변경 요약을 메시지에 직접 표시한다.
+  "리포트 파일 만들고 경로만 언급"은 불충분하다.
+- **롤백(`git revert`·이전 상태 복원)은 실행 전 사용자 검수 + 명시 승인 후에만.**
+- 사용자가 설명 난이도를 지정하면(예: "쉽게") 챗 답변뿐 아니라 **생성하는 문서·아티팩트에도
+  같은 수준을 적용한다.**
+- 작업을 다른 세션에 넘길 조건이 주어지면 분석만 주지 말고 **바로 붙여넣을 수 있는 완결형
+  프롬프트**를 함께 낸다.

@@ -352,10 +352,6 @@ export type V1CreateInquiryPayload = {
   contact?: string;
   relatedType?: V1InquiryRelatedType;
   relatedId?: string;
-  /** 비로그인(게스트) 문의자의 이메일 — 로그인 상태가 아니면 guestPhone과 함께 최소 1개 필수 */
-  guestEmail?: string;
-  /** 비로그인(게스트) 문의자의 전화번호 — 로그인 상태가 아니면 guestEmail과 함께 최소 1개 필수 */
-  guestPhone?: string;
 };
 
 export type V1Match = {
@@ -2057,6 +2053,8 @@ export type V1Tournament = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** 대회 상세 장소 아래에 노출하는 관리자 입력 주차 안내. null이면 서브 텍스트를 숨긴다. */
+  parkingInfo?: string | null;
   /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
   latitude: number | null;
   longitude: number | null;
@@ -2242,6 +2240,8 @@ export type V1TournamentDetail = {
   scheduledAt: string | null;
   scheduledEndAt: string | null;
   venue: string | null;
+  /** 대회 상세 장소 아래에 노출하는 관리자 입력 주차 안내. null이면 서브 텍스트를 숨긴다. */
+  parkingInfo?: string | null;
   /** venue를 카카오 로컬 API로 지오코딩한 좌표. 키 미설정/검색 실패 시 null(지도 임베드는 스킵, 네이버 지도 검색 링크로 폴백). */
   latitude: number | null;
   longitude: number | null;
@@ -2677,6 +2677,7 @@ export type V1UpdateTournamentPayload = Omit<
   rosterDeadlineAt?: string | null;
   scheduledAt?: string | null;
   venue?: string | null;
+  parkingInfo?: string | null;
   bankName?: string | null;
   bankAccount?: string | null;
   bankHolder?: string | null;

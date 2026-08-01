@@ -1,0 +1,20 @@
+[
+  {
+    "name": "blocked-member-only",
+    "bodyHas": {
+      "권한기준": true,
+      "차단문구": true,
+      "구EmptyState제목": false
+    },
+    "errs": []
+  },
+  {
+    "name": "normal-host",
+    "bodyHas": {
+      "권한기준": true,
+      "차단문구": false,
+      "구EmptyState제목": false
+    },
+    "errs": []
+  }
+]

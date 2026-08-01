@@ -1,5 +1,36 @@
 # v1_web
 
+## 0.2.0
+
+### Minor Changes
+
+- 72a8886: Move tournament campaign registration status, deadline, and primary action next to the hero, and unify prize and sponsor information into one responsive rewards flow.
+- b4f6263: 캠페인 공개 URL을 대회별로 자동 생성하고, 메인 상단 이미지와 참가 이유 이미지를 파일 업로드 방식으로 전환한다. 캠페인 편집 용어와 검증 문구를 작성자 중심으로 정리하고 모바일 팀 목록의 검색·필터 간격을 디자인 기준에 맞춘다.
+- 7cb1395: Require phone verification for every write. Unverified accounts can still browse, but any create/join/submit request is rejected with 403 `PHONE_VERIFICATION_REQUIRED` (verification, signup, logout, withdrawal and the admin console stay open), a global modal explains the block and links to verification, the home banner can no longer be dismissed, and the profile page and account settings both expose the verification entry point and status.
+- 57f4290: 대회 문의를 일반 문의와 동일한 로그인 회원 전용 접수로 통일한다. 비회원은 현재 대회 복귀 경로를 유지한 채 로그인 화면으로 이동하며, 대회 상세 하단에는 팀밋 인스타그램과 이메일 연락처를 고정 안내한다. 신규 게스트 문의 입력 계약은 제거하되 기존 게스트 문의 데이터의 관리자 조회 호환성은 유지한다.
+- 101078c: Let tournament administrators manage parking guidance shown below the venue on the public tournament detail page, and refresh the participant application guide copy.
+
+### Patch Changes
+
+- 6185c3b: Stop a long route from pushing the error log table's own detail button off screen. A path like /tournaments/campaigns/alpha-qa-futsal-recruiting was rendered without wrapping, so it took 354px of a 1130px table and shoved the release column and the 상세 button into horizontal overflow with nothing on screen to suggest they were there. The route is now truncated with the full value on hover, and the message and release columns give back a little width to match.
+- 22295a0: Let the error log table use the full width of the admin page. It was the only admin table still capped at 900px, so on a 1440 screen the occurrence count, release version, and the 보기 button sat outside the table's horizontal scroll with nothing on screen suggesting they were there.
+- d958233: Keep alpha deployment target verification fail-closed while documenting the required live IAM policy convergence.
+- fa56780: Add docker/setup-buildx-action before the alpha image build steps so the buildx builder uses the docker-container driver, which is required for the GHA cache backend (cache-to: type=gha). The default docker driver rejects cache export with "Cache export is not supported for the docker driver."
+- 193912a: Run the one-time certbot config migration rsync (old ALPHA_LIVE_DIR layout to the new persistent ALPHA_RUNTIME_CONFIG_DIR) with sudo. The deploy script runs as ec2-user, but certbot's archive/live directories are root-owned by design, so the copy failed with rsync Permission denied on the first real run of the immutable-release migration path.
+- 018a52c: Disable buildx provenance/SBOM attestation on the alpha image builds. Since switching to the docker-container buildx driver, build-push-action pushed images as an OCI image index wrapping a provenance attestation manifest, which ECR's basic scanner never registers a scan for (confirmed via a temporary diagnostic step: describe-images showed no imageScanStatus field at all, and the manifest media type was application/vnd.oci.image.index.v1+json). This is a documented BuildKit v0.11+/ECR interaction; provenance: false + sbom: false restores a plain single-manifest push that ECR can scan.
+- cf8fb2b: Fix the alpha deploy health contract's stale assumption that /v1/home returns 404. apps/v1_web/next.config.ts redirects() has intentionally 308-redirected the legacy /v1 basePath to root (kept for bookmarks and the Kakao OAuth redirect_uri) for a while now, but the deploy-time contract check was never updated to match, so today's first real candidate deploy failed health verification even though the app was actually healthy.
+- 2ac9025: Fix restore_legacy_runtime's post-rollback header verification, which used a grep pattern with a literal backslash-r that the instance's GNU grep does not treat as carriage return (warns "stray \ before r" and never matches). Rewritten to use the same awk-based header extraction already used correctly elsewhere in this file, so a legitimate rollback no longer logs a false CRITICAL failure.
+- 7af78a3: Retry ECR scan-findings lookup until the scan is registered before calling `aws ecr wait image-scan-complete`, which treats ScanNotFoundException as terminal instead of retrying. Fixes alpha deploys failing right after a fresh image push.
+- 404571d: Prune stale immutable release source directories after each successful alpha deploy. prepare_alpha_release_source() writes a full source-tree checkout under ALPHA_SOURCE_RELEASES_DIR for every deploy attempt (successful or failed), and nothing ever removed old ones, so disk usage grew without bound. Only the currently active and previous release directories are ever read again (by restore_active_release and rollback-alpha.sh), so everything else is now pruned right after state.json is promoted. Best-effort: a prune failure logs a warning but never fails an otherwise-healthy deploy.
+- 9479b51: Stop the alpha immutable-source drift guard from rejecting an unchanged source tree because of directory timestamps it wrote itself, which made same-commit redeploys fail and flaked the release-state CI gate.
+- c0233be: Keep the tournament application guide in the product voice while restoring the dev CI contracts required for Alpha deployment. The matching regression expectation follows the same copy.
+- 653e41b: Build alpha images once on GitHub, deploy exact ECR digests through a versioned release manifest, and preserve atomic active/previous rollback state.
+- 7414e2c: 회원가입 약관 화면에 "위치기반서비스 이용 동의" 선택 체크박스를 복원한다. 이후 변경에서 이 체크박스를 "위치 기능은 사용할 때마다 따로 동의해요" 안내 링크로 대체하면서 위치 동의가 가입 단계에서 완전히 분리됐는데, 같은 시점에 함께 추가된 이름/휴대폰/생년월일/성별 필수 입력은 그대로 두고 위치 동의 체크박스만 되돌린다. 이 체크박스는 백엔드로 전송된 적이 없는 순수 UI 항목이라 API/DB 계약 변경은 없다.
+- f27466f: Expose the deployed release version and commit SHA on production responses via `X-Teameet-Release` / `X-Teameet-Commit`, matching what alpha already does, so an incident responder can tell which build is live without shelling into the host.
+- 30558b4: Restore original SQL for 5 already-deployed tournament migrations that a checkpoint commit had retroactively rewritten with IF NOT EXISTS guards, unblocking the alpha rollback-compatibility gate.
+- 8ea9177: Require the depositor name to be typed when applying to a tournament. The wizard used to prefill it with the selected team's name, so the submit button turned active before the applicant entered anything — the application then carried a team name while the actual bank transfer arrived under a person's name, which is exactly what delays payment matching.
+- 002c98a: Wire scripts/qa/test-alpha-release-state.sh into the Gates CI job. This suite existed but was never run in CI, matching the same "untested contract" pattern behind several bugs found and fixed today in the alpha immutable-release pipeline (certbot migration permission, health contract assertion, source-directory pruning).
+
 ## 0.1.0
 
 ### Minor Changes

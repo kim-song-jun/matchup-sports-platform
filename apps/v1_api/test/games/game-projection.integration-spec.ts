@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Prisma } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GamesService } from '../../src/games/games.service';
 import {
@@ -43,6 +44,7 @@ const ids = {
   sourceFixture: '79000000-0000-4000-8000-000000000044',
   targetFixture: '79000000-0000-4000-8000-000000000045',
   otherTournamentFixture: '79000000-0000-4000-8000-000000000046',
+  loserTargetFixture: '79000000-0000-4000-8000-00000000004f',
   tournamentGame: '79000000-0000-4000-8000-000000000047',
   tournamentHomeSide: '79000000-0000-4000-8000-000000000048',
   tournamentAwaySide: '79000000-0000-4000-8000-000000000049',
@@ -54,6 +56,9 @@ const ids = {
   deliveryLaterA: '79000000-0000-4000-8000-000000000051',
   deliveryLaterB: '79000000-0000-4000-8000-000000000052',
   deliveryOlder: '79000000-0000-4000-8000-000000000053',
+  bracketDeliveryA: '79000000-0000-4000-8000-000000000054',
+  bracketDeliveryB: '79000000-0000-4000-8000-000000000055',
+  bracketConflictDelivery: '79000000-0000-4000-8000-000000000056',
 } as const;
 
 type OfficialProjectionRuntime = {
@@ -470,93 +475,132 @@ describe('Task 9 game projection real-database contract', () => {
       });
     });
 
-    it.skip('[RED] normalized WINNER/LOSER edges advance one locked target side and reject duplicate-side and cross-tournament conflicts', async () => {
-      const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
-        '../../src/games/projections/game-projection.service',
-        'GameProjectionService',
+    it('[RED-L3] normalized WINNER and LOSER edges advance locked target sides once and fail closed on an occupied side', async () => {
+      await insertBracketEdges([
+        {
+          tournamentId: ids.tournament,
+          sourceFixtureId: ids.sourceFixture,
+          sourceOutcome: 'WINNER',
+          targetFixtureId: ids.targetFixture,
+          targetSide: 'HOME',
+        },
+        {
+          tournamentId: ids.tournament,
+          sourceFixtureId: ids.sourceFixture,
+          sourceOutcome: 'LOSER',
+          targetFixtureId: ids.loserTargetFixture,
+          targetSide: 'AWAY',
+        },
+      ]);
+      const duplicateSideConstraint = await capturePrismaFailure(() =>
+        insertBracketEdges([
+          {
+            tournamentId: ids.tournament,
+            sourceFixtureId: ids.loserTargetFixture,
+            sourceOutcome: 'WINNER',
+            targetFixtureId: ids.targetFixture,
+            targetSide: 'HOME',
+          },
+        ]),
       );
-      if (runtime.configureBracketEdges) {
-        await runtime.configureBracketEdges({
-          actorUserId: ids.opsUser,
-          edges: [
-            {
-              sourceFixtureId: ids.sourceFixture,
-              outcome: 'WINNER',
-              targetFixtureId: ids.targetFixture,
-              targetSide: 'HOME',
-            },
-            {
-              sourceFixtureId: ids.sourceFixture,
-              outcome: 'LOSER',
-              targetFixtureId: ids.targetFixture,
-              targetSide: 'AWAY',
-            },
-          ],
-        });
-      }
-      if (runtime.projectOfficialResult) {
-        await Promise.all([
-          runtime.projectOfficialResult({ outboxEventId: tournamentOutboxId, deliveredSequence: 2 }),
-          runtime.projectOfficialResult({ outboxEventId: tournamentOutboxId, deliveredSequence: 2 }),
-        ]);
-      }
-      const advanced = await prisma.v1TournamentFixture.findUniqueOrThrow({ where: { id: ids.targetFixture } });
-      const duplicateSide = runtime.configureBracketEdges
-        ? await captureBusinessFailure(() =>
-            runtime.configureBracketEdges!({
-              actorUserId: ids.opsUser,
-              edges: [{
-                sourceFixtureId: ids.sourceFixture,
-                outcome: 'LOSER',
-                targetFixtureId: ids.targetFixture,
-                targetSide: 'HOME',
-              }],
-            }),
-          )
-        : { code: 'BRACKET_RUNTIME_MISSING' };
-      const crossTournament = runtime.configureBracketEdges
-        ? await captureBusinessFailure(() =>
-            runtime.configureBracketEdges!({
-              actorUserId: ids.opsUser,
-              edges: [{
-                sourceFixtureId: ids.sourceFixture,
-                outcome: 'WINNER',
-                targetFixtureId: ids.otherTournamentFixture,
-                targetSide: 'HOME',
-              }],
-            }),
-          )
-        : { code: 'BRACKET_RUNTIME_MISSING' };
-      const afterConflicts = await prisma.v1TournamentFixture.findUniqueOrThrow({ where: { id: ids.targetFixture } });
-      const edgeCount = await bracketEdgeCount(ids.sourceFixture);
+      const crossTournamentConstraint = await capturePrismaFailure(() =>
+        insertBracketEdges([
+          {
+            tournamentId: ids.tournament,
+            sourceFixtureId: ids.loserTargetFixture,
+            sourceOutcome: 'WINNER',
+            targetFixtureId: ids.otherTournamentFixture,
+            targetSide: 'AWAY',
+          },
+        ]),
+      );
 
-      expect({
-        bracketRuntimeAvailable: typeof runtime.configureBracketEdges === 'function',
-        projectionRuntimeAvailable: typeof runtime.projectOfficialResult === 'function',
-        edgeCount,
-        advanced: {
-          homeRegistrationId: advanced.homeRegistrationId,
-          awayRegistrationId: advanced.awayRegistrationId,
+      await resetOfficialDelivery(tournamentOutboxId);
+      const before = await bracketProjectionSnapshot();
+      const firstProcessed = await productionWorker().processOne();
+      await insertBracketOfficialDeliveries([ids.bracketDeliveryA, ids.bracketDeliveryB]);
+      const duplicateProcessed = await Promise.all([
+        productionWorker().processOne(),
+        productionWorker().processOne(),
+      ]);
+      const afterDuplicates = await bracketProjectionSnapshot();
+
+      await prisma.v1TournamentFixture.update({
+        where: { id: ids.targetFixture },
+        data: { homeRegistrationId: ids.opponentRegistration, awayRegistrationId: null },
+      });
+      await prisma.v1TournamentFixture.update({
+        where: { id: ids.loserTargetFixture },
+        data: { homeRegistrationId: null, awayRegistrationId: null },
+      });
+      const beforeConflictProjection = await projectionTransactionSnapshot(ids.tournamentRevision);
+      const beforeConflictStandings = await tournamentStandingSnapshot();
+      await insertBracketOfficialDeliveries([ids.bracketConflictDelivery], 5);
+      const conflictProcessed = await productionWorker().processOne();
+      const [afterConflict, conflictOutbox, afterConflictProjection, afterConflictStandings] = await Promise.all([
+        bracketProjectionSnapshot(),
+        outboxState(ids.bracketConflictDelivery),
+        projectionTransactionSnapshot(ids.tournamentRevision),
+        tournamentStandingSnapshot(),
+      ]);
+
+      const observable = {
+        edgeCount: await bracketEdgeCount(ids.sourceFixture),
+        constraints: {
+          duplicateSide: duplicateSideConstraint,
+          crossTournament: crossTournamentConstraint,
         },
-        duplicateSide,
-        crossTournament,
-        afterConflicts: {
-          homeRegistrationId: afterConflicts.homeRegistrationId,
-          awayRegistrationId: afterConflicts.awayRegistrationId,
+        before,
+        firstProcessed,
+        duplicateProcessed,
+        afterDuplicates,
+        conflictProcessed,
+        conflictOutbox: {
+          status: conflictOutbox.status,
+          attempts: conflictOutbox.attempts,
+          lastError: conflictOutbox.lastError,
+          leaseOwner: conflictOutbox.leaseOwner,
+          leaseUntil: conflictOutbox.leaseUntil,
         },
-      }).toEqual({
-        bracketRuntimeAvailable: true,
-        projectionRuntimeAvailable: true,
+        afterConflict,
+        conflictRollback: {
+          projectionUnchanged: JSON.stringify(afterConflictProjection) === JSON.stringify(beforeConflictProjection),
+          standingsUnchanged: JSON.stringify(afterConflictStandings) === JSON.stringify(beforeConflictStandings),
+        },
+      };
+      process.stdout.write(`TASK9_RED_L3_DB_OBSERVABLE=${JSON.stringify(observable)}\n`);
+
+      expect(observable).toEqual({
         edgeCount: 2,
-        advanced: {
-          homeRegistrationId: ids.hostRegistration,
-          awayRegistrationId: ids.opponentRegistration,
+        constraints: {
+          duplicateSide: { code: 'P2010', databaseCode: '23505' },
+          crossTournament: { code: 'P2010', databaseCode: '23503' },
         },
-        duplicateSide: { code: 'BRACKET_TARGET_SIDE_CONFLICT' },
-        crossTournament: { code: 'BRACKET_CROSS_TOURNAMENT' },
-        afterConflicts: {
-          homeRegistrationId: ids.hostRegistration,
-          awayRegistrationId: ids.opponentRegistration,
+        before: {
+          winnerTarget: { homeRegistrationId: null, awayRegistrationId: null },
+          loserTarget: { homeRegistrationId: null, awayRegistrationId: null },
+        },
+        firstProcessed: true,
+        duplicateProcessed: [true, true],
+        afterDuplicates: {
+          winnerTarget: { homeRegistrationId: ids.hostRegistration, awayRegistrationId: null },
+          loserTarget: { homeRegistrationId: null, awayRegistrationId: ids.opponentRegistration },
+        },
+        conflictProcessed: true,
+        conflictOutbox: {
+          status: 'POISONED',
+          attempts: 6,
+          lastError: 'Error: BRACKET_TARGET_SIDE_CONFLICT',
+          leaseOwner: null,
+          leaseUntil: null,
+        },
+        afterConflict: {
+          winnerTarget: { homeRegistrationId: ids.opponentRegistration, awayRegistrationId: null },
+          loserTarget: { homeRegistrationId: null, awayRegistrationId: null },
+        },
+        conflictRollback: {
+          projectionUnchanged: true,
+          standingsUnchanged: true,
         },
       });
     });
@@ -1010,6 +1054,13 @@ async function createFixture(): Promise<void> {
         competitionConfigVersionId: ids.config,
       },
       {
+        id: ids.loserTargetFixture,
+        tournamentId: ids.tournament,
+        round: 'placement',
+        fixtureNumber: 3,
+        competitionConfigVersionId: ids.config,
+      },
+      {
         id: ids.otherTournamentFixture,
         tournamentId: ids.otherTournament,
         round: 'final',
@@ -1418,6 +1469,124 @@ async function bracketEdgeCount(sourceFixtureId: string): Promise<number> {
     WHERE source_fixture_id = ${sourceFixtureId}
   `;
   return Number(rows[0]?.count ?? 0n);
+}
+
+async function bracketProjectionSnapshot(): Promise<{
+  winnerTarget: { homeRegistrationId: string | null; awayRegistrationId: string | null };
+  loserTarget: { homeRegistrationId: string | null; awayRegistrationId: string | null };
+}> {
+  const fixtures = await prisma.v1TournamentFixture.findMany({
+    where: { id: { in: [ids.targetFixture, ids.loserTargetFixture] } },
+    orderBy: { id: 'asc' },
+    select: { id: true, homeRegistrationId: true, awayRegistrationId: true },
+  });
+  const winnerTarget = fixtures.find(({ id }) => id === ids.targetFixture);
+  const loserTarget = fixtures.find(({ id }) => id === ids.loserTargetFixture);
+  if (!winnerTarget || !loserTarget) {
+    throw new Error('Task 9 Lane 3 target fixtures are required');
+  }
+  return {
+    winnerTarget: {
+      homeRegistrationId: winnerTarget.homeRegistrationId,
+      awayRegistrationId: winnerTarget.awayRegistrationId,
+    },
+    loserTarget: {
+      homeRegistrationId: loserTarget.homeRegistrationId,
+      awayRegistrationId: loserTarget.awayRegistrationId,
+    },
+  };
+}
+
+type BracketEdgeInput = {
+  tournamentId: string;
+  sourceFixtureId: string;
+  sourceOutcome: 'WINNER' | 'LOSER';
+  targetFixtureId: string;
+  targetSide: 'HOME' | 'AWAY';
+};
+
+async function insertBracketEdges(edges: readonly BracketEdgeInput[]): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    for (const edge of edges) {
+      await tx.$executeRaw`
+        INSERT INTO v1_tournament_fixture_advancement_edges (
+          id,
+          tournament_id,
+          source_fixture_id,
+          source_outcome,
+          target_fixture_id,
+          target_side,
+          created_at
+        ) VALUES (
+          ${randomUUID()},
+          ${edge.tournamentId},
+          ${edge.sourceFixtureId},
+          ${edge.sourceOutcome}::"V1FixtureAdvancementOutcome",
+          ${edge.targetFixtureId},
+          ${edge.targetSide}::"V1FixtureTargetSide",
+          CURRENT_TIMESTAMP
+        )
+      `;
+    }
+  });
+}
+
+async function insertBracketOfficialDeliveries(idsToInsert: readonly string[], attempts = 0): Promise<void> {
+  await prisma.v1OutboxEvent.createMany({
+    data: idsToInsert.map((id, index) => ({
+      id,
+      businessKey: `${prefix}:bracket-delivery:${id}`,
+      aggregateType: 'GAME',
+      aggregateId: ids.tournamentGame,
+      revisionId: ids.tournamentRevision,
+      type: 'GAME_RESULT_OFFICIAL',
+      payload: { revisionId: ids.tournamentRevision, deliveredSequence: index + 2 },
+      attempts,
+      availableAt: new Date('2000-01-01T00:00:00.000Z'),
+    })),
+  });
+}
+
+async function tournamentStandingSnapshot(): Promise<Array<{
+  groupId: string;
+  registrationId: string;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number;
+}>> {
+  return prisma.v1TournamentStanding.findMany({
+    where: { group: { tournamentId: ids.tournament } },
+    orderBy: [{ groupId: 'asc' }, { registrationId: 'asc' }],
+    select: {
+      groupId: true,
+      registrationId: true,
+      wins: true,
+      draws: true,
+      losses: true,
+      points: true,
+    },
+  });
+}
+
+async function capturePrismaFailure(
+  operation: () => Promise<unknown>,
+): Promise<{ code: string; databaseCode: string | null }> {
+  try {
+    await operation();
+    return { code: 'MISLEADING_SUCCESS', databaseCode: null };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return {
+        code: error.code,
+        databaseCode:
+          error.meta !== undefined && typeof error.meta.code === 'string'
+            ? error.meta.code
+            : null,
+      };
+    }
+    throw error;
+  }
 }
 
 async function futureTableExists(table: string): Promise<boolean> {

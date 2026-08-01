@@ -51,6 +51,9 @@ const ids = {
   terminalApprovedRevision: '79000000-0000-4000-8000-00000000004c',
   terminalChangeRequestedRevision: '79000000-0000-4000-8000-00000000004d',
   terminalCancelledRevision: '79000000-0000-4000-8000-00000000004e',
+  deliveryLaterA: '79000000-0000-4000-8000-000000000051',
+  deliveryLaterB: '79000000-0000-4000-8000-000000000052',
+  deliveryOlder: '79000000-0000-4000-8000-000000000053',
 } as const;
 
 type OfficialProjectionRuntime = {
@@ -289,124 +292,161 @@ describe('Task 9 game projection real-database contract', () => {
     });
   });
 
-  describe.skip('Task 9 future GREEN contracts (activate when each lane runtime exists)', () => {
-    it('[RED] duplicate and reordered deliveries keep one immutable fact while UTC-year, tournament, and lifetime totals exclude pending/error state', async () => {
-      const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
-        '../../src/games/projections/game-projection.service',
-        'GameProjectionService',
-      );
-      if (runtime.projectOfficialResult) {
-        await runtime.projectOfficialResult({ outboxEventId: officialOutboxId, deliveredSequence: 2 });
-        await runtime.projectOfficialResult({ outboxEventId: officialOutboxId, deliveredSequence: 2 });
-        await runtime.projectOfficialResult({ outboxEventId: officialOutboxId, deliveredSequence: 1 });
-      }
+  describe('Task 9 Lane 2 real worker RED contracts', () => {
+    it('[RED-L2] official duplicate and reordered deliveries complete once without regressing applied team or tournament surfaces', async () => {
+      const deliveryIds = await insertDuplicateOfficialDeliveries();
+      const worker = productionWorker();
+      const processed = [
+        await worker.processOne(),
+        await worker.processOne(),
+        await worker.processOne(),
+      ];
 
-      const initialWatermarks = await prisma.v1ProjectionWatermark.findMany({
-        where: { projection: 'TEAM_RECORD', entityType: 'TEAM', entityId: ids.hostTeam },
-      });
-      await seedDiagnosticWatermarks();
-      if (runtime.projectOfficialResult) {
-        await runtime.projectOfficialResult({ outboxEventId: tournamentOutboxId, deliveredSequence: 1 });
-        await runtime.projectOfficialResult({ outboxEventId: tournamentOutboxId, deliveredSequence: 1 });
-      }
-      const totals = runtime.getTeamRecordTotals
-        ? await runtime.getTeamRecordTotals({ teamId: ids.hostTeam, utcYear: 2026, tournamentId: ids.tournament })
-        : null;
-      const health = runtime.getProjectionHealth
-        ? await runtime.getProjectionHealth({ entityType: 'TEAM', entityId: ids.hostTeam })
-        : null;
-      const [teamMatchFacts, tournamentFacts, teamRecordFacts] = await Promise.all([
+      const [events, factCount, watermarks] = await Promise.all([
+        prisma.v1OutboxEvent.findMany({
+          where: { id: { in: deliveryIds } },
+          orderBy: { availableAt: 'asc' },
+          select: {
+            id: true,
+            businessKey: true,
+            revisionId: true,
+            payload: true,
+            status: true,
+            attempts: true,
+            lastError: true,
+          },
+        }),
         futureFactCount('v1_game_official_facts', ids.revision),
-        futureFactCount('v1_game_official_facts', ids.tournamentRevision),
-        futureFactCount('v1_team_record_facts', ids.revision),
+        prisma.v1ProjectionWatermark.findMany({
+          where: {
+            revisionId: ids.revision,
+            OR: [
+              { projection: 'TEAM_RECORD', entityType: 'TEAM', entityId: ids.hostTeam },
+              { projection: 'TOURNAMENT_RESULT', entityType: 'TOURNAMENT', entityId: ids.tournament },
+            ],
+          },
+          orderBy: [{ entityType: 'asc' }, { entityId: 'asc' }],
+          select: { projection: true, entityType: true, entityId: true, revisionId: true, status: true },
+        }),
       ]);
 
       expect({
-        projectionRuntimeAvailable: typeof runtime.projectOfficialResult === 'function',
-        initialWatermarkCount: initialWatermarks.length,
-        initialWatermarkRevisionId: initialWatermarks[0]?.revisionId ?? null,
-        initialWatermarkStatus: initialWatermarks[0]?.status ?? null,
-        teamMatchFacts,
-        tournamentFacts,
-        teamRecordFacts,
-        totals,
-        health,
+        processed,
+        events,
+        factCount,
+        watermarks,
       }).toEqual({
-        projectionRuntimeAvailable: true,
-        initialWatermarkCount: 1,
-        initialWatermarkRevisionId: ids.revision,
-        initialWatermarkStatus: 'APPLIED',
-        teamMatchFacts: 1,
-        tournamentFacts: 1,
-        teamRecordFacts: 2,
+        processed: [true, true, true],
+        events: [
+          {
+            id: ids.deliveryLaterA,
+            businessKey: `${prefix}:official-delivery:later-a`,
+            revisionId: ids.revision,
+            payload: { revisionId: ids.revision, deliveredSequence: 2 },
+            status: 'COMPLETED',
+            attempts: 1,
+            lastError: null,
+          },
+          {
+            id: ids.deliveryLaterB,
+            businessKey: `${prefix}:official-delivery:later-b`,
+            revisionId: ids.revision,
+            payload: { revisionId: ids.revision, deliveredSequence: 2 },
+            status: 'COMPLETED',
+            attempts: 1,
+            lastError: null,
+          },
+          {
+            id: ids.deliveryOlder,
+            businessKey: `${prefix}:official-delivery:older`,
+            revisionId: ids.revision,
+            payload: { revisionId: ids.revision, deliveredSequence: 1 },
+            status: 'COMPLETED',
+            attempts: 1,
+            lastError: null,
+          },
+        ],
+        factCount: 1,
+        watermarks: [
+          {
+            projection: 'TEAM_RECORD',
+            entityType: 'TEAM',
+            entityId: ids.hostTeam,
+            revisionId: ids.revision,
+            status: 'APPLIED',
+          },
+          {
+            projection: 'TOURNAMENT_RESULT',
+            entityType: 'TOURNAMENT',
+            entityId: ids.tournament,
+            revisionId: ids.revision,
+            status: 'APPLIED',
+          },
+        ],
+      });
+    });
+
+    it('[RED-L2] malformed official payload poisons with a projection error and never writes a current watermark', async () => {
+      await resetOfficialDelivery(officialOutboxId, { revisionId: '' }, 5);
+      const processed = await productionWorker().processOne();
+      const [event, facts, invalidWatermarks] = await Promise.all([
+        outboxState(officialOutboxId),
+        futureFactCount('v1_game_official_facts', ids.revision),
+        prisma.v1ProjectionWatermark.count({ where: { revisionId: { in: ['', ids.revision] } } }),
+      ]);
+
+      expect({
+        processed,
+        event: { status: event.status, attempts: event.attempts, lastError: event.lastError },
+        facts,
+        invalidWatermarks,
+      }).toEqual({
+        processed: true,
+        event: {
+          status: 'POISONED',
+          attempts: 6,
+          lastError: 'Error: GAME_RESULT_OFFICIAL payload requires a non-empty revisionId',
+        },
+        facts: 0,
+        invalidWatermarks: 0,
+      });
+    });
+
+    it('[RED-L2] official facts reproduce UTC-year tournament and lifetime team totals without personal identity rows', async () => {
+      await resetOfficialDelivery(officialOutboxId);
+      await resetOfficialDelivery(tournamentOutboxId);
+      const worker = productionWorker();
+      const processed = [await worker.processOne(), await worker.processOne()];
+      const [teamMatchFacts, tournamentFacts, totals, personalRows] = await Promise.all([
+        futureFactCount('v1_game_official_facts', ids.revision),
+        futureFactCount('v1_game_official_facts', ids.tournamentRevision),
+        officialTeamTotals(ids.hostTeam, 2026, ids.tournament),
+        prisma.v1ProjectionWatermark.count({
+          where: {
+            revisionId: { in: [ids.revision, ids.tournamentRevision] },
+            OR: [
+              { projection: 'USER_RECORD' },
+              { projection: 'PENDING_IDENTITY' },
+              { entityType: 'USER' },
+              { entityType: 'PARTICIPANT' },
+            ],
+          },
+        }),
+      ]);
+
+      expect({ processed, facts: teamMatchFacts + tournamentFacts, totals, personalRows }).toEqual({
+        processed: [true, true],
+        facts: 2,
         totals: {
           calendarYear: { played: 2, won: 2, drawn: 0, lost: 0 },
           tournament: { played: 1, won: 1, drawn: 0, lost: 0 },
           lifetime: { played: 2, won: 2, drawn: 0, lost: 0 },
         },
-        health: {
-          visibleStatuses: ['APPLIED', 'FAILED', 'PENDING'],
-          currentStatuses: ['APPLIED'],
-        },
+        personalRows: 0,
       });
     });
 
-    it('[RED] malformed official payload and sequence are rejected without a projection write', async () => {
-      const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
-        '../../src/games/projections/game-projection.service',
-        'GameProjectionService',
-      );
-      const failure = runtime.projectOfficialResult
-        ? await captureBusinessFailure(() =>
-            runtime.projectOfficialResult!({ outboxEventId: '', deliveredSequence: 0 }),
-          )
-        : { code: 'PROJECTION_RUNTIME_MISSING' };
-      const invalidWrites = await prisma.v1ProjectionWatermark.count({
-        where: { revisionId: { in: ['', 'invalid'] } },
-      });
-      expect({ failure, invalidWrites }).toEqual({
-        failure: { code: 'PROJECTION_EVENT_INVALID' },
-        invalidWrites: 0,
-      });
-    });
-
-    it('[RED] Task 9A creates a same-revision team fact but neither personal nor pending-identity projection rows', async () => {
-      const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
-        '../../src/games/projections/game-projection.service',
-        'GameProjectionService',
-      );
-      if (runtime.projectOfficialResult) {
-        await runtime.projectOfficialResult({ outboxEventId: officialOutboxId, deliveredSequence: 3 });
-      }
-      const [teamFacts, linkedPersonal, guestPersonal, pendingIdentity] = await Promise.all([
-        futureFactCount('v1_team_record_facts', ids.revision),
-        prisma.v1ProjectionWatermark.count({
-          where: { projection: 'USER_RECORD', entityType: 'USER', entityId: ids.linkedUser },
-        }),
-        prisma.v1ProjectionWatermark.count({
-          where: { projection: 'USER_RECORD', entityType: 'PARTICIPANT', entityId: ids.guestParticipant },
-        }),
-        prisma.v1ProjectionWatermark.count({
-          where: { projection: 'PENDING_IDENTITY', revisionId: ids.revision },
-        }),
-      ]);
-
-      expect({
-        projectionRuntimeAvailable: typeof runtime.projectOfficialResult === 'function',
-        teamFacts,
-        linkedPersonal,
-        guestPersonal,
-        pendingIdentity,
-      }).toEqual({
-        projectionRuntimeAvailable: true,
-        teamFacts: 2,
-        linkedPersonal: 0,
-        guestPersonal: 0,
-        pendingIdentity: 0,
-      });
-    });
-
-    it('[RED] normalized WINNER/LOSER edges advance one locked target side and reject duplicate-side and cross-tournament conflicts', async () => {
+    it.skip('[RED] normalized WINNER/LOSER edges advance one locked target side and reject duplicate-side and cross-tournament conflicts', async () => {
       const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
         '../../src/games/projections/game-projection.service',
         'GameProjectionService',
@@ -497,7 +537,7 @@ describe('Task 9 game projection real-database contract', () => {
       });
     });
 
-    it('[RED] persisted HIDDEN denies every public field while OFFICIAL_ONLY exposes only official result and records', async () => {
+    it.skip('[RED] persisted HIDDEN denies every public field while OFFICIAL_ONLY exposes only official result and records', async () => {
       const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
         '../../src/games/projections/game-projection.service',
         'GameProjectionService',
@@ -540,64 +580,68 @@ describe('Task 9 game projection real-database contract', () => {
       });
     });
 
-    it('[RED] reconciliation detects an injected count/hash mismatch and audited repair converges', async () => {
-      await prisma.v1ProjectionWatermark.updateMany({
-        where: { projection: 'TEAM_RECORD', entityType: 'TEAM', entityId: ids.hostTeam },
-        data: { revisionId: ids.revision, sourceHash: 'injected-mismatch', status: 'FAILED' },
-      });
-      const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
-        '../../src/games/projections/game-projection.service',
-        'GameProjectionService',
-      );
-      const reconciliationResult = runtime.reconcileOfficialResult
-        ? await runtime.reconcileOfficialResult({
-            revisionId: ids.revision,
-            expectedCount: 2,
-            expectedHash: 'official-source-hash',
-            actorUserId: ids.opsUser,
-            reason: 'Task 9 injected mismatch repair',
-          })
-        : { contractUnavailable: true };
+    it('[RED-L2] reconciliation repairs an injected aggregate mismatch with an audit and writes APPLIED watermark last', async () => {
+      await resetOfficialDelivery(officialOutboxId);
+      await ensureInjectedMismatch();
+      const processed = await productionWorker().processOne();
       const repaired = await prisma.v1ProjectionWatermark.findFirst({
         where: { projection: 'TEAM_RECORD', entityType: 'TEAM', entityId: ids.hostTeam },
       });
-      const repairAudits = await prisma.v1OperationAudit.count({
+      const repairAudits = await prisma.v1OperationAudit.findMany({
         where: { resourceId: ids.revision, action: 'GAME_PROJECTION_REPAIRED' },
+        select: { createdAt: true },
       });
+      const event = await outboxState(officialOutboxId);
 
-      expect({ reconciliationResult, repairedStatus: repaired?.status ?? null, repairAudits }).toEqual({
-        reconciliationResult: { mismatchDetected: true, repaired: true },
-        repairedStatus: 'APPLIED',
-        repairAudits: 1,
+      expect({
+        processed,
+        eventStatus: event.status,
+        repaired: repaired
+          ? { sourceHash: repaired.sourceHash, status: repaired.status }
+          : null,
+        repairAuditCount: repairAudits.length,
+        watermarkWrittenLast:
+          repaired !== null &&
+          repairAudits.length === 1 &&
+          repaired.projectedAt.getTime() >= repairAudits[0].createdAt.getTime(),
+      }).toEqual({
+        processed: true,
+        eventStatus: 'COMPLETED',
+        repaired: { sourceHash: 'official-source-hash', status: 'APPLIED' },
+        repairAuditCount: 1,
+        watermarkWrittenLast: true,
       });
     });
 
-    it('[RED] injected pre-watermark reconciliation failure rolls back fact, aggregate, audit, and watermark together', async () => {
-      const runtime = loadTask9Runtime<OfficialProjectionRuntime>(
-        '../../src/games/projections/game-projection.service',
-        'GameProjectionService',
-      );
+    it('[RED-L2] watermark trigger interruption rolls back fact aggregate audit writes and leaves the outbox retryable', async () => {
+      await resetOfficialDelivery(officialOutboxId);
       const before = await projectionTransactionSnapshot(ids.revision);
-      const failure = runtime.reconcileOfficialResult
-        ? await captureBusinessFailure(() => runtime.reconcileOfficialResult!({
-            revisionId: ids.revision,
-            expectedCount: 2,
-            expectedHash: 'rollback-injected-hash',
-            actorUserId: ids.opsUser,
-            reason: 'Task 9 watermark-last rollback probe',
-            failBeforeWatermark: true,
-          }))
-        : { code: 'PROJECTION_RUNTIME_MISSING' };
-      const after = await projectionTransactionSnapshot(ids.revision);
+      await installWatermarkFailureTrigger();
+      let processed = false;
+      let event: Awaited<ReturnType<typeof outboxState>>;
+      let after: Awaited<ReturnType<typeof projectionTransactionSnapshot>>;
+      try {
+        processed = await productionWorker().processOne();
+        event = await outboxState(officialOutboxId);
+        after = await projectionTransactionSnapshot(ids.revision);
+      } finally {
+        await removeWatermarkFailureTrigger();
+      }
 
-      expect({ failure, before, after }).toEqual({
-        failure: { code: 'PROJECTION_REPAIR_INJECTED_FAILURE' },
+      expect({
+        processed,
+        event: { status: event!.status, lastError: event!.lastError },
+        before,
+        after: after!,
+      }).toEqual({
+        processed: true,
+        event: { status: 'RETRY', lastError: 'Error: TASK9_L2_WATERMARK_TRIGGER' },
         before,
         after: before,
       });
     });
 
-    it('[RED] frozen +23:59/+24h/+47:59/+48h boundaries materialize exactly one reminder and escalation', async () => {
+    it.skip('[RED] frozen +23:59/+24h/+47:59/+48h boundaries materialize exactly one reminder and escalation', async () => {
       const submittedAt = new Date('2026-08-01T00:00:00.000Z');
       await prisma.$executeRaw`
         UPDATE v1_game_result_revisions
@@ -623,7 +667,7 @@ describe('Task 9 game projection real-database contract', () => {
       }).toEqual({ materializeRuntimeAvailable: true, counts: { reminders: 1, escalations: 1 } });
     });
 
-    it('[RED] superseded, approved, change-requested, and cancelled revisions independently close prior SLA jobs', async () => {
+    it.skip('[RED] superseded, approved, change-requested, and cancelled revisions independently close prior SLA jobs', async () => {
       const cases = [
         { revisionId: ids.terminalSupersededRevision, reason: 'superseded' },
         { revisionId: ids.terminalApprovedRevision, reason: 'approved' },
@@ -660,7 +704,7 @@ describe('Task 9 game projection real-database contract', () => {
       });
     });
 
-    it('[RED] escalation list/detail/ack/resolve enforces role, validation, version, and audit lifecycle', async () => {
+    it.skip('[RED] escalation list/detail/ack/resolve enforces role, validation, version, and audit lifecycle', async () => {
       await seedEscalationRows(ids.slaRevision);
       await prisma.v1ResultEscalation.updateMany({
         where: { resultRevisionId: ids.slaRevision, kind: 'REMINDER' },
@@ -1041,6 +1085,189 @@ function auditWorker(): V1GameOperationsWorkerService {
   const worker = new V1GameOperationsWorkerService(prisma);
   worker.registerDurableAuditHandler('TASK9_PIN_WORKER');
   return worker;
+}
+
+function productionWorker(): V1GameOperationsWorkerService {
+  const worker = new V1GameOperationsWorkerService(prisma);
+  worker.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
+  worker.registerDurableAuditHandler('GAME_OPERATION_JOB_REQUEUED');
+  return worker;
+}
+
+async function resetOfficialDelivery(
+  outboxEventId: string,
+  payload?: { revisionId: string },
+  attempts = 0,
+): Promise<void> {
+  const event = await prisma.v1OutboxEvent.findUniqueOrThrow({
+    where: { id: outboxEventId },
+    select: { revisionId: true },
+  });
+  await prisma.v1OutboxEvent.update({
+    where: { id: outboxEventId },
+    data: {
+      status: 'PENDING',
+      attempts,
+      availableAt: new Date('2000-01-01T00:00:00.000Z'),
+      leaseOwner: null,
+      leaseUntil: null,
+      lastError: null,
+      payload: payload ?? { revisionId: event.revisionId ?? '' },
+      version: { increment: 1 },
+    },
+  });
+}
+
+async function insertDuplicateOfficialDeliveries(): Promise<string[]> {
+  const deliveries = [
+    {
+      id: ids.deliveryLaterA,
+      businessKey: `${prefix}:official-delivery:later-a`,
+      deliveredSequence: 2,
+      availableAt: new Date('2000-01-01T00:00:00.000Z'),
+    },
+    {
+      id: ids.deliveryLaterB,
+      businessKey: `${prefix}:official-delivery:later-b`,
+      deliveredSequence: 2,
+      availableAt: new Date('2000-01-01T00:00:01.000Z'),
+    },
+    {
+      id: ids.deliveryOlder,
+      businessKey: `${prefix}:official-delivery:older`,
+      deliveredSequence: 1,
+      availableAt: new Date('2000-01-01T00:00:02.000Z'),
+    },
+  ];
+  await prisma.v1OutboxEvent.createMany({
+    data: deliveries.map((delivery) => ({
+      id: delivery.id,
+      businessKey: delivery.businessKey,
+      aggregateType: 'GAME',
+      aggregateId: ids.game,
+      revisionId: ids.revision,
+      type: 'GAME_RESULT_OFFICIAL',
+      payload: { revisionId: ids.revision, deliveredSequence: delivery.deliveredSequence },
+      availableAt: delivery.availableAt,
+    })),
+  });
+  return deliveries.map(({ id }) => id);
+}
+
+async function officialTeamTotals(teamId: string, utcYear: number, tournamentId: string) {
+  const rows = await prisma.$queryRaw<Array<{
+    calendarPlayed: bigint;
+    calendarWon: bigint;
+    calendarDrawn: bigint;
+    calendarLost: bigint;
+    tournamentPlayed: bigint;
+    tournamentWon: bigint;
+    tournamentDrawn: bigint;
+    tournamentLost: bigint;
+    lifetimePlayed: bigint;
+    lifetimeWon: bigint;
+    lifetimeDrawn: bigint;
+    lifetimeLost: bigint;
+  }>>`
+    SELECT
+      COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM official_at)::int = ${utcYear})::bigint AS "calendarPlayed",
+      COUNT(*) FILTER (
+        WHERE EXTRACT(YEAR FROM official_at)::int = ${utcYear}
+          AND ((home_team_id = ${teamId} AND home_score > away_score) OR (away_team_id = ${teamId} AND away_score > home_score))
+      )::bigint AS "calendarWon",
+      COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM official_at)::int = ${utcYear} AND home_score = away_score)::bigint AS "calendarDrawn",
+      COUNT(*) FILTER (
+        WHERE EXTRACT(YEAR FROM official_at)::int = ${utcYear}
+          AND ((home_team_id = ${teamId} AND home_score < away_score) OR (away_team_id = ${teamId} AND away_score < home_score))
+      )::bigint AS "calendarLost",
+      COUNT(*) FILTER (WHERE tournament_id = ${tournamentId})::bigint AS "tournamentPlayed",
+      COUNT(*) FILTER (
+        WHERE tournament_id = ${tournamentId}
+          AND ((home_team_id = ${teamId} AND home_score > away_score) OR (away_team_id = ${teamId} AND away_score > home_score))
+      )::bigint AS "tournamentWon",
+      COUNT(*) FILTER (WHERE tournament_id = ${tournamentId} AND home_score = away_score)::bigint AS "tournamentDrawn",
+      COUNT(*) FILTER (
+        WHERE tournament_id = ${tournamentId}
+          AND ((home_team_id = ${teamId} AND home_score < away_score) OR (away_team_id = ${teamId} AND away_score < home_score))
+      )::bigint AS "tournamentLost",
+      COUNT(*)::bigint AS "lifetimePlayed",
+      COUNT(*) FILTER (
+        WHERE (home_team_id = ${teamId} AND home_score > away_score) OR (away_team_id = ${teamId} AND away_score > home_score)
+      )::bigint AS "lifetimeWon",
+      COUNT(*) FILTER (WHERE home_score = away_score)::bigint AS "lifetimeDrawn",
+      COUNT(*) FILTER (
+        WHERE (home_team_id = ${teamId} AND home_score < away_score) OR (away_team_id = ${teamId} AND away_score < home_score)
+      )::bigint AS "lifetimeLost"
+    FROM v1_game_official_facts
+    WHERE home_team_id = ${teamId} OR away_team_id = ${teamId}
+  `;
+  const totals = rows[0];
+  return {
+    calendarYear: {
+      played: Number(totals.calendarPlayed),
+      won: Number(totals.calendarWon),
+      drawn: Number(totals.calendarDrawn),
+      lost: Number(totals.calendarLost),
+    },
+    tournament: {
+      played: Number(totals.tournamentPlayed),
+      won: Number(totals.tournamentWon),
+      drawn: Number(totals.tournamentDrawn),
+      lost: Number(totals.tournamentLost),
+    },
+    lifetime: {
+      played: Number(totals.lifetimePlayed),
+      won: Number(totals.lifetimeWon),
+      drawn: Number(totals.lifetimeDrawn),
+      lost: Number(totals.lifetimeLost),
+    },
+  };
+}
+
+async function ensureInjectedMismatch(): Promise<void> {
+  await prisma.v1ProjectionWatermark.upsert({
+    where: {
+      projection_entityType_entityId: {
+        projection: 'TEAM_RECORD',
+        entityType: 'TEAM',
+        entityId: ids.hostTeam,
+      },
+    },
+    create: {
+      projection: 'TEAM_RECORD',
+      entityType: 'TEAM',
+      entityId: ids.hostTeam,
+      revisionId: ids.revision,
+      sourceHash: 'injected-mismatch',
+      status: 'FAILED',
+    },
+    update: {
+      revisionId: ids.revision,
+      sourceHash: 'injected-mismatch',
+      status: 'FAILED',
+    },
+  });
+}
+
+async function installWatermarkFailureTrigger(): Promise<void> {
+  await prisma.$executeRawUnsafe(`
+    CREATE OR REPLACE FUNCTION task9_l2_fail_watermark_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      RAISE EXCEPTION 'TASK9_L2_WATERMARK_TRIGGER';
+    END $$
+  `);
+  await prisma.$executeRawUnsafe(`
+    CREATE TRIGGER task9_l2_fail_watermark_insert
+    BEFORE INSERT OR UPDATE ON v1_projection_watermarks
+    FOR EACH ROW EXECUTE FUNCTION task9_l2_fail_watermark_insert()
+  `);
+}
+
+async function removeWatermarkFailureTrigger(): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    'DROP TRIGGER IF EXISTS task9_l2_fail_watermark_insert ON v1_projection_watermarks',
+  );
+  await prisma.$executeRawUnsafe('DROP FUNCTION IF EXISTS task9_l2_fail_watermark_insert()');
 }
 
 async function insertOutbox(label: string, attempts: number): Promise<string> {

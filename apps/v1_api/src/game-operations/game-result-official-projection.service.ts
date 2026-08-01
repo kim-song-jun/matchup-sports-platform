@@ -13,8 +13,31 @@ type OfficialRevisionRow = {
   sourceType: string;
   currentOfficialRevisionId: string | null;
   tournamentId: string | null;
+  tournamentFixtureId: string | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
+};
+
+type AdvancementEdgeRow = {
+  tournamentId: string;
+  sourceFixtureId: string;
+  sourceOutcome: 'WINNER' | 'LOSER';
+  targetFixtureId: string;
+  targetSide: 'HOME' | 'AWAY';
+};
+
+type LockedFixtureRow = {
+  id: string;
+  tournamentId: string;
+  status: string;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+};
+
+type RegistrationRow = {
+  id: string;
+  tournamentId: string;
+  status: string;
 };
 
 type ExistingWatermark = {
@@ -56,6 +79,8 @@ export class GameResultOfficialProjectionService {
     if (repairRequired) {
       await this.writeRepairAudit(tx, claim, revision);
     }
+
+    await this.advanceBracket(tx, revision, score);
 
     for (const teamId of teamIds) {
       await this.writeWatermarkLast(tx, {
@@ -117,6 +142,7 @@ export class GameResultOfficialProjectionService {
         game.source_type::text AS "sourceType",
         game.current_official_revision_id AS "currentOfficialRevisionId",
         fixture.tournament_id AS "tournamentId",
+        fixture.id AS "tournamentFixtureId",
         home_side.team_id AS "homeTeamId",
         away_side.team_id AS "awayTeamId"
       FROM v1_game_result_revisions revision
@@ -149,6 +175,136 @@ export class GameResultOfficialProjectionService {
       throw new Error('OFFICIAL revision requires non-negative integer home and away scores');
     }
     return { home: score.home, away: score.away };
+  }
+
+  private async advanceBracket(
+    tx: Prisma.TransactionClient,
+    revision: OfficialRevisionRow,
+    score: { home: number; away: number },
+  ): Promise<void> {
+    if (revision.tournamentFixtureId === null) return;
+
+    const edges = await tx.$queryRaw<AdvancementEdgeRow[]>`
+      SELECT
+        tournament_id AS "tournamentId",
+        source_fixture_id AS "sourceFixtureId",
+        source_outcome::text AS "sourceOutcome",
+        target_fixture_id AS "targetFixtureId",
+        target_side::text AS "targetSide"
+      FROM v1_tournament_fixture_advancement_edges
+      WHERE source_fixture_id = ${revision.tournamentFixtureId}
+      ORDER BY target_fixture_id ASC, target_side ASC, source_outcome ASC
+      FOR UPDATE
+    `;
+    if (edges.length === 0) return;
+
+    const fixtureIds = [...new Set([
+      revision.tournamentFixtureId,
+      ...edges.map(({ targetFixtureId }) => targetFixtureId),
+    ])].sort();
+    const fixtures = await tx.$queryRaw<LockedFixtureRow[]>`
+      SELECT
+        id,
+        tournament_id AS "tournamentId",
+        status::text AS status,
+        home_registration_id AS "homeRegistrationId",
+        away_registration_id AS "awayRegistrationId"
+      FROM v1_tournament_fixtures
+      WHERE id IN (${Prisma.join(fixtureIds)})
+      ORDER BY id ASC
+      FOR UPDATE
+    `;
+    const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
+    const source = fixtureById.get(revision.tournamentFixtureId);
+    if (
+      source === undefined ||
+      revision.tournamentId === null ||
+      source.tournamentId !== revision.tournamentId ||
+      source.status !== 'completed' ||
+      source.homeRegistrationId === null ||
+      source.awayRegistrationId === null ||
+      source.homeRegistrationId === source.awayRegistrationId
+    ) {
+      throw new Error('BRACKET_SOURCE_STATE_INVALID');
+    }
+    if (score.home === score.away) {
+      throw new Error('BRACKET_RESULT_DRAW_UNSUPPORTED');
+    }
+
+    const sourceRegistrationIds = [source.homeRegistrationId, source.awayRegistrationId].sort();
+    const registrations = await tx.$queryRaw<RegistrationRow[]>`
+      SELECT id, tournament_id AS "tournamentId", status
+      FROM v1_tournament_registrations
+      WHERE id IN (${Prisma.join(sourceRegistrationIds)})
+      ORDER BY id ASC
+      FOR SHARE
+    `;
+    if (
+      registrations.length !== 2 ||
+      registrations.some((registration) =>
+        registration.tournamentId !== source.tournamentId || registration.status !== 'confirmed'
+      )
+    ) {
+      throw new Error('BRACKET_SOURCE_REGISTRATION_INVALID');
+    }
+
+    const winnerRegistrationId = score.home > score.away
+      ? source.homeRegistrationId
+      : source.awayRegistrationId;
+    const loserRegistrationId = score.home > score.away
+      ? source.awayRegistrationId
+      : source.homeRegistrationId;
+
+    for (const edge of edges) {
+      const target = fixtureById.get(edge.targetFixtureId);
+      if (
+        edge.sourceFixtureId !== source.id ||
+        edge.tournamentId !== source.tournamentId ||
+        target === undefined ||
+        target.tournamentId !== source.tournamentId ||
+        target.id === source.id ||
+        target.status !== 'scheduled'
+      ) {
+        throw new Error('BRACKET_TARGET_STATE_INVALID');
+      }
+
+      const registrationId = edge.sourceOutcome === 'WINNER'
+        ? winnerRegistrationId
+        : loserRegistrationId;
+      const currentSideRegistrationId = edge.targetSide === 'HOME'
+        ? target.homeRegistrationId
+        : target.awayRegistrationId;
+      const otherSideRegistrationId = edge.targetSide === 'HOME'
+        ? target.awayRegistrationId
+        : target.homeRegistrationId;
+      if (
+        (currentSideRegistrationId !== null && currentSideRegistrationId !== registrationId) ||
+        otherSideRegistrationId === registrationId
+      ) {
+        throw new Error('BRACKET_TARGET_SIDE_CONFLICT');
+      }
+      if (currentSideRegistrationId === registrationId) continue;
+
+      const updated = edge.targetSide === 'HOME'
+        ? await tx.$executeRaw`
+            UPDATE v1_tournament_fixtures
+            SET home_registration_id = ${registrationId}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ${target.id} AND home_registration_id IS NULL
+          `
+        : await tx.$executeRaw`
+            UPDATE v1_tournament_fixtures
+            SET away_registration_id = ${registrationId}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ${target.id} AND away_registration_id IS NULL
+          `;
+      if (updated !== 1) {
+        throw new Error('BRACKET_TARGET_SIDE_CONFLICT');
+      }
+      if (edge.targetSide === 'HOME') {
+        target.homeRegistrationId = registrationId;
+      } else {
+        target.awayRegistrationId = registrationId;
+      }
+    }
   }
 
   private async insertTeamFacts(

@@ -62,7 +62,10 @@ function setup() {
   };
   const access = { assertAccess: jest.fn() };
   const auditWriter = { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
-  const realtime = { forceDisconnectUser: jest.fn() };
+  const realtime = {
+    evictUserFromScopedGameRooms: jest.fn(),
+    forceDisconnectUser: jest.fn(),
+  };
   const service = new TournamentStaffService(
     prisma as unknown as PrismaService,
     access as unknown as TournamentStaffAccessService,
@@ -266,7 +269,78 @@ describe('TournamentStaffService', () => {
     expect(context.auditWriter.create).toHaveBeenCalledTimes(1);
   });
 
-  it('commits revocation and audit before disconnecting the affected user', async () => {
+  it('evicts only the revoked tournament scope after persisted revocation and audit commit', async () => {
+    const context = setup();
+    const order: string[] = [];
+    let persistedAssignment = assignment();
+    const persistedAudits: Array<Record<string, unknown>> = [];
+    const actualAuditWriter = new OperationAuditWriterService();
+    const service = new TournamentStaffService(
+      context.prisma as unknown as PrismaService,
+      context.access as unknown as TournamentStaffAccessService,
+      actualAuditWriter,
+      context.realtime as unknown as RealtimeGateway,
+      () => NOW,
+    );
+    context.access.assertAccess.mockResolvedValue({
+      userId: IDS.actor,
+      role: 'tournament_director',
+      tournamentId: IDS.tournament,
+      assignmentId: 'director-assignment',
+      assignmentVersion: 4,
+    });
+    context.tx.v1TournamentStaffAssignment.findFirst.mockResolvedValue({
+      id: 'director-assignment',
+    });
+    context.tx.v1TournamentStaffAssignment.updateMany.mockImplementation(async () => {
+      order.push('assignment');
+      persistedAssignment = assignment({ version: 1, revokedAt: NOW, updatedAt: NOW });
+      return { count: 1 };
+    });
+    context.tx.v1TournamentStaffAssignment.findUnique.mockImplementation(async () => persistedAssignment);
+    context.tx.v1OperationAudit.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+      order.push('audit');
+      persistedAudits.push(data);
+      return { id: 'audit-1' };
+    });
+    context.prisma.$transaction.mockImplementation(async (callback: (client: typeof context.tx) => unknown) => {
+      const result = await callback(context.tx);
+      order.push('commit');
+      return result;
+    });
+    context.realtime.evictUserFromScopedGameRooms.mockImplementation(() => order.push('scoped-eviction'));
+
+    const result = await service.revokeStaff({
+      actorUserId: IDS.actor,
+      tournamentId: IDS.tournament,
+      assignmentId: IDS.assignment,
+      expectedVersion: 0,
+      audit: AUDIT,
+    });
+
+    expect(result).toMatchObject({ id: IDS.assignment, version: 1, revokedAt: NOW });
+    expect(persistedAssignment).toMatchObject({
+      id: IDS.assignment,
+      version: 1,
+      revokedAt: NOW,
+    });
+    expect(persistedAudits).toHaveLength(1);
+    expect(persistedAudits[0]).toMatchObject({
+      action: 'tournament.staff.revoke',
+      requestId: AUDIT.requestId,
+      maskedSourceIp: '203.0.113.0',
+      resourceId: IDS.assignment,
+    });
+    expect(order).toEqual(['assignment', 'audit', 'commit', 'scoped-eviction']);
+    expect(context.realtime.evictUserFromScopedGameRooms).toHaveBeenCalledWith({
+      userId: IDS.target,
+      tournamentId: IDS.tournament,
+      assignmentVersion: 1,
+    });
+    expect(context.realtime.forceDisconnectUser).not.toHaveBeenCalled();
+  });
+
+  it('Task 8 revokes staff scope with selective room eviction after commit and no whole-user disconnect', async () => {
     const context = setup();
     const order: string[] = [];
     context.access.assertAccess.mockResolvedValue({
@@ -295,9 +369,10 @@ describe('TournamentStaffService', () => {
       order.push('commit');
       return result;
     });
+    context.realtime.evictUserFromScopedGameRooms.mockImplementation(() => order.push('scoped-eviction'));
     context.realtime.forceDisconnectUser.mockImplementation(() => order.push('disconnect'));
 
-    const result = await context.service.revokeStaff({
+    await context.service.revokeStaff({
       actorUserId: IDS.actor,
       tournamentId: IDS.tournament,
       assignmentId: IDS.assignment,
@@ -305,18 +380,51 @@ describe('TournamentStaffService', () => {
       audit: AUDIT,
     });
 
-    expect(result).toMatchObject({ id: IDS.assignment, version: 1, revokedAt: NOW });
-    expect(order).toEqual(['assignment', 'audit', 'commit', 'disconnect']);
-    expect(context.realtime.forceDisconnectUser).toHaveBeenCalledWith(IDS.target);
-    expect(context.auditWriter.create).toHaveBeenCalledWith(
-      expect.objectContaining({ v1OperationAudit: expect.any(Object) }),
-      expect.objectContaining({
-        requestId: AUDIT.requestId,
-        sourceIp: AUDIT.sourceIp,
-        before: expect.objectContaining({ version: 0, revokedAt: null }),
-        after: expect.objectContaining({ version: 1, revokedAt: NOW.toISOString() }),
-      }),
-    );
+    try {
+      expect(order).toEqual(['assignment', 'audit', 'commit', 'scoped-eviction']);
+    } catch (error) {
+      throw new Error(
+        `evictUserFromScopedGameRooms must run after the committed revoke audit: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    expect(context.realtime.evictUserFromScopedGameRooms).toHaveBeenCalledWith({
+      userId: IDS.target,
+      tournamentId: IDS.tournament,
+      assignmentVersion: 1,
+    });
+    expect(context.realtime.forceDisconnectUser).not.toHaveBeenCalled();
+  });
+
+  it('Task 8 permission revoked passes the committed revoked assignment version to scoped eviction', async () => {
+    const context = setup();
+    context.access.assertAccess.mockResolvedValue({
+      userId: IDS.actor,
+      role: 'tournament_director',
+      tournamentId: IDS.tournament,
+      assignmentId: 'director-assignment',
+      assignmentVersion: 4,
+    });
+    context.tx.v1TournamentStaffAssignment.findFirst.mockResolvedValue({ id: 'director-assignment' });
+    context.tx.v1TournamentStaffAssignment.updateMany.mockResolvedValue({ count: 1 });
+    context.tx.v1TournamentStaffAssignment.findUnique
+      .mockResolvedValueOnce(assignment())
+      .mockResolvedValueOnce(assignment({ version: 1, revokedAt: NOW, updatedAt: NOW }));
+
+    await context.service.revokeStaff({
+      actorUserId: IDS.actor,
+      tournamentId: IDS.tournament,
+      assignmentId: IDS.assignment,
+      expectedVersion: 0,
+      audit: AUDIT,
+    });
+
+    expect(context.realtime.evictUserFromScopedGameRooms).toHaveBeenCalledWith({
+      userId: IDS.target,
+      tournamentId: IDS.tournament,
+      assignmentVersion: 1,
+    });
   });
 
   it('does not disconnect or leave an audit when the revoke transaction fails', async () => {
@@ -538,8 +646,13 @@ describe('TournamentStaffService', () => {
     expect(committedAudits.every((audit) => audit['maskedSourceIp'] === '203.0.113.0')).toBe(true);
     expect(JSON.stringify(committedAudits)).not.toContain(AUDIT.sourceIp);
     expect(revoked).toMatchObject({ version: 1, revokedAt: NOW });
-    expect(context.realtime.forceDisconnectUser).toHaveBeenCalledTimes(1);
-    expect(context.realtime.forceDisconnectUser).toHaveBeenCalledWith(IDS.target);
+    expect(context.realtime.evictUserFromScopedGameRooms).toHaveBeenCalledTimes(1);
+    expect(context.realtime.evictUserFromScopedGameRooms).toHaveBeenCalledWith({
+      userId: IDS.target,
+      tournamentId: IDS.tournament,
+      assignmentVersion: 1,
+    });
+    expect(context.realtime.forceDisconnectUser).not.toHaveBeenCalled();
     console.log(
       'TASK7_STAFF_MANAGEMENT=PASS bootstrap=platform_ops grants=limited revocation=immediate court=stable audit=atomic deniedWrites=0',
     );

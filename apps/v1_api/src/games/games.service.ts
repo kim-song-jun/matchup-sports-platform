@@ -100,6 +100,16 @@ type CommandBoundaryInput = {
   payload: unknown;
 };
 
+type ImmutableGameEventInput = Omit<AppendGameEventDto, 'expectedVersion' | 'clientEventId' | 'takeoverToken'>;
+
+export type RetryGameEventInput = {
+  rebasedExpectedVersion: number;
+  clientEventId: string;
+  takeoverToken: string;
+  payloadHash: string;
+  event: ImmutableGameEventInput;
+};
+
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalize);
@@ -116,6 +126,58 @@ function canonicalize(value: unknown): unknown {
 
 export function canonicalGameCommandPayloadHash(payload: unknown): string {
   return createHash('sha256').update(JSON.stringify(canonicalize(payload))).digest('hex');
+}
+
+function immutableGameEventPayload(dto: AppendGameEventDto): ImmutableGameEventInput {
+  return {
+    type: dto.type,
+    ...(dto.sideId === undefined ? {} : { sideId: dto.sideId }),
+    ...(dto.participantId === undefined ? {} : { participantId: dto.participantId }),
+    period: dto.period,
+    clockMs: dto.clockMs,
+    occurredAt: dto.occurredAt,
+    payload: dto.payload,
+  };
+}
+
+function parseStoredGameEventAppendResult(value: unknown): GameEventAppendResult | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  if (
+    !('gameId' in value) ||
+    !('state' in value) ||
+    !('version' in value) ||
+    !('durableCommandId' in value) ||
+    !('replayed' in value) ||
+    !('clientEventId' in value) ||
+    !('sequence' in value)
+  ) {
+    return null;
+  }
+  const state = Object.values(V1GameState).find((candidate) => candidate === value.state);
+  if (
+    typeof value.gameId !== 'string' ||
+    state === undefined ||
+    typeof value.version !== 'number' ||
+    !Number.isSafeInteger(value.version) ||
+    typeof value.durableCommandId !== 'string' ||
+    typeof value.replayed !== 'boolean' ||
+    typeof value.clientEventId !== 'string' ||
+    typeof value.sequence !== 'number' ||
+    !Number.isSafeInteger(value.sequence)
+  ) {
+    return null;
+  }
+  return {
+    gameId: value.gameId,
+    state,
+    version: value.version,
+    durableCommandId: value.durableCommandId,
+    replayed: value.replayed,
+    clientEventId: value.clientEventId,
+    sequence: value.sequence,
+  };
 }
 
 export function gameAuthorizationAction(action: string): GameAuthorizationAction {
@@ -550,17 +612,36 @@ export class GamesService {
 
   async listEvents(user: V1AuthUser, gameId: string, afterSequence: number) {
     await this.resolveActor(this.prisma, gameId, user.id, 'read');
-    const [events, game] = await Promise.all([
-      this.prisma.v1GameEvent.findMany({
-        where: { gameId, sequence: { gt: afterSequence } },
-        orderBy: { sequence: 'asc' },
-      }),
-      this.prisma.v1Game.findUnique({ where: { id: gameId }, select: { lastSequence: true } }),
-    ]);
-    if (game === null) {
-      throw this.notFound();
-    }
-    return { events, lastSequence: game.lastSequence };
+    return this.prisma.$transaction(
+      async (tx) => {
+        const game = await tx.v1Game.findUnique({
+          where: { id: gameId },
+          select: { lastSequence: true },
+        });
+        if (game === null) {
+          throw this.notFound();
+        }
+        const snapshotLastSequence = game.lastSequence;
+        const events = await tx.v1GameEvent.findMany({
+          where: {
+            gameId,
+            sequence: { gt: afterSequence, lte: snapshotLastSequence },
+          },
+          orderBy: { sequence: 'asc' },
+        });
+        let expectedSequence = afterSequence + 1;
+        let gap: { expectedSequence: number; availableFrom: number } | null = null;
+        for (const event of events) {
+          if (event.sequence > expectedSequence) {
+            gap = { expectedSequence, availableFrom: event.sequence };
+            break;
+          }
+          expectedSequence = event.sequence + 1;
+        }
+        return { events, lastSequence: snapshotLastSequence, gap };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   async appendEvent(
@@ -578,7 +659,7 @@ export class GamesService {
         headerIdempotencyKey,
         bodyCommandId: dto.clientEventId,
         takeoverToken: dto.takeoverToken,
-        payload: dto,
+        payload: immutableGameEventPayload(dto),
       },
       async (tx, game, context) => {
         this.requireTakeover(context);
@@ -624,6 +705,171 @@ export class GamesService {
         };
       },
     );
+  }
+
+  async retryEvent(
+    user: V1AuthUser,
+    gameId: string,
+    input: RetryGameEventInput,
+  ): Promise<GameEventAppendResult> {
+    const immutablePayloadHash = canonicalGameCommandPayloadHash(input.event);
+    if (input.payloadHash.toLowerCase() !== immutablePayloadHash) {
+      throw new ConflictException({
+        code: 'OFFLINE_EVENT_REBASE_CONFLICT',
+        message: 'Offline event payload hash does not match the immutable event',
+      });
+    }
+
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
+          const game = await tx.v1Game.findUnique({
+            where: { id: gameId },
+            select: {
+              id: true,
+              sourceType: true,
+              teamMatchId: true,
+              tournamentFixtureId: true,
+              state: true,
+              version: true,
+              lastSequence: true,
+              competitionConfigVersionId: true,
+            },
+          });
+          if (game === null) {
+            throw this.notFound();
+          }
+          const actor = await this.resolveActor(tx, gameId, user.id, 'event_append');
+          const existing = await tx.v1IdempotencyRecord.findUnique({
+            where: {
+              actorUserId_action_resourceType_resourceId_idempotencyKey: {
+                actorUserId: actorStorageId(actor),
+                action: 'event_append',
+                resourceType: 'GAME',
+                resourceId: gameId,
+                idempotencyKey: input.clientEventId,
+              },
+            },
+          });
+          if (existing !== null) {
+            if (existing.payloadHash !== immutablePayloadHash) {
+              throw new ConflictException({
+                code: 'IDEMPOTENCY_PAYLOAD_CONFLICT',
+                message: 'The client event ID was already used with a different immutable event',
+              });
+            }
+            const response = parseStoredGameEventAppendResult(existing.responseBody);
+            if (response === null) {
+              throw new ConflictException({
+                code: 'OFFLINE_EVENT_REBASE_CONFLICT',
+                message: 'The stored offline event response is invalid',
+              });
+            }
+            return { ...response, replayed: true };
+          }
+          if (input.rebasedExpectedVersion !== game.version) {
+            throw new ConflictException({
+              code: 'OFFLINE_EVENT_REBASE_CONFLICT',
+              message: 'The rebased game version is stale',
+              details: {
+                expectedVersion: input.rebasedExpectedVersion,
+                currentVersion: game.version,
+              },
+            });
+          }
+          let context: GameCommandContext;
+          try {
+            context = assertGameCommandContext({
+              actor,
+              expectedVersion: input.rebasedExpectedVersion,
+              currentVersion: game.version,
+              headerIdempotencyKey: input.clientEventId,
+              bodyClientCommandId: input.clientEventId,
+              payloadHash: immutablePayloadHash,
+              takeoverToken: input.takeoverToken,
+            });
+          } catch (error) {
+            if (error instanceof GameContractError) {
+              throw toGameHttpException(error);
+            }
+            throw error;
+          }
+          this.requireTakeover(context);
+          const dto: AppendGameEventDto = {
+            ...input.event,
+            expectedVersion: input.rebasedExpectedVersion,
+            clientEventId: input.clientEventId,
+            takeoverToken: input.takeoverToken,
+          };
+          await this.assertEventReferences(tx, game, dto);
+          const sequence = game.lastSequence + 1;
+          await tx.v1GameEvent.create({
+            data: {
+              gameId,
+              sequence,
+              clientEventId: input.clientEventId,
+              payloadHash: immutablePayloadHash,
+              type: input.event.type,
+              sideId: input.event.sideId,
+              participantId: input.event.participantId,
+              period: input.event.period,
+              clockMs: input.event.clockMs,
+              occurredAt: new Date(input.event.occurredAt),
+              actorUserId: actorStorageId(context.actor),
+              payload: jsonInput(input.event.payload),
+            },
+          });
+          const updated = await tx.v1Game.update({
+            where: { id: gameId },
+            data: { lastSequence: sequence, version: { increment: 1 } },
+          });
+          const response: GameEventAppendResult = {
+            gameId,
+            state: updated.state,
+            version: updated.version,
+            durableCommandId: context.durableCommandId,
+            replayed: false,
+            clientEventId: input.clientEventId,
+            sequence,
+          };
+          await this.storeIdempotency(tx, {
+            actor,
+            action: 'event_append',
+            resourceType: 'GAME',
+            resourceId: gameId,
+            durableCommandId: input.clientEventId,
+            payloadHash: immutablePayloadHash,
+            response,
+          });
+          await this.writeAudit(
+            tx,
+            actor,
+            'EVENT_APPEND',
+            gameId,
+            input.clientEventId,
+            { version: game.version, state: game.state },
+            response,
+          );
+          await this.writeOutbox(tx, `game:${gameId}:event:${sequence}`, gameId, 'GAME_EVENT_APPENDED', {
+            sequence,
+          });
+          return response;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2034' || error.code === 'P2002')
+      ) {
+        throw new ConflictException({
+          code: 'COMMAND_CONCURRENCY_CONFLICT',
+          message: 'A concurrent command won; reload the current game version and retry',
+        });
+      }
+      throw error;
+    }
   }
 
   async reverseEvent(

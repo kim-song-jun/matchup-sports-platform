@@ -23,7 +23,7 @@ raw roster identity fields.
 | `GET` | `/api/v1/games/:gameId` | authenticated; source-scoped reader | Returns game, sides, periods, lineups, current version/sequence and current official revision reference. |
 | `POST` | `/api/v1/games/:gameId/commands/:command` | authenticated tournament command actor | `GameCommandDto`; `command` is `start`, `pause`, `resume`, or `end`. Team-match use is `409 TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN`; tournament `end` derives its result revision in the same transaction. |
 | `POST` | `/api/v1/games/:gameId/cancel` | authenticated source-scoped cancel actor | `CancelGameDto`; transitions to `CANCELLED` and makes visibility status-only. |
-| `GET` | `/api/v1/games/:gameId/events?afterSequence=N` | authenticated; source-scoped reader | `ListGameEventsQueryDto`; ascending append-only events after `N` plus `lastSequence` (sequence cursor, not page cursor). |
+| `GET` | `/api/v1/games/:gameId/events?afterSequence=N` | authenticated; source-scoped reader | `ListGameEventsQueryDto`; `N` defaults to `0` and otherwise accepts ASCII digits for a safe non-negative integer only. Returns ascending events with `N < sequence <= lastSequence`, the coherent `lastSequence` watermark, and `gap: null` or the first observed `{ expectedSequence, availableFrom }`. Invalid, empty, repeated, exponent, hex, signed, fractional, or unsafe cursors return `400 VALIDATION_ERROR`. |
 | `POST` | `/api/v1/games/:gameId/events` | authenticated event actor with takeover token | `AppendGameEventDto`; appends one sequenced event. Terminal games reject mutation with `409 TERMINAL_GAME_IMMUTABLE`. |
 | `POST` | `/api/v1/games/:gameId/events/:eventId/reverse` | authenticated reverse actor with takeover token | `ReverseGameEventDto`; appends one `CORRECTION` event that references the original; it does not mutate or delete it. |
 | `GET` | `/api/v1/games/:gameId/lineups` | authenticated; source-scoped reader | Returns lineup revisions in side/revision order. |
@@ -43,6 +43,11 @@ uses `clientEventId`. Missing or mismatched header/body values return
 identical retry replays the stored response while a changed payload with the same durable key
 returns `409 IDEMPOTENCY_PAYLOAD_CONFLICT`. Validation remains DTO-enforced (`400
 VALIDATION_ERROR`) and source/role failure is `401`, `403`, or `404` as applicable.
+
+Event backfill runs in a `RepeatableRead` transaction: it fixes the Game `lastSequence` first and
+then bounds the ascending event query by that watermark. The response therefore never combines
+events newer than its advertised watermark. `gap` reports the first discontinuity observed in the
+bounded rows; it is a recovery signal, not a synthesized event or an alternate pagination cursor.
 
 Game events and result revisions are append-only. A reversal is a compensating event; it never
 rewrites the original event. Result participant/scorer records are validated against the

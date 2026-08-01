@@ -284,7 +284,11 @@ export class TournamentStaffService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    this.realtimeGateway.forceDisconnectUser(result.userId);
+    this.realtimeGateway.evictUserFromScopedGameRooms({
+      userId: result.userId,
+      tournamentId: result.tournamentId,
+      assignmentVersion: result.version,
+    });
     return result;
   }
 

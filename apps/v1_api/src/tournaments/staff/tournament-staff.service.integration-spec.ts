@@ -26,7 +26,7 @@ const NOW = new Date('2026-08-01T06:00:00.000Z');
 describe('TournamentStaffService PostgreSQL contract', () => {
   const prisma = new PrismaService();
   const auditWriter = new OperationAuditWriterService();
-  const realtime = { forceDisconnectUser: jest.fn() };
+  const realtime = { evictUserFromScopedGameRooms: jest.fn() };
   const access = new TournamentStaffAccessService(prisma, () => NOW);
   const service = new TournamentStaffService(
     prisma,
@@ -147,8 +147,12 @@ describe('TournamentStaffService PostgreSQL contract', () => {
     expect(revoked).toMatchObject({ revokedAt: NOW, version: 1 });
     expect(audits).toHaveLength(4);
     expect(audits.every((audit) => audit.maskedSourceIp === '203.0.113.0')).toBe(true);
-    expect(realtime.forceDisconnectUser).toHaveBeenCalledTimes(1);
-    expect(realtime.forceDisconnectUser).toHaveBeenCalledWith(ID.operator);
+    expect(realtime.evictUserFromScopedGameRooms).toHaveBeenCalledTimes(1);
+    expect(realtime.evictUserFromScopedGameRooms).toHaveBeenCalledWith({
+      userId: ID.operator,
+      tournamentId: ID.tournament,
+      assignmentVersion: 1,
+    });
   });
 
   it('rolls back assignment and audit together when audit persistence fails', async () => {

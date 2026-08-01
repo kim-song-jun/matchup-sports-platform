@@ -74,7 +74,7 @@ export class GamesController {
     @Param('gameId') gameId: string,
     @Query() query: ListGameEventsQueryDto,
   ) {
-    return this.gamesService.listEvents(user, gameId, query.afterSequence);
+    return this.gamesService.listEvents(user, gameId, query.validatedAfterSequence);
   }
 
   @Post(':gameId/events')

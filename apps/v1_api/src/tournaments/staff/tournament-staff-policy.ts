@@ -311,7 +311,7 @@ function allowsRoleAction(role: TournamentStaffRole, action: TournamentStaffActi
     case 'public':
       return action === 'read';
     case 'team_manager':
-      return false;
+      return action === 'read' || action === 'lineup_mutate';
   }
 }
 

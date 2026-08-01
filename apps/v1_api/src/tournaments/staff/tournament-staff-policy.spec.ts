@@ -71,7 +71,7 @@ describe('Tournament staff policy', () => {
       tournament_director: actions,
       field_operator: ['read', 'tournament_command', 'event_append'],
       support_readonly: ['read'],
-      team_manager: [],
+      team_manager: ['read', 'lineup_mutate'],
       public: ['read'],
     };
     const roles = [
@@ -110,7 +110,49 @@ describe('Tournament staff policy', () => {
       }
     }
 
-    expect({ allowed, rejected }).toEqual({ allowed: 17, rejected: 19 });
+    expect({ allowed, rejected }).toEqual({ allowed: 19, rejected: 17 });
+  });
+
+  it('allows team managers only their frozen read and lineup mutation surface', () => {
+    const base = {
+      role: 'team_manager',
+      now: NOW,
+      resource: resource(),
+    } as const;
+
+    expect(decideTournamentStaffAccess({ ...base, action: 'read' })).toEqual({
+      allowed: true,
+      reason: 'ALLOWED',
+    });
+    expect(decideTournamentStaffAccess({ ...base, action: 'lineup_mutate' })).toEqual({
+      allowed: true,
+      reason: 'ALLOWED',
+    });
+    for (const action of ['tournament_command', 'event_append', 'event_reverse', 'cancel'] as const) {
+      expect(decideTournamentStaffAccess({ ...base, action })).toEqual({
+        allowed: false,
+        reason: 'ROLE_ACTION_DENIED',
+      });
+    }
+  });
+
+  it('allows public reads while rejecting every representative mutation', () => {
+    const base = {
+      role: 'public',
+      now: NOW,
+      resource: resource(),
+    } as const;
+
+    expect(decideTournamentStaffAccess({ ...base, action: 'read' })).toEqual({
+      allowed: true,
+      reason: 'ALLOWED',
+    });
+    for (const action of ['lineup_mutate', 'event_append', 'cancel'] as const) {
+      expect(decideTournamentStaffAccess({ ...base, action })).toEqual({
+        allowed: false,
+        reason: 'ROLE_ACTION_DENIED',
+      });
+    }
   });
 
   it('re-evaluates revoked, expired, and not-started assignments at the supplied current time', () => {

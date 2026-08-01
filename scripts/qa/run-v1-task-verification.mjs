@@ -119,6 +119,10 @@ const TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH =
   '.omo/start-work/host-pressure-override-task-9-plan-r2.json';
 const TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256 =
   '436ea7c6b56d2069dfb1d46d17974c75ceb6db99b5aa41c67208d1678eae783e';
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_PATH =
+  '.omo/start-work/host-pressure-override-task-9-plan-r3.json';
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_SHA256 =
+  '026b453a615973b71ace9734f21f895df58397c8a3fb995f9d259c47cd6feb7c';
 const VERIFICATION_SESSION_ID =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
 const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
@@ -435,17 +439,15 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
   const canonicalPath = resolve(repoRoot, OVERRIDE_PATH);
   const historicalPath = resolve(repoRoot, HISTORICAL_TASK_ONE_OVERRIDE_PATH);
   const pressureBPath = resolve(repoRoot, TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH);
-  const taskNinePath = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH);
-  const taskNineR2Path = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH);
+  const taskNineR3Path = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_PATH);
   const absoluteSupplied = resolve(supplied);
   const historical = task === 1 && absoluteSupplied === historicalPath;
   const pressureB = absoluteSupplied === pressureBPath;
-  const taskNineR2 = task === 9 && absoluteSupplied === taskNineR2Path;
-  const taskNine = task === 9 && (absoluteSupplied === taskNinePath || taskNineR2);
+  const taskNine = task === 9 && absoluteSupplied === taskNineR3Path;
   if (absoluteSupplied !== canonicalPath && !historical && !pressureB && !taskNine) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, ${TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH}`,
+      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_PATH}`,
       75,
     );
   }
@@ -454,9 +456,7 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     : pressureB
       ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256
       : taskNine
-        ? taskNineR2
-          ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256
-          : TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256
+        ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_SHA256
         : OVERRIDE_SHA256;
   const descriptor = secureImmutableDescriptor(
     absoluteSupplied,
@@ -465,7 +465,7 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     75,
     false,
     pressureB ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE : null,
-    taskNine,
+    false,
   );
   const receipt = descriptor.receipt;
   const allowed = historical
@@ -914,27 +914,39 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
       'authorizationText',
       'authorizedAt',
       'constraints',
-      'plan',
+      'mode',
+      'ownedPaths',
+      'planName',
+      'planPath',
       'planSHA256',
+      'receiptType',
       'schemaVersion',
       'scope',
       'sessionId',
+      'task',
     ]) &&
     JSON.stringify(receipt.allowedTasks) === JSON.stringify([9]) &&
-    receipt.authorizationSource ===
-      (taskNineR2
-        ? 'prior-explicit-user-message-plus-task-9-decision'
-        : 'user-message') &&
+    receipt.authorizationSource === 'user-pressure-override' &&
     Number.isFinite(Date.parse(receipt.authorizedAt)) &&
     typeof receipt.authorizationText === 'string' &&
     receipt.authorizationText.length > 0 &&
     Array.isArray(receipt.constraints) &&
     receipt.constraints.length > 0 &&
-    receipt.constraints.every((constraint) => typeof constraint === 'string');
+    receipt.constraints.every((constraint) => typeof constraint === 'string') &&
+    receipt.receiptType === 'task-9-host-pressure-override-r3' &&
+    receipt.mode === 'direct' &&
+    receipt.scope === 'host-preflight-only' &&
+    receipt.task === 9 &&
+    receipt.planName === 'teameet-team-tournament-operations-v1' &&
+    receipt.planPath === PLAN_PATH &&
+    receipt.planSHA256 === plan.normalizedSHA &&
+    JSON.stringify(receipt.ownedPaths) ===
+      JSON.stringify(ownershipRow(parseLedger(resolve(repoRoot, DEFAULT_LEDGER)), 9).outputs);
   if (
     receipt.schemaVersion !== 1 ||
-    receipt.plan !== PLAN_PATH ||
-    ![plan.rawSHA, plan.normalizedSHA].includes(receipt.planSHA256) ||
+    (!taskNine &&
+      (receipt.plan !== PLAN_PATH ||
+        ![plan.rawSHA, plan.normalizedSHA].includes(receipt.planSHA256))) ||
     receipt.sessionId !== VERIFICATION_SESSION_ID ||
     (!taskNine && receipt.authorizationSource !== 'user-message') ||
     !(pressureB

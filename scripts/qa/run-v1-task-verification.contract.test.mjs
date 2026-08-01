@@ -56,6 +56,31 @@ const taskNineR2OverrideSHA =
   '436ea7c6b56d2069dfb1d46d17974c75ceb6db99b5aa41c67208d1678eae783e';
 const taskNineR2PlanSHA =
   '61bb87ecb9e3b96046bb7f1e59ceb36ddf11620bfc1034779defd7bcacdfbed6';
+const taskNineR3OverridePath =
+  '.omo/start-work/host-pressure-override-task-9-plan-r3.json';
+const taskNineR3OverrideSHA =
+  '026b453a615973b71ace9734f21f895df58397c8a3fb995f9d259c47cd6feb7c';
+const taskNineR3PlanSHA =
+  '191e5fd616b96d31ab84fd83777489859640e6c1611b91b2cf09174a3cd2da0b';
+const taskNineR3OwnedPaths = [
+  'apps/v1_api/prisma/schema.prisma',
+  'apps/v1_api/prisma/migrations/20260802000100_v1_game_projections_escalations',
+  'apps/v1_api/prisma/migrations/20260802000200_v1_team_record_facts',
+  'apps/v1_api/src/game-operations',
+  'apps/v1_api/src/games/projections',
+  'apps/v1_api/src/jobs/result-escalation',
+  'apps/v1_api/src/jobs/v1-game-operations-worker.module.ts',
+  'apps/v1_api/src/jobs/v1-game-operations-worker.service.ts',
+  'apps/v1_api/src/jobs/v1-game-operations-worker.main.ts',
+  'apps/v1_api/src/games/games.service.ts',
+  'apps/v1_api/src/notifications/notifications.module.ts',
+  'apps/v1_api/src/notifications/notifications.service.ts',
+  'apps/v1_api/src/tournaments/tournament-bracket.service.ts',
+  'apps/v1_api/test/games/game-projection.integration-spec.ts',
+  'docs/api/domains/games.md',
+  'docs/api/domains/tournaments.md',
+  'docs/api/domains/tournament-operations-escalations.md',
+];
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -500,6 +525,8 @@ function hostPressureOverrideFunction({
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256',
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH',
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_PATH',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_SHA256',
     'OVERRIDE_SHA256',
     'VERIFICATION_SESSION_ID',
     'secureImmutableDescriptor',
@@ -518,6 +545,9 @@ function hostPressureOverrideFunction({
     'existsSync',
     'readFileSync',
     'spawnSync',
+    'ownershipRow',
+    'parseLedger',
+    'DEFAULT_LEDGER',
     `${declaration}; return verifyOverride;`,
   )(
     resolve,
@@ -532,6 +562,8 @@ function hostPressureOverrideFunction({
     taskNineOverrideSHA,
     taskNineR2OverridePath,
     taskNineR2OverrideSHA,
+    taskNineR3OverridePath,
+    taskNineR3OverrideSHA,
     '2c04e6621fccb1017838c6b479ac8addabba9061852654cec4c893ed588631c2',
     'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
     (path, expectedSHA, code, exitCode) => {
@@ -566,6 +598,13 @@ function hostPressureOverrideFunction({
     },
     readFileSync,
     spawnSync,
+    (ledger, task) => {
+      const row = ledger.ownership.find((entry) => entry.todo === task);
+      if (!row) throw new Error(`Missing Todo ${task}`);
+      return row;
+    },
+    () => ({ ownership: [{ todo: 9, outputs: taskNineR3OwnedPaths }] }),
+    '.github/tasks/127-v1-team-tournament-operations-game-record.md',
   );
 }
 
@@ -1442,72 +1481,95 @@ test('legacy Task1 host pressure override remains accepted', () => {
   }
 });
 
-test('Task 9 host pressure receipt accepts only its immutable simple contract', () => {
+test('Task 9 R3 host pressure receipt binds the normalized plan and exact ownership', () => {
   const canonicalReceipt = JSON.parse(
-    readFileSync(resolve(repoRoot, taskNineOverridePath), 'utf8'),
+    readFileSync(resolve(repoRoot, taskNineR3OverridePath), 'utf8'),
   );
   const source = readFileSync(
     join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
     'utf8',
   );
   const productionSHA = source.match(
-    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256 =\s*'([0-9a-f]{64})'/,
+    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_R3_SHA256 =\s*'([0-9a-f]{64})'/,
   )?.[1];
+  const ledgerText = readFileSync(
+    join(repoRoot, '.github/tasks/127-v1-team-tournament-operations-game-record.md'),
+    'utf8',
+  );
+  const ledgerMatch = ledgerText.match(
+    /<!-- TASK127_LEDGER_JSON_BEGIN -->\s*```json\n([\s\S]*?)\n```\s*<!-- TASK127_LEDGER_JSON_END -->/,
+  );
+  assert.ok(ledgerMatch);
+  const ledgerOutputs = JSON.parse(ledgerMatch[1]).ownership.find(
+    (entry) => entry.todo === 9,
+  ).outputs;
+  const planRow = readFileSync(
+    join(repoRoot, '.omo/plans/teameet-team-tournament-operations-v1.md'),
+    'utf8',
+  ).split('\n').find(
+    (line) =>
+      line.startsWith('| 9 |') &&
+      line.includes('apps/v1_api/prisma/schema.prisma'),
+  );
+  assert.ok(planRow);
+  const planOutputs = planRow.slice(1, -1).split('|')[2].trim().split('; ').map(
+    (entry) => entry.replace(/^`|`$/g, ''),
+  );
   const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
   const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
   try {
-    assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineOverridePath))), taskNineOverrideSHA);
-    assert.equal(productionSHA, taskNineOverrideSHA);
+    assert.deepEqual(ledgerOutputs, taskNineR3OwnedPaths);
+    assert.deepEqual(planOutputs, taskNineR3OwnedPaths);
+    assert.deepEqual(canonicalReceipt.ownedPaths, taskNineR3OwnedPaths);
+    assert.equal(canonicalReceipt.planSHA256, taskNineR3PlanSHA);
+    assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineR3OverridePath))), taskNineR3OverrideSHA);
+    assert.equal(productionSHA, taskNineR3OverrideSHA);
     const verifyDescriptor = secureImmutableDescriptorFunction();
-    assert.throws(
-      () => verifyDescriptor(
-        resolve(repoRoot, taskNineOverridePath),
-        taskNineOverrideSHA,
-        'HOST_PRESSURE_OVERRIDE_INVALID',
-        75,
-      ),
-      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
-      'the normal descriptor must reject the Task 9 receipt’s noncanonical pretty JSON',
-    );
     assert.doesNotThrow(() => verifyDescriptor(
-      resolve(repoRoot, taskNineOverridePath),
-      taskNineOverrideSHA,
+      resolve(repoRoot, taskNineR3OverridePath),
+      taskNineR3OverrideSHA,
       'HOST_PRESSURE_OVERRIDE_INVALID',
       75,
-      false,
-      null,
-      true,
     ));
     const hardLinkDirectory = mkdtempSync('/private/tmp/teameet-task9-hardlink-');
     const hardLinkPath = join(hardLinkDirectory, 'receipt.json');
     try {
-      linkSync(resolve(repoRoot, taskNineOverridePath), hardLinkPath);
-      assert.equal(lstatSync(resolve(repoRoot, taskNineOverridePath)).nlink, 2);
+      linkSync(resolve(repoRoot, taskNineR3OverridePath), hardLinkPath);
+      assert.equal(lstatSync(resolve(repoRoot, taskNineR3OverridePath)).nlink, 2);
       assert.throws(
         () => verifyDescriptor(
-          resolve(repoRoot, taskNineOverridePath),
-          taskNineOverrideSHA,
+          resolve(repoRoot, taskNineR3OverridePath),
+          taskNineR3OverrideSHA,
           'HOST_PRESSURE_OVERRIDE_INVALID',
           75,
-          false,
-          null,
-          true,
         ),
         (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
-        'the exact Task 9 receipt must reject a hard-linked inode',
+        'the exact Task 9 R3 receipt must reject a hard-linked inode',
       );
     } finally {
       rmSync(hardLinkDirectory, { recursive: true, force: true });
     }
-    process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, taskNineOverridePath);
+    const symlinkDirectory = mkdtempSync('/private/tmp/teameet-task9-symlink-');
+    try {
+      const symlinkPath = join(symlinkDirectory, 'receipt.json');
+      symlinkSync(resolve(repoRoot, taskNineR3OverridePath), symlinkPath);
+      assert.throws(
+        () => verifyDescriptor(symlinkPath, taskNineR3OverrideSHA, 'HOST_PRESSURE_OVERRIDE_INVALID', 75),
+        (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+        'the exact Task 9 R3 receipt must reject a symlink',
+      );
+    } finally {
+      rmSync(symlinkDirectory, { recursive: true, force: true });
+    }
+    process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, taskNineR3OverridePath);
     process.env.V1_VERIFICATION_SESSION_ID = verificationSessionId;
     const verifyOverride = hostPressureOverrideFunction({
       receipt: canonicalReceipt,
-      sha256: taskNineOverrideSHA,
+      sha256: taskNineR3OverrideSHA,
     });
     const accepted = verifyOverride(
       repoRoot,
-      { rawSHA: taskNinePlanSHA, normalizedSHA: 'different-normalized-plan-sha' },
+      { rawSHA: 'different-raw-plan-sha', normalizedSHA: taskNineR3PlanSHA },
       9,
       ['NODE_MCP_PROCESS_PROLIFERATION'],
     );
@@ -1515,20 +1577,23 @@ test('Task 9 host pressure receipt accepts only its immutable simple contract', 
     assert.deepEqual(accepted.observedFailures, ['NODE_MCP_PROCESS_PROLIFERATION']);
 
     const rejected = (name, {
-      path = taskNineOverridePath,
-      sha256: receiptSHA = taskNineOverrideSHA,
+      path = taskNineR3OverridePath,
+      sha256: receiptSHA = taskNineR3OverrideSHA,
       session = verificationSessionId,
-      planSHA = taskNinePlanSHA,
+      planSHA = taskNineR3PlanSHA,
       task = 9,
+      receipt = canonicalReceipt,
     }) => {
       process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, path);
       process.env.V1_VERIFICATION_SESSION_ID = session;
-      const receipt = { ...canonicalReceipt, planSHA256: planSHA };
-      const verifier = hostPressureOverrideFunction({ receipt, sha256: receiptSHA });
+      const verifier = hostPressureOverrideFunction({
+        receipt: { ...receipt, planSHA256: planSHA },
+        sha256: receiptSHA,
+      });
       assert.throws(
         () => verifier(
           repoRoot,
-          { rawSHA: taskNinePlanSHA, normalizedSHA: 'different-normalized-plan-sha' },
+          { rawSHA: 'different-raw-plan-sha', normalizedSHA: taskNineR3PlanSHA },
           task,
           ['NODE_MCP_PROCESS_PROLIFERATION'],
         ),
@@ -1540,7 +1605,19 @@ test('Task 9 host pressure receipt accepts only its immutable simple contract', 
     rejected('wrong SHA', { sha256: '0'.repeat(64) });
     rejected('wrong session', { session: 'codex:wrong-session' });
     rejected('wrong plan', { planSHA: '0'.repeat(64) });
+    rejected('wrong direct mode', {
+      receipt: { ...canonicalReceipt, mode: 'indirect' },
+    });
     rejected('wrong task', { task: 8 });
+    rejected('missing the new migration path', {
+      receipt: { ...canonicalReceipt, ownedPaths: taskNineR3OwnedPaths.filter((path) => path !== 'apps/v1_api/prisma/migrations/20260802000200_v1_team_record_facts') },
+    });
+    rejected('missing the new game-operations path', {
+      receipt: { ...canonicalReceipt, ownedPaths: taskNineR3OwnedPaths.filter((path) => path !== 'apps/v1_api/src/game-operations') },
+    });
+    rejected('extra unrelated path', {
+      receipt: { ...canonicalReceipt, ownedPaths: [...taskNineR3OwnedPaths, 'apps/v1_api/src/unrelated'] },
+    });
   } finally {
     if (previousReceipt === undefined) {
       delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
@@ -1555,7 +1632,7 @@ test('Task 9 host pressure receipt accepts only its immutable simple contract', 
   }
 });
 
-test('Task 9 R2 host pressure receipt accepts only its immutable descriptor', () => {
+test('Task 9 R2 host pressure receipt is rejected after the R3 ownership rebind', () => {
   const receipt = JSON.parse(readFileSync(resolve(repoRoot, taskNineR2OverridePath), 'utf8'));
   const source = readFileSync(
     join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
@@ -1579,41 +1656,16 @@ test('Task 9 R2 host pressure receipt accepts only its immutable descriptor', ()
       receipt,
       sha256: taskNineR2OverrideSHA,
     });
-    assert.doesNotThrow(() => verifyOverride(
-      repoRoot,
-      { rawSHA: taskNineR2PlanSHA, normalizedSHA: 'different-normalized-plan-sha' },
-      9,
-      ['NODE_MCP_PROCESS_PROLIFERATION'],
-    ));
-    const rejected = (name, {
-      path = taskNineR2OverridePath,
-      sha256: receiptSHA = taskNineR2OverrideSHA,
-      session = verificationSessionId,
-      planSHA = taskNineR2PlanSHA,
-      task = 9,
-    }) => {
-      process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, path);
-      process.env.V1_VERIFICATION_SESSION_ID = session;
-      const verifier = hostPressureOverrideFunction({
-        receipt: { ...receipt, planSHA256: planSHA },
-        sha256: receiptSHA,
-      });
-      assert.throws(
-        () => verifier(
-          repoRoot,
-          { rawSHA: taskNineR2PlanSHA, normalizedSHA: 'different-normalized-plan-sha' },
-          task,
-          ['NODE_MCP_PROCESS_PROLIFERATION'],
-        ),
-        (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
-        name,
-      );
-    };
-    rejected('wrong path', { path: '.omo/start-work/arbitrary-r2-receipt.json' });
-    rejected('wrong SHA', { sha256: '0'.repeat(64) });
-    rejected('wrong session', { session: 'codex:wrong-session' });
-    rejected('wrong plan', { planSHA: '0'.repeat(64) });
-    rejected('wrong task', { task: 8 });
+    assert.throws(
+      () => verifyOverride(
+        repoRoot,
+        { rawSHA: taskNineR2PlanSHA, normalizedSHA: taskNineR3PlanSHA },
+        9,
+        ['NODE_MCP_PROCESS_PROLIFERATION'],
+      ),
+      (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+      'V9 must reject the R2 descriptor before any fallback validation',
+    );
     const verifyDescriptor = secureImmutableDescriptorFunction();
     assert.doesNotThrow(() => verifyDescriptor(
       resolve(repoRoot, taskNineR2OverridePath),

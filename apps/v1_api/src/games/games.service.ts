@@ -13,11 +13,22 @@ import {
   V1GameResultRevisionState,
   V1GameSourceType,
   V1GameState,
+  type V1TournamentStaffRole,
   V1VisibilityMode,
 } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
+import type {
+  JsonValue as AuditJsonValue,
+  OperationAuditActor,
+} from '../common/audit/operation-audit.contract';
+import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  decideTournamentStaffAccess,
+  type TournamentStaffAction,
+  type TournamentStaffRole,
+} from '../tournaments/staff/tournament-staff-policy';
 import {
   assertGameCommandContext,
   assertGameLifecycleTransition,
@@ -57,6 +68,15 @@ import type {
 
 type Transaction = Prisma.TransactionClient;
 type CommandResult = object;
+type GameAuthorizationAction =
+  | 'read'
+  | 'tournament_command'
+  | 'event_append'
+  | 'event_reverse'
+  | 'lineup_mutate'
+  | 'team_result_submit'
+  | 'opponent_result_decide'
+  | 'cancel';
 
 type LockedGame = {
   id: string;
@@ -96,6 +116,50 @@ function canonicalize(value: unknown): unknown {
 
 export function canonicalGameCommandPayloadHash(payload: unknown): string {
   return createHash('sha256').update(JSON.stringify(canonicalize(payload))).digest('hex');
+}
+
+export function gameAuthorizationAction(action: string): GameAuthorizationAction {
+  switch (action) {
+    case 'game_start':
+    case 'game_pause':
+    case 'game_resume':
+    case 'game_end':
+      return 'tournament_command';
+    case 'game_cancel':
+      return 'cancel';
+    case 'event_append':
+      return 'event_append';
+    case 'event_reverse':
+      return 'event_reverse';
+    case 'lineup_save':
+    case 'lineup_submit':
+      return 'lineup_mutate';
+    case 'result_revision_create':
+    case 'result_revision_submit':
+      return 'team_result_submit';
+    case 'result_revision_approve':
+    case 'result_revision_change_request':
+      return 'opponent_result_decide';
+    default:
+      throw new TypeError(`Unsupported game command action: ${action}`);
+  }
+}
+
+export function gameOperationAuditActor(actor: GameActorScope): OperationAuditActor {
+  if (actor.actorType === 'SYSTEM') {
+    return { type: 'SYSTEM', id: actor.systemActor };
+  }
+  if (actor.role === 'platform_ops') {
+    return { type: 'PLATFORM_OPS', id: actor.actorUserId };
+  }
+  if (
+    actor.role === 'team_manager' ||
+    actor.role === 'team_owner' ||
+    actor.role === 'opponent_manager'
+  ) {
+    return { type: 'TEAM_MANAGER', id: actor.actorUserId };
+  }
+  return { type: 'TOURNAMENT_STAFF', id: actor.actorUserId };
 }
 
 export function toGameHttpException(error: GameContractError): HttpException {
@@ -144,6 +208,8 @@ function scoreFromJson(value: Prisma.JsonValue): GameScore {
 
 @Injectable()
 export class GamesService {
+  private readonly operationAuditWriter = new OperationAuditWriterService();
+
   constructor(private readonly prisma: PrismaService) {}
 
   async createFromSourceInTransaction(
@@ -1041,11 +1107,21 @@ export class GamesService {
         if (game === null) {
           throw this.notFound();
         }
+        const actor =
+          input.actor.actorType === 'SYSTEM'
+            ? input.actor
+            : await this.resolveActor(
+                tx,
+                input.gameId,
+                input.actor.actorUserId,
+                gameAuthorizationAction(input.action),
+                input.actor.authorizationSubject,
+              );
         const payloadHash = canonicalGameCommandPayloadHash(input.payload);
         let preliminary: GameCommandContext;
         try {
           preliminary = assertGameCommandContext({
-            actor: input.actor,
+            actor,
             expectedVersion: input.expectedVersion,
             currentVersion: input.expectedVersion,
             headerIdempotencyKey: input.headerIdempotencyKey ?? '',
@@ -1059,7 +1135,7 @@ export class GamesService {
           }
           throw error;
         }
-        const actorUserId = actorStorageId(input.actor);
+        const actorUserId = actorStorageId(actor);
         const existing = await tx.v1IdempotencyRecord.findUnique({
           where: {
             actorUserId_action_resourceType_resourceId_idempotencyKey: {
@@ -1094,7 +1170,7 @@ export class GamesService {
         let context: GameCommandContext;
         try {
           context = assertGameCommandContext({
-            actor: input.actor,
+            actor,
             expectedVersion: input.expectedVersion,
             currentVersion: game.version,
             headerIdempotencyKey: input.headerIdempotencyKey ?? '',
@@ -1110,7 +1186,7 @@ export class GamesService {
         }
         const response = await mutate(tx, game, context);
         await this.storeIdempotency(tx, {
-          actor: input.actor,
+          actor,
           action: input.action,
           resourceType: 'GAME',
           resourceId: input.gameId,
@@ -1120,7 +1196,7 @@ export class GamesService {
         });
         await this.writeAudit(
           tx,
-          input.actor,
+          actor,
           input.action.toUpperCase(),
           input.gameId,
           context.durableCommandId,
@@ -1176,15 +1252,8 @@ export class GamesService {
     tx: Transaction | PrismaService,
     gameId: string,
     userId: string,
-    action:
-      | 'read'
-      | 'tournament_command'
-      | 'event_append'
-      | 'event_reverse'
-      | 'lineup_mutate'
-      | 'team_result_submit'
-      | 'opponent_result_decide'
-      | 'cancel',
+    action: GameAuthorizationAction,
+    expectedAuthorizationSubject?: string,
   ): Promise<Extract<GameActorScope, { actorType: 'USER' }>> {
     const game = await tx.v1Game.findUnique({
       where: { id: gameId },
@@ -1193,7 +1262,7 @@ export class GamesService {
         teamMatch: {
           select: { hostTeamId: true, approvedApplicantTeamId: true },
         },
-        tournamentFixture: { select: { id: true, tournamentId: true } },
+        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
       },
     });
     if (game === null) {
@@ -1201,57 +1270,126 @@ export class GamesService {
     }
     const admin = await tx.v1AdminUser.findUnique({
       where: { userId },
-      select: { adminRole: true, status: true },
+      select: {
+        adminRole: true,
+        status: true,
+        revokedAt: true,
+        updatedAt: true,
+        user: { select: { accountStatus: true } },
+      },
     });
-    if (admin !== null && admin.status === 'active' && admin.adminRole !== 'support') {
-      return { actorType: 'USER', actorUserId: userId, role: 'platform_ops' };
-    }
     if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE) {
       const fixture = game.tournamentFixture;
       if (fixture === null) {
         throw this.notFound();
       }
+      const tournamentAction = this.tournamentAuthorizationAction(action);
+      if (tournamentAction === null) {
+        throw this.forbidden();
+      }
+      const resource = {
+        tournamentId: fixture.tournamentId,
+        fixtureId: fixture.id,
+        ...(fixture.fieldId === null ? {} : { fieldId: fixture.fieldId }),
+      };
+      if (
+        admin !== null &&
+        admin.status === 'active' &&
+        admin.revokedAt === null &&
+        admin.adminRole !== 'support' &&
+        admin.user.accountStatus === 'active'
+      ) {
+        const decision = decideTournamentStaffAccess({
+          role: 'platform_ops',
+          action: tournamentAction,
+          now: new Date().toISOString(),
+          resource,
+        });
+        if (!decision.allowed) {
+          throw this.forbidden();
+        }
+        const authorizationSubject = `platform_ops:${userId}@${admin.updatedAt.getTime()}`;
+        if (
+          expectedAuthorizationSubject !== undefined &&
+          expectedAuthorizationSubject !== authorizationSubject
+        ) {
+          throw this.forbidden();
+        }
+        return {
+          actorType: 'USER',
+          actorUserId: userId,
+          role: 'platform_ops',
+          tournamentId: fixture.tournamentId,
+          fixtureId: fixture.id,
+          authorizationSubject,
+        };
+      }
       const assignments = await tx.v1TournamentStaffAssignment.findMany({
         where: {
           tournamentId: fixture.tournamentId,
           userId,
-          revokedAt: null,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         },
-        include: { fixtureScopes: { select: { fixtureId: true } } },
+        select: {
+          id: true,
+          tournamentId: true,
+          role: true,
+          fieldId: true,
+          version: true,
+          createdAt: true,
+          expiresAt: true,
+          revokedAt: true,
+          fixtureScopes: { select: { fixtureId: true } },
+        },
       });
-      const assignment = assignments.find(
-        (item) =>
-          item.fixtureScopes.length === 0 ||
-          item.fixtureScopes.some((scope) => scope.fixtureId === fixture.id),
-      );
-      if (assignment === undefined) {
-        throw this.forbidden();
+      const now = new Date().toISOString();
+      for (const assignment of assignments) {
+        const role = this.tournamentStaffRole(assignment.role);
+        if (role === null) {
+          continue;
+        }
+        const authorizationSubject = `assignment:${assignment.id}@${assignment.version}`;
+        if (
+          expectedAuthorizationSubject !== undefined &&
+          expectedAuthorizationSubject !== authorizationSubject
+        ) {
+          continue;
+        }
+        const decision = decideTournamentStaffAccess({
+          role,
+          action: tournamentAction,
+          now,
+          resource,
+          assignment: {
+            role,
+            tournamentId: assignment.tournamentId,
+            startsAt: assignment.createdAt.toISOString(),
+            expiresAt: assignment.expiresAt?.toISOString() ?? null,
+            revokedAt: assignment.revokedAt?.toISOString() ?? null,
+            fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
+            ...(assignment.fieldId === null ? {} : { fieldId: assignment.fieldId }),
+          },
+        });
+        if (decision.allowed) {
+          return {
+            actorType: 'USER',
+            actorUserId: userId,
+            role,
+            tournamentId: fixture.tournamentId,
+            fixtureId: fixture.id,
+            authorizationSubject,
+          };
+        }
       }
-      const role = {
-        FIELD_OPERATOR: 'field_operator',
-        SUPPORT_READONLY: 'support_readonly',
-        TOURNAMENT_DIRECTOR: 'tournament_director',
-        PLATFORM_OPS: 'platform_ops',
-      }[assignment.role] as Extract<GameActorScope, { actorType: 'USER' }>['role'];
-      if (
-        action !== 'read' &&
-        ((action === 'event_reverse' && role !== 'tournament_director' && role !== 'platform_ops') ||
-          (action !== 'event_reverse' &&
-            role !== 'field_operator' &&
-            role !== 'tournament_director' &&
-            role !== 'platform_ops'))
-      ) {
-        throw this.forbidden();
-      }
-      return {
-        actorType: 'USER',
-        actorUserId: userId,
-        role,
-        tournamentId: fixture.tournamentId,
-        fixtureId: fixture.id,
-        authorizationSubject: `assignment:${assignment.id}@${assignment.version}`,
-      };
+      throw this.forbidden();
+    }
+    if (
+      admin !== null &&
+      admin.status === 'active' &&
+      admin.revokedAt === null &&
+      admin.adminRole !== 'support' &&
+      admin.user.accountStatus === 'active'
+    ) {
+      return { actorType: 'USER', actorUserId: userId, role: 'platform_ops' };
     }
     const match = game.teamMatch;
     if (match === null) {
@@ -1306,6 +1444,41 @@ export class GamesService {
       role,
       teamId: hostMembership?.teamId ?? opponentMembership?.teamId,
     };
+  }
+
+  private tournamentAuthorizationAction(
+    action: GameAuthorizationAction,
+  ): TournamentStaffAction | null {
+    switch (action) {
+      case 'read':
+      case 'tournament_command':
+      case 'event_append':
+      case 'event_reverse':
+      case 'lineup_mutate':
+      case 'cancel':
+        return action;
+      case 'team_result_submit':
+      case 'opponent_result_decide':
+        return null;
+    }
+  }
+
+  private tournamentStaffRole(
+    role: V1TournamentStaffRole,
+  ): Extract<
+    TournamentStaffRole,
+    'field_operator' | 'support_readonly' | 'tournament_director'
+  > | null {
+    switch (role) {
+      case 'FIELD_OPERATOR':
+        return 'field_operator';
+      case 'SUPPORT_READONLY':
+        return 'support_readonly';
+      case 'TOURNAMENT_DIRECTOR':
+        return 'tournament_director';
+      case 'PLATFORM_OPS':
+        return null;
+    }
   }
 
   private async assertEventReferences(
@@ -1565,18 +1738,31 @@ export class GamesService {
     before: unknown,
     after: unknown,
   ) {
-    await tx.v1OperationAudit.create({
-      data: {
-        actorType: actor.actorType,
-        actorUserId: actor.actorType === 'USER' ? actor.actorUserId : null,
-        systemActor: actor.actorType === 'SYSTEM' ? actor.systemActor : null,
-        action,
-        resourceType: 'GAME',
-        resourceId,
-        requestId,
-        before: before === null ? Prisma.JsonNull : jsonInput(before),
-        after: jsonInput(after),
+    const game = await tx.v1Game.findUnique({
+      where: { id: resourceId },
+      select: {
+        tournamentFixture: {
+          select: { id: true, tournamentId: true, fieldId: true },
+        },
       },
+    });
+    if (game === null) {
+      throw this.notFound();
+    }
+    const fixture = game.tournamentFixture;
+    await this.operationAuditWriter.create(tx, {
+      actor: gameOperationAuditActor(actor),
+      requestId,
+      action,
+      targetType: 'GAME',
+      targetId: resourceId,
+      occurredAt: new Date(),
+      sourceIp: null,
+      before: canonicalize(before) as AuditJsonValue,
+      after: canonicalize(after) as AuditJsonValue,
+      tournamentId: fixture?.tournamentId ?? null,
+      fixtureId: fixture?.id ?? null,
+      fieldId: fixture?.fieldId ?? null,
     });
   }
 

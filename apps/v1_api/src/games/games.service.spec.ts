@@ -5,6 +5,8 @@ import { GameContractError } from './core';
 import { GameCommandDto } from './dto/game-command.dto';
 import {
   canonicalGameCommandPayloadHash,
+  gameAuthorizationAction,
+  gameOperationAuditActor,
   toGameHttpException,
 } from './games.service';
 
@@ -80,5 +82,57 @@ describe('GamesService command boundary', () => {
       'ENDED',
       'CANCELLED',
     ]);
+  });
+
+  it.each([
+    ['game_start', 'tournament_command'],
+    ['game_end', 'tournament_command'],
+    ['game_cancel', 'cancel'],
+    ['event_append', 'event_append'],
+    ['event_reverse', 'event_reverse'],
+    ['lineup_save', 'lineup_mutate'],
+    ['lineup_submit', 'lineup_mutate'],
+    ['result_revision_create', 'team_result_submit'],
+    ['result_revision_submit', 'team_result_submit'],
+    ['result_revision_approve', 'opponent_result_decide'],
+    ['result_revision_change_request', 'opponent_result_decide'],
+  ] as const)('maps durable command %s to a fresh authorization action', (command, action) => {
+    expect(gameAuthorizationAction(command)).toBe(action);
+  });
+
+  it('rejects unknown durable commands instead of skipping authorization', () => {
+    expect(() => gameAuthorizationAction('unknown_command')).toThrow(
+      'Unsupported game command action: unknown_command',
+    );
+    expect(() => gameAuthorizationAction('game_destroy')).toThrow(
+      'Unsupported game command action: game_destroy',
+    );
+  });
+
+  it('maps game principals to actor-neutral audit identities', () => {
+    expect(
+      gameOperationAuditActor({
+        actorType: 'USER',
+        actorUserId: 'ops-user',
+        role: 'platform_ops',
+      }),
+    ).toEqual({ type: 'PLATFORM_OPS', id: 'ops-user' });
+    expect(
+      gameOperationAuditActor({
+        actorType: 'USER',
+        actorUserId: 'staff-user',
+        role: 'field_operator',
+      }),
+    ).toEqual({ type: 'TOURNAMENT_STAFF', id: 'staff-user' });
+    expect(
+      gameOperationAuditActor({
+        actorType: 'USER',
+        actorUserId: 'team-user',
+        role: 'team_manager',
+      }),
+    ).toEqual({ type: 'TEAM_MANAGER', id: 'team-user' });
+    expect(
+      gameOperationAuditActor({ actorType: 'SYSTEM', systemActor: 'PROJECTION_REPAIR' }),
+    ).toEqual({ type: 'SYSTEM', id: 'PROJECTION_REPAIR' });
   });
 });

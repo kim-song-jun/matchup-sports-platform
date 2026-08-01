@@ -29,7 +29,7 @@ services:
           memory: 1G
 
   v1_uploads_init:
-    image: teameet-v1-api:latest
+    image: ${V1_API_IMAGE}
     user: 0:0
     restart: no
     volumes:
@@ -42,7 +42,7 @@ services:
         chown -R 1001:1001 /app/apps/v1_api/uploads
 
   v1_api:
-    image: teameet-v1-api:latest
+    image: ${V1_API_IMAGE}
     container_name: teameet_v1_api
     restart: always
     volumes:
@@ -103,7 +103,7 @@ services:
           memory: 512M
 
   v1_web:
-    image: teameet-v1-web:latest
+    image: ${V1_WEB_IMAGE}
     container_name: teameet_v1_web
     restart: always
     environment:

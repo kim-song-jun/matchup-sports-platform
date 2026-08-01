@@ -93,11 +93,22 @@ jobs:
         run: bash scripts/qa/test-alpha-release-state.sh
 
       # prod 배포 경로는 main push 때만 도는 탓에 몇 주씩 검증되지 않는다 — 그래서
-      # prune_stale_release_tags 의 빈 입력 버그가 2026-08-01 배포에서야 터졌고,
-      # 빌드가 막혀 SHA 태그가 영영 안 생기는 교착이라 프로덕션 배포가 완전히 멈췄다.
-      # 이 스텝은 모든 PR·push 에서 도므로 같은 계열 버그를 배포 전에 잡는다.
-      - name: Prod release prune contract tests
-        run: bash scripts/qa/test-prod-release-prune.sh
+      # prune_stale_release_tags 의 빈 입력 버그가 2026-08-01 배포에서야 터졌다(#220).
+      # 이번 변경으로 EC2 가 더 이상 로컬 docker build 를 하지 않고 ECR digest 를 pull 만
+      # 하므로(요구사항 1·2) 그 함수가 지키던 문제 자체가 사라져 함수와 이 테스트를 제거
+      # 했다 — 대신 alpha 와 동일한 candidate→promote 상태 기계장치 계약 테스트로 교체한다.
+      # 이 스텝도 모든 PR·push 에서 돌아 같은 계열(main push 전용 경로가 몇 주씩 검증되지
+      # 않는) 버그를 배포 전에 잡는다.
+      - name: Prod release-state contract tests
+        run: bash scripts/qa/test-prod-release-state.sh
+
+      # rollback-prod.sh 는 지금까지 어떤 CI 에서도 실행된 적이 없고, 유일한 실행처가
+      # 라이브 프로덕션 EC2 였다 — 즉 "처음 롤백이 필요한 순간" 이 사실상 첫 실행이다.
+      # 롤백은 이미 뭔가 잘못된 상황에서만 쓰는 경로라, 그때 처음 버그를 만나면 복구 수단이
+      # 통째로 없는 것과 같다. 최소한 진입 가드만이라도 매 push 에서 실제 실행해 확인한다.
+      # (런타임 오케스트레이션 전체는 실제 EC2 리허설이 필요하다 — 이 테스트의 범위 밖이다.)
+      - name: Prod rollback guard tests
+        run: bash scripts/qa/test-prod-rollback-guards.sh
 
   # ── API: 타입·마이그레이션·유닛·통합·빌드 ───────────────────────────────────
   api:
@@ -202,9 +213,12 @@ jobs:
 
   # ── Build images: 승인 게이트 앞에서 프로덕션 이미지를 만들어 둔다 ──────────
   # 승인 대기가 배포 시간의 대부분이었다(실측 29분). 빌드를 게이트 앞으로 옮기면
-  # 승인 직후 남는 일은 마이그레이션·컨테이너 교체뿐이다.
-  # 이 job 은 DB 와 실행 중인 컨테이너를 건드리지 않는다 — 호스트의 소스 트리와
-  # 이미지 태그(:<sha>)만 갱신하므로, 승인이 거부돼도 서비스는 그대로 돌아간다.
+  # 승인 직후 남는 일은 activation + 마이그레이션·컨테이너 교체뿐이다.
+  # (요구사항 1·2 — 러너가 빌드해 ECR digest 로 push, EC2 는 pull 만 한다. :latest 제거.)
+  # 이 job 은 DB 와 실행 중인 컨테이너를 전혀 건드리지 않는다 — ECR 에 새 이미지를 올리고
+  # EC2 의 고정 스테이징 경로(~/.teameet-prod-staging/<sha>)에 소스를 채워 두기만 한다
+  # (D3). activation(symlink 스왑)은 승인 후 deploy job 이 한다 — 승인이 거부돼도 서비스는
+  # 그대로 돌아간다.
   build-images:
     name: Build images
     needs: [gates, api, web]
@@ -217,9 +231,42 @@ jobs:
     concurrency:
       group: deploy-production
       cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+
+    outputs:
+      registry: ${{ steps.login-ecr.outputs.registry }}
+      manifestSha256: ${{ steps.manifest.outputs.manifestSha256 }}
+      sourceSha256: ${{ steps.source.outputs.sourceSha256 }}
+      releaseVersion: ${{ steps.version.outputs.stable }}
 
     steps:
-      - uses: actions/checkout@v4
+      # fetch-depth: 0 필수 — "Resolve rollback compatibility base" 스텝이 호출하는
+      # check-expand-contract-migrations.sh 는 migration_base_sha(수 커밋 전일 수 있음)와
+      # 현재 SHA 사이 git history 를 직접 walk 한다. 얕은 checkout 이면 "unknown revision"
+      # 으로 실패한다(alpha 의 deploy-alpha.yml 이 이미 동일한 이유로 fetch-depth: 0 사용).
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PROD_AWS_REGION }}
+
+      - name: Verify production AWS target
+        id: target
+        env:
+          PROD_AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          PROD_EXPECTED_ACCOUNT_ID: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
+          PROD_EC2_INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+        run: bash scripts/release/verify-prod-aws-target.sh
+
+      - name: Sign in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
 
       - name: Setup SSH
         env:
@@ -251,166 +298,149 @@ jobs:
             UserKnownHostsFile ~/.ssh/known_hosts
           EOF
 
-      - name: Sync code
-        run: |
-          rsync -avz --delete \
-            --exclude node_modules --exclude .next --exclude dist --exclude .git \
-            --exclude backups --exclude 'deploy/certbot' \
-            --filter 'protect backups/***' \
-            --filter 'protect deploy/.env' \
-            -e "ssh" \
-            ./ ec2:~/teameet/
-
-      - name: Build release images
-        timeout-minutes: 35
-        # 웹 이미지 빌드 인자로 들어가는 값만 전달한다. 런타임 전용 시크릿(VAPID·SMS·SES·
-        # 관리자 비밀번호 등)은 승인 후 deploy job 이 .env 로 동기화하므로 여기 필요 없다.
+      - name: Resolve rollback compatibility base
+        id: rollback-base
         env:
           RELEASE_SHA: ${{ github.sha }}
-          KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
-          KAKAO_REDIRECT_URI_SECRET: ${{ secrets.KAKAO_REDIRECT_URI }}
-          # 공개 동의항목 목록이라 시크릿이 아닌 repository variable.
-          KAKAO_SCOPE_SECRET: ${{ vars.KAKAO_SCOPE }}
-          GA_MEASUREMENT_ID_SECRET: ${{ secrets.GA_PROD }}
+        run: bash scripts/release/resolve-prod-rollback-base.sh
+
+      - name: Resolve immutable image tags
+        id: images
+        env:
+          RELEASE_SHA: ${{ github.sha }}
         run: |
-          KAKAO_CLIENT_ID_B64="$(printf '%s' "${KAKAO_CLIENT_ID_SECRET:-}" | base64 | tr -d '\n')"
-          KAKAO_REDIRECT_URI_B64="$(printf '%s' "${KAKAO_REDIRECT_URI_SECRET:-}" | base64 | tr -d '\n')"
-          KAKAO_SCOPE_B64="$(printf '%s' "${KAKAO_SCOPE_SECRET:-}" | base64 | tr -d '\n')"
-          GA_MEASUREMENT_ID_B64="$(printf '%s' "${GA_MEASUREMENT_ID_SECRET:-}" | base64 | tr -d '\n')"
+          set -Eeuo pipefail
+          imageTag="sha-${RELEASE_SHA}"
+          api_exists=false
+          web_exists=false
+          aws ecr describe-images --repository-name teameet-prod-v1-api \
+            --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && api_exists=true
+          aws ecr describe-images --repository-name teameet-prod-v1-web \
+            --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && web_exists=true
+          echo "imageTag=${imageTag}" >> "${GITHUB_OUTPUT}"
+          echo "api_exists=${api_exists}" >> "${GITHUB_OUTPUT}"
+          echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
 
-          {
-            printf 'RELEASE_SHA=%s\n' "${RELEASE_SHA}"
-            printf 'KAKAO_CLIENT_ID_B64=%s\n' "${KAKAO_CLIENT_ID_B64}"
-            printf 'KAKAO_REDIRECT_URI_B64=%s\n' "${KAKAO_REDIRECT_URI_B64}"
-            printf 'KAKAO_SCOPE_B64=%s\n' "${KAKAO_SCOPE_B64}"
-            printf 'GA_MEASUREMENT_ID_B64=%s\n' "${GA_MEASUREMENT_ID_B64}"
-            cat <<'REMOTE_SCRIPT'
-          set -euo pipefail
+      # 이 릴리스의 stable SemVer 를 계산한다. prod 는 alpha 와 달리 prerelease 접미사가
+      # 없다(§2-4) — Gates job 의 "Validate planned SemVer" 스텝과 같은 스크립트를 쓰되
+      # stableVersion 만 취한다. X-Teameet-Release 헤더/manifest.release.version 양쪽에
+      # 이 값을 쓴다.
+      - name: Resolve stable release version
+        id: version
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          release_date="$(git show -s --format=%cs "${RELEASE_SHA}")"
+          metadata="$(node scripts/release/resolve-changeset-version.mjs \
+            --repo . --sha "${RELEASE_SHA}" --date "${release_date}")"
+          echo "stable=$(jq -er '.stableVersion' <<< "${metadata}")" >> "${GITHUB_OUTPUT}"
 
-          cd ~/teameet
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
-          # 이 job 은 deploy/.env 를 쓰지 않는다 — 승인 전에 프로덕션 런타임 설정을 바꾸면
-          # 그 사이 재부팅·수동 compose 실행이 '새 env + 옛 이미지' 혼합 상태를 만든다.
-          # 런타임 env 동기화는 승인 뒤 deploy job 이 담당하고, 여기서는 웹 빌드 인자로
-          # 들어갈 값만 시크릿에서 직접 디코드해 셸 변수로 쓴다.
-          decode_secret() {
-            local b64_value="$1"
-            if [ -n "$b64_value" ]; then
-              printf '%s' "$b64_value" | base64 -d
-            fi
-          }
+      - name: Build and push immutable API image
+        if: steps.images.outputs.api_exists != 'true'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-api
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-api:${{ steps.images.outputs.imageTag }}
+          cache-from: type=gha,scope=prod-v1-api
+          cache-to: type=gha,mode=max,scope=prod-v1-api
+          provenance: false
+          sbom: false
 
-          # prune_stale_release_tags 는 deploy/prod-release-common.sh 에 있다.
-          # 이 heredoc 안에 직접 적어 두면 테스트할 수가 없어서, main push 때만 도는
-          # 이 경로의 버그가 몇 주 동안 발견되지 않았다(2026-08-01 배포 실패).
-          # 파일로 빼면 scripts/qa/test-prod-release-prune.sh 가 실제로 호출해 검증한다.
-          # 위 Sync code 스텝이 저장소를 ~/teameet 로 rsync 한 뒤라 항상 존재한다.
-          . deploy/prod-release-common.sh
+      # 웹 이미지 빌드 인자 하나(INTERNAL_API_ORIGIN)만 EC2 .env 에서 읽는다. 승인 전
+      # 단계라 .env 를 쓰지는 않는다 — 값만 조회하는 짧은 SSH 조회다(기존 로직 이식).
+      - name: Resolve internal API origin
+        id: origin
+        run: |
+          set -Eeuo pipefail
+          origin="$(ssh ec2 "awk -F= '/^V1_INTERNAL_API_ORIGIN=/{sub(/^V1_INTERNAL_API_ORIGIN=/,\"\"); print; exit}' ~/teameet/deploy/.env" || true)"
+          echo "internalApiOrigin=${origin:-http://v1_api:8121}" >> "${GITHUB_OUTPUT}"
 
-          if sudo docker compose version >/dev/null 2>&1; then
-            COMPOSE="sudo docker compose"
-          elif sudo docker-compose version >/dev/null 2>&1; then
-            COMPOSE="sudo docker-compose"
-          else
-            echo "Docker Compose is not installed on the EC2 host"
+      - name: Build and push immutable Web image
+        if: steps.images.outputs.web_exists != 'true'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-web
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-web:${{ steps.images.outputs.imageTag }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=/api/v1
+            INTERNAL_API_ORIGIN=${{ steps.origin.outputs.internalApiOrigin }}
+            NEXT_PUBLIC_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}
+            NEXT_PUBLIC_KAKAO_SCOPE=${{ vars.KAKAO_SCOPE }}
+            NEXT_PUBLIC_GA_MEASUREMENT_ID=${{ secrets.GA_PROD }}
+          cache-from: type=gha,scope=prod-v1-web
+          cache-to: type=gha,mode=max,scope=prod-v1-web
+          provenance: false
+          sbom: false
+
+      - name: Gate ECR critical findings
+        env:
+          IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+        run: bash scripts/release/check-prod-image-scans.sh
+
+      # D2: S3 중계 없이 러너가 저장소를 EC2 의 고정 스테이징 경로로 직접 rsync 한다.
+      # 이 스텝은 아직 어떤 release-sha 도 활성화하지 않는다 — activation(symlink 스왑)은
+      # 승인 이후 deploy job 의 deploy-prod.sh 책임이다(D3).
+      - name: Stage release source on EC2
+        id: source
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          staging="~/.teameet-prod-staging/${RELEASE_SHA}"
+          ssh ec2 "mkdir -p ${staging}"
+          rsync -avz --delete \
+            --exclude node_modules --exclude .next --exclude dist --exclude .git \
+            --exclude backups --exclude 'deploy/certbot' --exclude 'deploy/.env' \
+            --exclude 'deploy/release-metadata.prod.conf' \
+            -e ssh ./ "ec2:${staging}/"
+          # R8: sourceSha256 은 EC2 로 실제 전송된 바이트를 그대로 재해싱한다(별도 재구성값이
+          # 아니다) — rsync exclude 목록과 어긋날 수 있는 값을 신뢰하지 않는다.
+          # 원격 커맨드를 문자열로 넘기면 로컬 set -e 는 ssh 자체의 종료코드만 본다. 그런데
+          # 그 안이 파이프라인이라 tar 가 실패해도 sha256sum 이 0 으로 끝나면 ssh 도 0 이 되어
+          # **빈 입력의 해시**가 정상값처럼 흘러간다. 원격에서도 pipefail 을 켜 tar 실패를
+          # 전파시키고, awk 는 로컬로 옮겨 원격 문자열의 $1 이스케이프 지옥을 없앤다.
+          source_sha256="$(ssh ec2 "set -o pipefail; tar --sort=name -C '${staging}' -cf - . | sha256sum")"
+          source_sha256="${source_sha256%% *}"
+          # 형식 검증까지 해야 위 pipefail 이 어떤 이유로든 안 걸렸을 때도 빈 값/쓰레기가
+          # 매니페스트에 박히지 않는다.
+          if [[ ! "${source_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Failed to compute sourceSha256 from ${staging} (got: '${source_sha256}')" >&2
             exit 1
           fi
+          echo "sourceSha256=${source_sha256}" >> "${GITHUB_OUTPUT}"
 
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo yum install -y jq 2>/dev/null || sudo apt-get install -y jq 2>/dev/null || {
-              echo "[ERROR] jq is required for deploy health checks"
-              exit 1
-            }
-          fi
+      - name: Create release manifest
+        id: manifest
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_VERSION: ${{ steps.version.outputs.stable }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
+          IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+          PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
+          MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
+        run: bash scripts/release/create-prod-release-manifest.sh
 
-          if [ ! -f deploy/.env ]; then
-            echo "[ERROR] Missing deploy/.env on the EC2 host"
-            exit 1
-          fi
+      - name: Copy release manifest onto EC2 staging
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          MANIFEST_PATH: ${{ steps.manifest.outputs.manifestPath }}
+        run: |
+          set -Eeuo pipefail
+          ssh ec2 "mkdir -p ~/.teameet-prod-staging/${RELEASE_SHA}/deploy"
+          scp -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+            "${MANIFEST_PATH}" "ec2:~/.teameet-prod-staging/${RELEASE_SHA}/deploy/release-manifest.json"
 
-          # .env 는 읽기만 한다(서브셸에서 읽어 이 스크립트가 파일을 수정하지 않음을 분명히 한다).
-          # DB_PASSWORD/JWT_SECRET 은 시크릿 sync 대상이 아니라 호스트 .env 에 상주하는 값이라,
-          # 여기서 미리 확인해 두면 승인까지 기다린 뒤 실패하는 일을 막을 수 있다.
-          for required_env in DB_PASSWORD JWT_SECRET; do
-            if ! grep -qE "^${required_env}=.+" deploy/.env; then
-              echo "[ERROR] Missing required deploy env: ${required_env}"
-              exit 1
-            fi
-          done
-
-          V1_INTERNAL_API_ORIGIN_VALUE="$(
-            awk -F= '/^V1_INTERNAL_API_ORIGIN=/ { sub(/^V1_INTERNAL_API_ORIGIN=/, ""); print; exit }' deploy/.env
-          )"
-          V1_WEB_INTERNAL_API_ORIGIN="${V1_INTERNAL_API_ORIGIN_VALUE:-http://v1_api:8121}"
-
-          # 웹 빌드 인자는 GitHub 시크릿 값을 그대로 쓴다(예전에도 .env 에 sync 한 직후
-          # 그 값을 읽었으므로 결과는 같다). .env 를 거치지 않으므로 승인 전 부작용이 없다.
-          KAKAO_CLIENT_ID="$(decode_secret "${KAKAO_CLIENT_ID_B64:-}")"
-          KAKAO_REDIRECT_URI="$(decode_secret "${KAKAO_REDIRECT_URI_B64:-}")"
-          KAKAO_SCOPE="$(decode_secret "${KAKAO_SCOPE_B64:-}")"
-          GA_MEASUREMENT_ID="$(decode_secret "${GA_MEASUREMENT_ID_B64:-}")"
-
-          if ! sudo docker buildx version >/dev/null 2>&1; then
-            echo "[ERROR] Docker BuildKit/buildx is required for production image builds"
-            exit 1
-          fi
-
-          # ── Pre-build disk cleanup ────────────────────────────────────────
-          # Prevent ERR_PNPM_ENOSPC during the docker build step by evicting
-          # dangling images, stopped containers, and unused build cache.
-          # Volumes are NOT touched (v1_postgres data must persist).
-          echo "[cleanup] Disk usage before prune:"
-          df -h / | tail -1
-          # Use `docker image prune -f` (without -a) to remove only dangling images.
-          # `-a` would delete ALL unused images including cached base layers (node:22-alpine,
-          # postgres:16-alpine, etc.) forcing a full re-pull on every deploy.
-          sudo docker image prune -f || true
-          sudo docker container prune -f || true
-          # 빌드 전에는 여유 공간 확보가 목적이라 '이번 릴리스를 뺀' 5개를 남긴다.
-          # 정확히 5개로 맞추는 정리는 빌드 뒤에 한 번 더 한다 — 여기서만 하면 새 태그가
-          # 추가되면서 결과적으로 6개가 남는다.
-          prune_stale_release_tags teameet-v1-api 5
-          prune_stale_release_tags teameet-v1-web 5
-          # The production host's BuildKit daemon predates the v0.17-only
-          # max-used-space/min-free-space filters. Age-bounded pruning works
-          # across the deployed builder versions and avoids blocking deploys.
-          # 168h 로 묶어 두는 이유: 이 캐시가 아래 빌드의 pnpm store·Next 캐시 마운트와
-          # 레이어 재사용을 담당한다 — 통째로 지우면 매 배포가 전체 재빌드가 된다.
-          sudo docker buildx prune -f --filter 'until=168h'
-          sudo docker network prune -f || true
-          echo "[cleanup] Disk usage after prune:"
-          df -h / | tail -1
-
-          # 레이어 캐시를 쓴다. Dockerfile 이 lockfile → pnpm install → 소스 순서로 짜여
-          # 있고 pnpm store 와 .next/cache 를 BuildKit 캐시 마운트로 잡고 있어서, 캐시를
-          # 켜면 lockfile 이 그대로인 배포는 install 단계를 그대로 재사용한다.
-          # (예전 --no-cache 는 2026-04 "배포해도 옛 자산이 보인다" 이슈에 같이 들어갔는데,
-          #  실제 원인은 nginx 디스크 캐시였고 그 정리는 restart-containers.sh 에 남아 있다.)
-          # --pull 로 베이스 이미지만 매번 최신으로 당겨 온다.
-          sudo env DOCKER_BUILDKIT=1 docker build --pull \
-            -f deploy/Dockerfile.v1-api \
-            -t "teameet-v1-api:${RELEASE_SHA}" .
-          sudo env DOCKER_BUILDKIT=1 docker build --pull \
-            -f deploy/Dockerfile.v1-web \
-            --build-arg NEXT_PUBLIC_API_URL=/api/v1 \
-            --build-arg INTERNAL_API_ORIGIN="${V1_WEB_INTERNAL_API_ORIGIN}" \
-            --build-arg NEXT_PUBLIC_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}" \
-            --build-arg NEXT_PUBLIC_KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-}" \
-            --build-arg NEXT_PUBLIC_KAKAO_SCOPE="${KAKAO_SCOPE:-}" \
-            --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${GA_MEASUREMENT_ID:-}" \
-            -t "teameet-v1-web:${RELEASE_SHA}" .
-
-          # 이번 릴리스 태그까지 포함해 정확히 5개만 남긴다.
-          prune_stale_release_tags teameet-v1-api 5
-          prune_stale_release_tags teameet-v1-web 5
-
-          echo "[INFO] Built teameet-v1-api:${RELEASE_SHA} and teameet-v1-web:${RELEASE_SHA}"
-          echo "[INFO] Images are staged only — :latest still points at the running release."
-          echo "[INFO] deploy/.env was not modified — runtime env sync happens after approval."
-          REMOTE_SCRIPT
-          } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
-
-  # ── Deploy job: 승인 후 마이그레이션 + 컨테이너 교체만 수행 ─────────────────
+  # ── Deploy job: 승인 후 activation + 마이그레이션 + 컨테이너 교체만 수행 ───────
   deploy:
     name: Deploy
     needs: build-images
@@ -457,12 +487,11 @@ jobs:
             UserKnownHostsFile ~/.ssh/known_hosts
           EOF
 
-      # 승인된 릴리스만 :latest 가 된다. compose 가 :latest 를 참조하므로, 이 단계 전까지는
-      # 호스트가 재부팅되더라도 이전 릴리스가 그대로 뜬다.
-      # 런타임 env(.env) 동기화도 여기서 한다 — 승인 전에 바꾸면 그 사이 재기동이
-      # '새 설정 + 옛 이미지' 조합을 띄울 수 있다.
-      - name: Sync runtime env, promote release images and migrate
-        timeout-minutes: 15
+      # 승인된 릴리스만 런타임 설정에 반영한다. 예전에는 이 스텝이 :latest 승격 +
+      # migrate 까지 겸했지만, 이제 그 책임은 deploy-prod.sh(D3) 로 옮겼다 — 여기서는
+      # 시크릿을 고정 런타임 경로(~/.teameet-prod-runtime/.env)에 동기화만 한다.
+      - name: Sync runtime env
+        timeout-minutes: 5
         env:
           RELEASE_SHA: ${{ github.sha }}
           KAKAO_CLIENT_ID_SECRET: ${{ secrets.KAKAO_CLIENT_ID }}
@@ -475,9 +504,8 @@ jobs:
           VAPID_PUBLIC_KEY_SECRET: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY_SECRET: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT_SECRET: ${{ secrets.VAPID_SUBJECT }}
-          # 휴대폰 SMS OTP 발송처. alpha(deploy-alpha.yml)에만 있어서 prod 컨테이너는
-          # GABIA/SOLAPI 값이 전부 빈 문자열이 됐고, 발송이 SMS_NOT_CONFIGURED 로 막혔다.
-          # 솔라피·가비아 양쪽을 모두 주입하고 SMS_PROVIDER 플래그로만 전환한다.
+          # 휴대폰 SMS OTP 발송처. 솔라피·가비아 양쪽을 모두 주입하고 SMS_PROVIDER
+          # 플래그로만 전환한다.
           SMS_PROVIDER_SECRET: ${{ secrets.SMS_PROVIDER }}
           SOLAPI_API_KEY_SECRET: ${{ secrets.SOLAPI_API_KEY }}
           SOLAPI_API_SECRET_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
@@ -485,9 +513,8 @@ jobs:
           GABIA_SMS_ID_SECRET: ${{ secrets.GABIA_SMS_ID }}
           GABIA_API_KEY_SECRET: ${{ secrets.GABIA_API_KEY }}
           GABIA_SENDER_NUMBER_SECRET: ${{ secrets.GABIA_SENDER_NUMBER }}
-          # 이메일 OTP 발송처(SesEmailSender). 둘 다 있어야 enabled 이고 하나라도 비면
-          # 이메일 인증이 조용히 비활성화된다 — SMS 와 같은 누락이 여기에도 있었다.
-          # 값이 공개 설정이라 시크릿이 아닌 repository variable 이다(alpha 와 동일 출처).
+          # 이메일 OTP 발송처(SesEmailSender). 값이 공개 설정이라 시크릿이 아닌
+          # repository variable 이다.
           SES_REGION_SECRET: ${{ vars.SES_REGION }}
           EMAIL_FROM_SECRET: ${{ vars.EMAIL_FROM }}
         run: |
@@ -533,8 +560,6 @@ jobs:
             cat <<'REMOTE_SCRIPT'
           set -euo pipefail
 
-          cd ~/teameet
-
           sync_env_from_github_secret() {
             local key="$1"
             local b64_value="$2"
@@ -546,33 +571,25 @@ jobs:
             fi
 
             tmp_env=$(mktemp)
-            awk -v key="${key}=" 'index($0, key) != 1' deploy/.env > "$tmp_env"
+            awk -v key="${key}=" 'index($0, key) != 1' "${RUNTIME_ENV_FILE}" > "$tmp_env"
             {
               cat "$tmp_env"
               printf '%s=%s\n' "$key" "$decoded_value"
-            } > deploy/.env
+            } > "${RUNTIME_ENV_FILE}"
             rm -f "$tmp_env"
           }
 
-          if sudo docker compose version >/dev/null 2>&1; then
-            COMPOSE="sudo docker compose"
-          elif sudo docker-compose version >/dev/null 2>&1; then
-            COMPOSE="sudo docker-compose"
-          else
-            echo "Docker Compose is not installed on the EC2 host"
-            exit 1
-          fi
-
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo yum install -y jq 2>/dev/null || sudo apt-get install -y jq 2>/dev/null || {
-              echo "[ERROR] jq is required for deploy health checks"
-              exit 1
-            }
-          fi
-
-          if [ ! -f deploy/.env ]; then
-            echo "[ERROR] Missing deploy/.env on the EC2 host"
-            exit 1
+          RUNTIME_DIR="${HOME}/.teameet-prod-runtime"
+          RUNTIME_ENV_FILE="${RUNTIME_DIR}/.env"
+          mkdir -p "${RUNTIME_DIR}"
+          # 최초 1회 부트스트랩: prepare_prod_release_source() 도 같은 일을 하지만, 이
+          # 스텝이 그보다 먼저 실행되므로 여기서도 방어적으로 한 번 더 보장한다.
+          if [ ! -f "${RUNTIME_ENV_FILE}" ]; then
+            # umask 077 로 감싸는 이유: cp 는 새 파일 권한을 umask 로 정한다. EC2 기본 umask 022
+            # 에서는 644 로 만들어지고, 아래에서 시크릿 18개를 다 기록한 뒤에야 chmod 600 이
+            # 걸린다 — 그 사이 구간 동안 프로덕션 시크릿이 world-readable 로 디스크에 놓인다.
+            # 처음부터 600 으로 만들어 그 창 자체를 없앤다(최초 1회 경로라 이후 배포엔 무영향).
+            ( umask 077; cp "${HOME}/teameet/deploy/.env" "${RUNTIME_ENV_FILE}" )
           fi
 
           sync_env_from_github_secret "KAKAO_CLIENT_ID" "${KAKAO_CLIENT_ID_B64:-}"
@@ -594,11 +611,12 @@ jobs:
           sync_env_from_github_secret "SES_REGION" "${SES_REGION_B64:-}"
           sync_env_from_github_secret "EMAIL_FROM" "${EMAIL_FROM_B64:-}"
 
-          # Harden deploy/.env perms against EC2 umask 022 — contains DB_PASSWORD/JWT_SECRET and other secrets
-          chmod 600 deploy/.env
+          # Harden ~/.teameet-prod-runtime/.env perms against EC2 umask 022 — contains
+          # DB_PASSWORD/JWT_SECRET and other secrets.
+          chmod 600 "${RUNTIME_ENV_FILE}"
 
           set -a
-          . deploy/.env
+          . "${RUNTIME_ENV_FILE}"
           set +a
 
           required_env_vars=(DB_PASSWORD JWT_SECRET)
@@ -612,99 +630,67 @@ jobs:
           # ── env 드리프트 경고 ──────────────────────────────────────────────
           # compose 는 ${VAR:-} 형태라 값이 없어도 빈 문자열로 조용히 치환된다. 앱은 그걸
           # "설정 없음"으로 보고 기능을 graceful disable 하므로, 배포는 성공한 채 해당 기능만
-          # 죽는다 — 가비아 SMS(SMS_NOT_CONFIGURED)와 SES 이메일이 실제로 이렇게 오래 죽어
-          # 있었다. 위 sync 목록과 compose 참조 목록이 어긋나면 여기서 눈에 띄게 만든다.
-          # 실패시키지 않는 이유: LOG_LEVEL 처럼 compose 기본값에 의존하는 것이 정상인 키가
-          # 섞여 있어, 배포를 막는 대신 로그로 드러내는 편이 안전하다.
-          drift_keys=$(grep -ohE '\$\{[A-Z0-9_]+' deploy/docker-compose.prod.yml | tr -d '${' | sort -u)
+          # 죽는다. 위 sync 목록과 compose 참조 목록이 어긋나면 여기서 눈에 띄게 만든다.
+          # V1_API_IMAGE/V1_WEB_IMAGE 는 .env 가 아니라 deploy-prod.sh 가 manifest 에서
+          # export 하므로 이 검사 대상에서 제외한다(§9 — 매 배포마다 오탐 WARN 을 막는다).
+          # grep 은 일치하는 줄이 하나도 없으면 exit 1 이고, 이 블록은 set -euo pipefail 로
+          # 돈다 — compose 에서 ${VAR} 참조가 전부 사라지는 정상 상태가 배포를 중단시킨다.
+          # #220(프로덕션 배포 교착)과 정확히 같은 계열이라 애초에 그 실패 모드를 없앤다.
+          # awk 는 일치가 없어도 0 을 반환한다. 한 줄에 여러 참조가 있을 수 있으므로
+          # match 를 반복 적용해 grep -o 와 동일하게 전부 뽑는다.
+          drift_keys=$(awk '{
+              s = $0
+              while (match(s, /\$\{[A-Z0-9_]+/)) {
+                print substr(s, RSTART + 2, RLENGTH - 2)
+                s = substr(s, RSTART + RLENGTH)
+              }
+            }' "${HOME}/teameet/deploy/docker-compose.prod.yml" | sort -u)
           empty_keys=""
           for drift_key in ${drift_keys}; do
+            case "${drift_key}" in
+              V1_API_IMAGE|V1_WEB_IMAGE) continue ;;
+            esac
             if [ -z "${!drift_key:-}" ]; then
               empty_keys="${empty_keys} ${drift_key}"
             fi
           done
           if [ -n "${empty_keys}" ]; then
-            echo "[WARN] compose 가 참조하지만 deploy/.env 에 값이 없는 키:${empty_keys}"
+            echo "[WARN] compose 가 참조하지만 런타임 .env 에 값이 없는 키:${empty_keys}"
             echo "[WARN] 의도한 기본값이 아니라면 GitHub secret/variable 등록과 이 워크플로의 sync 목록을 함께 확인할 것."
           fi
-
-          for release_image in "teameet-v1-api:${RELEASE_SHA}" "teameet-v1-web:${RELEASE_SHA}"; do
-            if ! sudo docker image inspect "${release_image}" >/dev/null 2>&1; then
-              echo "[ERROR] Missing ${release_image} — build-images job did not stage this release"
-              exit 1
-            fi
-          done
-
-          echo "[INFO] Promoting ${RELEASE_SHA} to :latest"
-          sudo docker tag "teameet-v1-api:${RELEASE_SHA}" teameet-v1-api:latest
-          sudo docker tag "teameet-v1-web:${RELEASE_SHA}" teameet-v1-web:latest
-
-          cd deploy
-
-          # ── Ensure v1_postgres is running before migrations ────────────────
-          # network prune in the build job may have removed the deploy_default network.
-          # Start the DB service first so the migration container can reach it.
-          echo "[INFO] Starting database services..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env up -d v1_postgres
-
-          echo "[INFO] Waiting for v1_postgres to be healthy..."
-          for i in $(seq 1 30); do
-            if ${COMPOSE} -f docker-compose.prod.yml --env-file .env exec -T v1_postgres \
-                pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-              echo "[INFO] v1_postgres is ready (attempt $i)"
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "[ERROR] v1_postgres did not become healthy in time"
-              exit 1
-            fi
-            sleep 2
-          done
-
-          echo "[INFO] Syncing v1 deploy database schema..."
-          ${COMPOSE} -f docker-compose.prod.yml --env-file .env \
-            run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy"
-          echo "[INFO] Migration phase complete."
+          echo "[INFO] Runtime env synced to ${RUNTIME_ENV_FILE}"
           REMOTE_SCRIPT
           } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
 
-      # alpha 는 x-teameet-release / x-teameet-commit 헤더로 "지금 무엇이 떠 있는지"를
-      # 즉시 답할 수 있는데 prod 에는 그 헤더가 없어 장애 때 배포본을 확인할 방법이 없었다.
-      # nginx 가 include 하는 스니펫에 이번 릴리스 값을 찍는다.
-      #
-      # 릴리스 버전은 이미 동기화된 호스트의 apps/v1_api/package.json 에서 읽는다 —
-      # deploy job 은 저장소를 체크아웃하지 않으므로 러너에 로컬 파일이 없다.
-      # 값을 못 읽어도 unknown 으로 두고 배포는 계속한다: 헤더 스탬프가 프로덕션 배포를
-      # 막는 사유가 되어서는 안 되고, unknown 은 눈에 보이므로 조용한 실패도 아니다.
-      #
-      # 이 파일은 bind mount 라 교체하면 inode 가 바뀐다. reload 만으로는 컨테이너가
-      # 새 파일을 못 보므로 다음 스텝의 restart-containers.sh 가 nginx 를
-      # --force-recreate 해야 반영된다.
-      - name: Stamp prod release metadata
+      # activation(symlink 스왑) + migrate + 컨테이너 교체를 전부 이 한 스텝에서 한다
+      # (D3). build-images 가 승인 전에 이미지 push + 소스 스테이징까지 끝내 뒀으므로
+      # 여기서 남는 일은 이것뿐이다.
+      - name: Run deploy-prod.sh
+        timeout-minutes: 20
         env:
-          RELEASE_SHA: ${{ github.sha }}
+          PROD_SHA: ${{ github.sha }}
+          PROD_MANIFEST_SHA256: ${{ needs.build-images.outputs.manifestSha256 }}
+          PROD_RELEASE_VERSION: ${{ needs.build-images.outputs.releaseVersion }}
+          PROD_ECR_REGISTRY: ${{ needs.build-images.outputs.registry }}
+          PROD_AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          PROD_SOURCE_SHA256: ${{ needs.build-images.outputs.sourceSha256 }}
         run: |
-          {
-            printf 'RELEASE_SHA=%s\n' "${RELEASE_SHA}"
-            cat <<'REMOTE_SCRIPT'
-          set -euo pipefail
+          set -Eeuo pipefail
+          staging="/home/ec2-user/.teameet-prod-staging/${PROD_SHA}"
+          ssh ec2 "sudo -u ec2-user -H env \
+            PROD_SOURCE_DIR='${staging}' \
+            PROD_MANIFEST_FILE='${staging}/deploy/release-manifest.json' \
+            PROD_MANIFEST_SHA256='${PROD_MANIFEST_SHA256}' \
+            PROD_SHA='${PROD_SHA}' \
+            PROD_RELEASE_VERSION='${PROD_RELEASE_VERSION}' \
+            PROD_ECR_REGISTRY='${PROD_ECR_REGISTRY}' \
+            PROD_AWS_REGION='${PROD_AWS_REGION}' \
+            PROD_SOURCE_SHA256='${PROD_SOURCE_SHA256}' \
+            bash '${staging}/deploy/deploy-prod.sh'"
 
-          release_version="$(jq -r '.version // "unknown"' ~/teameet/apps/v1_api/package.json 2>/dev/null || echo unknown)"
-          metadata_tmp="$(mktemp)"
-          printf 'add_header X-Teameet-Release "%s" always;\nadd_header X-Teameet-Commit "%s" always;\n' \
-            "${release_version}" "${RELEASE_SHA}" > "${metadata_tmp}"
-          chmod 644 "${metadata_tmp}"
-          mv "${metadata_tmp}" ~/teameet/deploy/release-metadata.prod.conf
-          echo "[INFO] Stamped prod release metadata: ${release_version} / ${RELEASE_SHA}"
-          REMOTE_SCRIPT
-          } | ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 "bash -se"
-
-      - name: Restart containers
-        timeout-minutes: 15
-        run: |
-          ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=20 ec2 \
-            "bash ~/teameet/deploy/restart-containers.sh"
-
+      # deploy-prod.sh 는 EC2 안에서 이미 wait_for_prod_health_contract 로 로컬 헬스를
+      # 확인한 뒤에만 성공 리턴한다. 여기서는 "EC2 로컬은 성공했지만 네트워크 경로 문제로
+      # 퍼블릭엔 아직 안 나온" 케이스를 잡기 위해 러너에서 한 번 더 확인한다(요구사항 5).
       - name: Health check
         run: |
           for i in $(seq 1 12); do

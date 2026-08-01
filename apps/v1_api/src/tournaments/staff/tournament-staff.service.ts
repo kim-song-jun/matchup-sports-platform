@@ -120,7 +120,7 @@ export class TournamentStaffService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        await this.recheckActor(tx, principal, normalized.tournamentId);
+        await this.recheckActor(tx, principal, normalized.tournamentId, normalized.occurredAt);
         await this.assertTournamentAndTarget(tx, normalized.tournamentId, normalized.targetUserId);
         const activeDirectorCount = await this.activeDirectorCount(
           tx,
@@ -141,6 +141,7 @@ export class TournamentStaffService {
             role: V1TournamentStaffRole.TOURNAMENT_DIRECTOR,
             expiresAt: normalized.expiresAt,
             grantedByUserId: normalized.actorUserId,
+            createdAt: normalized.occurredAt,
           },
           select: ASSIGNMENT_SELECT,
         });
@@ -163,7 +164,7 @@ export class TournamentStaffService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        await this.recheckActor(tx, principal, normalized.tournamentId);
+        await this.recheckActor(tx, principal, normalized.tournamentId, normalized.occurredAt);
         await this.assertTournamentAndTarget(tx, normalized.tournamentId, normalized.targetUserId);
         if (
           normalized.role === V1TournamentStaffRole.TOURNAMENT_DIRECTOR &&
@@ -186,6 +187,7 @@ export class TournamentStaffService {
             fieldId: normalized.fieldId,
             expiresAt: normalized.expiresAt,
             grantedByUserId: normalized.actorUserId,
+            createdAt: normalized.occurredAt,
           },
           select: ASSIGNMENT_SELECT,
         });
@@ -227,7 +229,7 @@ export class TournamentStaffService {
     const principal = await this.authorize(normalized.actorUserId, normalized.tournamentId);
     const result = await this.prisma.$transaction(
       async (tx) => {
-        await this.recheckActor(tx, principal, normalized.tournamentId);
+        await this.recheckActor(tx, principal, normalized.tournamentId, normalized.occurredAt);
         const before = await tx.v1TournamentStaffAssignment.findUnique({
           where: { id: normalized.assignmentId },
           select: ASSIGNMENT_SELECT,
@@ -305,6 +307,7 @@ export class TournamentStaffService {
     tx: StaffTransaction,
     principal: TournamentStaffPrincipal,
     tournamentId: string,
+    occurredAt: Date,
   ): Promise<void> {
     if (principal.role === 'platform_ops') {
       const admin = await tx.v1AdminUser.findUnique({
@@ -343,7 +346,7 @@ export class TournamentStaffService {
         role: V1TournamentStaffRole.TOURNAMENT_DIRECTOR,
         version: principal.assignmentVersion,
         revokedAt: null,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: this.now() } }],
+        OR: [{ expiresAt: null }, { expiresAt: { gt: occurredAt } }],
       },
       select: { id: true },
     });

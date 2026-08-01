@@ -45,7 +45,7 @@ describe('TournamentStaffService PostgreSQL contract', () => {
     await prisma.$disconnect();
   });
 
-  it('persists bootstrap, director-limited stable scopes, atomic audit, and immediate revoke', async () => {
+  it('uses the bootstrap operation time for immediate director grant, revoke, and audit', async () => {
     const beforeFirstDirectorAttempt = await counts();
     await expect(
       service.grantStaff({
@@ -77,6 +77,11 @@ describe('TournamentStaffService PostgreSQL contract', () => {
       targetUserId: ID.director,
       audit: { requestId: 'task7-pg-bootstrap', sourceIp: '203.0.113.42' },
     });
+    const persistedDirector = await prisma.v1TournamentStaffAssignment.findUniqueOrThrow({
+      where: { id: director.id },
+      select: { createdAt: true },
+    });
+    expect(persistedDirector.createdAt).toEqual(NOW);
     const laterDirector = await service.grantStaff({
       actorUserId: ID.ops,
       tournamentId: ID.tournament,

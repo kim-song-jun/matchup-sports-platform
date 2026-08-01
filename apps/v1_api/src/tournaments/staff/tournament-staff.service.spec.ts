@@ -98,6 +98,40 @@ describe('TournamentStaffService', () => {
     expect(context.auditWriter.create).not.toHaveBeenCalled();
   });
 
+  it('persists the bootstrap operation timestamp as the first director assignment start time', async () => {
+    const context = setup();
+    const director = assignment({
+      id: IDS.directorAssignment,
+      role: 'TOURNAMENT_DIRECTOR',
+      fieldId: null,
+      fixtureScopes: [],
+    });
+    context.access.assertAccess.mockResolvedValue({
+      userId: IDS.actor,
+      role: 'platform_ops',
+      tournamentId: IDS.tournament,
+      assignmentId: null,
+      assignmentVersion: null,
+    });
+    context.tx.v1AdminUser.findUnique.mockResolvedValue({
+      adminRole: 'ops', status: 'active', revokedAt: null, user: { accountStatus: 'active' },
+    });
+    context.tx.v1TournamentStaffAssignment.create.mockResolvedValue(director);
+
+    await expect(
+      context.service.bootstrapFirstDirector({
+        actorUserId: IDS.actor,
+        tournamentId: IDS.tournament,
+        targetUserId: IDS.target,
+        audit: AUDIT,
+      }),
+    ).resolves.toMatchObject({ id: IDS.directorAssignment, role: 'TOURNAMENT_DIRECTOR' });
+
+    expect(context.tx.v1TournamentStaffAssignment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ createdAt: NOW }) }),
+    );
+  });
+
   it.each([
     { role: 'PLATFORM_OPS' as const, tournamentId: IDS.tournament },
     { role: 'FIELD_OPERATOR' as const, tournamentId: IDS.otherTournament },

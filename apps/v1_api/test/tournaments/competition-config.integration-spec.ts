@@ -1,4 +1,5 @@
 import { AdminContextService } from '../../src/common/admin-context.service';
+import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { GamesService } from '../../src/games/games.service';
@@ -18,7 +19,11 @@ import {
 
 const prisma = new PrismaService();
 const adminContext = new AdminContextService(prisma);
-const bracketService = new TournamentBracketService(prisma, adminContext, new GamesService(prisma));
+const bracketService = new TournamentBracketService(
+  prisma,
+  adminContext,
+  new GamesService(prisma, new OperationAuditWriterService()),
+);
 
 const authUser = {
   id: competitionConfigFixture.adminUserId,

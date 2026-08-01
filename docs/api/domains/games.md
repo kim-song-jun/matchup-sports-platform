@@ -7,6 +7,11 @@ Team Match and Tournament source adapters. `TeamMatchesModule` and `TournamentsM
 import that same module to consume the service; Nest resolves the static module once, so this is
 not a duplicate provider registration or a circular dependency.
 
+`GamesService` receives the shared `OperationAuditWriterService` from
+`OperationAuditModule`; it does not construct a private writer. Game command audits therefore use
+the same validated, append-only operation-audit boundary as tournament staff mutations while
+remaining in the command transaction. This module wiring changes no Game endpoint or DTO.
+
 All successful responses use the v1 `{ status, data, timestamp }` envelope. `V1AuthGuard`
 means an authenticated v1 user, and the service then re-checks source-specific authority. The
 only public read is the visibility projection; it uses `OptionalV1AuthGuard` and never exposes

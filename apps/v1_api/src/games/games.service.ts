@@ -208,9 +208,10 @@ function scoreFromJson(value: Prisma.JsonValue): GameScore {
 
 @Injectable()
 export class GamesService {
-  private readonly operationAuditWriter = new OperationAuditWriterService();
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly operationAuditWriter: OperationAuditWriterService,
+  ) {}
 
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,

@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { V1CompetitionConfigStatus, V1GameSideKey } from '@prisma/client';
 import { AdminContextService } from '../../src/common/admin-context.service';
+import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GamesService } from '../../src/games/games.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
@@ -31,7 +32,7 @@ const authUser = {
 };
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma);
+const games = new GamesService(prisma, new OperationAuditWriterService());
 const adminContext = new AdminContextService(prisma);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
 

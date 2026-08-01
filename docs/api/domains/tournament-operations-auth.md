@@ -16,6 +16,21 @@
 
 <!-- API_CONTRACT_SECTION_END:Canonical actor-action matrix -->
 
+## Task 7 internal authorization runtime
+
+`TournamentsModule` provides `TournamentStaffAccessService`, `TournamentStaffGuard`, and
+`TournamentStaffService`, and imports the shared operation-audit and realtime modules. This makes
+the scoped actor matrix enforceable by tournament controllers without registering a second copy
+of any provider or introducing a module cycle. Staff grant, bootstrap, and revoke write through
+the shared append-only operation audit boundary; a successful revoke commits first and then
+disconnects every current socket for the revoked user so a stale realtime session cannot retain
+access.
+
+This is an internal service/guard contract only. Task 7 adds no staff-management HTTP route,
+controller, or DTO. Public list/grant/revoke endpoints remain deferred to Task 18. Existing
+`/api/v1/admin/**` controllers continue to use the v1 session guard plus the established
+active-admin/owner-or-ops checks; tournament staff assignments do not grant global Admin access.
+
 ## Migrated general admin and audit surface
 
 The following pre-normalization v1 admin/audit contract is retained here so superseding the duplicate tree loses no contract content.

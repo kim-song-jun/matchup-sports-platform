@@ -6,6 +6,7 @@ import {
   V1GameSourceType,
   V1GameState,
 } from '@prisma/client';
+import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import {
   canonicalGameCommandPayloadHash,
   GamesService,
@@ -29,7 +30,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma);
+const games = new GamesService(prisma, new OperationAuditWriterService());
 const notifications = {
   emitNotification: async () => undefined,
   emitToManyDeferred: () => undefined,

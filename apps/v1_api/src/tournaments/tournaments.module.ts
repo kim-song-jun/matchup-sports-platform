@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
+import { OperationAuditModule } from '../common/audit/operation-audit.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
@@ -33,6 +34,10 @@ import { TournamentCampaignAdminService } from './tournament-campaign-admin.serv
 import { TournamentCampaignReadService } from './tournament-campaign-read.service';
 import { TournamentCampaignStatusService } from './tournament-campaign-status.service';
 import { GamesModule } from '../games/games.module';
+import { RealtimeModule } from '../realtime/realtime.module';
+import { TournamentStaffAccessService } from './staff/tournament-staff-access.service';
+import { TournamentStaffGuard } from './staff/tournament-staff.guard';
+import { TournamentStaffService } from './staff/tournament-staff.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -43,7 +48,14 @@ import { GamesModule } from '../games/games.module';
  * 컨트롤러를 와일드카드(:tournamentId) 컨트롤러보다 먼저 두어 매칭 모호성을 줄인다.
  */
 @Module({
-  imports: [AdminContextModule, NotificationsModule, IntegrationsModule, GamesModule],
+  imports: [
+    AdminContextModule,
+    NotificationsModule,
+    IntegrationsModule,
+    GamesModule,
+    OperationAuditModule,
+    RealtimeModule,
+  ],
   controllers: [
     TournamentCampaignsPublicController,
     TournamentCampaignsAdminController,
@@ -76,6 +88,9 @@ import { GamesModule } from '../games/games.module';
     TournamentCampaignStatusService,
     OptionalV1AuthGuard,
     V1AuthGuard,
+    TournamentStaffAccessService,
+    TournamentStaffGuard,
+    TournamentStaffService,
   ],
 })
 export class TournamentsModule {}

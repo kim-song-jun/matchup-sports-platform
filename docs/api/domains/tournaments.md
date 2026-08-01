@@ -12,6 +12,18 @@ Tournament list/detail reads are public. Clients may call them without a stored 
 
 Public list/detail items include `campaignSlug` only while the related campaign is `published`; otherwise the field is `null`. The slug endpoint also requires a published campaign and a non-deleted tournament in `open`, `closed`, `in_progress`, or `completed`. Its tournament projection contains display facts, rules/refund policy, active sponsors, confirmed count, and public confirmed/waitlisted team summaries. It never returns bank account fields, player/contact PII, creator/admin identity, or deleted-row metadata.
 
+## Tournament staff runtime boundary
+
+Task 7 wires the scoped tournament-staff access, guard, and management services into
+`TournamentsModule`. Active assignments are evaluated against tournament, fixture, and field/court
+scope; expired, revoked, stale-version, or cross-scope authority fails with
+`403 STAFF_SCOPE_DENIED`. Staff management mutations share the append-only operation audit writer,
+and a committed revoke immediately disconnects the affected user's realtime sockets.
+
+No tournament-staff HTTP endpoint is part of Task 7. Task 18 owns the future list, bootstrap,
+grant, and revoke controllers/DTOs. Existing `/api/v1/admin/**` routes and their active-admin
+authorization remain unchanged; a tournament assignment is never a global Admin grant.
+
 ## Tournament Campaign Endpoints
 
 | Method | Path | Auth | Request | Response |

@@ -387,19 +387,45 @@ describe('Task 9 game projection real-database contract', () => {
     });
 
     it('[RED-L2] malformed official payload poisons with a projection error and never writes a current watermark', async () => {
+      const [beforeFactCount, beforeWatermarks] = await Promise.all([
+        futureFactCount('v1_game_official_facts', ids.revision),
+        prisma.v1ProjectionWatermark.findMany({
+          where: { revisionId: ids.revision },
+          orderBy: [{ projection: 'asc' }, { entityType: 'asc' }, { entityId: 'asc' }],
+          select: {
+            projection: true,
+            entityType: true,
+            entityId: true,
+            revisionId: true,
+            sourceHash: true,
+            status: true,
+          },
+        }),
+      ]);
       await resetOfficialDelivery(officialOutboxId, { revisionId: '' }, 5);
       const processed = await productionWorker().processOne();
-      const [event, facts, invalidWatermarks] = await Promise.all([
+      const [event, afterFactCount, afterWatermarks] = await Promise.all([
         outboxState(officialOutboxId),
         futureFactCount('v1_game_official_facts', ids.revision),
-        prisma.v1ProjectionWatermark.count({ where: { revisionId: { in: ['', ids.revision] } } }),
+        prisma.v1ProjectionWatermark.findMany({
+          where: { revisionId: ids.revision },
+          orderBy: [{ projection: 'asc' }, { entityType: 'asc' }, { entityId: 'asc' }],
+          select: {
+            projection: true,
+            entityType: true,
+            entityId: true,
+            revisionId: true,
+            sourceHash: true,
+            status: true,
+          },
+        }),
       ]);
 
+      expect(afterFactCount).toBe(beforeFactCount);
+      expect(afterWatermarks).toEqual(beforeWatermarks);
       expect({
         processed,
         event: { status: event.status, attempts: event.attempts, lastError: event.lastError },
-        facts,
-        invalidWatermarks,
       }).toEqual({
         processed: true,
         event: {
@@ -407,8 +433,6 @@ describe('Task 9 game projection real-database contract', () => {
           attempts: 6,
           lastError: 'Error: GAME_RESULT_OFFICIAL payload requires a non-empty revisionId',
         },
-        facts: 0,
-        invalidWatermarks: 0,
       });
     });
 

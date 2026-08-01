@@ -33,10 +33,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
   });
 
   afterEach(async () => {
-    await prisma.$executeRaw`
-      DELETE FROM v1_operation_audits
-      WHERE request_id LIKE ${`${keyPrefix}%`}
-    `;
+    await prisma.$executeRaw`TRUNCATE TABLE v1_operation_audits`;
     await prisma.$executeRaw`
       DELETE FROM v1_outbox_events
       WHERE business_key LIKE ${`${keyPrefix}%`}

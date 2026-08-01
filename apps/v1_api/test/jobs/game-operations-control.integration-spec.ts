@@ -117,10 +117,7 @@ describe('Task 5 game operation control plane', () => {
       WHERE business_key LIKE 'platform-ops-control:%'
          OR business_key LIKE 'task5-poisoned:%'
     `;
-    await prisma.$executeRaw`
-      DELETE FROM v1_operation_audits
-      WHERE system_actor = 'PLATFORM_OPS_CONTROL'
-    `;
+    await prisma.$executeRaw`TRUNCATE TABLE v1_operation_audits`;
     await prisma.$executeRaw`DELETE FROM v1_game_operation_flags`;
     await prisma.$executeRaw`DELETE FROM v1_game_cutover_epochs WHERE id = 'game-cutover'`;
     attemptId = randomUUID();
@@ -652,10 +649,7 @@ async function deleteTestRows(prisma: PrismaService) {
     WHERE business_key LIKE 'platform-ops-control:%'
        OR business_key LIKE 'task5-poisoned:%'
   `;
-  await prisma.$executeRaw`
-    DELETE FROM v1_operation_audits
-    WHERE system_actor = 'PLATFORM_OPS_CONTROL'
-  `;
+  await prisma.$executeRaw`TRUNCATE TABLE v1_operation_audits`;
   await prisma.v1AdminUser.deleteMany({ where: { userId: { in: TEST_USER_IDS } } });
   await prisma.v1User.deleteMany({ where: { id: { in: TEST_USER_IDS } } });
 }

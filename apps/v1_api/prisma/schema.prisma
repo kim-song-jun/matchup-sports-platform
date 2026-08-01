@@ -362,6 +362,18 @@ enum V1GameResultRevisionState {
 enum V1VisibilityMode {
   LIVE
   STATUS_ONLY
+  HIDDEN
+  OFFICIAL_ONLY
+}
+
+enum V1FixtureAdvancementOutcome {
+  WINNER
+  LOSER
+}
+
+enum V1FixtureTargetSide {
+  HOME
+  AWAY
 }
 
 enum V1OutboxStatus {
@@ -1881,9 +1893,9 @@ model V1Tournament {
   deletedAt                  DateTime?                   @map("deleted_at")
   competitionConfigVersionId String                      @default(dbgenerated("v1_default_competition_config_version()")) @map("competition_config_version_id")
 
-  sport             V1Sport                       @relation(fields: [sportId], references: [id], onDelete: Restrict)
-  competitionConfig V1CompetitionConfigVersion    @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
-  createdByAdmin    V1AdminUser?                  @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+  sport             V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
+  competitionConfig V1CompetitionConfigVersion           @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
+  createdByAdmin    V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
   registrations     V1TournamentRegistration[]
   groups            V1TournamentGroup[]
   fixtures          V1TournamentFixture[]
@@ -1896,6 +1908,7 @@ model V1Tournament {
   fields            V1TournamentField[]
   staffAssignments  V1TournamentStaffAssignment[]
   operationAudits   V1OperationAudit[]
+  advancementEdges  V1TournamentFixtureAdvancementEdge[]
 
   @@index([status, scheduledAt])
   @@index([sportId, status])
@@ -2103,19 +2116,21 @@ model V1TournamentFixture {
   updatedAt                  DateTime                  @updatedAt @map("updated_at")
   competitionConfigVersionId String                    @default(dbgenerated("v1_default_competition_config_version()")) @map("competition_config_version_id")
 
-  tournament        V1Tournament                    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  group             V1TournamentGroup?              @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  parentFixture     V1TournamentFixture?            @relation("V1TournamentFixtureParent", fields: [parentFixtureId], references: [id], onDelete: SetNull)
-  childFixtures     V1TournamentFixture[]           @relation("V1TournamentFixtureParent")
-  homeRegistration  V1TournamentRegistration?       @relation("V1TournamentFixtureHome", fields: [homeRegistrationId], references: [id], onDelete: SetNull)
-  awayRegistration  V1TournamentRegistration?       @relation("V1TournamentFixtureAway", fields: [awayRegistrationId], references: [id], onDelete: SetNull)
-  result            V1TournamentFixtureResult?
-  videos            V1TournamentFixtureVideo[]
-  game              V1Game?                         @relation("V1GameTournamentFixture")
-  competitionConfig V1CompetitionConfigVersion      @relation("V1FixtureCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_fixtures_competition_config_fk")
-  field             V1TournamentField?              @relation(fields: [tournamentId, fieldId], references: [tournamentId, id], onDelete: Restrict, map: "v1_tournament_fixtures_field_fk")
-  staffScopes       V1TournamentStaffFixtureScope[]
-  operationAudits   V1OperationAudit[]
+  tournament         V1Tournament                         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  group              V1TournamentGroup?                   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  parentFixture      V1TournamentFixture?                 @relation("V1TournamentFixtureParent", fields: [parentFixtureId], references: [id], onDelete: SetNull)
+  childFixtures      V1TournamentFixture[]                @relation("V1TournamentFixtureParent")
+  homeRegistration   V1TournamentRegistration?            @relation("V1TournamentFixtureHome", fields: [homeRegistrationId], references: [id], onDelete: SetNull)
+  awayRegistration   V1TournamentRegistration?            @relation("V1TournamentFixtureAway", fields: [awayRegistrationId], references: [id], onDelete: SetNull)
+  result             V1TournamentFixtureResult?
+  videos             V1TournamentFixtureVideo[]
+  game               V1Game?                              @relation("V1GameTournamentFixture")
+  competitionConfig  V1CompetitionConfigVersion           @relation("V1FixtureCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_fixtures_competition_config_fk")
+  field              V1TournamentField?                   @relation(fields: [tournamentId, fieldId], references: [tournamentId, id], onDelete: Restrict, map: "v1_tournament_fixtures_field_fk")
+  staffScopes        V1TournamentStaffFixtureScope[]
+  operationAudits    V1OperationAudit[]
+  advancementSources V1TournamentFixtureAdvancementEdge[] @relation("V1FixtureAdvancementSource")
+  advancementTargets V1TournamentFixtureAdvancementEdge[] @relation("V1FixtureAdvancementTarget")
 
   @@unique([tournamentId, id], map: "v1_tournament_fixtures_tournament_id_id_key")
   @@index([tournamentId, round, fixtureNumber])
@@ -2144,6 +2159,26 @@ model V1TournamentFixtureResult {
   goals           V1TournamentFixtureGoal[]
 
   @@map("v1_tournament_fixture_results")
+}
+
+model V1TournamentFixtureAdvancementEdge {
+  id              String                      @id @default(uuid())
+  tournamentId    String                      @map("tournament_id")
+  sourceFixtureId String                      @map("source_fixture_id")
+  sourceOutcome   V1FixtureAdvancementOutcome @map("source_outcome")
+  targetFixtureId String                      @map("target_fixture_id")
+  targetSide      V1FixtureTargetSide         @map("target_side")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+
+  tournament    V1Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  sourceFixture V1TournamentFixture @relation("V1FixtureAdvancementSource", fields: [tournamentId, sourceFixtureId], references: [tournamentId, id], onDelete: Cascade, map: "v1_fixture_advancement_source_fk")
+  targetFixture V1TournamentFixture @relation("V1FixtureAdvancementTarget", fields: [tournamentId, targetFixtureId], references: [tournamentId, id], onDelete: Cascade, map: "v1_fixture_advancement_target_fk")
+
+  @@unique([sourceFixtureId, sourceOutcome], map: "v1_fixture_advancement_source_outcome_key")
+  @@unique([targetFixtureId, targetSide], map: "v1_fixture_advancement_target_side_key")
+  @@index([tournamentId, sourceFixtureId], map: "v1_fixture_advancement_source_lock_idx")
+  @@index([tournamentId, targetFixtureId], map: "v1_fixture_advancement_target_lock_idx")
+  @@map("v1_tournament_fixture_advancement_edges")
 }
 
 model V1TournamentFixtureGoal {
@@ -2474,11 +2509,37 @@ model V1GameResultRevision {
   supersededBy         V1GameResultRevision[]    @relation("V1RevisionSupersedes")
   currentGames         V1Game[]                  @relation("V1CurrentOfficialRevision")
   resultParticipants   V1GameResultParticipant[]
+  officialFact         V1GameOfficialFact?
 
   @@unique([gameId, revision], map: "v1_game_result_revisions_game_revision_key")
   @@unique([gameId, id], map: "v1_game_result_revisions_game_id_id_key")
   @@index([gameId, state], map: "v1_game_result_revisions_game_id_state_idx")
   @@map("v1_game_result_revisions")
+}
+
+model V1GameOfficialFact {
+  id             String               @id @default(uuid())
+  revisionId     String               @unique(map: "v1_game_official_facts_revision_id_key") @map("revision_id")
+  gameId         String               @map("game_id")
+  revision       Int
+  sourceType     V1GameSourceType     @map("source_type")
+  tournamentId   String?              @map("tournament_id")
+  homeTeamId     String?              @map("home_team_id")
+  awayTeamId     String?              @map("away_team_id")
+  homeScore      Int                  @map("home_score")
+  awayScore      Int                  @map("away_score")
+  score          Json
+  eventsHash     String               @map("events_hash")
+  officialAt     DateTime             @map("official_at")
+  recordedAt     DateTime             @default(now()) @map("recorded_at")
+  resultRevision V1GameResultRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict, map: "v1_game_official_facts_revision_fk")
+
+  @@unique([gameId, revision], map: "v1_game_official_facts_game_revision_key")
+  @@index([officialAt], map: "v1_game_official_facts_official_at_idx")
+  @@index([tournamentId, officialAt], map: "v1_game_official_facts_tournament_official_at_idx")
+  @@index([homeTeamId, officialAt], map: "v1_game_official_facts_home_team_official_at_idx")
+  @@index([awayTeamId, officialAt], map: "v1_game_official_facts_away_team_official_at_idx")
+  @@map("v1_game_official_facts")
 }
 
 model V1GameResultParticipant {

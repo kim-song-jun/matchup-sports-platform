@@ -237,7 +237,9 @@ describe('AdminTermsService', () => {
   });
 
   it('publishes a future-effective version without archiving the currently effective version', async () => {
-    const future = new Date('2026-08-01T00:00:00.000Z');
+    // changeStatus 는 실제 시각(new Date())으로 예약 발행 여부를 판정하므로
+    // 고정 날짜를 쓰면 그 시각이 지나는 순간 테스트가 영구히 깨진다.
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const draft = {
       ...document,
       id: 'document-2',

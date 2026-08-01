@@ -115,6 +115,10 @@ const TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH =
   '.omo/start-work/host-pressure-override-task-9.json';
 const TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256 =
   '1dc8b10b5027ad1daa65bac2727eaaf7e11e80162fc5274fcc98affea21c55e0';
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH =
+  '.omo/start-work/host-pressure-override-task-9-plan-r2.json';
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256 =
+  '436ea7c6b56d2069dfb1d46d17974c75ceb6db99b5aa41c67208d1678eae783e';
 const VERIFICATION_SESSION_ID =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
 const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
@@ -394,8 +398,11 @@ function secureImmutableDescriptor(
   const observedText = descriptor.bytes.toString('utf8');
   const exactTaskNinePrettyJSON =
     allowTaskNinePrettyJSON &&
-    expectedSHA === TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256 &&
-    descriptor.sha256 === TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256;
+    expectedSHA === descriptor.sha256 &&
+    [
+      TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256,
+      TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256,
+    ].includes(expectedSHA);
   if (
     observedText !== canonical &&
     !(allowCanonicalNewline && observedText === `${canonical}\n`) &&
@@ -429,14 +436,16 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
   const historicalPath = resolve(repoRoot, HISTORICAL_TASK_ONE_OVERRIDE_PATH);
   const pressureBPath = resolve(repoRoot, TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH);
   const taskNinePath = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH);
+  const taskNineR2Path = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH);
   const absoluteSupplied = resolve(supplied);
   const historical = task === 1 && absoluteSupplied === historicalPath;
   const pressureB = absoluteSupplied === pressureBPath;
-  const taskNine = task === 9 && absoluteSupplied === taskNinePath;
+  const taskNineR2 = task === 9 && absoluteSupplied === taskNineR2Path;
+  const taskNine = task === 9 && (absoluteSupplied === taskNinePath || taskNineR2);
   if (absoluteSupplied !== canonicalPath && !historical && !pressureB && !taskNine) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH}`,
+      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, ${TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH}`,
       75,
     );
   }
@@ -445,7 +454,9 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     : pressureB
       ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256
       : taskNine
-        ? TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256
+        ? taskNineR2
+          ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256
+          : TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256
         : OVERRIDE_SHA256;
   const descriptor = secureImmutableDescriptor(
     absoluteSupplied,
@@ -910,6 +921,10 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
       'sessionId',
     ]) &&
     JSON.stringify(receipt.allowedTasks) === JSON.stringify([9]) &&
+    receipt.authorizationSource ===
+      (taskNineR2
+        ? 'prior-explicit-user-message-plus-task-9-decision'
+        : 'user-message') &&
     Number.isFinite(Date.parse(receipt.authorizedAt)) &&
     typeof receipt.authorizationText === 'string' &&
     receipt.authorizationText.length > 0 &&
@@ -921,7 +936,7 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     receipt.plan !== PLAN_PATH ||
     ![plan.rawSHA, plan.normalizedSHA].includes(receipt.planSHA256) ||
     receipt.sessionId !== VERIFICATION_SESSION_ID ||
-    receipt.authorizationSource !== 'user-message' ||
+    (!taskNine && receipt.authorizationSource !== 'user-message') ||
     !(pressureB
       ? pressureBReceiptValid
       : taskNine

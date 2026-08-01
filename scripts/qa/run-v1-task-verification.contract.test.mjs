@@ -50,6 +50,12 @@ const taskNinePlanSHA =
   '5b38fa2106872da3f00b26277a8fc8365b2178d61b23418943549508c18916ec';
 const verificationSessionId =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
+const taskNineR2OverridePath =
+  '.omo/start-work/host-pressure-override-task-9-plan-r2.json';
+const taskNineR2OverrideSHA =
+  '436ea7c6b56d2069dfb1d46d17974c75ceb6db99b5aa41c67208d1678eae783e';
+const taskNineR2PlanSHA =
+  '61bb87ecb9e3b96046bb7f1e59ceb36ddf11620bfc1034779defd7bcacdfbed6';
 
 function runNode(args, options = {}) {
   return spawnSync(process.execPath, args, {
@@ -492,6 +498,8 @@ function hostPressureOverrideFunction({
     'TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE',
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH',
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256',
     'OVERRIDE_SHA256',
     'VERIFICATION_SESSION_ID',
     'secureImmutableDescriptor',
@@ -522,6 +530,8 @@ function hostPressureOverrideFunction({
     pressureBOverrideSize,
     taskNineOverridePath,
     taskNineOverrideSHA,
+    taskNineR2OverridePath,
+    taskNineR2OverrideSHA,
     '2c04e6621fccb1017838c6b479ac8addabba9061852654cec4c893ed588631c2',
     'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027',
     (path, expectedSHA, code, exitCode) => {
@@ -594,6 +604,7 @@ function secureImmutableDescriptorFunction() {
     'HarnessError',
     'stable',
     'TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256',
+    'TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256',
     `${declaration}; return secureImmutableDescriptor;`,
   )(
     isAbsolute,
@@ -603,6 +614,7 @@ function secureImmutableDescriptorFunction() {
     TestHarnessError,
     stable,
     taskNineOverrideSHA,
+    taskNineR2OverrideSHA,
   );
 }
 
@@ -1529,6 +1541,109 @@ test('Task 9 host pressure receipt accepts only its immutable simple contract', 
     rejected('wrong session', { session: 'codex:wrong-session' });
     rejected('wrong plan', { planSHA: '0'.repeat(64) });
     rejected('wrong task', { task: 8 });
+  } finally {
+    if (previousReceipt === undefined) {
+      delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+    } else {
+      process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = previousReceipt;
+    }
+    if (previousSession === undefined) {
+      delete process.env.V1_VERIFICATION_SESSION_ID;
+    } else {
+      process.env.V1_VERIFICATION_SESSION_ID = previousSession;
+    }
+  }
+});
+
+test('Task 9 R2 host pressure receipt accepts only its immutable descriptor', () => {
+  const receipt = JSON.parse(readFileSync(resolve(repoRoot, taskNineR2OverridePath), 'utf8'));
+  const source = readFileSync(
+    join(repoRoot, 'scripts/qa/run-v1-task-verification.mjs'),
+    'utf8',
+  );
+  const productionPath = source.match(
+    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_PATH =\s*'([^']+)'/,
+  )?.[1];
+  const productionSHA = source.match(
+    /const TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256 =\s*'([0-9a-f]{64})'/,
+  )?.[1];
+  const previousReceipt = process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;
+  const previousSession = process.env.V1_VERIFICATION_SESSION_ID;
+  try {
+    assert.equal(sha256(readFileSync(resolve(repoRoot, taskNineR2OverridePath))), taskNineR2OverrideSHA);
+    assert.equal(productionPath, taskNineR2OverridePath);
+    assert.equal(productionSHA, taskNineR2OverrideSHA);
+    process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, taskNineR2OverridePath);
+    process.env.V1_VERIFICATION_SESSION_ID = verificationSessionId;
+    const verifyOverride = hostPressureOverrideFunction({
+      receipt,
+      sha256: taskNineR2OverrideSHA,
+    });
+    assert.doesNotThrow(() => verifyOverride(
+      repoRoot,
+      { rawSHA: taskNineR2PlanSHA, normalizedSHA: 'different-normalized-plan-sha' },
+      9,
+      ['NODE_MCP_PROCESS_PROLIFERATION'],
+    ));
+    const rejected = (name, {
+      path = taskNineR2OverridePath,
+      sha256: receiptSHA = taskNineR2OverrideSHA,
+      session = verificationSessionId,
+      planSHA = taskNineR2PlanSHA,
+      task = 9,
+    }) => {
+      process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT = resolve(repoRoot, path);
+      process.env.V1_VERIFICATION_SESSION_ID = session;
+      const verifier = hostPressureOverrideFunction({
+        receipt: { ...receipt, planSHA256: planSHA },
+        sha256: receiptSHA,
+      });
+      assert.throws(
+        () => verifier(
+          repoRoot,
+          { rawSHA: taskNineR2PlanSHA, normalizedSHA: 'different-normalized-plan-sha' },
+          task,
+          ['NODE_MCP_PROCESS_PROLIFERATION'],
+        ),
+        (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+        name,
+      );
+    };
+    rejected('wrong path', { path: '.omo/start-work/arbitrary-r2-receipt.json' });
+    rejected('wrong SHA', { sha256: '0'.repeat(64) });
+    rejected('wrong session', { session: 'codex:wrong-session' });
+    rejected('wrong plan', { planSHA: '0'.repeat(64) });
+    rejected('wrong task', { task: 8 });
+    const verifyDescriptor = secureImmutableDescriptorFunction();
+    assert.doesNotThrow(() => verifyDescriptor(
+      resolve(repoRoot, taskNineR2OverridePath),
+      taskNineR2OverrideSHA,
+      'HOST_PRESSURE_OVERRIDE_INVALID',
+      75,
+      false,
+      null,
+      true,
+    ));
+    const hardLinkDirectory = mkdtempSync('/private/tmp/teameet-task9-r2-hardlink-');
+    try {
+      linkSync(resolve(repoRoot, taskNineR2OverridePath), join(hardLinkDirectory, 'receipt.json'));
+      assert.equal(lstatSync(resolve(repoRoot, taskNineR2OverridePath)).nlink, 2);
+      assert.throws(
+        () => verifyDescriptor(
+          resolve(repoRoot, taskNineR2OverridePath),
+          taskNineR2OverrideSHA,
+          'HOST_PRESSURE_OVERRIDE_INVALID',
+          75,
+          false,
+          null,
+          true,
+        ),
+        (error) => error.code === 'HOST_PRESSURE_OVERRIDE_INVALID',
+        'the R2 receipt must reject a hard-linked inode',
+      );
+    } finally {
+      rmSync(hardLinkDirectory, { recursive: true, force: true });
+    }
   } finally {
     if (previousReceipt === undefined) {
       delete process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT;

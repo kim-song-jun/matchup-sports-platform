@@ -16,3 +16,4 @@ services:
       - ./nginx.security-headers.conf:/etc/nginx/snippets/teameet-security-headers.conf:ro
       - ./nginx.proxy-hide-security-headers.conf:/etc/nginx/snippets/teameet-proxy-hide-security-headers.conf:ro
       - ./release-metadata.alpha.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro
+      - ./cloudflare-real-ip.conf:/etc/nginx/snippets/teameet-cloudflare-real-ip.conf:ro

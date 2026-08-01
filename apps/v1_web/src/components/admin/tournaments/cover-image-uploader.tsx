@@ -14,6 +14,8 @@ type CoverImageUploaderProps = {
   uploading?: boolean;
   disabled?: boolean;
   label?: string;
+  helperText?: string;
+  previewAlt?: string;
   eager?: boolean;
 };
 
@@ -24,6 +26,8 @@ export function CoverImageUploader({
   uploading = false,
   disabled = false,
   label = '커버 이미지',
+  helperText = 'JPG, PNG, WebP · 최대 10MB. 목록과 상세 상단에 같은 이미지가 표시돼요.',
+  previewAlt,
   eager = false,
 }: CoverImageUploaderProps) {
   const generatedId = useId();
@@ -40,7 +44,7 @@ export function CoverImageUploader({
         <div className="relative aspect-video overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--grey50)]">
           <Image
             src={publicAssetPath(value ?? COVER_EXAMPLE)}
-            alt={value ? '선택한 대회 커버 미리보기' : '대회 커버 이미지 예시'}
+            alt={previewAlt ?? (value ? '선택한 대회 커버 미리보기' : '대회 커버 이미지 예시')}
             fill
             sizes="(max-width: 640px) 100vw, 240px"
             className={`object-cover ${value ? '' : 'opacity-55'}`}
@@ -59,6 +63,7 @@ export function CoverImageUploader({
             ref={inputRef}
             id={inputId}
             type="file"
+            aria-label={`${label} 파일 선택`}
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
             disabled={locked}
@@ -89,7 +94,7 @@ export function CoverImageUploader({
             </button>
           ) : null}
           <p className="text-xs leading-5 text-[var(--text-caption)]">
-            JPG, PNG, WebP · 최대 10MB. 목록과 상세 상단에 같은 이미지가 표시돼요.
+            {helperText}
           </p>
         </div>
       </div>

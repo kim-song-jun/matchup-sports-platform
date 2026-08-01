@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import type {
   CampaignFaqForm,
   CampaignHighlightForm,
@@ -17,6 +18,10 @@ type CollectionsProps = {
   readonly errors: TournamentCampaignFormErrors;
   readonly faqSectionTitleField: ReactNode;
   readonly onHighlightsChange: (items: readonly CampaignHighlightForm[]) => void;
+  readonly onHighlightImageSelect: (index: number, file: File) => void;
+  readonly onHighlightImageClear: (index: number) => void;
+  readonly uploadingHighlightIndex: number | null;
+  readonly imageUploadDisabled: boolean;
   readonly onFaqChange: (items: readonly CampaignFaqForm[]) => void;
 };
 
@@ -25,15 +30,19 @@ export function TournamentCampaignEditorCollections({
   errors,
   faqSectionTitleField,
   onHighlightsChange,
+  onHighlightImageSelect,
+  onHighlightImageClear,
+  uploadingHighlightIndex,
+  imageUploadDisabled,
   onFaqChange,
 }: CollectionsProps) {
   return (
     <>
       <EditorCollectionSection
-        title="하이라이트"
+        title="참가할 이유"
         count={`${form.highlights.length}/8`}
         error={errors.highlights}
-        addLabel="하이라이트 추가"
+        addLabel="참가할 이유 추가"
         addDisabled={form.highlights.length >= 8}
         onAdd={() => onHighlightsChange([
           ...form.highlights,
@@ -43,31 +52,35 @@ export function TournamentCampaignEditorCollections({
         {form.highlights.map((item, index) => (
           <div key={`highlight-${index}`} className="rounded-xl bg-gray-50 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold text-gray-600">하이라이트 {index + 1}</p>
+              <p className="text-xs font-semibold text-gray-600">참가할 이유 {index + 1}</p>
               <RemoveButton
-                label={`하이라이트 ${index + 1} 삭제`}
+                label={`참가할 이유 ${index + 1} 삭제`}
                 onClick={() => onHighlightsChange(form.highlights.filter((_, itemIndex) => itemIndex !== index))}
               />
             </div>
             <div className="grid gap-3">
               <CollectionField
-                label={`하이라이트 ${index + 1} 제목`}
+                label={`참가할 이유 ${index + 1} 제목`}
                 value={item.title}
                 maxLength={100}
                 onChange={(title) => onHighlightsChange(replaceHighlight(form.highlights, index, { ...item, title }))}
               />
               <CollectionField
-                label={`하이라이트 ${index + 1} 내용`}
+                label={`참가할 이유 ${index + 1} 내용`}
                 value={item.body}
                 maxLength={500}
                 multiline
                 onChange={(body) => onHighlightsChange(replaceHighlight(form.highlights, index, { ...item, body }))}
               />
-              <CollectionField
-                label={`하이라이트 ${index + 1} 이미지 주소`}
-                value={item.imageUrl}
-                maxLength={2048}
-                onChange={(imageUrl) => onHighlightsChange(replaceHighlight(form.highlights, index, { ...item, imageUrl }))}
+              <CoverImageUploader
+                label={`참가할 이유 ${index + 1} 이미지`}
+                value={item.imageUrl || null}
+                onSelectFile={(file) => onHighlightImageSelect(index, file)}
+                onClear={() => onHighlightImageClear(index)}
+                uploading={uploadingHighlightIndex === index}
+                disabled={imageUploadDisabled}
+                helperText="JPG, PNG, WebP · 최대 5MB. 해당 참가 이유 카드에 표시돼요."
+                previewAlt={item.imageUrl ? `참가할 이유 ${index + 1} 이미지 미리보기` : `참가할 이유 ${index + 1} 이미지 예시`}
               />
             </div>
           </div>

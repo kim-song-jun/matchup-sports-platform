@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
+import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
@@ -62,6 +63,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
+    const officialProjection = new GameResultOfficialProjectionService();
+    this.registerHandler('GAME_RESULT_OFFICIAL', officialProjection.handler);
   }
 
   registerHandler(type: string, handler: GameOperationHandler): void {
@@ -490,6 +493,15 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   }
 
   private boundedError(error: unknown): string {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      const databaseMessage = error.meta?.message;
+      if (typeof databaseMessage === 'string' && databaseMessage.trim().length > 0) {
+        const normalized = databaseMessage.trim().startsWith('ERROR: ')
+          ? databaseMessage.trim().slice('ERROR: '.length)
+          : databaseMessage.trim();
+        return `Error: ${normalized}`.slice(0, MAX_ERROR_LENGTH);
+      }
+    }
     const value = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     return value.slice(0, MAX_ERROR_LENGTH);
   }

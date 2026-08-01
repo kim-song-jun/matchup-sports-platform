@@ -111,6 +111,10 @@ const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH =
 const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256 =
   '292432a0001ce5aaaf480db0a9c825c84a4f95cfcb78962f2a81055ae2484aeb';
 const TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE = 915;
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH =
+  '.omo/start-work/host-pressure-override-task-9.json';
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256 =
+  '1dc8b10b5027ad1daa65bac2727eaaf7e11e80162fc5274fcc98affea21c55e0';
 const VERIFICATION_SESSION_ID =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
 const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
@@ -344,6 +348,7 @@ function secureImmutableDescriptor(
   exitCode = 68,
   allowCanonicalNewline = false,
   expectedSize = null,
+  allowTaskNinePrettyJSON = false,
 ) {
   const absolutePath = isAbsolute(filePath) ? filePath : resolve(filePath);
   let stat;
@@ -356,12 +361,13 @@ function secureImmutableDescriptor(
   if (
     stat.isSymbolicLink() ||
     !stat.isFile() ||
+    stat.nlink !== 1 ||
     (stat.mode & 0o777) !== 0o444 ||
     stat.uid !== expectedUid
   ) {
     throw new HarnessError(
       code,
-      `${absolutePath}: receipt must be current-user-owned, regular, non-symlink, and mode 0444`,
+      `${absolutePath}: receipt must be current-user-owned, regular, single-link, non-symlink, and mode 0444`,
       exitCode,
     );
   }
@@ -386,9 +392,14 @@ function secureImmutableDescriptor(
   }
   const canonical = JSON.stringify(stable(receipt));
   const observedText = descriptor.bytes.toString('utf8');
+  const exactTaskNinePrettyJSON =
+    allowTaskNinePrettyJSON &&
+    expectedSHA === TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256 &&
+    descriptor.sha256 === TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256;
   if (
     observedText !== canonical &&
-    !(allowCanonicalNewline && observedText === `${canonical}\n`)
+    !(allowCanonicalNewline && observedText === `${canonical}\n`) &&
+    !exactTaskNinePrettyJSON
   ) {
     throw new HarnessError(
       code,
@@ -417,13 +428,15 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
   const canonicalPath = resolve(repoRoot, OVERRIDE_PATH);
   const historicalPath = resolve(repoRoot, HISTORICAL_TASK_ONE_OVERRIDE_PATH);
   const pressureBPath = resolve(repoRoot, TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH);
+  const taskNinePath = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH);
   const absoluteSupplied = resolve(supplied);
   const historical = task === 1 && absoluteSupplied === historicalPath;
   const pressureB = absoluteSupplied === pressureBPath;
-  if (absoluteSupplied !== canonicalPath && !historical && !pressureB) {
+  const taskNine = task === 9 && absoluteSupplied === taskNinePath;
+  if (absoluteSupplied !== canonicalPath && !historical && !pressureB && !taskNine) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, or ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}`,
+      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_PATH}`,
       75,
     );
   }
@@ -431,7 +444,9 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     ? HISTORICAL_TASK_ONE_OVERRIDE_SHA256
     : pressureB
       ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256
-      : OVERRIDE_SHA256;
+      : taskNine
+        ? TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256
+        : OVERRIDE_SHA256;
   const descriptor = secureImmutableDescriptor(
     absoluteSupplied,
     expectedSHA,
@@ -439,11 +454,14 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     75,
     false,
     pressureB ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SIZE : null,
+    taskNine,
   );
   const receipt = descriptor.receipt;
   const allowed = historical
     ? receipt.task === 1
-    : Array.isArray(receipt.allowedTasks) && receipt.allowedTasks.includes(task);
+    : taskNine
+      ? JSON.stringify(receipt.allowedTasks) === JSON.stringify([9])
+      : Array.isArray(receipt.allowedTasks) && receipt.allowedTasks.includes(task);
   const exactKeys = (value, expected) =>
     value &&
     typeof value === 'object' &&
@@ -877,6 +895,27 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     pressureBPreflightValid &&
     pressureBLifecycleValid &&
     failures.every((failure) => failure === 'NODE_MCP_PROCESS_PROLIFERATION');
+  const taskNineReceiptValid =
+    taskNine &&
+    exactKeys(receipt, [
+      'allowedTasks',
+      'authorizationSource',
+      'authorizationText',
+      'authorizedAt',
+      'constraints',
+      'plan',
+      'planSHA256',
+      'schemaVersion',
+      'scope',
+      'sessionId',
+    ]) &&
+    JSON.stringify(receipt.allowedTasks) === JSON.stringify([9]) &&
+    Number.isFinite(Date.parse(receipt.authorizedAt)) &&
+    typeof receipt.authorizationText === 'string' &&
+    receipt.authorizationText.length > 0 &&
+    Array.isArray(receipt.constraints) &&
+    receipt.constraints.length > 0 &&
+    receipt.constraints.every((constraint) => typeof constraint === 'string');
   if (
     receipt.schemaVersion !== 1 ||
     receipt.plan !== PLAN_PATH ||
@@ -885,6 +924,8 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     receipt.authorizationSource !== 'user-message' ||
     !(pressureB
       ? pressureBReceiptValid
+      : taskNine
+        ? taskNineReceiptValid
       : ['host-preflight-only', 'plan-host-preflight-only'].includes(receipt.scope)) ||
     !allowed
   ) {

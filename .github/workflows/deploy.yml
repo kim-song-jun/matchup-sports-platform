@@ -92,6 +92,13 @@ jobs:
       - name: Alpha release-state contract tests
         run: bash scripts/qa/test-alpha-release-state.sh
 
+      # prod 배포 경로는 main push 때만 도는 탓에 몇 주씩 검증되지 않는다 — 그래서
+      # prune_stale_release_tags 의 빈 입력 버그가 2026-08-01 배포에서야 터졌고,
+      # 빌드가 막혀 SHA 태그가 영영 안 생기는 교착이라 프로덕션 배포가 완전히 멈췄다.
+      # 이 스텝은 모든 PR·push 에서 도므로 같은 계열 버그를 배포 전에 잡는다.
+      - name: Prod release prune contract tests
+        run: bash scripts/qa/test-prod-release-prune.sh
+
   # ── API: 타입·마이그레이션·유닛·통합·빌드 ───────────────────────────────────
   api:
     name: API
@@ -293,23 +300,12 @@ jobs:
             fi
           }
 
-          # 릴리스 태그를 5개까지만 남긴다. 예전에는 dangling 이미지만 정리해도 됐지만
-          # 이제 커밋 SHA 로 태그를 붙이므로 정리하지 않으면 디스크가 찬다.
-          # :latest 는 마지막 '승인된' 배포를 가리키므로 절대 지우지 않는다.
-          prune_stale_release_tags() {
-            local repo="$1"
-            local keep="$2"
-
-            sudo docker images --filter "reference=${repo}:*" \
-                --format '{{.CreatedAt}}|{{.Repository}}:{{.Tag}}' \
-              | grep -v "|${repo}:latest$" \
-              | sort -r \
-              | awk -F'|' -v keep="${keep}" 'NR > keep { print $2 }' \
-              | while IFS= read -r stale_image; do
-                  echo "[cleanup] dropping stale release tag ${stale_image}"
-                  sudo docker rmi "${stale_image}" >/dev/null 2>&1 || true
-                done
-          }
+          # prune_stale_release_tags 는 deploy/prod-release-common.sh 에 있다.
+          # 이 heredoc 안에 직접 적어 두면 테스트할 수가 없어서, main push 때만 도는
+          # 이 경로의 버그가 몇 주 동안 발견되지 않았다(2026-08-01 배포 실패).
+          # 파일로 빼면 scripts/qa/test-prod-release-prune.sh 가 실제로 호출해 검증한다.
+          # 위 Sync code 스텝이 저장소를 ~/teameet 로 rsync 한 뒤라 항상 존재한다.
+          . deploy/prod-release-common.sh
 
           if sudo docker compose version >/dev/null 2>&1; then
             COMPOSE="sudo docker compose"

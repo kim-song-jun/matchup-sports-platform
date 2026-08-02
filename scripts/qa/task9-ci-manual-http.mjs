@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = resolve(SCRIPT_DIR, '..', '..');
 const API_ROOT = join(REPOSITORY_ROOT, 'apps', 'v1_api');
-const API_ENTRYPOINT = join(API_ROOT, 'dist', 'main.js');
+const API_ENTRYPOINT = join(API_ROOT, 'dist', 'src', 'main.js');
 const DB_PREFIX = 'ulw_v1_integration_task9_ci_';
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 const REQUIRED_OUTPUTS = [
@@ -746,7 +746,7 @@ async function startApi() {
     stdio: ['ignore', state.apiLogFd, state.apiLogFd],
   });
   state.apiProcess = child;
-  appendCommand(`api-start executable=node entrypoint=apps/v1_api/dist/main.js pid=${child.pid} ppid=${process.pid} port=${state.port}`);
+  appendCommand(`api-start executable=node entrypoint=apps/v1_api/dist/src/main.js pid=${child.pid} ppid=${process.pid} port=${state.port}`);
   child.once('error', (error) => {
     state.failure ??= `API child process error: ${error.message}`;
   });

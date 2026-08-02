@@ -191,6 +191,42 @@ for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
   }
 }
 
+// compose 가 **기본값 없이** 참조하는 변수(`${VAR}`)는 값이 없으면 빈 문자열로 조용히
+// 치환된다. 2026-08-02 배포에서 DB_PASSWORD / JWT_SECRET 이 그랬고, 중첩 기본값
+// `${V1_JWT_SECRET:-${JWT_SECRET}}` 때문에 빈 JWT 서명 비밀키까지 번질 뻔했다.
+// deploy-prod.sh 의 런타임 preflight 가 최종 방어선이지만, 그건 배포가 시작돼야 발화한다 —
+// 여기서는 "compose 에 새 무기본값 변수를 추가했는데 배포 경로에 배선하지 않은" 경우를
+// CI 에서 먼저 잡는다.
+export function findUnwiredComposeVariables(compose, workflow) {
+  const bare = new Set([...compose.matchAll(/\$\{([A-Z][A-Z0-9_]*)\}/g)].map((m) => m[1]));
+  // 릴리스 매니페스트가 export 하는 이미지 변수는 .env 가 아니라
+  // load_prod_release_manifest() 가 채우고, 거기서 digest 형식까지 검증한다.
+  const fromManifest = new Set(['V1_API_IMAGE', 'V1_WEB_IMAGE']);
+  const wired = new Set(
+    [...workflow.matchAll(/SECRET_([A-Z][A-Z0-9_]*)\s*:/g)].map((m) => m[1]),
+  );
+  return [...bare]
+    .filter((name) => !fromManifest.has(name) && !wired.has(name))
+    .sort();
+}
+
+{
+  let compose = '';
+  try {
+    compose = readFileSync('deploy/docker-compose.prod.yml', 'utf8');
+  } catch {
+    compose = '';
+  }
+  if (compose) {
+    for (const name of findUnwiredComposeVariables(compose, workflow)) {
+      errors.push(
+        `${workflowPath}: compose 가 기본값 없이 참조하는 ${name} 가 Sync runtime env 에 없습니다 — ` +
+          `SECRET_${name} 를 추가하세요 (없으면 compose 가 빈 문자열로 치환해 빈 비밀키로 배포될 수 있다)`,
+      );
+    }
+  }
+}
+
 const requiredPatterns = [
   {
     pattern: /^permissions:\n  contents: read$/m,

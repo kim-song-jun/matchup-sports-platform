@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { usesSshAlias, findJobsMissingRunnerPrereqs } from './check-production-deploy-security.mjs';
+import {
+  usesSshAlias,
+  findJobsMissingRunnerPrereqs,
+  findUnwiredComposeVariables,
+} from './check-production-deploy-security.mjs';
 
 // 이 가드는 "prod 배포 스크립트에 SSH alias 잔재가 없는가" 를 지킨다. 그런데 가드 자체가
 // 약해서 놓친 전례가 있다 — 2026-08-02 첫 프로덕션 배포가 `ssh ec2` 잔재로 죽었고,
@@ -136,6 +140,47 @@ jobs:
       - run: echo "done"
 `;
   assert.deepEqual(findJobsMissingRunnerPrereqs(commented), []);
+});
+
+// compose 가 기본값 없이 참조하는 변수는 값이 없으면 **빈 문자열**이 된다. 2026-08-02
+// 배포에서 DB_PASSWORD / JWT_SECRET 이 그랬고, 중첩 기본값을 타고 빈 JWT 서명 비밀키까지
+// 번질 뻔했다(DB 인증 실패가 먼저 나서 실제로 뜨지는 않았다).
+test('기본값 없는 compose 변수가 배포 경로에 배선되지 않으면 탐지한다', () => {
+  const compose = `
+services:
+  api:
+    environment:
+      JWT_SECRET: \${V1_JWT_SECRET:-\${JWT_SECRET}}
+      DBURL: postgres://u:\${V1_DB_PASSWORD:-\${DB_PASSWORD}}@h/db
+      LOG: \${LOG_LEVEL:-info}
+    image: \${V1_API_IMAGE}
+`;
+  const workflowWithout = 'env:\n  SECRET_KAKAO_CLIENT_ID: x\n';
+  assert.deepEqual(
+    findUnwiredComposeVariables(compose, workflowWithout),
+    ['DB_PASSWORD', 'JWT_SECRET'],
+    '중첩 기본값 안쪽의 무기본값 변수를 잡아야 합니다 — 그게 빈 문자열이 되는 뿌리입니다',
+  );
+});
+
+test('배선된 변수와 매니페스트 제공 이미지 변수는 통과시킨다', () => {
+  const compose = `
+    image: \${V1_API_IMAGE}
+    web: \${V1_WEB_IMAGE}
+    jwt: \${V1_JWT_SECRET:-\${JWT_SECRET}}
+    db: \${V1_DB_PASSWORD:-\${DB_PASSWORD}}
+`;
+  const workflowWith = [
+    'env:',
+    '  SECRET_DB_PASSWORD: ${{ secrets.DB_PASSWORD }}',
+    '  SECRET_JWT_SECRET: ${{ secrets.JWT_SECRET }}',
+  ].join('\n');
+  assert.deepEqual(findUnwiredComposeVariables(compose, workflowWith), []);
+});
+
+test('기본값이 있는 변수에는 배선을 요구하지 않는다', () => {
+  const compose = 'a: ${LOG_LEVEL:-info}\nb: ${FRONTEND_URL:-https://teameet.co.kr}\n';
+  assert.deepEqual(findUnwiredComposeVariables(compose, 'env:\n'), []);
 });
 
 test('여러 줄 중 한 줄만 위반해도 탐지한다', () => {

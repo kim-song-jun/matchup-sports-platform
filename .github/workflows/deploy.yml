@@ -241,8 +241,6 @@ jobs:
       CI: true
       NODE_ENV: test
       JWT_SECRET: task10-ci-isolated-secret
-      TASK10_EVIDENCE_DIR: ${{ runner.temp }}/task10
-      TASK10_RUNTIME_FILE: ${{ runner.temp }}/task10-runtime-${{ github.run_id }}-${{ github.run_attempt }}.json
 
     steps:
       - name: Check out exact candidate SHA
@@ -251,6 +249,12 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Initialize Task 10 runner paths
+        run: |
+          set -Eeuo pipefail
+          printf '%s\n' "TASK10_EVIDENCE_DIR=${RUNNER_TEMP}/task10" >> "${GITHUB_ENV}"
+          printf '%s\n' "TASK10_RUNTIME_FILE=${RUNNER_TEMP}/task10-runtime-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json" >> "${GITHUB_ENV}"
 
       - name: Verify immutable clean candidate
         run: |

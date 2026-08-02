@@ -1204,6 +1204,7 @@ describe('Task 9 game projection real-database contract', () => {
     });
 
     it('[RED-AC6] global platform_ops queue lists, details, acknowledges, resolves, and audits due escalations across tournaments', async () => {
+      await cleanupR7EscalationArtifacts();
       const primary = await createAc6EscalationFixture(ids.tournamentGame, 'global-primary');
       const otherTournamentGameId = randomUUID();
       await prisma.v1Game.create({
@@ -2496,6 +2497,28 @@ async function seedEscalationRows(revisionId: string): Promise<void> {
       update: { status: 'PENDING', version: 0, ackByUserId: null, resolvedByUserId: null, reason: null },
     }),
   ]);
+}
+
+async function cleanupR7EscalationArtifacts(): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const rows = await tx.v1ResultEscalation.findMany({
+      where: {
+        resultRevisionId: ids.tournamentRevision,
+        kind: { in: ['ESCALATION', 'REMINDER'] },
+      },
+      select: { id: true },
+    });
+    const escalationIds = rows.map(({ id }) => id);
+    if (escalationIds.length === 0) return;
+
+    await tx.v1IdempotencyRecord.deleteMany({
+      where: { resourceType: 'RESULT_ESCALATION', resourceId: { in: escalationIds } },
+    });
+    await tx.v1OperationAudit.deleteMany({
+      where: { resourceType: 'RESULT_ESCALATION', resourceId: { in: escalationIds } },
+    });
+    await tx.v1ResultEscalation.deleteMany({ where: { id: { in: escalationIds } } });
+  });
 }
 
 async function createAc6EscalationFixture(

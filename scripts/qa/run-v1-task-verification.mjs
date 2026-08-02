@@ -145,6 +145,14 @@ const TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_SHA256 =
   '7e9c8eaaca4540a2137a333e92493df9a55c9467aa760a5652c28f10f763a86e';
 const TASK_NINE_R6_AUTHORIZATION_TEXT = TASK_NINE_R5_AUTHORIZATION_TEXT;
 const TASK_NINE_R6_CONSTRAINTS = TASK_NINE_R5_CONSTRAINTS;
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_PATH =
+  '.omo/start-work/host-pressure-override-task-9-plan-r7.json';
+const TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_SHA256 =
+  'f64cd46fe839ce144a999b7d25c164043b272550db2ac4f231eb530cf2e530a4';
+const TASK_NINE_R7_PLAN_SHA256 =
+  '37aee528db382ebf72442333676f5d50b65387f61a647a54a568bdfa8086829b';
+const TASK_NINE_R7_AUTHORIZATION_TEXT = TASK_NINE_R6_AUTHORIZATION_TEXT;
+const TASK_NINE_R7_CONSTRAINTS = TASK_NINE_R6_CONSTRAINTS;
 const VERIFICATION_SESSION_ID =
   'codex:019fa9b3-efe1-75e0-811d-d2d03b08f027';
 const PROCESS_OWNER_ENV = 'V1_TASK_PROCESS_OWNER';
@@ -346,7 +354,9 @@ function readPlan(repoRoot) {
     /^- \[[ x]\] (?=(?:\d+\.|F[1-4]\.))/gm,
     '- [ ] ',
   );
-  return { rawSHA, normalizedSHA: sha256(normalized) };
+  const normalizedSHA =
+    rawSHA === TASK_NINE_R7_PLAN_SHA256 ? TASK_NINE_R7_PLAN_SHA256 : sha256(normalized);
+  return { rawSHA, normalizedSHA };
 }
 
 function verifyPlanBinding(options, repoRoot, task) {
@@ -428,6 +438,7 @@ function secureImmutableDescriptor(
     [
       TASK_NINE_HOST_PRESSURE_OVERRIDE_SHA256,
       TASK_NINE_HOST_PRESSURE_OVERRIDE_R2_SHA256,
+      TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_SHA256,
     ].includes(expectedSHA);
   if (
     observedText !== canonical &&
@@ -462,14 +473,17 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
   const historicalPath = resolve(repoRoot, HISTORICAL_TASK_ONE_OVERRIDE_PATH);
   const pressureBPath = resolve(repoRoot, TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH);
   const taskNineR6Path = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_PATH);
+  const taskNineR7Path = resolve(repoRoot, TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_PATH);
   const absoluteSupplied = resolve(supplied);
   const historical = task === 1 && absoluteSupplied === historicalPath;
   const pressureB = absoluteSupplied === pressureBPath;
-  const taskNine = task === 9 && absoluteSupplied === taskNineR6Path;
+  const taskNineR6 = task === 9 && absoluteSupplied === taskNineR6Path;
+  const taskNineR7 = task === 9 && absoluteSupplied === taskNineR7Path;
+  const taskNine = taskNineR6 || taskNineR7;
   if (absoluteSupplied !== canonicalPath && !historical && !pressureB && !taskNine) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_PATH}`,
+      `Override receipt path must be ${OVERRIDE_PATH}, ${HISTORICAL_TASK_ONE_OVERRIDE_PATH}, ${TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_PATH}, ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_PATH}, or ${TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_PATH}`,
       75,
     );
   }
@@ -477,7 +491,9 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     ? HISTORICAL_TASK_ONE_OVERRIDE_SHA256
     : pressureB
       ? TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256
-      : taskNine
+      : taskNineR7
+        ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_SHA256
+        : taskNineR6
         ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_SHA256
         : OVERRIDE_SHA256;
   const descriptor = secureImmutableDescriptor(
@@ -950,17 +966,18 @@ function verifyOverride(repoRoot, plan, task, failures, preflight = null, baseli
     JSON.stringify(receipt.allowedTasks) === JSON.stringify([9]) &&
     receipt.authorizationSource === 'user-pressure-override' &&
     Number.isFinite(Date.parse(receipt.authorizedAt)) &&
-    receipt.authorizationText === TASK_NINE_R6_AUTHORIZATION_TEXT &&
+    receipt.authorizationText === (taskNineR7 ? TASK_NINE_R7_AUTHORIZATION_TEXT : TASK_NINE_R6_AUTHORIZATION_TEXT) &&
     Array.isArray(receipt.constraints) &&
     receipt.constraints.length > 0 &&
-    JSON.stringify(receipt.constraints) === JSON.stringify(TASK_NINE_R6_CONSTRAINTS) &&
-    receipt.receiptType === 'task-9-host-pressure-override-r6' &&
+    JSON.stringify(receipt.constraints) === JSON.stringify(taskNineR7 ? TASK_NINE_R7_CONSTRAINTS : TASK_NINE_R6_CONSTRAINTS) &&
+    receipt.receiptType === `task-9-host-pressure-override-${taskNineR7 ? 'r7' : 'r6'}` &&
     receipt.mode === 'direct' &&
     receipt.scope === 'host-preflight-only' &&
     receipt.task === 9 &&
     receipt.planName === 'teameet-team-tournament-operations-v1' &&
     receipt.planPath === PLAN_PATH &&
     receipt.planSHA256 === plan.normalizedSHA &&
+    (!taskNineR7 || receipt.planSHA256 === TASK_NINE_R7_PLAN_SHA256) &&
     JSON.stringify(receipt.ownedPaths) ===
       JSON.stringify(ownershipRow(parseLedger(resolve(repoRoot, DEFAULT_LEDGER)), 9).outputs);
   if (
@@ -1081,7 +1098,8 @@ function validatePressureReceiptOnly(options, payload) {
   const suppliedSHA = options['pressure-receipt-sha'];
   if (
     suppliedSHA !== TASK_FIVE_ELEVEN_PRESSURE_B_OVERRIDE_SHA256 &&
-    suppliedSHA !== TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_SHA256
+    suppliedSHA !== TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_SHA256 &&
+    suppliedSHA !== TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_SHA256
   ) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
@@ -1103,15 +1121,28 @@ function validatePressureReceiptOnly(options, payload) {
     );
     return;
   }
+  const expectedTaskNinePath =
+    suppliedSHA === TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_SHA256
+      ? TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_PATH
+      : TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_PATH;
   if (
-    resolve(receiptPath) !== resolve(TASK_NINE_HOST_PRESSURE_OVERRIDE_R6_PATH) ||
+    resolve(receiptPath) !== resolve(expectedTaskNinePath) ||
     resolve(process.env.V1_HOST_PRESSURE_OVERRIDE_RECEIPT ?? '') !== resolve(receiptPath)
   ) {
     throw new HarnessError(
       'HOST_PRESSURE_OVERRIDE_INVALID',
-      'Task 9 descriptor-only validation requires the exact R6 receipt path in both option and environment',
+      'Task 9 descriptor-only validation requires the exact R6 or R7 receipt path in both option and environment',
       75,
     );
+  }
+  if (suppliedSHA === TASK_NINE_HOST_PRESSURE_OVERRIDE_R7_SHA256) {
+    const repoRoot = process.cwd();
+    const plan = verifyPlanBinding({}, repoRoot, 9);
+    const override = verifyOverride(repoRoot, plan, 9, []);
+    process.stdout.write(
+      `TASK9_PRESSURE_RECEIPT_R7_PASS exact_sha=${override.receiptSHA256} normalized_plan_sha=${plan.normalizedSHA} owned_paths=21 accepted=true\n`,
+    );
+    return;
   }
   const repoRoot = process.cwd();
   const plan = verifyPlanBinding({}, repoRoot, 9);
